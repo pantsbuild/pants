@@ -8,7 +8,6 @@ import pytest
 from pants.backend.python import target_types_rules
 from pants.backend.python.lint.docformatter.rules import DocformatterFieldSet, DocformatterRequest
 from pants.backend.python.lint.docformatter.rules import rules as docformatter_rules
-from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.lint.docformatter.subsystem import rules as docformatter_subsystem_rules
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.goals.fmt import FmtResult
@@ -71,7 +70,10 @@ def run_docformatter(
 @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
-    all_major_minor_python_versions(Docformatter.default_interpreter_constraints),
+    # Excluded due to https://github.com/pantsbuild/pants/issues/21718
+    # lib2to3 is Officially Removed in 3.13, but some distributions of Python
+    # remove it earlier See for example https://github.com/PyCQA/docformatter/issues/129
+    all_major_minor_python_versions(["CPython>=3.8,<3.12"]),
 )
 def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"})

@@ -22,7 +22,7 @@ class RuleInfo:
     provider: str
     output_type: str
     input_types: List[str]
-    input_gets: List[str]
+    awaitables: List[str]
 
     @classmethod
     def from_help(cls, info: help_info_extracter.RuleInfo) -> RuleInfo:

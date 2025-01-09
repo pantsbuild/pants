@@ -33,8 +33,29 @@ def test_help_advanced_global() -> None:
 def test_help_targets() -> None:
     pants_run = run_pants(["help", "targets"])
     pants_run.assert_success()
-    lines = [" ".join(line.split()) for line in pants_run.stdout.splitlines()]
-    assert "archive A ZIP or TAR file containing loose files and code packages." in lines
+
+    # The target help text may be split over several lines depending on what targets there are
+    # and how Pants views the terminal size. Extract the full texts consistently to reduce this test's
+    # brittle nature.
+    target_help_texts: list[str] = []
+    current = ""
+    for line in pants_run.stdout.splitlines():
+        line = line.rstrip()
+        if not line:
+            continue
+
+        if not line[0:1].isspace():
+            target_help_texts.append(current)
+            current = ""
+
+        line = re.sub(r"\s+", " ", line.strip())
+        current += f" {line}"
+    if current:
+        target_help_texts.append(current)
+
+    assert (
+        " archive A ZIP or TAR file containing loose files and code packages." in target_help_texts
+    )
     assert "to get help for a specific target" in pants_run.stdout
 
 
@@ -138,14 +159,14 @@ def test_unknown_goal() -> None:
 def test_unknown_global_flags() -> None:
     pants_run = run_pants(["--pants-workdirx", "goals"])
     pants_run.assert_failure()
-    assert "Unknown flag --pants-workdirx on global scope" in pants_run.stdout
+    assert "Unknown flag --pants-workdirx in global context" in pants_run.stdout
     assert "Did you mean --pants-workdir" in pants_run.stdout
 
 
 def test_unknown_scoped_flags() -> None:
     pants_run = run_pants(["test", "--forcex"])
     pants_run.assert_failure()
-    assert "Unknown flag --forcex on test scope" in pants_run.stdout
+    assert "Unknown flag --forcex in test goal context" in pants_run.stdout
     assert "Did you mean --force" in pants_run.stdout
 
 
@@ -154,7 +175,7 @@ def test_global_flag_in_scoped_position() -> None:
         ["test", "--pants-distdir=dist/"],
     )
     pants_run.assert_failure()
-    assert "Unknown flag --pants-distdir on test scope" in pants_run.stdout
+    assert "Unknown flag --pants-distdir in test goal context" in pants_run.stdout
     assert "Did you mean to use the global --pants-distdir?" in pants_run.stdout
 
 
@@ -176,7 +197,7 @@ def test_help_provided_target_plugin_field() -> None:
 
             A publishable Python setuptools distribution (e.g. an sdist or wheel).
 
-            See {doc_url("python-distributions")}.
+            See {doc_url("docs/python/overview/building-distributions")}.
 
 
             Activated by pants.backend.python

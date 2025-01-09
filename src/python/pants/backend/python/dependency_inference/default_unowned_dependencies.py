@@ -86,6 +86,7 @@ _STDLIB_MODULES = [
     "_threading_local",
     "_tkinter",
     "_tracemalloc",
+    "_typeshed",
     "_uuid",
     "_warnings",
     "_weakref",

@@ -9,7 +9,8 @@ from typing import Iterable
 
 from _pytest.fixtures import FixtureRequest
 
-from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, Coordinate
+from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
+from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.lockfile_metadata import LockfileContext
 from pants.util.docutil import bin_name

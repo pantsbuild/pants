@@ -16,13 +16,14 @@ from pants.bin.pants_env_vars import (
     RECURSION_LIMIT,
 )
 from pants.bin.pants_runner import PantsRunner
+from pants.engine.internals import native_engine
 from pants.util.strutil import softwrap
 
 
 class PantsLoader:
     """Initial entrypoint for pants.
 
-    Executes a pants_runner by default, or executs a pantsd-specific entrypoint.
+    Executes a pants_runner by default, or executes a pantsd-specific entrypoint.
     """
 
     @staticmethod
@@ -96,6 +97,7 @@ class PantsLoader:
 
     @classmethod
     def main(cls) -> None:
+        native_engine.initialize()
         cls.setup_warnings()
         cls.ensure_locale()
 

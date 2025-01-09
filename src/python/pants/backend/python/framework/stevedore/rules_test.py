@@ -25,6 +25,7 @@ from pants.backend.python.target_types import (
     PythonTestTarget,
 )
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
+from pants.backend.python.util_rules.entry_points import rules as entry_points_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -37,6 +38,7 @@ st2_runners = ["noop", "python", "foobar"]
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
+            *entry_points_rules(),
             *python_target_types_rules(),
             *stevedore_dep_rules(),
             *stevedore_rules(),

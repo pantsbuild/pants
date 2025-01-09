@@ -7,7 +7,7 @@ from textwrap import dedent
 from urllib.parse import urlparse
 
 import pytest
-from pylsp_jsonrpc.exceptions import JsonRpcException  # type: ignore[import]
+from pylsp_jsonrpc.exceptions import JsonRpcException  # type: ignore[import-untyped]
 
 from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
     JVMLockfileFixture,

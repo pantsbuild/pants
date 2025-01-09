@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 from typing import ClassVar, Iterable, Tuple
 
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.external_tool import (
@@ -17,12 +18,13 @@ from pants.core.util_rules.external_tool import (
     ExternalToolRequest,
     TemplatedExternalTool,
 )
-from pants.core.util_rules.system_binaries import BashBinary
+from pants.core.util_rules.system_binaries import BashBinary, MkdirBinary
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.option.option_types import StrListOption
+from pants.engine.unions import UnionRule
+from pants.option.option_types import StrListOption, StrOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
@@ -81,11 +83,10 @@ COURSIER_FETCH_WRAPPER_SCRIPT = textwrap.dedent(  # noqa: PNT20
     "$coursier_exe" fetch {repos_args} \
         --json-output-file="$json_output_file" \
         "${{@//{coursier_working_directory}/$working_dir}}"
-    /bin/mkdir -p classpath
+    {mkdir} -p classpath
     {python_path} {coursier_bin_dir}/coursier_post_processing_script.py "$json_output_file"
     """
 )
-
 
 # TODO: Coursier renders setrlimit error line on macOS.
 #   see https://github.com/pantsbuild/pants/issues/13942.
@@ -149,8 +150,22 @@ class CoursierSubsystem(TemplatedExternalTool):
             Maven style repositories to resolve artifacts from.
 
             Coursier will resolve these repositories in the order in which they are
-            specifed, and re-ordering repositories will cause artifacts to be
+            specified, and re-ordering repositories will cause artifacts to be
             re-downloaded. This can result in artifacts in lockfiles becoming invalid.
+            """
+        ),
+    )
+
+    jvm_index = StrOption(
+        default="",
+        help=softwrap(
+            """
+            The JVM index to be used by Coursier.
+
+            Possible values are:
+              - cs: The default JVM index used and maintained by Coursier.
+              - cs-maven: Fetches a JVM index from the io.get-coursier:jvm-index Maven repository.
+              - <URL>: An arbitrary URL for a JVM index. Ex. https://url/of/your/index.json
             """
         ),
     )
@@ -170,6 +185,7 @@ class Coursier:
     coursier: DownloadedExternalTool
     _digest: Digest
     repos: FrozenOrderedSet[str]
+    jvm_index: str
     _append_only_caches: FrozenDict[str, str]
 
     bin_dir: ClassVar[str] = "__coursier"
@@ -257,6 +273,7 @@ async def setup_coursier(
     coursier_subsystem: CoursierSubsystem,
     python: PythonBuildStandaloneBinary,
     platform: Platform,
+    mkdir: MkdirBinary,
 ) -> Coursier:
     repos_args = (
         " ".join(f"-r={shlex.quote(repo)}" for repo in coursier_subsystem.repos) + " --no-default"
@@ -266,6 +283,7 @@ async def setup_coursier(
         coursier_working_directory=Coursier.working_directory_placeholder,
         python_path=shlex.quote(python.path),
         coursier_bin_dir=shlex.quote(Coursier.bin_dir),
+        mkdir=shlex.quote(mkdir.path),
     )
 
     post_process_stderr = POST_PROCESS_COURSIER_STDERR_SCRIPT.format(python_path=python.path)
@@ -314,6 +332,7 @@ async def setup_coursier(
             ),
         ),
         repos=FrozenOrderedSet(coursier_subsystem.repos),
+        jvm_index=coursier_subsystem.jvm_index,
         _append_only_caches=python.APPEND_ONLY_CACHES,
     )
 
@@ -322,4 +341,5 @@ def rules():
     return [
         *collect_rules(),
         *external_tool.rules(),
+        UnionRule(ExportableTool, CoursierSubsystem),
     ]

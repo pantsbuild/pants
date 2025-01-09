@@ -43,8 +43,7 @@ class DuplicateHelmChartNamesFound(Exception):
 class HelmArtifactLocationSpec(ABC):
     @property
     @abstractmethod
-    def spec(self) -> str:
-        ...
+    def spec(self) -> str: ...
 
     @property
     def is_url(self) -> bool:
@@ -148,8 +147,10 @@ class ResolvedHelmArtifact(HelmArtifact, EngineAwareReturnType):
 
 
 @rule
-def resolved_helm_artifact(artifact: HelmArtifact, subsytem: HelmSubsystem) -> ResolvedHelmArtifact:
-    remotes = subsytem.remotes()
+def resolved_helm_artifact(
+    artifact: HelmArtifact, subsystem: HelmSubsystem
+) -> ResolvedHelmArtifact:
+    remotes = subsystem.remotes()
 
     candidate_remotes = list(remotes.get(artifact.requirement.location.spec))
     if candidate_remotes:

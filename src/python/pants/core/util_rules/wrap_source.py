@@ -117,6 +117,12 @@ def wrap_source_rule_and_target(
         input = ActivateWrapSourceTargetField
         output = source_field_type
 
+    setattr(
+        GenerateWrapSourceSourcesRequest,
+        "__qualname__",
+        f"{source_field_type.__qualname__}.{GenerateWrapSourceSourcesRequest.__name__}",
+    )
+
     class WrapSourceTarget(Target):
         alias = f"experimental_wrap_as_{target_name_suffix}"
         core_fields = (

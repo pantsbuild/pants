@@ -89,7 +89,7 @@ def _render_source_file(content: bytes, boundaries: Sequence[GoCoverageBoundary]
                 n = 0
                 if b.count > 0:
                     n = int(math.floor(b.norm * 9)) + 1
-                rendered.write('<span class="cov{}" title="{}">'.format(n, b.count))
+                rendered.write(f'<span class="cov{n}" title="{b.count}">')
             else:
                 rendered.write("</span>")
             boundaries = boundaries[1:]
@@ -154,7 +154,7 @@ async def render_go_coverage_profile_to_html(
                 {
                     "i": i,
                     "name": file.name,
-                    "coverage": "{:.1f}".format(file.coverage),
+                    "coverage": f"{file.coverage:.1f}",
                     "body": file.body,
                 }
                 for i, file in enumerate(files)

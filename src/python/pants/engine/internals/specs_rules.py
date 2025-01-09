@@ -506,7 +506,7 @@ async def find_valid_field_sets_for_target_roots(
             specs,
             union_membership,
             registered_target_types,
-            field_set_types=union_membership[request.field_set_superclass],
+            field_set_types=union_membership.get(request.field_set_superclass),
             goal_description=request.goal_description,
         )
         if request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.error:

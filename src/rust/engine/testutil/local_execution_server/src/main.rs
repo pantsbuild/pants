@@ -30,7 +30,8 @@ struct Options {
     request_size: i64,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let options = Options::from_args();
 
     // When the request is executed, perform this operation
@@ -54,7 +55,7 @@ fn main() {
     }]);
 
     // Start the server
-    let server = TestServer::new(execution, options.port);
+    let server = TestServer::new(execution, options.port).await;
     println!("Started execution server at address: {}", server.address());
 
     // Wait for the user to kill us

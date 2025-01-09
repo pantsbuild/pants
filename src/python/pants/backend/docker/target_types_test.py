@@ -13,8 +13,8 @@ from pants.engine.internals.native_engine import Address
     "src, expected",
     [
         (
-            "/aboslute/path",
-            "/aboslute/path",
+            "/absolute/path",
+            "/absolute/path",
         ),
         (
             "./relative/path",

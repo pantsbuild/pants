@@ -8,7 +8,7 @@ from packaging.version import Version as _Version
 
 import pants._version
 
-# Generate a inferrable dependency on the `pants._version` package and its associated resources.
+# Generate an inferrable dependency on the `pants._version` package and its associated resources.
 from pants.util.resources import read_resource
 
 

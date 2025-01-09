@@ -4,12 +4,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import ClassVar, Optional
+from typing import ClassVar
 
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
 from pants.backend.scala.util_rules.versions import ScalaCrossVersionMode
-from pants.base.deprecated import warn_or_error
 from pants.build_graph.address import AddressInput
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
@@ -427,18 +426,6 @@ class ScalaArtifactCrossversionField(StringField):
     )
     valid_choices = ScalaCrossVersionMode
 
-    @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
-        computed_value = super().compute_value(raw_value, address)
-        if computed_value == ScalaCrossVersionMode.PARTIAL.value:
-            warn_or_error(
-                "2.21.0",
-                f"Scala cross version value '{computed_value}' in target: {address}",
-                "Use value `binary` instead",
-                start_version="2.20.0",
-            )
-        return computed_value
-
 
 @dataclass(frozen=True)
 class ScalaArtifactExclusion(JvmArtifactExclusion):
@@ -464,13 +451,6 @@ class ScalaArtifactExclusion(JvmArtifactExclusion):
                     {', '.join(valid_crossversions)}
                     """
                 )
-            )
-        if self.crossversion == ScalaCrossVersionMode.PARTIAL.value:
-            warn_or_error(
-                "2.21.0",
-                f"Scala cross version value '{self.crossversion}' in list of exclusions at target: {address}",
-                "Use value `binary` instead",
-                start_version="2.20.0",
             )
         return errors
 
@@ -591,6 +571,16 @@ async def generate_jvm_artifact_targets(
     )
 
     return GeneratedTargets(request.generator, (jvm_artifact_target,))
+
+
+SCALA_SOURCES_TARGET_TYPES: list[type[Target]] = [
+    ScalaSourceTarget,
+    ScalaSourcesGeneratorTarget,
+    ScalatestTestTarget,
+    ScalatestTestsGeneratorTarget,
+    ScalaJunitTestTarget,
+    ScalaJunitTestsGeneratorTarget,
+]
 
 
 def rules():

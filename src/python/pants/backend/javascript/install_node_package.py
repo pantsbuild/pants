@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import itertools
 import os.path
 from dataclasses import dataclass
 from typing import Iterable
@@ -19,22 +18,17 @@ from pants.backend.javascript.package_json import (
     NodePackageVersionField,
     PackageJsonSourceField,
 )
+from pants.backend.javascript.package_manager import PackageManager
 from pants.backend.javascript.subsystems import nodejs
-from pants.backend.javascript.target_types import JSSourceField
+from pants.backend.javascript.target_types import JSRuntimeSourceField
 from pants.build_graph.address import Address
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Rule, collect_rules, rule
-from pants.engine.target import (
-    SourcesField,
-    Target,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-    targets_with_sources_types,
-)
+from pants.engine.target import SourcesField, Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionMembership, UnionRule
 
 
@@ -59,6 +53,10 @@ class InstalledNodePackage:
     def target(self) -> Target:
         return self.project_env.ensure_target()
 
+    @property
+    def package_manager(self) -> PackageManager:
+        return self.project_env.project.package_manager
+
 
 @dataclass(frozen=True)
 class InstalledNodePackageWithSource(InstalledNodePackage):
@@ -73,7 +71,7 @@ async def _get_relevant_source_files(
         SourceFilesRequest(
             sources,
             for_sources_types=(PackageJsonSourceField, FileSourceField)
-            + ((ResourceSourceField, JSSourceField) if with_js else ()),
+            + ((ResourceSourceField, JSRuntimeSourceField) if with_js else ()),
             enable_codegen=True,
         ),
     )
@@ -87,28 +85,11 @@ async def install_node_packages_for_address(
     target = project_env.ensure_target()
     transitive_tgts = await Get(TransitiveTargets, TransitiveTargetsRequest([target.address]))
 
-    pkg_tgts = targets_with_sources_types(
-        [PackageJsonSourceField], transitive_tgts.dependencies, union_membership
-    )
-    assert target not in pkg_tgts
-    installations = await MultiGet(
-        Get(InstalledNodePackageWithSource, InstalledNodePackageRequest(pkg_tgt.address))
-        for pkg_tgt in pkg_tgts
-    )
-
     source_files = await _get_relevant_source_files(
         (tgt[SourcesField] for tgt in transitive_tgts.closure if tgt.has_field(SourcesField)),
         with_js=False,
     )
-    install_input_digest = await Get(
-        Digest,
-        MergeDigests(
-            itertools.chain(
-                (installation.digest for installation in installations),
-                (source_files.snapshot.digest,),
-            )
-        ),
-    )
+    package_digest = source_files.snapshot.digest
 
     install_result = await Get(
         ProcessResult,
@@ -116,14 +97,23 @@ async def install_node_packages_for_address(
             project_env,
             project_env.project.immutable_install_args,
             description=f"Installing {target[NodePackageNameField].value}@{target[NodePackageVersionField].value}.",
-            input_digest=install_input_digest,
+            input_digest=package_digest,
             output_directories=tuple(project_env.node_modules_directories),
         ),
     )
     node_modules = await Get(Digest, AddPrefix(install_result.output_digest, project_env.root_dir))
+
     return InstalledNodePackage(
         project_env,
-        digest=await Get(Digest, MergeDigests([install_input_digest, node_modules])),
+        digest=await Get(
+            Digest,
+            MergeDigests(
+                [
+                    package_digest,
+                    node_modules,
+                ]
+            ),
+        ),
     )
 
 

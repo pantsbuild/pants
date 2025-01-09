@@ -3,13 +3,21 @@
 
 from __future__ import annotations
 
+import fnmatch
 import logging
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 from pathlib import PurePath
 from typing import Any
 
 from pants.backend.docker.target_types import AllDockerImageTargets
 from pants.backend.docker.target_types import rules as docker_target_types_rules
+from pants.backend.docker.utils import image_ref_regexp
+from pants.backend.helm.dependency_inference.subsystem import (
+    HelmInferSubsystem,
+    UnownedDependencyError,
+    UnownedHelmDependencyUsage,
+)
 from pants.backend.helm.subsystems import k8s_parser
 from pants.backend.helm.subsystems.k8s_parser import ParsedKubeManifest, ParseKubeManifestRequest
 from pants.backend.helm.target_types import HelmDeploymentFieldSet
@@ -86,7 +94,7 @@ async def analyse_deployment(request: AnalyseHelmDeploymentRequest) -> HelmDeplo
         if isinstance(entry, FileEntry)
     )
 
-    # Build YAML index of Docker image refs for future processing during depedendecy inference or post-rendering.
+    # Build YAML index of Docker image refs for future processing during dependency inference or post-rendering.
     image_refs_index: MutableYamlIndex[str] = MutableYamlIndex()
     for manifest in parsed_manifests:
         for entry in manifest.found_image_refs:
@@ -123,9 +131,34 @@ class FirstPartyHelmDeploymentMapping:
     indexed_docker_addresses: FrozenYamlIndex[tuple[str, Address]]
 
 
+@dataclass(frozen=True)
+class _FirstPartyHelmDeploymentMappingRequest(EngineAwareParameter):
+    field_set: HelmDeploymentFieldSet
+
+
 @rule
 async def first_party_helm_deployment_mapping(
-    request: FirstPartyHelmDeploymentMappingRequest, docker_targets: AllDockerImageTargets
+    request: FirstPartyHelmDeploymentMappingRequest,
+    helm_infer: HelmInferSubsystem,
+) -> FirstPartyHelmDeploymentMapping:
+    if not helm_infer.deployment_dependencies:
+        return FirstPartyHelmDeploymentMapping(
+            request.field_set.address,
+            FrozenYamlIndex.empty(),
+        )
+    # Use a small proxy rule to make sure we don't calculate AllDockerImageTargets
+    # if `[helm-infer].deployment_dependencies` is set to true.
+    return await Get(
+        FirstPartyHelmDeploymentMapping,
+        _FirstPartyHelmDeploymentMappingRequest(field_set=request.field_set),
+    )
+
+
+@rule
+async def _first_party_helm_deployment_mapping(
+    request: _FirstPartyHelmDeploymentMappingRequest,
+    docker_targets: AllDockerImageTargets,
+    helm_infer: HelmInferSubsystem,
 ) -> FirstPartyHelmDeploymentMapping:
     deployment_report = await Get(
         HelmDeploymentReport, AnalyseHelmDeploymentRequest(request.field_set)
@@ -154,25 +187,105 @@ async def first_party_helm_deployment_mapping(
         for ((ref, _), maybe_addr) in zip(indexed_address_inputs.values(), maybe_addresses)
     }
 
-    def image_ref_to_actual_address(
-        image_ref_ai: tuple[str, AddressInput]
-    ) -> tuple[str, Address] | None:
-        image_ref, _ = image_ref_ai
-        maybe_addr = maybe_addresses_by_ref.get(image_ref)
+    resolver = ImageReferenceResolver(helm_infer, maybe_addresses_by_ref, docker_target_addresses)
+
+    indexed_docker_addresses = indexed_address_inputs.transform_values(
+        lambda image_ref_ai: resolver.image_ref_to_actual_address(image_ref_ai[0])
+    )
+
+    resolver.report_errors()
+    return FirstPartyHelmDeploymentMapping(
+        address=request.field_set.address,
+        indexed_docker_addresses=indexed_docker_addresses,
+    )
+
+
+@dataclass
+class ImageReferenceResolver:
+    """Attempt to resolve images to their references.
+
+    Errors are stored internally and are surfaced by a call to `report_errors`, so we can report all
+    problems and avoid only raising 1 per run.
+    """
+
+    helm_infer: HelmInferSubsystem
+    maybe_addresses_by_ref: dict[str, MaybeAddress]
+    docker_target_addresses: set[Address]
+
+    errors: list[str] = field(default_factory=list)
+
+    def image_ref_to_actual_address(self, image_ref: str) -> tuple[str, Address] | None:
+        """Attempt to resolve an image reference to its Pants Address or the docker image."""
+        maybe_addr = self.maybe_addresses_by_ref.get(image_ref)
         if not maybe_addr:
             return None
         if not isinstance(maybe_addr.val, Address):
-            return None
-        if maybe_addr.val not in docker_target_addresses:
+            # obviously intended to be a Pants target
+            if (
+                image_ref.startswith("//")
+                or image_ref.startswith("./")
+                or image_ref.startswith(":")
+            ):
+                message = f"`{image_ref}` was supplied but the docker_image target at `{maybe_addr.val}` does not exist."
+                self._handle_missing_docker_image(message)
+                return None
+            # explicit 3rd party
+            elif self._image_ref_is_known_external(image_ref):
+                return None
+            else:
+                message = f"""\
+                `{image_ref}` was supplied, but Pants cannot determine
+                whether this should be a target's address or a 3rd-party dependency.
+                If this should be an external image, add `{image_ref}` to `[{HelmInferSubsystem.options_scope}].external_docker_images`
+                If this should be a target address, use an absolute path instead (possibly `//{image_ref}`).
+                """
+                self._handle_missing_docker_image(message)
+                return None
+
+        if maybe_addr.val not in self.docker_target_addresses:
+            message = f"The address `{image_ref}` was supplied, but the target at `{maybe_addr.val}` is not a docker_image target."
+            self._handle_missing_docker_image(message)
             return None
         return image_ref, maybe_addr.val
 
-    return FirstPartyHelmDeploymentMapping(
-        address=request.field_set.address,
-        indexed_docker_addresses=indexed_address_inputs.transform_values(
-            image_ref_to_actual_address
-        ),
-    )
+    def _image_ref_is_known_external(self, image_ref: str) -> bool:
+        parsed = re.match(image_ref_regexp, image_ref.strip("\"'"))
+        if not parsed:
+            return False
+        if parsed.group("registry"):
+            image_name = parsed.group("registry") + "/" + parsed.group("repository")
+        else:
+            image_name = parsed.group("repository")
+
+        return any(
+            (fnmatch.fnmatch(image_name, pattern) or fnmatch.fnmatch(image_ref, pattern))
+            for pattern in self.helm_infer.external_docker_images
+        )
+
+    def _handle_missing_docker_image(self, message):
+        self.errors.append(message)
+
+    def report_errors(self):
+        """Raise all gathered errors.
+
+        Invoke this method after all resolving is done.
+        """
+        if not self.errors:
+            return
+
+        message = "\n".join(
+            [
+                "Error resolving Docker image dependency of a Helm chart.",
+                *self.errors,
+                f"The behavior for unowned imports can also be set with the `[{HelmInferSubsystem.options_scope}].unowned_dependency_behavior`",
+            ]
+        )
+        if self.helm_infer.unowned_dependency_behavior == UnownedHelmDependencyUsage.RaiseError:
+            raise UnownedDependencyError(message)
+        elif self.helm_infer.unowned_dependency_behavior == UnownedHelmDependencyUsage.LogWarning:
+            logging.warning(message)
+        else:
+            return
 
 
 class InferHelmDeploymentDependenciesRequest(InferDependenciesRequest):
@@ -182,10 +295,17 @@ class InferHelmDeploymentDependenciesRequest(InferDependenciesRequest):
 @rule(desc="Find the dependencies needed by a Helm deployment")
 async def inject_deployment_dependencies(
     request: InferHelmDeploymentDependenciesRequest,
+    infer_subsystem: HelmInferSubsystem,
 ) -> InferredDependencies:
+    get_address = Get(Address, AddressInput, request.field_set.chart.to_address_input())
+    get_explicit_deps = Get(
+        ExplicitlyProvidedDependencies,
+        DependenciesRequest(request.field_set.dependencies),
+    )
+
     chart_address, explicitly_provided_deps, mapping = await MultiGet(
-        Get(Address, AddressInput, request.field_set.chart.to_address_input()),
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
+        get_address,
+        get_explicit_deps,
         Get(
             FirstPartyHelmDeploymentMapping,
             FirstPartyHelmDeploymentMappingRequest(request.field_set),

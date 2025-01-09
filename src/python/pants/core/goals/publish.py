@@ -6,7 +6,7 @@ Plugins implement the publish protocol that provides this goal with the processe
 publish the artifacts.
 
 The publish protocol consists of defining two union members and one rule, returning the processes to
-run. See the doc for the corresponding classses in this module for details on the classes to define.
+run. See the doc for the corresponding classes in this module for details on the classes to define.
 
 Example rule:
 
@@ -35,8 +35,9 @@ from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult
-from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.intrinsics import run_interactive_process_in_environment
+from pants.engine.process import InteractiveProcess
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
     ImmutableValue,
@@ -124,7 +125,7 @@ class PublishPackages:
     The `names` should list all artifacts being published by the `process` command.
 
     The `process` may be `None`, indicating that it will not be published. This will be logged as
-    `skipped`. If the process returns a non zero exit code, it will be logged as `failed`.
+    `skipped`. If the process returns a non-zero exit code, it will be logged as `failed`.
 
     The `description` may be a reason explaining why the publish was skipped, or identifying which
     repository the artifacts are published to.
@@ -244,10 +245,7 @@ async def run_publish(
             continue
 
         logger.debug(f"Execute {pub.process}")
-        res = await Effect(
-            InteractiveProcessResult,
-            {pub.process: InteractiveProcess, local_environment.val: EnvironmentName},
-        )
+        res = await run_interactive_process_in_environment(pub.process, local_environment.val)
         if res.exit_code == 0:
             sigil = console.sigil_succeeded()
             status = "published"
@@ -279,7 +277,7 @@ async def run_publish(
 
     # We collect all results to the end, so all output from the interactive processes are done,
     # before printing the results.
-    for line in results:
+    for line in sorted(results):
         console.print_stderr(line)
 
     # Log structured output

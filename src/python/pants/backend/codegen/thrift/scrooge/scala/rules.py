@@ -8,6 +8,7 @@ from pants.backend.codegen.thrift.scrooge.rules import (
     GeneratedScroogeThriftSources,
     GenerateScroogeThriftSourcesRequest,
 )
+from pants.backend.codegen.thrift.scrooge.scala import symbol_mapper
 from pants.backend.codegen.thrift.target_types import (
     ThriftDependenciesField,
     ThriftSourceField,
@@ -138,6 +139,7 @@ async def inject_scrooge_thrift_scala_dependencies(
 def rules():
     return (
         *collect_rules(),
+        *symbol_mapper.rules(),
         UnionRule(GenerateSourcesRequest, GenerateScalaFromThriftRequest),
         UnionRule(InferDependenciesRequest, InferScroogeThriftScalaDependencies),
         ThriftSourceTarget.register_plugin_field(PrefixedJvmJdkField),

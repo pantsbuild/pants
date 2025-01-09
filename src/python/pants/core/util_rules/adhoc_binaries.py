@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from textwrap import dedent  # noqa: PNT20
 
 from pants.core.subsystems.python_bootstrap import PythonBootstrapSubsystem
-from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
+from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.system_binaries import BashBinary, SystemBinariesSubsystem, TarBinary
 from pants.engine.fs import DownloadFile
 from pants.engine.internals.native_engine import Digest, FileDigest
@@ -49,7 +49,7 @@ class _DownloadPythonBuildStandaloneBinaryRequest:
 
 @rule
 async def get_python_for_scripts(env_tgt: EnvironmentTarget) -> PythonBuildStandaloneBinary:
-    if env_tgt.val is None or isinstance(env_tgt.val, LocalEnvironmentTarget):
+    if env_tgt.can_access_local_system_paths:
         return PythonBuildStandaloneBinary(sys.executable)
 
     result = await Get(_PythonBuildStandaloneBinary, _DownloadPythonBuildStandaloneBinaryRequest())
@@ -104,10 +104,11 @@ async def download_python_binary(
             cp -r python "{installation_root}"
             touch "{installation_root}/DONE"
         fi
+        echo "$(realpath "{installation_root}")/bin/python3"
     """
     )
 
-    await Get(
+    result = await Get(
         ProcessResult,
         Process(
             [bash_binary.path, "-c", installation_script],
@@ -123,7 +124,7 @@ async def download_python_binary(
         ),
     )
 
-    return _PythonBuildStandaloneBinary(f"{installation_root}/bin/python3")
+    return _PythonBuildStandaloneBinary(result.stdout.decode().splitlines()[-1].strip())
 
 
 @dataclass(frozen=True)

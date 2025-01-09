@@ -11,8 +11,8 @@ from pants.backend.terraform import dependencies, dependency_inference, tool
 from pants.backend.terraform.goals import check
 from pants.backend.terraform.goals.check import TerraformCheckRequest
 from pants.backend.terraform.target_types import (
-    TerraformDeploymentFieldSet,
     TerraformDeploymentTarget,
+    TerraformFieldSet,
     TerraformModuleTarget,
 )
 from pants.core.goals.check import CheckResult, CheckResults
@@ -85,7 +85,7 @@ def make_target(
     }
     files.update({source_file.path: source_file.content.decode() for source_file in source_files})
     rule_runner.write_files(files)
-    return rule_runner.get_target(Address("", target_name=target_name))
+    return rule_runner.get_target(Address("", target_name=f"{target_name}mod"))
 
 
 def run_terraform_validate(
@@ -95,7 +95,7 @@ def run_terraform_validate(
     args: list[str] | None = None,
 ) -> Sequence[CheckResult]:
     rule_runner.set_options(args or ())
-    field_sets = [TerraformDeploymentFieldSet.create(tgt) for tgt in targets]
+    field_sets = [TerraformFieldSet.create(tgt) for tgt in targets]
     check_results = rule_runner.request(CheckResults, [TerraformCheckRequest(field_sets)])
     return check_results.results
 
@@ -155,8 +155,8 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     )
 
     targets = [
-        rule_runner.get_target(Address("", target_name="tgt_good")),
-        rule_runner.get_target(Address("", target_name="tgt_bad")),
+        rule_runner.get_target(Address("", target_name="good")),
+        rule_runner.get_target(Address("", target_name="bad")),
     ]
 
     check_results = run_terraform_validate(rule_runner, targets)
@@ -206,7 +206,7 @@ def test_in_folder(rule_runner: RuleRunner) -> None:
         ),
     }
     rule_runner.write_files(files)
-    target = rule_runner.get_target(Address("folder", target_name=target_name))
+    target = rule_runner.get_target(Address("folder", target_name="mod0"))
 
     check_results = run_terraform_validate(rule_runner, [target])
     assert check_results[0].exit_code == 0
@@ -219,7 +219,7 @@ def test_conflicting_provider_versions(rule_runner: RuleRunner) -> None:
     If a large target glob is used (`::`), we get all the sources
     """
     target_name = "in_folder"
-    versions = ["3.2.1", "3.0.0"]
+    versions = ["3.2.1", "3.2.2"]
 
     def make_terraform_module(version: str) -> Dict[str, str]:
         return {
@@ -251,7 +251,7 @@ def test_conflicting_provider_versions(rule_runner: RuleRunner) -> None:
 
     rule_runner.write_files(files)
     targets = [
-        rule_runner.get_target(Address(folder, target_name=target_name))
+        rule_runner.get_target(Address(folder, target_name="mod"))
         for folder in (f"folder{version}" for version in versions)
     ]
 

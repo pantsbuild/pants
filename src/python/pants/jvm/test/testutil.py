@@ -9,6 +9,8 @@ from pants.engine.internals.native_engine import Address
 from pants.jvm.test.junit import JunitTestFieldSet, JunitTestRequest
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 
+ATTEMPTS_DEFAULT_OPTION = 2
+
 
 def run_junit_test(
     rule_runner: RuleRunner,
@@ -20,6 +22,7 @@ def run_junit_test(
 ) -> TestResult:
     args = [
         "--junit-args=['--disable-ansi-colors','--details=flat','--details-theme=ascii']",
+        f"--test-attempts-default={ATTEMPTS_DEFAULT_OPTION}",
         *(extra_args or ()),
     ]
     rule_runner.set_options(args, env=env, env_inherit=PYTHON_BOOTSTRAP_ENV)

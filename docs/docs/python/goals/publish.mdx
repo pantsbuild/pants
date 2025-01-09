@@ -1,0 +1,79 @@
+---
+    title: publish
+    sidebar_position: 4
+---
+
+How to distribute packages to a PyPi repository
+
+---
+
+The `publish` goal is currently in the experimental Python backend. Activate it with this config:
+
+```toml title="pants.toml"
+[GLOBAL]
+backend_packages.add = [
+  "pants.backend.experimental.python",
+]
+```
+
+This will register a new `repositories` field on the `python_distribution` target type, so that when you run `pants publish` on such targets they will be packaged into wheels and/or sdists, and then published to the repositories specified in your BUILD files.
+
+## Python Repositories
+
+When publishing a `python_distribution`, you need to tell Pants which repositories to publish to. That is done with a new `repositories` field on `python_distribution` targets.
+
+```python tab={"label":"src/python/BUILD"}
+python_distribution(
+  name="demo",
+  # ...
+  repositories=[
+    "@pypi",
+    "@private-repo",
+    "https://pypi.private2.example.com",
+  ]
+)
+```
+
+```text tab={"label":".pypirc"}
+[distutils]
+index-servers =
+	pypi
+  private-repo
+
+[pypi]
+username: publisher-example
+
+[private-repo]
+repository: https://pypi.private.example.com
+```
+
+Each repository is either a repository URL or, when prefixed with `@`, a reference to a repository configured in the `.pypirc` file.
+
+:::danger Keep Secrets Secret
+We strongly discourage the use of secrets verbatim in your configuration files.
+
+It is better to provide the required secrets using environment variables when running `pants publish`. Or, better yet, to use `keyring` as described in the [Twine documentation](https://twine.readthedocs.io/en/latest/#keyring-support)
+:::
+
+## Environment variables
+
+Pants will pass certain configuration [environment variables](https://twine.readthedocs.io/en/latest/#environment-variables), through to Twine. If multiple repositories are involved in a single `publish` goal, you can distinguish them by adding an underscore and the repository name (upper-cased, and with hyphens replaced with underscores) as a suffix on the environment variable names:
+
+- `TWINE_USERNAME`
+- `TWINE_USERNAME_<repository>`
+- `TWINE_PASSWORD`
+- `TWINE_PASSWORD_<repository>`
+- `TWINE_REPOSITORY_URL`
+- `TWINE_REPOSITORY_URL_<repository>`
+
+```shell title="secrets"
+# Ephemeral file
+export TWINE_USERNAME_PRIVATE_REPO="accountname"
+export TWINE_PASSWORD_PRIVATE_REPO="secretvalue"
+```
+
+Given the example `BUILD` and `.pypirc` files from the previous section, `demo` could be published with the following command:
+
+```shell
+$ { source ./secrets && pants publish src/python:demo }
+```

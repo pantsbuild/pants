@@ -66,14 +66,14 @@ impl ImmutableInputs {
 
         // We (might) need to initialize the value.
         //
-        // Because this code executes a side-effect which could be observed elsewhere within this
+        // Because this code executes a side effect which could be observed elsewhere within this
         // process (other threads can observe the contents of the temporary directory), we need to
         // ensure that if this method is cancelled (via async Drop), whether the cell has been
-        // initialized or not stays in sync with whether the side-effect is visible.
+        // initialized or not stays in sync with whether the side effect is visible.
         //
         // Making the initialization "cancellation safe", involves either:
         //
-        //   1. Adding a Drop guard to "undo" the side-effect if we're dropped before we fully
+        //   1. Adding a Drop guard to "undo" the side effect if we're dropped before we fully
         //      initialize the cell.
         //       * This is challenging to do correctly in this case, because the `Drop` guard cannot
         //         be created until after initialization begins, but cannot be cleared until after the
@@ -89,7 +89,7 @@ impl ImmutableInputs {
         //         requested that Digest.
         //   3. Using anonymous destination paths, such that multiple attempts to initialize cannot
         //      collide.
-        //       * This means that although the side-effect is visible, it can never collide.
+        //       * This means that although the side effect is visible, it can never collide.
         //
         // We take the final approach here currently (for simplicity's sake), but the advanced variant
         // of approach 2 might eventually be worthwhile.

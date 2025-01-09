@@ -138,7 +138,7 @@ async def package_deploy_jar(
                 (rule.pattern, rule.action)
                 for rule in field_set.duplicate_policy.value_or_default()
             ],
-            skip=field_set.exclude_files.value,
+            skip=[*(jvm.deploy_jar_exclude_files or []), *(field_set.exclude_files.value or [])],
             compress=True,
         ),
     )

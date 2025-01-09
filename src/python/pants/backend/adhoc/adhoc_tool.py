@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
+import os
 
 from pants.backend.adhoc.target_types import (
     AdhocToolArgumentsField,
+    AdhocToolCacheScopeField,
     AdhocToolExecutionDependenciesField,
     AdhocToolExtraEnvVarsField,
     AdhocToolLogOutputField,
@@ -13,38 +15,31 @@ from pants.backend.adhoc.target_types import (
     AdhocToolOutputDirectoriesField,
     AdhocToolOutputFilesField,
     AdhocToolOutputRootDirField,
+    AdhocToolOutputsMatchMode,
+    AdhocToolPathEnvModifyModeField,
     AdhocToolRunnableDependenciesField,
     AdhocToolRunnableField,
     AdhocToolSourcesField,
     AdhocToolStderrFilenameField,
     AdhocToolStdoutFilenameField,
     AdhocToolWorkdirField,
+    AdhocToolWorkspaceInvalidationSourcesField,
 )
-from pants.build_graph.address import Address, AddressInput
-from pants.core.goals.run import RunFieldSet, RunInSandboxRequest
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.adhoc_process_support import (
     AdhocProcessRequest,
     AdhocProcessResult,
-    ExtraSandboxContents,
-    MergeExtraSandboxContents,
-    ResolvedExecutionDependencies,
-    ResolveExecutionDependenciesRequest,
+    ToolRunner,
+    ToolRunnerRequest,
+    prepare_env_vars,
 )
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
-from pants.core.util_rules.environments import EnvironmentNameRequest
-from pants.engine.addresses import Addresses
+from pants.core.util_rules.environments import EnvironmentNameRequest, EnvironmentTarget
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import Digest, MergeDigests, Snapshot
-from pants.engine.internals.native_engine import EMPTY_DIGEST
+from pants.engine.fs import Digest, PathGlobs, Snapshot
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import (
-    FieldSetsPerTarget,
-    FieldSetsPerTargetRequest,
-    GeneratedSources,
-    GenerateSourcesRequest,
-    Targets,
-)
+from pants.engine.target import GeneratedSources, GenerateSourcesRequest
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -63,116 +58,84 @@ async def run_in_sandbox_request(
 ) -> GeneratedSources:
     target = request.protocol_target
     description = f"the `{target.alias}` at {target.address}"
+
     environment_name = await Get(
         EnvironmentName, EnvironmentNameRequest, EnvironmentNameRequest.from_target(target)
     )
+
+    environment_target = await Get(EnvironmentTarget, EnvironmentName, environment_name)
 
     runnable_address_str = target[AdhocToolRunnableField].value
     if not runnable_address_str:
         raise Exception(f"Must supply a value for `runnable` for {description}.")
 
-    runnable_address = await Get(
-        Address,
-        AddressInput,
-        AddressInput.parse(
-            runnable_address_str,
-            relative_to=target.address.spec_path,
-            description_of_origin=f"The `{AdhocToolRunnableField.alias}` field of {description}",
+    tool_runner = await Get(
+        ToolRunner,
+        ToolRunnerRequest(
+            runnable_address_str=runnable_address_str,
+            args=target.get(AdhocToolArgumentsField).value or (),
+            execution_dependencies=target.get(AdhocToolExecutionDependenciesField).value or (),
+            runnable_dependencies=target.get(AdhocToolRunnableDependenciesField).value or (),
+            target=request.protocol_target,
+            named_caches=FrozenDict(target.get(AdhocToolNamedCachesField).value or {}),
         ),
     )
-
-    addresses = Addresses((runnable_address,))
-    addresses.expect_single()
-
-    runnable_targets = await Get(Targets, Addresses, addresses)
-    field_sets = await Get(
-        FieldSetsPerTarget, FieldSetsPerTargetRequest(RunFieldSet, runnable_targets)
-    )
-    run_field_set: RunFieldSet = field_sets.field_sets[0]
 
     working_directory = target[AdhocToolWorkdirField].value or ""
     root_output_directory = target[AdhocToolOutputRootDirField].value or ""
 
-    # Must be run in target environment so that the binaries/envvars match the execution
-    # environment when we actually run the process.
-    run_request = await Get(
-        RunInSandboxRequest, {environment_name: EnvironmentName, run_field_set: RunFieldSet}
-    )
-
-    execution_environment = await Get(
-        ResolvedExecutionDependencies,
-        ResolveExecutionDependenciesRequest(
-            target.address,
-            target.get(AdhocToolExecutionDependenciesField).value,
-            target.get(AdhocToolRunnableDependenciesField).value,
-        ),
-    )
-    dependencies_digest = execution_environment.digest
-    runnable_dependencies = execution_environment.runnable_dependencies
-
-    extra_env: dict[str, str] = dict(run_request.extra_env or {})
-    extra_path = extra_env.pop("PATH", None)
-
-    extra_sandbox_contents = []
-
-    extra_sandbox_contents.append(
-        ExtraSandboxContents(
-            EMPTY_DIGEST,
-            extra_path,
-            run_request.immutable_input_digests or FrozenDict(),
-            run_request.append_only_caches or FrozenDict(),
-            run_request.extra_env or FrozenDict(),
-        )
-    )
-
-    if runnable_dependencies:
-        extra_sandbox_contents.append(
-            ExtraSandboxContents(
-                EMPTY_DIGEST,
-                f"{{chroot}}/{runnable_dependencies.path_component}",
-                runnable_dependencies.immutable_input_digests,
-                runnable_dependencies.append_only_caches,
-                runnable_dependencies.extra_env,
-            )
-        )
-
-    merged_extras = await Get(
-        ExtraSandboxContents, MergeExtraSandboxContents(tuple(extra_sandbox_contents))
-    )
-    extra_env = dict(merged_extras.extra_env)
-    if merged_extras.path:
-        extra_env["PATH"] = merged_extras.path
-
-    input_digest = await Get(Digest, MergeDigests((dependencies_digest, run_request.digest)))
-
     output_files = target.get(AdhocToolOutputFilesField).value or ()
     output_directories = target.get(AdhocToolOutputDirectoriesField).value or ()
 
-    extra_args = target.get(AdhocToolArgumentsField).value or ()
+    cache_scope = environment_target.default_cache_scope
+    maybe_override_cache_scope = target.get(AdhocToolCacheScopeField).enum_value
+    if maybe_override_cache_scope is not None:
+        cache_scope = maybe_override_cache_scope
 
-    append_only_caches = {
-        **merged_extras.append_only_caches,
-        **(target.get(AdhocToolNamedCachesField).value or {}),
-    }
+    workspace_invalidation_globs: PathGlobs | None = None
+    workspace_invalidation_sources = (
+        target.get(AdhocToolWorkspaceInvalidationSourcesField).value or ()
+    )
+    if workspace_invalidation_sources:
+        spec_path = target.address.spec_path
+        workspace_invalidation_globs = PathGlobs(
+            globs=(os.path.join(spec_path, glob) for glob in workspace_invalidation_sources),
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin=f"`{AdhocToolWorkspaceInvalidationSourcesField.alias}` for `adhoc_tool` target at `{target.address}`",
+        )
+
+    env_vars = await prepare_env_vars(
+        tool_runner.extra_env,
+        target.get(AdhocToolExtraEnvVarsField).value or (),
+        extra_paths=tool_runner.extra_paths,
+        path_env_modify_mode=target.get(AdhocToolPathEnvModifyModeField).enum_value,
+        description_of_origin=f"`{AdhocToolExtraEnvVarsField.alias}` for `adhoc_tool` target at `{target.address}`",
+    )
+
+    outputs_match_mode = target.get(AdhocToolOutputsMatchMode).enum_value
 
     process_request = AdhocProcessRequest(
         description=description,
         address=target.address,
         working_directory=working_directory,
         root_output_directory=root_output_directory,
-        argv=tuple(run_request.args + extra_args),
+        argv=tool_runner.args,
         timeout=None,
-        input_digest=input_digest,
-        immutable_input_digests=FrozenDict.frozen(merged_extras.immutable_input_digests),
-        append_only_caches=FrozenDict(append_only_caches),
+        input_digest=tool_runner.digest,
+        immutable_input_digests=FrozenDict.frozen(tool_runner.immutable_input_digests),
+        append_only_caches=FrozenDict(tool_runner.append_only_caches),
         output_files=output_files,
         output_directories=output_directories,
-        fetch_env_vars=target.get(AdhocToolExtraEnvVarsField).value or (),
-        supplied_env_var_values=FrozenDict(extra_env),
+        env_vars=env_vars,
         log_on_process_errors=None,
         log_output=target[AdhocToolLogOutputField].value,
         capture_stderr_file=target[AdhocToolStderrFilenameField].value,
         capture_stdout_file=target[AdhocToolStdoutFilenameField].value,
+        workspace_invalidation_globs=workspace_invalidation_globs,
+        cache_scope=cache_scope,
+        use_working_directory_as_base_for_output_captures=environment_target.use_working_directory_as_base_for_output_captures,
+        outputs_match_error_behavior=outputs_match_mode.glob_match_error_behavior,
+        outputs_match_conjunction=outputs_match_mode.glob_expansion_conjunction,
     )
 
     adhoc_result = await Get(

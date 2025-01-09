@@ -23,20 +23,20 @@ def test_invalid_options() -> None:
     }
     config_errors = [
         "ERROR] Invalid option 'invalid_global' under [GLOBAL]",
-        "ERROR] Invalid section [invalid_scope]",
+        "ERROR] Invalid table name [invalid_scope]",
         "ERROR] Invalid option 'bad_option' under [pytest]",
     ]
 
     # We error on invalid CLI options before validating the config file.
     result = run_pants(["--pytest-invalid=ALL", "help"], config=config)
     result.assert_failure()
-    assert "Unknown flags --invalid on scope pytest" in result.stderr
+    assert "Unknown flag --pytest-invalid in global context" in result.stdout
     for error in config_errors:
         assert error not in result.stderr
 
     result = run_pants(["help"], config=config)
     result.assert_failure()
-    assert "Unknown flags" not in result.stderr
+    assert "Unknown flags" not in result.stdout
     for error in config_errors:
         assert error in result.stderr
 
@@ -54,7 +54,7 @@ def test_deprecation_and_ignore_warnings(use_pantsd: bool) -> None:
 
             deprecated = StrOption(
                 default=None,
-                help="doens't matter",
+                help="doesn't matter",
                 removal_version="999.99.9.dev0",
                 removal_hint="blah",
             )

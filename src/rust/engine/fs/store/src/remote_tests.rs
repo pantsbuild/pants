@@ -8,7 +8,7 @@ use bytes::Bytes;
 use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
-use remote_provider::{ByteStoreProvider, LoadDestination, RemoteStoreOptions};
+use remote_provider::{ByteStoreProvider, LoadDestination, RemoteProvider, RemoteStoreOptions};
 use tempfile::TempDir;
 use testutil::data::TestData;
 use testutil::file::mk_tempfile;
@@ -27,9 +27,10 @@ async fn smoke_test_from_options_reapi_provider() {
     let roland = TestData::roland();
     let empty = TestData::empty();
 
-    let cas = new_cas(10);
+    let cas = new_cas(10).await;
 
     let store = ByteStore::from_options(RemoteStoreOptions {
+        provider: RemoteProvider::Reapi,
         store_address: cas.address(),
         instance_name: None,
         tls_config: tls::Config::default(),
@@ -78,6 +79,7 @@ async fn smoke_test_from_options_file_provider() {
     let dir = TempDir::new().unwrap();
 
     let store = ByteStore::from_options(RemoteStoreOptions {
+        provider: RemoteProvider::ExperimentalFile,
         store_address: format!("file://{}", dir.path().display()),
         instance_name: None,
         tls_config: tls::Config::default(),

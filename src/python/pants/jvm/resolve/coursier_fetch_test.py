@@ -11,7 +11,7 @@ from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.core.util_rules import config_files, source_files
 from pants.engine.addresses import Address, Addresses
-from pants.jvm.resolve.common import Coordinate
+from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.resolve.coursier_fetch import NoCompatibleResolve
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.key import CoursierResolveKey

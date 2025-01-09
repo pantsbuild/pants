@@ -106,15 +106,16 @@ class DockerOptions(Subsystem):
             Configure the default repository name used in the Docker image tag.
 
             The value is formatted and may reference these variables (in addition to the normal
-            placeheolders derived from the Dockerfile and build args etc):
+            placeholders derived from the Dockerfile and build args etc):
 
-            {bullet_list(["name", "directory", "parent_directory", "target_repository"])}
+            {bullet_list(["name", "directory", "parent_directory", "full_directory", "target_repository"])}
 
             Example: `--default-repository="{{directory}}/{{name}}"`.
 
-            The `name` variable is the `docker_image`'s target name, `directory` and
-            `parent_directory` are the name of the directory in which the BUILD file is for the
-            target, and its parent directory respectively.
+            The `name` variable is the `docker_image`'s target name.
+
+            With the directory variables available, given a sample repository path of `baz/foo/bar/BUILD`,
+            then `directory` is `bar`, `parent_directory` is `foo` and `full_directory` will be `baz/foo/bar`.
 
             Use the `repository` field to set this value directly on a `docker_image` target.
 
@@ -151,6 +152,7 @@ class DockerOptions(Subsystem):
             """
         ),
     )
+
     _build_args = ShellStrListOption(
         help=softwrap(
             f"""
@@ -241,6 +243,17 @@ class DockerOptions(Subsystem):
         advanced=True,
     )
 
+    _optional_tools = StrListOption(
+        help=softwrap(
+            """
+            List any additional executables which are not mandatory for Docker to work, but which
+            should be included if available. The paths to these tools will be included in the
+            PATH used in the execution sandbox, so that they may be used by the Docker client.
+            """
+        ),
+        advanced=True,
+    )
+
     tailor = BoolOption(
         default=True,
         help="If true, add `docker_image` targets with the `tailor` goal.",
@@ -254,6 +267,10 @@ class DockerOptions(Subsystem):
     @property
     def tools(self) -> tuple[str, ...]:
         return tuple(sorted(set(self._tools)))
+
+    @property
+    def optional_tools(self) -> tuple[str, ...]:
+        return tuple(sorted(set(self._optional_tools)))
 
     @memoized_method
     def registries(self) -> DockerRegistries:

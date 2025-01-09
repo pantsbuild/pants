@@ -158,7 +158,7 @@ def test_invalid_config_file(rule_runner: RuleRunner) -> None:
             "BUILD": "python_sources()",
         }
     )
-    tgt = rule_runner.get_target((Address("", relative_file_path="example.py")))
+    tgt = rule_runner.get_target(Address("", relative_file_path="example.py"))
     with pytest.raises(ExecutionError) as isort_error:
         run_isort(rule_runner, [tgt])
     assert any(

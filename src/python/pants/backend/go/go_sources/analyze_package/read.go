@@ -36,7 +36,7 @@ import (
 	"unicode/utf8"
 )
 
-// PANTS NOTE: These types were adaptd from https://github.com/bazelbuild/rules_go/blob/master/go/tools/builders/filter.go
+// PANTS NOTE: These types were adapted from https://github.com/bazelbuild/rules_go/blob/master/go/tools/builders/filter.go
 
 type fileInfo struct {
 	filename string

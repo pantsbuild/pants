@@ -12,7 +12,6 @@ import pytest
 from pants.build_graph.address import Address, ResolveError
 from pants.core.util_rules import environments
 from pants.core.util_rules.environments import (
-    LOCAL_ENVIRONMENT_MATCHER,
     AllEnvironmentTargets,
     AmbiguousEnvironmentError,
     ChosenLocalEnvironmentName,
@@ -27,6 +26,7 @@ from pants.core.util_rules.environments import (
     EnvironmentTarget,
     FallbackEnvironmentField,
     LocalEnvironmentTarget,
+    LocalWorkspaceEnvironmentTarget,
     NoFallbackEnvironmentError,
     RemoteEnvironmentCacheBinaryDiscovery,
     RemoteEnvironmentTarget,
@@ -36,6 +36,7 @@ from pants.core.util_rules.environments import (
     extract_process_config_from_environment,
     resolve_environment_name,
 )
+from pants.engine.environment import LOCAL_ENVIRONMENT_MATCHER, ChosenLocalWorkspaceEnvironmentName
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessCacheScope
@@ -60,8 +61,15 @@ def rule_runner() -> RuleRunner:
             QueryRule(EnvironmentTarget, [EnvironmentName]),
             QueryRule(EnvironmentName, [EnvironmentNameRequest]),
             QueryRule(EnvironmentName, [SingleEnvironmentNameRequest]),
+            QueryRule(ChosenLocalEnvironmentName, []),
+            QueryRule(ChosenLocalWorkspaceEnvironmentName, []),
         ],
-        target_types=[LocalEnvironmentTarget, DockerEnvironmentTarget, RemoteEnvironmentTarget],
+        target_types=[
+            LocalEnvironmentTarget,
+            LocalWorkspaceEnvironmentTarget,
+            DockerEnvironmentTarget,
+            RemoteEnvironmentTarget,
+        ],
         inherent_environment=None,
     )
 
@@ -70,7 +78,13 @@ def test_extract_process_config_from_environment() -> None:
     def assert_config(
         *,
         envs_enabled: bool = True,
-        env_tgt: LocalEnvironmentTarget | RemoteEnvironmentTarget | DockerEnvironmentTarget | None,
+        env_tgt: (
+            LocalEnvironmentTarget
+            | LocalWorkspaceEnvironmentTarget
+            | RemoteEnvironmentTarget
+            | DockerEnvironmentTarget
+            | None
+        ),
         enable_remote_execution: bool,
         expected_remote_execution: bool,
         expected_docker_image: str | None,
@@ -321,7 +335,7 @@ def test_resolve_environment_names(rule_runner: RuleRunner) -> None:
 
 
 def test_resolve_environment_name_local_and_docker_fallbacks(monkeypatch) -> None:
-    # We can't monkeypatch the Platform with RuleRunner, so instead use run_run_with_mocks.
+    # We can't monkeypatch the Platform with RuleRunner, so instead use run_rule_with_mocks.
     def get_env_name(
         env_tgt: Target, platform: Platform, *, docker_execution: bool = True
     ) -> str | None:
@@ -338,6 +352,11 @@ def test_resolve_environment_name_local_and_docker_fallbacks(monkeypatch) -> Non
             mock_gets=[
                 MockGet(
                     output_type=ChosenLocalEnvironmentName,
+                    input_types=(),
+                    mock=lambda: ChosenLocalEnvironmentName(EnvironmentName(None)),
+                ),
+                MockGet(
+                    output_type=ChosenLocalWorkspaceEnvironmentName,
                     input_types=(),
                     mock=lambda: ChosenLocalEnvironmentName(EnvironmentName(None)),
                 ),
@@ -360,9 +379,9 @@ def test_resolve_environment_name_local_and_docker_fallbacks(monkeypatch) -> Non
     ) -> LocalEnvironmentTarget:
         return LocalEnvironmentTarget(
             {
-                CompatiblePlatformsField.alias: [plat.value for plat in compatible_platforms]
-                if compatible_platforms
-                else None,
+                CompatiblePlatformsField.alias: (
+                    [plat.value for plat in compatible_platforms] if compatible_platforms else None
+                ),
                 FallbackEnvironmentField.alias: "fallback" if fallback else None,
             },
             Address("envs"),
@@ -510,3 +529,26 @@ def test_executable_search_path_cache_scope() -> None:
     ):
         assert_cache(tgt, cache_failures=False, expected=ProcessCacheScope.SUCCESSFUL)
         assert_cache(tgt, cache_failures=True, expected=ProcessCacheScope.ALWAYS)
+
+
+# Test for regression in choosing local environments.
+def test_find_chosen_local_and_experimental_workspace_environments(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+            local_environment(name="local")
+            experimental_workspace_environment(name="workspace")
+            """
+            )
+        }
+    )
+    rule_runner.set_options(
+        ["--environments-preview-names={'local': '//:local', 'workspace': '//:workspace'}"]
+    )
+
+    chosen_local_env = rule_runner.request(ChosenLocalEnvironmentName, [])
+    assert chosen_local_env.val.val == "local"
+
+    chosen_workspace_env = rule_runner.request(ChosenLocalWorkspaceEnvironmentName, [])
+    assert chosen_workspace_env.val.val == "workspace"

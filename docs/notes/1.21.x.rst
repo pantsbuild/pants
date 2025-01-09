@@ -1,0 +1,231 @@
+1.21.x Stable Releases
+======================
+
+This document describes releases leading up to the ``1.21.x`` ``stable`` series.
+
+1.21.1rc0 (6/16/2020)
+---------------------
+
+N.B.: No further releases are expected in the ``1.21.x`` ``stable`` series. This ``.1rc0``
+release is for those upgrading through stable versions who wish to retain pytest console
+coverage support in Pants "v1".
+
+Bugfixes
+~~~~~~~~
+
+* Restore pytest coverage console report. (#10022)
+  `PR #10022 <https://github.com/pantsbuild/pants/pull/10022>`_
+
+1.21.0 (10/14/2019)
+-------------------
+
+The first stable release of the ``1.21.x`` series, with no changes since the previous rc!
+
+1.21.0rc0 (09/23/2019)
+----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Add "did you mean" functionality to runtime Param mismatches. (#8315)
+  `PR #8315 <https://github.com/pantsbuild/pants/pull/8315>`_
+
+Bugfixes
+~~~~~~~~
+* Fix support for running pants from source in other repositories. (#8297)
+  `PR #8297 <https://github.com/pantsbuild/pants/pull/8297>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Upgrade to Pex 1.6.11. (#8287)
+  `PR #8287 <https://github.com/pantsbuild/pants/pull/8287>`_
+
+* Implement critical path algorithm in Graph (#8308)
+  `PR #8308 <https://github.com/pantsbuild/pants/pull/8308>`_
+
+* Bump to latest zinc and remove the extractor. (#8246)
+  `PR #8246 <https://github.com/pantsbuild/pants/pull/8246>`_
+
+* Skip test_ctypes_third_party_integration due to network failure. (#8317)
+  `PR #8317 <https://github.com/pantsbuild/pants/pull/8317>`_
+
+* repr() exceptions when logging/stringifying them. (#8230)
+  `PR #8230 <https://github.com/pantsbuild/pants/pull/8230>`_
+
+* On stats v2, use json body, API will support uploading multiple builds in a single call (#8305)
+  `PR #8305 <https://github.com/pantsbuild/pants/pull/8305>`_
+
+* Hide zinc-compiler `BareBonesLogger` behind flag (#8295)
+  `PR #8295 <https://github.com/pantsbuild/pants/pull/8295>`_
+
+* Port 5 more integration tests to V2 remote execution (#8304)
+  `PR #8304 <https://github.com/pantsbuild/pants/pull/8304>`_
+
+* Port `backend/codegen` and `backend/python` integration tests to V2 remote execution (#8293)
+  `PR #8293 <https://github.com/pantsbuild/pants/pull/8293>`_
+
+* Default in CI to remote execution for integration tests (#8298)
+  `Issue #8113, <https://github.com/pantsbuild/pants/issues/8113,>`_
+  `PR #8298 <https://github.com/pantsbuild/pants/pull/8298>`_
+
+* Increase zinc_compile_integration_test timeouts. (#8296)
+  `PR #8296 <https://github.com/pantsbuild/pants/pull/8296>`_
+
+* Port `backend/jvm` integration tests to remote execution (#8273)
+  `PR #8273 <https://github.com/pantsbuild/pants/pull/8273>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Prepare notes for 1.20.0rc2 (#8310)
+  `PR #8310 <https://github.com/pantsbuild/pants/pull/8310>`_
+
+* Correct misleading comment in graph::Walk (#8301)
+  `PR #8301 <https://github.com/pantsbuild/pants/pull/8301>`_
+
+
+1.21.0.dev1 (09/14/2019)
+------------------------
+
+New Features
+~~~~~~~~~~~~
+* Introduce multi-platform support to hermetic execution. (#8216)
+  `PR #8216 <https://github.com/pantsbuild/pants/pull/8216>`_
+
+* Implement cancellation for remote execution (#8222)
+  `PR #8222 <https://github.com/pantsbuild/pants/pull/8222>`_
+
+API Changes
+~~~~~~~~~~~
+* Invoke Pants via module in ITs. (#8265)
+  `Issue #707 <https://github.com/pex-tool/pex/issues/707>`_
+  `PR #8265 <https://github.com/pantsbuild/pants/pull/8265>`_
+
+Bugfixes
+~~~~~~~~
+* Raise a python exception, rather than panicking (#8275)
+  `PR #8275 <https://github.com/pantsbuild/pants/pull/8275>`_
+
+* Don't error on remote execution timeouts (#8269)
+  `PR #8269 <https://github.com/pantsbuild/pants/pull/8269>`_
+
+* Fix runtime_classpath initialization in node_build (#8267)
+  `PR #8267 <https://github.com/pantsbuild/pants/pull/8267>`_
+  `PR #8277 <https://github.com/pantsbuild/pants/pull/8277>`_
+
+* Add rsc_mixed_compile_classpath to RscCompile products (#8249)
+  `PR #8249 <https://github.com/pantsbuild/pants/pull/8249>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Use more precise test discovery for V2 Pytest runner (#8281)
+  `PR #8281 <https://github.com/pantsbuild/pants/pull/8281>`_
+
+* Pipe is_executable both ways in FileContent (#8271)
+  `PR #8271 <https://github.com/pantsbuild/pants/pull/8271>`_
+
+* Refactor code of remote.rs (#8276)
+  `PR #8276 <https://github.com/pantsbuild/pants/pull/8276>`_
+
+* Use InputFilesContent instead of InputFileContent (#8272)
+  `PR #8272 <https://github.com/pantsbuild/pants/pull/8272>`_
+  `PR #8226 <https://github.com/pantsbuild/pants/pull/8226>`_
+
+* Remove unused backend/jvm integration test (#8264)
+  `PR #8264 <https://github.com/pantsbuild/pants/pull/8264>`_
+
+* Port ~20 integration tests to remote execution (#8262)
+  `Issue #8113 <https://github.com/pantsbuild/pants/issues/8113>`_
+  `PR #8262 <https://github.com/pantsbuild/pants/pull/8262>`_
+
+* Run all contrib integration tests using V2 remote execution (#8261)
+  `Issue #8113 <https://github.com/pantsbuild/pants/issues/8113>`_
+  `PR #8261 <https://github.com/pantsbuild/pants/pull/8261>`_
+
+* Port `tasks`, `base`, and `awslambda` integration tests to V2 (#8259)
+  `PR #8259 <https://github.com/pantsbuild/pants/pull/8259>`_
+  `PR #8257 <https://github.com/pantsbuild/pants/pull/8257>`_
+
+* Refactor `init` code and tests (#8258)
+  `PR #8258 <https://github.com/pantsbuild/pants/pull/8258>`_
+
+* `pants.pex` used for tests always includes `pants.ini` (#8260)
+  `PR #8260 <https://github.com/pantsbuild/pants/pull/8260>`_
+  `PR #8259 <https://github.com/pantsbuild/pants/pull/8259>`_
+
+* Properly depend on plugins in chrooted integration tests (#8257)
+  `Issue #8113 <https://github.com/pantsbuild/pants/issues/8113>`_
+  `PR #8257 <https://github.com/pantsbuild/pants/pull/8257>`_
+
+* Refactor `pathlib.Path` usages to use multiple path segments constructor (#8255)
+  `PR #8255 <https://github.com/pantsbuild/pants/pull/8255>`_
+
+* Run first few integration tests through remote execution (#8210)
+  `Issue #8113 <https://github.com/pantsbuild/pants/issues/8113>`_
+  `PR #8210 <https://github.com/pantsbuild/pants/pull/8210>`_
+
+* Fixup `release.sh` getopts / usage. (#8254)
+  `PR #8254 <https://github.com/pantsbuild/pants/pull/8254>`_
+
+* Log computed information in RunTracker (#8237)
+  `PR #8237 <https://github.com/pantsbuild/pants/pull/8237>`_
+
+
+1.21.0.dev0 (09/06/2019)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* New intrinsic InputFileContent -> Digest (#8226)
+  `PR #8226 <https://github.com/pantsbuild/pants/pull/8226>`_
+
+Bugfixes
+~~~~~~~~
+
+* fix exception handling of KeyboardInterrupt during startup (#8182)
+  `PR #8182 <https://github.com/pantsbuild/pants/pull/8182>`_
+
+* Use correct function on list (#8238)
+  `PR #8238 <https://github.com/pantsbuild/pants/pull/8238>`_
+
+* Support omitting the test sources themselves from coverage. (#8208)
+  `PR #8208 <https://github.com/pantsbuild/pants/pull/8208>`_
+
+* Use NGContext.exit() instead of sys.exit(). (#8239)
+  `PR #8239 <https://github.com/pantsbuild/pants/pull/8239>`_
+
+* Disable pantsd in inner runs. (#7884)
+  `PR #7884 <https://github.com/pantsbuild/pants/pull/7884>`_
+
+* Fix error when uploading stats to stats storage (#8233)
+  `PR #8233 <https://github.com/pantsbuild/pants/pull/8233>`_
+
+* Fix custom panic handler (#4884) (#8219)
+  `PR #4884 <https://github.com/pantsbuild/pants/pull/4884>`_
+  `PR #8219 <https://github.com/pantsbuild/pants/pull/8219>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Quash warnings about missing dyn in generated code (#8245)
+  `PR #8245 <https://github.com/pantsbuild/pants/pull/8245>`_
+
+* Split store into lib, local, remote modules (#8244)
+  `PR #8244 <https://github.com/pantsbuild/pants/pull/8244>`_
+
+* Use `./pants.pex`, not `./pants`, to run internal integration tests (#8183)
+  `Issue #8113 <https://github.com/pantsbuild/pants/issues/8113>`_
+  `Issue #8209 <https://github.com/pantsbuild/pants/issues/8209>`_
+  `PR #8183 <https://github.com/pantsbuild/pants/pull/8183>`_
+
+* Refactor auth logic out of RunTracker and into BasicAuth (#8211)
+  `PR #8211 <https://github.com/pantsbuild/pants/pull/8211>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Update notes for the hotfix for 1.20 release (#8240)
+  `PR #8240 <https://github.com/pantsbuild/pants/pull/8240>`_
+

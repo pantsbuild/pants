@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from pants.engine.fs import Digest, DigestContents
 from pants.engine.rules import Get, collect_rules, rule
-from pants.jvm.resolve.common import Coordinate
+from pants.jvm.resolve.coordinate import Coordinate
 
 
 @dataclass(frozen=True)

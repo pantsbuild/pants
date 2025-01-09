@@ -19,6 +19,7 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
+from pants.core.goals.resolves import ExportableTool
 from pants.core.goals.test import (
     ConsoleCoverageReport,
     CoverageData,
@@ -106,7 +107,7 @@ class CoverageReportType(Enum):
 
 class CoverageSubsystem(PythonToolBase):
     options_scope = "coverage-py"
-    help = "Configuration for Python test coverage measurement."
+    help_short = "Configuration for Python test coverage measurement."
 
     default_main = ConsoleScript("coverage")
     default_requirements = ["coverage[toml]>=6.5,<8"]
@@ -120,6 +121,9 @@ class CoverageSubsystem(PythonToolBase):
             """
             A list of Python modules or filesystem paths to use in the coverage report, e.g.
             `['helloworld_test', 'helloworld/util/dirutil']`.
+
+            For including files without any test in coverage calculation pass paths instead of modules.
+            Paths need to be relative to the `pants.toml`.
 
             Both modules and directory paths are recursive: any submodules or child paths,
             respectively, will be included.
@@ -147,7 +151,7 @@ class CoverageSubsystem(PythonToolBase):
         help=lambda cls: softwrap(
             f"""
             Path to an INI or TOML config file understood by coverage.py
-            (https://coverage.readthedocs.io/en/stable/config.html).
+            (https://coverage.readthedocs.io/en/latest/config.html).
 
             Setting this option will disable `[{cls.options_scope}].config_discovery`. Use
             this option if the config is located in a non-standard location.
@@ -374,10 +378,6 @@ async def merge_coverage_data(
     coverage: CoverageSubsystem,
     source_roots: AllSourceRoots,
 ) -> MergedCoverageData:
-    if len(data_collection) == 1 and not coverage.global_report:
-        coverage_data = data_collection[0]
-        return MergedCoverageData(coverage_data.digest, coverage_data.addresses)
-
     coverage_digest_gets = []
     coverage_data_file_paths = []
     addresses: list[Address] = []
@@ -391,7 +391,7 @@ async def merge_coverage_data(
         coverage_data_file_paths.append(f"{path_prefix}/.coverage")
         addresses.extend(data.addresses)
 
-    if coverage.global_report:
+    if coverage.global_report or coverage.filter:
         # It's important to set the `branch` value in the empty base report to the value it will
         # have when running on real inputs, so that the reports are of the same type, and can be
         # merged successfully. Otherwise we may get "Can't combine arc data with line data" errors.
@@ -403,13 +403,19 @@ async def merge_coverage_data(
         )
         global_coverage_base_dir = PurePath("__global_coverage__")
         global_coverage_config_path = global_coverage_base_dir / "pyproject.toml"
+
+        if coverage.filter:
+            source = list(coverage.filter)
+        else:
+            source = [source_root.path for source_root in source_roots]
+
         global_coverage_config_content = toml.dumps(
             {
                 "tool": {
                     "coverage": {
                         "run": {
                             "relative_files": True,
-                            "source": [source_root.path for source_root in source_roots],
+                            "source": source,
                             "branch": branch,
                         },
                         "report": {
@@ -481,7 +487,7 @@ async def merge_coverage_data(
     )
     return MergedCoverageData(
         await Get(Digest, MergeDigests((result.output_digest, extra_sources_digest))),
-        tuple(addresses),
+        tuple(sorted(addresses)),
     )
 
 
@@ -621,4 +627,5 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(CoverageDataCollection, PytestCoverageDataCollection),
+        UnionRule(ExportableTool, CoverageSubsystem),
     ]

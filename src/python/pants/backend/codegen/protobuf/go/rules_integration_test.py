@@ -113,7 +113,7 @@ def assert_files_generated(
 
 
 def test_extracts_go_package() -> None:
-    import_path = parse_go_package_option("""option go_package = "example.com/dir1";""".encode())
+    import_path = parse_go_package_option(b"""option go_package = "example.com/dir1";""")
     assert import_path == "example.com/dir1"
 
 

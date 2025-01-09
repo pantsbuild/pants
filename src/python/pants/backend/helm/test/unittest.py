@@ -42,7 +42,13 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
-from pants.engine.process import FallibleProcessResult, ProcessCacheScope, ProcessResult
+from pants.engine.process import (
+    Process,
+    ProcessCacheScope,
+    ProcessResult,
+    ProcessResultWithRetries,
+    ProcessWithRetries,
+)
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     DependenciesRequest,
@@ -211,19 +217,22 @@ async def run_helm_unittest(
             timeout_seconds=field_set.timeout.calculate_from_global_options(test_subsystem),
         ),
     )
-    process_result = await Get(FallibleProcessResult, HelmProcess, setup.process)
+    process = await Get(Process, HelmProcess, setup.process)
+    process_results = await Get(
+        ProcessResultWithRetries, ProcessWithRetries(process, test_subsystem.attempts_default)
+    )
 
     reports_digest = await Get(
         Digest,
         DigestSubset(
-            process_result.output_digest,
+            process_results.last.output_digest,
             PathGlobs([os.path.join(setup.reports_output_directory, "**")]),
         ),
     )
     reports = await Get(Snapshot, RemovePrefix(reports_digest, setup.reports_output_directory))
 
     return TestResult.from_fallible_process_result(
-        process_results=(process_result,),
+        process_results=process_results.results,
         address=field_set.address,
         output_setting=test_subsystem.output,
         xml_results=reports,

@@ -18,13 +18,16 @@ from pants.backend.python.target_types import (
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.backend.python.util_rules.faas import (
     BuildPythonFaaSRequest,
+    FaaSArchitecture,
     InferPythonFaaSHandlerDependency,
     PythonFaaSCompletePlatforms,
     PythonFaaSDependencies,
     PythonFaaSHandlerField,
     PythonFaaSHandlerInferenceFieldSet,
     PythonFaaSKnownRuntime,
+    PythonFaaSLayoutField,
     PythonFaaSPex3VenvCreateExtraArgsField,
+    PythonFaaSPexBuildExtraArgs,
     PythonFaaSRuntimeField,
     ResolvedPythonFaaSHandler,
     ResolvePythonFaaSHandlerRequest,
@@ -34,7 +37,7 @@ from pants.backend.python.util_rules.faas import (
 )
 from pants.backend.python.util_rules.pex import CompletePlatforms, Pex, PexPlatforms
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
-from pants.backend.python.util_rules.pex_venv import PexVenv, PexVenvRequest
+from pants.backend.python.util_rules.pex_venv import PexVenv, PexVenvLayout, PexVenvRequest
 from pants.build_graph.address import Address
 from pants.core.goals.package import OutputPathField
 from pants.core.target_types import FileTarget
@@ -245,10 +248,13 @@ def test_infer_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
 
 class TestRuntimeField(PythonFaaSRuntimeField):
     known_runtimes = (
-        PythonFaaSKnownRuntime(3, 45, tag="faas-test-3-45"),
-        PythonFaaSKnownRuntime(67, 89, tag="faas-test-67-89"),
+        PythonFaaSKnownRuntime(
+            "3.45", 3, 45, "", tag="faas-test-3-45", architecture=FaaSArchitecture.X86_64
+        ),
+        PythonFaaSKnownRuntime(
+            "67.89", 67, 89, "", tag="faas-test-67-89", architecture=FaaSArchitecture.X86_64
+        ),
     )
-    known_runtimes_docker_repo = ""
 
     def to_interpreter_version(self) -> None | tuple[int, int]:
         if self.value is None:
@@ -288,6 +294,7 @@ def test_infer_runtime_platforms_when_runtime_and_no_complete_platforms(
         target_name="unused",
         runtime=TestRuntimeField(value, address),
         complete_platforms=PythonFaaSCompletePlatforms(None, address),
+        architecture=FaaSArchitecture.X86_64,
     )
 
     platforms = rule_runner.request(RuntimePlatforms, [request])
@@ -308,6 +315,7 @@ def test_infer_runtime_platforms_when_complete_platforms(
         address=address,
         target_name="unused",
         runtime=TestRuntimeField("completely ignored!", address),
+        architecture=FaaSArchitecture.ARM64,  # ignored
         complete_platforms=PythonFaaSCompletePlatforms(["path:cp"], address),
     )
 
@@ -349,6 +357,7 @@ def test_infer_runtime_platforms_when_narrow_ics_only(
         target_name="example_target",
         runtime=TestRuntimeField(None, address),
         complete_platforms=PythonFaaSCompletePlatforms(None, address),
+        architecture=FaaSArchitecture.X86_64,
     )
 
     platforms = rule_runner.request(RuntimePlatforms, [request])
@@ -386,6 +395,7 @@ def test_infer_runtime_platforms_errors_when_wide_ics(
         address=address,
         target_name="example_target",
         runtime=TestRuntimeField(None, address),
+        architecture=FaaSArchitecture.X86_64,
         complete_platforms=PythonFaaSCompletePlatforms(None, address),
     )
 
@@ -413,7 +423,10 @@ def test_venv_create_extra_args_are_passed_through() -> None:
         handler=None,
         output_path=OutputPathField(None, addr),
         runtime=Mock(),
+        architecture=FaaSArchitecture.X86_64,
         pex3_venv_create_extra_args=extra_args_field,
+        pex_build_extra_args=PythonFaaSPexBuildExtraArgs(None, addr),
+        layout=PythonFaaSLayoutField(PexVenvLayout.FLAT_ZIPPED.value, addr),
         include_requirements=False,
         include_sources=False,
         reexported_handler_module=None,
@@ -454,3 +467,114 @@ def test_venv_create_extra_args_are_passed_through() -> None:
     # Verify
     assert len(observed_extra_args) == 1
     assert observed_extra_args[0] == extra_args
+
+
+@pytest.mark.parametrize(
+    "input_layout,expected_output",
+    [
+        (PexVenvLayout.FLAT_ZIPPED, "x.zip"),
+        (PexVenvLayout.FLAT, "x"),
+        # PexVenvLayout.VENV is semi-supported: if a user can get it to work, that's fine, but we don't explicitly support it.
+    ],
+)
+def test_layout_should_be_passed_through_and_adjust_filename(input_layout, expected_output) -> None:
+    # Setup
+    addr = Address("x")
+    request = BuildPythonFaaSRequest(
+        address=addr,
+        target_name="x",
+        complete_platforms=Mock(),
+        handler=None,
+        output_path=OutputPathField(None, addr),
+        runtime=Mock(),
+        architecture=FaaSArchitecture.X86_64,
+        pex3_venv_create_extra_args=Mock(),
+        pex_build_extra_args=PythonFaaSPexBuildExtraArgs(None, addr),
+        layout=input_layout,
+        include_requirements=False,
+        include_sources=False,
+        reexported_handler_module=None,
+    )
+
+    mock_build = Mock()
+
+    # Exercise
+    run_rule_with_mocks(
+        build_python_faas,
+        rule_args=[request],
+        mock_gets=[
+            MockGet(
+                output_type=RuntimePlatforms,
+                input_types=(RuntimePlatformsRequest,),
+                mock=lambda _: RuntimePlatforms(interpreter_version=None),
+            ),
+            MockGet(
+                output_type=ResolvedPythonFaaSHandler,
+                input_types=(ResolvePythonFaaSHandlerRequest,),
+                mock=lambda _: Mock(),
+            ),
+            MockGet(output_type=Digest, input_types=(CreateDigest,), mock=lambda _: EMPTY_DIGEST),
+            MockGet(
+                output_type=Pex,
+                input_types=(PexFromTargetsRequest,),
+                mock=lambda _: Pex(digest=EMPTY_DIGEST, name="pex", python=None),
+            ),
+            MockGet(output_type=PexVenv, input_types=(PexVenvRequest,), mock=mock_build),
+        ],
+    )
+
+    args = mock_build.mock_calls[0].args[0]
+    assert args.layout == input_layout
+    assert args.output_path.name == expected_output
+
+
+def test_pex_build_extra_args_passed_through() -> None:
+    addr = Address("addr")
+    extra_args = ("--exclude=test_package",)
+
+    extra_pex_args_field = PythonFaaSPexBuildExtraArgs(extra_args, addr)
+
+    request = BuildPythonFaaSRequest(
+        address=addr,
+        target_name="test",
+        complete_platforms=Mock(),
+        handler=None,
+        output_path=OutputPathField(None, addr),
+        runtime=Mock(),
+        architecture=FaaSArchitecture.X86_64,
+        pex3_venv_create_extra_args=Mock(),
+        pex_build_extra_args=extra_pex_args_field,
+        layout=PythonFaaSLayoutField(PexVenvLayout.FLAT_ZIPPED.value, addr),
+        include_requirements=False,
+        include_sources=False,
+        reexported_handler_module=None,
+    )
+
+    mock_build = Mock()
+
+    # Exercise
+    run_rule_with_mocks(
+        build_python_faas,
+        rule_args=[request],
+        mock_gets=[
+            MockGet(
+                output_type=RuntimePlatforms,
+                input_types=(RuntimePlatformsRequest,),
+                mock=lambda _: RuntimePlatforms(interpreter_version=None),
+            ),
+            MockGet(
+                output_type=ResolvedPythonFaaSHandler,
+                input_types=(ResolvePythonFaaSHandlerRequest,),
+                mock=lambda _: Mock(),
+            ),
+            MockGet(output_type=Digest, input_types=(CreateDigest,), mock=lambda _: EMPTY_DIGEST),
+            MockGet(
+                output_type=Pex,
+                input_types=(PexFromTargetsRequest,),
+                mock=mock_build,
+            ),
+            MockGet(output_type=PexVenv, input_types=(PexVenvRequest,), mock=Mock()),
+        ],
+    )
+
+    assert extra_args[0] in mock_build.mock_calls[0].args[0].additional_args

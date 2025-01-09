@@ -21,8 +21,9 @@ from pants.engine.internals.specs_rules import (
     AmbiguousImplementationsException,
     TooManyTargetsException,
 )
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult
-from pants.engine.rules import Effect, Get, Rule, _uncacheable_rule, collect_rules, goal_rule, rule
+from pants.engine.intrinsics import run_interactive_process
+from pants.engine.process import InteractiveProcess
+from pants.engine.rules import Get, Rule, _uncacheable_rule, collect_rules, goal_rule, rule
 from pants.engine.target import (
     BoolField,
     FieldSet,
@@ -44,8 +45,8 @@ _T = TypeVar("_T")
 
 
 class RunInSandboxBehavior(Enum):
-    """Defines the behavhior of rules that act on a `RunFieldSet` subclass with regards to use in
-    the sandbox.
+    """Defines the behavior of rules that act on a `RunFieldSet` subclass with regards to use in the
+    sandbox.
 
     This is used to automatically generate rules used to fulfill `experimental_run_in_sandbox`
     targets.
@@ -53,7 +54,7 @@ class RunInSandboxBehavior(Enum):
     The behaviors are as follows:
 
     * `RUN_REQUEST_HERMETIC`: Use the existing `RunRequest`-generating rule, and enable cacheing.
-       Use this if you are confident the behaviour of the rule relies only on state that is
+       Use this if you are confident the behavior of the rule relies only on state that is
        captured by pants (e.g. binary paths are found using `EnvironmentVarsRequest`), and that
        the rule only refers to files in the sandbox.
     * `RUN_REQUEST_NOT_HERMETIC`: Use the existing `RunRequest`-generating rule, and do not
@@ -231,7 +232,7 @@ async def run(
     run_subsystem: RunSubsystem,
     debug_adapter: DebugAdapterSubsystem,
     global_options: GlobalOptions,
-    workspace: Workspace,  # Needed to enable sideeffecting.
+    workspace: Workspace,  # Needed to enable side-effecting.
     complete_env: CompleteEnvironmentVars,
 ) -> Run:
     field_set, target = await _find_what_to_run("the `run` goal")
@@ -254,8 +255,7 @@ async def run(
             )
         )
 
-    result = await Effect(
-        InteractiveProcessResult,
+    result = await run_interactive_process(
         InteractiveProcess(
             argv=(*request.args, *run_subsystem.args),
             env={**complete_env, **request.extra_env},
@@ -265,7 +265,7 @@ async def run(
             keep_sandboxes=global_options.keep_sandboxes,
             immutable_input_digests=request.immutable_input_digests,
             append_only_caches=request.append_only_caches,
-        ),
+        )
     )
 
     return Run(result.exit_code)

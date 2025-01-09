@@ -5,13 +5,16 @@ from __future__ import annotations
 
 import ast
 import dataclasses
+import difflib
 import inspect
+import itertools
 import json
+import re
 from collections import defaultdict, namedtuple
 from dataclasses import dataclass
 from enum import Enum
+from functools import reduce
 from itertools import chain
-from operator import attrgetter
 from pathlib import Path
 from typing import (
     Any,
@@ -39,14 +42,19 @@ from pants.engine.internals.parser import BuildFileSymbolInfo, BuildFileSymbolsI
 from pants.engine.rules import Rule, TaskRule
 from pants.engine.target import Field, RegisteredTargetTypes, StringField, Target, TargetGenerator
 from pants.engine.unions import UnionMembership, UnionRule, is_union
+from pants.option.native_options import NativeOptionParser, parse_dest
+from pants.option.option_types import OptionInfo
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.options import Options
-from pants.option.parser import OptionValueHistory, Parser
-from pants.option.scope import ScopeInfo
+from pants.option.ranked_value import Rank, RankedValue
+from pants.option.registrar import OptionRegistrar, OptionValueHistory
+from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.util.frozendict import LazyFrozenDict
 from pants.util.strutil import first_paragraph, strval
 
 T = TypeVar("T")
+
+_ENV_SANITIZER_RE = re.compile(r"[.-]")
 
 
 class HelpJSONEncoder(json.JSONEncoder):
@@ -269,9 +277,9 @@ class TargetTypeHelpInfo:
             fields=tuple(
                 TargetFieldHelpInfo.create(
                     field,
-                    provider=""
-                    if get_field_type_provider is None
-                    else get_field_type_provider(field),
+                    provider=(
+                        "" if get_field_type_provider is None else get_field_type_provider(field)
+                    ),
                 )
                 for field in fields
                 if not field.alias.startswith("_") and field.removal_version is None
@@ -297,7 +305,7 @@ class RuleInfo:
     provider: str
     output_type: str
     input_types: tuple[str, ...]
-    input_gets: tuple[str, ...]
+    awaitables: tuple[str, ...]
 
     @classmethod
     def create(cls, rule: TaskRule, provider: str) -> RuleInfo:
@@ -306,8 +314,8 @@ class RuleInfo:
             description=rule.desc,
             documentation=maybe_cleandoc(rule.func.__doc__),
             provider=provider,
-            input_types=tuple(selector.__name__ for selector in rule.input_selectors),
-            input_gets=tuple(str(constraints) for constraints in rule.input_gets),
+            input_types=tuple(typ.__name__ for typ in rule.parameters.values()),
+            awaitables=tuple(str(constraints) for constraints in rule.awaitables),
             output_type=rule.output_type.__name__,
         )
 
@@ -322,7 +330,7 @@ class PluginAPITypeInfo:
     name: str
     module: str
     documentation: str | None
-    provider: str
+    provider: tuple[str, ...]
     is_union: bool
     union_type: str | None
     union_members: tuple[str, ...]
@@ -331,6 +339,14 @@ class PluginAPITypeInfo:
     returned_by_rules: tuple[str, ...]
     consumed_by_rules: tuple[str, ...]
     used_in_rules: tuple[str, ...]
+
+    @property
+    def fully_qualified_name(self) -> str:
+        return f"{self.module}.{self.name}"
+
+    @staticmethod
+    def fully_qualified_name_from_type(t: type):
+        return f"{t.__module__}.{t.__qualname__}"
 
     @classmethod
     def create(
@@ -345,7 +361,7 @@ class PluginAPITypeInfo:
         task_rules = [rule for rule in rules if isinstance(rule, TaskRule)]
 
         return cls(
-            name=api_type.__name__,
+            name=api_type.__qualname__,
             module=api_type.__module__,
             documentation=maybe_cleandoc(api_type.__doc__),
             is_union=is_union(api_type),
@@ -365,7 +381,7 @@ class PluginAPITypeInfo:
     @staticmethod
     def _rule_consumes(api_type: type) -> Callable[[TaskRule], bool]:
         def satisfies(rule: TaskRule) -> bool:
-            return api_type in rule.input_selectors
+            return api_type in rule.parameters.values()
 
         return satisfies
 
@@ -381,7 +397,7 @@ class PluginAPITypeInfo:
         def satisfies(rule: TaskRule) -> bool:
             return any(
                 api_type in (*constraint.input_types, constraint.output_type)
-                for constraint in rule.input_gets
+                for constraint in rule.awaitables
             )
 
         return satisfies
@@ -392,6 +408,25 @@ class PluginAPITypeInfo:
             return isinstance(rule, UnionRule) and rule.union_member is api_type
 
         return satisfies
+
+    def merged_with(self, that: PluginAPITypeInfo) -> PluginAPITypeInfo:
+        def merge_tuples(l, r):
+            return tuple(sorted({*l, *r}))
+
+        return PluginAPITypeInfo(
+            self.name,
+            self.module,
+            self.documentation,
+            merge_tuples(self.provider, that.provider),
+            self.is_union,
+            self.union_type,
+            merge_tuples(self.union_members, that.union_members),
+            merge_tuples(self.dependencies, that.dependencies),
+            merge_tuples(self.dependents, that.dependents),
+            merge_tuples(self.returned_by_rules, that.returned_by_rules),
+            merge_tuples(self.consumed_by_rules, that.consumed_by_rules),
+            merge_tuples(self.used_in_rules, that.used_in_rules),
+        )
 
 
 @dataclass(frozen=True)
@@ -455,7 +490,6 @@ class HelpInfoExtracter:
             scope_info: ScopeInfo,
         ) -> Callable[[], OptionScopeHelpInfo]:
             def load() -> OptionScopeHelpInfo:
-                options.for_scope(scope_info.scope)  # Force parsing.
                 subsystem_cls = scope_info.subsystem_cls
                 if not scope_info.description:
                     cls_name = (
@@ -470,11 +504,13 @@ class HelpInfoExtracter:
                 provider = ""
                 if subsystem_cls is not None and build_configuration is not None:
                     provider = cls.get_provider(
-                        build_configuration.subsystem_to_providers.get(subsystem_cls)
+                        build_configuration.subsystem_to_providers.get(subsystem_cls),
+                        subsystem_cls.__module__,
                     )
                 return HelpInfoExtracter(scope_info.scope).get_option_scope_help_info(
                     scope_info.description,
-                    options.get_parser(scope_info.scope),
+                    options.get_registrar(scope_info.scope),
+                    options.native_parser.with_derivation(),
                     # `filter` should be treated as a subsystem for `help`, even though it still
                     # works as a goal for backwards compatibility.
                     scope_info.is_goal if scope_info.scope != "filter" else False,
@@ -490,7 +526,8 @@ class HelpInfoExtracter:
                 assert subsystem_cls is not None
                 if build_configuration is not None:
                     provider = cls.get_provider(
-                        build_configuration.subsystem_to_providers.get(subsystem_cls)
+                        build_configuration.subsystem_to_providers.get(subsystem_cls),
+                        subsystem_cls.__module__,
                     )
                 goal_subsystem_cls = cast(Type[GoalSubsystem], subsystem_cls)
                 return GoalHelpInfo(
@@ -511,14 +548,18 @@ class HelpInfoExtracter:
                     provider=cls.get_provider(
                         build_configuration
                         and build_configuration.target_type_to_providers.get(target_type)
-                        or None
+                        or None,
+                        target_type.__module__,
                     ),
                     get_field_type_provider=lambda field_type: cls.get_provider(
-                        build_configuration.union_rule_to_providers.get(
-                            UnionRule(target_type.PluginField, field_type)
-                        )
-                        if build_configuration is not None
-                        else None
+                        (
+                            build_configuration.union_rule_to_providers.get(
+                                UnionRule(target_type.PluginField, field_type)
+                            )
+                            if build_configuration is not None
+                            else None
+                        ),
+                        field_type.__module__,
                     ),
                 )
 
@@ -586,18 +627,14 @@ class HelpInfoExtracter:
         if default_help_repr is not None:
             return str(default_help_repr)  # Should already be a string, but might as well be safe.
 
-        ranked_default = kwargs.get("default")
-        fallback: Any = None
+        default = kwargs.get("default")
+        if default is not None:
+            return default
         if is_list_option(kwargs):
-            fallback = []
+            return []
         elif is_dict_option(kwargs):
-            fallback = {}
-        default = (
-            ranked_default.value
-            if ranked_default and ranked_default.value is not None
-            else fallback
-        )
-        return default
+            return {}
+        return None
 
     @staticmethod
     def stringify_type(t: type) -> str:
@@ -644,11 +681,22 @@ class HelpInfoExtracter:
             return None
 
     @staticmethod
-    def get_provider(providers: tuple[str, ...] | None) -> str:
+    def get_provider(providers: tuple[str, ...] | None, hint: str | None = None) -> str:
+        """Get the best match for the provider.
+
+        To take advantage of provider names being modules, `hint` should be something like the a
+        subsystem's `__module__` or a rule's `canonical_name`.
+        """
         if not providers:
             return ""
-        # Pick the shortest backend name.
-        return sorted(providers, key=len)[0]
+        if not hint:
+            # Pick the shortest backend name.
+            return sorted(providers, key=len)[0]
+
+        # Pick the one closest to `hint`.
+        # No cutoff and max 1 result guarantees a result with a single element.
+        [provider] = difflib.get_close_matches(hint, providers, n=1, cutoff=0.0)
+        return provider
 
     @staticmethod
     def maybe_cleandoc(doc: str | None) -> str | None:
@@ -674,7 +722,9 @@ class HelpInfoExtracter:
 
         return LazyFrozenDict(
             {
-                rule.canonical_name: rule_info_loader(rule, cls.get_provider(providers))
+                rule.canonical_name: rule_info_loader(
+                    rule, cls.get_provider(providers, rule.canonical_name)
+                )
                 for rule, providers in build_configuration.rule_to_providers.items()
                 if isinstance(rule, TaskRule)
             }
@@ -718,8 +768,8 @@ class HelpInfoExtracter:
             return api_type.__module__
 
         def _rule_dependencies(rule: TaskRule) -> Iterator[type]:
-            yield from rule.input_selectors
-            for constraint in rule.input_gets:
+            yield from rule.parameters.values()
+            for constraint in rule.awaitables:
                 yield constraint.output_type
 
         def _extract_api_types() -> Iterator[tuple[type, str, tuple[type, ...]]]:
@@ -728,16 +778,16 @@ class HelpInfoExtracter:
             for rule, providers in bc.rule_to_providers.items():
                 if not isinstance(rule, TaskRule):
                     continue
-                provider = cls.get_provider(providers)
+                provider = cls.get_provider(providers, rule.canonical_name)
                 yield rule.output_type, provider, tuple(_rule_dependencies(rule))
 
-                for constraint in rule.input_gets:
+                for constraint in rule.awaitables:
                     for input_type in constraint.input_types:
                         yield input_type, _find_provider(input_type), ()
 
             union_bases: set[type] = set()
             for union_rule, providers in bc.union_rule_to_providers.items():
-                provider = cls.get_provider(providers)
+                provider = cls.get_provider(providers, union_rule.union_member.__module__)
                 union_bases.add(union_rule.union_base)
                 yield union_rule.union_member, provider, (union_rule.union_base,)
 
@@ -810,27 +860,40 @@ class HelpInfoExtracter:
             ),
         )
 
-        def get_api_type_info_loader(api_type: type) -> Callable[[], PluginAPITypeInfo]:
+        def get_api_type_info(api_types: tuple[type, ...]):
+            """Gather the info from each of the types and aggregate it.
+
+            The gathering is the expensive operation, and we can only aggregate once we've gathered.
+            """
+
             def load() -> PluginAPITypeInfo:
-                return PluginAPITypeInfo.create(
-                    api_type,
-                    rules,
-                    provider=", ".join(type_graph[api_type]["providers"]),
-                    dependencies=type_graph[api_type]["dependencies"],
-                    dependents=type_graph[api_type].get("dependents", ()),
-                    union_members=tuple(
-                        sorted(member.__name__ for member in union_membership.get(api_type))
-                    ),
-                )
+                gatherered_infos = [
+                    PluginAPITypeInfo.create(
+                        api_type,
+                        rules,
+                        provider=type_graph[api_type]["providers"],
+                        dependencies=type_graph[api_type]["dependencies"],
+                        dependents=type_graph[api_type].get("dependents", ()),
+                        union_members=tuple(
+                            sorted(member.__qualname__ for member in union_membership.get(api_type))
+                        ),
+                    )
+                    for api_type in api_types
+                ]
+                return reduce(lambda x, y: x.merged_with(y), gatherered_infos)
 
             return load
 
-        return LazyFrozenDict(
-            {
-                f"{api_type.__module__}.{api_type.__name__}": get_api_type_info_loader(api_type)
-                for api_type in sorted(all_types, key=attrgetter("__name__"))
-            }
-        )
+        # We want to provide a lazy dict so we don't spend so long doing the info gathering.
+        # We provide a list of the types here, and the lookup function performs the gather and the aggregation
+        api_type_name = PluginAPITypeInfo.fully_qualified_name_from_type
+        all_types_sorted = sorted(all_types, key=api_type_name)
+        infos: dict[str, Callable[[], PluginAPITypeInfo]] = {
+            k: get_api_type_info(tuple(v))
+            for k, v in itertools.groupby(all_types_sorted, key=api_type_name)
+        }
+
+        return LazyFrozenDict(infos)
 
     @classmethod
     def get_backend_help_info(cls, options: Options) -> LazyFrozenDict[str, BackendHelpInfo]:
@@ -928,6 +991,9 @@ class HelpInfoExtracter:
             {
                 symbol.name: get_build_file_symbol_help_info_loader(symbol)
                 for symbol in build_symbols.info.values()
+                # (NB. we don't just check name.startswith("_") because there's symbols like
+                # __default__ that should appear in help & docs)
+                if not symbol.hide_from_help
             }
         )
 
@@ -938,7 +1004,8 @@ class HelpInfoExtracter:
     def get_option_scope_help_info(
         self,
         description: str,
-        parser: Parser,
+        registrar: OptionRegistrar,
+        native_parser: NativeOptionParser,
         is_goal: bool,
         provider: str = "",
         deprecated_scope: Optional[str] = None,
@@ -948,13 +1015,31 @@ class HelpInfoExtracter:
         basic_options = []
         advanced_options = []
         deprecated_options = []
-        for args, kwargs in parser.option_registrations_iter():
-            history = parser.history(kwargs["dest"])
-            ohi = self.get_option_help_info(args, kwargs)
+        for option_info in registrar.option_registrations_iter():
+            derivation = native_parser.get_derivation(registrar.scope, option_info)
+            # Massage the derivation structure returned by the NativeOptionParser into an
+            # OptionValueHistory as returned by the legacy parser.
+            # TODO: Once we get rid of the legacy parser we can probably simplify by
+            #  using the native structure directly.
+            ranked_values = []
+
+            # Adding this constant, empty history entry is silly, but it appears in the
+            # legacy parser's results as an implementation artifact, and we want to be
+            # consistent with its tests until we get rid of it.
+            is_list = option_info.kwargs.get("type") == list
+            is_dict = option_info.kwargs.get("type") == dict
+            empty_val: list | dict | None = [] if is_list else {} if is_dict else None
+            empty_details = "" if (is_list or is_dict) else None
+            ranked_values.append(RankedValue(Rank.NONE, empty_val, empty_details))
+
+            for value, rank, details in derivation:
+                ranked_values.append(RankedValue(rank, value, details or empty_details))
+            history = OptionValueHistory(tuple(ranked_values))
+            ohi = self.get_option_help_info(option_info)
             ohi = dataclasses.replace(ohi, value_history=history)
             if ohi.deprecation_active:
                 deprecated_options.append(ohi)
-            elif kwargs.get("advanced"):
+            elif option_info.kwargs.get("advanced"):
                 advanced_options.append(ohi)
             else:
                 basic_options.append(ohi)
@@ -970,13 +1055,13 @@ class HelpInfoExtracter:
             deprecated=tuple(deprecated_options),
         )
 
-    def get_option_help_info(self, args, kwargs):
+    def get_option_help_info(self, option_info: OptionInfo) -> OptionHelpInfo:
         """Returns an OptionHelpInfo for the option registered with the given (args, kwargs)."""
         display_args = []
         scoped_cmd_line_args = []
         unscoped_cmd_line_args = []
 
-        for arg in args:
+        for arg in option_info.args:
             is_short_arg = len(arg) == 2
             unscoped_cmd_line_args.append(arg)
             if self._scope_prefix:
@@ -985,7 +1070,7 @@ class HelpInfoExtracter:
                 scoped_arg = arg
             scoped_cmd_line_args.append(scoped_arg)
 
-            if Parser.is_bool(kwargs):
+            if OptionRegistrar.is_bool(option_info.kwargs):
                 if is_short_arg:
                     display_args.append(scoped_arg)
                 else:
@@ -994,17 +1079,18 @@ class HelpInfoExtracter:
                     scoped_cmd_line_args.append(f"--no-{sa_2}")
                     display_args.append(f"--[no-]{sa_2}")
             else:
-                metavar = self.compute_metavar(kwargs)
-                display_args.append(f"{scoped_arg}={metavar}")
-                if kwargs.get("passthrough"):
-                    type_str = self.stringify_type(kwargs.get("member_type", str))
+                metavar = self.compute_metavar(option_info.kwargs)
+                separator = "" if is_short_arg else "="
+                display_args.append(f"{scoped_arg}{separator}{metavar}")
+                if option_info.kwargs.get("passthrough"):
+                    type_str = self.stringify_type(option_info.kwargs.get("member_type", str))
                     display_args.append(f"... -- [{type_str} [{type_str} [...]]]")
 
-        typ = kwargs.get("type", str)
-        default = self.compute_default(**kwargs)
-        help_msg = kwargs.get("help", "No help available.")
-        deprecation_start_version = kwargs.get("deprecation_start_version")
-        removal_version = kwargs.get("removal_version")
+        typ = option_info.kwargs.get("type", str)
+        default = self.compute_default(**option_info.kwargs)
+        help_msg = option_info.kwargs.get("help", "No help available.")
+        deprecation_start_version = option_info.kwargs.get("deprecation_start_version")
+        removal_version = option_info.kwargs.get("removal_version")
         deprecation_active = removal_version is not None and deprecated.is_deprecation_active(
             deprecation_start_version
         )
@@ -1019,16 +1105,27 @@ class HelpInfoExtracter:
             deprecated_message = (
                 f"{message_start}, {deprecated_tense} removed in version: {removal_version}."
             )
-        removal_hint = kwargs.get("removal_hint")
-        choices = self.compute_choices(kwargs)
+        removal_hint = option_info.kwargs.get("removal_hint")
+        choices = self.compute_choices(option_info.kwargs)
 
-        dest = Parser.parse_dest(*args, **kwargs)
-        # Global options have three env var variants. The last one is the most human-friendly.
-        env_var = Parser.get_env_var_names(self._scope, dest)[-1]
+        dest = parse_dest(option_info)
+        udest = dest.upper()
+        if self._scope == GLOBAL_SCOPE:
+            # Global options have 2-3 env var variants, e.g., --pants-workdir can be
+            # set with PANTS_GLOBAL_PANTS_WORKDIR, PANTS_PANTS_WORKDIR, or PANTS_WORKDIR.
+            # The last one is the most human-friendly, so it's what we use in the help info.
+            if udest.startswith("PANTS_"):
+                env_var = udest
+            else:
+                env_var = f"PANTS_{udest}"
+        else:
+            env_var = f"PANTS_{_ENV_SANITIZER_RE.sub('_', self._scope.upper())}_{udest}"
 
-        target_field_name = f"{self._scope_prefix}_{option_field_name_for(args)}".replace("-", "_")
-        environment_aware = kwargs.get("environment_aware") is True
-        fromfile = kwargs.get("fromfile", False)
+        target_field_name = (
+            f"{self._scope_prefix}_{option_field_name_for(option_info.args)}".replace("-", "_")
+        )
+        environment_aware = option_info.kwargs.get("environment_aware") is True
+        fromfile = option_info.kwargs.get("fromfile", False)
 
         ret = OptionHelpInfo(
             display_args=tuple(display_args),

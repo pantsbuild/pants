@@ -14,14 +14,14 @@ from enum import Enum
 from typing import ClassVar, Iterable, Mapping
 
 from pants.core.util_rules.environments import EnvironmentTarget
-from pants.core.util_rules.system_binaries import BashBinary
+from pants.core.util_rules.system_binaries import BashBinary, LnBinary
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileDigest, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import CoarsenedTarget
 from pants.jvm.compile import ClasspathEntry
-from pants.jvm.resolve.common import Coordinate, Coordinates
+from pants.jvm.resolve.coordinate import Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.subsystems import JvmSubsystem
@@ -201,6 +201,7 @@ async def prepare_jdk_environment(
     coursier: Coursier,
     nailgun_: Nailgun,
     bash: BashBinary,
+    ln: LnBinary,
     request: JdkRequest,
     env_target: EnvironmentTarget,
 ) -> JdkEnvironment:
@@ -214,19 +215,24 @@ async def prepare_jdk_environment(
     if version is DefaultJdk.SYSTEM:
         coursier_jdk_option = "--system-jvm"
     else:
-        coursier_jdk_option = shlex.quote(f"--jvm={version}")
+        coursier_jdk_option = f"--jvm={version}"
+
+    if not coursier.jvm_index:
+        coursier_options = ["java-home", coursier_jdk_option]
+    else:
+        jvm_index_option = f"--jvm-index={coursier.jvm_index}"
+        coursier_options = ["java-home", jvm_index_option, coursier_jdk_option]
 
     # TODO(#16104) This argument re-writing code should use the native {chroot} support.
     # See also `run` for other argument re-writing code.
     def prefixed(arg: str) -> str:
+        quoted = shlex.quote(arg)
         if arg.startswith("__"):
-            return f"${{PANTS_INTERNAL_ABSOLUTE_PREFIX}}{arg}"
+            return f"${{PANTS_INTERNAL_ABSOLUTE_PREFIX}}{quoted}"
         else:
-            return arg
+            return quoted
 
-    optionally_prefixed_coursier_args = [
-        prefixed(arg) for arg in coursier.args(["java-home", coursier_jdk_option])
-    ]
+    optionally_prefixed_coursier_args = [prefixed(arg) for arg in coursier.args(coursier_options)]
     # NB: We `set +e` in the subshell to ensure that it exits as well.
     #  see https://unix.stackexchange.com/a/23099
     java_home_command = " ".join(("set +e;", *optionally_prefixed_coursier_args))
@@ -271,13 +277,14 @@ async def prepare_jdk_environment(
 
     # TODO: Locate `ln`.
     version_comment = "\n".join(f"# {line}" for line in java_version.splitlines())
+    ln_path = shlex.quote(ln.path)
     jdk_preparation_script = textwrap.dedent(  # noqa: PNT20
         f"""\
         # pants javac script using Coursier {coursier_jdk_option}. `java -version`:"
         {version_comment}
         set -eu
 
-        /bin/ln -s "$({java_home_command})" "${{PANTS_INTERNAL_ABSOLUTE_PREFIX}}{JdkEnvironment.java_home}"
+        {ln_path} -s "$({java_home_command})" "${{PANTS_INTERNAL_ABSOLUTE_PREFIX}}{JdkEnvironment.java_home}"
         exec "$@"
         """
     )

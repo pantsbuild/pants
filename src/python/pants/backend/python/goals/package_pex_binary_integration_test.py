@@ -14,7 +14,10 @@ import pytest
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.goals import package_dists, package_pex_binary
-from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
+from pants.backend.python.goals.package_pex_binary import (
+    PexBinaryFieldSet,
+    PexFromTargetsRequestForBuiltPackage,
+)
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import (
@@ -49,6 +52,7 @@ def rule_runner() -> PythonRuleRunner:
             *core_target_types_rules(),
             *package_dists.rules(),
             QueryRule(BuiltPackage, [PexBinaryFieldSet]),
+            QueryRule(PexFromTargetsRequestForBuiltPackage, [PexBinaryFieldSet]),
             QueryRule(BuiltPackage, [PythonDistributionFieldSet]),
         ],
         target_types=[
@@ -135,6 +139,7 @@ def test_include_sources_avoids_files_targets_warning(
                 """\
                 python_sources(
                     name='sources',
+                    interpreter_constraints=["CPython==3.10.*"]
                 )
 
                 python_distribution(
@@ -147,12 +152,14 @@ def test_include_sources_avoids_files_targets_warning(
                         name='my-dist',
                         version='1.2.3',
                     ),
+                    interpreter_constraints=["CPython==3.10.*"]
                 )
 
                 pex_binary(
                     dependencies=[':wheel'],
                     entry_point="none",
                     include_sources=False,
+                    interpreter_constraints=["CPython==3.10.*"]
                 )
                 """
             ),
@@ -208,9 +215,11 @@ def test_layout(rule_runner: PythonRuleRunner, layout: PexLayout) -> None:
     rule_runner.write_digest(result.digest)
     executable = os.path.join(
         rule_runner.build_root,
-        expected_pex_relpath
-        if PexLayout.ZIPAPP is layout
-        else os.path.join(expected_pex_relpath, "__main__.py"),
+        (
+            expected_pex_relpath
+            if PexLayout.ZIPAPP is layout
+            else os.path.join(expected_pex_relpath, "__main__.py")
+        ),
     )
     stdout = dedent(
         """\
@@ -245,46 +254,9 @@ def pex_executable(rule_runner: PythonRuleRunner) -> str:
     return os.path.join(rule_runner.build_root, expected_pex_relpath)
 
 
-def test_resolve_local_platforms(pex_executable: str, rule_runner: PythonRuleRunner) -> None:
-    complete_current_platform = subprocess.run(
-        args=[pex_executable, "interpreter", "inspect", "-mt"],
-        env=dict(PEX_MODULE="pex.cli", **os.environ),
-        stdout=subprocess.PIPE,
-    ).stdout
-
-    # N.B.: ansicolors 1.0.2 is available sdist-only on PyPI, so resolving it requires using a
-    # local interpreter.
-    rule_runner.write_files(
-        {
-            "src/py/project/app.py": "import colors",
-            "src/py/project/platform.json": complete_current_platform,
-            "src/py/project/BUILD": dedent(
-                """\
-                python_requirement(name="ansicolors", requirements=["ansicolors==1.0.2"])
-                file(name="platform", source="platform.json")
-                pex_binary(
-                    dependencies=[":ansicolors"],
-                    complete_platforms=[":platform"],
-                    resolve_local_platforms=True,
-                )
-                """
-            ),
-        }
-    )
-    tgt = rule_runner.get_target(Address("src/py/project"))
-    field_set = PexBinaryFieldSet.create(tgt)
-    result = rule_runner.request(BuiltPackage, [field_set])
-    assert len(result.artifacts) == 1
-    expected_pex_relpath = "src.py.project/project.pex"
-    assert expected_pex_relpath == result.artifacts[0].relpath
-
-    rule_runner.write_digest(result.digest)
-    executable = os.path.join(rule_runner.build_root, expected_pex_relpath)
-    subprocess.run([executable], check=True)
-
-
 @skip_unless_python38_present
-def test_complete_platforms(rule_runner: PythonRuleRunner) -> None:
+@pytest.mark.parametrize("target_type", ["files", "resources"])
+def test_complete_platforms(rule_runner: PythonRuleRunner, target_type: str) -> None:
     linux_complete_platform = pkgutil.get_data(__name__, "platform-linux-py38.json")
     assert linux_complete_platform is not None
 
@@ -296,9 +268,9 @@ def test_complete_platforms(rule_runner: PythonRuleRunner) -> None:
             "src/py/project/platform-linux-py38.json": linux_complete_platform,
             "src/py/project/platform-mac-py38.json": mac_complete_platform,
             "src/py/project/BUILD": dedent(
-                """\
+                f"""\
                 python_requirement(name="p537", requirements=["p537==1.0.6"])
-                files(name="platforms", sources=["platform*.json"])
+                {target_type}(name="platforms", sources=["platform*.json"])
                 pex_binary(
                     dependencies=[":p537"],
                     complete_platforms=[":platforms"],
@@ -418,3 +390,67 @@ def test_non_hermetic_venv_scripts(rule_runner: PythonRuleRunner) -> None:
     )
     assert "bob" == non_hermetic_results.pythonpath
     assert bob_sys_path_entry in non_hermetic_results.sys_path
+
+
+def test_sh_boot_plumb(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(name="lib")
+                pex_binary(
+                    entry_point="app.py",
+                    sh_boot=True
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+    assert len(result.artifacts) == 1
+    expected_pex_relpath = "src.py.project/project.pex"
+    assert expected_pex_relpath == result.artifacts[0].relpath
+
+    rule_runner.write_digest(result.digest)
+
+    executable = os.path.join(rule_runner.build_root, expected_pex_relpath)
+    with open(executable, "rb") as f:
+        shebang = f.readline().decode()
+        assert "#!/bin/sh" in shebang
+
+
+def test_extra_build_args(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(name="lib")
+                pex_binary(
+                    entry_point="app.py",
+                    extra_build_args=["--example-extra-arg", "value-goes-here"]
+                )
+                """
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(PexFromTargetsRequestForBuiltPackage, [field_set])
+
+    additional_args = result.request.additional_args
+
+    assert additional_args[-2] == "--example-extra-arg"
+    assert additional_args[-1] == "value-goes-here"

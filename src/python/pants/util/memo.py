@@ -249,7 +249,7 @@ def memoized_property(
     getter = memoized_method(func=func, key_factory=key_factory, cache_factory=cache_factory)
     return property(  # type: ignore[return-value]
         fget=getter,
-        fdel=lambda self: getter.forget(self),  # type: ignore[attr-defined, no-any-return]
+        fdel=lambda self: getter.forget(self),  # type: ignore[attr-defined]
     )
 
 
@@ -283,5 +283,5 @@ def testable_memoized_property(
     return property(  # type: ignore[return-value]
         fget=getter,
         fset=setter,
-        fdel=lambda self: getter.forget(self),  # type: ignore[attr-defined, no-any-return]
+        fdel=lambda self: getter.forget(self),  # type: ignore[attr-defined]
     )

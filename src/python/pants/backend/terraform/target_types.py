@@ -15,7 +15,7 @@ from pants.engine.target import (
     DescriptionField,
     FieldSet,
     MultipleSourcesField,
-    OptionalSingleSourceField,
+    SingleSourceField,
     StringField,
     Target,
     Targets,
@@ -88,17 +88,29 @@ class TerraformRootModuleField(StringField, AsyncFieldMixin):
         )
 
 
-class TerraformBackendConfigField(OptionalSingleSourceField):
-    alias = "backend_config"
-    help = "Configuration to be merged with what is in the configuration file's 'backend' block"
+class TerraformBackendConfigField(SingleSourceField):
+    default = ".tfbackend"
+    help = "Configuration to be merged with what is in the root module's 'backend' block"
 
 
-class TerraformVarFileSourcesField(MultipleSourcesField):
-    alias = "var_files"
+class TerraformBackendTarget(Target):
+    alias = "terraform_backend"
+    core_fields = (*COMMON_TARGET_FIELDS, TerraformBackendConfigField)
+    help = "Configuration to be merged with what is in the root module's 'backend' block"
+
+
+class TerraformVarFileSourceField(MultipleSourcesField):
+    default = ("*.tfvars",)
     expected_file_extensions = (".tfvars",)
     help = generate_multiple_sources_field_help_message(
-        "Example: `var_files=['common.tfvars', 'prod.tfvars']`"
+        "Example: `sources=['common.tfvars', 'prod.tfvars']`"
     )
+
+
+class TerraformVarFileTarget(Target):
+    alias = "terraform_var_files"
+    core_fields = (*COMMON_TARGET_FIELDS, TerraformVarFileSourceField)
+    help = "Terraform vars files"
 
 
 class TerraformDeploymentTarget(Target):
@@ -107,8 +119,6 @@ class TerraformDeploymentTarget(Target):
         *COMMON_TARGET_FIELDS,
         TerraformDependenciesField,
         TerraformRootModuleField,
-        TerraformBackendConfigField,
-        TerraformVarFileSourcesField,
     )
     help = "A deployment of Terraform"
 
@@ -123,9 +133,6 @@ class TerraformDeploymentFieldSet(FieldSet):
     root_module: TerraformRootModuleField
     dependencies: TerraformDependenciesField
 
-    backend_config: TerraformBackendConfigField
-    var_files: TerraformVarFileSourcesField
-
 
 class AllTerraformDeploymentTargets(Targets):
     pass
@@ -135,6 +142,29 @@ class AllTerraformDeploymentTargets(Targets):
 def all_terraform_deployment_targets(targets: AllTargets) -> AllTerraformDeploymentTargets:
     return AllTerraformDeploymentTargets(
         tgt for tgt in targets if TerraformDeploymentFieldSet.is_applicable(tgt)
+    )
+
+
+class LockfileSourceField(SingleSourceField):
+    """Source field for synthesized `_lockfile` targets."""
+
+    default = ".terraform.lock.hcl"
+
+
+class LockfileDependenciesField(Dependencies):
+    pass
+
+
+class TerraformLockfileTarget(Target):
+    alias = "_terraform_lockfile"
+    core_fields = (*COMMON_TARGET_FIELDS, LockfileSourceField, LockfileDependenciesField)
+    help = help_text(
+        """
+        A target for lockfiles in order to include them in the dependency graph of other targets.
+
+        This tracks them so that `--changed-since --changed-dependents` works properly for targets
+        relying on a particular lockfile.
+        """
     )
 
 

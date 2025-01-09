@@ -35,7 +35,7 @@ def main():
             if attempts <= 0:
                 raise Exception("File was never written.")
             attempts -= 1
-            sys.stderr.write("Waiting for file {}\n".format(waiting_for_file))
+            sys.stderr.write(f"Waiting for file {waiting_for_file}\n")
             sys.stderr.flush()
             time.sleep(1)
 

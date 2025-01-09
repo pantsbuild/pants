@@ -42,7 +42,7 @@ class DjangoApps(FrozenDict[str, DjangoApp]):
     def label_to_file(self) -> FrozenDict[str, str]:
         return FrozenDict((label, app.config_file) for label, app in self.items())
 
-    def add_from_json(self, json_bytes: bytes, strip_prefix="") -> "DjangoApps":
+    def add_from_json(self, json_bytes: bytes, strip_prefix="") -> DjangoApps:
         json_dict: dict[str, dict[str, str]] = json.loads(json_bytes.decode())
         apps = {
             label: DjangoApp(

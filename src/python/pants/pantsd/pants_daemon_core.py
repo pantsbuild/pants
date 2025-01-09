@@ -6,9 +6,7 @@ from __future__ import annotations
 import logging
 import threading
 from contextlib import contextmanager
-from typing import Iterator
-
-from typing_extensions import Protocol
+from typing import Iterator, Protocol
 
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.env_vars import CompleteEnvironmentVars
@@ -31,8 +29,7 @@ class PantsServicesConstructor(Protocol):
         self,
         bootstrap_options: OptionValueContainer,
         graph_scheduler: GraphScheduler,
-    ) -> PantsServices:
-        ...
+    ) -> PantsServices: ...
 
 
 class PantsDaemonCore:
@@ -135,7 +132,7 @@ class PantsDaemonCore:
 
         scheduler_restart_explanation: str | None = None
 
-        # Because these options are computed dynamically via side-effects like reading from a file,
+        # Because these options are computed dynamically via side effects like reading from a file,
         # they need to be re-evaluated every run. We only reinitialize the scheduler if changes
         # were made, though.
         dynamic_remote_options, auth_plugin_result = DynamicRemoteOptions.from_options(
@@ -170,7 +167,7 @@ class PantsDaemonCore:
                 # The fingerprint mismatches, either because this is the first run (and there is no
                 # fingerprint) or because relevant options have changed. Create a new scheduler
                 # and services.
-                bootstrap_options = options.bootstrap_option_values()
+                bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
                 assert bootstrap_options is not None
                 with self._handle_exceptions():
                     self._initialize(

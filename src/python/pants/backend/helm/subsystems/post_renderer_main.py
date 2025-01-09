@@ -38,7 +38,7 @@ def build_manifest_map(input_file: str) -> dict[str, list[str]]:
 
     result = defaultdict(list)
     template_files = []
-    with open(input_file, "r", encoding="utf-8") as f:
+    with open(input_file, encoding="utf-8") as f:
         template_files = f.read().split("---")
 
     for template in template_files:

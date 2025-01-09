@@ -8,7 +8,11 @@ from typing import cast
 
 from pants.backend.docker.goals.package_image import BuiltDockerImage, DockerPackageFieldSet
 from pants.backend.docker.subsystems.docker_options import DockerOptions
-from pants.backend.docker.target_types import DockerImageRegistriesField, DockerImageSourceField
+from pants.backend.docker.target_types import (
+    DockerImageRegistriesField,
+    DockerImageRunExtraArgsField,
+    DockerImageSourceField,
+)
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
@@ -21,6 +25,11 @@ from pants.engine.target import WrappedTarget, WrappedTargetRequest
 class DockerRunFieldSet(RunFieldSet):
     required_fields = (DockerImageSourceField,)
     run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
+
+    extra_run_args: DockerImageRunExtraArgsField
+
+    def get_run_args(self, options: DockerOptions) -> tuple[str, ...]:
+        return tuple(options.run_args + (self.extra_run_args.value or ()))
 
 
 @rule
@@ -49,8 +58,13 @@ async def docker_image_run_request(
         Get(EnvironmentVars, EnvironmentVarsRequest(options_env_aware.env_vars)),
         Get(BuiltPackage, PackageFieldSet, build_request),
     )
+
     tag = cast(BuiltDockerImage, image.artifacts[0]).tags[0]
-    run = docker.run_image(tag, docker_run_args=options.run_args, env=env)
+    run = docker.run_image(
+        tag,
+        docker_run_args=field_set.get_run_args(options),
+        env=env,
+    )
 
     return RunRequest(
         digest=image.digest,

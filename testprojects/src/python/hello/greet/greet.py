@@ -9,4 +9,4 @@ from colors import green
 def greet(greetee):
     """Given the name, return a greeting for a person of that name."""
     greeting = pkgutil.get_data(__name__, "greeting.txt").decode().strip()
-    return green("{}, {}!".format(greeting, greetee))
+    return green(f"{greeting}, {greetee}!")

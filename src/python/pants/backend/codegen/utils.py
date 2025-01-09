@@ -54,7 +54,7 @@ def find_python_runtime_library_or_raise_error(
                 No `python_requirement` target was found with the module `{runtime_library_module}`
                 in your project{for_resolve_str}, so the Python code generated from the target
                 {codegen_address} will not work properly. See
-                {doc_url('python-third-party-dependencies')} for how to add a requirement, such as
+                {doc_url('docs/python/overview/third-party-dependencies')} for how to add a requirement, such as
                 adding to requirements.txt. Usually you will want to use the
                 `{recommended_requirement_name}` project at {recommended_requirement_url}.
 

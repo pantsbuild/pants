@@ -23,6 +23,8 @@ from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.testutil.rule_runner import RuleRunner
 
+ATTEMPTS_DEFAULT_OPTION = 2
+
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
@@ -41,10 +43,13 @@ def rule_runner() -> RuleRunner:
             ShellCommandTestTarget,
         ],
     )
-    rule_runner.set_options([], env_inherit={"PATH"})
+    rule_runner.set_options(
+        [f"--test-attempts-default={ATTEMPTS_DEFAULT_OPTION}"], env_inherit={"PATH"}
+    )
     return rule_runner
 
 
+@pytest.mark.platform_specific_behavior
 def test_shell_command_as_test(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -105,3 +110,4 @@ def test_shell_command_as_test(rule_runner: RuleRunner) -> None:
     fail_result = run_test(fail_target)
     assert fail_result.exit_code == 1
     assert fail_result.stdout_bytes == b"does not contain 'xyzzy'\n"
+    assert len(fail_result.process_results) == ATTEMPTS_DEFAULT_OPTION

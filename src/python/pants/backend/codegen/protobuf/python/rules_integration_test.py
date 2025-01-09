@@ -340,3 +340,51 @@ def test_grpc_pre_v2_mypy_plugin(rule_runner: RuleRunner) -> None:
             "src/protobuf/dir1/f_pb2_grpc.py",
         ],
     )
+
+
+def test_grpclib_plugin(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/protobuf/dir1/f.proto": dedent(GRPC_PROTO_STANZA),
+            "src/protobuf/dir1/BUILD": "protobuf_sources(grpc=True)",
+        }
+    )
+    assert_files_generated(
+        rule_runner,
+        Address("src/protobuf/dir1", relative_file_path="f.proto"),
+        source_roots=["src/protobuf"],
+        extra_args=[
+            "--python-protobuf-grpclib-plugin",
+            "--no-python-protobuf-grpcio-plugin",
+        ],
+        expected_files=[
+            "src/protobuf/dir1/f_pb2.py",
+            "src/protobuf/dir1/f_grpc.py",
+        ],
+    )
+
+
+def test_all_plugins(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/protobuf/dir1/f.proto": dedent(GRPC_PROTO_STANZA),
+            "src/protobuf/dir1/BUILD": "protobuf_sources(grpc=True)",
+        }
+    )
+    assert_files_generated(
+        rule_runner,
+        Address("src/protobuf/dir1", relative_file_path="f.proto"),
+        source_roots=["src/protobuf"],
+        extra_args=[
+            "--python-protobuf-grpclib-plugin",
+            "--python-protobuf-grpcio-plugin",
+            "--python-protobuf-mypy-plugin",
+        ],
+        expected_files=[
+            "src/protobuf/dir1/f_pb2.py",
+            "src/protobuf/dir1/f_pb2.pyi",
+            "src/protobuf/dir1/f_pb2_grpc.py",
+            "src/protobuf/dir1/f_pb2_grpc.pyi",
+            "src/protobuf/dir1/f_grpc.py",
+        ],
+    )

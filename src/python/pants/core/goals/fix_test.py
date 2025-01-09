@@ -396,7 +396,7 @@ def test_fixers_first() -> None:
 
     stderr = run_fix(rule_runner, target_specs=["::"])
 
-    # NB Since both rules have the same body, if the fixer runs first, it'll make changes. Then the
+    # NB: Since both rules have the same body, if the fixer runs first, it'll make changes. Then the
     # formatter will have nothing to change.
     assert stderr == dedent(
         """\

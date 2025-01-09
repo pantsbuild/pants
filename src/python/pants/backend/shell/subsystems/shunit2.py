@@ -1,9 +1,10 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.rules import collect_rules
+from pants.engine.unions import UnionRule
 from pants.option.option_types import SkipOption
 from pants.util.meta import classproperty
 
@@ -38,4 +39,5 @@ def rules():
     return [
         *collect_rules(),
         *external_tool.rules(),
+        UnionRule(ExportableTool, Shunit2),
     ]

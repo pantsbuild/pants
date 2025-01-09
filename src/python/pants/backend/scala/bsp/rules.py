@@ -38,6 +38,7 @@ from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec.base import BuildTargetIdentifier
 from pants.bsp.spec.targets import DependencyModule
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
+from pants.bsp.util_rules.queries import compute_handler_query_rules
 from pants.bsp.util_rules.targets import (
     BSPBuildTargetsMetadataRequest,
     BSPBuildTargetsMetadataResult,
@@ -64,7 +65,8 @@ from pants.jvm.bsp.resources import rules as jvm_resources_rules
 from pants.jvm.bsp.spec import JvmBuildTarget, MavenDependencyModule, MavenDependencyModuleArtifact
 from pants.jvm.compile import ClasspathEntry, ClasspathEntryRequest, ClasspathEntryRequestFactory
 from pants.jvm.jdk_rules import DefaultJdk, JdkEnvironment, JdkRequest
-from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, Coordinate
+from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
+from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.resolve.coursier_fetch import (
     CoursierLockfileEntry,
     CoursierResolvedLockfile,
@@ -299,7 +301,12 @@ async def bsp_resolve_scala_metadata(
 
 def _jdk_request_sort_key(
     jvm: JvmSubsystem,
-) -> Callable[[JdkRequest,], tuple[int, ...]]:
+) -> Callable[
+    [
+        JdkRequest,
+    ],
+    tuple[int, ...],
+]:
     def sort_key_function(request: JdkRequest) -> tuple[int, ...]:
         if request == JdkRequest.SYSTEM:
             return (-1,)
@@ -536,7 +543,7 @@ async def bsp_scala_resources_request(
 
 
 def rules():
-    return (
+    base_rules = (
         *collect_rules(),
         *jvm_compile_rules(),
         *jvm_resources_rules(),
@@ -549,3 +556,4 @@ def rules():
         UnionRule(BSPResourcesRequest, ScalaBSPResourcesRequest),
         UnionRule(BSPDependencyModulesRequest, ScalaBSPDependencyModulesRequest),
     )
+    return (*base_rules, *compute_handler_query_rules(base_rules))

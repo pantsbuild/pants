@@ -4,7 +4,7 @@
 use pyo3::prelude::*;
 use workunit_store::Metric;
 
-pub fn register(m: &PyModule) -> PyResult<()> {
+pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(all_counter_names, m)?)?;
     Ok(())
 }

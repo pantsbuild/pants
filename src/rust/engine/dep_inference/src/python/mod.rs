@@ -2,13 +2,15 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::path::PathBuf;
 
-include!(concat!(env!("OUT_DIR"), "/python/constants.rs"));
-include!(concat!(env!("OUT_DIR"), "/python/visitor.rs"));
-include!(concat!(env!("OUT_DIR"), "/python_impl_hash.rs"));
-
 use fnv::{FnvHashMap as HashMap, FnvHashSet as HashSet};
 use serde_derive::{Deserialize, Serialize};
 use tree_sitter::Parser;
+
+use crate::code;
+
+include!(concat!(env!("OUT_DIR"), "/python/constants.rs"));
+include!(concat!(env!("OUT_DIR"), "/python/visitor.rs"));
+include!(concat!(env!("OUT_DIR"), "/python_impl_hash.rs"));
 
 #[derive(Serialize, Deserialize)]
 pub struct ParsedPythonDependencies {
@@ -97,7 +99,7 @@ impl ImportCollector<'_> {
     }
 
     fn code_at(&self, range: tree_sitter::Range) -> &str {
-        &self.code[range.start_byte..range.end_byte]
+        code::at_range(self.code, range)
     }
 
     fn string_at(&self, range: tree_sitter::Range) -> &str {
@@ -107,18 +109,47 @@ impl ImportCollector<'_> {
             .trim_matches(|c| "'\"".contains(c))
     }
 
+    fn is_pragma_ignored_at_row(&self, node: tree_sitter::Node, end_row: usize) -> bool {
+        let node_range = node.range();
+        if node.kind_id() == KindID::COMMENT
+            && end_row == node_range.start_point.row
+            && self.code_at(node_range).contains("# pants: no-infer-dep")
+        {
+            return true;
+        }
+        false
+    }
+
     fn is_pragma_ignored(&self, node: tree_sitter::Node) -> bool {
         if let Some(sibling) = node.next_named_sibling() {
-            let next_node_range = sibling.range();
-            if sibling.kind_id() == KindID::COMMENT
-                && node.range().end_point.row == next_node_range.start_point.row
-                && self
-                    .code_at(next_node_range)
-                    .contains("# pants: no-infer-dep")
-            {
+            return self.is_pragma_ignored_at_row(sibling, node.range().end_point.row);
+        }
+        false
+    }
+
+    fn is_pragma_ignored_recursive(&self, node: tree_sitter::Node) -> bool {
+        let node_end_point = node.range().end_point;
+        if let Some(sibling) = node.next_named_sibling() {
+            if self.is_pragma_ignored_at_row(sibling, node_end_point.row) {
                 return true;
             }
         }
+
+        let mut current = node;
+        loop {
+            if let Some(parent) = current.parent() {
+                if let Some(sibling) = parent.next_named_sibling() {
+                    if self.is_pragma_ignored_at_row(sibling, node_end_point.row) {
+                        return true;
+                    }
+                }
+                current = parent;
+                continue;
+            }
+            // At the root / no more parents.
+            break;
+        }
+
         false
     }
 
@@ -322,7 +353,9 @@ impl Visitor for ImportCollector<'_> {
     fn visit_string(&mut self, node: tree_sitter::Node) -> ChildBehavior {
         let range = node.range();
         let text: &str = self.string_at(range);
-        if !text.contains(|c: char| c.is_ascii_whitespace() || c == '\\') {
+        if !text.contains(|c: char| c.is_ascii_whitespace() || c == '\\')
+            && !self.is_pragma_ignored_recursive(node)
+        {
             self.string_candidates
                 .insert(text.to_string(), (range.start_point.row + 1) as u64);
         }

@@ -29,7 +29,6 @@ from pants.backend.python.dependency_inference.subsystem import (
     AmbiguityResolution,
     InitFilesInference,
     PythonInferSubsystem,
-    UnownedDependencyUsage,
 )
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -46,6 +45,10 @@ from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core import target_types
 from pants.core.target_types import AllAssetTargetsByPath
 from pants.core.util_rules import stripped_source_files
+from pants.core.util_rules.unowned_dependency_behavior import (
+    UnownedDependencyError,
+    UnownedDependencyUsage,
+)
 from pants.engine.addresses import Address, Addresses
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import Get, MultiGet, rule
@@ -63,10 +66,6 @@ from pants.util.docutil import doc_url
 from pants.util.strutil import bullet_list, softwrap
 
 logger = logging.getLogger(__name__)
-
-
-class UnownedDependencyError(Exception):
-    """The inferred dependency does not have any owner."""
 
 
 @dataclass(frozen=True)
@@ -346,7 +345,7 @@ async def _handle_unowned_imports(
 
         If you do not expect an import to be inferrable, add `# pants: no-infer-dep` to the
         import line. Otherwise, see
-        {doc_url('troubleshooting#import-errors-and-missing-dependencies')} for common problems.
+        {doc_url('docs/using-pants/troubleshooting-common-issues#import-errors-and-missing-dependencies')} for common problems.
         """
     )
     if unowned_dependency_behavior is UnownedDependencyUsage.LogWarning:
@@ -563,7 +562,7 @@ async def infer_python_conftest_dependencies(
     owners = await MultiGet(
         # NB: Because conftest.py files effectively always have content, we require an
         # owning target.
-        Get(Owners, OwnersRequest((f,), GlobMatchErrorBehavior.error))
+        Get(Owners, OwnersRequest((f,), owners_not_found_behavior=GlobMatchErrorBehavior.error))
         for f in conftest_files.snapshot.files
     )
 

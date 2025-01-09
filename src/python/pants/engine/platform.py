@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pants.util.osutil import get_normalized_arch_name, get_normalized_os_name
 
@@ -15,7 +15,7 @@ class PlatformError(Exception):
     """
 
 
-class Platform(Enum):
+class Platform(StrEnum):
     linux_arm64 = "linux_arm64"
     linux_x86_64 = "linux_x86_64"
     macos_arm64 = "macos_arm64"
@@ -33,3 +33,15 @@ class Platform(Enum):
         active `Platform`, they should request a `Platform` as a positional argument.
         """
         return Platform(f"{get_normalized_os_name()}_{get_normalized_arch_name()}")
+
+    def for_linux(self) -> Platform:
+        """Returns a Platform instance representing Linux on the Platform's architecture.
+
+        Useful for fetching docker images runnable directly on the local architecture.
+        """
+        if self == Platform.macos_x86_64:
+            return Platform.linux_x86_64
+        elif self == Platform.macos_arm64:
+            return Platform.linux_arm64
+        else:
+            return self

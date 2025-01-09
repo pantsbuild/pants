@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
 from enum import Enum
 from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Sequence, Tuple, Union
 
@@ -20,9 +21,9 @@ from pants.engine.internals.native_engine import AddPrefix as AddPrefix
 from pants.engine.internals.native_engine import Digest as Digest
 from pants.engine.internals.native_engine import FileDigest as FileDigest
 from pants.engine.internals.native_engine import MergeDigests as MergeDigests
+from pants.engine.internals.native_engine import PathMetadata, PathNamespace
 from pants.engine.internals.native_engine import RemovePrefix as RemovePrefix
 from pants.engine.internals.native_engine import Snapshot as Snapshot
-from pants.engine.rules import QueryRule
 from pants.util.frozendict import FrozenDict
 
 if TYPE_CHECKING:
@@ -272,19 +273,29 @@ class NativeDownloadFile:
     # authorization.
     auth_headers: FrozenDict[str, str]
 
+    retry_error_duration: timedelta
+    max_attempts: int
+
     def __init__(
-        self, url: str, expected_digest: FileDigest, auth_headers: Mapping[str, str] | None = None
+        self,
+        url: str,
+        expected_digest: FileDigest,
+        auth_headers: Mapping[str, str] | None = None,
+        retry_delay_duration: timedelta = timedelta(milliseconds=10),
+        max_attempts: int = 4,
     ) -> None:
         object.__setattr__(self, "url", url)
         object.__setattr__(self, "expected_digest", expected_digest)
         object.__setattr__(self, "auth_headers", FrozenDict(auth_headers or {}))
+        object.__setattr__(self, "retry_error_duration", retry_delay_duration)
+        object.__setattr__(self, "max_attempts", max_attempts)
 
 
 @dataclass(frozen=True)
 class Workspace(SideEffecting):
     """A handle for operations that mutate the local filesystem."""
 
-    _scheduler: "SchedulerSession"
+    _scheduler: SchedulerSession
     _enforce_effects: bool = True
 
     def write_digest(
@@ -300,7 +311,7 @@ class Workspace(SideEffecting):
         You should not use this in a `for` loop due to slow performance. Instead, call `await
         Get(Digest, MergeDigests)` beforehand.
 
-        As an advanced usecase, if the digest is known to be written to a temporary or idempotent
+        As an advanced use-case, if the digest is known to be written to a temporary or idempotent
         location, side_effecting=False may be passed to avoid tracking this write as a side effect.
         """
         if side_effecting:
@@ -326,11 +337,36 @@ class SnapshotDiff:
     changed_files: tuple[str, ...] = ()
 
     @classmethod
-    def from_snapshots(cls, ours: Snapshot, theirs: Snapshot) -> "SnapshotDiff":
+    def from_snapshots(cls, ours: Snapshot, theirs: Snapshot) -> SnapshotDiff:
         return cls(*ours._diff(theirs))
 
 
+@dataclass(frozen=True)
+class PathMetadataRequest:
+    """Request the full metadata of a single path in the filesystem.
+
+    Note: This API is symlink-aware and will distinguish between symlinks and regular files.
+    """
+
+    path: str
+    namespace: PathNamespace = PathNamespace.WORKSPACE
+
+
+@dataclass(frozen=True)
+class PathMetadataResult:
+    """Result of requesting the metadata for a path in the filesystem.
+
+    The `metadata` field will contain the metadata for the requested path, or else `None` if the
+    path does not exist.
+    """
+
+    metadata: PathMetadata | None
+
+
 def rules():
+    # Avoids an import cycle.
+    from pants.engine.rules import QueryRule
+
     return (
         QueryRule(Digest, (CreateDigest,)),
         QueryRule(Digest, (PathGlobs,)),

@@ -4,12 +4,13 @@
 from __future__ import annotations
 
 import itertools
+import logging
 import re
 from collections import defaultdict
-from typing import Iterable, Iterator, Sequence, Tuple, TypeVar
+from typing import Iterable, Iterator, Protocol, Sequence, Tuple, TypeVar
 
+from packaging.requirements import InvalidRequirement
 from pkg_resources import Requirement
-from typing_extensions import Protocol
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
@@ -22,17 +23,17 @@ from pants.util.memo import memoized
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
 
+logger = logging.getLogger(__name__)
+
 
 # This protocol allows us to work with any arbitrary FieldSet. See
 # https://mypy.readthedocs.io/en/stable/protocols.html.
 class FieldSetWithInterpreterConstraints(Protocol):
     @property
-    def address(self) -> Address:
-        ...
+    def address(self) -> Address: ...
 
     @property
-    def interpreter_constraints(self) -> InterpreterConstraintsField:
-        ...
+    def interpreter_constraints(self) -> InterpreterConstraintsField: ...
 
 
 _FS = TypeVar("_FS", bound=FieldSetWithInterpreterConstraints)
@@ -66,8 +67,14 @@ def parse_constraint(constraint: str) -> Requirement:
     """
     try:
         parsed_requirement = Requirement.parse(constraint)
-    except ValueError:
-        parsed_requirement = Requirement.parse(f"CPython{constraint}")
+    except ValueError as err:
+        try:
+            parsed_requirement = Requirement.parse(f"CPython{constraint}")
+        except ValueError:
+            raise InvalidRequirement(
+                f"Failed to parse Python interpreter constraint `{constraint}`: {err.args[0]}"
+            )
+
     return parsed_requirement
 
 
@@ -178,7 +185,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
 
         NB: Because Python targets validate that they have ICs which are a subset of their
         dependencies, merging constraints like this is only necessary when you are _mixing_ code
-        which might not have any inter-dependencies, such as when you're merging un-related roots.
+        which might not have any interdependencies, such as when you're merging unrelated roots.
         """
         fields = [
             tgt[InterpreterConstraintsField]
@@ -507,3 +514,24 @@ def _major_minor_version_when_single_and_entire(ics: InterpreterConstraints) -> 
 
     # anything else we don't understand
     raise _NonSimpleMajorMinor()
+
+
+@memoized
+def _warn_on_python2_usage_in_interpreter_constraints(
+    interpreter_constraints: tuple[str, ...], *, description_of_origin: str
+) -> None:
+    ics = InterpreterConstraints(interpreter_constraints)
+    if ics.includes_python2():
+        logger.warning(
+            f"The Python interpreter constraints from {description_of_origin} includes Python 2.x as a selected Python version. "
+            "Please note that Pants will no longer be proactively tested with Python 2.x starting with Pants v2.24.x because "
+            "Python 2 support ended on 1 January 2020. Please consider upgrading to Python 3.x for your code."
+        )
+
+
+def warn_on_python2_usage_in_interpreter_constraints(
+    interpreter_constraints: Iterable[str], *, description_of_origin: str
+) -> None:
+    _warn_on_python2_usage_in_interpreter_constraints(
+        tuple(interpreter_constraints), description_of_origin=description_of_origin
+    )

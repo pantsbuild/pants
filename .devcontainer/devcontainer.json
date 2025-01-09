@@ -1,0 +1,76 @@
+{
+    "name": "Pants Dev Container",
+    "build": {
+      "context": ".",
+      "dockerfile": "./Dockerfile"
+    },
+    "features": {
+      "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+      "ghcr.io/devcontainers/features/python:1": {
+        "version": "3.11.10"
+      },
+      "ghcr.io/stuartleeks/dev-container-features/shell-history:0": {}
+    },
+    "customizations": {
+      "vscode": {
+        "extensions": [
+          // VS Code extensions installed by the Python feature.
+          // See: https://github.com/devcontainers/features/tree/main/src/python#vs-code-extensions
+          // "ms-python.python",
+          // "ms-python.vscode-pylance",
+          // "ms-python.autopep8",
+          // Others useful extensions for Python and Rust.
+          "ms-python.black-formatter",
+          "ms-python.flake8",
+          "ms-python.mypy-type-checker",
+          "rust-lang.rust-analyzer",
+          "vadimcn.vscode-lldb",
+          "tamasfe.even-better-toml",
+          "unifiedjs.vscode-mdx"
+        ],
+        "settings": {
+          "[python]": {
+            "editor.defaultFormatter": "ms-python.black-formatter",
+            "editor.formatOnSave": true
+          },
+          "[rust]": {
+            "editor.defaultFormatter": "rust-lang.rust-analyzer",
+            "editor.formatOnSave": true
+          },
+          "python.analysis.extraPaths": ["src/python"],
+          "black-formatter.args": ["--config=pyproject.toml"],
+          "flake8.args": ["--config=build-support/flake8/.flake8"],
+          "flake8.path": ["dist/export/python/virtualenvs/flake8/3.11.10/bin/flake8"],
+          "mypy-type-checker.args": ["--config-file=pyproject.toml"],
+          "mypy-type-checker.path": ["dist/export/python/virtualenvs/mypy/3.11.10/bin/mypy"],
+          "rust-analyzer.linkedProjects": ["src/rust/engine/Cargo.toml"]
+        }
+      }
+    },
+    "remoteUser": "vscode",
+    "mounts": [
+      // DinD feature mounts `/tmp` to `tmpfs` by default, limiting the `/tmp` folder size
+      // to the amount of RAM that is available, which results in `Out of space Exception`
+      // when Pants runs. Temporary fix until issue #471 is resolved.
+      // See: https://github.com/devcontainers/features/issues/471
+      {
+        "target": "/tmp",
+        "type": "volume"
+      },
+      // Mount cache directories used by the Pants launcher binary
+      // and some underlying tools.
+      // See: https://www.pantsbuild.org/stable/docs/using-pants/using-pants-in-ci#directories-to-cache
+      {
+        "source": "pants-named_caches",
+        "target": "/home/vscode/.cache/pants/named_caches",
+        "type": "volume"
+      },
+      {
+        "source": "pants-lmdb_store",
+        "target": "/home/vscode/.cache/pants/lmdb_store",
+        "type": "volume"
+      }
+    ],
+    "postCreateCommand": ".devcontainer/postCreateCommand.sh",
+    "postStartCommand": ".devcontainer/postStartCommand.sh"
+  }

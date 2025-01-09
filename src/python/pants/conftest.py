@@ -10,7 +10,7 @@ import pytest
 def dedicated_target_fields():
     """Ensures we follow our convention of dedicated source and dependencies field per-target.
 
-    This help ensure that plugin authors can do dependency inference on _specific_ field types, and
+    This helps ensure that plugin authors can do dependency inference on _specific_ field types, and
     not have to filter targets using generic field types.
 
     Note that this can't help us if a target type should use an _even more specialized_ dependencies
@@ -63,7 +63,7 @@ def _check_frozen_dataclass_attributes() -> None:
                         assert expected == actual
                     else:
                         for attrname in self.__slots__:
-                            # Only way to validate it was initialized is to trigger the descriptor
+                            # The only way to validate it was initialized is to trigger the descriptor.
                             getattr(self, attrname)
 
                 setattr(dataclass_cls, "__init__", new__init__)

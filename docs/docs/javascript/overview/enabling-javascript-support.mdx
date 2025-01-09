@@ -1,0 +1,76 @@
+---
+    title: Enabling Javascript support
+    sidebar_position: 0
+---
+
+How to enable Pants's bundled Javascript backend package.
+
+---
+
+:::note Example Javascript repository
+See [here](https://github.com/pantsbuild/example-javascript) for examples of Pants's Javascript functionality.
+
+:::
+
+### Configuring the repository
+
+Enable the experimental Javascript [backend](../../using-pants/key-concepts/backends.mdx) like this:
+
+```toml title="pants.toml"
+[GLOBAL]
+...
+backend_packages = [
+    "pants.backend.experimental.javascript"
+]
+```
+
+Pants uses [`package_json`](../../../reference/targets/package_json.mdx) targets to model a NodeJS package.
+Further, [`javascript_source`](../../../reference/targets/javascript_source.mdx) and
+[`javascript_tests`](../../../reference/targets/javascript_test.mdx) targets are used to know which Javascript files to
+run on and to set any metadata.
+
+You can generate these targets by running [`pants tailor ::`](../../getting-started/initial-configuration.mdx#5-generate-build-files).
+
+```
+❯ pants tailor ::
+Created project/BUILD:
+  - Add javascript_sources target project
+  - Add javascript_tests target tests
+```
+
+:::tip Improved inference and introspection for bundled projects
+For [dependency inference](../../introduction/how-does-pants-work.mdx#dependency-inference), Pants reads both your
+projects' `package.json` sections and additionally
+supports [`jsconfig.json`](https://code.visualstudio.com/docs/languages/jsconfig), if one is present.
+:::
+
+### Setting up node
+Pants will by default download a distribution of `node` according to the
+[`nodejs` subsystem](../../../reference/subsystems/nodejs) configuration. If you wish to instead use a locally installed
+ version of, for example, 18.0.0 using `nvm` and its `.nvmrc` file, the following will get you there:
+
+```toml tab={"label": "pants.toml"}
+[nodejs]
+known_versions = [] # Assign this to the empty list to ensure Pants never downloads.
+version = "v18.0.0"
+search_path = ["<NVM_LOCAL>"]
+
+```
+
+```txt tab={"label": ".nvmrc"}
+v18.0.0
+
+```
+
+### Setting up a package manager
+To set a package manager project wide, do the following:
+
+```toml title="pants.toml"
+[nodejs]
+package_manager = "pnpm" # or yarn, or npm.
+
+```
+
+you can instead opt to use the [`package.json#packageManager`](./package.mdx#package-manager) field for this setting.
+Regardless of setting, pants uses the [`corepack`](https://github.com/nodejs/corepack) version distributed with the Node
+version you have chosen to install and manage package managers.

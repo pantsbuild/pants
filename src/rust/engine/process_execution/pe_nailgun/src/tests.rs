@@ -17,7 +17,7 @@ fn pool(size: usize) -> (NailgunPool, NamedCaches, ImmutableInputs, TempDir) {
     let named_caches_dir = base_dir.path().join("named");
     let store_dir = base_dir.path().join("store");
     let executor = Executor::new();
-    let store = Store::local_only(executor.clone(), &store_dir).unwrap();
+    let store = Store::local_only(executor.clone(), store_dir).unwrap();
 
     let pool = NailgunPool::new(base_dir.path().to_owned(), size, store.clone(), executor);
     (

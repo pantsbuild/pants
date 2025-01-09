@@ -48,7 +48,7 @@ def assert_rule_match(
         ("*/[be]*/b*", ("foo/bar/baz", "foo/bar/bar")),
         ("foo*/bar", ("foofighters/bar", "foofighters.venv/bar")),
         # Double stars.
-        ("**", ("a/b/c", "b")),
+        ("**", ("BUILDROOT", "a/b/c", "b")),
         ("a/**/f", ("a/f", "a/b/c/d/e/f")),
         ("a/b/**", ("a/b/d", "a/b/c/d/e/f")),
         # Dots.

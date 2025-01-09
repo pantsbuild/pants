@@ -12,7 +12,7 @@ use testutil::file::mk_tempfile;
 use tokio::fs::File;
 use workunit_store::WorkunitStore;
 
-use remote_provider_traits::{ByteStoreProvider, RemoteStoreOptions};
+use remote_provider_traits::{ByteStoreProvider, RemoteProvider, RemoteStoreOptions};
 
 use crate::byte_store::Provider;
 
@@ -25,6 +25,7 @@ fn remote_options(
     batch_api_size_limit: usize,
 ) -> RemoteStoreOptions {
     RemoteStoreOptions {
+        provider: RemoteProvider::Reapi,
         store_address,
         instance_name: None,
         tls_config: tls::Config::default(),
@@ -53,7 +54,8 @@ async fn load_test(chunk_size: usize) {
     let cas = StubCAS::builder()
         .chunk_size_bytes(chunk_size)
         .file(&testdata)
-        .build();
+        .build()
+        .await;
 
     let provider = new_provider(&cas).await;
     let mut destination = Vec::new();
@@ -90,7 +92,7 @@ async fn load_existing_multiple_chunks_nonfactor() {
 #[tokio::test]
 async fn load_missing() {
     let testdata = TestData::roland();
-    let cas = StubCAS::empty();
+    let cas = StubCAS::empty().await;
     let provider = new_provider(&cas).await;
     let mut destination: Vec<u8> = Vec::new();
 
@@ -106,7 +108,7 @@ async fn load_missing() {
 #[tokio::test]
 async fn load_grpc_error() {
     let testdata = TestData::roland();
-    let cas = StubCAS::cas_always_errors();
+    let cas = StubCAS::cas_always_errors().await;
 
     let provider = new_provider(&cas).await;
     let mut destination = Vec::new();
@@ -135,7 +137,8 @@ async fn load_existing_wrong_digest_error() {
             TestData::roland().fingerprint(),
             Bytes::from_static(b"not roland"),
         )
-        .build();
+        .build()
+        .await;
 
     let provider = new_provider(&cas).await;
     let mut destination = Vec::new();
@@ -170,7 +173,7 @@ fn assert_cas_store(cas: &StubCAS, testdata: &TestData, chunks: usize, chunk_siz
 #[tokio::test]
 async fn store_file_one_chunk() {
     let testdata = TestData::roland();
-    let cas = StubCAS::empty();
+    let cas = StubCAS::empty().await;
     let provider = new_provider(&cas).await;
 
     provider
@@ -187,7 +190,7 @@ async fn store_file_one_chunk() {
 async fn store_file_multiple_chunks() {
     let testdata = TestData::all_the_henries();
 
-    let cas = StubCAS::empty();
+    let cas = StubCAS::empty().await;
     let chunk_size = 10 * 1024;
     let provider = Provider::new(remote_options(
         cas.address(),
@@ -211,7 +214,7 @@ async fn store_file_multiple_chunks() {
 #[tokio::test]
 async fn store_file_empty_file() {
     let testdata = TestData::empty();
-    let cas = StubCAS::empty();
+    let cas = StubCAS::empty().await;
     let provider = new_provider(&cas).await;
 
     provider
@@ -228,7 +231,7 @@ async fn store_file_empty_file() {
 #[tokio::test]
 async fn store_file_grpc_error() {
     let testdata = TestData::roland();
-    let cas = StubCAS::cas_always_errors();
+    let cas = StubCAS::cas_always_errors().await;
     let provider = new_provider(&cas).await;
 
     let error = provider
@@ -269,7 +272,7 @@ async fn store_file_connection_error() {
         .await
         .expect_err("Want err");
     assert!(
-        error.contains("Unavailable: \"error trying to connect: dns error"),
+        error.contains("client error (Connect)"),
         "Bad error message, got: {error}"
     );
 }
@@ -277,7 +280,7 @@ async fn store_file_connection_error() {
 #[tokio::test]
 async fn store_file_source_read_error_immediately() {
     let testdata = TestData::roland();
-    let cas = StubCAS::empty();
+    let cas = StubCAS::empty().await;
     let provider = new_provider(&cas).await;
 
     let temp_dir = TempDir::new().unwrap();
@@ -299,7 +302,7 @@ async fn store_file_source_read_error_immediately() {
 #[tokio::test]
 async fn store_bytes_one_chunk() {
     let testdata = TestData::roland();
-    let cas = StubCAS::empty();
+    let cas = StubCAS::empty().await;
     let provider = new_provider(&cas).await;
 
     provider
@@ -313,7 +316,7 @@ async fn store_bytes_one_chunk() {
 async fn store_bytes_multiple_chunks() {
     let testdata = TestData::all_the_henries();
 
-    let cas = StubCAS::empty();
+    let cas = StubCAS::empty().await;
     let chunk_size = 10 * 1024;
     let provider = Provider::new(remote_options(
         cas.address(),
@@ -334,7 +337,7 @@ async fn store_bytes_multiple_chunks() {
 #[tokio::test]
 async fn store_bytes_empty_file() {
     let testdata = TestData::empty();
-    let cas = StubCAS::empty();
+    let cas = StubCAS::empty().await;
     let provider = new_provider(&cas).await;
 
     provider
@@ -348,7 +351,7 @@ async fn store_bytes_empty_file() {
 #[tokio::test]
 async fn store_bytes_batch_grpc_error() {
     let testdata = TestData::roland();
-    let cas = StubCAS::cas_always_errors();
+    let cas = StubCAS::cas_always_errors().await;
     let provider = new_provider(&cas).await;
 
     let error = provider
@@ -372,7 +375,7 @@ async fn store_bytes_batch_grpc_error() {
 #[tokio::test]
 async fn store_bytes_write_stream_grpc_error() {
     let testdata = TestData::all_the_henries();
-    let cas = StubCAS::cas_always_errors();
+    let cas = StubCAS::cas_always_errors().await;
     let chunk_size = 10 * 1024;
     let provider = Provider::new(remote_options(
         cas.address(),
@@ -414,7 +417,7 @@ async fn store_bytes_connection_error() {
         .await
         .expect_err("Want err");
     assert!(
-        error.contains("Unavailable: \"error trying to connect: dns error"),
+        error.contains("client error (Connect)"),
         "Bad error message, got: {error}"
     );
 }
@@ -423,7 +426,7 @@ async fn store_bytes_connection_error() {
 async fn list_missing_digests_none_missing() {
     let testdata = TestData::roland();
     let _ = WorkunitStore::setup_for_tests();
-    let cas = StubCAS::builder().file(&testdata).build();
+    let cas = StubCAS::builder().file(&testdata).build().await;
 
     let provider = new_provider(&cas).await;
 
@@ -437,7 +440,7 @@ async fn list_missing_digests_none_missing() {
 
 #[tokio::test]
 async fn list_missing_digests_some_missing() {
-    let cas = StubCAS::empty();
+    let cas = StubCAS::empty().await;
 
     let provider = new_provider(&cas).await;
     let digest = TestData::roland().digest();
@@ -455,7 +458,7 @@ async fn list_missing_digests_some_missing() {
 
 #[tokio::test]
 async fn list_missing_digests_grpc_error() {
-    let cas = StubCAS::cas_always_errors();
+    let cas = StubCAS::cas_always_errors().await;
     let provider = new_provider(&cas).await;
 
     let error = provider

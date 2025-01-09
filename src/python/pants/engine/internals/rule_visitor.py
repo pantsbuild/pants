@@ -59,6 +59,12 @@ class _TypeStack:
         self.root = sys.modules[func.__module__]
         self.push(self.root)
         self._push_function_closures(func)
+        # To support recursive rules.
+        # TODO: This will not allow mutually recursive rules defined in the same module.
+        #  Doing so will require changes to the @rule decorator implementation so that we
+        #  gather all rules in a module and assign them ids, and only then run
+        #  collect_awaitables() on those rules.
+        self.push({func.__name__: func})
 
     def __getitem__(self, name: str) -> Any:
         for ns in reversed(self._stack):
@@ -135,14 +141,16 @@ class _AwaitableCollector(ast.NodeVisitor):
         if beginning_indent:
             source = "\n".join(line[beginning_indent:] for line in source.split("\n"))
 
-        self.source_file = inspect.getsourcefile(func)
+        self.source_file = inspect.getsourcefile(func) or "<unknown>"
 
         self.types = _TypeStack(func)
         self.awaitables: List[AwaitableConstraints] = []
         self.visit(ast.parse(source))
 
     def _format(self, node: ast.AST, msg: str) -> str:
-        lineno = node.lineno + self.func.__code__.co_firstlineno - 1
+        lineno: str = "<unknown>"
+        if isinstance(node, (ast.expr, ast.stmt)):
+            lineno = str(node.lineno + self.func.__code__.co_firstlineno - 1)
         return f"{self.source_file}:{lineno}: {msg}"
 
     def _lookup(self, attr: ast.expr) -> Any:
@@ -237,6 +245,7 @@ class _AwaitableCollector(ast.NodeVisitor):
         return AwaitableConstraints(
             None,
             self._check_constraint_arg_type(output_type, output_node),
+            0,
             tuple(
                 self._check_constraint_arg_type(input_type, input_node)
                 for input_type, input_node in zip(input_types, input_nodes)
@@ -253,16 +262,10 @@ class _AwaitableCollector(ast.NodeVisitor):
 
         output_type = _lookup_return_type(rule_func, check=True)
 
-        if call_node.args:
-            raise parse_error(
-                self._format(
-                    call_node,
-                    (
-                        f"Expected no positional arguments (got {len(call_node.args)}), and "
-                        "a `**implicitly(..)` application."
-                    ),
-                )
-            )
+        # To support explicit positional arguments, we record the number passed positionally.
+        # TODO: To support keyword arguments, we would additionally need to begin recording the
+        # argument names of kwargs. But positional-only callsites can avoid those allocations.
+        explicit_args_arity = len(call_node.args)
 
         input_types: tuple[type, ...]
         if not call_node.keywords:
@@ -282,13 +285,14 @@ class _AwaitableCollector(ast.NodeVisitor):
             raise parse_error(
                 self._format(
                     call_node,
-                    "Expected an `**implicitly(..)` application as the only input.",
+                    "Expected an `**implicitly(..)` application as the only keyword input.",
                 )
             )
 
         return AwaitableConstraints(
             rule_id,
             output_type,
+            explicit_args_arity,
             input_types,
             # TODO: Extract this from the callee? Currently only intrinsics can be Effects, so need
             # to figure out their new syntax first.
@@ -303,9 +307,10 @@ class _AwaitableCollector(ast.NodeVisitor):
                 self.awaitables.append(
                     self._get_legacy_awaitable(call_node, is_effect=issubclass(func, Effect))
                 )
-            elif inspect.isfunction(func) and (rule := getattr(func, "rule", None)) is not None:
+            elif (
+                inspect.isfunction(func) and (rule_id := getattr(func, "rule_id", None)) is not None
+            ):
                 # Is a direct `@rule` call.
-                rule_id = rule.canonical_name
                 self.awaitables.append(self._get_byname_awaitable(rule_id, func, call_node))
             elif inspect.iscoroutinefunction(func) or _returns_awaitable(func):
                 # Is a call to a "rule helper".

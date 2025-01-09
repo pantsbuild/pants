@@ -6,8 +6,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-
-from typing_extensions import Protocol
+from typing import Protocol
 
 from pants.engine.addresses import Address
 from pants.engine.internals.target_adaptor import TargetAdaptor
@@ -91,8 +90,7 @@ class BuildFileDependencyRules(ABC):
     @abstractmethod
     def create_parser_state(
         path: str, parent: BuildFileDependencyRules | None
-    ) -> BuildFileDependencyRulesParserState:
-        ...
+    ) -> BuildFileDependencyRulesParserState: ...
 
     @staticmethod
     @abstractmethod
@@ -115,8 +113,7 @@ class BuildFileDependencyRules(ABC):
         """
 
     @abstractmethod
-    def get_ruleset(self, address: Address, target: TargetAdaptor) -> DependencyRuleSet | None:
-        ...
+    def get_ruleset(self, address: Address, target: TargetAdaptor) -> DependencyRuleSet | None: ...
 
 
 class BuildFileDependencyRulesParserState(ABC):

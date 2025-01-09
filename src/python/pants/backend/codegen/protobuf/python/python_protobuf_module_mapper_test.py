@@ -114,3 +114,28 @@ def test_top_level_source_root(rule_runner: RuleRunner) -> None:
             }
         }
     )
+
+
+def test_map_grpclib_modules_to_addresses(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        [
+            "--source-root-patterns=['/']",
+            "--python-enable-resolves",
+            "--python-protobuf-grpclib-plugin",
+            "--no-python-protobuf-grpcio-plugin",
+        ]
+    )
+    rule_runner.write_files({"protos/f.proto": "", "protos/BUILD": "protobuf_sources(grpc=True)"})
+    result = rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
+
+    def providers(addresses: list[Address]) -> tuple[ModuleProvider, ...]:
+        return tuple(ModuleProvider(addr, ModuleProviderType.IMPL) for addr in addresses)
+
+    assert result == FirstPartyPythonMappingImpl.create(
+        {
+            "python-default": {
+                "protos.f_pb2": providers([Address("protos", relative_file_path="f.proto")]),
+                "protos.f_grpc": providers([Address("protos", relative_file_path="f.proto")]),
+            }
+        }
+    )

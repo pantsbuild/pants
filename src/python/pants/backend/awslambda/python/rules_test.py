@@ -21,7 +21,11 @@ from pants.backend.awslambda.python.rules import (
     package_python_aws_lambda_layer,
 )
 from pants.backend.awslambda.python.rules import rules as awslambda_python_rules
-from pants.backend.awslambda.python.target_types import PythonAWSLambda, PythonAWSLambdaLayer
+from pants.backend.awslambda.python.target_types import (
+    AWSLambdaArchitectureField,
+    PythonAWSLambda,
+    PythonAWSLambdaLayer,
+)
 from pants.backend.awslambda.python.target_types import rules as target_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
@@ -33,7 +37,9 @@ from pants.backend.python.target_types import (
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.backend.python.util_rules.faas import (
     BuildPythonFaaSRequest,
+    FaaSArchitecture,
     PythonFaaSPex3VenvCreateExtraArgsField,
+    PythonFaaSPexBuildExtraArgs,
 )
 from pants.core.goals import package
 from pants.core.goals.package import BuiltPackage
@@ -169,7 +175,7 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
                     name='lambda',
                     dependencies=[':lib'],
                     handler='foo.bar.hello_world:handler',
-                    runtime='python3.7',
+                    runtime='python3.8',
                 )
                 """
             ),
@@ -181,7 +187,8 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
         rule_runner,
         Address("src/py/project", target_name="lambda"),
         expected_extra_log_lines=(
-            "    Runtime: python3.7",
+            "    Runtime: python3.8",
+            f"    Architecture: {FaaSArchitecture.X86_64.value}",
             "    Handler: lambda_function.handler",
         ),
     )
@@ -197,14 +204,39 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
 
 
 @pytest.mark.parametrize(
-    ("ics", "runtime"),
+    ("ics", "runtime", "architecture"),
     [
-        pytest.param(["==3.7.*"], None, id="runtime inferred from ICs"),
-        pytest.param(None, "python3.7", id="runtime explicitly set"),
+        pytest.param(
+            ["==3.8.*"],
+            None,
+            FaaSArchitecture.X86_64,
+            id="runtime inferred from ICs, x86_64 architecture",
+        ),
+        pytest.param(
+            None,
+            "python3.8",
+            FaaSArchitecture.X86_64,
+            id="runtime explicitly set, x86_64 architecture",
+        ),
+        pytest.param(
+            ["==3.8.*"],
+            None,
+            FaaSArchitecture.ARM64,
+            id="runtime inferred from ICs, ARM64 architecture",
+        ),
+        pytest.param(
+            None,
+            "python3.8",
+            FaaSArchitecture.ARM64,
+            id="runtime explicitly set, ARM64 architecture",
+        ),
     ],
 )
 def test_create_hello_world_lambda(
-    ics: list[str] | None, runtime: None | str, rule_runner: PythonRuleRunner
+    ics: list[str] | None,
+    runtime: None | str,
+    architecture: FaaSArchitecture,
+    rule_runner: PythonRuleRunner,
 ) -> None:
     rule_runner.write_files(
         {
@@ -225,12 +257,14 @@ def test_create_hello_world_lambda(
                     name='lambda',
                     handler='foo.bar.hello_world:handler',
                     runtime={runtime!r},
+                    architecture="{architecture.value}",
                 )
                 python_aws_lambda_function(
                     name='slimlambda',
                     include_requirements=False,
                     handler='foo.bar.hello_world:handler',
                     runtime={runtime!r},
+                    architecture="{architecture.value}",
                 )
                 """
             ),
@@ -241,7 +275,8 @@ def test_create_hello_world_lambda(
         rule_runner,
         Address("src/python/foo/bar", target_name="lambda"),
         expected_extra_log_lines=(
-            "    Runtime: python3.7",
+            "    Runtime: python3.8",
+            f"    Architecture: {architecture.value}",
             "    Handler: lambda_function.handler",
         ),
     )
@@ -259,7 +294,8 @@ def test_create_hello_world_lambda(
         rule_runner,
         Address("src/python/foo/bar", target_name="slimlambda"),
         expected_extra_log_lines=(
-            "    Runtime: python3.7",
+            "    Runtime: python3.8",
+            f"    Architecture: {architecture.value}",
             "    Handler: lambda_function.handler",
         ),
     )
@@ -274,7 +310,13 @@ def test_create_hello_world_lambda(
     )
 
 
-def test_create_hello_world_layer(rule_runner: PythonRuleRunner) -> None:
+@pytest.mark.parametrize(
+    "architecture",
+    FaaSArchitecture.__members__.values(),
+)
+def test_create_hello_world_layer(
+    rule_runner: PythonRuleRunner, architecture: FaaSArchitecture
+) -> None:
     rule_runner.write_files(
         {
             "src/python/foo/bar/hello_world.py": dedent(
@@ -286,20 +328,22 @@ def test_create_hello_world_layer(rule_runner: PythonRuleRunner) -> None:
                 """
             ),
             "src/python/foo/bar/BUILD": dedent(
-                """
+                f"""
                 python_requirement(name="mureq", requirements=["mureq==0.2"])
                 python_sources()
 
                 python_aws_lambda_layer(
                     name='lambda',
                     dependencies=["./hello_world.py"],
-                    runtime="python3.7",
+                    runtime="python3.8",
+                    architecture="{architecture.value}",
                 )
                 python_aws_lambda_layer(
                     name='slimlambda',
                     include_sources=False,
                     dependencies=["./hello_world.py"],
-                    runtime="python3.7",
+                    runtime="python3.8",
+                    architecture="{architecture.value}",
                 )
                 """
             ),
@@ -309,7 +353,10 @@ def test_create_hello_world_layer(rule_runner: PythonRuleRunner) -> None:
     zip_file_relpath, content = create_python_awslambda(
         rule_runner,
         Address("src/python/foo/bar", target_name="lambda"),
-        expected_extra_log_lines=("    Runtime: python3.7",),
+        expected_extra_log_lines=(
+            "    Runtime: python3.8",
+            f"    Architecture: {architecture.value}",
+        ),
         layer=True,
     )
     assert "src.python.foo.bar/lambda.zip" == zip_file_relpath
@@ -324,7 +371,10 @@ def test_create_hello_world_layer(rule_runner: PythonRuleRunner) -> None:
     zip_file_relpath, content = create_python_awslambda(
         rule_runner,
         Address("src/python/foo/bar", target_name="slimlambda"),
-        expected_extra_log_lines=("    Runtime: python3.7",),
+        expected_extra_log_lines=(
+            "    Runtime: python3.8",
+            f"    Architecture: {architecture.value}",
+        ),
         layer=True,
     )
     assert "src.python.foo.bar/slimlambda.zip" == zip_file_relpath
@@ -340,7 +390,7 @@ def test_create_hello_world_layer(rule_runner: PythonRuleRunner) -> None:
 def test_layer_must_have_dependencies(rule_runner: PythonRuleRunner) -> None:
     """A layer _must_ use 'dependencies', unlike most other targets."""
     rule_runner.write_files(
-        {"BUILD": "python_aws_lambda_layer(name='lambda', runtime='python3.7')"}
+        {"BUILD": "python_aws_lambda_layer(name='lambda', runtime='python3.8')"}
     )
     with pytest.raises(
         ExecutionError, match="The `dependencies` field in target //:lambda must be defined"
@@ -348,7 +398,7 @@ def test_layer_must_have_dependencies(rule_runner: PythonRuleRunner) -> None:
         create_python_awslambda(
             rule_runner,
             Address("", target_name="lambda"),
-            expected_extra_log_lines=("    Runtime: python3.7",),
+            expected_extra_log_lines=("    Runtime: python3.8",),
             layer=True,
         )
 
@@ -381,11 +431,14 @@ def test_pex3_venv_create_extra_args_are_passed_through(
         address=addr,
         include_requirements=Mock(),
         runtime=Mock(),
+        architecture=AWSLambdaArchitectureField(FaaSArchitecture.X86_64.value, addr),
         complete_platforms=Mock(),
         output_path=Mock(),
         environment=Mock(),
+        layout=Mock(),
         **{arg: Mock() for arg in extra_field_set_args},
         pex3_venv_create_extra_args=extra_args_field,
+        pex_build_extra_args=PythonFaaSPexBuildExtraArgs(None, addr),
     )
 
     observed_calls = []

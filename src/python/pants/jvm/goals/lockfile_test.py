@@ -8,27 +8,42 @@ from typing import cast
 
 import pytest
 
-from pants.core.goals.generate_lockfiles import GenerateLockfileResult, UserGenerateLockfiles
+from pants.core.goals.generate_lockfiles import (
+    DEFAULT_TOOL_LOCKFILE,
+    GenerateLockfileResult,
+    UserGenerateLockfiles,
+)
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import DigestContents, FileDigest
 from pants.engine.internals.parametrize import Parametrize
+from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
 from pants.jvm.goals.lockfile import GenerateJvmLockfile, RequestedJVMUserResolveNames
-from pants.jvm.resolve.common import (
-    ArtifactRequirement,
-    ArtifactRequirements,
-    Coordinate,
-    Coordinates,
-)
+from pants.jvm.resolve import jvm_tool
+from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
+from pants.jvm.resolve.coordinate import Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.resolve.jvm_tool import JvmToolBase
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+
+
+class MockJvmTool(JvmToolBase, ExportableTool):
+    """This one uses the ExportableTool resolve mechanism."""
+
+    options_scope = "mock-tool"
+    help = "Hamcrest is a mocking tool for the JVM."
+
+    default_version = "1.3"
+    default_artifacts = ("org.hamcrest:hamcrest-core:{version}",)
+    default_lockfile_resource = ("pants.backend.jvm.resolve", "mock-tool.default.lockfile.txt")
 
 
 @pytest.fixture
@@ -37,10 +52,13 @@ def rule_runner() -> RuleRunner:
         rules=[
             *coursier_fetch_rules(),
             *lockfile.rules(),
+            *jvm_tool.rules(),
             *coursier_setup_rules(),
             *external_tool_rules(),
             *source_files.rules(),
             *util_rules(),
+            *MockJvmTool.rules(),
+            UnionRule(ExportableTool, MockJvmTool),
             QueryRule(UserGenerateLockfiles, [RequestedJVMUserResolveNames]),
             QueryRule(GenerateLockfileResult, [GenerateJvmLockfile]),
         ],
@@ -180,3 +198,36 @@ def test_multiple_resolves(rule_runner: RuleRunner) -> None:
             diff=False,
         ),
     }
+
+
+@pytest.mark.asyncio
+async def test_plan_generate_lockfile_tool(rule_runner: RuleRunner):
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                def mk(name):
+                  jvm_artifact(
+                      name=name,
+                      group='group',
+                      artifact='artifact',
+                      version='1',
+                      jar='jar.jar',
+                  )
+
+                mk('one')
+                mk('two')
+                """
+            ),
+        }
+    )
+
+    result_group = rule_runner.request(
+        UserGenerateLockfiles, [RequestedJVMUserResolveNames([MockJvmTool.options_scope])]
+    )
+
+    assert len(result_group) == 1, f"we're expecting a single {GenerateJvmLockfile.__name__}"
+    result = result_group[0]
+
+    assert result.resolve_name == MockJvmTool.options_scope
+    assert result.lockfile_dest == DEFAULT_TOOL_LOCKFILE

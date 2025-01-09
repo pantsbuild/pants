@@ -13,8 +13,7 @@ from pants.core.goals.tailor import (
     PutativeTargets,
     PutativeTargetsRequest,
 )
-from pants.engine.fs import PathGlobs, Paths
-from pants.engine.internals.selectors import Get
+from pants.engine.intrinsics import path_globs_to_paths
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
@@ -38,8 +37,8 @@ async def find_putative_targets(
     req: PutativeSwiftTargetsRequest,
     all_owned_sources: AllOwnedSources,
 ) -> PutativeTargets:
-    all_swift_files = await Get(
-        Paths, PathGlobs, req.path_globs(*(f"*{ext}" for ext in SWIFT_FILE_EXTENSIONS))
+    all_swift_files = await path_globs_to_paths(
+        req.path_globs(*(f"*{ext}" for ext in SWIFT_FILE_EXTENSIONS))
     )
     unowned_swift_files = set(all_swift_files.files) - set(all_owned_sources)
     classified_unowned_swift_files = classify_source_files(unowned_swift_files)

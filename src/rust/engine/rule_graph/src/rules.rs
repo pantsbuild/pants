@@ -1,6 +1,7 @@
 // Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::borrow::Cow;
 use std::collections::BTreeSet;
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
@@ -45,14 +46,21 @@ impl Display for RuleId {
     }
 }
 
+#[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug, PartialOrd, Ord)]
+pub struct CallSignature {
+    // The id of the rule that is being called.
+    pub rule_id: RuleId,
+    // The number of explicit positional arguments that were passed.
+    pub explicit_args_arity: u16,
+}
+
 // NB: Most of our expected usecases for multiple-provided-parameters involve two parameters, hence
 // the SmallVec sizing here. See also `Self::provides`.
 #[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug, PartialOrd, Ord)]
 pub struct DependencyKey<T: TypeId> {
-    // The id of the rule represented by this DependencyKey, if provided at the callsite
-    // (e.g., via call-by-name semantics).
-    pub rule_id: Option<RuleId>,
-
+    // If this dependency represents a by-name call to a known rule, the signature of the call.
+    pub call_signature: Option<CallSignature>,
+    // The output type produced by this dependency.
     pub product: T,
     // The param types which are introduced into scope at the callsite ("provided").
     pub provided_params: SmallVec<[T; 2]>,
@@ -67,16 +75,19 @@ pub struct DependencyKey<T: TypeId> {
 impl<T: TypeId> DependencyKey<T> {
     pub fn new(product: T) -> Self {
         DependencyKey {
-            rule_id: None,
+            call_signature: None,
             product,
             provided_params: SmallVec::default(),
             in_scope_params: None,
         }
     }
 
-    pub fn for_known_rule(rule_id: RuleId, product: T) -> Self {
+    pub fn for_known_rule(rule_id: RuleId, product: T, explicit_args_arity: u16) -> Self {
         DependencyKey {
-            rule_id: Some(rule_id),
+            call_signature: Some(CallSignature {
+                rule_id,
+                explicit_args_arity,
+            }),
             product,
             provided_params: SmallVec::default(),
             in_scope_params: None,
@@ -156,11 +167,29 @@ impl<T: TypeId> DependencyKey<T> {
 
 impl<T: TypeId> Display for DependencyKey<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(rule_id) = &self.rule_id {
+        if let Some(call_signature) = &self.call_signature {
+            let explicit_args_arity: Cow<str> = if call_signature.explicit_args_arity > 0 {
+                format!("<{}>, ", call_signature.explicit_args_arity).into()
+            } else {
+                "".into()
+            };
+            let provided_params: Cow<str> = if self.provided_params.is_empty() {
+                "".into()
+            } else {
+                format!(
+                    "**implicitly({})",
+                    self.provided_params
+                        .iter()
+                        .map(|p| p.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+                .into()
+            };
             write!(
                 f,
-                "{}({:?}, ...) -> {}",
-                rule_id, self.provided_params, self.product
+                "{}({}, {}) -> {}",
+                call_signature.rule_id, explicit_args_arity, provided_params, self.product
             )
         } else if self.provided_params.is_empty() {
             write!(f, "{}", self.product)
@@ -219,9 +248,10 @@ pub trait Rule:
     fn product(&self) -> Self::TypeId;
 
     ///
-    /// Return keys for the dependencies of this Rule.
+    /// Return keys for the dependencies of this Rule, with the given prefix count of explicitly
+    /// provided arguments excluded.
     ///
-    fn dependency_keys(&self) -> Vec<&DependencyKey<Self::TypeId>>;
+    fn dependency_keys(&self, explicit_args_arity: u16) -> Vec<&DependencyKey<Self::TypeId>>;
 
     ///
     /// Returns types which this rule is not allowed to consume from the calling scope.

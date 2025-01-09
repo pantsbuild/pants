@@ -35,6 +35,10 @@ class ProcessCacheScope(Enum):
     ALWAYS = "always"
     # Cached in all locations, but only if the process exits successfully.
     SUCCESSFUL = "successful"
+    # Cached only locally, regardless of success or failure.
+    LOCAL_ALWAYS = "local_always"
+
+    LOCAL_SUCCESSFUL = "local_successful"
     # Cached only in memory (i.e. memoized in pantsd), but never persistently, regardless of
     # success vs. failure.
     PER_RESTART_ALWAYS = "per_restart_always"
@@ -97,7 +101,9 @@ class Process:
 
         Usually, you will want to provide input files/directories via the parameter `input_digest`.
         The process will then be able to access these paths through relative paths. If you want to
-        give multiple input digests, first merge them with `await Get(Digest, MergeDigests)`.
+        give multiple input digests, first merge them with `await Get(Digest, MergeDigests)`. Files
+        larger than 512KB will be read-only unless they are globbed as part of either `output_files`
+        or `output_directories`.
 
         Often, you will want to capture the files/directories created in the process. To do this,
         you can either set `output_files` or `output_directories`. The specified paths should be
@@ -207,6 +213,8 @@ class ProcessResultMetadata:
     """Metadata for a ProcessResult, which is not included in its definition of equality."""
 
     class Source(Enum):
+        """This is public API as these values are part of the test result report file."""
+
         RAN = "ran"
         HIT_LOCALLY = "hit_locally"
         HIT_REMOTELY = "hit_remotely"
@@ -230,7 +238,7 @@ class ProcessResultMetadata:
     def source(self, current_run_id: RunId) -> Source:
         """Given the current run_id, return the calculated "source" of the ProcessResult.
 
-        If a ProcessResult is consumed in any run_id other than the one it was created in, the its
+        If a ProcessResult is consumed in any run_id other than the one it was created in, the
         source implicitly becomes memoization, since the result was re-used in a new run without
         being recreated.
         """
@@ -283,6 +291,18 @@ class ProcessExecutionFailure(Exception):
             )
         super().__init__("\n".join(err_strings))
 
+    @classmethod
+    def from_result(
+        cls, result: FallibleProcessResult, description: str, keep_sandboxes: KeepSandboxes
+    ) -> ProcessExecutionFailure:
+        return cls(
+            result.exit_code,
+            result.stdout,
+            result.stderr,
+            description,
+            keep_sandboxes=keep_sandboxes,
+        )
+
 
 @rule
 def get_multi_platform_request_description(req: Process) -> ProductDescription:
@@ -315,8 +335,25 @@ def fallible_to_exec_result_or_raise(
     )
 
 
+# fallible_to_exec_result_or_raise directly converts a FallibleProcessResult
+# to a ProcessResult, or raises an exception if the process failed.
+# Its name makes sense when you already have a FallibleProcessResult in hand.
+#
+# But, it is common to want to execute a process and automatically raise an exception
+# on process error. The execute_process_or_raise() alias below facilitates this idiom:
+#
+# result = await execute_process_or_raise(
+#         **implicitly(
+#             Process(...) # Or something that some other rule can convert to a Process.
+#         )
+#     )
+# Where the execute_process() intrinsic is invoked implicitly to create a FallibleProcessResult.
+# This is simply a better name for the same rule, when invoked in this use case.
+execute_process_or_raise = fallible_to_exec_result_or_raise
+
+
 @rule
-async def run_proc_with_retry(req: ProcessWithRetries) -> ProcessResultWithRetries:
+async def execute_process_with_retry(req: ProcessWithRetries) -> ProcessResultWithRetries:
     results: List[FallibleProcessResult] = []
     for attempt in range(0, req.attempts):
         proc = dataclasses.replace(req.proc, attempt=attempt)
@@ -351,6 +388,7 @@ class InteractiveProcess(SideEffecting):
         argv: Iterable[str],
         *,
         env: Mapping[str, str] | None = None,
+        description: str = "Interactive process",
         input_digest: Digest = EMPTY_DIGEST,
         run_in_workspace: bool = False,
         forward_signals_to_process: bool = True,
@@ -375,7 +413,7 @@ class InteractiveProcess(SideEffecting):
             "process",
             Process(
                 argv,
-                description="Interactive process",
+                description=description,
                 env=env,
                 input_digest=input_digest,
                 append_only_caches=append_only_caches,
@@ -394,15 +432,18 @@ class InteractiveProcess(SideEffecting):
         *,
         forward_signals_to_process: bool = True,
         restartable: bool = False,
+        keep_sandboxes: KeepSandboxes = KeepSandboxes.never,
     ) -> InteractiveProcess:
         return InteractiveProcess(
             argv=process.argv,
             env=process.env,
+            description=process.description,
             input_digest=process.input_digest,
             forward_signals_to_process=forward_signals_to_process,
             restartable=restartable,
             append_only_caches=process.append_only_caches,
             immutable_input_digests=process.immutable_input_digests,
+            keep_sandboxes=keep_sandboxes,
         )
 
 

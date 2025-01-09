@@ -7,7 +7,7 @@ from functools import lru_cache
 import pytest
 
 
-@lru_cache()
+@lru_cache
 def skip_if_command_errors(*args: str):
     def empty_decorator(func):
         return func

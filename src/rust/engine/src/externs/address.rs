@@ -11,10 +11,13 @@ use pyo3::basic::CompareOp;
 use pyo3::create_exception;
 use pyo3::exceptions::{PyAssertionError, PyException};
 use pyo3::prelude::*;
+use pyo3::pybacked::PyBackedStr;
 use pyo3::types::{PyDict, PyFrozenSet, PyType};
 
 use fnv::FnvHasher;
 use lazy_static::lazy_static;
+
+use crate::python::PyComparedBool;
 
 create_exception!(native_engine, AddressParseException, PyException);
 create_exception!(native_engine, InvalidAddressError, AddressParseException);
@@ -23,7 +26,7 @@ create_exception!(native_engine, InvalidTargetNameError, InvalidAddressError);
 create_exception!(native_engine, InvalidParametersError, InvalidAddressError);
 create_exception!(native_engine, UnsupportedWildcardError, InvalidAddressError);
 
-pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
+pub fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(address_spec_parse, m)?)?;
 
     m.add(
@@ -91,6 +94,14 @@ pub struct AddressInput {
 #[pymethods]
 impl AddressInput {
     #[new]
+    #[pyo3(signature = (
+        original_spec,
+        path_component,
+        description_of_origin,
+        target_component=None,
+        generated_component=None,
+        parameters=None
+    ))]
     fn __new__(
         original_spec: String,
         path_component: PathBuf,
@@ -149,16 +160,31 @@ impl AddressInput {
     }
 
     #[classmethod]
+    #[pyo3(signature = (
+        spec,
+        *,
+        description_of_origin,
+        relative_to=None,
+        subproject_roots=None
+    ))]
     fn parse(
-        _cls: &PyType,
+        _cls: &Bound<'_, PyType>,
         spec: &str,
         description_of_origin: &str,
-        relative_to: Option<&str>,
-        subproject_roots: Option<Vec<&str>>,
+        relative_to: Option<PyBackedStr>,
+        subproject_roots: Option<Vec<PyBackedStr>>,
     ) -> PyResult<Self> {
-        let subproject_info = subproject_roots
-            .zip(relative_to)
-            .and_then(|(roots, relative_to)| split_on_longest_dir_prefix(relative_to, &roots));
+        let subproject_roots: Option<Vec<&str>> = subproject_roots
+            .as_deref()
+            .map(|roots| roots.iter().map(|s| s.as_ref()).collect());
+        let relative_to: Option<&str> = relative_to.as_deref();
+
+        let subproject_info = match (subproject_roots, relative_to) {
+            (Some(roots), Some(relative_to)) => {
+                split_on_longest_dir_prefix(relative_to, &roots[..])
+            }
+            _ => None,
+        };
 
         let parsed_spec =
             address::parse_address_spec(spec).map_err(AddressParseException::new_err)?;
@@ -382,12 +408,12 @@ impl AddressInput {
         format!("{self:?}")
     }
 
-    fn __richcmp__(&self, other: &Self, op: CompareOp, py: Python) -> PyObject {
-        match op {
-            CompareOp::Eq => (self == other).into_py(py),
-            CompareOp::Ne => (self != other).into_py(py),
-            _ => py.NotImplemented(),
-        }
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> PyComparedBool {
+        PyComparedBool(match op {
+            CompareOp::Eq => Some(self == other),
+            CompareOp::Ne => Some(self != other),
+            _ => None,
+        })
     }
 }
 
@@ -422,6 +448,14 @@ pub struct Address {
 #[pymethods]
 impl Address {
     #[new]
+    #[pyo3(signature = (
+        spec_path,
+        *,
+        target_name=None,
+        parameters=None,
+        generated_name=None,
+        relative_file_path=None
+    ))]
     fn __new__(
         spec_path: PathBuf,
         target_name: Option<String>,
@@ -680,9 +714,15 @@ impl Address {
         Ok(format!("{prefix}{path}{target}{generated}{params}"))
     }
 
-    fn parametrize(&self, parameters: BTreeMap<String, String>) -> Self {
-        let mut merged_parameters = self.parameters.clone();
-        merged_parameters.extend(parameters);
+    #[pyo3(signature = (parameters, replace=false))]
+    fn parametrize(&self, parameters: BTreeMap<String, String>, replace: bool) -> Self {
+        let merged_parameters = if replace {
+            parameters
+        } else {
+            let mut merged_parameters = parameters.clone();
+            merged_parameters.extend(parameters);
+            merged_parameters
+        };
 
         Self {
             spec_path: self.spec_path.clone(),
@@ -693,19 +733,21 @@ impl Address {
         }
     }
 
-    fn maybe_convert_to_target_generator(self_: PyRef<Self>, py: Python) -> PyObject {
+    fn maybe_convert_to_target_generator(self_: PyRef<Self>, py: Python) -> PyResult<PyObject> {
         if !self_.is_generated_target() && !self_.is_parametrized() {
-            return self_.into_py(py);
+            return Ok(self_.into_pyobject(py)?.into_any().unbind());
         }
 
-        Self {
+        Ok(Self {
             spec_path: self_.spec_path.clone(),
             target_name: self_.target_name.clone(),
             parameters: BTreeMap::default(),
             generated_name: None,
             relative_file_path: None,
         }
-        .into_py(py)
+        .into_pyobject(py)?
+        .into_any()
+        .unbind())
     }
 
     fn create_generated(&self, generated_name: String) -> PyResult<Self> {
@@ -744,7 +786,7 @@ impl Address {
         self.spec()
     }
 
-    fn metadata<'p>(&self, py: Python<'p>) -> PyResult<&'p PyDict> {
+    fn metadata<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let dict = PyDict::new(py);
         dict.set_item(pyo3::intern!(py, "address"), self.spec())?;
         Ok(dict)

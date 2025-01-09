@@ -8,11 +8,10 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass, replace
 from enum import Enum
-from typing import Callable, ClassVar, Iterable, Iterator, Mapping, Sequence, Tuple, cast
+from typing import Callable, Iterable, Iterator, Mapping, Protocol, Sequence, Tuple, Type, cast
 
-from typing_extensions import Protocol
-
-from pants.engine.collection import Collection
+from pants.core.goals.resolves import ExportableTool
+from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.console import Console
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import Digest, MergeDigests, Workspace
@@ -72,24 +71,6 @@ class WrappedGenerateLockfile:
     request: GenerateLockfile
 
 
-@union(in_scope_types=[EnvironmentName])
-class GenerateToolLockfileSentinel:
-    """Tools use this as an entry point to say how to generate their tool lockfile.
-
-    Each language ecosystem should set up a union member of `GenerateLockfile`, like
-    `GeneratePythonLockfile`, as explained in that class's docstring.
-
-    Each language ecosystem should also subclass `GenerateToolLockfileSentinel`, e.g.
-    `GeneratePythonToolLockfileSentinel`. The subclass does not need to do anything - it is only used to know which language ecosystems tools correspond to.
-
-    Then, each tool should subclass their language ecosystem's subclass of `GenerateToolLockfileSentinel` and set up a rule that goes from the
-    subclass -> the language's lockfile request, e.g. BlackLockfileSentinel ->
-    GeneratePythonLockfile. Register `UnionRule(GenerateToolLockfileSentinel, MySubclass)`.
-    """
-
-    resolve_name: ClassVar[str]
-
-
 class UserGenerateLockfiles(Collection[GenerateLockfile]):
     """All user resolves for a particular language ecosystem to build.
 
@@ -124,33 +105,31 @@ class KnownUserResolveNames:
 
 
 @union(in_scope_types=[EnvironmentName])
-class RequestedUserResolveNames(Collection[str]):
+class RequestedUserResolveNames(DeduplicatedCollection[str]):
     """The user resolves requested for a particular language ecosystem.
 
     Each language ecosystem should set up a subclass and register it with a UnionRule. Implement a
     rule that goes from the subclass -> UserGenerateLockfiles.
     """
 
+    sort_input = True
+
 
 class PackageVersion(Protocol):
-    """Protocol for backend specific implementations, to support language ecosystem specific version
+    """Protocol for backend specific implementations, to support language-ecosystem-specific version
     formats and sort rules.
 
     May support the `int` properties `major`, `minor` and `micro` to color diff based on semantic
     step taken.
     """
 
-    def __eq__(self, other) -> bool:
-        ...
+    def __eq__(self, other) -> bool: ...
 
-    def __gt__(self, other) -> bool:
-        ...
+    def __gt__(self, other) -> bool: ...
 
-    def __lt__(self, other) -> bool:
-        ...
+    def __lt__(self, other) -> bool: ...
 
-    def __str__(self) -> str:
-        ...
+    def __str__(self) -> str: ...
 
 
 PackageName = str
@@ -285,9 +264,12 @@ class UnrecognizedResolveNamesError(Exception):
         self,
         unrecognized_resolve_names: list[str],
         all_valid_names: Iterable[str],
+        all_valid_binaries: Iterable[str] | None = None,
         *,
         description_of_origin: str,
     ) -> None:
+        all_valid_binaries = all_valid_binaries or set()
+
         # TODO(#12314): maybe implement "Did you mean?"
         if len(unrecognized_resolve_names) == 1:
             unrecognized_str = unrecognized_resolve_names[0]
@@ -295,16 +277,26 @@ class UnrecognizedResolveNamesError(Exception):
         else:
             unrecognized_str = str(sorted(unrecognized_resolve_names))
             name_description = "names"
-        super().__init__(
-            softwrap(
-                f"""
-                Unrecognized resolve {name_description} from {description_of_origin}:
-                {unrecognized_str}
 
-                All valid resolve names: {sorted(all_valid_names)}
-                """
-            )
-        )
+        message = [
+            f"Unrecognized resolve {name_description} from {description_of_origin}: {unrecognized_str}",
+            f"All valid resolve names: {sorted(all_valid_names)}",
+        ]
+        if all_valid_binaries:
+            message.append(f"All valid exportable binaries: {sorted(all_valid_binaries)}")
+
+        should_be_bins = set(unrecognized_resolve_names) & set(all_valid_binaries)
+        should_be_resolves = set(unrecognized_resolve_names) & set(all_valid_names)
+
+        if should_be_bins:
+            cmd = " ".join([f"--bin={e}" for e in should_be_bins])
+            message.append(f"HINT: Some resolves should be binaries, try with `{cmd}`")
+
+        if should_be_resolves:
+            cmd = " ".join([f"--resolve={e}" for e in should_be_resolves])
+            message.append(f"HINT: Some binaries should be resolves, try with `{cmd}`")
+
+        super().__init__(softwrap("\n\n".join(message)))
 
 
 class _ResolveProviderType(Enum):
@@ -348,34 +340,18 @@ def _check_ambiguous_resolve_names(
 
 def determine_resolves_to_generate(
     all_known_user_resolve_names: Iterable[KnownUserResolveNames],
-    all_tool_sentinels: Iterable[type[GenerateToolLockfileSentinel]],
     requested_resolve_names: set[str],
-) -> tuple[list[RequestedUserResolveNames], list[type[GenerateToolLockfileSentinel]]]:
-    """Apply the `--resolve` option to determine which resolves are specified.
-
-    Return a tuple of `(user_resolves, tool_lockfile_sentinels)`.
-    """
-    # Let user resolve names silently shadow tools with the same name.
-    # This is necessary since we now support installing a tool from a named resolve,
-    # and it's not reasonable to ban the name of the tool as the resolve name, when it
-    # is the most obvious choice for that...
-    # This is likely only an issue if you were going to, e.g., have a named resolve called flake8
-    # but not use it as the resolve for the flake8 tool, which seems pretty unlikely.
-    all_known_user_resolve_name_strs = set(
-        itertools.chain.from_iterable(akurn.names for akurn in all_known_user_resolve_names)
-    )
-    all_tool_sentinels = [
-        ts for ts in all_tool_sentinels if ts.resolve_name not in all_known_user_resolve_name_strs
-    ]
-
+) -> list[RequestedUserResolveNames]:
+    """Apply the `--resolve` option to determine which resolves are specified."""
     # Resolve names must be globally unique, so check for ambiguity across backends.
     _check_ambiguous_resolve_names(all_known_user_resolve_names)
 
+    # If no resolves have been requested, we generate lockfiles for all user resolves
     if not requested_resolve_names:
         return [
             known_resolve_names.requested_resolve_names_cls(known_resolve_names.names)
             for known_resolve_names in all_known_user_resolve_names
-        ], list(all_tool_sentinels)
+        ]
 
     requested_user_resolve_names = []
     for known_resolve_names in all_known_user_resolve_names:
@@ -386,12 +362,6 @@ def determine_resolves_to_generate(
                 known_resolve_names.requested_resolve_names_cls(requested)
             )
 
-    specified_sentinels = []
-    for sentinel in all_tool_sentinels:
-        if sentinel.resolve_name in requested_resolve_names:
-            requested_resolve_names.discard(sentinel.resolve_name)
-            specified_sentinels.append(sentinel)
-
     if requested_resolve_names:
         raise UnrecognizedResolveNamesError(
             unrecognized_resolve_names=sorted(requested_resolve_names),
@@ -400,41 +370,61 @@ def determine_resolves_to_generate(
                     known_resolve_names.names
                     for known_resolve_names in all_known_user_resolve_names
                 ),
-                *(sentinel.resolve_name for sentinel in all_tool_sentinels),
             },
             description_of_origin="the option `--generate-lockfiles-resolve`",
         )
 
-    return requested_user_resolve_names, specified_sentinels
+    return requested_user_resolve_names
 
 
-def filter_tool_lockfile_requests(
-    specified_requests: Sequence[WrappedGenerateLockfile], *, resolve_specified: bool
-) -> list[GenerateLockfile]:
-    result = []
-    for wrapped_req in specified_requests:
-        req = wrapped_req.request
+def filter_lockfiles_for_unconfigured_exportable_tools(
+    generate_lockfile_requests: Sequence[GenerateLockfile],
+    exportabletools_by_name: dict[str, Type[ExportableTool]],
+    *,
+    resolve_specified: bool,
+) -> tuple[tuple[str, ...], tuple[GenerateLockfile, ...]]:
+    """Filter lockfile requests for tools still using their default lockfiles."""
+
+    valid_lockfiles = []
+    errs = []
+
+    for req in generate_lockfile_requests:
         if req.lockfile_dest != DEFAULT_TOOL_LOCKFILE:
-            result.append(req)
+            valid_lockfiles.append(req)
             continue
-        if resolve_specified:
-            resolve = req.resolve_name
-            raise ValueError(
+
+        if req.resolve_name in exportabletools_by_name:
+            if resolve_specified:
+                # A user has asked us to generate a tool which is using a default lockfile
+                errs.append(
+                    exportabletools_by_name[
+                        req.resolve_name
+                    ].help_for_generate_lockfile_with_default_location(req.resolve_name)
+                )
+            else:
+                # When a user selects no resolves, we try generating lockfiles for all resolves.
+                # The intention is clearly to not generate lockfiles for internal tools, so we skip them here.
+                continue
+        else:
+            # Arriving at this case is either a user error or an implementation error, but we can be helpful
+            errs.append(
                 softwrap(
                     f"""
-                    You requested to generate a lockfile for {resolve} because
-                    you included it in `--generate-lockfiles-resolve`, but
-                    `[{resolve}].lockfile` is set to `{req.lockfile_dest}`
-                    so a lockfile will not be generated.
+                    The resolve {req.resolve_name} is using the lockfile destination {DEFAULT_TOOL_LOCKFILE}.
+                    This destination is used as a sentinel to signal that internal tools should use their bundled lockfile.
+                    However, the resolve {req.resolve_name} does not appear to be an exportable tool.
 
-                    If you would like to generate a lockfile for {resolve}, please
-                    set `[{resolve}].lockfile` to the path where it should be
-                    generated and run again.
+                    If you intended to generate a lockfile for a resolve you specified,
+                    you should specify a file as the lockfile destination.
+                    If this is indeed a tool that should be exportable, this is a bug:
+                    This tool does not appear to be exportable the way we expect.
+                    It may need a `UnionRule` to `ExportableTool`
                     """
                 )
             )
+            continue
 
-    return result
+    return tuple(errs), tuple(valid_lockfiles)
 
 
 class GenerateLockfilesSubsystem(GoalSubsystem):
@@ -443,10 +433,7 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
-        return (
-            GenerateToolLockfileSentinel in union_membership
-            or KnownUserResolveNamesRequest in union_membership
-        )
+        return KnownUserResolveNamesRequest in union_membership
 
     resolve = StrListOption(
         advanced=False,
@@ -520,9 +507,8 @@ async def generate_lockfiles_goal(
         Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())
         for request in union_membership.get(KnownUserResolveNamesRequest)
     )
-    requested_user_resolve_names, requested_tool_sentinels = determine_resolves_to_generate(
+    requested_user_resolve_names = determine_resolves_to_generate(
         known_user_resolve_names,
-        union_membership.get(GenerateToolLockfileSentinel),
         set(generate_lockfiles_subsystem.resolve),
     )
 
@@ -535,27 +521,28 @@ async def generate_lockfiles_goal(
         )
         for resolve_names in requested_user_resolve_names
     )
-    specified_tool_requests = await MultiGet(
-        Get(
-            WrappedGenerateLockfile,
-            {sentinel(): GenerateToolLockfileSentinel, local_environment.val: EnvironmentName},
-        )
-        for sentinel in requested_tool_sentinels
-    )
-    applicable_tool_requests = filter_tool_lockfile_requests(
-        specified_tool_requests,
-        resolve_specified=bool(generate_lockfiles_subsystem.resolve),
+    resolve_specified = bool(generate_lockfiles_subsystem.resolve)
+    # We filter "user" requests because we're moving to combine user and tool lockfiles
+    (
+        tool_request_errors,
+        applicable_user_requests,
+    ) = filter_lockfiles_for_unconfigured_exportable_tools(
+        list(itertools.chain(*all_specified_user_requests)),
+        {e.options_scope: e for e in union_membership.get(ExportableTool)},
+        resolve_specified=resolve_specified,
     )
 
+    if tool_request_errors:
+        raise ValueError("\n\n".join(tool_request_errors))
+
     # Execute the actual lockfile generation in each request's environment.
-    # Currently, since resolves specify a single filename for output, we pick a resonable
+    # Currently, since resolves specify a single filename for output, we pick a reasonable
     # environment to execute the request in. Currently we warn if multiple environments are
     # specified.
-    all_requests: Iterator[GenerateLockfile] = itertools.chain(
-        *all_specified_user_requests, applicable_tool_requests
-    )
     if generate_lockfiles_subsystem.request_diffs:
-        all_requests = (replace(req, diff=True) for req in all_requests)
+        all_requests = tuple(replace(req, diff=True) for req in applicable_user_requests)
+    else:
+        all_requests = applicable_user_requests
 
     results = await MultiGet(
         Get(

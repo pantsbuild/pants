@@ -18,6 +18,7 @@ from pants.backend.go.util_rules.go_mod import (
 )
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.partitions import PartitionerType
@@ -35,6 +36,7 @@ from pants.engine.target import (
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
+from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
 
@@ -67,7 +69,7 @@ async def run_golangci_lint(
 ) -> LintResult:
     transitive_targets = await Get(
         TransitiveTargets,
-        TransitiveTargetsRequest((field_set.address for field_set in request.elements)),
+        TransitiveTargetsRequest(field_set.address for field_set in request.elements),
     )
 
     all_source_files_request = Get(
@@ -194,4 +196,5 @@ def rules():
     return [
         *collect_rules(),
         *GolangciLintRequest.rules(),
+        UnionRule(ExportableTool, GolangciLint),
     ]

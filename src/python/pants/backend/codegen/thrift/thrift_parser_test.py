@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import Iterable
 
 import pytest
 
@@ -14,14 +15,19 @@ from pants.engine.addresses import Address
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
-def parse(content: str) -> ParsedThrift:
+def parse(content: str, *, extra_namespace_directives: Iterable[str] = ()) -> ParsedThrift:
     rule_runner = RuleRunner(
         rules=[*thrift_parser.rules(), QueryRule(ParsedThrift, [ParsedThriftRequest])]
     )
     rule_runner.write_files({"f.thrift": content})
     return rule_runner.request(
         ParsedThrift,
-        [ParsedThriftRequest(ThriftSourceField("f.thrift", Address("", target_name="t")))],
+        [
+            ParsedThriftRequest(
+                ThriftSourceField("f.thrift", Address("", target_name="t")),
+                extra_namespace_directives=tuple(extra_namespace_directives),
+            )
+        ],
     )
 
 
@@ -85,3 +91,16 @@ def test_namespaces_invalid() -> None:
     )
     assert not result.imports
     assert not result.namespaces
+
+
+def test_extra_namespace_directives() -> None:
+    result = parse(
+        dedent(
+            """\
+            #@namespace psd mynamespace
+            """
+        ),
+        extra_namespace_directives=["#@namespace"],
+    )
+    assert not result.imports
+    assert dict(result.namespaces) == {"psd": "mynamespace"}

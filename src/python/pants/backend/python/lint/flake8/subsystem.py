@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.backend.python.goals import lockfile
 from pants.backend.python.lint.flake8.skip_field import SkipFlake8Field
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import (
@@ -20,12 +19,14 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
     StrippedPythonSourceFiles,
 )
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import AddPrefix, Digest
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, Target, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.unions import UnionRule
 from pants.option.option_types import (
     ArgsListOption,
     BoolOption,
@@ -55,7 +56,7 @@ class Flake8FieldSet(FieldSet):
 class Flake8(PythonToolBase):
     options_scope = "flake8"
     name = "Flake8"
-    help = "The Flake8 Python linter (https://flake8.pycqa.org/)."
+    help_short = "The Flake8 Python linter (https://flake8.pycqa.org/)."
 
     default_main = ConsoleScript("flake8")
     default_requirements = ["flake8>=5.0.4,<7"]
@@ -108,7 +109,7 @@ class Flake8(PythonToolBase):
             example, if your plugin is at `build-support/flake8/custom_plugin.py`, add
             `'build-support/flake8'` to `[source].root_patterns` in `pants.toml`. This is
             necessary for Pants to know how to tell Flake8 to discover your plugin. See
-            {doc_url('source-roots')}
+            {doc_url('docs/using-pants/key-concepts/source-roots')}
 
             You must also set `[flake8:local-plugins]` in your Flake8 config file.
 
@@ -123,7 +124,7 @@ class Flake8(PythonToolBase):
             directory or a subdirectory.
 
             To instead load third-party plugins, add them to a custom resolve alongside
-            flake8 itself, as described in {doc_url("python-lockfiles#lockfiles-for-tools")}.
+            flake8 itself, as described in {doc_url("docs/python/overview/lockfiles#lockfiles-for-tools")}.
             """
         ),
     )
@@ -211,6 +212,6 @@ async def flake8_first_party_plugins(flake8: Flake8) -> Flake8FirstPartyPlugins:
 def rules():
     return (
         *collect_rules(),
-        *lockfile.rules(),
         *python_sources.rules(),
+        UnionRule(ExportableTool, Flake8),
     )

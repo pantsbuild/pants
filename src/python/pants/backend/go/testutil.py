@@ -40,7 +40,7 @@ def gen_module_gomodproxy(
     prefix = f"{import_path}@{version}"
 
     all_files = [(f"{prefix}/go.mod", go_mod_content)]
-    all_files.extend(((f"{prefix}/{path}", contents) for (path, contents) in files))
+    all_files.extend((f"{prefix}/{path}", contents) for (path, contents) in files)
 
     mod_zip_bytes = io.BytesIO()
     with zipfile.ZipFile(mod_zip_bytes, "w") as mod_zip:

@@ -123,7 +123,7 @@ class StreamingWorkunitContext:
                 if source is None:
                     # This is a thing, that may need investigating to be fully understood.
                     # merely patches over a crash here. See #18564.
-                    logger.warn(
+                    logger.warning(
                         softwrap(
                             f"""
                             Unknown source address for target: {target_spec}
@@ -178,9 +178,9 @@ class WorkunitsCallback(ABC):
         completed?
 
         The main reason to `return False` is if your callback logs in its final call, when
-        `finished=True`, as it may end up logging to `.pantsd.d/pants.log` instead of the console,
-        which is harder for users to find. Otherwise, most callbacks should return `True` to avoid
-        slowing down Pants from finishing the run.
+        `finished=True`, as it may end up logging to `.pants.d/workdir/pants.log` instead of the
+        console, which is harder for users to find. Otherwise, most callbacks should return `True`
+        to avoid slowing down Pants from finishing the run.
         """
 
 

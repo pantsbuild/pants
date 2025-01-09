@@ -167,8 +167,8 @@ fn create_store(
     // Collect and sort by SpanId.
     let mut all = started
         .into_iter()
-        .chain(blocked.into_iter())
-        .chain(completed.into_iter())
+        .chain(blocked)
+        .chain(completed)
         .collect::<Vec<_>>();
     all.sort_by(|a, b| a.1.cmp(&b.1));
 

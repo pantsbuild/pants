@@ -14,9 +14,11 @@ from pants.backend.python.target_types import (
     InterpreterConstraintsField,
     PythonSourceField,
 )
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules
 from pants.engine.target import FieldSet, Target
+from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
 from pants.util.strutil import softwrap
 
@@ -36,13 +38,14 @@ class BlackFieldSet(FieldSet):
 class Black(PythonToolBase):
     options_scope = "black"
     name = "Black"
-    help = "The Black Python code formatter (https://black.readthedocs.io/)."
+    help_short = "The Black Python code formatter (https://black.readthedocs.io/)."
 
     default_main = ConsoleScript("black")
     default_requirements = [
-        "black>=22.6.0,<24",
+        "black>=22.6.0,<25",
         'typing-extensions>=3.10.0.0; python_version < "3.10"',
     ]
+    default_interpreter_constraints = ["CPython>=3.8,<4"]
 
     register_interpreter_constraints = True
 
@@ -89,4 +92,7 @@ class Black(PythonToolBase):
 
 
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+        UnionRule(ExportableTool, Black),
+    ]

@@ -10,8 +10,11 @@ from dataclasses import dataclass
 from threading import Thread
 from typing import Any, BinaryIO, Dict, Iterable, Tuple
 
-from pylsp_jsonrpc.endpoint import Endpoint  # type: ignore[import]
-from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # type: ignore[import]
+from pylsp_jsonrpc.endpoint import Endpoint  # type: ignore[import-untyped]
+from pylsp_jsonrpc.streams import (  # type: ignore[import-untyped]
+    JsonRpcStreamReader,
+    JsonRpcStreamWriter,
+)
 
 from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPConnection
@@ -95,7 +98,7 @@ def setup_bsp_server(
     notification_names = notification_names or set()
     thread_locals = PyThreadLocals.get_for_current_thread()
 
-    with setup_pipes() as pipes:
+    with setup_pipes() as pipes, rule_runner.pushd():
         context = BSPContext()
         rule_runner.set_session_values({BSPContext: context})
         conn = BSPConnection(

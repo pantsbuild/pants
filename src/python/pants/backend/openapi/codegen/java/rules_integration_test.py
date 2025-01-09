@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from textwrap import dedent
 from typing import Iterable
 
 import pytest
@@ -11,6 +12,9 @@ from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
     JVMLockfileFixture,
     JVMLockfileFixtureDefinition,
 )
+from pants.backend.experimental.java.register import rules as java_backend_rules
+from pants.backend.java.compile.javac import CompileJavaSourceRequest
+from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JavaSourceTarget
 from pants.backend.openapi.codegen.java.rules import GenerateJavaFromOpenAPIRequest
 from pants.backend.openapi.codegen.java.rules import rules as java_codegen_rules
 from pants.backend.openapi.sample.resources import PETSTORE_SAMPLE_SPEC
@@ -22,16 +26,24 @@ from pants.backend.openapi.target_types import (
     OpenApiSourceGeneratorTarget,
     OpenApiSourceTarget,
 )
-from pants.core.util_rules import config_files, external_tool, source_files, system_binaries
+from pants.backend.openapi.target_types import rules as target_types_rules
+from pants.backend.openapi.util_rules import openapi_bundle
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import (
+    Dependencies,
     DependenciesRequest,
     GeneratedSources,
     HydratedSources,
     HydrateSourcesRequest,
 )
+from pants.jvm import testutil
 from pants.jvm.target_types import JvmArtifactTarget
-from pants.jvm.testutil import maybe_skip_jdk_test
+from pants.jvm.testutil import (
+    RenderedClasspath,
+    expect_single_expanded_coarsened_target,
+    make_resolve,
+    maybe_skip_jdk_test,
+)
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 
 
@@ -40,20 +52,23 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         target_types=[
             JvmArtifactTarget,
+            JavaSourceTarget,
+            JavaSourcesGeneratorTarget,
             OpenApiSourceTarget,
             OpenApiSourceGeneratorTarget,
             OpenApiDocumentTarget,
             OpenApiDocumentGeneratorTarget,
         ],
         rules=[
+            *java_backend_rules(),
             *java_codegen_rules(),
-            *config_files.rules(),
-            *source_files.rules(),
-            *external_tool.rules(),
-            *system_binaries.rules(),
+            *openapi_bundle.rules(),
+            *target_types_rules(),
+            *testutil.rules(),
             QueryRule(HydratedSources, (HydrateSourcesRequest,)),
             QueryRule(GeneratedSources, (GenerateJavaFromOpenAPIRequest,)),
             QueryRule(Addresses, (DependenciesRequest,)),
+            QueryRule(RenderedClasspath, (CompileJavaSourceRequest,)),
         ],
     )
     rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
@@ -219,4 +234,53 @@ def test_generate_java_sources_using_custom_api_package(
         [
             "src/openapi/org/mycompany/PetsApi.java",
         ],
+    )
+
+
+@maybe_skip_jdk_test
+def test_java_dependency_inference(
+    rule_runner: RuleRunner, openapi_lockfile: JVMLockfileFixture
+) -> None:
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/default.lock": openapi_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": openapi_lockfile.requirements_as_jvm_artifact_targets(),
+            "src/openapi/BUILD": dedent(
+                """\
+                openapi_document(
+                    name="petstore",
+                    source="petstore_spec.yaml",
+                    java_api_package="org.mycompany.api",
+                    java_model_package="org.mycompany.model",
+                )
+                """
+            ),
+            "src/openapi/petstore_spec.yaml": PETSTORE_SAMPLE_SPEC,
+            "src/java/BUILD": "java_sources()",
+            "src/java/Example.java": dedent(
+                """\
+                package org.pantsbuild.java.example;
+
+                import org.mycompany.api.PetsApi;
+                import org.mycompany.model.Pet;
+
+                public class Example {
+                    PetsApi api;
+                    Pet pet;
+                }
+                """
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("src/java", relative_file_path="Example.java"))
+    dependencies = rule_runner.request(Addresses, [DependenciesRequest(tgt[Dependencies])])
+    assert Address("src/openapi", target_name="petstore") in dependencies
+
+    coarsened_target = expect_single_expanded_coarsened_target(
+        rule_runner, Address(spec_path="src/java")
+    )
+    _ = rule_runner.request(
+        RenderedClasspath,
+        [CompileJavaSourceRequest(component=coarsened_target, resolve=make_resolve(rule_runner))],
     )

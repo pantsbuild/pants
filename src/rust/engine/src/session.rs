@@ -8,7 +8,7 @@ use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 
 use crate::context::{Core, SessionCore};
-use crate::nodes::{NodeKey, Select};
+use crate::nodes::{NodeKey, Root};
 use crate::python::{Failure, Value};
 
 use async_latch::AsyncLatch;
@@ -27,9 +27,6 @@ use workunit_store::{format_workunit_duration_ms, RunId, WorkunitStore};
 // threshold should be logged. The threshold might become configurable, but this might not need
 // to be.
 const STRAGGLER_LOGGING_INTERVAL: Duration = Duration::from_secs(30);
-
-// Root requests are limited to Select nodes, which produce (python) Values.
-pub type Root = Select;
 
 pub type ObservedValueResult = (Result<Value, Failure>, Option<LastObserved>);
 
@@ -85,7 +82,7 @@ struct SessionState {
     // A place to store info about workunits in rust part
     workunit_store: WorkunitStore,
     // Per-Session values that have been set for this session.
-    session_values: Mutex<PyObject>,
+    session_values: Mutex<Value>,
     // An id used to control the visibility of uncacheable rules. Generally this is identical for an
     // entire Session, but in some cases (in particular, a `--loop`) the caller wants to retain the
     // same Session while still observing new values for uncacheable rules like Goals.
@@ -184,7 +181,7 @@ impl Session {
                 preceding_graph_size,
                 roots: Mutex::new(HashMap::new()),
                 workunit_store,
-                session_values: Mutex::new(session_values),
+                session_values: Mutex::new(Value::new(session_values)),
                 run_id: AtomicU32::new(run_id.0),
                 tail_tasks: TailTasks::new(),
             }),
@@ -273,8 +270,9 @@ impl Session {
         roots.keys().map(|r| r.clone().into()).collect()
     }
 
-    pub fn session_values(&self) -> PyObject {
-        self.state.session_values.lock().clone()
+    pub fn session_values(&self) -> Value {
+        let obj = self.state.session_values.lock();
+        obj.clone()
     }
 
     pub fn preceding_graph_size(&self) -> usize {

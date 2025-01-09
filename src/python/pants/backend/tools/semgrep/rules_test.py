@@ -20,33 +20,51 @@ def configs(strs: dict[str, set[str]]) -> AllSemgrepConfigs:
 
 
 @pytest.mark.parametrize(
-    ("paths", "expected"),
+    ("config_files", "config_dir_files", "expected"),
     [
-        pytest.param((), configs({}), id="nothing"),
+        pytest.param((), (), configs({}), id="nothing"),
         pytest.param(
             ("foo/bar/.semgrep.yml",),
+            (),
             configs({"foo/bar": {"foo/bar/.semgrep.yml"}}),
             id="semgrep_file",
         ),
         pytest.param(
+            (),
             ("foo/bar/.semgrep/baz.yml", "foo/bar/.semgrep/qux.yml"),
             configs({"foo/bar": {"foo/bar/.semgrep/baz.yml", "foo/bar/.semgrep/qux.yml"}}),
             id="semgrep_dir",
         ),
         pytest.param(
-            (
-                "foo/bar/.semgrep.yml",
-                "foo/bar/.semgrep/baz.yml",
-            ),
+            ("foo/bar/.semgrep.yml",),
+            ("foo/bar/.semgrep/baz.yml",),
             configs({"foo/bar": {"foo/bar/.semgrep.yml", "foo/bar/.semgrep/baz.yml"}}),
             id="both_file_and_dir",
         ),
         pytest.param(
+            (),
             (
-                "foo/.semgrep/baz.yml",
+                "foo/bar/.semgrep/.semgrep.yml",
+                "foo/bar/.semgrep/baz1.yml",
+                "foo/bar/.semgrep/quz/baz2.yml",
+            ),
+            configs(
+                {
+                    "foo/bar": {
+                        "foo/bar/.semgrep/.semgrep.yml",
+                        "foo/bar/.semgrep/baz1.yml",
+                        "foo/bar/.semgrep/quz/baz2.yml",
+                    }
+                }
+            ),
+            id="recursively_find_yamls",
+        ),
+        pytest.param(
+            (
                 "foo/bar/.semgrep.yml",
                 "foo/bar/qux/.semgrep.yml",
             ),
+            ("foo/.semgrep/baz.yml",),
             configs(
                 {
                     "foo": {"foo/.semgrep/baz.yml"},
@@ -58,15 +76,21 @@ def configs(strs: dict[str, set[str]]) -> AllSemgrepConfigs:
         ),
         # at the top level should be okay too
         pytest.param(
-            (".semgrep.yml", ".semgrep/foo.yml"),
+            (".semgrep.yml",),
+            (".semgrep/foo.yml",),
             configs({"": {".semgrep.yml", ".semgrep/foo.yml"}}),
             id="top_level",
         ),
     ],
 )
-def test_group_by_group_by_semgrep_dir(paths: tuple[str, ...], expected: AllSemgrepConfigs):
-    input = Paths(files=paths, dirs=())
-    result = rules._group_by_semgrep_dir(input)
+def test_group_by_group_by_semgrep_dir(
+    config_files: tuple[str, ...],
+    config_dir_files: tuple[str, ...],
+    expected: AllSemgrepConfigs,
+):
+    config_file_paths = Paths(files=config_files, dirs=())
+    config_dir_file_paths = Paths(files=config_dir_files, dirs=())
+    result = rules._group_by_semgrep_dir(config_file_paths, config_dir_file_paths, ".semgrep")
     assert result == expected
 
 

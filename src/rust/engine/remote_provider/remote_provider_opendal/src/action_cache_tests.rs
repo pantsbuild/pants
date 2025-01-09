@@ -11,7 +11,7 @@ use hashing::Digest;
 use opendal::services::Memory;
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use remote_provider_traits::{ActionCacheProvider, RemoteStoreOptions};
+use remote_provider_traits::{ActionCacheProvider, RemoteProvider, RemoteStoreOptions};
 
 use super::Provider;
 
@@ -30,6 +30,7 @@ fn test_path(digest: Digest) -> String {
 
 fn remote_options() -> RemoteStoreOptions {
     RemoteStoreOptions {
+        provider: RemoteProvider::ExperimentalFile,
         store_address: "".to_owned(),
         instance_name: None,
         tls_config: tls::Config::default(),

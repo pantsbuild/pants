@@ -9,6 +9,7 @@ import logging
 import os.path
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import ClassVar, Optional, cast
 
@@ -36,6 +37,7 @@ from pants.backend.python.util_rules.pex_from_targets import (
 from pants.backend.python.util_rules.pex_from_targets import rules as pex_from_targets_rules
 from pants.backend.python.util_rules.pex_venv import PexVenv, PexVenvLayout, PexVenvRequest
 from pants.backend.python.util_rules.pex_venv import rules as pex_venv_rules
+from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, OutputPathField
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.fs import (
@@ -64,9 +66,25 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.util.docutil import doc_url
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
+
+
+class PythonFaaSLayoutField(StringField):
+    alias = "layout"
+    valid_choices = PexVenvLayout
+    expected_type = str
+    default = PexVenvLayout.FLAT_ZIPPED.value
+    help = help_text(
+        """
+        Control the layout of the final artifact: `flat` creates a directory with the
+        source and requirements at the top level, as recommended by cloud vendors,
+        while `flat-zipped` (the default) wraps this up into a single zip file.
+        """
+    )
 
 
 class PythonFaaSPex3VenvCreateExtraArgsField(StringSequenceField):
@@ -75,11 +93,28 @@ class PythonFaaSPex3VenvCreateExtraArgsField(StringSequenceField):
     help = help_text(
         """
         Any extra arguments to pass to the `pex3 venv create` invocation that is used to create the
-        final zip file.
+        final zip file or directory.
 
         For example, `pex3_venv_create_extra_args=["--collisions-ok"]`, if using packages that have
         colliding files that aren't required at runtime (errors like "Encountered collisions
         populating ...").
+        """
+    )
+
+
+class PythonFaaSPexBuildExtraArgs(StringSequenceField):
+    alias = "pex_build_extra_args"
+    default = ()
+    help = help_text(
+        """
+        Additional arguments to pass to the `pex` invocation that is used to collect the requirements
+        and sources for packaging.
+
+        For example, `pex_build_extra_args=["--exclude=pypi-package-name"]` to force a package called
+        `pypi-package-name` isn't included in the artifact.
+
+        Note: Excluding dependencies currently causes Pex to throw an error. You can additionally pass
+        the `--ignore-errors` flag.
         """
     )
 
@@ -254,11 +289,19 @@ class PythonFaaSCompletePlatforms(PexCompletePlatformsField):
     )
 
 
+class FaaSArchitecture(str, Enum):
+    X86_64 = "x86_64"
+    ARM64 = "arm64"
+
+
 @dataclass(frozen=True)
 class PythonFaaSKnownRuntime:
+    name: str
     major: int
     minor: int
+    docker_repo: str
     tag: str
+    architecture: FaaSArchitecture
 
     def file_name(self) -> str:
         return f"complete_platform_{self.tag}.json"
@@ -269,7 +312,6 @@ class PythonFaaSRuntimeField(StringField, ABC):
     default = None
 
     known_runtimes: ClassVar[tuple[PythonFaaSKnownRuntime, ...]] = ()
-    known_runtimes_docker_repo: ClassVar[str]
 
     @classmethod
     def known_runtimes_complete_platforms_module(cls) -> str:
@@ -321,6 +363,7 @@ class RuntimePlatformsRequest:
 
     runtime: PythonFaaSRuntimeField
     complete_platforms: PythonFaaSCompletePlatforms
+    architecture: FaaSArchitecture
 
 
 @dataclass(frozen=True)
@@ -383,20 +426,46 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
         return RuntimePlatforms(interpreter_version=None, complete_platforms=complete_platforms)
 
     version = request.runtime.to_interpreter_version()
+    inferred_from_ics = False
     if version is None:
         # if there's not a specified version, let's try to infer it from the interpreter constraints
         version = await _infer_from_ics(request)
+        inferred_from_ics = True
 
     try:
         file_name = next(
             rt.file_name()
             for rt in request.runtime.known_runtimes
-            if version == (rt.major, rt.minor)
+            if version == (rt.major, rt.minor) and request.architecture.value == rt.architecture
         )
     except StopIteration:
-        # Not a known runtime, so fallback to just passing a platform
-        # TODO: maybe this should be an error, and we require users to specify
-        # complete_platforms themselves?
+        # No known runtime, so prompt the user to specify
+        version_modifier = "[inferred from interpreter constraints]" if inferred_from_ics else ""
+        version_adjective = "inferred" if inferred_from_ics else "specified"
+        known_runtimes_str = ", ".join(
+            FrozenOrderedSet(r.name for r in request.runtime.known_runtimes)
+        )
+        warn_or_error(
+            # Replace this with an unconditional `InvalidTargetException`
+            "2.26.0.dev0",
+            "implicitly resolving platforms for unknown FaaS runtimes",
+            softwrap(
+                f"""
+                Could not find a known runtime for the {version_adjective} Python version and machine architecture!
+
+                * Python version: {version} {version_modifier}
+                * Machine architecture: {request.architecture.value}
+                * Known runtime values: {known_runtimes_str}
+
+                To fix, please generate a `complete_platforms` file for the given Python version and
+                machine architecture, or specify a runtime that is known to Pants.
+
+                You can follow the instructions at {doc_url('docs/python/overview/pex#generating-the-complete_platforms-file')}
+                to generate a `complete_platforms` file for your Python version and machine
+                architecture.
+                """
+            ),
+        )
         return RuntimePlatforms(
             interpreter_version=version,
             pex_platforms=PexPlatforms((_format_platform_from_major_minor(*version),)),
@@ -421,7 +490,10 @@ class BuildPythonFaaSRequest:
     handler: None | PythonFaaSHandlerField
     output_path: OutputPathField
     runtime: PythonFaaSRuntimeField
+    architecture: FaaSArchitecture
     pex3_venv_create_extra_args: PythonFaaSPex3VenvCreateExtraArgsField
+    pex_build_extra_args: PythonFaaSPexBuildExtraArgs
+    layout: PythonFaaSLayoutField
 
     include_requirements: bool
     include_sources: bool
@@ -442,6 +514,8 @@ async def build_python_faas(
         # When we're executing Pex on Linux, allow a local interpreter to be resolved if
         # available and matching the AMI platform.
         "--resolve-local-platforms",
+        # Additional args from request
+        *(request.pex_build_extra_args.value or ()),
     )
 
     platforms_get = Get(
@@ -450,6 +524,7 @@ async def build_python_faas(
             address=request.address,
             target_name=request.target_name,
             runtime=request.runtime,
+            architecture=request.architecture,
             complete_platforms=request.complete_platforms,
         ),
     )
@@ -503,13 +578,17 @@ async def build_python_faas(
 
     pex_result = await Get(Pex, PexFromTargetsRequest, pex_request)
 
-    output_filename = request.output_path.value_or_default(file_ending="zip")
+    layout = PexVenvLayout(request.layout.value)
+
+    output_filename = request.output_path.value_or_default(
+        file_ending="zip" if layout is PexVenvLayout.FLAT_ZIPPED else None
+    )
 
     result = await Get(
         PexVenv,
         PexVenvRequest(
             pex=pex_result,
-            layout=PexVenvLayout.FLAT_ZIPPED,
+            layout=layout,
             platforms=platforms.pex_platforms,
             complete_platforms=platforms.complete_platforms,
             extra_args=request.pex3_venv_create_extra_args.value or (),
@@ -525,6 +604,9 @@ async def build_python_faas(
         extra_log_lines.append(
             f"    Runtime: {request.runtime.from_interpreter_version(*platforms.interpreter_version)}"
         )
+
+    if request.architecture is not None:
+        extra_log_lines.append(f"    Architecture: {request.architecture.value}")
 
     if reexported_handler_func is not None:
         if request.log_only_reexported_handler_func:

@@ -8,6 +8,9 @@ python_sources(dependencies=[":lockfile"])
 python_tests(
     name="tests",
     overrides={
-        "rules_integration_test.py": dict(timeout=240),
+        "rules_integration_test.py": {
+            "timeout": 240,
+            "tags": ["platform_specific_behavior"],
+        }
     },
 )

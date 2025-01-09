@@ -831,7 +831,7 @@ async def cgo_compile_request(
     # C files
     cflags = [*flags.cppflags, *flags.cflags]
     for gcc_file in gcc_files:
-        ofile = os.path.join(obj_dir_path, "_x{:03}.o".format(oseq))
+        ofile = os.path.join(obj_dir_path, f"_x{oseq:03}.o")
         oseq = oseq + 1
         out_obj_files.append(ofile)
 
@@ -850,7 +850,7 @@ async def cgo_compile_request(
     # C++ files
     cxxflags = [*flags.cppflags, *flags.cxxflags]
     for cxx_file in (os.path.join(dir_path, cxx_file) for cxx_file in request.cxx_files):
-        ofile = os.path.join(obj_dir_path, "_x{:03}.o".format(oseq))
+        ofile = os.path.join(obj_dir_path, f"_x{oseq:03}.o")
         oseq = oseq + 1
         out_obj_files.append(ofile)
 
@@ -868,7 +868,7 @@ async def cgo_compile_request(
 
     # Objective-C files
     for objc_file in (os.path.join(dir_path, objc_file) for objc_file in request.objc_files):
-        ofile = os.path.join(obj_dir_path, "_x{:03}.o".format(oseq))
+        ofile = os.path.join(obj_dir_path, f"_x{oseq:03}.o")
         oseq = oseq + 1
         out_obj_files.append(ofile)
 
@@ -888,7 +888,7 @@ async def cgo_compile_request(
     for fortran_file in (
         os.path.join(dir_path, fortran_file) for fortran_file in request.fortran_files
     ):
-        ofile = os.path.join(obj_dir_path, "_x{:03}.o".format(oseq))
+        ofile = os.path.join(obj_dir_path, f"_x{oseq:03}.o")
         oseq = oseq + 1
         out_obj_files.append(ofile)
 

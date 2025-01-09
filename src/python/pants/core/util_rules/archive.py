@@ -69,9 +69,12 @@ async def create_archive(
         argv: tuple[str, ...] = (
             bash_binary.path,
             "-c",
+            # Note: The -A (--adjust-sfx) option causes zip to treat the given archive name as-is.
+            # This works even when archive isn't created as a self-extracting archive
+            #  see https://unix.stackexchange.com/a/557812
             softwrap(
                 f"""
-                {zip_binary.path} --names-stdin {shlex.quote(request.output_filename)}
+                {zip_binary.path} --adjust-sfx --names-stdin {shlex.quote(request.output_filename)}
                 < {FILE_LIST_FILENAME}
                 """
             ),
@@ -86,7 +89,7 @@ async def create_archive(
         # `tar` expects to find a couple binaries like `gzip` and `xz` by looking on the PATH.
         env = {"PATH": os.pathsep.join(system_binaries_environment.system_binary_paths)}
 
-        # `tar` requires that the output filename's parent directory exists,so if the caller
+        # `tar` requires that the output filename's parent directory exists, so if the caller
         # wants the output in a directory we explicitly create it here.
         # We have to guard this path as the Rust code will crash if we give it empty paths.
         output_dir = os.path.dirname(request.output_filename)

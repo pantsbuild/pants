@@ -16,10 +16,7 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import Digest
-from pants.testutil.python_interpreter_selection import (
-    skip_unless_python27_present,
-    skip_unless_python39_present,
-)
+from pants.testutil.python_interpreter_selection import skip_unless_python39_present
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
 
@@ -58,6 +55,7 @@ def do_test_backend_shim(rule_runner: RuleRunner, constraints: str) -> None:
         build_sdist=True,
         input=input_digest,
         working_directory="",
+        dist_source_root=".",
         build_time_source_roots=tuple(),
         output_path="dist",
         wheel_config_settings=FrozenDict({"setting1": ("value1",), "setting2": ("value2",)}),
@@ -67,11 +65,6 @@ def do_test_backend_shim(rule_runner: RuleRunner, constraints: str) -> None:
     is_py2 = "2.7" in constraints
     assert res.sdist_path == "dist/foobar-1.2.3.tar.gz"
     assert res.wheel_path == f"dist/foobar-1.2.3-py{'2' if is_py2 else '3'}-none-any.whl"
-
-
-@skip_unless_python27_present
-def test_works_with_python2(rule_runner: RuleRunner) -> None:
-    do_test_backend_shim(rule_runner, constraints="CPython==2.7.*")
 
 
 @skip_unless_python39_present

@@ -1,0 +1,86 @@
+---
+    title: repl
+    sidebar_position: 5
+---
+
+Open a REPL for interactive development.
+
+---
+
+Pants will load a [REPL](https://en.wikipedia.org/wiki/REPL) with all of your specified source code and any of its third-party dependencies, which allows you to import those values.
+
+## IPython
+
+In addition to the default Python shell, Pants supports the improved [IPython shell](https://ipython.org).
+
+To use IPython, run `pants repl --shell=ipython`. To permanently use IPython, add this to your `pants.toml`:
+
+```toml title="pants.toml"
+[repl]
+shell = "ipython"
+```
+
+You can change IPython's version [like any other tool, using `install_from_resolve`](../overview/lockfiles#lockfiles-for-tools).
+
+If you use a version lower than IPython 7, then you must set `[ipython].ignore_cwd = false` to avoid Pants setting an option that did not exist in earlier IPython releases.
+
+:::note Python 2 support
+Pants uses IPython 7 by default, which does not work with Python 2. You can use `install_from_resolve` to install IPython 5:
+
+```toml tab={"label":"pants.toml"}
+[python.resolves]
+...
+ipython = "3rdparty/python/ipython.lock"
+
+[ipython]
+install_from_resolve = "ipython"
+ignore_cwd = false
+```
+```toml tab={"label": "BUILD"}
+python_requirement(name="ipython", requirements=["ipython<6"], resolve="ipython")
+```
+
+:::
+
+## Examples
+
+```text title="Shell"
+$ pants repl helloworld/greet/greeting.py
+
+Python 3.7.6 (default, Feb 26 2020, 08:28:08)
+[Clang 11.0.0 (clang-1100.0.33.8)] on darwin
+Type "help", "copyright", "credits" or "license" for more information.
+(InteractiveConsole)
+>>> from helloworld.greet.greeting import Greeter
+>>> Greeter().greet("Pants")
+'buenas tardes, Pants!'
+>>> from translate import Translator
+>>> Translator(to_lang="fr").translate("Good morning.")
+'Salut.'
+```
+
+This will not load any of your code:
+
+```text title="Shell"
+❯ pants repl --shell=ipython
+Python 3.9.12 (main, Mar 26 2022, 15:45:34)
+Type 'copyright', 'credits' or 'license' for more information
+IPython 7.34.0 -- An enhanced Interactive Python. Type '?' for help.
+
+In [1]: 21 * 4
+Out[1]: 84
+```
+
+`pants repl ::` will load all your code.
+
+To pass arguments to the repl program, use `--` at the end of the command, like this:
+
+```text title="Shell"
+$ pants repl --shell=ipython -- -i helloworld/main.py
+```
+
+Check the documentation for the `--repl-args` option in `pants help repl` to see which shells support passing arguments.
+
+:::note Tip: how to exit the REPL
+Either type `exit()` and hit enter, or press `ctrl+d`.
+:::

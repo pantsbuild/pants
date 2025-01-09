@@ -11,7 +11,8 @@ from pants.build_graph.address import Address
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import AllTargets, Targets
 from pants.jvm.dependency_inference.jvm_artifact_mappings import JVM_ARTIFACT_MAPPINGS
-from pants.jvm.resolve.common import ArtifactRequirement, Coordinate
+from pants.jvm.resolve.common import ArtifactRequirement
+from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
     JvmArtifactArtifactField,
@@ -279,9 +280,9 @@ async def find_available_third_party_artifacts(
     address_mapping: DefaultDict[
         tuple[_ResolveName, UnversionedCoordinate], OrderedSet[Address]
     ] = defaultdict(OrderedSet)
-    package_mapping: DefaultDict[
-        tuple[_ResolveName, UnversionedCoordinate], OrderedSet[str]
-    ] = defaultdict(OrderedSet)
+    package_mapping: DefaultDict[tuple[_ResolveName, UnversionedCoordinate], OrderedSet[str]] = (
+        defaultdict(OrderedSet)
+    )
     for tgt in all_jvm_artifact_tgts:
         coord = UnversionedCoordinate(
             group=tgt[JvmArtifactGroupField].value, artifact=tgt[JvmArtifactArtifactField].value

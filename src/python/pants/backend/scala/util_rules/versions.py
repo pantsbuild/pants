@@ -5,9 +5,10 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 from pants.engine.rules import collect_rules, rule
-from pants.jvm.resolve.common import Coordinate
+from pants.jvm.resolve.coordinate import Coordinate
 from pants.util.strutil import softwrap
 
 
@@ -22,7 +23,6 @@ class InvalidScalaVersion(ValueError):
 
 
 class ScalaCrossVersionMode(Enum):
-    PARTIAL = "partial"
     BINARY = "binary"
     FULL = "full"
 
@@ -61,6 +61,26 @@ class ScalaVersion:
     def binary(self) -> str:
         return self.crossversion(ScalaCrossVersionMode.BINARY)
 
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ScalaVersion)
+            and other.major == self.major
+            and other.minor == self.minor
+            and other.patch == self.patch
+            and other.suffix == self.suffix
+        )
+
+    def __gt__(self, other: Any) -> bool:
+        if isinstance(other, ScalaVersion):
+            if self.major > other.major:
+                return True
+            elif (self.major == other.major) and (self.minor > other.minor):
+                return True
+            elif (self.major == other.major) and (self.minor == other.minor):
+                return self.patch > other.patch
+            return False
+        return False
+
     def __str__(self) -> str:
         version_str = f"{self.major}.{self.minor}.{self.patch}"
         if self.suffix:
@@ -89,21 +109,20 @@ class ScalaArtifactsForVersionResult:
         return tuple(coords)
 
 
-@rule
-async def resolve_scala_artifacts_for_version(
-    request: ScalaArtifactsForVersionRequest,
+def _resolve_scala_artifacts_for_version(
+    scala_version: ScalaVersion,
 ) -> ScalaArtifactsForVersionResult:
-    if request.scala_version.major == 3:
+    if scala_version.major == 3:
         return ScalaArtifactsForVersionResult(
             compiler_coordinate=Coordinate(
                 group="org.scala-lang",
                 artifact="scala3-compiler_3",
-                version=str(request.scala_version),
+                version=str(scala_version),
             ),
             library_coordinate=Coordinate(
                 group="org.scala-lang",
                 artifact="scala3-library_3",
-                version=str(request.scala_version),
+                version=str(scala_version),
             ),
             reflect_coordinate=None,
             compiler_main="dotty.tools.dotc.Main",
@@ -114,21 +133,28 @@ async def resolve_scala_artifacts_for_version(
         compiler_coordinate=Coordinate(
             group="org.scala-lang",
             artifact="scala-compiler",
-            version=str(request.scala_version),
+            version=str(scala_version),
         ),
         library_coordinate=Coordinate(
             group="org.scala-lang",
             artifact="scala-library",
-            version=str(request.scala_version),
+            version=str(scala_version),
         ),
         reflect_coordinate=Coordinate(
             group="org.scala-lang",
             artifact="scala-reflect",
-            version=str(request.scala_version),
+            version=str(scala_version),
         ),
         compiler_main="scala.tools.nsc.Main",
         repl_main="scala.tools.nsc.MainGenericRunner",
     )
+
+
+@rule
+async def resolve_scala_artifacts_for_version(
+    request: ScalaArtifactsForVersionRequest,
+) -> ScalaArtifactsForVersionResult:
+    return _resolve_scala_artifacts_for_version(request.scala_version)
 
 
 def rules():

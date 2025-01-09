@@ -130,6 +130,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
     assert lint_results[0].stderr == ""
 
 
+@pytest.mark.platform_specific_behavior
 def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -138,7 +139,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
             "BUILD": "go_mod(name='mod')\ngo_package(name='pkg')\n",
         }
     )
-    tgt = rule_runner.get_target((Address("", target_name="pkg")))
+    tgt = rule_runner.get_target(Address("", target_name="pkg"))
     lint_results = run_golangci_lint(rule_runner, [tgt])
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1

@@ -7,17 +7,16 @@ from pants.backend.kotlin.lint.ktlint.skip_field import SkipKtlintField
 from pants.backend.kotlin.lint.ktlint.subsystem import KtlintSubsystem
 from pants.backend.kotlin.target_types import KotlinSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.partitions import PartitionerType
-from pants.engine.internals.selectors import Get
-from pants.engine.process import ProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.process import execute_process_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve import jvm_tool
-from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
+from pants.jvm.resolve.coursier_fetch import ToolClasspathRequest, materialize_classpath_for_tool
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -41,16 +40,14 @@ class KtlintRequest(FmtTargetsRequest):
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
-class KtlintToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
-    resolve_name = KtlintSubsystem.options_scope
-
-
 @rule(desc="Format with Ktlint", level=LogLevel.DEBUG)
 async def ktlint_fmt(
     request: KtlintRequest.Batch, tool: KtlintSubsystem, jdk: InternalJdk
 ) -> FmtResult:
-    lockfile_request = await Get(GenerateJvmLockfileFromTool, KtlintToolLockfileSentinel())
-    tool_classpath = await Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request))
+    lockfile_request = GenerateJvmLockfileFromTool.create(tool)
+    tool_classpath = await materialize_classpath_for_tool(
+        ToolClasspathRequest(lockfile=lockfile_request)
+    )
 
     toolcp_relpath = "__toolcp"
     extra_immutable_input_digests = {
@@ -63,30 +60,24 @@ async def ktlint_fmt(
         *request.files,
     ]
 
-    result = await Get(
-        ProcessResult,
-        JvmProcess(
-            jdk=jdk,
-            argv=args,
-            classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
-            input_digest=request.snapshot.digest,
-            extra_jvm_options=tool.jvm_options,
-            extra_immutable_input_digests=extra_immutable_input_digests,
-            extra_nailgun_keys=extra_immutable_input_digests,
-            output_files=request.files,
-            description=f"Run Ktlint on {pluralize(len(request.files), 'file')}.",
-            level=LogLevel.DEBUG,
-        ),
+    result = await execute_process_or_raise(
+        **implicitly(
+            JvmProcess(
+                jdk=jdk,
+                argv=args,
+                classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
+                input_digest=request.snapshot.digest,
+                extra_jvm_options=tool.jvm_options,
+                extra_immutable_input_digests=extra_immutable_input_digests,
+                extra_nailgun_keys=extra_immutable_input_digests,
+                output_files=request.files,
+                description=f"Run Ktlint on {pluralize(len(request.files), 'file')}.",
+                level=LogLevel.DEBUG,
+            )
+        )
     )
 
     return await FmtResult.create(request, result)
-
-
-@rule
-def generate_ktlint_lockfile_request(
-    _: KtlintToolLockfileSentinel, tool: KtlintSubsystem
-) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool.create(tool)
 
 
 def rules():
@@ -94,5 +85,5 @@ def rules():
         *collect_rules(),
         *jvm_tool.rules(),
         *KtlintRequest.rules(),
-        UnionRule(GenerateToolLockfileSentinel, KtlintToolLockfileSentinel),
+        UnionRule(ExportableTool, KtlintSubsystem),
     ]

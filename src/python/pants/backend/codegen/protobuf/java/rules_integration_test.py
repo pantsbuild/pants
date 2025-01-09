@@ -21,14 +21,21 @@ from pants.backend.codegen.protobuf.target_types import rules as target_types_ru
 from pants.backend.experimental.java.register import rules as java_backend_rules
 from pants.backend.java.compile.javac import CompileJavaSourceRequest
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JavaSourceTarget
-from pants.engine.addresses import Address
-from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
+from pants.engine.addresses import Address, Addresses
+from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
+    GeneratedSources,
+    HydratedSources,
+    HydrateSourcesRequest,
+)
 from pants.jvm import testutil
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import (
     RenderedClasspath,
     expect_single_expanded_coarsened_target,
     make_resolve,
+    maybe_skip_jdk_test,
 )
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -81,6 +88,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GenerateJavaFromProtobufRequest]),
             QueryRule(RenderedClasspath, (CompileJavaSourceRequest,)),
+            QueryRule(Addresses, (DependenciesRequest,)),
         ],
         target_types=[
             ProtobufSourcesGeneratorTarget,
@@ -112,6 +120,7 @@ def assert_files_generated(
     assert set(generated_sources.snapshot.files) == set(expected_files)
 
 
+@maybe_skip_jdk_test
 def test_generates_java(
     rule_runner: RuleRunner, protobuf_java_lockfile: JVMLockfileFixture
 ) -> None:
@@ -120,6 +129,7 @@ def test_generates_java(
     #  * Protobuf files can import other protobuf files, and those can import others
     #    (transitive dependencies). We'll only generate the requested target, though.
     #  * We can handle multiple source roots, which need to be preserved in the final output.
+    #  * Dependency inference between Java and Protobuf sources.
     rule_runner.write_files(
         {
             "src/protobuf/dir1/f.proto": dedent(
@@ -144,7 +154,7 @@ def test_generates_java(
                 """
             ),
             "src/protobuf/dir1/BUILD": "protobuf_sources()",
-            "src/protobuf/dir2/f.proto": dedent(
+            "src/protobuf/dir2/f3.proto": dedent(
                 """\
                 syntax = "proto3";
 
@@ -161,7 +171,7 @@ def test_generates_java(
 
                 package test_protos;
 
-                import "dir2/f.proto";
+                import "dir2/f3.proto";
                 """
             ),
             "tests/protobuf/test_protos/BUILD": (
@@ -169,11 +179,13 @@ def test_generates_java(
             ),
             "3rdparty/jvm/default.lock": protobuf_java_lockfile.serialized_lockfile,
             "3rdparty/jvm/BUILD": protobuf_java_lockfile.requirements_as_jvm_artifact_targets(),
-            "src/jvm/BUILD": "java_sources(dependencies=['src/protobuf/dir1'])",
+            "src/jvm/BUILD": "java_sources()",
             "src/jvm/TestJavaProtobuf.java": dedent(
                 """\
                 package org.pantsbuild.java.example;
+
                 import org.pantsbuild.java.proto.F.Person;
+
                 public class TestJavaProtobuf {
                   Person person;
                 }
@@ -198,12 +210,16 @@ def test_generates_java(
         Address("src/protobuf/dir1", relative_file_path="f2.proto"), "src/protobuf/dir1/F2.java"
     )
     assert_gen(
-        Address("src/protobuf/dir2", relative_file_path="f.proto"), "src/protobuf/dir2/F.java"
+        Address("src/protobuf/dir2", relative_file_path="f3.proto"), "src/protobuf/dir2/F3.java"
     )
     assert_gen(
         Address("tests/protobuf/test_protos", relative_file_path="f.proto"),
         "tests/protobuf/test_protos/F.java",
     )
+
+    tgt = rule_runner.get_target(Address("src/jvm", relative_file_path="TestJavaProtobuf.java"))
+    dependencies = rule_runner.request(Addresses, [DependenciesRequest(tgt[Dependencies])])
+    assert Address("src/protobuf/dir1", relative_file_path="f.proto") in dependencies
 
     request = CompileJavaSourceRequest(
         component=expect_single_expanded_coarsened_target(
@@ -235,6 +251,7 @@ def protobuf_java_grpc_lockfile(
     return protobuf_java_grpc_lockfile_def.load(request)
 
 
+@maybe_skip_jdk_test
 def test_generates_grpc_java(
     rule_runner: RuleRunner, protobuf_java_grpc_lockfile: JVMLockfileFixture
 ) -> None:

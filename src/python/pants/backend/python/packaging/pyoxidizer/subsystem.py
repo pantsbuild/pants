@@ -3,7 +3,9 @@
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
+from pants.core.goals.resolves import ExportableTool
 from pants.engine.rules import collect_rules
+from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption
 from pants.util.strutil import help_text
 
@@ -11,7 +13,7 @@ from pants.util.strutil import help_text
 class PyOxidizer(PythonToolBase):
     options_scope = "pyoxidizer"
     name = "PyOxidizer"
-    help = help_text(
+    help_short = help_text(
         """
         The PyOxidizer utility for packaging Python code in a Rust binary
         (https://pyoxidizer.readthedocs.io/en/stable/pyoxidizer.html).
@@ -32,4 +34,7 @@ class PyOxidizer(PythonToolBase):
 
 
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+        UnionRule(ExportableTool, PyOxidizer),
+    ]

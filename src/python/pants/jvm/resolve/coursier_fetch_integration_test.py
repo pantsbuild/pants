@@ -14,15 +14,15 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessExecutionFailure
 from pants.engine.target import Targets
 from pants.jvm.compile import ClasspathEntry
-from pants.jvm.resolve.common import (
-    ArtifactRequirement,
-    ArtifactRequirements,
-    Coordinate,
-    Coordinates,
-)
+from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
+from pants.jvm.resolve.coordinate import Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
-from pants.jvm.target_types import JvmArtifactJarSourceField, JvmArtifactTarget
+from pants.jvm.target_types import (
+    JvmArtifactExclusion,
+    JvmArtifactJarSourceField,
+    JvmArtifactTarget,
+)
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import ExtractFileDigest
 from pants.jvm.util_rules import rules as util_rules
@@ -648,21 +648,17 @@ def test_user_repo_order_is_respected(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 def test_transitive_excludes(rule_runner: RuleRunner) -> None:
+    requirement = ArtifactRequirement(
+        coordinate=Coordinate(
+            group="com.fasterxml.jackson.core",
+            artifact="jackson-databind",
+            version="2.12.1",
+        ),
+        excludes=frozenset(["com.fasterxml.jackson.core:jackson-core"]),
+    )
     resolve = rule_runner.request(
         CoursierResolvedLockfile,
-        [
-            ArtifactRequirements(
-                [
-                    Coordinate(
-                        group="com.fasterxml.jackson.core",
-                        artifact="jackson-databind",
-                        version="2.12.1",
-                    )
-                    .as_requirement()
-                    .with_extra_excludes("com.fasterxml.jackson.core:jackson-core")
-                ]
-            ),
-        ],
+        [ArtifactRequirements([requirement])],
     )
 
     entries = resolve.entries
@@ -671,26 +667,43 @@ def test_transitive_excludes(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
+def test_transitive_group_only_excludes(rule_runner: RuleRunner) -> None:
+    group_only_excludes = JvmArtifactExclusion(group="com.fasterxml.jackson.core", artifact=None)
+
+    requirement = ArtifactRequirement(
+        coordinate=Coordinate(
+            group="com.fasterxml.jackson.module",
+            artifact="jackson-module-jaxb-annotations",
+            version="2.17.1",
+        ),
+        excludes=frozenset([group_only_excludes.to_coord_str()]),
+    )
+
+    resolve = rule_runner.request(CoursierResolvedLockfile, [ArtifactRequirements([requirement])])
+
+    entries = resolve.entries
+    assert not any(i for i in entries if i.coord.group == "com.fasterxml.jackson.core")
+
+
+@maybe_skip_jdk_test
 def test_missing_entry_for_transitive_dependency(rule_runner: RuleRunner) -> None:
+    requirement = ArtifactRequirement(
+        coordinate=Coordinate(
+            group="org.apache.hive",
+            artifact="hive-exec",
+            version="1.1.0",
+        ),
+        excludes=frozenset(
+            [
+                "org.apache.calcite:calcite-avatica",
+                "org.apache.calcite:calcite-core",
+                "jdk.tools:jdk.tools",
+            ]
+        ),
+    )
     resolve = rule_runner.request(
         CoursierResolvedLockfile,
-        [
-            ArtifactRequirements(
-                [
-                    Coordinate(
-                        group="org.apache.hive",
-                        artifact="hive-exec",
-                        version="1.1.0",
-                    )
-                    .as_requirement()
-                    .with_extra_excludes(
-                        "org.apache.calcite:calcite-avatica",
-                        "org.apache.calcite:calcite-core",
-                        "jdk.tools:jdk.tools",
-                    )
-                ]
-            )
-        ],
+        [ArtifactRequirements([requirement])],
     )
 
     coords_of_entries = {(entry.coord.group, entry.coord.artifact) for entry in resolve.entries}
@@ -707,13 +720,13 @@ def test_missing_entry_for_transitive_dependency(rule_runner: RuleRunner) -> Non
 
 @maybe_skip_jdk_test
 def test_failed_to_fetch_jar_given_packaging_pom(rule_runner: RuleRunner) -> None:
-    reqs = ArtifactRequirements(
+    reqs = ArtifactRequirements.from_coordinates(
         [
             Coordinate(
                 group="org.apache.curator",
                 artifact="apache-curator",
                 version="5.5.0",
-            ).as_requirement()
+            )
         ]
     )
 
@@ -723,3 +736,56 @@ def test_failed_to_fetch_jar_given_packaging_pom(rule_runner: RuleRunner) -> Non
         match=r"Exception: No jar found for org.apache.curator:apache-curator:5.5.0. .*",
     ):
         rule_runner.request(CoursierResolvedLockfile, [reqs])
+
+
+@maybe_skip_jdk_test
+def test_force_version(rule_runner):
+    # first check that force_version=False leads to a different version
+    reqs = ArtifactRequirements.from_coordinates(
+        [
+            Coordinate(
+                group="org.apache.parquet",
+                artifact="parquet-common",
+                version="1.13.1",
+            ),
+            Coordinate(
+                group="org.slf4j",
+                artifact="slf4j-api",
+                version="1.7.19",
+            ),
+        ]
+    )
+    entries = rule_runner.request(CoursierResolvedLockfile, [reqs]).entries
+    assert Coordinate(
+        group="org.slf4j",
+        artifact="slf4j-api",
+        version="1.7.22",
+    ) in [e.coord for e in entries]
+
+    # then check force_version=True pins the version
+    reqs = ArtifactRequirements(
+        [
+            ArtifactRequirement(
+                Coordinate(
+                    group="org.apache.parquet",
+                    artifact="parquet-common",
+                    version="1.13.1",
+                ),
+            ),
+            ArtifactRequirement(
+                coordinate=Coordinate(
+                    group="org.slf4j",
+                    artifact="slf4j-api",
+                    version="1.7.19",
+                ),
+                force_version=True,
+            ),
+        ]
+    )
+    entries = rule_runner.request(CoursierResolvedLockfile, [reqs]).entries
+    assert Coordinate(
+        group="org.slf4j",
+        artifact="slf4j-api",
+        version="1.7.19",
+        strict=True,
+    ) in [e.coord for e in entries]

@@ -344,7 +344,6 @@ fn walk_too_many_links_rootdir() {
     assert_walk(
         &tree,
         (0..MAX_LINK_DEPTH)
-            .into_iter()
             .map(|n| ("self/".repeat(n.into()) + "file.txt"))
             .collect::<Vec<_>>(),
         vec!["".to_string()],
@@ -366,7 +365,6 @@ fn walk_too_many_links_subdir() {
     assert_walk(
         &tree,
         (0..MAX_LINK_DEPTH)
-            .into_iter()
             .map(|n| ("a/".to_string() + &"self/".repeat(n.into()) + "file.txt"))
             .collect::<Vec<_>>(),
         vec!["".to_string(), "a".to_string()],

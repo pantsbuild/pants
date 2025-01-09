@@ -13,10 +13,11 @@ from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.selectors import AwaitableConstraints, Get
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass
 from pants.option.errors import OptionsError
-from pants.option.option_types import OptionsInfo, collect_options_info
+from pants.option.option_types import OptionInfo, collect_options_info
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo, normalize_scope
+from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
 
 if TYPE_CHECKING:
@@ -73,6 +74,7 @@ class Subsystem(metaclass=_SubsystemMeta):
     deprecated_options_scope: str | None = None
     deprecated_options_scope_removal_version: str | None = None
 
+    # // Note: must be aligned with the regex in src/rust/engine/options/src/id.rs.
     _scope_name_re = re.compile(r"^(?:[a-z0-9_])+(?:-(?:[a-z0-9_])+)*$")
 
     _rules: ClassVar[Sequence[Rule] | None] = None
@@ -116,12 +118,12 @@ class Subsystem(metaclass=_SubsystemMeta):
                 return default
 
             # Resolving an attribute on the class object will return the underlying descriptor.
-            # If the descriptor is an `OptionsInfo`, we can resolve it against the environment
+            # If the descriptor is an `OptionInfo`, we can resolve it against the environment
             # target.
-            if isinstance(v, OptionsInfo):
+            if isinstance(v, OptionInfo):
                 # If the value is not defined in the `EnvironmentTarget`, return the value
                 # from the options system.
-                override = resolve_environment_sensitive_option(v.flag_names[0], self)
+                override = resolve_environment_sensitive_option(v.args[0], self)
                 return override if override is not None else default
 
             # We should just return the default at this point.
@@ -132,12 +134,12 @@ class Subsystem(metaclass=_SubsystemMeta):
             from pants.core.util_rules.environments import resolve_environment_sensitive_option
 
             v = getattr(type(self), __name)
-            assert isinstance(v, OptionsInfo)
+            assert isinstance(v, OptionInfo)
 
             return (
                 # vars beginning with `_` are exposed as option names with the leading `_` stripped
                 self.options.is_default(__name.lstrip("_"))
-                and resolve_environment_sensitive_option(v.flag_names[0], self) is None
+                and resolve_environment_sensitive_option(v.args[0], self) is None
             )
 
     @classmethod
@@ -183,7 +185,7 @@ class Subsystem(metaclass=_SubsystemMeta):
         # Global-level imports are conditional, we need to re-import here for runtime use
         from pants.engine.rules import TaskRule
 
-        partial_construct_subsystem: Any = functools.partial(_construct_subsytem, cls)
+        partial_construct_subsystem: Any = functools.partial(_construct_subsystem, cls)
 
         # NB: We must populate several dunder methods on the partial function because partial
         # functions do not have these defined by default and the engine uses these values to
@@ -199,10 +201,14 @@ class Subsystem(metaclass=_SubsystemMeta):
 
         return TaskRule(
             output_type=cls,
-            input_selectors=(),
-            input_gets=(
+            parameters=FrozenDict(),
+            awaitables=(
                 AwaitableConstraints(
-                    rule_id=None, output_type=ScopedOptions, input_types=(Scope,), is_effect=False
+                    rule_id=None,
+                    output_type=ScopedOptions,
+                    explicit_args_arity=0,
+                    input_types=(Scope,),
+                    is_effect=False,
                 ),
             ),
             masked_types=(),
@@ -229,11 +235,12 @@ class Subsystem(metaclass=_SubsystemMeta):
 
         return TaskRule(
             output_type=cls.EnvironmentAware,
-            input_selectors=(cls, EnvironmentTarget),
-            input_gets=(
+            parameters=FrozenDict({"subsystem_instance": cls, "env_tgt": EnvironmentTarget}),
+            awaitables=(
                 AwaitableConstraints(
                     rule_id=None,
                     output_type=EnvironmentVars,
+                    explicit_args_arity=0,
                     input_types=(EnvironmentVarsRequest,),
                     is_effect=False,
                 ),
@@ -245,7 +252,7 @@ class Subsystem(metaclass=_SubsystemMeta):
 
     @classmethod
     def is_valid_scope_name(cls, s: str) -> bool:
-        return s == "" or cls._scope_name_re.match(s) is not None
+        return s == "" or (cls._scope_name_re.match(s) is not None and s != "pants")
 
     @classmethod
     def validate_scope(cls) -> None:
@@ -255,7 +262,7 @@ class Subsystem(metaclass=_SubsystemMeta):
         if not cls.is_valid_scope_name(options_scope):
             raise OptionsError(
                 softwrap(
-                    """
+                    f"""
                     Options scope "{options_scope}" is not valid.
 
                     Replace in code with a new scope name consisting of only lower-case letters,
@@ -281,34 +288,33 @@ class Subsystem(metaclass=_SubsystemMeta):
 
         Subclasses should not generally need to override this method.
         """
-        register = options.registration_function_for_subsystem(cls)
+
+        def register(*args, **kwargs):
+            options.register(cls.options_scope, *args, **kwargs)
+
         plugin_option_containers = union_membership.get(cls.PluginOption)
         for options_info in collect_options_info(cls):
-            register(*options_info.flag_names, **options_info.flag_options)
+            register(*options_info.args, **options_info.kwargs)
         for options_info in collect_options_info(cls.EnvironmentAware):
-            register(*options_info.flag_names, environment_aware=True, **options_info.flag_options)
+            register(*options_info.args, environment_aware=True, **options_info.kwargs)
         for options_info in (
             option
             for container in plugin_option_containers
             for option in collect_options_info(container)
         ):
-            register(*options_info.flag_names, **options_info.flag_options)
-
-        # NB: If the class defined `register_options` we should call it
-        if "register_options" in cls.__dict__:
-            cls.register_options(register)  # type: ignore[attr-defined]
+            register(*options_info.args, **options_info.kwargs)
 
     def __init__(self, options: OptionValueContainer) -> None:
         self.validate_scope()
         self.options = options
 
     def __eq__(self, other: Any) -> bool:
-        if type(self) != type(other):
+        if type(self) != type(other):  # noqa: E721
             return False
         return bool(self.options == other.options)
 
 
-async def _construct_subsytem(subsystem_typ: type[_SubsystemT]) -> _SubsystemT:
+async def _construct_subsystem(subsystem_typ: type[_SubsystemT]) -> _SubsystemT:
     scoped_options = await Get(ScopedOptions, Scope(str(subsystem_typ.options_scope)))
     return subsystem_typ(scoped_options.options)
 

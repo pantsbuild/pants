@@ -1,0 +1,162 @@
+---
+    title: Setting up Pants
+    sidebar_position: 0
+---
+
+How to set up Pants for local development.
+
+---
+
+## Step 1: Fork and clone `pantsbuild/pants`
+
+We use the popular forking workflow typically used by open source projects. See [https://guides.github.com/activities/forking/](https://guides.github.com/activities/forking/) for a guide on how to fork [pantsbuild/pants](https://github.com/pantsbuild/pants), then clone it to your local machine.
+
+:::caution macOS users: install a newer `openssl`
+Pants requires a more modern OpenSSL version than the one that comes with macOS. To get all dependencies to resolve correctly, run the below commands. If you are using Zsh, use `.zshrc` rather than `.bashrc`.
+
+```bash
+$ brew install openssl
+$ echo 'export PATH="$(brew --prefix)/opt/openssl/bin:$PATH"' >> ~/.bashrc
+$ echo 'export LDFLAGS="-L$(brew --prefix)/opt/openssl/lib"' >> ~/.bashrc
+$ echo 'export CPPFLAGS="-I$(brew --prefix)/opt/openssl/include"' >> ~/.bashrc
+```
+
+(If you don't have `brew` installed, see [https://brew.sh](https://brew.sh))
+:::
+
+## Step 2: Bootstrap the Rust engine
+
+Pants requires several dependencies to be installed: a Python 3.9 interpreter, Rust, the protobuf compiler, clang and others. There is experimental support for the Nix package manager that makes it easy to set up a dev environment. Follow the instructions on the [Nix website](https://nixos.org/download.html) to install Nix. Then `cd` into the directory where you cloned the Pants repo and type `nix-shell`. This will download all the necessary dependencies and start a shell with a suitably configured PATH variable to make them available for use.
+
+Alternatively, you can install the dependencies manually as follows:
+
+Pants uses Rustup to install Rust. Run the command from [https://rustup.rs](https://rustup.rs) to install Rustup; ensure that `rustup` is on your `$PATH`.
+
+If your system Python is not the version Pants expects (currently Python 3.9), you'll need to provide one. Python interpreters from Linux or Mac distributions sometimes have quirks that can cause headaches with bootstrapping the dev venv. Some examples of Pythons that work well with Pants are those provided by:
+
+- [Fedora](https://packages.fedoraproject.org/pkgs/python3.9/python3.9/)
+- [ASDF](https://github.com/asdf-community/asdf-python)
+- [PyEnv](https://github.com/pyenv/pyenv)
+  Providers that sometimes cause issues include:
+- Ubuntu Deadsnakes
+  You also need to have the protobuf compiler and LLVM clang installed. On Debian derivatives, these can be installed using `apt install clang protobuf-compiler`.
+
+Then, run `pants` to set up the Python virtual environment and compile the engine.
+
+:::caution This will take several minutes
+Rust compilation is really slow. Fortunately, this step gets cached, so you will only need to wait the first time.
+:::
+
+:::note Want a faster compile?
+We default to compiling with Rust's `release` mode, instead of its `debug` mode, because this makes Pants substantially faster. However, this results in the compile taking 5-10x longer.
+
+If you are okay with Pants running much slower when iterating, set the environment variable `MODE=debug` and rerun `pants` to compile in debug mode.
+:::
+
+:::caution Rust compilation can use lots of storage
+Compiling the engine typically results in several gigabytes of storage over time. We have not yet implemented automated garbage collection for building the engine because contributors are the only ones to need to compile Rust, not every-day users.
+
+To free up space, run `rm -rf src/rust/engine/target`.
+
+Warning: this will cause Rust to recompile everything.
+:::
+
+## Step 3: Set up a pre-push Git Hook
+
+We have a [Git Hook](https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks) that runs some useful checks and lints when you `git push`. Running this locally can prevent easily avoidable CI failures such as whitespace or linting issues.
+
+To install this, run:
+
+```bash
+$ build-support/bin/setup.sh
+```
+
+You can manually run the pre-push check with:
+
+```bash
+$ build-support/githooks/pre-push
+```
+
+The [Rust-compilation](./developing-rust.mdx) affecting `MODE` flag is passed through to the hooks, so to run the githooks in "debug" mode, you can do something like:
+
+```bash
+$ MODE=debug git push ...
+```
+
+:::note How to temporarily skip the pre-push checks
+Use `git push --no-verify` or `git push -n` to skip the checks.
+:::
+
+## Configure your IDE (optional)
+
+### Hooking up the Python virtual environment
+
+Most IDEs allow you to configure a Python [virtual environment](https://docs.python.org/3/tutorial/venv.html) so that the editor understands your Python import statements.
+
+Pants sets up its development virtualenv at `~/.cache/pants/pants_dev_deps/<arch>.<version>.venv/`. Point your editor to the `bin/python` file in this folder, e.g. `~/.cache/pants/pants_dev_deps/Darwin.py37.venv/bin/python`.
+
+### PyCharm guide
+
+1. Use "New project" and click the option "Existing interpreter". Point the interpreter to the virtual environment location described above.
+2. In your project tree (the list of folders and files), secondary-click the folder `src/python`. Click "Mark directory as" and choose "Sources".
+
+### VSCode guide
+
+Add this to your `settings.json` file inside the build root's `.vscode` folder:
+
+```json title="settings.json"
+{
+  "python.analysis.extraPaths": ["src/python"],
+  "python.formatting.provider": "black",
+  "python.linting.enabled": true,
+  "python.linting.flake8Enabled": true,
+  "python.linting.flake8Args": ["--config=build-support/flake8/.flake8"],
+  "rust-analyzer.linkedProjects": ["src/rust/engine/Cargo.toml"]
+}
+```
+
+`python.analysis.extraPaths` lets VSCode know where to find Pants's source root. The other config enables `black` and `flake8`.
+
+## Alternative with the Dev Container
+
+:::note We would love your feedback
+The *Development Container* for Pants is still in its early stages. Please let us know if you encounter any issues or have suggestions for improvement.
+:::
+
+This project provides a *Development Container* (or [Dev Container](https://containers.dev/) for short) with a full-featured development environment containing all the tools, libraries, and runtimes needed to work with the [Pants](https://github.com/pantsbuild/pants) codebase. Here are some advantages of using dev containers:
+
+- **Faster setup**: Dev containers can be pre-built with all the necessary tools, libraries and runtimes, making setting up a new development environment faster. This is especially useful for new team members joining a project who can quickly get started without spending time setting up their development environment.
+- **Portability**: Dev containers provide portability between different platforms and clouds, allowing developers to write once and run anywhere. This ensures that developers can use the same development environment across different machines and platforms without compatibility issues.
+- **Consistency**: Dev containers provide a consistent development environment for all developers working on a project. This ensures that everyone is using the same tools, libraries and runtimes, reducing the chances of compatibility issues and making it easier to collaborate and reproduce bugs.
+- **Isolation**: Dev containers run in isolation from the host system, which improves security and reduces the chances of conflicts with other software installed on the host system.
+- **Reproducibility**: Dev containers can be version-controlled, making it easy to reproduce the development environment at any point in time. It also allows developers to roll back to an earlier environment version if necessary.
+
+### Features
+
+- [Rust](https://www.rust-lang.org/) engine and common Rust utilities
+- [Python](https://www.python.org/) 3.11
+- [Docker-in-Docker](https://github.com/devcontainers/features/tree/main/src/docker-in-docker) (DinD)
+- [Shell History](https://github.com/stuartleeks/dev-container-features/tree/main/src/shell-history)
+- [Local Git hooks](https://www.pantsbuild.org/stable/docs/contributions/development/setting-up-pants#step-3-set-up-a-pre-push-git-hook)
+- Useful VS Code extensions like `Python`, `Pylance`, `Black Formatter`, `rust-analyser`, `Even Better TOML`, etc.
+- Volumes for Pants [cache directories](https://www.pantsbuild.org/stable/docs/using-pants/using-pants-in-ci#directories-to-cache)
+- `hyperfine`, `py-sy`, `memray` and `dbg` for [debugging and benchmarking](https://www.pantsbuild.org/stable/docs/contributions/development/debugging-and-benchmarking)
+
+### Getting started
+
+You need three (3) things to get started with development containers:
+
+- [VS Code](https://code.visualstudio.com/)
+- [Docker](https://www.docker.com/)
+- [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension for VS Code
+
+More on getting started can be found [here](https://code.visualstudio.com/docs/devcontainers/containers#_getting-started).
+
+### Using the Dev Container
+
+1. After forking and cloning `pantsbuild/pants`, start VS Code and run the `Dev Containers: Open Folder in Container...` command from the *Command Palette...* (`F1`) and select the Pants project folder.
+2. The VS Code window (instance) will reload and start building the dev container. A progress notification provides status updates.
+3. After the build completes, VS Code will automatically connect to the container. You can now work with the repository source code in this independent environment.
+4. Pants sets up its development virtualenv at `~/.cache/pants/pants_dev_deps/<venv_fingerprint>.venv/`. Point VS Code to the `bin/python` file in this folder by running the `Python: Select Interpreter` command from the *Command Palette...* (`F1`), and then `Enter interpreter path...`. You may need to restart your *terminal*. See [Configure your IDE (optional)](https://www.pantsbuild.org/docs/contributor-setup#configure-your-ide-optional).
+
+More on starting a dev container can be found [here](https://code.visualstudio.com/docs/devcontainers/containers#_picking-your-quick-start).

@@ -106,7 +106,7 @@ class PutativeTarget:
     name: str
     type_alias: str
 
-    # The sources that triggered creating of this putative target.
+    # The sources that triggered creating this putative target.
     # The putative target will own these sources, but may also glob over other sources.
     # If the putative target does not have a `sources` field, then this value must be the
     # empty tuple.
@@ -208,7 +208,7 @@ class PutativeTarget:
     def realias(self, new_alias: str | None) -> PutativeTarget:
         """A copy of this object with the alias replaced to the given alias.
 
-        Returns this object if the alias is None or is identical to this objects existing alias.
+        Returns this object if the alias is None or is identical to this object's existing alias.
         """
         return (
             self
@@ -226,7 +226,7 @@ class PutativeTarget:
         return dataclasses.replace(
             self,
             owned_sources=owned_sources,
-            kwargs={**self.kwargs, "sources": owned_sources},
+            kwargs=FrozenDict({**self.kwargs, "sources": owned_sources}),
         )
 
     def add_comments(self, comments: Iterable[str]) -> PutativeTarget:
@@ -246,7 +246,7 @@ class PutativeTarget:
         if self.kwargs or has_name:
             _kwargs = {
                 **({"name": self.name} if has_name else {}),
-                **self.kwargs,  # type: ignore[arg-type]
+                **self.kwargs,
             }
             _kwargs_str_parts = [f"\n{indent}{k}={fmt_val(v)}" for k, v in _kwargs.items()]
             kwargs_str = ",".join(_kwargs_str_parts) + ",\n"
@@ -318,7 +318,7 @@ class TailorSubsystem(GoalSubsystem):
             f"""
             A mapping from standard target type to custom type to use instead. The custom
             type can be a custom target type or a macro that offers compatible functionality
-            to the one it replaces (see {doc_url('macros')}).
+            to the one it replaces (see {doc_url('docs/writing-plugins/macros')}).
             """
         ),
         advanced=True,

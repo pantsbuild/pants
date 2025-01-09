@@ -12,7 +12,7 @@ from pants.bsp.utils import freeze_json
 @dataclass(frozen=True)
 class BuildClientCapabilities:
     # The languages that this client supports.
-    # The ID strings for each language is defined in the LSP.
+    # The ID strings for each language are defined in the LSP.
     # The server must never respond with build targets for other
     # languages than those that appear in this list.
     language_ids: tuple[str, ...]
@@ -149,7 +149,7 @@ class BuildServerCapabilities:
     # via method buildTarget/dependencySources
     dependency_sources_provider: bool | None
 
-    # The server cam provide a list of dependency modules (libraries with meta information)
+    # The server can provide a list of dependency modules (libraries with meta information)
     # via method buildTarget/dependencyModules
     dependency_modules_provider: bool | None
 
@@ -167,18 +167,20 @@ class BuildServerCapabilities:
     @classmethod
     def from_json_dict(cls, d):
         return cls(
-            compile_provider=CompileProvider.from_json_dict(d["compileProvider"])
-            if "compileProvider" in d
-            else None,
-            test_provider=TestProvider.from_json_dict(d["testProvider"])
-            if "testProvider" in d
-            else None,
-            run_provider=RunProvider.from_json_dict(d["runProvider"])
-            if "runProvider" in d
-            else None,
-            debug_provider=DebugProvider.from_json_dict(d["debugProvider"])
-            if "debugProvider" in d
-            else None,
+            compile_provider=(
+                CompileProvider.from_json_dict(d["compileProvider"])
+                if "compileProvider" in d
+                else None
+            ),
+            test_provider=(
+                TestProvider.from_json_dict(d["testProvider"]) if "testProvider" in d else None
+            ),
+            run_provider=(
+                RunProvider.from_json_dict(d["runProvider"]) if "runProvider" in d else None
+            ),
+            debug_provider=(
+                DebugProvider.from_json_dict(d["debugProvider"]) if "debugProvider" in d else None
+            ),
             inverse_sources_provider=d.get("inverseSourcesProvider"),
             dependency_sources_provider=d.get("dependencySourcesProvider"),
             dependency_modules_provider=d.get("dependencyModulesProvider"),

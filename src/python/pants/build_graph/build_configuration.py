@@ -189,9 +189,9 @@ class BuildConfiguration:
                     "Overwriting!".format(alias)
                 )
 
-            self._exposed_context_aware_object_factory_by_alias[
-                alias
-            ] = context_aware_object_factory
+            self._exposed_context_aware_object_factory_by_alias[alias] = (
+                context_aware_object_factory
+            )
 
         def register_subsystems(
             self, plugin_or_backend: str, subsystems: Iterable[type[Subsystem]]
@@ -268,6 +268,24 @@ class BuildConfiguration:
 
         def register_remote_auth_plugin(self, remote_auth_plugin: Callable) -> None:
             self._remote_auth_plugin = remote_auth_plugin
+
+        def register_auxiliary_goals(self, plugin_or_backend: str, auxiliary_goals: Iterable[type]):
+            """Registers the given auxiliary goals."""
+            if not isinstance(auxiliary_goals, Iterable):
+                raise TypeError(
+                    f"The entrypoint `auxiliary_goals` must return an iterable. "
+                    f"Given {repr(auxiliary_goals)}"
+                )
+            # Import `AuxiliaryGoal` here to avoid import cycle.
+            from pants.goal.auxiliary_goal import AuxiliaryGoal
+
+            bad_elements = [goal for goal in auxiliary_goals if not issubclass(goal, AuxiliaryGoal)]
+            if bad_elements:
+                raise TypeError(
+                    "Every element of the entrypoint `auxiliary_goals` must be a subclass of "
+                    f"{AuxiliaryGoal.__name__}. Bad elements: {bad_elements}."
+                )
+            self.register_subsystems(plugin_or_backend, auxiliary_goals)
 
         def allow_unknown_options(self, allow: bool = True) -> None:
             """Allows overriding whether Options parsing will fail for unrecognized Options.

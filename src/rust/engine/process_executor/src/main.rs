@@ -22,7 +22,8 @@ use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
 use protos::gen::buildbarn::cas::UncachedActionResult;
 use protos::require_digest;
 use remote::remote_cache::RemoteCacheRunnerOptions;
-use store::{ImmutableInputs, RemoteStoreOptions, Store};
+use store::{ImmutableInputs, RemoteProvider, RemoteStoreOptions, Store};
+use tokio::sync::RwLock;
 use workunit_store::{in_workunit, Level, WorkunitStore};
 
 #[derive(Clone, Debug, Default)]
@@ -261,7 +262,8 @@ async fn main() {
         .expect("failed parsing root CA certs");
 
       local_only_store
-        .into_with_remote(RemoteStoreOptions {
+            .into_with_remote(RemoteStoreOptions {
+                provider: RemoteProvider::Reapi,
           store_address: cas_server.to_owned(),
           instance_name: args.remote_instance_name.clone(),
           tls_config,
@@ -363,6 +365,7 @@ async fn main() {
                                 .map(|p| p.to_string_lossy().to_string()),
                         },
                         RemoteStoreOptions {
+                            provider: RemoteProvider::Reapi,
                             instance_name: process_metadata.instance_name.clone(),
                             store_address: address,
                             tls_config,
@@ -391,6 +394,7 @@ async fn main() {
             ),
             ImmutableInputs::new(store.clone(), &workdir).unwrap(),
             KeepSandboxes::Never,
+            Arc::new(RwLock::new(())),
         )) as Box<dyn process_execution::CommandRunner>,
     };
 

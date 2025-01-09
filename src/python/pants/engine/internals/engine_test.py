@@ -231,7 +231,7 @@ class TestEngine(SchedulerTestBase):
                 1 Exception encountered:
 
                 Engine traceback:
-                  in select
+                  in root
                     ..
                   in pants.engine.internals.engine_test.nested_raise
                     ..
@@ -425,7 +425,7 @@ class TestStreamingWorkunit(SchedulerTestBase):
 
         # With the max_workunit_verbosity set to TRACE, we should see the workunit corresponding
         # to the Select node.
-        select = next(
+        root = next(
             item
             for item in finished
             if item["name"]
@@ -436,11 +436,11 @@ class TestStreamingWorkunit(SchedulerTestBase):
                 "pants.engine.internals.engine_test.rule_four",
             }
         )
-        assert select["name"] == "select"
-        assert select["level"] == "TRACE"
+        assert root["name"] == "root"
+        assert root["level"] == "TRACE"
 
         r1 = next(item for item in finished if item["name"] == "canonical_rule_one")
-        assert r1["parent_id"] == select["span_id"]
+        assert r1["parent_id"] == root["span_id"]
 
     def test_streaming_workunit_log_level_parent_rewrite(self, tmp_path: Path) -> None:
         rules = [rule_A, rule_B, rule_C, QueryRule(Alpha, (Input,))]

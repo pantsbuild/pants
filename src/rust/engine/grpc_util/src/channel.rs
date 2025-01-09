@@ -1,11 +1,16 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use http::{Request, Response, Uri};
-use hyper::client::{HttpConnector, ResponseFuture};
+use http::Uri;
+use hyper::body::Incoming;
 use hyper_rustls::HttpsConnector;
+use hyper_util::client::legacy::{
+    connect::HttpConnector, Client as HyperClient, Error as HyperClientError,
+};
+use hyper_util::rt::TokioExecutor;
 use rustls::ClientConfig;
 use tonic::body::BoxBody;
 use tower_service::Service;
@@ -16,8 +21,8 @@ use tower_service::Service;
 /// `Channel`.
 #[derive(Clone, Debug)]
 pub enum Client {
-    Plain(hyper::Client<HttpConnector, BoxBody>),
-    Tls(hyper::Client<HttpsConnector<HttpConnector>, BoxBody>),
+    Plain(HyperClient<HttpConnector, BoxBody>),
+    Tls(HyperClient<HttpsConnector<HttpConnector>, BoxBody>),
 }
 
 /// A communication channel which may either communicate using HTTP or HTTP over TLS. This
@@ -38,13 +43,17 @@ impl Channel {
         tls_config: Option<&ClientConfig>,
         uri: Uri,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let client = match tls_config {
-            None => {
-                let mut http = HttpConnector::new();
-                http.enforce_http(false);
+        crate::initialize()?;
 
-                Client::Plain(hyper::Client::builder().http2_only(true).build(http))
-            }
+        let mut http = HttpConnector::new();
+        http.enforce_http(false);
+
+        let client = match tls_config {
+            None => Client::Plain(
+                HyperClient::builder(TokioExecutor::new())
+                    .http2_only(true)
+                    .build(http),
+            ),
             Some(tls_config) => {
                 let tls_config = tls_config.to_owned();
 
@@ -54,7 +63,11 @@ impl Channel {
                     .enable_http2()
                     .build();
 
-                Client::Tls(hyper::Client::builder().http2_only(true).build(https))
+                Client::Tls(
+                    HyperClient::builder(TokioExecutor::new())
+                        .http2_only(true)
+                        .build(https),
+                )
             }
         };
 
@@ -62,18 +75,19 @@ impl Channel {
     }
 }
 
-impl Service<Request<BoxBody>> for Channel {
-    type Response = Response<hyper::Body>;
-    type Error = hyper::Error;
-    type Future = ResponseFuture;
+impl Service<http::Request<BoxBody>> for Channel {
+    type Response = http::Response<Incoming>;
+    type Error = HyperClientError;
+    type Future =
+        Pin<Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Ok(()).into()
+    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, mut req: Request<BoxBody>) -> Self::Future {
+    fn call(&mut self, mut req: http::Request<BoxBody>) -> Self::Future {
         // Apparently the schema and authority do not get set by Hyper. Thus, the examples generally
-        // opy the URI and replace the scheme and authority with the ones from the initial URI used
+        // copy the URI and replace the scheme and authority with the ones from the initial URI used
         // to configure the client.
         //
         // See https://github.com/LucioFranco/tonic-openssl/blob/bdaaecda437949244a1b4d61cb39110c4bcad019/example/src/client2.rs#L92
@@ -86,10 +100,13 @@ impl Service<Request<BoxBody>> for Channel {
             .unwrap();
         *req.uri_mut() = uri;
 
-        match &self.client {
-            Client::Plain(client) => client.request(req),
-            Client::Tls(client) => client.request(req),
-        }
+        let client = self.client.clone();
+        Box::pin(async move {
+            match &client {
+                Client::Plain(client) => client.request(req).await,
+                Client::Tls(client) => client.request(req).await,
+            }
+        })
     }
 }
 
@@ -102,7 +119,13 @@ mod tests {
     use axum::{routing::get, Router};
     use axum_server::tls_rustls::RustlsConfig;
     use http::{Request, Uri};
-    use rustls::ClientConfig;
+    use http_body_util::BodyExt;
+    use rustls::{
+        client::danger::HandshakeSignatureValid,
+        crypto::{verify_tls12_signature, verify_tls13_signature},
+        ClientConfig, DigitallySignedStruct, RootCertStore, SignatureScheme,
+    };
+    use rustls_pki_types::{CertificateDer, UnixTime};
     use tower::ServiceExt;
     use tower_service::Service;
 
@@ -122,14 +145,13 @@ mod tests {
         let addr = listener.local_addr().unwrap();
 
         tokio::spawn(async move {
-            axum::Server::from_tcp(listener)
-                .unwrap()
+            axum_server::Server::from_tcp(listener)
                 .serve(router().into_make_service())
                 .await
                 .unwrap();
         });
 
-        let uri = Uri::try_from(format!("http://{}", addr.to_string())).unwrap();
+        let uri = Uri::try_from(format!("http://{}", addr)).unwrap();
 
         let mut channel = Channel::new(None, uri).await.unwrap();
 
@@ -141,12 +163,14 @@ mod tests {
         channel.ready().await.unwrap();
         let response = channel.call(request).await.unwrap();
 
-        let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-        assert_eq!(&body[..], TEST_RESPONSE);
+        let body = response.collect().await.unwrap();
+        assert_eq!(body.to_bytes().as_ref(), TEST_RESPONSE);
     }
 
     #[tokio::test]
     async fn tls_client_request_test() {
+        crate::initialize().expect("init crate");
+
         let config = RustlsConfig::from_pem_file(
             PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .join("test-certs")
@@ -160,6 +184,7 @@ mod tests {
 
         let bind_addr = "127.0.0.1:0".parse::<SocketAddr>().unwrap();
         let listener = std::net::TcpListener::bind(bind_addr).unwrap();
+        listener.set_nonblocking(true).unwrap();
         let addr = listener.local_addr().unwrap();
 
         let server = axum_server::from_tcp_rustls(listener, config);
@@ -168,12 +193,15 @@ mod tests {
             server.serve(router().into_make_service()).await.unwrap();
         });
 
-        let uri = Uri::try_from(format!("https://{}", addr.to_string())).unwrap();
+        let uri = Uri::try_from(format!("https://{}", addr)).unwrap();
 
-        let tls_config = ClientConfig::builder()
-            .with_safe_defaults()
-            .with_custom_certificate_verifier(Arc::new(NoVerifier))
+        let mut tls_config = ClientConfig::builder()
+            .with_root_certificates(RootCertStore::empty())
             .with_no_client_auth();
+
+        tls_config
+            .dangerous()
+            .set_certificate_verifier(Arc::new(NoVerifier));
 
         let mut channel = Channel::new(Some(&tls_config), uri).await.unwrap();
 
@@ -185,35 +213,74 @@ mod tests {
         channel.ready().await.unwrap();
         let response = channel.call(request).await.unwrap();
 
-        let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-        assert_eq!(&body[..], TEST_RESPONSE);
+        let body = response.collect().await.unwrap();
+        assert_eq!(body.to_bytes().as_ref(), TEST_RESPONSE);
     }
 
     #[tokio::test]
     async fn tls_mtls_client_request_test() {
+        crate::initialize().expect("init crate");
+
+        #[derive(Debug)]
         pub struct CertVerifierMock {
             saw_a_cert: std::sync::atomic::AtomicUsize,
         }
 
-        impl rustls::server::ClientCertVerifier for CertVerifierMock {
+        impl rustls::server::danger::ClientCertVerifier for CertVerifierMock {
             fn offer_client_auth(&self) -> bool {
                 true
             }
 
-            fn client_auth_root_subjects(&self) -> &[rustls::DistinguishedName] {
+            fn root_hint_subjects(&self) -> &[rustls::DistinguishedName] {
                 &[]
             }
 
             fn verify_client_cert(
                 &self,
-                _end_entity: &rustls::Certificate,
-                _intermediates: &[rustls::Certificate],
-                _now: std::time::SystemTime,
-            ) -> Result<rustls::server::ClientCertVerified, rustls::Error> {
+                _end_entity: &CertificateDer<'_>,
+                _intermediates: &[CertificateDer<'_>],
+                _now: UnixTime,
+            ) -> Result<rustls::server::danger::ClientCertVerified, rustls::Error> {
                 self.saw_a_cert
                     .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
-                Ok(rustls::server::ClientCertVerified::assertion())
+                Ok(rustls::server::danger::ClientCertVerified::assertion())
+            }
+
+            fn verify_tls12_signature(
+                &self,
+                message: &[u8],
+                cert: &CertificateDer<'_>,
+                dss: &DigitallySignedStruct,
+            ) -> Result<HandshakeSignatureValid, rustls::Error> {
+                verify_tls12_signature(
+                    message,
+                    cert,
+                    dss,
+                    &rustls::crypto::aws_lc_rs::default_provider()
+                        .signature_verification_algorithms,
+                )
+            }
+
+            fn verify_tls13_signature(
+                &self,
+                message: &[u8],
+                cert: &CertificateDer<'_>,
+                dss: &DigitallySignedStruct,
+            ) -> Result<HandshakeSignatureValid, rustls::Error> {
+                verify_tls13_signature(
+                    message,
+                    cert,
+                    dss,
+                    &rustls::crypto::aws_lc_rs::default_provider()
+                        .signature_verification_algorithms,
+                )
+            }
+
+            fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+                rustls::crypto::aws_lc_rs::default_provider()
+                    .signature_verification_algorithms
+                    .supported_schemes()
             }
         }
 
@@ -232,27 +299,24 @@ mod tests {
         .unwrap();
 
         let certificates = rustls_pemfile::certs(&mut std::io::Cursor::new(&cert_pem))
-            .unwrap()
-            .into_iter()
-            .map(rustls::Certificate)
-            .collect::<Vec<_>>();
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
 
-        let privkey = rustls::PrivateKey(
-            rustls_pemfile::pkcs8_private_keys(&mut std::io::Cursor::new(&key_pem))
-                .unwrap()
-                .remove(0),
-        );
+        let privkey = rustls_pemfile::private_key(&mut std::io::Cursor::new(&key_pem))
+            .unwrap()
+            .unwrap();
 
         let mut root_store = rustls::RootCertStore::empty();
-        root_store.add(&certificates[0]).unwrap();
+        for cert in &certificates {
+            root_store.add(cert.clone()).unwrap();
+        }
 
         let verifier = Arc::new(CertVerifierMock {
             saw_a_cert: std::sync::atomic::AtomicUsize::new(0),
         });
         let mut config = rustls::ServerConfig::builder()
-            .with_safe_defaults()
             .with_client_cert_verifier(verifier.clone())
-            .with_single_cert(certificates.clone(), privkey.clone())
+            .with_single_cert(certificates.clone(), privkey)
             .unwrap();
 
         config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
@@ -269,7 +333,7 @@ mod tests {
             server.serve(router().into_make_service()).await.unwrap();
         });
 
-        let uri = Uri::try_from(format!("https://{}", addr.to_string())).unwrap();
+        let uri = Uri::try_from(format!("https://{}", addr)).unwrap();
 
         let mut tls_config =
             crate::tls::Config::new(Some(&cert_pem), Some((&cert_pem, &key_pem))).unwrap();
@@ -298,8 +362,8 @@ mod tests {
         channel.ready().await.unwrap();
         let response = channel.call(request).await.unwrap();
 
-        let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-        assert_eq!(&body[..], TEST_RESPONSE);
+        let body = response.collect().await.unwrap();
+        assert_eq!(body.to_bytes().as_ref(), TEST_RESPONSE);
 
         assert_eq!(
             verifier

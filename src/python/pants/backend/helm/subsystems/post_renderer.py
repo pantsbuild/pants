@@ -40,7 +40,7 @@ _HELM_POSTRENDERER_PACKAGE = "pants.backend.helm.subsystems"
 
 class HelmPostRendererSubsystem(PythonToolRequirementsBase):
     options_scope = "helm-post-renderer"
-    help = "Used perform modifications to the final output produced by Helm charts when they've been fully rendered."
+    help_short = "Used perform modifications to the final output produced by Helm charts when they've been fully rendered."
 
     default_requirements = [
         "yamlpath>=3.6.0,<4",
@@ -48,7 +48,7 @@ class HelmPostRendererSubsystem(PythonToolRequirementsBase):
     ]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<3.10"]
+    default_interpreter_constraints = ["CPython>=3.8,<3.10"]
 
     default_lockfile_resource = (_HELM_POSTRENDERER_PACKAGE, "post_renderer.lock")
 

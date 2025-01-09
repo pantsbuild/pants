@@ -279,9 +279,7 @@ Scenario = namedtuple(
                 kwargs=dict(ignore_unknown_fields=True),
                 expected_defaults={
                     "test_type_1": _determenistic_parametrize_group_keys(
-                        {
-                            **ParametrizeDefault("splat", description="splat-desc")  # type: ignore[list-item]
-                        }
+                        {**ParametrizeDefault("splat", description="splat-desc")}
                     )
                 },
             ),
@@ -305,6 +303,31 @@ Scenario = namedtuple(
                 },
             ),
             id="overrides value not frozen (issue #18784)",
+        ),
+        pytest.param(
+            Scenario(
+                args=(
+                    {
+                        TestGenTargetGenerator.alias: {
+                            "tags": Parametrize(["foo"], ["bar"], baz=["baz"]),
+                            **Parametrize(
+                                "splat", description="splat-desc", dependencies=["splat:dep"]
+                            ),
+                        }
+                    },
+                ),
+                expected_defaults={
+                    "test_gen_targets": _determenistic_parametrize_group_keys(
+                        {
+                            "tags": ParametrizeDefault(("foo",), ("bar",), baz=("baz",)),  # type: ignore[arg-type]
+                            **ParametrizeDefault(
+                                "splat", description="splat-desc", dependencies=["splat:dep"]
+                            ),
+                        }
+                    )
+                },
+            ),
+            id="parametrizations on target generator (issue #20418)",
         ),
     ],
 )

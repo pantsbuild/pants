@@ -10,7 +10,7 @@ from pants.backend.codegen.thrift.target_types import (
     ThriftSourcesGeneratorTarget,
     ThriftSourceTarget,
 )
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
@@ -26,7 +26,7 @@ from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.target_types import PrefixedJvmJdkField, PrefixedJvmResolveField
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.logging import LogLevel
@@ -44,10 +44,6 @@ class GeneratedScroogeThriftSources:
     snapshot: Snapshot
 
 
-class ScroogeToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
-    resolve_name = ScroogeSubsystem.options_scope
-
-
 @rule
 async def generate_scrooge_thrift_sources(
     request: GenerateScroogeThriftSourcesRequest,
@@ -57,7 +53,7 @@ async def generate_scrooge_thrift_sources(
     output_dir = "_generated_files"
     toolcp_relpath = "__toolcp"
 
-    lockfile_request = await Get(GenerateJvmLockfileFromTool, ScroogeToolLockfileSentinel())
+    lockfile_request = GenerateJvmLockfileFromTool.create(scrooge)
     tool_classpath, transitive_targets, empty_output_dir_digest, wrapped_target = await MultiGet(
         Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
         Get(TransitiveTargets, TransitiveTargetsRequest([request.thrift_source_field.address])),
@@ -141,19 +137,12 @@ async def generate_scrooge_thrift_sources(
     return GeneratedScroogeThriftSources(output_snapshot)
 
 
-@rule
-def generate_scrooge_lockfile_request(
-    _: ScroogeToolLockfileSentinel, scrooge: ScroogeSubsystem
-) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool.create(scrooge)
-
-
 def rules():
     return [
         *collect_rules(),
         *additional_fields.rules(),
         *lockfile.rules(),
-        UnionRule(GenerateToolLockfileSentinel, ScroogeToolLockfileSentinel),
+        UnionRule(ExportableTool, ScroogeSubsystem),
         ThriftSourceTarget.register_plugin_field(PrefixedJvmJdkField),
         ThriftSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
         ThriftSourceTarget.register_plugin_field(PrefixedJvmResolveField),

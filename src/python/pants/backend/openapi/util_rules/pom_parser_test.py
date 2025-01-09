@@ -10,7 +10,7 @@ import pytest
 from pants.backend.openapi.util_rules import pom_parser
 from pants.backend.openapi.util_rules.pom_parser import AnalysePomRequest, PomReport
 from pants.engine.fs import Digest, PathGlobs
-from pants.jvm.resolve.common import Coordinate
+from pants.jvm.resolve.coordinate import Coordinate
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 
 

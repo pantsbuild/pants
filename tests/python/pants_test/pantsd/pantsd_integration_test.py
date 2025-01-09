@@ -524,7 +524,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         :param signum: The signal to send.
         :param regexps: Assert that all of these regexps match somewhere in stderr.
         :param not_regexps: Assert that all of these regexps do not match somewhere in stderr.
-        :param cleanup_wait_time: passed throught to waiter, dictated how long simulated cleanup will take
+        :param cleanup_wait_time: passed through to waiter, dictated how long simulated cleanup will take
         """
         with self.pantsd_test_context() as (workdir, config, checker):
             client_handle, waiter_pid, child_pid, _ = launch_waiter(
@@ -561,7 +561,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             checker.assert_running()
 
     def test_pantsd_graceful_shutdown(self):
-        """Test that SIGINT is propgated to child processes and they are given time to shutdown."""
+        """Test that SIGINT is propagated to child processes and they are given time to shutdown."""
         self._assert_pantsd_keyboardinterrupt_signal(
             signal.SIGINT,
             regexps=[
@@ -592,7 +592,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     def test_sigint_kills_request_waiting_for_lock(self):
         """Test that, when a pailgun request is blocked waiting for another one to end, sending
         SIGINT to the blocked run will kill it."""
-        config = {"GLOBAL": {"pantsd_timeout_when_multiple_invocations": -1, "level": "debug"}}
+        config = {"GLOBAL": {"pantsd_timeout_when_multiple_invocations": -1.0, "level": "debug"}}
         with self.pantsd_test_context(extra_config=config) as (workdir, config, checker):
             # Run a process that will wait forever.
             first_run_handle, _, _, file_to_create = launch_waiter(workdir=workdir, config=config)

@@ -296,7 +296,7 @@ _TEST_CASES = [
 ]
 
 
-@pytest.mark.parametrize("case", _TEST_CASES, ids=lambda c: c.name)  # type: ignore[no-any-return]
+@pytest.mark.parametrize("case", _TEST_CASES, ids=lambda c: c.name)
 def test_parse_go_coverage_profiles(case) -> None:
     try:
         profiles = parse_go_coverage_profiles(case.input.encode(), description_of_origin="test")

@@ -19,6 +19,7 @@ from pants.util.dirutil import (
     _mkdtemp_unregister_cleaner,
     absolute_symlink,
     fast_relpath,
+    find_nearest_ancestor_file,
     group_by_dir,
     longest_dir_prefix,
     read_file,
@@ -434,3 +435,28 @@ class AbsoluteSymlinkTest(unittest.TestCase):
     def test_overwrite_dir(self) -> None:
         os.makedirs(os.path.join(self.link, "a", "b", "c"))
         self._create_and_check_link(self.source, self.link)
+
+
+def test_find_nearest_ancestor_file() -> None:
+    files = {"grok.conf", "foo/bar/grok.conf", "hello/world/grok.conf"}
+    assert find_nearest_ancestor_file(files, "foo/bar", "grok.conf") == "foo/bar/grok.conf"
+    assert find_nearest_ancestor_file(files, "foo/bar/", "grok.conf") == "foo/bar/grok.conf"
+    assert find_nearest_ancestor_file(files, "foo", "grok.conf") == "grok.conf"
+    assert find_nearest_ancestor_file(files, "foo/", "grok.conf") == "grok.conf"
+    assert find_nearest_ancestor_file(files, "foo/xyzzy", "grok.conf") == "grok.conf"
+    assert find_nearest_ancestor_file(files, "foo/xyzzy", "grok.conf") == "grok.conf"
+    assert find_nearest_ancestor_file(files, "", "grok.conf") == "grok.conf"
+    assert find_nearest_ancestor_file(files, "hello", "grok.conf") == "grok.conf"
+    assert find_nearest_ancestor_file(files, "hello/", "grok.conf") == "grok.conf"
+    assert (
+        find_nearest_ancestor_file(files, "hello/world/foo", "grok.conf") == "hello/world/grok.conf"
+    )
+    assert (
+        find_nearest_ancestor_file(files, "hello/world/foo/", "grok.conf")
+        == "hello/world/grok.conf"
+    )
+
+    files2 = {"foo/bar/grok.conf", "hello/world/grok.conf"}
+    assert find_nearest_ancestor_file(files2, "foo", "grok.conf") is None
+    assert find_nearest_ancestor_file(files2, "foo/", "grok.conf") is None
+    assert find_nearest_ancestor_file(files2, "", "grok.conf") is None

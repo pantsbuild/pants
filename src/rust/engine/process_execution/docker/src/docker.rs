@@ -218,9 +218,17 @@ async fn credentials_for_image(
                 // TODO: https://github.com/keirlawson/docker_credential/issues/7 means that this will only
                 // work for credential helpers and credentials encoded directly in the docker config,
                 // rather than for general credStore implementations.
-                let credential = docker_credential::get_credential(&server).map_err(|e| {
-                    format!("Failed to retrieve credentials for server `{server}`: {e}")
-                })?;
+                let credential = match docker_credential::get_credential(&server) {
+                    Ok(credential) => credential,
+                    Err(e) => {
+                        log::warn!(
+                            "Failed to retrieve Docker credentials for server `{}`: {}",
+                            server,
+                            e
+                        );
+                        return Ok(None);
+                    }
+                };
 
                 let bollard_credentials = match credential {
                     docker_credential::DockerCredential::IdentityToken(token) => {
@@ -386,7 +394,7 @@ impl fmt::Debug for CommandRunner<'_> {
 }
 
 #[async_trait]
-impl<'a> process_execution::CommandRunner for CommandRunner<'a> {
+impl process_execution::CommandRunner for CommandRunner<'_> {
     async fn run(
         &self,
         context: Context,
@@ -541,7 +549,7 @@ impl<'a> process_execution::CommandRunner for CommandRunner<'a> {
 }
 
 #[async_trait]
-impl<'a> CapturedWorkdir for CommandRunner<'a> {
+impl CapturedWorkdir for CommandRunner<'_> {
     type WorkdirToken = (String, String);
 
     // TODO: This method currently violates the `Drop` constraint of `CapturedWorkdir`, because the

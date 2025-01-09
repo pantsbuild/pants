@@ -10,7 +10,12 @@ from pants.jvm.package.war import rules as war_rules
 from pants.jvm.resolve import coursier_fetch, jvm_tool
 from pants.jvm.shading.rules import rules as shading_rules
 from pants.jvm.strip_jar import strip_jar
-from pants.jvm.target_types import DeployJarTarget, JvmArtifactTarget, JvmWarTarget
+from pants.jvm.target_types import (
+    DeployJarTarget,
+    JvmArtifactsTargetGenerator,
+    JvmArtifactTarget,
+    JvmWarTarget,
+)
 from pants.jvm.target_types import build_file_aliases as jvm_build_file_aliases
 from pants.jvm.test import junit
 
@@ -19,6 +24,7 @@ def target_types():
     return [
         DeployJarTarget,
         JvmArtifactTarget,
+        JvmArtifactsTargetGenerator,
         JvmWarTarget,
     ]
 

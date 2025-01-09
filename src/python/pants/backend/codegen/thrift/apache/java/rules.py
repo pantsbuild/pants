@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.backend.codegen.thrift.apache.java import subsystem
+from pants.backend.codegen.thrift.apache.java import subsystem, symbol_mapper
 from pants.backend.codegen.thrift.apache.java.subsystem import ApacheThriftJavaSubsystem
 from pants.backend.codegen.thrift.apache.rules import (
     GeneratedThriftSources,
@@ -137,6 +137,7 @@ def rules():
     return (
         *collect_rules(),
         *subsystem.rules(),
+        *symbol_mapper.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromThriftRequest),
         UnionRule(InferDependenciesRequest, InferApacheThriftJavaDependencies),
         ThriftSourceTarget.register_plugin_field(PrefixedJvmJdkField),
