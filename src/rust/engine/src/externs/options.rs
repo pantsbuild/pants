@@ -180,7 +180,7 @@ impl PyArgSplitter {
     #[new]
     fn __new__(build_root: &str, known_goal_names: Vec<String>) -> Self {
         Self(ArgSplitter::new(
-            &Path::new(build_root),
+            Path::new(build_root),
             known_goal_names
                 .iter()
                 .map(AsRef::as_ref)
