@@ -32,7 +32,7 @@ impl ArgSplitter {
     ) -> ArgSplitter {
         ArgSplitter {
             build_root: build_root.to_owned(),
-            known_goal_names: HashSet::from_iter(known_goal_names.into_iter().map(str::to_string)),
+            known_goal_names: known_goal_names.into_iter().map(str::to_string).collect(),
         }
     }
 

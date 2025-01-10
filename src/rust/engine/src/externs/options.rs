@@ -14,12 +14,13 @@ use options::{
 
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
+use std::path::Path;
 
 pyo3::import_exception!(pants.option.errors, ParseError);
 
 pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyOptionId>()?;
+    m.add_class::<PySplitArgs>()?;
     m.add_class::<PyArgSplitter>()?;
     m.add_class::<PyConfigSource>()?;
     m.add_class::<PyOptionParser>()?;
@@ -177,19 +178,18 @@ struct PyArgSplitter(ArgSplitter);
 #[pymethods]
 impl PyArgSplitter {
     #[new]
-    fn __new__(build_root: &str, known_goal_names: Vec<String>) -> PyResult<Self> {
-        Ok(Self(ArgSplitter::new(
-            &PathBuf::from(build_root),
+    fn __new__(build_root: &str, known_goal_names: Vec<String>) -> Self {
+        Self(ArgSplitter::new(
+            &Path::new(build_root),
             known_goal_names
                 .iter()
                 .map(AsRef::as_ref)
                 .collect::<Vec<_>>(),
-        )))
+        ))
     }
 
-    #[pyo3(signature = (args))]
-    fn split_args(&self, args: Vec<String>) -> PyResult<PySplitArgs> {
-        Ok(PySplitArgs(self.0.split_args(args)))
+    fn split_args(&self, args: Vec<String>) -> PySplitArgs {
+        PySplitArgs(self.0.split_args(args))
     }
 }
 
