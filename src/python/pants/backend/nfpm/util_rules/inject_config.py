@@ -40,7 +40,7 @@ class InjectedNfpmPackageFields:
         self,
         fields: Iterable[Field],
         *,
-        address: Address,  # might be needed for error messages
+        address: Address,
         _allow_banned_fields: bool = False,
     ) -> None:
         super().__init__()
@@ -53,7 +53,7 @@ class InjectedNfpmPackageFields:
                     raise ValueError(
                         softwrap(
                             f"""
-                            {alias} cannot be an injected nfpm package field to avoid
+                            {alias} cannot be an injected nfpm package field for {address} to avoid
                             breaking dependency inference.
                             """
                         )
@@ -94,10 +94,21 @@ class InjectNfpmPackageFieldsRequest(ABC):
         """Whether to use this InjectNfpmPackageFieldsRequest implementation for this target."""
 
 
+@dataclass(frozen=True)
+class NfpmPackageTargetWrapper:
+    """Nfpm Package target Wrapper.
+
+    This is not meant to be used by plugin authors.
+    """
+
+    target: Target
+
+
 @rule
 async def determine_injected_nfpm_package_fields(
-    target: Target, union_membership: UnionMembership
+    wrapper: NfpmPackageTargetWrapper, union_membership: UnionMembership
 ) -> InjectedNfpmPackageFields:
+    target = wrapper.target
     inject_nfpm_config_requests = union_membership.get(InjectNfpmPackageFieldsRequest)
     applicable_inject_nfpm_config_requests = tuple(
         request for request in inject_nfpm_config_requests if request.is_applicable(target)
