@@ -255,7 +255,7 @@ class _SrcDstSequenceField(TupleSequenceField):
         if dst_dupes:
             raise InvalidFieldException(
                 help_text(
-                    lambda: f"""
+                    f"""
                     '{cls._dst_alias}' must be unique in '{cls.alias}', but
                     found duplicate entries for: {repr(dst_dupes)}
                     """
