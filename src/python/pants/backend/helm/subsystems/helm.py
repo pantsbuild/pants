@@ -9,6 +9,7 @@ from typing import Any, Iterable
 from pants.backend.helm.resolve.remotes import HelmRemotes
 from pants.backend.helm.target_types import HelmChartTarget, HelmRegistriesField
 from pants.core.util_rules.external_tool import TemplatedExternalTool
+from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP
 from pants.engine.platform import Platform
 from pants.option.option_types import (
     ArgsListOption,
@@ -153,9 +154,11 @@ class HelmSubsystem(TemplatedExternalTool):
     )
     extra_env_vars = StrListOption(
         help=softwrap(
-            """
+            f"""
             Additional environment variables that would be made available to all Helm processes
             or during value interpolation.
+
+            {EXTRA_ENV_VARS_USAGE_HELP}
             """
         ),
         advanced=True,

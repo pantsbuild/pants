@@ -23,7 +23,6 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.testutil.python_interpreter_selection import (
-    skip_unless_python27_present,
     skip_unless_python38_present,
     skip_unless_python39_present,
 )
@@ -437,52 +436,6 @@ def test_gracefully_handle_syntax_errors(rule_runner: RuleRunner) -> None:
 
 def test_handle_unicode(rule_runner: RuleRunner) -> None:
     assert_deps_parsed(rule_runner, "x = 'äbç'", expected_imports={})
-
-
-@skip_unless_python27_present
-def test_works_with_python2(rule_runner: RuleRunner) -> None:
-    content = dedent(
-        """\
-        # -*- coding: utf-8 -*-
-        print "Python 2 lives on."
-
-        import demo
-        from project.demo import Demo
-
-        __import__(u"pkg_resources")
-        __import__(b"treat.as.a.regular.import.not.a.string.import")
-        __import__(u"{}".format("interpolation"))
-
-        importlib.import_module(b"dep.from.bytes")
-        importlib.import_module(u"dep.from.str")
-        importlib.import_module(u"dep.from.str_狗")
-
-        b"\\xa0 a non-utf8 string, make sure we ignore it"
-
-        try: import weak1
-        except ImportError: import strong1
-        else: import strong2
-        finally: import strong3
-        """
-    )
-    assert_deps_parsed(
-        rule_runner,
-        content,
-        constraints="==2.7.*",
-        expected_imports={
-            "demo": ImpInfo(lineno=4, weak=False),
-            "project.demo.Demo": ImpInfo(lineno=5, weak=False),
-            "pkg_resources": ImpInfo(lineno=7, weak=False),
-            "treat.as.a.regular.import.not.a.string.import": ImpInfo(lineno=8, weak=False),
-            "dep.from.bytes": ImpInfo(lineno=11, weak=True),
-            "dep.from.str": ImpInfo(lineno=12, weak=True),
-            "dep.from.str_狗": ImpInfo(lineno=13, weak=True),
-            "weak1": ImpInfo(lineno=17, weak=True),
-            "strong1": ImpInfo(lineno=18, weak=False),
-            "strong2": ImpInfo(lineno=19, weak=False),
-            "strong3": ImpInfo(lineno=20, weak=False),
-        },
-    )
 
 
 @skip_unless_python38_present

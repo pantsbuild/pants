@@ -11,19 +11,21 @@ use process_execution::local::{
     apply_chroot, create_sandbox, prepare_workdir, setup_run_sh_script, KeepSandboxes,
 };
 use process_execution::{ManagedChild, ProcessExecutionStrategy};
-use pyo3::prelude::{pyfunction, wrap_pyfunction, PyAny, PyModule, PyResult, Python, ToPyObject};
+use pyo3::prelude::{pyfunction, wrap_pyfunction, PyAny, PyModule, PyResult, Python};
+use pyo3::pybacked::PyBackedStr;
+use pyo3::types::{PyAnyMethods, PyModuleMethods};
+use pyo3::Bound;
 use stdio::TryCloneAsFile;
 use tokio::process;
 use workunit_store::{in_workunit, Level};
 
 use crate::context::Context;
 use crate::externs::{self, PyGeneratorResponseNativeCall};
-use crate::nodes::{task_get_context, task_side_effected, ExecuteProcess, NodeResult};
+use crate::nodes::{task_get_context, ExecuteProcess, NodeResult};
 use crate::python::{Failure, Value};
 
-pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn register(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(interactive_process, m)?)?;
-
     Ok(())
 }
 
@@ -55,9 +57,9 @@ pub async fn interactive_process_inner(
         Value,
         externs::process::PyProcessExecutionEnvironment,
     ) = Python::with_gil(|py| {
-        let py_interactive_process = interactive_process.as_ref().as_ref(py);
+        let py_interactive_process = interactive_process.bind(py);
         let py_process: Value = externs::getattr(py_interactive_process, "process").unwrap();
-        let process_config = process_config.as_ref().as_ref(py).extract().unwrap();
+        let process_config = process_config.bind(py).extract().unwrap();
         (
             py_interactive_process.extract().unwrap(),
             py_process,
@@ -79,18 +81,19 @@ pub async fn interactive_process_inner(
     let mut process = ExecuteProcess::lift(&context.core.store(), py_process, process_config)
         .await?
         .process;
-    let (run_in_workspace, restartable, keep_sandboxes) = Python::with_gil(|py| {
-        let py_interactive_process_obj = py_interactive_process.to_object(py);
-        let py_interactive_process = py_interactive_process_obj.as_ref(py);
+    let (run_in_workspace, keep_sandboxes) = Python::with_gil(|py| {
+        let py_interactive_process = py_interactive_process.bind(py);
         let run_in_workspace: bool =
             externs::getattr(py_interactive_process, "run_in_workspace").unwrap();
-        let restartable: bool = externs::getattr(py_interactive_process, "restartable").unwrap();
-        let keep_sandboxes_value: &PyAny =
+        let keep_sandboxes_value: Bound<'_, PyAny> =
             externs::getattr(py_interactive_process, "keep_sandboxes").unwrap();
-        let keep_sandboxes =
-            KeepSandboxes::from_str(externs::getattr(keep_sandboxes_value, "value").unwrap())
-                .unwrap();
-        (run_in_workspace, restartable, keep_sandboxes)
+        let keep_sandboxes = KeepSandboxes::from_str(
+            externs::getattr::<PyBackedStr>(&keep_sandboxes_value, "value")
+                .unwrap()
+                .as_ref(),
+        )
+        .unwrap();
+        (run_in_workspace, keep_sandboxes)
     });
 
     let session = context.session.clone();
@@ -137,10 +140,6 @@ pub async fn interactive_process_inner(
 
     command.env_clear();
     command.envs(&process.env);
-
-    if !restartable {
-        task_side_effected()?;
-    }
 
     let exit_status = session.clone()
 .with_console_ui_disabled(async move {

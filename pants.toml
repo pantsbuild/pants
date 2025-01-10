@@ -35,6 +35,7 @@ backend_packages.add = [
   "pants.backend.experimental.scala.lint.scalafix",
   "pants.backend.experimental.scala.debug_goals",
   "pants.backend.experimental.tools.workunit_logger",
+  "pants.backend.experimental.typescript",
   "pants.backend.experimental.visibility",
   "pants.backend.tools.preamble",
   "pants.backend.tools.taplo",
@@ -84,6 +85,10 @@ unmatched_build_file_globs = "error"
 # network codepaths is needed. See:
 #   https://github.com/pantsbuild/pants/issues/16096.
 cache_content_behavior = "fetch"
+
+# Our current macOS 10.15 and 11 infrastructure is working okay, so for now (i.e. 2.24 dev
+# releases), we'll just keep building on them:
+allow_deprecated_macos_versions = ["10", "11"]
 
 [DEFAULT]
 # Tell `scie-pants` to use our `./pants` bootstrap script.
@@ -145,7 +150,7 @@ emit_warnings = true
 # + src/python/pants/testutil:testutil_wheel
 # And update the PythonBuildStandalone version/URL:
 # + src/python/pants/core/subsystems/python_bootstrap.py
-interpreter_constraints = ["==3.9.*"]
+interpreter_constraints = ["==3.11.*"]
 macos_big_sur_compatibility = true
 enable_resolves = true
 pip_version = "latest"
@@ -155,6 +160,7 @@ python-default = "3rdparty/python/user_reqs.lock"
 flake8 = "3rdparty/python/flake8.lock"
 mypy = "3rdparty/python/mypy.lock"
 pytest = "3rdparty/python/pytest.lock"
+pbs-script = "3rdparty/python/pbs-script-requirements.lock"
 
 [python-infer]
 assets = true
@@ -201,7 +207,7 @@ requirements = ["//3rdparty/python:mypy"]
 
 
 [coverage-py]
-interpreter_constraints = ["==3.9.*"]
+interpreter_constraints = ["==3.11.*"]
 
 [preamble]
 template_by_globs = "@build-support/preambles/config.yaml"

@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import argparse
 import logging
 import re
 import subprocess
@@ -57,7 +58,7 @@ def categorize(pr_num: str, repo: github.Repository.Repository) -> Category | No
         return category if isinstance(category, Category) else None
 
     pull = repo.get_pull(int(pr_num))
-    for label in pull.labels:
+    for label in sorted(pull.labels, key=lambda label: label.name):
         name = label.name
         if name.startswith("category:"):
             try:
@@ -68,6 +69,8 @@ def categorize(pr_num: str, repo: github.Repository.Repository) -> Category | No
                     f"Unrecognized category label {name!r}. Recognized category labels are: "
                     f"{recognized_category_labels}"
                 )
+        if name == "release-notes:not-required":
+            return complete_categorization(Category.Internal)
     return complete_categorization("No recognized `category:*` label found.")
 
 
@@ -83,7 +86,7 @@ def prepare_sha(sha: str, repo: github.Repository.Repository) -> Entry:
     return Entry(category=category, text=f"* {subject_with_url}")
 
 
-def format_notes(entries: list[Entry]) -> str:
+def format_notes_by_category(entries: list[Entry]) -> str:
     entries_by_category = defaultdict(list)
     for entry in entries:
         entries_by_category[entry.category].append(entry.text)
@@ -107,22 +110,44 @@ def format_notes(entries: list[Entry]) -> str:
         None,
     ]
 
-    notes = "\n\n".join(
+    notes = "\n".join(
         formatted for category in external_categories if (formatted := format_entries(category))
     )
 
     return notes
 
 
-def main(tag) -> None:
-    repo = github_repo()
+def format_notes(entries: list[Entry]) -> str:
+    if not entries:
+        return ""
+    return "\n\n".join([entry.text for entry in entries if entry.category != Category.Internal])
 
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--use-category-headings",
+        action="store_true",
+        default=False,
+        help="Use category labels as headings in the release notes",
+    )
+    parser.add_argument(
+        "release_ref",
+        # required=True,
+        help="The git ref (tag) of the release",
+    )
+
+    args = parser.parse_args()
+
+    repo = github_repo()
     # NB: This assumes the tag (and relevant history) is already pulled
-    entries = [prepare_sha(sha, repo) for sha in relevant_shas(tag)]
-    notes = format_notes(entries)
+    entries = [prepare_sha(sha, repo) for sha in relevant_shas(args.release_ref)]
+    notes = (
+        format_notes_by_category(entries) if args.use_category_headings else format_notes(entries)
+    )
 
     print(notes)
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main()

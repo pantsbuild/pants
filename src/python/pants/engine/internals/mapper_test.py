@@ -115,12 +115,12 @@ def test_address_family_create_single() -> None:
     address_family = AddressFamily.create(
         "",
         [
-            AddressMap(
+            AddressMap.create(
                 "0",
-                {
-                    "one": TargetAdaptor(type_alias="thing", name="one", age=42),
-                    "two": TargetAdaptor(type_alias="thing", name="two", age=37),
-                },
+                [
+                    TargetAdaptor(type_alias="thing", name="one", age=42),
+                    TargetAdaptor(type_alias="thing", name="two", age=37),
+                ],
             )
         ],
     )
@@ -135,11 +135,11 @@ def test_address_family_create_multiple() -> None:
     address_family = AddressFamily.create(
         "name/space",
         [
-            AddressMap(
-                "name/space/0", {"one": TargetAdaptor(type_alias="thing", name="one", age=42)}
+            AddressMap.create(
+                "name/space/0", [TargetAdaptor(type_alias="thing", name="one", age=42)]
             ),
-            AddressMap(
-                "name/space/1", {"two": TargetAdaptor(type_alias="thing", name="two", age=37)}
+            AddressMap.create(
+                "name/space/1", [TargetAdaptor(type_alias="thing", name="two", age=37)]
             ),
         ],
     )
@@ -165,7 +165,8 @@ def test_address_family_create_empty() -> None:
 def test_address_family_mismatching_paths() -> None:
     with pytest.raises(DifferingFamiliesError):
         AddressFamily.create(
-            "one", [AddressMap("/dev/null/one/0", {}), AddressMap("/dev/null/two/0", {})]
+            "one",
+            [AddressMap.create("/dev/null/one/0", []), AddressMap.create("/dev/null/two/0", [])],
         )
 
 
@@ -174,11 +175,11 @@ def test_address_family_duplicate_names() -> None:
         AddressFamily.create(
             "name/space",
             [
-                AddressMap(
-                    "name/space/0", {"one": TargetAdaptor(type_alias="thing", name="one", age=42)}
+                AddressMap.create(
+                    "name/space/0", [TargetAdaptor(type_alias="thing", name="one", age=42)]
                 ),
-                AddressMap(
-                    "name/space/1", {"one": TargetAdaptor(type_alias="thing", name="one", age=37)}
+                AddressMap.create(
+                    "name/space/1", [TargetAdaptor(type_alias="thing", name="one", age=37)]
                 ),
             ],
         )

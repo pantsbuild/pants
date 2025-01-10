@@ -4,17 +4,15 @@
 from __future__ import annotations
 
 import dataclasses
+import re
 from dataclasses import dataclass
-from enum import Enum, unique
-from typing import Iterable, Mapping
+from typing import Iterable, Iterator, Mapping
 
 from pants.backend.openapi.subsystems import openapi_generator
-from pants.backend.openapi.subsystems.openapi_generator import (
-    OpenAPIGenerator,
-    OpenAPIGeneratorLockfileSentinel,
-)
+from pants.backend.openapi.subsystems.openapi_generator import OpenAPIGenerator
 from pants.engine.fs import Digest
-from pants.engine.process import Process, ProcessCacheScope
+from pants.engine.internals.native_engine import EMPTY_DIGEST
+from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.jvm import jdk_rules, non_jvm_dependencies
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
@@ -26,15 +24,10 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 
-@unique
-class OpenAPIGeneratorType(Enum):
-    JAVA = "java"
-
-
 @dataclass(frozen=True)
 class OpenAPIGeneratorProcess:
     argv: tuple[str, ...]
-    generator_type: OpenAPIGeneratorType
+    generator_name: str
     input_digest: Digest
     description: str = dataclasses.field(compare=False)
     level: LogLevel
@@ -49,7 +42,7 @@ class OpenAPIGeneratorProcess:
     def __init__(
         self,
         *,
-        generator_type: OpenAPIGeneratorType,
+        generator_name: str,
         argv: Iterable[str],
         input_digest: Digest,
         description: str,
@@ -62,7 +55,7 @@ class OpenAPIGeneratorProcess:
         extra_jvm_options: Iterable[str] | None = None,
         cache_scope: ProcessCacheScope | None = None,
     ):
-        object.__setattr__(self, "generator_type", generator_type)
+        object.__setattr__(self, "generator_name", generator_name)
         object.__setattr__(self, "argv", tuple(argv))
         object.__setattr__(self, "input_digest", input_digest)
         object.__setattr__(self, "description", description)
@@ -81,12 +74,65 @@ class OpenAPIGeneratorProcess:
 _GENERATOR_CLASS_NAME = "org.openapitools.codegen.OpenAPIGenerator"
 
 
+@dataclass(frozen=True)
+class OpenAPIGeneratorNames:
+    names: tuple[str, ...]
+
+
+def _parse_names(stdout: str) -> Iterator[str]:
+    regex = re.compile(r"^ *- (?P<name>[^ ]+)")
+    for line in stdout.splitlines():
+        if (match := regex.match(line)) is not None:
+            yield match.group("name")
+
+
+@rule
+async def get_openapi_generator_names(
+    subsystem: OpenAPIGenerator, jdk: InternalJdk
+) -> OpenAPIGeneratorNames:
+    tool_classpath = await Get(
+        ToolClasspath, ToolClasspathRequest(lockfile=GenerateJvmLockfileFromTool.create(subsystem))
+    )
+
+    toolcp_relpath = "__toolcp"
+    immutable_input_digests = {
+        toolcp_relpath: tool_classpath.digest,
+    }
+
+    classpath_entries = [
+        *tool_classpath.classpath_entries(toolcp_relpath),
+    ]
+
+    jvm_process = JvmProcess(
+        jdk=jdk,
+        argv=[_GENERATOR_CLASS_NAME, "list"],
+        classpath_entries=classpath_entries,
+        input_digest=EMPTY_DIGEST,
+        extra_immutable_input_digests=immutable_input_digests,
+        extra_jvm_options=subsystem.jvm_options,
+        description="Get openapi generator names.",
+        cache_scope=ProcessCacheScope.SUCCESSFUL,
+    )
+    result = await Get(ProcessResult, JvmProcess, jvm_process)
+    return OpenAPIGeneratorNames(names=tuple(_parse_names(result.stdout.decode("utf-8"))))
+
+
 @rule
 async def openapi_generator_process(
-    request: OpenAPIGeneratorProcess, jdk: InternalJdk, subsystem: OpenAPIGenerator
+    request: OpenAPIGeneratorProcess,
+    jdk: InternalJdk,
+    subsystem: OpenAPIGenerator,
+    generator_names: OpenAPIGeneratorNames,
 ) -> Process:
-    lockfile_request = await Get(GenerateJvmLockfileFromTool, OpenAPIGeneratorLockfileSentinel())
-    tool_classpath = await Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request))
+    if request.generator_name not in generator_names.names:
+        names = ", ".join(f"`{name}`" for name in generator_names.names)
+        raise ValueError(
+            f"OpenAPI generator `{request.generator_name}` is not found, available generators: {names}"
+        )
+
+    tool_classpath = await Get(
+        ToolClasspath, ToolClasspathRequest(lockfile=GenerateJvmLockfileFromTool.create(subsystem))
+    )
 
     toolcp_relpath = "__toolcp"
     immutable_input_digests = {
@@ -107,7 +153,7 @@ async def openapi_generator_process(
             _GENERATOR_CLASS_NAME,
             "generate",
             "-g",
-            request.generator_type.value,
+            request.generator_name,
             *request.argv,
         ],
         classpath_entries=classpath_entries,

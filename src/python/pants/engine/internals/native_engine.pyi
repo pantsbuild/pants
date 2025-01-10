@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from io import RawIOBase
 from typing import (
     Any,
@@ -30,10 +31,13 @@ from pants.engine.fs import (
     DigestSubset,
     NativeDownloadFile,
     PathGlobs,
+    PathMetadataRequest,
+    PathMetadataResult,
     Paths,
 )
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.internals.native_dep_inference import (
+    NativeParsedDockerfileInfo,
     NativeParsedJavascriptDependencies,
     NativeParsedPythonDependencies,
 )
@@ -160,6 +164,7 @@ class AddressInput:
         directory, i.e. a target which leaves off `name`.
         """
         ...
+
     @property
     def spec(self) -> str: ...
     @property
@@ -175,6 +180,7 @@ class AddressInput:
     def file_to_address(self) -> Address:
         """Converts to an Address by assuming that the path_component is a file on disk."""
         ...
+
     def dir_to_address(self) -> Address:
         """Converts to an Address by assuming that the path_component is a directory on disk."""
         ...
@@ -210,6 +216,7 @@ class Address:
           them, this will always be relative.
         """
         ...
+
     @property
     def spec_path(self) -> str: ...
     @property
@@ -227,6 +234,7 @@ class Address:
     def is_parametrized_subset_of(self, other: Address) -> bool:
         """True if this Address is == to the given Address, but with a subset of its parameters."""
         ...
+
     @property
     def filename(self) -> str: ...
     @property
@@ -241,18 +249,21 @@ class Address:
         "relative" spec notation.
         """
         ...
+
     @property
     def path_safe_spec(self) -> str: ...
     def parametrize(self, parameters: Mapping[str, str], replace: bool = False) -> Address:
         """Creates a new Address with the given `parameters` merged or replaced over
         self.parameters."""
         ...
+
     def maybe_convert_to_target_generator(self) -> Address:
         """If this address is generated or parametrized, convert it to its generator target.
 
         Otherwise, return self unmodified.
         """
         ...
+
     def create_generated(self, generated_name: str) -> Address: ...
     def create_file(self, relative_file_path: str) -> Address: ...
     def debug_hint(self) -> str: ...
@@ -284,6 +295,7 @@ class _NoValue:
     def __bool__(self) -> bool:
         """NB: Always returns `False`."""
         ...
+
     def __repr__(self) -> str: ...
 
 # Marker for unspecified field values that should use the default value if applicable.
@@ -421,9 +433,7 @@ class Snapshot:
     @property
     def files(self) -> tuple[str, ...]: ...
     # Don't call this, call pants.engine.fs.SnapshotDiff instead
-    def _diff(
-        self, other: Snapshot
-    ) -> tuple[
+    def _diff(self, other: Snapshot) -> tuple[
         tuple[str, ...],
         tuple[str, ...],
         tuple[str, ...],
@@ -492,11 +502,56 @@ EMPTY_SNAPSHOT: Snapshot
 
 def default_cache_path() -> str: ...
 
+class PathMetadataKind:
+    FILE: PathMetadataKind = ...
+    DIRECTORY: PathMetadataKind = ...
+    SYMLINK: PathMetadataKind = ...
+
+class PathMetadata:
+    def __new__(
+        cls,
+        path: str,
+        kind: PathMetadataKind,
+        length: int,
+        is_executable: bool,
+        unix_mode: int | None,
+        accessed: datetime | None,
+        created: datetime | None,
+        modified: datetime | None,
+        symlink_target: str | None,
+    ) -> PathMetadata: ...
+    @property
+    def path(self) -> str: ...
+    @property
+    def kind(self) -> PathMetadataKind: ...
+    @property
+    def length(self) -> int: ...
+    @property
+    def is_executable(self) -> bool: ...
+    @property
+    def unix_mode(self) -> int | None: ...
+    @property
+    def accessed(self) -> datetime | None: ...
+    @property
+    def created(self) -> datetime | None: ...
+    @property
+    def modified(self) -> datetime | None: ...
+    @property
+    def symlink_target(self) -> str | None: ...
+    def copy(self) -> PathMetadata: ...
+
+class PathNamespace:
+    WORKSPACE: PathNamespace = ...
+    SYSTEM: PathNamespace = ...
+
+    def __eq__(self, other: PathNamespace | Any) -> bool: ...
+    def __hash__(self) -> int: ...
+
 # ------------------------------------------------------------------------------
 # Intrinsics
 # ------------------------------------------------------------------------------
 
-async def create_digest_to_digest(
+async def create_digest(
     create_digest: CreateDigest,
 ) -> Digest: ...
 async def path_globs_to_digest(
@@ -505,16 +560,16 @@ async def path_globs_to_digest(
 async def path_globs_to_paths(
     path_globs: PathGlobs,
 ) -> Paths: ...
-async def download_file_to_digest(
+async def download_file(
     native_download_file: NativeDownloadFile,
 ) -> Digest: ...
 async def digest_to_snapshot(digest: Digest) -> Snapshot: ...
-async def directory_digest_to_digest_contents(digest: Digest) -> DigestContents: ...
-async def directory_digest_to_digest_entries(digest: Digest) -> DigestEntries: ...
-async def merge_digests_request_to_digest(merge_digests: MergeDigests) -> Digest: ...
-async def remove_prefix_request_to_digest(remove_prefix: RemovePrefix) -> Digest: ...
-async def add_prefix_request_to_digest(add_prefix: AddPrefix) -> Digest: ...
-async def process_request_to_process_result(
+async def get_digest_contents(digest: Digest) -> DigestContents: ...
+async def get_digest_entries(digest: Digest) -> DigestEntries: ...
+async def merge_digests(merge_digests: MergeDigests) -> Digest: ...
+async def remove_prefix(remove_prefix: RemovePrefix) -> Digest: ...
+async def add_prefix(add_prefix: AddPrefix) -> Digest: ...
+async def execute_process(
     process: Process, process_execution_environment: ProcessExecutionEnvironment
 ) -> FallibleProcessResult: ...
 async def digest_subset_to_digest(digest_subset: DigestSubset) -> Digest: ...
@@ -524,12 +579,16 @@ async def interactive_process(
     process: InteractiveProcess, process_execution_environment: ProcessExecutionEnvironment
 ) -> InteractiveProcessResult: ...
 async def docker_resolve_image(request: DockerResolveImageRequest) -> DockerResolveImageResult: ...
+async def parse_dockerfile_info(
+    deps_request: NativeDependenciesRequest,
+) -> NativeParsedDockerfileInfo: ...
 async def parse_python_deps(
     deps_request: NativeDependenciesRequest,
 ) -> NativeParsedPythonDependencies: ...
 async def parse_javascript_deps(
     deps_request: NativeDependenciesRequest,
 ) -> NativeParsedJavascriptDependencies: ...
+async def path_metadata_request(request: PathMetadataRequest) -> PathMetadataResult: ...
 
 # ------------------------------------------------------------------------------
 # `pantsd`
@@ -606,11 +665,14 @@ class PyOptionId:
 class PyConfigSource:
     def __init__(self, path: str, content: bytes) -> None: ...
 
+# See src/rust/engine/src/externs/options.rs for the Rust-side versions of these types.
 T = TypeVar("T")
-# A pair of (option value, rank). See src/python/pants/option/ranked_value.py.
-OptionValue = Tuple[Optional[T], int]
-OptionListValue = Tuple[list[T], int]
-OptionDictValue = Tuple[dict[str, Any], int]
+
+# List of tuples of (value, rank, details string).
+OptionValueDerivation = list[Tuple[T, int, str]]
+
+# A tuple (value, rank of value, optional derivation of value).
+OptionValue = Tuple[Optional[T], int, Optional[OptionValueDerivation]]
 
 class PyOptionParser:
     def __init__(
@@ -619,6 +681,8 @@ class PyOptionParser:
         env: dict[str, str],
         configs: Optional[Sequence[PyConfigSource]],
         allow_pantsrc: bool,
+        include_derivation: bool,
+        known_scopes_to_flags: Optional[dict[str, frozenset[str]]],
     ) -> None: ...
     def get_bool(self, option_id: PyOptionId, default: Optional[bool]) -> OptionValue[bool]: ...
     def get_int(self, option_id: PyOptionId, default: Optional[int]) -> OptionValue[int]: ...
@@ -626,16 +690,19 @@ class PyOptionParser:
     def get_string(self, option_id: PyOptionId, default: Optional[str]) -> OptionValue[str]: ...
     def get_bool_list(
         self, option_id: PyOptionId, default: list[bool]
-    ) -> OptionListValue[bool]: ...
-    def get_int_list(self, option_id: PyOptionId, default: list[int]) -> OptionListValue[int]: ...
+    ) -> OptionValue[list[bool]]: ...
+    def get_int_list(self, option_id: PyOptionId, default: list[int]) -> OptionValue[list[int]]: ...
     def get_float_list(
         self, option_id: PyOptionId, default: list[float]
-    ) -> OptionListValue[float]: ...
+    ) -> OptionValue[list[float]]: ...
     def get_string_list(
         self, option_id: PyOptionId, default: list[str]
-    ) -> OptionListValue[str]: ...
-    def get_dict(self, option_id: PyOptionId, default: dict[str, Any]) -> OptionDictValue: ...
+    ) -> OptionValue[list[str]]: ...
+    def get_dict(self, option_id: PyOptionId, default: dict[str, Any]) -> OptionValue[dict]: ...
+    def get_args(self) -> list[str]: ...
     def get_passthrough_args(self) -> Optional[list[str]]: ...
+    def get_unconsumed_flags(self) -> dict[str, list[str]]: ...
+    def validate_config(self, valid_keys: dict[str, set[str]]) -> list[str]: ...
 
 # ------------------------------------------------------------------------------
 # Testutil
@@ -661,7 +728,10 @@ class PyStubCAS:
 class InferenceMetadata:
     @staticmethod
     def javascript(
-        package_root: str, import_patterns: dict[str, list[str]]
+        package_root: str,
+        import_patterns: dict[str, Sequence[str]],
+        config_root: str | None,
+        paths: dict[str, Sequence[str]],
     ) -> InferenceMetadata: ...
     def __eq__(self, other: InferenceMetadata | Any) -> bool: ...
     def __hash__(self) -> int: ...
@@ -702,6 +772,7 @@ class RawFdRunner(Protocol):
         stderr_fileno: int,
     ) -> int: ...
 
+def initialize() -> None: ...
 def capture_snapshots(
     scheduler: PyScheduler,
     session: PySession,
@@ -848,18 +919,26 @@ _Output = TypeVar("_Output")
 _Input = TypeVar("_Input")
 
 class PyGeneratorResponseCall:
+    output_type: type
+    input_types: Sequence[type]
+    inputs: Sequence[Any]
+
     @overload
     def __init__(
         self,
+        rule_id: str,
         output_type: type,
         args: tuple[Any, ...],
         input_arg0: dict[Any, type],
     ) -> None: ...
     @overload
-    def __init__(self, output_type: type, args: tuple[Any, ...], input_arg0: _Input) -> None: ...
+    def __init__(
+        self, rule_id: str, output_type: type, args: tuple[Any, ...], input_arg0: _Input
+    ) -> None: ...
     @overload
     def __init__(
         self,
+        rule_id: str,
         output_type: type,
         args: tuple[Any, ...],
         input_arg0: type[_Input],
@@ -868,6 +947,7 @@ class PyGeneratorResponseCall:
     @overload
     def __init__(
         self,
+        rule_id: str,
         output_type: type,
         args: tuple[Any, ...],
         input_arg0: type[_Input] | _Input,

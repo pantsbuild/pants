@@ -52,6 +52,7 @@ def assert_counts(
     assert code == int(fields[5])
 
 
+@pytest.mark.platform_specific_behavior
 def test_count_loc(rule_runner: RuleRunner) -> None:
     py_dir = "src/py/foo"
     elixir_dir = "src/elixir/foo"

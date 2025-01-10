@@ -10,9 +10,12 @@ import logging
 import os.path
 import sys
 import typing
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Any, Sequence, cast
+
+import typing_extensions
 
 from pants.build_graph.address import (
     Address,
@@ -48,6 +51,7 @@ from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
 from pants.engine.target import (
     DependenciesRuleApplication,
     DependenciesRuleApplicationRequest,
+    InvalidTargetException,
     RegisteredTargetTypes,
 )
 from pants.engine.unions import UnionMembership
@@ -118,8 +122,11 @@ async def evaluate_preludes(
         ),
     )
     globals: dict[str, Any] = {
-        **{name: getattr(builtins, name) for name in dir(builtins) if name.endswith("Error")},
+        # Later entries have precendence replacing conflicting keys from previous entries, so we
+        # start with typing_extensions as the lowest prio source for global values.
+        **{name: getattr(typing_extensions, name) for name in typing_extensions.__all__},
         **{name: getattr(typing, name) for name in typing.__all__},
+        **{name: getattr(builtins, name) for name in dir(builtins) if name.endswith("Error")},
         # Ensure the globals for each prelude includes the builtin symbols (E.g. `python_sources`)
         # and any build file aliases (e.g. from plugins)
         **parser.symbols,
@@ -137,7 +144,7 @@ async def evaluate_preludes(
         env_vars.update(BUILDFileEnvVarExtractor.get_env_vars(file_content))
     # __builtins__ is a dict, so isn't hashable, and can't be put in a FrozenDict.
     # Fortunately, we don't care about it - preludes should not be able to override builtins, so we just pop it out.
-    # TODO: Give a nice error message if a prelude tries to set a expose a non-hashable value.
+    # TODO: Give a nice error message if a prelude tries to set and expose a non-hashable value.
     locals.pop("__builtins__", None)
     # Ensure preludes can reference each other by populating the shared globals object with references
     # to the other symbols
@@ -353,7 +360,7 @@ async def parse_address_family(
         for fc in digest_contents
     )
 
-    address_maps = [
+    declared_address_maps = [
         AddressMap.parse(
             fc.path,
             fc.content.decode(),
@@ -382,16 +389,95 @@ async def parse_address_family(
     )
 
     # Process synthetic targets.
-    for address_map in address_maps:
-        for synthetic in synthetic_address_maps:
-            synthetic.process_declared_targets(address_map)
-            synthetic.apply_defaults(frozen_defaults)
+
+    def apply_defaults(tgt: TargetAdaptor) -> TargetAdaptor:
+        default_values = frozen_defaults.get(tgt.type_alias)
+        if default_values is None:
+            return tgt
+        return tgt.with_new_kwargs(**{**default_values, **tgt.kwargs})
+
+    name_to_path_and_synthetic_target: dict[str, tuple[str, TargetAdaptor]] = {}
+    for synthetic_address_map in synthetic_address_maps:
+        for name, target in synthetic_address_map.name_to_target_adaptor.items():
+            name_to_path_and_synthetic_target[name] = (
+                synthetic_address_map.path,
+                apply_defaults(target),
+            )
+
+    name_to_path_and_declared_target: dict[str, tuple[str, TargetAdaptor]] = {}
+    for declared_address_map in declared_address_maps:
+        for name, target in declared_address_map.name_to_target_adaptor.items():
+            name_to_path_and_declared_target[name] = (declared_address_map.path, target)
+
+    # We copy the dict so we can modify the original in the loop.
+    for name, (
+        declared_target_path,
+        declared_target,
+    ) in name_to_path_and_declared_target.copy().items():
+        # Pop the synthetic target to let the declared target take precedence.
+        synthetic_target_path, synthetic_target = name_to_path_and_synthetic_target.pop(
+            name, (None, None)
+        )
+        if "_extend_synthetic" not in declared_target.kwargs:
+            # The explicitly declared target should replace the synthetic one.
+            continue
+
+        # The _extend_synthetic kwarg was explicitly provided, so we must strip it.
+        declared_target_kwargs = dict(declared_target.kwargs)
+        extend_synthetic = declared_target_kwargs.pop("_extend_synthetic")
+        if extend_synthetic:
+            if synthetic_target is None:
+                raise InvalidTargetException(
+                    softwrap(
+                        f"""
+                            The `{declared_target.type_alias}` target {name!r} in {declared_target_path} has
+                            `_extend_synthetic=True` but there is no synthetic target to extend.
+                            """
+                    )
+                )
+
+            if synthetic_target.type_alias != declared_target.type_alias:
+                raise InvalidTargetException(
+                    softwrap(
+                        f"""
+                        The `{declared_target.type_alias}` target {name!r} in {declared_target_path} is
+                        of a different type than the synthetic target
+                        `{synthetic_target.type_alias}` from {synthetic_target_path}.
+
+                        When `_extend_synthetic` is true the target types must match, set this to
+                        false if you want to replace the synthetic target with the target from your
+                        BUILD file.
+                        """
+                    )
+                )
+
+            # Preserve synthetic field values not overriden by the declared target from the BUILD.
+            kwargs = {**synthetic_target.kwargs, **declared_target_kwargs}
+        else:
+            kwargs = declared_target_kwargs
+        name_to_path_and_declared_target[name] = (
+            declared_target_path,
+            declared_target.with_new_kwargs(**kwargs),
+        )
+
+    # Now reconstitute into AddressMaps, to pass into AddressFamily.create().
+    # We no longer need to distinguish between synthetic and declared AddressMaps.
+    # TODO: We might want to move the validation done by AddressFamily.create() to here, since
+    #  we're already iterating over the AddressMap data, and simplify AddressFamily.
+    path_to_targets = defaultdict(list)
+    for name_to_path_and_target in [
+        name_to_path_and_declared_target,
+        name_to_path_and_synthetic_target,
+    ]:
+        for path_and_target in name_to_path_and_target.values():
+            path_to_targets[path_and_target[0]].append(path_and_target[1])
+    address_maps = [AddressMap.create(path, targets) for path, targets in path_to_targets.items()]
 
     return OptionalAddressFamily(
         directory.path,
         AddressFamily.create(
             spec_path=directory.path,
-            address_maps=(*address_maps, *synthetic_address_maps),
+            address_maps=address_maps,
             defaults=frozen_defaults,
             dependents_rules=frozen_dependents_rules,
             dependencies_rules=frozen_dependencies_rules,
@@ -511,15 +597,15 @@ async def get_dependencies_rule_application(
     for dependency_address, (dependency_rules_family, dependency_target) in zip(
         request.dependencies, dependencies_family_adaptor
     ):
-        dependencies_rule[
-            dependency_address
-        ] = build_file_dependency_rules_class.check_dependency_rules(
-            origin_address=request.address,
-            origin_adaptor=origin_target,
-            dependencies_rules=origin_rules_family.dependencies_rules,
-            dependency_address=dependency_address,
-            dependency_adaptor=dependency_target,
-            dependents_rules=dependency_rules_family.dependents_rules,
+        dependencies_rule[dependency_address] = (
+            build_file_dependency_rules_class.check_dependency_rules(
+                origin_address=request.address,
+                origin_adaptor=origin_target,
+                dependencies_rules=origin_rules_family.dependencies_rules,
+                dependency_address=dependency_address,
+                dependency_adaptor=dependency_target,
+                dependents_rules=dependency_rules_family.dependents_rules,
+            )
         )
     return DependenciesRuleApplication(request.address, FrozenDict(dependencies_rule))
 

@@ -208,12 +208,12 @@ backend_packages = [
 ]
 ```
 
-### Bandit, Flake8, and Pylint: report files
+### Bandit, Flake8, Pylint and Ruff: report files
 
-Flake8, Bandit, and Pylint can generate report files saved to disk.
+Flake8, Bandit, Pylint and Ruff can generate report files saved to disk.
 
 For Pants to properly preserve the reports, instruct the tools to write to the `reports/` folder
-by updating their config files, or `--flake8-args`, `--bandit-args`, and `--pylint-args`. For
+by updating their config files, or `--flake8-args`, `--bandit-args`, `--pylint-args` and `--ruff-args`. For
 example, in your `pants.toml`:
 
 ```toml
@@ -225,13 +225,16 @@ args = ["--output-file=reports/report.txt"]
 
 [pylint]
 args = ["--output-format=text:reports/report.txt"]
+
+[ruff]
+args = ["--output-file=reports/report.txt"]
 ```
 
 Pants will copy all reports into the folder `dist/lint/<linter_name>`.
 
 ### Pylint and Flake8: how to add first-party plugins
 
-See [`[pylint].source_plugins`](../../../reference/subsystems/pylint.mdx#section-source-plugins) and [`[flake8].source_plugins`](../../../reference/subsystems/flake8.mdx#section-source-plugins) for instructions to add plugins written by you.
+See [`[pylint].source_plugins`](../../../reference/subsystems/pylint.mdx#source_plugins) and [`[flake8].source_plugins`](../../../reference/subsystems/flake8.mdx#source_plugins) for instructions to add plugins written by you.
 
 ### Bandit: less verbose logging
 

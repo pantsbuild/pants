@@ -1,6 +1,7 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::any::Any;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -192,6 +193,9 @@ impl FromValue for f64 {
     fn from_value(value: &Value) -> Result<f64, ValueConversionError> {
         if let Some(float) = value.as_float() {
             Ok(float)
+        } else if let Some(int) = value.as_integer() {
+            // See if we can parse as an int and coerce it to a float.
+            Ok(int as f64)
         } else {
             Err(ValueConversionError {
                 expected_type: "float",
@@ -349,6 +353,39 @@ impl ConfigReader {
         }
     }
 
+    // Given a map from section name to valid keys for that section,
+    // returns a vec of validation error messages.
+    pub fn validate(
+        &self,
+        section_to_valid_keys: &HashMap<String, HashSet<String>>,
+    ) -> Vec<String> {
+        let mut errors = vec![];
+        // We validated that the top level is a table when creating the Config instances.
+        let top_level_table = self.config.value.as_table().unwrap();
+        for (section_name, section_table) in top_level_table.iter() {
+            // We don't validate the DEFAULT section.
+            if section_name == DEFAULT_SECTION {
+                continue;
+            }
+            // We validated that each section is a table when creating the Config instance.
+            let section_table = section_table.as_table().unwrap();
+            match section_to_valid_keys.get(section_name) {
+                None => {
+                    errors.push(format!("Invalid table name [{}]", section_name));
+                }
+                Some(valid_keys) => {
+                    for key in section_table.keys() {
+                        if !(valid_keys.contains(key)) {
+                            errors
+                                .push(format!("Invalid option '{}' under [{}]", key, section_name));
+                        }
+                    }
+                }
+            }
+        }
+        errors
+    }
+
     fn option_name(id: &OptionId) -> String {
         id.name("_", NameTransform::None)
     }
@@ -487,6 +524,10 @@ impl ConfigReader {
 impl OptionsSource for ConfigReader {
     fn display(&self, id: &OptionId) -> String {
         format!("{id}")
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 
     fn get_string(&self, id: &OptionId) -> Result<Option<String>, String> {

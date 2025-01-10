@@ -6,18 +6,19 @@ from typing import Any, Iterable, List, Optional, Tuple, Union
 
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.engine.fs import FileContent
 from pants.engine.goal import GoalSubsystem
 from pants.engine.internals.parser import BuildFileSymbolInfo, BuildFileSymbolsInfo
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import IntField, RegisteredTargetTypes, StringField, Target
 from pants.engine.unions import UnionMembership
 from pants.help.help_info_extracter import HelpInfoExtracter, pretty_print_type_hint, to_help_str
-from pants.option.config import Config
 from pants.option.global_options import GlobalOptions, LogLevelOption
-from pants.option.option_types import BoolOption, IntOption, StrListOption
+from pants.option.native_options import NativeOptionParser
+from pants.option.option_types import BoolOption, IntListOption, OptionInfo, StrListOption
 from pants.option.options import Options
-from pants.option.parser import Parser
-from pants.option.ranked_value import Rank, RankedValue
+from pants.option.ranked_value import Rank
+from pants.option.registrar import OptionRegistrar
 from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
@@ -33,7 +34,7 @@ def test_global_scope():
     def do_test(args, kwargs, expected_display_args, expected_scoped_cmd_line_args):
         # The scoped and unscoped args are the same in global scope.
         expected_unscoped_cmd_line_args = expected_scoped_cmd_line_args
-        ohi = HelpInfoExtracter("").get_option_help_info(args, kwargs)
+        ohi = HelpInfoExtracter("").get_option_help_info(OptionInfo(args, kwargs))
         assert tuple(expected_display_args) == ohi.display_args
         assert tuple(expected_scoped_cmd_line_args) == ohi.scoped_cmd_line_args
         assert tuple(expected_unscoped_cmd_line_args) == ohi.unscoped_cmd_line_args
@@ -79,7 +80,7 @@ def test_non_global_scope():
         expected_scoped_cmd_line_args,
         expected_unscoped_cmd_line_args,
     ):
-        ohi = HelpInfoExtracter("bar.baz").get_option_help_info(args, kwargs)
+        ohi = HelpInfoExtracter("bar.baz").get_option_help_info(OptionInfo(args, kwargs))
         assert tuple(expected_display_args) == ohi.display_args
         assert tuple(expected_scoped_cmd_line_args) == ohi.scoped_cmd_line_args
         assert tuple(expected_unscoped_cmd_line_args) == ohi.unscoped_cmd_line_args
@@ -96,16 +97,17 @@ def test_non_global_scope():
 
 def test_default() -> None:
     def do_test(args, kwargs, expected_default_str):
-        # Defaults are computed in the parser and added into the kwargs, so we
+        # Defaults are computed in the registrar and added into the kwargs, so we
         # must jump through this hoop in this test.
-        parser = Parser(
-            env={},
-            config=Config.load([]),
-            scope_info=GlobalOptions.get_scope_info(),
+        registrar = OptionRegistrar(
+            scope=GlobalOptions.options_scope,
         )
-        parser.register(*args, **kwargs)
-        oshi = HelpInfoExtracter(parser.scope).get_option_scope_help_info(
-            "description", parser, False, "provider"
+        native_parser = NativeOptionParser(
+            [], {}, [], allow_pantsrc=False, include_derivation=True, known_scopes_to_flags={}
+        )
+        registrar.register(*args, **kwargs)
+        oshi = HelpInfoExtracter(registrar.scope).get_option_scope_help_info(
+            "description", registrar, native_parser, False, "provider"
         )
         assert oshi.description == "description"
         assert oshi.provider == "provider"
@@ -127,7 +129,6 @@ def test_default() -> None:
 
 def test_compute_default():
     def do_test(expected_default: Optional[Any], **kwargs):
-        kwargs["default"] = RankedValue(Rank.HARDCODED, kwargs["default"])
         assert expected_default == HelpInfoExtracter.compute_default(**kwargs)
 
     do_test(False, type=bool, default=False)
@@ -140,7 +141,7 @@ def test_compute_default():
 
 def test_deprecated():
     kwargs = {"removal_version": "999.99.9", "removal_hint": "do not use this"}
-    ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], kwargs)
+    ohi = HelpInfoExtracter("").get_option_help_info(OptionInfo(("--foo",), kwargs))
     assert "999.99.9" == ohi.removal_version
     assert "do not use this" == ohi.removal_hint
     assert ohi.deprecated_message is not None
@@ -148,28 +149,28 @@ def test_deprecated():
 
 
 def test_not_deprecated():
-    ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], {})
+    ohi = HelpInfoExtracter("").get_option_help_info(OptionInfo(("--foo",), {}))
     assert ohi.removal_version is None
     assert not ohi.deprecation_active
 
 
 def test_deprecation_start_version_past():
     kwargs = {"deprecation_start_version": "1.0.0", "removal_version": "999.99.9"}
-    ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], kwargs)
+    ohi = HelpInfoExtracter("").get_option_help_info(OptionInfo(("--foo",), kwargs))
     assert "999.99.9" == ohi.removal_version
     assert ohi.deprecation_active
 
 
 def test_deprecation_start_version_future():
     kwargs = {"deprecation_start_version": "999.99.8", "removal_version": "999.99.9"}
-    ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], kwargs)
+    ohi = HelpInfoExtracter("").get_option_help_info(OptionInfo(("--foo",), kwargs))
     assert "999.99.9" == ohi.removal_version
     assert not ohi.deprecation_active
 
 
 def test_passthrough():
     kwargs = {"passthrough": True, "type": list, "member_type": str}
-    ohi = HelpInfoExtracter("").get_option_help_info(["--thing"], kwargs)
+    ohi = HelpInfoExtracter("").get_option_help_info(OptionInfo(("--thing",), kwargs))
     assert 2 == len(ohi.display_args)
     assert any(args.startswith("--thing") for args in ohi.display_args)
     assert any(args.startswith("... -- ") for args in ohi.display_args)
@@ -177,19 +178,19 @@ def test_passthrough():
 
 def test_choices() -> None:
     kwargs = {"choices": ["info", "debug"]}
-    ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], kwargs)
+    ohi = HelpInfoExtracter("").get_option_help_info(OptionInfo(("--foo",), kwargs))
     assert ohi.choices == ("info", "debug")
 
 
 def test_choices_enum() -> None:
     kwargs = {"type": LogLevelSimple}
-    ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], kwargs)
+    ohi = HelpInfoExtracter("").get_option_help_info(OptionInfo(("--foo",), kwargs))
     assert ohi.choices == ("info", "debug")
 
 
 def test_list_of_enum() -> None:
     kwargs = {"type": list, "member_type": LogLevelSimple}
-    ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], kwargs)
+    ohi = HelpInfoExtracter("").get_option_help_info(OptionInfo(("--foo",), kwargs))
     assert ohi.choices == ("info", "debug")
 
 
@@ -198,13 +199,14 @@ def test_grouping():
         def exp_to_len(exp):
             return int(exp)  # True -> 1, False -> 0.
 
-        parser = Parser(
-            env={},
-            config=Config.load([]),
-            scope_info=GlobalOptions.get_scope_info(),
+        registrar = OptionRegistrar(scope=GlobalOptions.options_scope)
+        native_parser = NativeOptionParser(
+            [], {}, [], allow_pantsrc=False, include_derivation=True, known_scopes_to_flags={}
         )
-        parser.register("--foo", **kwargs)
-        oshi = HelpInfoExtracter("").get_option_scope_help_info("", parser, False, "")
+        registrar.register("--foo", **kwargs)
+        oshi = HelpInfoExtracter("").get_option_scope_help_info(
+            "", registrar, native_parser, False, ""
+        )
         assert exp_to_len(expected_basic) == len(oshi.basic)
         assert exp_to_len(expected_advanced) == len(oshi.advanced)
 
@@ -213,12 +215,12 @@ def test_grouping():
     do_test({"advanced": True}, expected_advanced=True)
 
 
-def test_get_all_help_info():
+def test_get_all_help_info(tmp_path) -> None:
     class Global(Subsystem):
         options_scope = GLOBAL_SCOPE
         help = help_text("Global options.")
 
-        opt1 = IntOption(default=42, help="Option 1")
+        opt1 = IntListOption(default=[42], help="Option 1")
         # This is special in having a short option `-l`. Make sure it works.
         level = LogLevelOption()
 
@@ -252,14 +254,16 @@ def test_get_all_help_info():
         alias = "baz_library"
         help = "A library of baz-es.\n\nUse it however you like."
 
-        core_fields = [QuxField, QuuxField]
+        core_fields = (QuxField, QuuxField)
 
+    config_path = "pants.test.toml"
+    config_source = FileContent(path=config_path, content=b"[GLOBAL]\nopt1 = '+[99]'")
     options = Options.create(
-        env={},
-        config=Config.load([]),
-        known_scope_infos=[Global.get_scope_info(), Foo.get_scope_info(), Bar.get_scope_info()],
         args=["./pants", "--backend-packages=['internal_plugins.releases']"],
-        bootstrap_option_values=None,
+        env={"PANTS_OPT1": "88"},
+        config_sources=[config_source],
+        known_scope_infos=[Global.get_scope_info(), Foo.get_scope_info(), Bar.get_scope_info()],
+        include_derivation=True,
     )
     Global.register_options_on_scope(options, UnionMembership({}))
     Foo.register_options_on_scope(options, UnionMembership({}))
@@ -283,7 +287,12 @@ def test_get_all_help_info():
         UnionMembership({}),
         fake_consumed_scopes_mapper,
         RegisteredTargetTypes({BazLibrary.alias: BazLibrary}),
-        BuildFileSymbolsInfo.from_info((BuildFileSymbolInfo("dummy", rule_info_test),)),
+        BuildFileSymbolsInfo.from_info(
+            (
+                BuildFileSymbolInfo("dummy", rule_info_test),
+                BuildFileSymbolInfo("private", 1, hide_from_help=True),
+            )
+        ),
         bc_builder.create(),
     )
 
@@ -298,20 +307,24 @@ def test_get_all_help_info():
                 "deprecated_scope": None,
                 "basic": (
                     {
-                        "display_args": ("--opt1=<int>",),
-                        "comma_separated_display_args": "--opt1=<int>",
+                        "display_args": ('--opt1="[<int>, <int>, ...]"',),
+                        "comma_separated_display_args": '--opt1="[<int>, <int>, ...]"',
                         "scoped_cmd_line_args": ("--opt1",),
                         "unscoped_cmd_line_args": ("--opt1",),
                         "config_key": "opt1",
                         "env_var": "PANTS_OPT1",
                         "value_history": {
                             "ranked_values": (
-                                {"rank": Rank.NONE, "value": None, "details": None},
-                                {"rank": Rank.HARDCODED, "value": 42, "details": None},
+                                {"rank": Rank.NONE, "value": [], "details": ""},
+                                {
+                                    "rank": Rank.ENVIRONMENT,
+                                    "value": [42, 99, 88],
+                                    "details": "pants.test.toml, env var",
+                                },
                             ),
                         },
-                        "typ": int,
-                        "default": 42,
+                        "typ": list,
+                        "default": [42],
                         "fromfile": False,
                         "help": "Option 1",
                         "deprecation_active": False,
@@ -323,8 +336,8 @@ def test_get_all_help_info():
                         "target_field_name": None,
                     },
                     {
-                        "display_args": ("-l=<LogLevel>", "--level=<LogLevel>"),
-                        "comma_separated_display_args": "-l=<LogLevel>, --level=<LogLevel>",
+                        "display_args": ("-l<LogLevel>", "--level=<LogLevel>"),
+                        "comma_separated_display_args": "-l<LogLevel>, --level=<LogLevel>",
                         "scoped_cmd_line_args": ("-l", "--level"),
                         "unscoped_cmd_line_args": ("-l", "--level"),
                         "config_key": "level",
@@ -370,7 +383,7 @@ def test_get_all_help_info():
                                 {"details": "", "rank": Rank.NONE, "value": []},
                                 {"details": "", "rank": Rank.HARDCODED, "value": []},
                                 {
-                                    "details": "from command-line flag",
+                                    "details": "command-line flag",
                                     "rank": Rank.FLAG,
                                     "value": ["internal_plugins.releases"],
                                 },
@@ -617,20 +630,24 @@ def test_get_all_help_info():
         },
         "env_var_to_help_info": {
             "PANTS_OPT1": {
-                "display_args": ("--opt1=<int>",),
-                "comma_separated_display_args": "--opt1=<int>",
+                "display_args": ('--opt1="[<int>, <int>, ...]"',),
+                "comma_separated_display_args": '--opt1="[<int>, <int>, ...]"',
                 "scoped_cmd_line_args": ("--opt1",),
                 "unscoped_cmd_line_args": ("--opt1",),
                 "config_key": "opt1",
                 "env_var": "PANTS_OPT1",
                 "value_history": {
                     "ranked_values": (
-                        {"rank": Rank.NONE, "value": None, "details": None},
-                        {"rank": Rank.HARDCODED, "value": 42, "details": None},
+                        {"rank": Rank.NONE, "value": [], "details": ""},
+                        {
+                            "rank": Rank.ENVIRONMENT,
+                            "value": [42, 99, 88],
+                            "details": "pants.test.toml, env var",
+                        },
                     ),
                 },
-                "typ": int,
-                "default": 42,
+                "typ": list,
+                "default": [42],
                 "fromfile": False,
                 "help": "Option 1",
                 "deprecation_active": False,
@@ -642,8 +659,8 @@ def test_get_all_help_info():
                 "target_field_name": None,
             },
             "PANTS_LEVEL": {
-                "display_args": ("-l=<LogLevel>", "--level=<LogLevel>"),
-                "comma_separated_display_args": "-l=<LogLevel>, --level=<LogLevel>",
+                "display_args": ("-l<LogLevel>", "--level=<LogLevel>"),
+                "comma_separated_display_args": "-l<LogLevel>, --level=<LogLevel>",
                 "scoped_cmd_line_args": ("-l", "--level"),
                 "unscoped_cmd_line_args": ("-l", "--level"),
                 "config_key": "level",
@@ -689,7 +706,7 @@ def test_get_all_help_info():
                         {"details": "", "rank": Rank.NONE, "value": []},
                         {"details": "", "rank": Rank.HARDCODED, "value": []},
                         {
-                            "details": "from command-line flag",
+                            "details": "command-line flag",
                             "rank": Rank.FLAG,
                             "value": ["internal_plugins.releases"],
                         },

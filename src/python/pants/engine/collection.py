@@ -26,12 +26,10 @@ class Collection(Tuple[T, ...]):
     """
 
     @overload  # type: ignore[override]  # noqa: F811
-    def __getitem__(self, index: int) -> T:
-        ...
+    def __getitem__(self, index: int) -> T: ...
 
     @overload  # noqa: F811
-    def __getitem__(self, index: slice) -> Collection[T]:
-        ...
+    def __getitem__(self, index: slice) -> Collection[T]: ...
 
     def __getitem__(self, index: int | slice) -> T | Collection[T]:  # noqa: F811
         result = super().__getitem__(index)
@@ -42,7 +40,7 @@ class Collection(Tuple[T, ...]):
     def __eq__(self, other: Any) -> bool:
         if self is other:
             return True
-        return type(self) == type(other) and super().__eq__(other)
+        return type(self) is type(other) and super().__eq__(other)
 
     def __ne__(self, other: Any) -> bool:
         # We must explicitly override to provide the inverse of _our_ __eq__ and not get the
@@ -52,7 +50,8 @@ class Collection(Tuple[T, ...]):
     # Unlike in Python 2 we must explicitly implement __hash__ since we explicitly implement __eq__
     # per the Python 3 data model.
     # See: https://docs.python.org/3/reference/datamodel.html#object.__hash__
-    __hash__ = Tuple.__hash__
+    def __hash__(self):
+        return super().__hash__()
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({list(self)})"

@@ -394,7 +394,7 @@ impl fmt::Debug for CommandRunner<'_> {
 }
 
 #[async_trait]
-impl<'a> process_execution::CommandRunner for CommandRunner<'a> {
+impl process_execution::CommandRunner for CommandRunner<'_> {
     async fn run(
         &self,
         context: Context,
@@ -549,7 +549,7 @@ impl<'a> process_execution::CommandRunner for CommandRunner<'a> {
 }
 
 #[async_trait]
-impl<'a> CapturedWorkdir for CommandRunner<'a> {
+impl CapturedWorkdir for CommandRunner<'_> {
     type WorkdirToken = (String, String);
 
     // TODO: This method currently violates the `Drop` constraint of `CapturedWorkdir`, because the

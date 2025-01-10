@@ -217,9 +217,15 @@ class SetupKwargs:
     """The keyword arguments to the `setup()` function in the generated `setup.py`."""
 
     _pickled_bytes: bytes
+    _overwrite_banned_keys: Tuple[str, ...]
 
     def __init__(
-        self, kwargs: Mapping[str, Any], *, address: Address, _allow_banned_keys: bool = False
+        self,
+        kwargs: Mapping[str, Any],
+        *,
+        address: Address,
+        _allow_banned_keys: bool = False,
+        _overwrite_banned_keys: Tuple[str, ...] = (),
     ) -> None:
         super().__init__()
         if "name" not in kwargs:
@@ -249,7 +255,9 @@ class SetupKwargs:
                             """
                         )
                     )
-
+        object.__setattr__(
+            self, "_overwrite_banned_keys", _overwrite_banned_keys if _overwrite_banned_keys else ()
+        )
         # We serialize with `pickle` so that is hashable. We don't use `FrozenDict` because it
         # would require that all values are immutable, and we may have lists and dictionaries as
         # values. It's too difficult/clunky to convert those all, then to convert them back out of
@@ -645,18 +653,35 @@ async def determine_finalized_setup_kwargs(request: GenerateSetupPyRequest) -> F
             next(str(ic.specifier) for ic in request.interpreter_constraints),  # type: ignore[attr-defined]
         )
 
-    # NB: We are careful to not overwrite these values, but we also don't expect them to have been
-    # set. The user must have gone out of their way to use a `SetupKwargs` plugin, and to have
-    # specified `SetupKwargs(_allow_banned_keys=True)`.
+    # The cascading defaults here are for two levels of "I know what I'm
+    # doing. Normally the plugin will calculate the appropriate values.  If
+    # the user Really Knows what they are doing and has gone out of their way
+    # to use a `SetupKwargs` plugin, and to have also specified
+    # `SetupKwargs(_allow_banned_keys=True)`, then instead the values are
+    # merged.  If the user REALLY REALLY knows what they are doing, they can
+    # use `_overwrite_banned_keys=("the-key",)` in their plugin to use only
+    # their value for that key.
+    def _overwrite_value(key: str) -> bool:
+        return key in resolved_setup_kwargs._overwrite_banned_keys
+
     setup_kwargs.update(
         {
-            "packages": (*sources.packages, *(setup_kwargs.get("packages", []))),
+            "packages": (
+                *(sources.packages if not _overwrite_value("packages") else []),
+                *(setup_kwargs.get("packages", [])),
+            ),
             "namespace_packages": (
-                *sources.namespace_packages,
+                *(sources.namespace_packages if not _overwrite_value("namespace_packages") else []),
                 *setup_kwargs.get("namespace_packages", []),
             ),
-            "package_data": {**dict(sources.package_data), **setup_kwargs.get("package_data", {})},
-            "install_requires": (*requirements, *setup_kwargs.get("install_requires", [])),
+            "package_data": {
+                **dict(sources.package_data if not _overwrite_value("package_data") else {}),
+                **setup_kwargs.get("package_data", {}),
+            },
+            "install_requires": (
+                *(requirements if not _overwrite_value("install_requires") else []),
+                *setup_kwargs.get("install_requires", []),
+            ),
         }
     )
 

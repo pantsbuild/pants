@@ -21,16 +21,13 @@ class FrozenDict(Mapping[K, V]):
     """
 
     @overload
-    def __init__(self, __items: Iterable[tuple[K, V]], **kwargs: V) -> None:
-        ...
+    def __init__(self, __items: Iterable[tuple[K, V]], **kwargs: V) -> None: ...
 
     @overload
-    def __init__(self, __other: Mapping[K, V], **kwargs: V) -> None:
-        ...
+    def __init__(self, __other: Mapping[K, V], **kwargs: V) -> None: ...
 
     @overload
-    def __init__(self, **kwargs: V) -> None:
-        ...
+    def __init__(self, **kwargs: V) -> None: ...
 
     def __init__(self, *item: Mapping[K, V] | Iterable[tuple[K, V]], **kwargs: V) -> None:
         """Creates a `FrozenDict` with arguments accepted by `dict` that also must be hashable."""
@@ -96,6 +93,20 @@ class FrozenDict(Mapping[K, V]):
         # optimising this, by, for instance, sorting on construction.
         return sorted(self._data.items()) < sorted(other._data.items())
 
+    def __or__(self, other: Any) -> FrozenDict[K, V]:
+        if isinstance(other, FrozenDict):
+            other = other._data
+        elif not isinstance(other, Mapping):
+            return NotImplemented
+        return FrozenDict(self._data | other)
+
+    def __ror__(self, other: Any) -> FrozenDict[K, V]:
+        if isinstance(other, FrozenDict):
+            other = other._data
+        elif not isinstance(other, Mapping):
+            return NotImplemented
+        return FrozenDict(other | self._data)
+
     def _calculate_hash(self) -> int:
         try:
             h = 0
@@ -135,16 +146,13 @@ class LazyFrozenDict(FrozenDict[K, V]):
     @overload
     def __init__(
         self, __items: Iterable[tuple[K, Callable[[], V]]], **kwargs: Callable[[], V]
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @overload
-    def __init__(self, __other: Mapping[K, Callable[[], V]], **kwargs: Callable[[], V]) -> None:
-        ...
+    def __init__(self, __other: Mapping[K, Callable[[], V]], **kwargs: Callable[[], V]) -> None: ...
 
     @overload
-    def __init__(self, **kwargs: Callable[[], V]) -> None:
-        ...
+    def __init__(self, **kwargs: Callable[[], V]) -> None: ...
 
     def __init__(
         self,

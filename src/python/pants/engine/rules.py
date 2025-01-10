@@ -70,7 +70,7 @@ RuleDecorator = Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]
 def _rule_call_trampoline(rule_id: str, output_type: type, func: Callable[P, R]) -> Callable[P, R]:
     @functools.wraps(func)  # type: ignore
     async def wrapper(*args, __implicitly: Sequence[Any] = (), **kwargs):
-        call = Call(rule_id, output_type, args, *__implicitly)  # type: ignore[call-overload]
+        call = Call(rule_id, output_type, args, *__implicitly)
         return await call
 
     return cast(Callable[P, R], wrapper)
@@ -110,12 +110,13 @@ def _make_rule(
         if not inspect.isfunction(original_func):
             raise ValueError("The @rule decorator must be applied innermost of all decorators.")
 
+        # Set our own custom `__line_number__` dunder so that the engine may visualize the line number.
+        original_func.__line_number__ = original_func.__code__.co_firstlineno
+        original_func.rule_id = canonical_name
+
         awaitables = FrozenOrderedSet(collect_awaitables(original_func))
 
         validate_requirements(func_id, parameter_types, awaitables, cacheable)
-
-        # Set our own custom `__line_number__` dunder so that the engine may visualize the line number.
-        original_func.__line_number__ = original_func.__code__.co_firstlineno
 
         func = _rule_call_trampoline(canonical_name, return_type, original_func)
 
@@ -356,20 +357,17 @@ def inner_rule(*args, **kwargs) -> AsyncRuleT | RuleDecorator:
 
 
 @overload
-def rule(func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Coroutine[Any, Any, R]]:
-    ...
+def rule(func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Coroutine[Any, Any, R]]: ...
 
 
 @overload
-def rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]:
-    ...
+def rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]: ...
 
 
 @overload
 def rule(
     *args, func: None = None, **kwargs: Any
-) -> Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]:
-    ...
+) -> Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]: ...
 
 
 def rule(*args, **kwargs):
@@ -377,20 +375,17 @@ def rule(*args, **kwargs):
 
 
 @overload
-def goal_rule(func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Coroutine[Any, Any, R]]:
-    ...
+def goal_rule(func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Coroutine[Any, Any, R]]: ...
 
 
 @overload
-def goal_rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]:
-    ...
+def goal_rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]: ...
 
 
 @overload
 def goal_rule(
     *args, func: None = None, **kwargs: Any
-) -> Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]:
-    ...
+) -> Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]: ...
 
 
 def goal_rule(*args, **kwargs):
@@ -399,9 +394,25 @@ def goal_rule(*args, **kwargs):
     return inner_rule(*args, **kwargs, rule_type=RuleType.goal_rule, cacheable=False)
 
 
+@overload
+def _uncacheable_rule(
+    func: Callable[P, Coroutine[Any, Any, R]]
+) -> Callable[P, Coroutine[Any, Any, R]]: ...
+
+
+@overload
+def _uncacheable_rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]: ...
+
+
+@overload
+def _uncacheable_rule(
+    *args, func: None = None, **kwargs: Any
+) -> Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]: ...
+
+
 # This has a "private" name, as we don't (yet?) want it to be part of the rule API, at least
 # until we figure out the implications, and have a handle on the semantics and use-cases.
-def _uncacheable_rule(*args, **kwargs) -> AsyncRuleT | RuleDecorator:
+def _uncacheable_rule(*args, **kwargs):
     return inner_rule(*args, **kwargs, rule_type=RuleType.uncacheable_rule, cacheable=False)
 
 

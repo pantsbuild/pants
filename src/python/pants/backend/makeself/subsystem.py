@@ -1,18 +1,24 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-import logging
+from __future__ import annotations
 
-from pants.backend.makeself.goals.run import RunMakeselfArchive
+import logging
+from dataclasses import dataclass
+from typing import Iterable, Optional
+
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
-    ExternalToolRequest,
     TemplatedExternalTool,
+    download_external_tool,
 )
 from pants.engine.fs import Digest, RemovePrefix
+from pants.engine.intrinsics import remove_prefix
 from pants.engine.platform import Platform
-from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.process import execute_process_or_raise
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
+from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 
@@ -54,11 +60,7 @@ async def download_makeself_distribution(
     options: MakeselfSubsystem,
     platform: Platform,
 ) -> MakeselfDistribution:
-    tool = await Get(
-        DownloadedExternalTool,
-        ExternalToolRequest,
-        options.get_request(platform),
-    )
+    tool = await download_external_tool(options.get_request(platform))
     logger.debug("makeself external tool: %s", tool)
     return MakeselfDistribution(digest=tool.digest, exe=tool.exe)
 
@@ -67,36 +69,49 @@ class MakeselfTool(DownloadedExternalTool):
     """The Makeself tool."""
 
 
+@dataclass(frozen=True)
+class RunMakeselfArchive:
+    exe: str
+    input_digest: Digest
+    description: str
+    level: LogLevel = LogLevel.INFO
+    output_directory: Optional[str] = None
+    extra_args: Optional[tuple[str, ...]] = None
+    extra_tools: tuple[str, ...] = ()
+
+
 @rule(desc="Extract makeself distribution", level=LogLevel.DEBUG)
 async def extract_makeself_distribution(
     dist: MakeselfDistribution,
 ) -> MakeselfTool:
     out = "__makeself"
-    result = await Get(
-        ProcessResult,
-        RunMakeselfArchive(
-            exe=dist.exe,
-            extra_args=(
-                "--keep",
-                "--accept",
-                "--noprogress",
-                "--nox11",
-                "--nochown",
-                "--nodiskspace",
-                "--quiet",
-            ),
-            input_digest=dist.digest,
-            output_directory=out,
-            description=f"Extracting Makeself archive: {out}",
-            level=LogLevel.DEBUG,
-        ),
+    result = await execute_process_or_raise(
+        **implicitly(
+            RunMakeselfArchive(
+                exe=dist.exe,
+                extra_args=(
+                    "--keep",
+                    "--accept",
+                    "--noprogress",
+                    "--nox11",
+                    "--nochown",
+                    "--nodiskspace",
+                    "--quiet",
+                ),
+                input_digest=dist.digest,
+                output_directory=out,
+                description=f"Extracting Makeself archive: {out}",
+                level=LogLevel.DEBUG,
+            )
+        )
     )
-    digest = await Get(Digest, RemovePrefix(result.output_digest, out))
+    digest = await remove_prefix(RemovePrefix(result.output_digest, out))
     return MakeselfTool(digest=digest, exe="makeself.sh")
 
 
-def rules():
-    return [
+def rules() -> Iterable[Rule | UnionRule]:
+    return (
         *collect_rules(),
         *external_tool.rules(),
-    ]
+        UnionRule(ExportableTool, MakeselfSubsystem),
+    )

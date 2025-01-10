@@ -30,7 +30,7 @@ class GolangSubsystem(Subsystem):
             default=["<PATH>"],
             help=softwrap(
                 f"""
-                A list of paths to search for Go.
+                A list of paths to search for Go and extra tools needed by go.
 
                 Specify absolute paths to directories with the `go` binary, e.g. `/usr/bin`.
                 Earlier entries will be searched first.
@@ -69,6 +69,18 @@ class GolangSubsystem(Subsystem):
                 * `<PATH>`, the contents of the PATH environment variable
                 """
             ),
+        )
+
+        _extra_tools = StrListOption(
+            default=[],
+            help=softwrap(
+                """
+                List any additional executable tools required for the `go` tool to work.
+                The paths to these tools will be included in the PATH used in the execution sandbox.
+                E.g. `go mod download` may require the `git` tool to download private modules.
+                """
+            ),
+            advanced=True,
         )
 
         cgo_gcc_binary_name = StrOption(
@@ -183,6 +195,10 @@ class GolangSubsystem(Subsystem):
                         yield entry
 
             return tuple(OrderedSet(iter_path_entries()))
+
+        @property
+        def extra_tools(self) -> tuple[str, ...]:
+            return tuple(sorted(set(self._extra_tools)))
 
     minimum_expected_version = StrOption(
         default="1.17",

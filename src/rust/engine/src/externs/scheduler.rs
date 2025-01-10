@@ -7,7 +7,7 @@ use pyo3::exceptions::PyException;
 use pyo3::ffi;
 use pyo3::prelude::*;
 
-pub fn register(m: &PyModule) -> PyResult<()> {
+pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyExecutor>()?;
     Ok(())
 }
@@ -38,7 +38,7 @@ impl PyExecutor {
             let _ =
                 unsafe { ffi::PyThreadState_New(Python::with_gil(|_| PyInterpreterState_Main())) };
             Python::with_gil(|py| {
-                let _ = py.eval("__import__('debugpy').debug_this_thread()", None, None);
+                let _ = py.eval(c"__import__('debugpy').debug_this_thread()", None, None);
             });
         })
         .map(PyExecutor)

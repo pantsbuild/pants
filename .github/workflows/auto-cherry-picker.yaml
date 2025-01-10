@@ -73,7 +73,27 @@ jobs:
           # NB: If this fetch fails, we assume that means the milestone branch hasn't been created yet
           git fetch --depth 1 origin "${{ matrix.milestone }}" || exit 0
           git checkout -b "${{ matrix.branch_name }}" FETCH_HEAD
+
+          set +e
           git cherry-pick "${{ needs.prerequisites.outputs.merge_commit }}"
+          cherry_pick_exit_code="$?"
+          set -e
+          if [ "$cherry_pick_exit_code" != 0 ]; then
+            # Cherry pick failed. See if it was from a release notes file for a subsequent version of Pants,
+            # and, if so, delete the file and continue the `git cherry-pick`.
+            this_minor_version="$(cat ./src/python/pants/VERSION | cut -d. -f2)"
+            for conflicting_file in "$(git status --porcelain=v1 -- docs/notes)" ; do
+              conflicting_minor_version="$(echo $conflicting_file | sed -E -e 's#^.*docs/notes/2\.([0-9]+)\.x\.md$#\1#')"
+              if [[ conflicting_minor_version -gt this_minor_version ]]; then
+                echo "NOTE: Deleting release notes file from subsequent Pants version (v2.{conflicting_minor_version}.x)."
+                git rm "docs/notes/2.${conflicting_minor_version}.x.md"
+              fi
+            done
+
+            # With the "future" release notes removed, attempt to continue the cherry-pick operation.
+            git cherry-pick --continue
+          fi
+
           git push -u origin "${{ matrix.branch_name }}"
 
           # Now we go back to `main` to ensure we're running the latest `make_pr.sh`.

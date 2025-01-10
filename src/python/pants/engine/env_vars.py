@@ -3,15 +3,22 @@
 
 from __future__ import annotations
 
+import fnmatch
 import re
 from dataclasses import dataclass
-from typing import Dict, Optional, Sequence
+from typing import Dict, Iterator, Optional, Sequence
 
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
 
 name_value_re = re.compile(r"([A-Za-z_]\w*)=(.*)")
 shorthand_re = re.compile(r"([A-Za-z_]\w*)")
+
+EXTRA_ENV_VARS_USAGE_HELP = """\
+Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
+`ENV_VAR` to copy the value of a variable in Pants's own environment.
+`fnmatch` globs like `ENV_VAR_PREFIXED_*` can be used to copy multiple environment variables.
+"""
 
 
 class CompleteEnvironmentVars(FrozenDict):
@@ -53,7 +60,8 @@ class CompleteEnvironmentVars(FrozenDict):
             if name_value_match:
                 check_and_set(name_value_match[1], name_value_match[2])
             elif shorthand_re.match(env_var):
-                check_and_set(env_var, self.get(env_var))
+                for name, value in self.get_or_match(env_var):
+                    check_and_set(name, value)
             else:
                 raise ValueError(
                     f"An invalid variable was requested via the --test-extra-env-var "
@@ -61,6 +69,23 @@ class CompleteEnvironmentVars(FrozenDict):
                 )
 
         return FrozenDict(env_var_subset)
+
+    def get_or_match(self, name_or_pattern: str) -> Iterator[tuple[str, str]]:
+        """Get the value of an envvar if it has an exact match, otherwise all fnmatches.
+
+        Although fnmatch could also handle direct matches, it is significantly slower (roughly 2000
+        times).
+        """
+        if value := self.get(name_or_pattern):
+            yield name_or_pattern, value
+            return  # do not check fnmatches if we have an exact match
+
+        # fnmatch.filter looks tempting,
+        # but we'd need to iterate once for the filtering the keys and again for getting the values
+        for k, v in self.items():
+            # we use fnmatchcase to avoid normalising the case with `os.path.normcase` on Windows systems
+            if fnmatch.fnmatchcase(k, name_or_pattern):
+                yield k, v
 
 
 @dataclass(frozen=True)

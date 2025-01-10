@@ -218,6 +218,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &source_dir,
         out_dir,
     )?;
+    gen_files_for_language(
+        tree_sitter_dockerfile::language(),
+        "dockerfile",
+        &source_dir,
+        out_dir,
+    )?;
     println!("cargo:rerun-if-env-changed=PANTS_PRINT_IMPL_HASHES");
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=src");

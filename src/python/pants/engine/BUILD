@@ -8,6 +8,9 @@ python_tests(
     dependencies=["src/python/pants/engine/internals:fs_test_data"],
     sources=["*_test.py", "!streaming_workunit_handler_integration_test.py"],
     timeout=90,
+    overrides={
+        "goal_test.py": {"dependencies": ["//BUILD_ROOT:files"]},
+    },
 )
 
 python_tests(

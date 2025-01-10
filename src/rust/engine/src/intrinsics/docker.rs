@@ -3,14 +3,15 @@
 
 use docker::docker::{ImagePullPolicy, ImagePullScope, DOCKER, IMAGE_PULL_CACHE};
 use process_execution::Platform;
-use pyo3::prelude::{pyfunction, wrap_pyfunction, PyAny, PyModule, PyResult, Python, ToPyObject};
-use pyo3::types::PyString;
+use pyo3::prelude::{pyfunction, wrap_pyfunction, PyModule, PyResult, Python};
+use pyo3::types::{PyModuleMethods, PyString};
+use pyo3::Bound;
 
 use crate::externs::{self, PyGeneratorResponseNativeCall};
 use crate::nodes::task_get_context;
 use crate::python::{Failure, Value};
 
-pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn register(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(docker_resolve_image, m)?)?;
 
     Ok(())
@@ -25,7 +26,7 @@ fn docker_resolve_image(docker_request: Value) -> PyGeneratorResponseNativeCall 
         let docker_resolve_image_result = types.docker_resolve_image_result;
 
         let (image_name, platform) = Python::with_gil(|py| {
-            let py_docker_request: &PyAny = docker_request.as_ref().as_ref(py);
+            let py_docker_request = docker_request.bind(py);
             let image_name: String = externs::getattr(py_docker_request, "image_name").unwrap();
             let platform: String = externs::getattr(py_docker_request, "platform").unwrap();
             (image_name, platform)
@@ -63,7 +64,7 @@ fn docker_resolve_image(docker_request: Value) -> PyGeneratorResponseNativeCall 
             externs::unsafe_call(
                 py,
                 docker_resolve_image_result,
-                &[Value::from(PyString::new(py, &image_id).to_object(py))],
+                &[Value::from(&PyString::new(py, &image_id))],
             )
         }))
     })

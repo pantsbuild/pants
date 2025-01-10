@@ -13,6 +13,10 @@ mod config;
 #[cfg(test)]
 mod config_tests;
 
+mod cli_alias;
+#[cfg(test)]
+mod cli_alias_tests;
+
 mod env;
 #[cfg(test)]
 mod env_tests;
@@ -34,8 +38,10 @@ mod tests;
 
 mod types;
 
+use std::any::Any;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Debug;
+use std::fs;
 use std::hash::Hash;
 use std::path::Path;
 use std::sync::Arc;
@@ -106,6 +112,8 @@ pub(crate) trait OptionsSource: Send + Sync {
     /// flag based options and "BOB" in environment variable based options.
     ///
     fn display(&self, id: &OptionId) -> String;
+
+    fn as_any(&self) -> &dyn Any;
 
     ///
     /// Get the string option identified by `id` from this source.
@@ -195,7 +203,7 @@ pub(crate) trait OptionsSource: Send + Sync {
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Source {
     Default,
-    Config { ordinal: usize, path: String },
+    Config { ordinal: usize, path: String }, // TODO: Should be a PathBuf
     Env,
     Flag,
 }
@@ -224,22 +232,60 @@ impl Source {
     }
 }
 
+pub fn apply_list_edits<T>(
+    remover: fn(&mut Vec<T>, &[T]),
+    list_edits: impl Iterator<Item = ListEdit<T>>,
+) -> Vec<T> {
+    let mut list = vec![];
+    // Removals from any source apply after adds from any source (but are themselves
+    // overridden by later replacements), so we collect them here and apply them later.
+    let mut removal_lists: Vec<Vec<T>> = vec![];
+
+    for list_edit in list_edits {
+        match list_edit.action {
+            ListEditAction::Replace => {
+                list = list_edit.items;
+                removal_lists.clear();
+            }
+            ListEditAction::Add => list.extend(list_edit.items),
+            ListEditAction::Remove => removal_lists.push(list_edit.items),
+        }
+    }
+
+    for removals in removal_lists {
+        remover(&mut list, &removals);
+    }
+
+    list
+}
+
+pub fn apply_dict_edits(dict_edits: impl Iterator<Item = DictEdit>) -> HashMap<String, Val> {
+    let mut dict = HashMap::new();
+    for dict_edit in dict_edits {
+        match dict_edit.action {
+            DictEditAction::Replace => dict = dict_edit.items,
+            DictEditAction::Add => dict.extend(dict_edit.items),
+        }
+    }
+    dict
+}
+
 #[derive(Debug)]
-pub struct OptionValue<T> {
-    pub derivation: Option<Vec<(Source, T)>>,
-    pub source: Source,
+pub struct OptionValue<'a, T> {
+    pub derivation: Option<Vec<(&'a Source, T)>>,
+    pub source: &'a Source,
     pub value: T,
 }
 
 #[derive(Debug)]
-pub struct OptionalOptionValue<T> {
-    pub derivation: Option<Vec<(Source, T)>>,
-    pub source: Source,
+pub struct OptionalOptionValue<'a, T> {
+    pub derivation: Option<Vec<(&'a Source, T)>>,
+    pub source: &'a Source,
     pub value: Option<T>,
 }
 
-impl<T> OptionalOptionValue<T> {
-    fn unwrap(self) -> OptionValue<T> {
+impl<'a, T> OptionalOptionValue<'a, T> {
+    fn unwrap(self) -> OptionValue<'a, T> {
         OptionValue {
             derivation: self.derivation,
             source: self.source,
@@ -249,25 +295,25 @@ impl<T> OptionalOptionValue<T> {
 }
 
 #[derive(Debug)]
-pub struct ListOptionValue<T> {
-    pub derivation: Option<Vec<(Source, Vec<ListEdit<T>>)>>,
+pub struct ListOptionValue<'a, T> {
+    #[allow(clippy::type_complexity)]
+    pub derivation: Option<Vec<(&'a Source, Vec<ListEdit<T>>)>>,
     // The highest-priority source that provided edits for this value.
-    pub source: Source,
+    pub source: &'a Source,
     pub value: Vec<T>,
 }
 
 #[derive(Debug)]
-pub struct DictOptionValue {
-    pub derivation: Option<Vec<(Source, Vec<DictEdit>)>>,
+pub struct DictOptionValue<'a> {
+    pub derivation: Option<Vec<(&'a Source, Vec<DictEdit>)>>,
     // The highest-priority source that provided edits for this value.
-    pub source: Source,
+    pub source: &'a Source,
     pub value: HashMap<String, Val>,
 }
 
 pub struct OptionParser {
     sources: BTreeMap<Source, Arc<dyn OptionsSource>>,
     include_derivation: bool,
-    passthrough_args: Option<Vec<String>>,
 }
 
 impl OptionParser {
@@ -280,10 +326,19 @@ impl OptionParser {
         allow_pantsrc: bool,
         include_derivation: bool,
         buildroot: Option<BuildRoot>,
+        // TODO: pass the raw option registration data in instead, so we can also use it
+        //  for validating config files and other uses.
+        //  For now this is just what we need to validate CLI aliases.
+        known_scopes_to_flags: Option<&HashMap<String, HashSet<String>>>,
     ) -> Result<OptionParser, String> {
+        let has_provided_configs = config_sources.is_some();
+
         let buildroot = buildroot.unwrap_or(BuildRoot::find()?);
         let buildroot_string = buildroot.convert_to_string()?;
         let fromfile_expander = FromfileExpander::relative_to(buildroot);
+
+        let args_reader = ArgsReader::new(args, fromfile_expander.clone());
+        let mut sources: BTreeMap<Source, Arc<dyn OptionsSource>> = BTreeMap::new();
 
         let mut seed_values = HashMap::from_iter(
             env.env
@@ -291,10 +346,11 @@ impl OptionParser {
                 .map(|(k, v)| (format!("env.{k}", k = k), v.clone())),
         );
 
-        let args_reader = ArgsReader::new(args, fromfile_expander.clone());
-        let passthrough_args = args_reader.get_passthrough_args().cloned();
+        // We bootstrap options in several steps.
 
-        let mut sources: BTreeMap<Source, Arc<dyn OptionsSource>> = BTreeMap::new();
+        // Step #1: Read env and (non cli alias-expanded) args to find config files and
+        // the workdir/distdir.
+
         sources.insert(
             Source::Env,
             Arc::new(EnvReader::new(env, fromfile_expander.clone())),
@@ -303,7 +359,6 @@ impl OptionParser {
         let mut parser = OptionParser {
             sources: sources.clone(),
             include_derivation: false,
-            passthrough_args: None,
         };
 
         fn path_join(prefix: &str, suffix: &str) -> String {
@@ -326,11 +381,25 @@ impl OptionParser {
         let config_sources = match config_sources {
             Some(cs) => cs,
             None => {
+                // If a pants.toml exists at the build root, use it as the default config file
+                // if no config files were explicitly specified via --pants-config-files
+                // (or PANTS_CONFIG_FILES).
+                // If it doesn't exist, proceed with no config files. We don't need to error
+                // if no config file exists (we may error later if an option value is not
+                // provided).
+                // In regular usage there is always a config file in practice, but there may not
+                // be in some obscure test scenarios.
                 let default_config_path = path_join(&buildroot_string, "pants.toml");
+                let default_config_paths =
+                    if fs::exists(Path::new(&default_config_path)).map_err(|e| e.to_string())? {
+                        vec![default_config_path]
+                    } else {
+                        vec![]
+                    };
                 let config_paths = parser
                     .parse_string_list(
                         &option_id!("pants", "config", "files"),
-                        vec![default_config_path],
+                        default_config_paths,
                     )?
                     .value;
                 config_paths
@@ -358,6 +427,8 @@ impl OptionParser {
             ("pants_distdir".to_string(), subdir("distdir", "dist")?),
         ]);
 
+        // Step #2: Read (unexpanded) args, env, and config to find rcfiles.
+
         let mut ordinal: usize = 0;
         for config_source in config_sources {
             let config = Config::parse(&config_source, &seed_values)?;
@@ -373,13 +444,16 @@ impl OptionParser {
             );
             ordinal += 1;
         }
+
         parser = OptionParser {
             sources: sources.clone(),
             include_derivation: false,
-            passthrough_args: None,
         };
 
-        if allow_pantsrc && parser.parse_bool(&option_id!("pantsrc"), true)?.value {
+        if allow_pantsrc
+            && parser.parse_bool(&option_id!("pantsrc"), true)?.value
+            && !has_provided_configs
+        {
             for rcfile in parser
                 .parse_string_list(
                     &option_id!("pantsrc", "files"),
@@ -406,10 +480,50 @@ impl OptionParser {
                 }
             }
         }
+
+        // Step #3: Read env and config (but not args) to find cli aliases.
+
+        // Remove the args source, as we don't support providing cli aliases on the cli...
+        let unexpanded_args_source = sources.remove(&Source::Flag).unwrap();
+
+        parser = OptionParser {
+            sources: sources.clone(),
+            include_derivation: false,
+        };
+        let alias_strings = parser
+            .parse_dict(&option_id!(["cli"], "alias"), HashMap::new())?
+            .value
+            .into_iter()
+            .map(|(k, v)| {
+                if let Val::String(s) = v {
+                    Ok((k, s))
+                } else {
+                    Err(format!(
+                        "Values in [cli.alias] must be strings. Got: {:?}",
+                        v
+                    ))
+                }
+            })
+            .collect::<Result<HashMap<_, _>, String>>()?;
+
+        let alias_map = cli_alias::create_alias_map(known_scopes_to_flags, &alias_strings)?;
+
+        // Step #4: Return the final OptionParser, which reads from
+        // alias-expanded args, env, config and rcfiles.
+
+        // Add the args reader back in, after expanding aliases.
+        let unexpanded_args_reader = unexpanded_args_source
+            .as_any()
+            .downcast_ref::<ArgsReader>()
+            .unwrap();
+        sources.insert(
+            Source::Flag,
+            Arc::new(unexpanded_args_reader.expand_aliases(&alias_map)),
+        );
+
         Ok(OptionParser {
             sources,
             include_derivation,
-            passthrough_args,
         })
     }
 
@@ -424,11 +538,11 @@ impl OptionParser {
         if self.include_derivation {
             let mut derivations = vec![];
             if let Some(def) = default {
-                derivations.push((Source::Default, def.to_owned()));
+                derivations.push((&Source::Default, def.to_owned()));
             }
             for (source_type, source) in self.sources.iter() {
                 if let Some(val) = getter(source, id)? {
-                    derivations.push((source_type.clone(), val));
+                    derivations.push((source_type, val));
                 }
             }
             derivation = Some(derivations);
@@ -437,14 +551,14 @@ impl OptionParser {
             if let Some(value) = getter(source, id)? {
                 return Ok(OptionalOptionValue {
                     derivation,
-                    source: source_type.clone(),
+                    source: source_type,
                     value: Some(value),
                 });
             }
         }
         Ok(OptionalOptionValue {
             derivation,
-            source: Source::Default,
+            source: &Source::Default,
             value: default.map(|x| x.to_owned()),
         })
     }
@@ -511,55 +625,43 @@ impl OptionParser {
         id: &OptionId,
         default: Vec<T>,
         getter: fn(&Arc<dyn OptionsSource>, &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String>,
-        remover: fn(&mut Vec<T>, &Vec<T>),
+        remover: fn(&mut Vec<T>, &[T]),
     ) -> Result<ListOptionValue<T>, String> {
-        let mut list = default;
         let mut derivation = None;
         if self.include_derivation {
             let mut derivations = vec![(
-                Source::Default,
+                &Source::Default,
                 vec![ListEdit {
                     action: ListEditAction::Replace,
-                    items: list.clone(),
+                    items: default.clone(),
                 }],
             )];
             for (source_type, source) in self.sources.iter() {
                 if let Some(list_edits) = getter(source, id)? {
                     if !list_edits.is_empty() {
-                        derivations.push((source_type.clone(), list_edits));
+                        derivations.push((source_type, list_edits));
                     }
                 }
             }
             derivation = Some(derivations);
         }
 
-        // Removals from any source apply after adds from any source (but are themselves
-        // overridden by later replacements), so we collect them here and apply them later.
-        let mut removal_lists: Vec<Vec<T>> = vec![];
-
-        let mut highest_priority_source = Source::Default;
+        let mut highest_priority_source = &Source::Default;
+        let mut edits: Vec<ListEdit<T>> = vec![ListEdit {
+            action: ListEditAction::Replace,
+            items: default,
+        }];
         for (source_type, source) in self.sources.iter() {
             if let Some(list_edits) = getter(source, id)? {
-                highest_priority_source = source_type.clone();
-                for list_edit in list_edits {
-                    match list_edit.action {
-                        ListEditAction::Replace => {
-                            list = list_edit.items;
-                            removal_lists.clear();
-                        }
-                        ListEditAction::Add => list.extend(list_edit.items),
-                        ListEditAction::Remove => removal_lists.push(list_edit.items),
-                    }
-                }
+                highest_priority_source = source_type;
+                edits.extend(list_edits);
             }
         }
-        for removals in removal_lists {
-            remover(&mut list, &removals);
-        }
+
         Ok(ListOptionValue {
             derivation,
             source: highest_priority_source,
-            value: list,
+            value: apply_list_edits(remover, edits.into_iter()),
         })
     }
 
@@ -627,44 +729,95 @@ impl OptionParser {
         id: &OptionId,
         default: HashMap<String, Val>,
     ) -> Result<DictOptionValue, String> {
-        let mut dict = default;
         let mut derivation = None;
         if self.include_derivation {
             let mut derivations = vec![(
-                Source::Default,
+                &Source::Default,
                 vec![DictEdit {
                     action: DictEditAction::Replace,
-                    items: dict.clone(),
+                    items: default.clone(),
                 }],
             )];
             for (source_type, source) in self.sources.iter() {
                 if let Some(dict_edits) = source.get_dict(id)? {
-                    derivations.push((source_type.clone(), dict_edits));
+                    derivations.push((source_type, dict_edits));
                 }
             }
             derivation = Some(derivations);
         }
-        let mut highest_priority_source = Source::Default;
+        let mut highest_priority_source = &Source::Default;
+        let mut edits: Vec<DictEdit> = vec![DictEdit {
+            action: DictEditAction::Replace,
+            items: default,
+        }];
         for (source_type, source) in self.sources.iter() {
             if let Some(dict_edits) = source.get_dict(id)? {
-                highest_priority_source = source_type.clone();
-                for dict_edit in dict_edits {
-                    match dict_edit.action {
-                        DictEditAction::Replace => dict = dict_edit.items,
-                        DictEditAction::Add => dict.extend(dict_edit.items),
-                    }
-                }
+                highest_priority_source = source_type;
+                edits.extend(dict_edits);
             }
         }
         Ok(DictOptionValue {
             derivation,
             source: highest_priority_source,
-            value: dict,
+            value: apply_dict_edits(edits.into_iter()),
         })
     }
 
-    pub fn get_passthrough_args(&self) -> Option<&Vec<String>> {
-        self.passthrough_args.as_ref()
+    // Return the config files used by this parser. Useful for testing config file discovery.
+    pub fn get_config_file_paths(&self) -> Vec<String> {
+        let mut ret = vec![];
+        for source in self.sources.keys() {
+            if let Source::Config { ordinal: _, path } = source {
+                ret.push(path.to_owned());
+            }
+        }
+        ret
+    }
+
+    pub fn get_args(&self) -> Result<Vec<String>, String> {
+        Ok(self.get_args_reader()?.get_args())
+    }
+
+    pub fn get_passthrough_args(&self) -> Result<Option<Vec<String>>, String> {
+        Ok(self.get_args_reader()?.get_passthrough_args())
+    }
+
+    pub fn get_unconsumed_flags(&self) -> Result<HashMap<Scope, Vec<String>>, String> {
+        Ok(self.get_args_reader()?.get_tracker().get_unconsumed_flags())
+    }
+
+    fn get_args_reader(&self) -> Result<&ArgsReader, String> {
+        if let Some(args_reader) = self
+            .sources
+            .get(&Source::Flag)
+            .and_then(|source| source.as_any().downcast_ref::<ArgsReader>())
+        {
+            Ok(args_reader)
+        } else {
+            Err("This OptionParser does not have command-line args as a source".to_string())
+        }
+    }
+
+    // Given a map from section name to valid keys for that section,
+    // returns a vec of validation error messages.
+    pub fn validate_config(
+        &self,
+        section_to_valid_keys: &HashMap<String, HashSet<String>>,
+    ) -> Vec<String> {
+        let mut errors = vec![];
+        for (source_type, source) in self.sources.iter() {
+            if let Source::Config { ordinal: _, path } = source_type {
+                if let Some(config_reader) = source.as_any().downcast_ref::<ConfigReader>() {
+                    errors.extend(
+                        config_reader
+                            .validate(section_to_valid_keys)
+                            .iter()
+                            .map(|err| format!("{} in {}", err, path)),
+                    );
+                }
+            }
+        }
+        errors
     }
 }
 

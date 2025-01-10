@@ -156,11 +156,11 @@ Test runs are _hermetic_, meaning that they are stripped of the parent `pants` p
 
 To add any arbitrary environment variable back to the process, you can either add the environment variable to the specific tests with the `extra_env_vars` field on `python_test` / `python_tests` targets or to all your tests with the `[test].extra_env_vars` option. Generally, prefer the field `extra_env_vars` field so that more of your tests are hermetic.
 
-With both `[test].extra_env_vars` and the `extra_env_vars` field, you can either hardcode a value or leave off a value to "allowlist" it and read from the parent `pants` process's environment.
+With both `[test].extra_env_vars` and the `extra_env_vars` field, you can specify a value with the form `"VAR1=hardcoded_value"` or read it from the parent `pants` process's environment with the form `VAR2`. `fnmatch` globs like `"VAR_PREFIXED_*"` can be used to read multiple environment variables.
 
 ```toml tab={"label":"pants.toml"}
 [test]
-extra_env_vars = ["VAR1", "VAR2=hardcoded_value"]
+extra_env_vars = ["VAR1=hardcoded_value", "VAR2", "VAR_PREFIXED_*"]
 ```
 
 ```python tab={"label":"project/BUILD"}
@@ -523,7 +523,7 @@ ignore_errors = true
 
 `ignore_errors = true` means that those files will simply be left off of the final coverage report.
 
-(Pants should autodiscover the config file `.coveragerc`. See [coverage-py](../../../reference/subsystems/coverage-py.mdx#section-config-discovery).)
+(Pants should autodiscover the config file `.coveragerc`. See [coverage-py](../../../reference/subsystems/coverage-py.mdx#config-discovery).)
 
 There's a proposal for Pants to fix this by generating multiple reports when necessary: [https://github.com/pantsbuild/pants/issues/11137](https://github.com/pantsbuild/pants/issues/11137). We'd appreciate your feedback.
 :::

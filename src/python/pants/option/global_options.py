@@ -10,7 +10,7 @@ import re
 import sys
 import tempfile
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path, PurePath
 from typing import Any, Callable, Type, TypeVar, cast
@@ -391,18 +391,11 @@ class DynamicRemoteOptions:
 
     @classmethod
     def _use_oauth_token(cls, bootstrap_options: OptionValueContainer) -> DynamicRemoteOptions:
-        if bootstrap_options.remote_oauth_bearer_token:
-            oauth_token = bootstrap_options.remote_oauth_bearer_token
-            description = "`remote_oauth_bearer_token` option"
-        else:
-            oauth_token = (
-                Path(bootstrap_options.remote_oauth_bearer_token_path).resolve().read_text().strip()
-            )
-            description = f"`remote_oauth_bearer_token_path` option ({bootstrap_options.remote_oauth_bearer_token_path})"
+        oauth_token = bootstrap_options.remote_oauth_bearer_token
 
         if set(oauth_token).intersection({"\n", "\r"}):
             raise OptionsError(
-                f"OAuth bearer token from {description} must not contain multiple lines."
+                "OAuth bearer token from `remote_oauth_bearer_token` option must not contain multiple lines."
             )
 
         token_header = {"authorization": f"Bearer {oauth_token}"}
@@ -445,20 +438,16 @@ class DynamicRemoteOptions:
         prior_result: AuthPluginResult | None = None,
         remote_auth_plugin_func: Callable | None = None,
     ) -> tuple[DynamicRemoteOptions, AuthPluginResult | None]:
-        bootstrap_options = full_options.bootstrap_option_values()
-        assert bootstrap_options is not None
-        execution = cast(bool, bootstrap_options.remote_execution)
-        cache_read = cast(bool, bootstrap_options.remote_cache_read)
-        cache_write = cast(bool, bootstrap_options.remote_cache_write)
+        global_options = full_options.for_global_scope()
+        execution = cast(bool, global_options.remote_execution)
+        cache_read = cast(bool, global_options.remote_cache_read)
+        cache_write = cast(bool, global_options.remote_cache_write)
         if not (execution or cache_read or cache_write):
             return cls.disabled(), None
 
         sources = {
             str(remote_auth_plugin_func): bool(remote_auth_plugin_func),
-            "[GLOBAL].remote_oauth_bearer_token_path": bool(
-                bootstrap_options.remote_oauth_bearer_token_path
-            ),
-            "[GLOBAL].remote_oauth_bearer_token": bool(bootstrap_options.remote_oauth_bearer_token),
+            "[GLOBAL].remote_oauth_bearer_token": bool(global_options.remote_oauth_bearer_token),
         }
         enabled_sources = [name for name, enabled in sources.items() if enabled]
         if len(enabled_sources) > 1:
@@ -471,20 +460,17 @@ class DynamicRemoteOptions:
                     """
                 )
             )
-        if (
-            bootstrap_options.remote_oauth_bearer_token_path
-            or bootstrap_options.remote_oauth_bearer_token
-        ):
-            return cls._use_oauth_token(bootstrap_options), None
+        if global_options.remote_oauth_bearer_token:
+            return cls._use_oauth_token(global_options), None
         if remote_auth_plugin_func is not None:
             return cls._use_auth_plugin(
-                bootstrap_options,
+                global_options,
                 full_options=full_options,
                 env=env,
                 prior_result=prior_result,
                 remote_auth_plugin_func=remote_auth_plugin_func,
             )
-        return cls._use_no_auth(bootstrap_options), None
+        return cls._use_no_auth(global_options), None
 
     @classmethod
     def _use_no_auth(cls, bootstrap_options: OptionValueContainer) -> DynamicRemoteOptions:
@@ -692,7 +678,7 @@ class ExecutionOptions:
             process_per_child_memory_usage=bootstrap_options.process_per_child_memory_usage,
             # Remote store setup.
             remote_store_address=dynamic_remote_options.store_address,
-            remote_store_headers=dynamic_remote_options.store_headers,
+            remote_store_headers=cls.with_user_agent(dynamic_remote_options.store_headers),
             remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
             remote_store_rpc_retries=bootstrap_options.remote_store_rpc_retries,
             remote_store_rpc_concurrency=dynamic_remote_options.store_rpc_concurrency,
@@ -704,11 +690,18 @@ class ExecutionOptions:
             remote_cache_rpc_timeout_millis=bootstrap_options.remote_cache_rpc_timeout_millis,
             # Remote execution setup.
             remote_execution_address=dynamic_remote_options.execution_address,
-            remote_execution_headers=dynamic_remote_options.execution_headers,
+            remote_execution_headers=cls.with_user_agent(dynamic_remote_options.execution_headers),
             remote_execution_overall_deadline_secs=bootstrap_options.remote_execution_overall_deadline_secs,
             remote_execution_rpc_concurrency=dynamic_remote_options.execution_rpc_concurrency,
             remote_execution_append_only_caches_base_path=bootstrap_options.remote_execution_append_only_caches_base_path,
         )
+
+    @classmethod
+    def with_user_agent(cls, headers: dict[str, str]) -> dict[str, str]:
+        has_user_agent = any(k.lower() == "user-agent" for k in headers.keys())
+        if has_user_agent:
+            return headers
+        return {"user-agent": f"pants/{VERSION}"} | headers
 
 
 @dataclass(frozen=True)
@@ -779,9 +772,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_graceful_shutdown_timeout=3,
     # Remote store setup.
     remote_store_address=None,
-    remote_store_headers={
-        "user-agent": f"pants/{VERSION}",
-    },
+    remote_store_headers={},
     remote_store_chunk_bytes=1024 * 1024,
     remote_store_rpc_retries=2,
     remote_store_rpc_concurrency=128,
@@ -793,9 +784,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_cache_rpc_timeout_millis=1500,
     # Remote execution setup.
     remote_execution_address=None,
-    remote_execution_headers={
-        "user-agent": f"pants/{VERSION}",
-    },
+    remote_execution_headers={},
     remote_execution_overall_deadline_secs=60 * 60,  # one hour
     remote_execution_rpc_concurrency=128,
     remote_execution_append_only_caches_base_path=None,
@@ -813,7 +802,7 @@ class LogLevelOption(EnumOption[LogLevel, LogLevel]):
 
     def __new__(cls) -> LogLevelOption:
         self = super().__new__(
-            cls,  # type: ignore[arg-type]
+            cls,
             default=LogLevel.INFO,
             daemon=True,
             help="Set the logging level.",
@@ -995,6 +984,8 @@ class BootstrapOptions:
     )
     native_options_validation = EnumOption(
         default=NativeOptionsValidation.warning,
+        removal_version="2.26.0.dev0",
+        removal_hint="The legacy parser has been removed so this option has no effect.",
         help=softwrap(
             """
             Pants is switching its option parsing system from a legacy parser written in Python
@@ -1005,7 +996,9 @@ class BootstrapOptions:
             This option controls how to report discrepancies that arise.
 
             - `error`: Discrepancies will cause Pants to exit.
+
             - `warning`: Discrepancies will be logged but Pants will continue.
+
             - `ignore`: A last resort to turn off this check entirely.
 
             If you encounter discrepancies that are not easily resolvable, please reach out to
@@ -1605,23 +1598,6 @@ class BootstrapOptions:
             """
         ),
     )
-    remote_oauth_bearer_token_path = StrOption(
-        default=None,
-        advanced=True,
-        help=softwrap(
-            """
-            Path to a file containing an oauth token to use for gGRPC connections to
-            `[GLOBAL].remote_execution_address` and `[GLOBAL].remote_store_address`.
-
-            If specified, Pants will add a header in the format `authorization: Bearer <token>`.
-            You can also manually add this header via `[GLOBAL].remote_execution_headers` and
-            `[GLOBAL].remote_store_headers`, or use `[GLOBAL].remote_auth_plugin` to provide a plugin to
-            dynamically set the relevant headers. Otherwise, no authorization will be performed.
-            """
-        ),
-        removal_version="2.23.0.dev0",
-        removal_hint=f'use `[GLOBAL].remote_oauth_bearer_token = "@/path/to/token.txt"` instead, see {doc_url("reference/global-options#remote_oauth_bearer_token")}',
-    )
 
     remote_oauth_bearer_token = StrOption(
         default=None,
@@ -1776,6 +1752,80 @@ class BootstrapOptions:
             """
         ),
     )
+    _file_downloads_retry_delay = FloatOption(
+        default=0.2,
+        advanced=True,
+        help=softwrap(
+            """
+            When Pants downloads files (for example, for the `http_source` source), Pants will retry the download
+            if a "retryable" error occurs. Between each attempt, Pants will delay a random amount of time using an
+            exponential backoff algorithm.
+
+            This option sets the "base" duration in seconds used for calculating the retry delay.
+            """
+        ),
+    )
+    _file_downloads_max_attempts = IntOption(
+        default=4,
+        advanced=True,
+        help=softwrap(
+            """
+            When Pants downloads files (for example, for the `http_source` source), Pants will retry the download
+            if a "retryable" error occurs.
+
+            This option sets the maximum number of attempts Pants will make to try to download the file before giving up
+            with an error.
+            """
+        ),
+    )
+
+    @property
+    def file_downloads_retry_delay(self) -> timedelta:
+        value = self._file_downloads_retry_delay
+        if value <= 0.0:
+            raise ValueError(
+                f"Global option `--file-downloads-retry-delay` must a positive number, got {value}"
+            )
+        return timedelta(seconds=value)
+
+    @property
+    def file_downloads_max_attempts(self) -> int:
+        value = self._file_downloads_max_attempts
+        if value < 1:
+            raise ValueError(
+                f"Global option `--file-downloads-max-attempts` must be at least 1, got {value}"
+            )
+        return value
+
+    allow_deprecated_macos_before_12 = BoolOption(
+        default=False,
+        advanced=True,
+        help=softwrap(
+            f"""
+            Silence warnings about running Pants on macOS 10.15 - 11. In future versions, Pants will
+            only be supported on macOS 12 and newer.
+
+            If you have questions or concerns about this, please reach out to us at
+            {doc_url("community/getting-help")}.
+            """
+        ),
+        removal_version="2.26.0.dev0",
+        removal_hint='Upgrade your operating system or write `allow_deprecated_macos_versions = ["10", "11"]` instead.',
+    )
+
+    allow_deprecated_macos_versions = StrListOption(
+        default=[],
+        advanced=True,
+        help=softwrap(
+            f"""
+            Silence warnings/errors about running Pants on these versions of macOS. Pants only supports
+            recent versions of macOS. You can try running on older versions, but it may or may not work.
+
+            If you have questions or concerns about this, please reach out to us at
+            {doc_url("community/getting-help")}.
+            """
+        ),
+    )
 
 
 # N.B. By subclassing BootstrapOptions, we inherit all of those options and are also able to extend
@@ -1887,6 +1937,12 @@ class GlobalOptions(BootstrapOptions, Subsystem):
     )
     subproject_roots = StrListOption(
         help="Paths that correspond with build roots for any subproject that this project depends on.",
+        advanced=True,
+    )
+
+    enable_target_origin_sources_blocks = BoolOption(
+        default=False,
+        help="Enable fine grained target analysis based on line numbers.",
         advanced=True,
     )
 
@@ -2202,11 +2258,11 @@ class GlobalOptionsFlags:
         short_flags = set()
 
         for options_info in collect_options_info(BootstrapOptions):
-            for flag in options_info.flag_names:
+            for flag in options_info.args:
                 flags.add(flag)
                 if len(flag) == 2:
                     short_flags.add(flag)
-                elif options_info.flag_options.get("type") == bool:
+                elif options_info.kwargs.get("type") == bool:
                     flags.add(f"--no-{flag[2:]}")
 
         return cls(FrozenOrderedSet(flags), FrozenOrderedSet(short_flags))

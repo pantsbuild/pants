@@ -108,8 +108,6 @@ def find_dependents(
 class DependentsSubsystem(LineOriented, GoalSubsystem):
     name = "dependents"
     help = "List all targets that depend on any of the input files/targets."
-    deprecated_options_scope = "dependees"
-    deprecated_options_scope_removal_version = "2.23.0.dev0"
 
     transitive = BoolOption(
         default=False,

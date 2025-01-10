@@ -9,8 +9,9 @@ chevron==0.14.0
 fasteners==0.16.3
 freezegun==1.2.1
 ijson==3.2.3
+libcst==1.4.0
 packaging==21.3
-pex==2.3.1
+pex==2.27.1
 psutil==5.9.8
 # This should be compatible with pytest.py, although it can be looser so that we don't
 # over-constrain pantsbuild.pants.testutil
@@ -30,10 +31,17 @@ types-PyYAML==6.0.3
 types-requests==2.28.1
 types-setuptools==62.6.1
 types-toml==0.10.8
-typing-extensions==4.3.0
+typing-extensions~=4.12
 mypy-typing-asserts==0.1.1
 node-semver==0.9.0
 
+# In src/python/pants/backend/url_handlers/s3/register.py we advise adding
+# `botocore` to `[GLOBAL].plugins`, but `botocore` is particular about the
+# version of urllib3 used.  To make the s3 handler easier to use, constrain
+# urlib3 here.  Per the voluminous thread at
+# https://github.com/boto/botocore/issues/2926 this can likely be relaxed when
+# Pants itself is on a newer version of Python
+urllib3<2
 
 # These dependencies are only for debugging Pants itself (in VSCode/PyCharm respectively),
 # and should never be imported.
@@ -51,4 +59,4 @@ beautifulsoup4==4.11.1 # Util for webcrawling for pulling in tool versions
 python-gnupg==0.4.9 # For validating signatures
 
 # Only used for release management
-PyGithub==2.0.0rc1
+PyGithub==2.4.0

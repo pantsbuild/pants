@@ -28,17 +28,17 @@ def sources_rule_runner() -> RuleRunner:
 
 def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
     sources_rule_runner.write_files(
-        {
-            f: ""
-            for f in [
+        dict.fromkeys(
+            [
                 "f1.txt",
                 "f2.txt",
                 "dirA/f3.txt",
                 "dirB/f4.txt",
                 "dirC/f5.txt",
                 "dirC/f6.txt",
-            ]
-        }
+            ],
+            "",
+        )
     )
 
     def hydrate(sources_cls: Type[DebianSources], sources: Iterable[str]) -> HydratedSources:

@@ -137,7 +137,7 @@ def assert_chroot(
     interpreter_constraints: InterpreterConstraints | None = None,
 ) -> None:
     if interpreter_constraints is None:
-        interpreter_constraints = InterpreterConstraints(["CPython>=3.7,<4"])
+        interpreter_constraints = InterpreterConstraints(["CPython>=3.8,<4"])
 
     tgt = rule_runner.get_target(addr)
     req = DistBuildChrootRequest(
@@ -166,13 +166,13 @@ def assert_chroot_error(
             [
                 DistBuildChrootRequest(
                     ExportedTarget(tgt),
-                    InterpreterConstraints(["CPython>=3.7,<4"]),
+                    InterpreterConstraints(["CPython>=3.8,<4"]),
                 )
             ],
         )
     ex = excinfo.value
     assert len(ex.wrapped_exceptions) == 1
-    assert type(ex.wrapped_exceptions[0]) == exc_cls
+    assert type(ex.wrapped_exceptions[0]) is exc_cls
 
 
 def test_use_existing_setup_script(chroot_rule_runner) -> None:
@@ -305,7 +305,7 @@ def test_use_generate_setup_script_package_provenance_agnostic(chroot_rule_runne
                 )
             },
             "install_requires": (),
-            "python_requires": "<4,>=3.7",
+            "python_requires": "<4,>=3.8",
         },
         Address("src/python", target_name="foo-dist"),
     )
@@ -435,7 +435,7 @@ def test_generate_chroot(chroot_rule_runner: PythonRuleRunner) -> None:
             "namespace_packages": ("foo",),
             "package_data": {"foo": ("resources/js/code.js",), "foo.qux": ("qux.pyi",)},
             "install_requires": ("baz==1.1.1",),
-            "python_requires": "<4,>=3.7",
+            "python_requires": "<4,>=3.8",
             "entry_points": {"console_scripts": ["foo_main = foo.qux.bin:main"]},
         },
         Address("src/python/foo", target_name="foo-dist"),
@@ -508,7 +508,7 @@ def test_generate_chroot_entry_points(chroot_rule_runner: PythonRuleRunner) -> N
             "namespace_packages": tuple(),
             "package_data": {},
             "install_requires": tuple(),
-            "python_requires": "<4,>=3.7",
+            "python_requires": "<4,>=3.8",
             "entry_points": {
                 "console_scripts": [
                     "foo_main = foo.qux.bin:main",
@@ -561,7 +561,7 @@ def test_generate_long_description_field_from_file(chroot_rule_runner: PythonRul
             "namespace_packages": tuple(),
             "package_data": {},
             "install_requires": tuple(),
-            "python_requires": "<4,>=3.7",
+            "python_requires": "<4,>=3.8",
             "long_description": "Some long description.",
         },
         Address("src/python/foo", target_name="foo-dist"),
@@ -721,7 +721,7 @@ def test_binary_shorthand(chroot_rule_runner: PythonRuleRunner) -> None:
             "packages": ("project",),
             "namespace_packages": (),
             "install_requires": (),
-            "python_requires": "<4,>=3.7",
+            "python_requires": "<4,>=3.8",
             "package_data": {},
             "entry_points": {"console_scripts": ["foo = project.app:func"]},
         },
@@ -784,7 +784,7 @@ def test_get_sources() -> None:
             [
                 DistBuildChrootRequest(
                     ExportedTarget(owner_tgt),
-                    InterpreterConstraints(["CPython>=3.7,<4"]),
+                    InterpreterConstraints(["CPython>=3.8,<4"]),
                 )
             ],
         )
@@ -1167,7 +1167,7 @@ def assert_owner_error(rule_runner, owned: Address, exc_cls: type[Exception]):
         )
     ex = excinfo.value
     assert len(ex.wrapped_exceptions) == 1
-    assert type(ex.wrapped_exceptions[0]) == exc_cls
+    assert type(ex.wrapped_exceptions[0]) is exc_cls
 
 
 def assert_no_owner(rule_runner: PythonRuleRunner, owned: Address):
