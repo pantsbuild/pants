@@ -5,6 +5,7 @@ use pyo3::exceptions::PyException;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
 use pyo3::{prelude::*, BoundObject};
 
+use options::arg_splitter::{ArgSplitter, SplitArgs};
 use options::{
     apply_dict_edits, apply_list_edits, Args, ConfigSource, DictEdit, DictEditAction, Env,
     ListEdit, ListEditAction, ListOptionValue, OptionId, OptionParser, OptionalOptionValue, Scope,
@@ -13,11 +14,14 @@ use options::{
 
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
+use std::path::Path;
 
 pyo3::import_exception!(pants.option.errors, ParseError);
 
 pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyOptionId>()?;
+    m.add_class::<PySplitArgs>()?;
+    m.add_class::<PyArgSplitter>()?;
     m.add_class::<PyConfigSource>()?;
     m.add_class::<PyOptionParser>()?;
     Ok(())
@@ -143,6 +147,49 @@ impl PyOptionId {
         let option_id =
             OptionId::new(scope, components.into_iter(), switch).map_err(ParseError::new_err)?;
         Ok(Self(option_id))
+    }
+}
+
+#[pyclass]
+struct PySplitArgs(SplitArgs);
+
+#[pymethods]
+impl PySplitArgs {
+    fn goals(&self) -> &Vec<String> {
+        &self.0.goals
+    }
+
+    fn unknown_goals(&self) -> &Vec<String> {
+        &self.0.unknown_goals
+    }
+
+    fn specs(&self) -> &Vec<String> {
+        &self.0.specs
+    }
+
+    fn passthru(&self) -> &Vec<String> {
+        &self.0.passthru
+    }
+}
+
+#[pyclass]
+struct PyArgSplitter(ArgSplitter);
+
+#[pymethods]
+impl PyArgSplitter {
+    #[new]
+    fn __new__(build_root: &str, known_goal_names: Vec<String>) -> Self {
+        Self(ArgSplitter::new(
+            Path::new(build_root),
+            known_goal_names
+                .iter()
+                .map(AsRef::as_ref)
+                .collect::<Vec<_>>(),
+        ))
+    }
+
+    fn split_args(&self, args: Vec<String>) -> PySplitArgs {
+        PySplitArgs(self.0.split_args(args))
     }
 }
 

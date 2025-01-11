@@ -109,7 +109,7 @@ class ArgSplitter:
                 yield alias, si
 
     def split_args(self, args: Sequence[str]) -> SplitArgs:
-        """Split the specified arg list (or sys.argv if unspecified).
+        """Split the specified arg list.
 
         args[0] is ignored.
 
