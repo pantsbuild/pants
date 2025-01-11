@@ -156,7 +156,7 @@ def main():
             )
 
     for result in results:
-        v = result.get(60)
+        v = result.get(timeout=60)
         if v is None:
             continue
         print(
