@@ -67,7 +67,9 @@ async def run_k8s_deploy(
 ) -> DeployProcess:
     context = field_set.context.value
     if context is None:
-        raise ValueError(f"Missing `{K8sBundleContextField.alias}` field")
+        raise ValueError(
+            f"Missing `{K8sBundleContextField.alias}` field on target `{field_set.address.spec}`"
+        )
 
     context = context if kubectl.pass_context else None
     if context is not None and context not in k8s_subsystem.available_contexts:
