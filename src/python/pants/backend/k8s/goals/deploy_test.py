@@ -14,6 +14,7 @@ from pants.backend.k8s.goals.deploy import rules as k8s_deploy_rules
 from pants.backend.k8s.kubectl_subsystem import Kubectl
 from pants.backend.k8s.target_types import K8sBundleTarget, K8sSourcesTargetGenerator
 from pants.core.goals.deploy import DeployProcess
+from pants.core.util_rules import external_tool
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.platform import Platform
@@ -28,6 +29,7 @@ def rule_runner() -> RuleRunner:
             K8sBundleTarget,
         ],
         rules=[
+            *external_tool.rules(),
             *k8s_deploy_rules(),
             *k8s_subsystem.rules(),
             *kubectl_subsystem.rules(),

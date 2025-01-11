@@ -149,14 +149,19 @@ async def kubectl_apply_process(
     kubectl_tool = await Get(
         DownloadedExternalTool, ExternalToolRequest, kubectl.get_request(platform)
     )
-    digest = await Get(Digest, MergeDigests([kubectl_tool.digest, request.input_digest]))
+
+    tool_relpath = "__kubectl"
+    immutable_input_digests = {
+        tool_relpath: kubectl_tool.digest,
+    }
 
     return Process(
         argv=argv,
-        input_digest=digest,
+        input_digest=request.input_digest,
         cache_scope=ProcessCacheScope.PER_SESSION,
         description=f"Applying kubernetes config {request.paths}",
         env=request.env,
+        immutable_input_digests=immutable_input_digests,
     )
 
 
