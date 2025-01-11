@@ -41,6 +41,7 @@
 //     "types-requests==2.28.1",
 //     "types-setuptools==62.6.1",
 //     "types-toml==0.10.8",
+//     "types-tqdm",
 //     "typing-extensions~=4.12",
 //     "urllib3<2",
 //     "uvicorn[standard]==0.17.6"
@@ -1993,6 +1994,26 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "a1f1c9cda5c2d8482d2c73957a5398bfdedda10f6bc7b3b4e812d5c910486d29",
+              "url": "https://files.pythonhosted.org/packages/e5/e9/9832ef6d017d12b6b4740d7c4dd4eab31867c92ab2c95331d5cb4632fb22/types_tqdm-4.67.0.20241221-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "e56046631056922385abe89aeb18af5611f471eadd7918a0ad7f34d84cd4c8cc",
+              "url": "https://files.pythonhosted.org/packages/0d/4f/70760ecc463f3383826666837f28d6e328ff28749fea7fd250f04c861708/types_tqdm-4.67.0.20241221.tar.gz"
+            }
+          ],
+          "project_name": "types-tqdm",
+          "requires_dists": [
+            "types-requests"
+          ],
+          "requires_python": ">=3.8",
+          "version": "4.67.0.20241221"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "9683bbb7fb72e32bfe9d2be6e04875fbe1b3eeec3cbb4ea231435aa7fd6b4f0e",
               "url": "https://files.pythonhosted.org/packages/11/7b/3fc711b2efea5e85a7a0bbfe269ea944aa767bbba5ec52f9ee45d362ccf3/types_urllib3-1.26.25.14-py3-none-any.whl"
             },
@@ -2383,6 +2404,7 @@
     "types-requests==2.28.1",
     "types-setuptools==62.6.1",
     "types-toml==0.10.8",
+    "types-tqdm",
     "typing-extensions~=4.12",
     "urllib3<2",
     "uvicorn[standard]==0.17.6"
