@@ -3,14 +3,13 @@
 
 from __future__ import annotations
 
-import os.path
 from abc import ABC
 from dataclasses import dataclass
 from typing import Iterable, Iterator, Sequence
 
 from pants.base.deprecated import warn_or_error
+from pants.engine.internals.native_engine import PyArgSplitter
 from pants.option.scope import ScopeInfo
-from pants.util.ordered_set import OrderedSet
 
 
 class ArgSplitterError(Exception):
@@ -79,23 +78,8 @@ class ArgSplitter:
     """
 
     def __init__(self, known_scope_infos: Iterable[ScopeInfo], buildroot: str) -> None:
-        self._buildroot = buildroot
-        self._known_scope_infos = known_scope_infos
         self._known_goal_scopes = dict(self._get_known_goal_scopes(known_scope_infos))
-        self._known_scopes = {si.scope for si in known_scope_infos} | set(
-            self._known_goal_scopes.keys()
-        )
-
-        # Holds aliases like `-h` for `--help`. Used for disambiguation with ignore specs like
-        # `-dir::`.
-        self._single_dash_goal_aliases = {
-            scope
-            for scope in self._known_goal_scopes.keys()
-            if scope.startswith("-") and not scope.startswith("--")
-        }
-
-        # We store in reverse order, for efficient popping off the end.
-        self._unconsumed_args: list[str] = []
+        self._native_arg_splitter = PyArgSplitter(buildroot, list(self._known_goal_scopes.keys()))
 
     @staticmethod
     def _get_known_goal_scopes(
@@ -109,73 +93,15 @@ class ArgSplitter:
                 yield alias, si
 
     def split_args(self, args: Sequence[str]) -> SplitArgs:
-        """Split the specified arg list.
+        native_split_args = self._native_arg_splitter.split_args(list(args))
 
-        args[0] is ignored.
-
-        Returns a SplitArgs tuple.
-        """
-        goals: OrderedSet[str] = OrderedSet()
-        specs: list[str] = []
-        passthru: list[str] = []
-        unknown_scopes: list[str] = []
         builtin_or_auxiliary_goal: str | None = None
+        canonical_goals = []
+        for goal in native_split_args.goals():
+            si = self._known_goal_scopes.get(goal)
+            if not si or not si.scope:
+                continue  # Should never happen.
 
-        def add_goal(scope: str) -> str:
-            """Returns the scope name to assign flags to."""
-            scope_info = self._known_goal_scopes.get(scope)
-            if not scope_info:
-                unknown_scopes.append(scope)
-                return scope
-
-            nonlocal builtin_or_auxiliary_goal
-            if (scope_info.is_builtin or scope_info.is_auxiliary) and (
-                not builtin_or_auxiliary_goal or scope.startswith("-")
-            ):
-                if builtin_or_auxiliary_goal:
-                    goals.add(builtin_or_auxiliary_goal)
-
-                # Get scope from info in case we hit an aliased builtin/auxiliary goal.
-                builtin_or_auxiliary_goal = scope_info.scope
-            else:
-                goals.add(scope_info.scope)
-
-            # Use builtin/auxiliary goal as default scope for args.
-            return builtin_or_auxiliary_goal or scope_info.scope
-
-        self._unconsumed_args = list(reversed(args))
-        # The first token is the binary name, so skip it.
-        self._unconsumed_args.pop()
-
-        self._consume_flags()
-        scope, flags = self._consume_scope()
-        while scope:
-            add_goal(scope)
-            scope, flags = self._consume_scope()
-
-        while self._unconsumed_args and not self._at_standalone_double_dash():
-            if self._at_flag():
-                self._unconsumed_args.pop()
-                continue
-
-            arg = self._unconsumed_args.pop()
-            if self.likely_a_spec(arg):
-                specs.append(arg)
-            else:
-                add_goal(arg)
-
-        if not builtin_or_auxiliary_goal:
-            if unknown_scopes and UNKNOWN_GOAL_NAME in self._known_goal_scopes:
-                builtin_or_auxiliary_goal = UNKNOWN_GOAL_NAME
-            elif not goals and NO_GOAL_NAME in self._known_goal_scopes:
-                builtin_or_auxiliary_goal = NO_GOAL_NAME
-
-        if self._at_standalone_double_dash():
-            self._unconsumed_args.pop()
-            passthru = list(reversed(self._unconsumed_args))
-
-        for goal in goals:
-            si = self._known_goal_scopes[goal]
             if (
                 si.deprecated_scope
                 and goal == si.deprecated_scope
@@ -188,73 +114,25 @@ class ArgSplitter:
                     f"The {si.deprecated_scope} goal was renamed to {si.subsystem_cls.options_scope}",
                 )
 
+            if (si.is_builtin or si.is_auxiliary) and (
+                builtin_or_auxiliary_goal is None or goal.startswith("-")
+            ):
+                if builtin_or_auxiliary_goal:
+                    canonical_goals.append(builtin_or_auxiliary_goal)
+                builtin_or_auxiliary_goal = si.scope
+            else:
+                canonical_goals.append(si.scope)
+
+        if not builtin_or_auxiliary_goal:
+            if native_split_args.unknown_goals() and UNKNOWN_GOAL_NAME in self._known_goal_scopes:
+                builtin_or_auxiliary_goal = UNKNOWN_GOAL_NAME
+            elif not canonical_goals and NO_GOAL_NAME in self._known_goal_scopes:
+                builtin_or_auxiliary_goal = NO_GOAL_NAME
+
         return SplitArgs(
             builtin_or_auxiliary_goal=builtin_or_auxiliary_goal,
-            goals=list(goals),
-            unknown_goals=unknown_scopes,
-            specs=specs,
-            passthru=passthru,
+            goals=canonical_goals,
+            unknown_goals=native_split_args.unknown_goals(),
+            specs=native_split_args.specs(),
+            passthru=native_split_args.passthru(),
         )
-
-    def likely_a_spec(self, arg: str) -> bool:
-        """Return whether `arg` looks like a spec, rather than a goal name."""
-        # Check if it's an ignore spec.
-        if (
-            arg.startswith("-")
-            and arg not in self._single_dash_goal_aliases
-            and not arg.startswith("--")
-        ):
-            return True
-        return any(c in arg for c in (os.path.sep, ".", ":", "*", "#")) or os.path.exists(
-            os.path.join(self._buildroot, arg)
-        )
-
-    def _consume_scope(self) -> tuple[str | None, list[str]]:
-        """Returns a pair (scope, list of flags encountered in that scope).
-
-        Note that the flag may be explicitly scoped, and therefore not actually belong to this scope.
-
-        For example, in:
-
-            pants --check-some-opt=100 check <target>
-
-        --check-some-opt should be treated as if it were --check-some-opt=100 in the check scope.
-        """
-        if not self._at_scope():
-            return None, []
-        scope = self._unconsumed_args.pop()
-        flags = self._consume_flags()
-        return scope, flags
-
-    def _consume_flags(self) -> list[str]:
-        """Read flags until we encounter the first token that isn't a flag."""
-        flags = []
-        while self._at_flag():
-            flag = self._unconsumed_args.pop()
-            flags.append(flag)
-        return flags
-
-    def _at_flag(self) -> bool:
-        if not self._unconsumed_args:
-            return False
-        arg = self._unconsumed_args[-1]
-        if not arg.startswith("--") and not self.is_level_short_arg(arg):
-            return False
-        return not self._at_standalone_double_dash() and not self._at_scope()
-
-    def _at_scope(self) -> bool:
-        return bool(self._unconsumed_args) and self._unconsumed_args[-1] in self._known_scopes
-
-    def _at_standalone_double_dash(self) -> bool:
-        """At the value `--`, used to start passthrough args."""
-        return bool(self._unconsumed_args) and self._unconsumed_args[-1] == "--"
-
-    def is_level_short_arg(self, arg: str) -> bool:
-        """We special case the `--level` global option to also be recognized with `-l`.
-
-        It's important that this be classified as a global option.
-
-        Note that we also need to recognize `-h` and `-v` as builtin goals. That is handled already
-        via `likely_a_spec()`.
-        """
-        return arg in {"-ltrace", "-ldebug", "-linfo", "-lwarn", "-lerror"}
