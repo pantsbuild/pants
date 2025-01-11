@@ -63,3 +63,4 @@ PyGithub==2.4.0
 
 # Only used in build-support/
 tqdm~=4.67.1
+types-tqdm
