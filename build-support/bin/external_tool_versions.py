@@ -19,6 +19,8 @@ from string import Formatter
 from urllib.parse import urlparse
 
 import requests
+from packaging.version import Version
+from tqdm import tqdm
 
 from pants.core.util_rules.external_tool import ExternalToolVersion
 
@@ -84,7 +86,7 @@ def fetch_version(
     url = url_template.format(version=version, platform=platform_mapping[platform])
     response = requests.get(url, allow_redirects=True)
     if response.status_code != 200:
-        logger.error("failed to fetch version: %s\n%s", version, response.text)
+        logger.debug("failed to fetch version: %s\n%s", version, response.text)
         return None
 
     size = len(response.content)
@@ -139,11 +141,11 @@ def main():
     domain = urlparse(cls.default_url_template).netloc
     get_versions = DOMAIN_TO_VERSIONS_MAPPING[domain]
     pool = ThreadPool(processes=args.workers)
-    results = []
+    futures = []
     for version in get_versions(cls.default_url_template, pool):
         for platform in platforms:
             logger.debug("fetching version: %s %s", version, platform)
-            results.append(
+            futures.append(
                 pool.apply_async(
                     fetch_version,
                     kwds=dict(
@@ -155,10 +157,12 @@ def main():
                 )
             )
 
-    for result in results:
-        v = result.get(timeout=60)
-        if v is None:
-            continue
+    results: list[ExternalToolVersion] = [
+        result for future in tqdm(futures) if (result := future.get(timeout=60)) is not None
+    ]
+    results.sort(key=lambda e: Version(e.version))
+
+    for v in results:
         print(
             "|".join(
                 [
