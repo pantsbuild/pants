@@ -6,6 +6,7 @@ Example:
 
 pants run build-support/bin:external-tool-versions -- --tool pants.backend.k8s.kubectl_subsystem:Kubectl > list.txt
 """
+
 import argparse
 import hashlib
 import importlib
@@ -13,22 +14,15 @@ import logging
 import re
 import xml.etree.ElementTree as ET
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass
 from multiprocessing.pool import ThreadPool
 from string import Formatter
 from urllib.parse import urlparse
 
 import requests
 
+from pants.core.util_rules.external_tool import ExternalToolVersion
+
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class VersionHash:
-    version: str
-    platform: str
-    size: int
-    sha256: str
 
 
 def format_string_to_regex(format_string: str) -> re.Pattern:
@@ -80,8 +74,14 @@ DOMAIN_TO_VERSIONS_MAPPING: dict[str, Callable[[str, ThreadPool], Iterator[str]]
 }
 
 
-def fetch_version(url_template: str, version: str, platform: str) -> VersionHash | None:
-    url = url_template.format(version=version, platform=platform)
+def fetch_version(
+    *,
+    url_template: str,
+    version: str,
+    platform: str,
+    platform_mapping: dict[str, str],
+) -> ExternalToolVersion | None:
+    url = url_template.format(version=version, platform=platform_mapping[platform])
     response = requests.get(url, allow_redirects=True)
     if response.status_code != 200:
         logger.error("failed to fetch version: %s\n%s", version, response.text)
@@ -89,10 +89,10 @@ def fetch_version(url_template: str, version: str, platform: str) -> VersionHash
 
     size = len(response.content)
     sha256 = hashlib.sha256(response.content)
-    return VersionHash(
+    return ExternalToolVersion(
         version=version,
         platform=platform,
-        size=size,
+        filesize=size,
         sha256=sha256.hexdigest(),
     )
 
@@ -135,20 +135,26 @@ def main():
 
     platforms = args.platforms.split(",")
     platform_mapping = cls.default_url_platform_mapping
-    mapped_platforms = {platform_mapping.get(p) for p in platforms}
 
     domain = urlparse(cls.default_url_template).netloc
     get_versions = DOMAIN_TO_VERSIONS_MAPPING[domain]
     pool = ThreadPool(processes=args.workers)
     results = []
     for version in get_versions(cls.default_url_template, pool):
-        for platform in mapped_platforms:
+        for platform in platforms:
             logger.debug("fetching version: %s %s", version, platform)
             results.append(
-                pool.apply_async(fetch_version, args=(cls.default_url_template, version, platform))
+                pool.apply_async(
+                    fetch_version,
+                    kwds=dict(
+                        version=version,
+                        platform=platform,
+                        url_template=cls.default_url_template,
+                        platform_mapping=platform_mapping,
+                    ),
+                )
             )
 
-    backward_platform_mapping = {v: k for k, v in platform_mapping.items()}
     for result in results:
         v = result.get(60)
         if v is None:
@@ -157,9 +163,9 @@ def main():
             "|".join(
                 [
                     v.version,
-                    backward_platform_mapping[v.platform],
+                    v.platform,
                     v.sha256,
-                    str(v.size),
+                    str(v.filesize),
                 ]
             )
         )
