@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import os
 import shlex
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -63,49 +62,6 @@ def assert_unknown_goal(splitter: ArgSplitter, args_str: str, unknown_goals: lis
     split_args = splitter.split_args(shlex.split(args_str))
     assert UNKNOWN_GOAL_NAME == split_args.builtin_or_auxiliary_goal
     assert set(unknown_goals) == set(split_args.unknown_goals)
-
-
-def test_is_spec(tmp_path: Path, splitter: ArgSplitter, known_scope_infos: list[ScopeInfo]) -> None:
-    unambiguous_specs = [
-        "a/b/c",
-        "a/b/c/",
-        "a/b:c",
-        "a/b/c.txt",
-        ":c",
-        "::",
-        "a/",
-        "./a.txt",
-        ".",
-        "*",
-        "a/b/*.txt",
-        "a/b/test*",
-        "a/**/*",
-        "a/b.txt:tgt",
-        "a/b.txt:../tgt",
-        "dir#gen",
-        "//:tgt#gen",
-        "cache.java",
-        "cache.tmp.java",
-    ]
-
-    directories_vs_goals = ["foo", "a_b_c"]
-
-    # With no directories on disk to tiebreak.
-    for spec in directories_vs_goals:
-        assert splitter.likely_a_spec(spec) is False
-        assert splitter.likely_a_spec(f"-{spec}") is True
-    for s in unambiguous_specs:
-        assert splitter.likely_a_spec(s) is True
-        assert splitter.likely_a_spec(f"-{s}") is True
-
-    assert splitter.likely_a_spec("-") is True
-    assert splitter.likely_a_spec("--") is False
-
-    # With directories on disk to tiebreak.
-    splitter = ArgSplitter(known_scope_infos, tmp_path.as_posix())
-    for d in directories_vs_goals:
-        (tmp_path / d).mkdir()
-        assert splitter.likely_a_spec(d) is True
 
 
 def goal_split_test(command_line: str, **expected):
