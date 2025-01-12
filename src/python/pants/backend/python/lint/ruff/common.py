@@ -6,9 +6,10 @@ from typing import Tuple
 from typing_extensions import assert_never
 
 from pants.backend.python.lint.ruff.subsystem import Ruff, RuffMode
+from pants.core.goals.lint import REPORT_DIR
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
-from pants.engine.fs import Digest, MergeDigests
+from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process
@@ -34,11 +35,23 @@ async def run_ruff(
         ConfigFiles, ConfigFilesRequest, ruff.config_request(request.snapshot.dirs)
     )
 
-    ruff_tool, config_files = await MultiGet(ruff_tool_get, config_files_get)
+    # Ensure that the empty report dir exists.
+    report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))
+
+    ruff_tool, config_files, report_directory = await MultiGet(
+        ruff_tool_get, config_files_get, report_directory_digest_get
+    )
 
     input_digest = await Get(
         Digest,
-        MergeDigests((ruff_tool.digest, request.snapshot.digest, config_files.snapshot.digest)),
+        MergeDigests(
+            (
+                ruff_tool.digest,
+                request.snapshot.digest,
+                config_files.snapshot.digest,
+                report_directory,
+            )
+        ),
     )
 
     conf_args = [f"--config={ruff.config}"] if ruff.config else []
@@ -64,6 +77,7 @@ async def run_ruff(
             argv=(ruff_tool.exe, *initial_args, *conf_args, *ruff.args, *request.snapshot.files),
             input_digest=input_digest,
             output_files=request.snapshot.files,
+            output_directories=(REPORT_DIR,) if request.mode is RuffMode.LINT else (),
             description=f"Run ruff {' '.join(initial_args)} on {pluralize(len(request.snapshot.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),

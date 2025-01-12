@@ -73,7 +73,7 @@ class PantsRunner:
         self.scrub_pythonpath()
 
         options_bootstrapper = OptionsBootstrapper.create(
-            env=self.env, args=self.args, allow_pantsrc=True
+            args=self.args, env=self.env, allow_pantsrc=True
         )
         with warnings.catch_warnings(record=True):
             bootstrap_options = options_bootstrapper.bootstrap_options

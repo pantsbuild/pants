@@ -357,20 +357,17 @@ def inner_rule(*args, **kwargs) -> AsyncRuleT | RuleDecorator:
 
 
 @overload
-def rule(func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Coroutine[Any, Any, R]]:
-    ...
+def rule(func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Coroutine[Any, Any, R]]: ...
 
 
 @overload
-def rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]:
-    ...
+def rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]: ...
 
 
 @overload
 def rule(
     *args, func: None = None, **kwargs: Any
-) -> Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]:
-    ...
+) -> Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]: ...
 
 
 def rule(*args, **kwargs):
@@ -378,20 +375,17 @@ def rule(*args, **kwargs):
 
 
 @overload
-def goal_rule(func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Coroutine[Any, Any, R]]:
-    ...
+def goal_rule(func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Coroutine[Any, Any, R]]: ...
 
 
 @overload
-def goal_rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]:
-    ...
+def goal_rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]: ...
 
 
 @overload
 def goal_rule(
     *args, func: None = None, **kwargs: Any
-) -> Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]:
-    ...
+) -> Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]: ...
 
 
 def goal_rule(*args, **kwargs):
@@ -403,20 +397,17 @@ def goal_rule(*args, **kwargs):
 @overload
 def _uncacheable_rule(
     func: Callable[P, Coroutine[Any, Any, R]]
-) -> Callable[P, Coroutine[Any, Any, R]]:
-    ...
+) -> Callable[P, Coroutine[Any, Any, R]]: ...
 
 
 @overload
-def _uncacheable_rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]:
-    ...
+def _uncacheable_rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]: ...
 
 
 @overload
 def _uncacheable_rule(
     *args, func: None = None, **kwargs: Any
-) -> Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]:
-    ...
+) -> Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]: ...
 
 
 # This has a "private" name, as we don't (yet?) want it to be part of the rule API, at least

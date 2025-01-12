@@ -111,23 +111,19 @@ def safe_file_dump(
 
 
 @overload
-def maybe_read_file(filename: str) -> str | None:
-    ...
+def maybe_read_file(filename: str) -> str | None: ...
 
 
 @overload
-def maybe_read_file(filename: str, binary_mode: Literal[False]) -> str | None:
-    ...
+def maybe_read_file(filename: str, binary_mode: Literal[False]) -> str | None: ...
 
 
 @overload
-def maybe_read_file(filename: str, binary_mode: Literal[True]) -> bytes | None:
-    ...
+def maybe_read_file(filename: str, binary_mode: Literal[True]) -> bytes | None: ...
 
 
 @overload
-def maybe_read_file(filename: str, binary_mode: bool) -> bytes | str | None:
-    ...
+def maybe_read_file(filename: str, binary_mode: bool) -> bytes | str | None: ...
 
 
 def maybe_read_file(filename: str, binary_mode: bool = False) -> bytes | str | None:
@@ -144,23 +140,19 @@ def maybe_read_file(filename: str, binary_mode: bool = False) -> bytes | str | N
 
 
 @overload
-def read_file(filename: str) -> str:
-    ...
+def read_file(filename: str) -> str: ...
 
 
 @overload
-def read_file(filename: str, binary_mode: Literal[False]) -> str:
-    ...
+def read_file(filename: str, binary_mode: Literal[False]) -> str: ...
 
 
 @overload
-def read_file(filename: str, binary_mode: Literal[True]) -> bytes:
-    ...
+def read_file(filename: str, binary_mode: Literal[True]) -> bytes: ...
 
 
 @overload
-def read_file(filename: str, binary_mode: bool) -> bytes | str:
-    ...
+def read_file(filename: str, binary_mode: bool) -> bytes | str: ...
 
 
 def read_file(filename: str, binary_mode: bool = False) -> bytes | str:

@@ -1,6 +1,10 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+pub mod arg_splitter;
+#[cfg(test)]
+mod arg_splitter_tests;
+
 mod args;
 #[cfg(test)]
 mod args_tests;
@@ -41,6 +45,7 @@ mod types;
 use std::any::Any;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Debug;
+use std::fs;
 use std::hash::Hash;
 use std::path::Path;
 use std::sync::Arc;
@@ -380,11 +385,25 @@ impl OptionParser {
         let config_sources = match config_sources {
             Some(cs) => cs,
             None => {
+                // If a pants.toml exists at the build root, use it as the default config file
+                // if no config files were explicitly specified via --pants-config-files
+                // (or PANTS_CONFIG_FILES).
+                // If it doesn't exist, proceed with no config files. We don't need to error
+                // if no config file exists (we may error later if an option value is not
+                // provided).
+                // In regular usage there is always a config file in practice, but there may not
+                // be in some obscure test scenarios.
                 let default_config_path = path_join(&buildroot_string, "pants.toml");
+                let default_config_paths =
+                    if fs::exists(Path::new(&default_config_path)).map_err(|e| e.to_string())? {
+                        vec![default_config_path]
+                    } else {
+                        vec![]
+                    };
                 let config_paths = parser
                     .parse_string_list(
                         &option_id!("pants", "config", "files"),
-                        vec![default_config_path],
+                        default_config_paths,
                     )?
                     .value;
                 config_paths
@@ -746,6 +765,17 @@ impl OptionParser {
             source: highest_priority_source,
             value: apply_dict_edits(edits.into_iter()),
         })
+    }
+
+    // Return the config files used by this parser. Useful for testing config file discovery.
+    pub fn get_config_file_paths(&self) -> Vec<String> {
+        let mut ret = vec![];
+        for source in self.sources.keys() {
+            if let Source::Config { ordinal: _, path } = source {
+                ret.push(path.to_owned());
+            }
+        }
+        ret
     }
 
     pub fn get_args(&self) -> Result<Vec<String>, String> {

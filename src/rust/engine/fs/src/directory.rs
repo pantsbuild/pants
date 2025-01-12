@@ -650,7 +650,15 @@ impl DigestTrie {
                     link_depth += 1;
                     if s.target == Component::CurDir.as_os_str() {
                         if link_depth >= MAX_LINK_DEPTH {
-                            warn!("Exceeded the maximum link depth while traversing links. Stopping traversal.");
+                            let mut logical_path = PathBuf::new();
+                            for component in path_so_far.components() {
+                                let cs = component.as_os_str();
+                                logical_path.push(cs);
+                                if cs == entry.name().as_str() {
+                                    break;
+                                }
+                            }
+                            warn!("Exceeded the maximum link depth while traversing link {:#?} to path {:#?}. Stopping traversal.", logical_path, s.target);
                             return;
                         }
                         self.walk_helper(root, path.clone(), symlink_behavior, link_depth, f);
@@ -958,7 +966,7 @@ impl DigestTrie {
 
             if let Some(Entry::Symlink(s)) = maybe_matching_entry {
                 if link_depth >= MAX_LINK_DEPTH {
-                    warn!("Exceeded the maximum link depth while traversing links. Stopping traversal.");
+                    warn!("Exceeded the maximum link depth while traversing link {:#?} to path {:#?}. Stopping traversal.", logical_path, s.target);
                     return Ok(None);
                 }
 

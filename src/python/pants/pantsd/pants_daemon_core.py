@@ -29,8 +29,7 @@ class PantsServicesConstructor(Protocol):
         self,
         bootstrap_options: OptionValueContainer,
         graph_scheduler: GraphScheduler,
-    ) -> PantsServices:
-        ...
+    ) -> PantsServices: ...
 
 
 class PantsDaemonCore:
