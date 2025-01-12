@@ -86,7 +86,7 @@ class ThingHelpBuiltinGoalBase(HelpBuiltinGoalBase):
 
     def create_help_request(self, options: Options) -> HelpRequest:
         # Include the `options.specs` for things to give help on, as args with any . : * or # in
-        # them is deemed "likely a spec" by `pants.option.arg_splitter:ArgSplitter.likely_a_spec()`.
+        # them is deemed "likely a spec" by the arg splitter.
         # We want to support getting help on API types that may contain periods.
         return ThingHelp(
             advanced=self._advanced,

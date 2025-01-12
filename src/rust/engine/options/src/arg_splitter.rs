@@ -1,9 +1,10 @@
 // Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use crate::GoalInfo;
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 lazy_static! {
@@ -22,17 +23,22 @@ pub struct SplitArgs {
 
 pub struct ArgSplitter {
     build_root: PathBuf,
-    known_goal_names: HashSet<String>,
+    known_goals: HashMap<String, GoalInfo>,
 }
 
 impl ArgSplitter {
-    pub fn new<'a, I: IntoIterator<Item = &'a str>>(
-        build_root: &Path,
-        known_goal_names: I,
-    ) -> ArgSplitter {
+    pub fn new<I: IntoIterator<Item = GoalInfo>>(build_root: &Path, known_goals: I) -> ArgSplitter {
+        let mut known_goals_map = HashMap::new();
+        for goal_info in known_goals.into_iter() {
+            for alias in &goal_info.aliases {
+                known_goals_map.insert(alias.to_owned(), goal_info.clone());
+            }
+            known_goals_map.insert(goal_info.scope_name.to_owned(), goal_info);
+        }
+
         ArgSplitter {
             build_root: build_root.to_owned(),
-            known_goal_names: known_goal_names.into_iter().map(str::to_string).collect(),
+            known_goals: known_goals_map,
         }
     }
 
@@ -60,7 +66,7 @@ impl ArgSplitter {
         while let Some(arg) = unconsumed_args.pop() {
             // Some special flags, such as `-v` and `--help`, are implemented as
             // goal aliases, so we must check this before checking for any dash prefixes.
-            if self.known_goal_names.contains(&arg) {
+            if self.known_goals.contains_key(arg.as_str()) {
                 goals.push(arg);
             } else if arg == "--" {
                 // Arg is the passthru delimiter.

@@ -5,11 +5,10 @@ use pyo3::exceptions::PyException;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
 use pyo3::{prelude::*, BoundObject};
 
-use options::arg_splitter::{ArgSplitter, SplitArgs};
 use options::{
-    apply_dict_edits, apply_list_edits, Args, ConfigSource, DictEdit, DictEditAction, Env,
-    ListEdit, ListEditAction, ListOptionValue, OptionId, OptionParser, OptionalOptionValue, Scope,
-    Source, Val,
+    apply_dict_edits, apply_list_edits, ArgSplitter, Args, ConfigSource, DictEdit, DictEditAction,
+    Env, GoalInfo, ListEdit, ListEditAction, ListOptionValue, OptionId, OptionParser,
+    OptionalOptionValue, Scope, Source, SplitArgs, Val,
 };
 
 use itertools::Itertools;
@@ -19,6 +18,7 @@ use std::path::Path;
 pyo3::import_exception!(pants.option.errors, ParseError);
 
 pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PyGoalInfo>()?;
     m.add_class::<PyOptionId>()?;
     m.add_class::<PySplitArgs>()?;
     m.add_class::<PyArgSplitter>()?;
@@ -118,6 +118,27 @@ pub(crate) fn py_object_to_val(obj: &Bound<'_, PyAny>) -> Result<Val, PyErr> {
 }
 
 #[pyclass]
+struct PyGoalInfo(GoalInfo);
+
+#[pymethods]
+impl PyGoalInfo {
+    #[new]
+    fn __new__(
+        scope_name: &str,
+        is_builtin: bool,
+        is_auxiliary: bool,
+        aliases: Vec<String>,
+    ) -> Self {
+        Self(GoalInfo::new(
+            scope_name,
+            is_builtin,
+            is_auxiliary,
+            aliases.iter().map(String::as_ref),
+        ))
+    }
+}
+
+#[pyclass]
 struct PyOptionId(OptionId);
 
 #[pymethods]
@@ -178,12 +199,12 @@ struct PyArgSplitter(ArgSplitter);
 #[pymethods]
 impl PyArgSplitter {
     #[new]
-    fn __new__(build_root: &str, known_goal_names: Vec<String>) -> Self {
+    fn __new__(build_root: &str, known_goals: Vec<Bound<'_, PyGoalInfo>>) -> Self {
         Self(ArgSplitter::new(
             Path::new(build_root),
-            known_goal_names
+            known_goals
                 .iter()
-                .map(AsRef::as_ref)
+                .map(|pgi| pgi.borrow().0.clone())
                 .collect::<Vec<_>>(),
         ))
     }

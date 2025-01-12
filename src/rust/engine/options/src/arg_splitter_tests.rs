@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use crate::arg_splitter::{ArgSplitter, SplitArgs};
+use crate::scope::GoalInfo;
 use shlex;
 use std::fs::File;
 use std::path::Path;
@@ -15,17 +16,13 @@ fn shlex_and_split_args(build_root: Option<&Path>, args_str: &str) -> SplitArgs 
     ArgSplitter::new(
         &build_root.unwrap_or(TempDir::new().unwrap().path()),
         vec![
-            "run",
-            "check",
-            "fmt",
-            "test",
-            "help",
-            "jvm",
-            "bsp",
-            "-v",
-            "-h",
-            "--help",
-            "--help-advanced",
+            GoalInfo::new("run", false, false, vec![]),
+            GoalInfo::new("check", false, false, vec![]),
+            GoalInfo::new("fmt", false, false, vec![]),
+            GoalInfo::new("test", false, false, vec![]),
+            GoalInfo::new("help", true, false, vec!["-h", "--help", "--help-advanced"]),
+            GoalInfo::new("bsp", false, true, vec![]),
+            GoalInfo::new("version", true, false, vec!["-v", "-V"]),
         ],
     )
     .split_args(shlex::split(args_str).unwrap())
