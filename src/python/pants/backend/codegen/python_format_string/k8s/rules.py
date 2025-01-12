@@ -1,3 +1,5 @@
+# Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, Snapshot
@@ -10,12 +12,12 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 
-from experimental.codegen.python_format_string.target_types import (
+from pants.backend.codegen.python_format_string.target_types import (
     PythonFormatStringOutputPathField,
     PythonFormatStringSourceField,
     PythonFormatStringValuesField,
 )
-from experimental.k8s.targets import K8sSourceField
+from pants.backend.k8s.target_types import K8sSourceField
 
 
 class GenerateK8sSourceFromPythonFormatStringRequest(GenerateSourcesRequest):
@@ -43,10 +45,10 @@ async def generate_k8s_source(request: GenerateK8sSourceFromPythonFormatStringRe
         rendered = content.format(**values)
     except KeyError as e:
         raise ValueError(
-            f"missing key in target `{format_string_target.address}`: {e}, provided values: {values}"
+            f"Missing key in target `{format_string_target.address}`: {e}, provided values: {values}"
         ) from e
     except IndexError as e:
-        raise ValueError(f"failed to render target `{format_string_target.address}`") from e
+        raise ValueError(f"Failed to render target `{format_string_target.address}`") from e
 
     path = format_string_target[PythonFormatStringOutputPathField].value_or_default(file_ending="rendered")
     snapshot = await Get(
