@@ -113,3 +113,61 @@ which will only have access to a single context, set the
 `[kubectl].pass_context` to false in `pants.toml` to have them use their
 default context.
 :::
+
+## Simple templates
+
+To use docker images you most likely will need some templating. This is because
+your docker image tags will be probably versioned. The simplest way to
+introduce templating is to use `python_format_string` target that will generate
+`k8s_sources` based on values you provide in the BUILD file.
+
+First, add the codegen backend:
+
+```toml title="pants.toml"
+backend_packages = [
+    ...
+    "pants.backend.experimental.k8s",
+    "pants.backend.experimental.codegen.python_format_string",
+    "pants.backend.experimental.codegen.python_format_string.k8s",
+    ...
+]
+```
+
+Then parametrize the yaml using python format string syntax:
+
+```yaml title="src/k8s/webpages.yaml
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: webpages
+  namespace: {namespace}
+data:
+  index.html: |
+    <html>
+      <head>Hello pants!</head>
+      <body>Hello pants!</body>
+    </html>
+```
+
+Now replace `k8s_sources` with a `python_format_string` target and pass the
+namespace value:
+
+```python title="src/k8s/BUILD"
+python_format_string(
+    name="webpages-template",
+    source="webpages.yaml",
+    values={"namespace": "web"},
+)
+k8s_bundle(
+    name="webpages",
+    sources=("src/k8s:webpages-template",),
+    context="kind-kind",
+)
+```
+
+Now you can deploy the bundle:
+
+```bash
+pants experimental-deploy src/k8s/:webpages
+```
