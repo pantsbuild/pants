@@ -33,20 +33,20 @@ The Kubernetes backend adds [`k8s_source`](../../reference/targets/k8s_source.md
 files. The `tailor` goal will automatically generate the targets for
 your .yaml files.
 
-For example, create a file `src/k8s/configmap.yaml`:
+For example, create a file `src/k8s/webpages.yaml`:
 
-```yaml title="src/k8s/configmap.yaml"
+```yaml title="src/k8s/webpages.yaml"
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: spark-defaults-conf
+  name: webpages
 data:
-  spark-defaults.conf: |
-    spark.driver.memory=1g
-    spark.executor.cores=1
-    spark.executor.instances=1
-    spark.executor.memory=2g
+  index.html: |
+    <html>
+      <head>Hello pants!</head>
+      <body>Hello pants!</body>
+    </html>
 ```
 
 Now run:
@@ -94,8 +94,8 @@ Third, create a deployable target `k8s_bundle` in `src/k8s/BUILD`:
 ```python title="src/k8s/BUILD"
 k8s_sources()
 k8s_bundle(
-    name="configmap",
-    sources=("src/k8s/configmap.yaml",),
+    name="webpages",
+    sources=("src/k8s/webpages.yaml",),
     context="kind-kind",
 )
 ```
@@ -103,9 +103,9 @@ k8s_bundle(
 Now you can deploy the target:
 
 ```bash
-pants experimental-deploy src/k8s:configmap
+pants experimental-deploy src/k8s:webpages
 ```
 ```
-✓ src/k8s:configmap deployed to context kind-kind
+✓ src/k8s:webpages deployed to context kind-kind
 ```
 
