@@ -382,22 +382,33 @@ async def add_corepack_shims_to_digest(
 
 @rule(level=LogLevel.DEBUG)
 async def node_process_environment(
-    binaries: NodeJSBinaries, nodejs: NodeJS.EnvironmentAware
+    binaries: NodeJSBinaries,
+    nodejs: NodeJS,
+    nodejs_environment: NodeJS.EnvironmentAware,
+    platform: Platform,
 ) -> NodeJSProcessEnvironment:
     default_required_tools = ["sh", "bash"]
     tools_used_by_setup_scripts = ["mkdir", "rm", "touch", "which"]
     pnpm_shim_tools = ["sed", "dirname"]
+
+    additional_tools = nodejs.tools
+    if platform.is_macos:
+        additional_tools.extend(nodejs.macos_tools)
+
     binary_shims = await Get(
         BinaryShims,
         BinaryShimsRequest.for_binaries(
             *default_required_tools,
             *tools_used_by_setup_scripts,
             *pnpm_shim_tools,
+            *additional_tools,
             rationale="execute a nodejs process",
-            search_path=nodejs.executable_search_path,
+            search_path=nodejs_environment.executable_search_path,
         ),
     )
-    corepack_env_vars = await Get(EnvironmentVars, EnvironmentVarsRequest(nodejs.corepack_env_vars))
+    corepack_env_vars = await Get(
+        EnvironmentVars, EnvironmentVarsRequest(nodejs_environment.corepack_env_vars)
+    )
     binary_digest_with_shims = await add_corepack_shims_to_digest(
         binaries, binary_shims, corepack_env_vars
     )
