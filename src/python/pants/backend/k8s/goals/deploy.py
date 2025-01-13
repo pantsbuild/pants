@@ -136,7 +136,8 @@ async def run_k8s_deploy(
 async def kubectl_apply_process(
     request: KubectlApply, platform: Platform, kubectl: Kubectl
 ) -> Process:
-    argv: tuple[str, ...] = (kubectl.generate_exe(platform),)
+    tool_relpath = "__kubectl"
+    argv: tuple[str, ...] = (f"{tool_relpath}/{kubectl.generate_exe(platform)}",)
 
     if request.context is not None:
         argv += ("--context", request.context)
@@ -150,7 +151,6 @@ async def kubectl_apply_process(
         DownloadedExternalTool, ExternalToolRequest, kubectl.get_request(platform)
     )
 
-    tool_relpath = "__kubectl"
     immutable_input_digests = {
         tool_relpath: kubectl_tool.digest,
     }
