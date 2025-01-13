@@ -159,6 +159,38 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
             return f"{self.package_manager}@{self.package_managers[self.package_manager]}"
         return self.package_manager
 
+    _tools = StrListOption(
+        default=[],
+        help=softwrap(
+            """
+            List any additional executable tools required for node processes to work. The paths to
+            these tools will be included in the PATH used in the execution sandbox, so that
+            they may be used by nodejs processes execution.
+            """
+        ),
+        advanced=True,
+    )
+
+    _macos_tools = StrListOption(
+        default=[],
+        help=softwrap(
+            """
+            List any additional executable tools required for node processes to work on macOS.
+            The paths to these tools will be included in the PATH used in the execution sandbox,
+            so that they may be used by nodejs processes execution.
+            """
+        ),
+        advanced=True,
+    )
+
+    @property
+    def tools(self) -> tuple[str, ...]:
+        return tuple(sorted(set(self._tools)))
+
+    @property
+    def macos_tools(self) -> tuple[str, ...]:
+        return tuple(sorted(set(self._macos_tools)))
+
     class EnvironmentAware(ExecutableSearchPathsOptionMixin, Subsystem.EnvironmentAware):
         search_path = StrListOption(
             default=["<PATH>"],
