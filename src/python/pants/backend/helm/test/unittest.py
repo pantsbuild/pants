@@ -65,8 +65,8 @@ logger = logging.getLogger(__name__)
 
 
 class MissingUnitTestChartDependency(Exception):
-    f"""Indicates that no chart has been found as dependency of the `{HelmUnitTestTestTarget.alias}` or
-    `{HelmUnitTestTestsGeneratorTarget.alias}` targets."""
+    """Indicates that no chart has been found as dependency of the `HelmUnitTestTestTarget` or
+    `HelmUnitTestTestsGeneratorTarget` targets."""
 
     def __init__(self, address: Address) -> None:
         super().__init__(
