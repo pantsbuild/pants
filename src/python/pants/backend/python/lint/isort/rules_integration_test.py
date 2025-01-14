@@ -9,7 +9,11 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.lint.isort.rules import IsortFieldSet, IsortRequest
+from pants.backend.python.lint.isort.rules import (
+    IsortFieldSet,
+    IsortPartitionMetadata,
+    IsortRequest,
+)
 from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.lint.isort.subsystem import rules as isort_subsystem_rules
@@ -22,6 +26,7 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.util.frozendict import FrozenDict
 
 
 @pytest.fixture
@@ -72,7 +77,9 @@ def run_isort(
             IsortRequest.Batch(
                 "",
                 input_sources.snapshot.files,
-                partition_metadata=None,
+                partition_metadata=IsortPartitionMetadata(
+                    FrozenDict({file: tuple() for file in input_sources.snapshot.files})
+                ),
                 snapshot=input_sources.snapshot,
             ),
         ],
