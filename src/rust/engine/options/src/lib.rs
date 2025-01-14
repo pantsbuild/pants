@@ -37,6 +37,10 @@ mod parse;
 #[cfg(test)]
 mod parse_tests;
 
+mod scope;
+#[cfg(test)]
+mod scope_tests;
+
 #[cfg(test)]
 mod tests;
 
@@ -61,7 +65,8 @@ use self::env::EnvReader;
 use crate::fromfile::FromfileExpander;
 use crate::parse::Parseable;
 pub use build_root::BuildRoot;
-pub use id::{OptionId, Scope};
+pub use id::OptionId;
+pub use scope::Scope;
 pub use types::OptionType;
 
 // NB: The legacy Python options parser supported dicts with member_type "Any", which means
