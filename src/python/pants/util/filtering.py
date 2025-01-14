@@ -14,6 +14,31 @@ Filter = Callable[[_T], bool]
 TargetFilter = Callable[["Target"], bool]
 
 
+def _reduce_predicates(predicate_params: Iterable[str]) -> Iterable[str]:
+    """Reduce a list of potentially conflicting predicates into a set of non-conflicting predicates.
+
+    Priority is given to later tags in the list, so that a late opt-in or opt-out will override an earlier opt-in or opt-out.
+
+    :param predicate_params: A list of predicate_param arguments as in `create_filter`.
+    """
+
+    seen = set()
+    out = []
+    for param in reversed(predicate_params):
+        modifier = ""
+        if param.startswith("-") or param.startswith("+"):
+            modifier = param[0]
+            param = param[1:]
+
+        if param in seen:
+            continue
+
+        seen.add(param)
+        out.append(f"{modifier}{param}")
+
+    return reversed(out)
+
+
 def _extract_modifier(modified_param: str) -> Tuple[Callable[[bool], bool], str]:
     if modified_param.startswith("-"):
         return operator.not_, modified_param[1:]
@@ -59,6 +84,9 @@ def create_filters(
 
     :API: public
     """
+
+    predicate_params = _reduce_predicates(predicate_params)
+
     filters = []
     for predicate_param in predicate_params:
         filters.append(create_filter(predicate_param, predicate_factory))
