@@ -158,19 +158,17 @@ impl Provider {
             );
         }
 
-        let mut reader = reader
-            .into_futures_async_read(..)
-            .await
-            .map_err(|e| format!("failed to convert reader for {}: {}", path, e))?
-            .compat();
+        let mut reader = match reader.into_futures_async_read(..).await {
+            Ok(reader) => reader.compat(),
+            Err(e) if e.kind() == opendal::ErrorKind::NotFound => return Ok(false),
+            Err(e) => return Err(format!("failed to convert reader for {}: {}", path, e)),
+        };
+
         match mode {
             LoadMode::Validate => {
-                let correct_digest =
-                    match async_verified_copy(digest, false, &mut reader, destination).await {
-                        Ok(correct_digest) => correct_digest,
-                        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
-                        Err(e) => return Err(format!("failed to read {}: {}", path, e)),
-                    };
+                let correct_digest = async_verified_copy(digest, false, &mut reader, destination)
+                    .await
+                    .map_err(|e| format!("failed to read {}: {}", path, e))?;
 
                 if !correct_digest {
                     // TODO: include the actual digest here
@@ -178,11 +176,9 @@ impl Provider {
                 }
             }
             LoadMode::NoValidate => {
-                match tokio::io::copy(&mut reader, destination).await {
-                    Ok(result) => result,
-                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
-                    Err(e) => return Err(format!("failed to read {}: {}", path, e)),
-                };
+                tokio::io::copy(&mut reader, destination)
+                    .await
+                    .map_err(|e| format!("failed to read {}: {}", path, e))?;
             }
         }
         Ok(true)
