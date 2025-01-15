@@ -56,6 +56,7 @@ use std::sync::Arc;
 
 use serde::Deserialize;
 
+pub use self::arg_splitter::{ArgSplitter, SplitArgs};
 pub use self::args::Args;
 use self::args::ArgsReader;
 pub use self::config::ConfigSource;
@@ -66,7 +67,7 @@ use crate::fromfile::FromfileExpander;
 use crate::parse::Parseable;
 pub use build_root::BuildRoot;
 pub use id::OptionId;
-pub use scope::Scope;
+pub use scope::{GoalInfo, Scope};
 pub use types::OptionType;
 
 // NB: The legacy Python options parser supported dicts with member_type "Any", which means

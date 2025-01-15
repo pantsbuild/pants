@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Iterable, Iterator, Sequence
 
 from pants.base.deprecated import warn_or_error
-from pants.engine.internals.native_engine import PyArgSplitter
+from pants.engine.internals.native_engine import PyArgSplitter, PyGoalInfo
 from pants.option.scope import ScopeInfo
 
 
@@ -79,7 +79,12 @@ class ArgSplitter:
 
     def __init__(self, known_scope_infos: Iterable[ScopeInfo], buildroot: str) -> None:
         self._known_goal_scopes = dict(self._get_known_goal_scopes(known_scope_infos))
-        self._native_arg_splitter = PyArgSplitter(buildroot, list(self._known_goal_scopes.keys()))
+        native_known_goals = tuple(
+            PyGoalInfo(si.scope, si.is_builtin, si.is_auxiliary, si.scope_aliases)
+            for si in known_scope_infos
+            if si.is_goal
+        )
+        self._native_arg_splitter = PyArgSplitter(buildroot, native_known_goals)
 
     @staticmethod
     def _get_known_goal_scopes(
@@ -93,7 +98,7 @@ class ArgSplitter:
                 yield alias, si
 
     def split_args(self, args: Sequence[str]) -> SplitArgs:
-        native_split_args = self._native_arg_splitter.split_args(list(args))
+        native_split_args = self._native_arg_splitter.split_args(tuple(args))
 
         builtin_or_auxiliary_goal: str | None = None
         canonical_goals = []
