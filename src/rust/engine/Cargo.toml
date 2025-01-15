@@ -215,7 +215,7 @@ default-members = [
 # https://doc.rust-lang.org/nightly/cargo/reference/specifying-dependencies.html#\
 #  inheriting-a-dependency-from-a-workspace
 [workspace.dependencies]
-arc-swap = "1.6"
+arc-swap = "1.7"
 async-lock = "2.8"
 async-oncecell = "0.2"
 async-stream = "0.3"
