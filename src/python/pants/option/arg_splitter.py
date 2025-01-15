@@ -100,8 +100,6 @@ class ArgSplitter:
     def split_args(self, args: Sequence[str]) -> SplitArgs:
         native_split_args = self._native_arg_splitter.split_args(tuple(args))
 
-        builtin_or_auxiliary_goal: str | None = None
-        canonical_goals = []
         for goal in native_split_args.goals():
             si = self._known_goal_scopes.get(goal)
             if not si or not si.scope:
@@ -119,24 +117,9 @@ class ArgSplitter:
                     f"The {si.deprecated_scope} goal was renamed to {si.subsystem_cls.options_scope}",
                 )
 
-            if (si.is_builtin or si.is_auxiliary) and (
-                builtin_or_auxiliary_goal is None or goal.startswith("-")
-            ):
-                if builtin_or_auxiliary_goal:
-                    canonical_goals.append(builtin_or_auxiliary_goal)
-                builtin_or_auxiliary_goal = si.scope
-            else:
-                canonical_goals.append(si.scope)
-
-        if not builtin_or_auxiliary_goal:
-            if native_split_args.unknown_goals() and UNKNOWN_GOAL_NAME in self._known_goal_scopes:
-                builtin_or_auxiliary_goal = UNKNOWN_GOAL_NAME
-            elif not canonical_goals and NO_GOAL_NAME in self._known_goal_scopes:
-                builtin_or_auxiliary_goal = NO_GOAL_NAME
-
         return SplitArgs(
-            builtin_or_auxiliary_goal=builtin_or_auxiliary_goal,
-            goals=canonical_goals,
+            builtin_or_auxiliary_goal=native_split_args.builtin_or_auxiliary_goal(),
+            goals=native_split_args.goals(),
             unknown_goals=native_split_args.unknown_goals(),
             specs=native_split_args.specs(),
             passthru=native_split_args.passthru(),
