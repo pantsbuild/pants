@@ -66,6 +66,9 @@
 #
 # NOTE: If you edit this file, run `packer fmt build-support/packer/runson/runson.pkr.hcl` to format it
 #       and `packer validate build-support/packer/runson/runson.pkr.hcl` to validate it.
+#
+# See https://runs-on.com/guides/building-custom-ami-with-packer/ for RunsOn's documentation relating
+# to generating compatible AMIs with Packer.
 
 packer {
   required_plugins {
