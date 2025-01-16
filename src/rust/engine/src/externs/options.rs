@@ -176,6 +176,10 @@ struct PySplitArgs(SplitArgs);
 
 #[pymethods]
 impl PySplitArgs {
+    fn builtin_or_auxiliary_goal(&self) -> &Option<String> {
+        &self.0.builtin_or_auxiliary_goal
+    }
+
     fn goals(&self) -> &Vec<String> {
         &self.0.goals
     }
