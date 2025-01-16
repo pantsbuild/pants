@@ -10,8 +10,8 @@ use std::path::{Path, PathBuf};
 // These are the names for the built in goals to print help message when there is no goal, or any
 // unknown goals respectively. They begin with underlines to exclude them from the list of goals in
 // the goal help output.
-pub static NO_GOAL_NAME: &str = "__no_goal";
-pub static UNKNOWN_GOAL_NAME: &str = "__unknown_goal";
+pub const NO_GOAL_NAME: &str = "__no_goal";
+pub const UNKNOWN_GOAL_NAME: &str = "__unknown_goal";
 
 lazy_static! {
     static ref SPEC_RE: Regex = Regex::new(r"[/\\.:*#]").unwrap();
@@ -76,16 +76,16 @@ impl ArgSplitter {
             // Some special flags, such as `-v` and `--help`, are implemented as
             // goal aliases, so we must check this before checking for any dash prefixes.
             if let Some(goal_info) = goal_info {
-                let canoncal_scope_name = goal_info.scope_name.clone();
+                let canonical_scope_name = goal_info.scope_name.clone();
                 if (goal_info.is_auxiliary || goal_info.is_builtin)
                     && (builtin_or_auxiliary_goal.is_none() || arg.starts_with("-"))
                 {
                     if let Some(boag) = builtin_or_auxiliary_goal {
                         goals.push(boag);
                     }
-                    builtin_or_auxiliary_goal = Some(canoncal_scope_name);
+                    builtin_or_auxiliary_goal = Some(canonical_scope_name);
                 } else {
-                    goals.push(canoncal_scope_name);
+                    goals.push(canonical_scope_name);
                 }
             } else if arg == "--" {
                 // Arg is the passthru delimiter.

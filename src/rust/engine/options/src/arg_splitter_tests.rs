@@ -32,6 +32,7 @@ fn shlex_and_split_args(build_root: Option<&Path>, args_str: &str) -> SplitArgs 
 
 #[test]
 fn test_spec_detection() {
+    #[track_caller]
     fn assert_spec(build_root: Option<&Path>, maybe_spec: &str) {
         assert_eq!(
             SplitArgs {
@@ -45,6 +46,7 @@ fn test_spec_detection() {
         );
     }
 
+    #[track_caller]
     fn assert_goal(build_root: Option<&Path>, spec: &str) {
         assert_eq!(
             SplitArgs {
@@ -97,6 +99,7 @@ fn test_spec_detection() {
 
 #[test]
 fn test_valid_arg_splits() {
+    #[track_caller]
     fn assert(goals: &[&str], specs: &[&str], args_str: &str) {
         assert_eq!(
             SplitArgs {
@@ -308,6 +311,7 @@ fn test_split_args_short_flags() {
 
 #[test]
 fn test_help() {
+    #[track_caller]
     fn assert_help(args_str: &str, expected_goals: Vec<&str>, expected_specs: Vec<&str>) {
         assert_eq!(
             SplitArgs {
@@ -345,6 +349,7 @@ fn test_help() {
         vec!["src/foo/bar:baz"],
     );
 
+    #[track_caller]
     fn assert_help_advanced(args_str: &str, expected_goals: Vec<&str>, expected_specs: Vec<&str>) {
         assert_eq!(
             SplitArgs {
