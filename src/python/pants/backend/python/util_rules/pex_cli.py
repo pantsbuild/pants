@@ -271,6 +271,10 @@ async def setup_keyring_state(
                 credentials_responses[site] = []
             credentials_responses[site].append((keyring_plugin_request_type.name, user_password))
 
+    # Short circuit if the providers did not supply any credentials.
+    if not credentials_responses:
+        return _KeyringState(keyring_data_path=None)
+
     # Check for multiple responses for a single site. Keyring and our simulation of it only supports
     # a single user/password per site.
     credentials: list[tuple[str, str, str]] = []
