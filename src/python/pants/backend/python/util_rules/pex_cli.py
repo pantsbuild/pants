@@ -6,27 +6,34 @@ from __future__ import annotations
 import dataclasses
 import logging
 import os.path
+import shlex
 from dataclasses import dataclass
-from typing import Iterable, List, Mapping, Optional, Tuple
+from io import StringIO
+from pathlib import Path
+from typing import ClassVar, Iterable, Mapping, Optional, Tuple
 
 from pants.backend.python.subsystems.python_native_code import PythonNativeCodeSubsystem
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules import pex_environment
 from pants.backend.python.util_rules.pex_environment import PexEnvironment, PexSubsystem
+from pants.base.build_root import BuildRoot
 from pants.core.goals.resolves import ExportableTool
-from pants.core.util_rules import adhoc_binaries, external_tool
+from pants.core.util_rules import adhoc_binaries, external_tool, system_binaries
 from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
+from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalToolRequest,
     TemplatedExternalTool,
 )
-from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests
+from pants.core.util_rules.system_binaries import BashBinary
+from pants.engine.fs import CreateDigest, Digest, Directory, FileContent, MergeDigests
 from pants.engine.internals.selectors import MultiGet
+from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
-from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.unions import UnionRule
+from pants.engine.rules import Get, _uncacheable_rule, collect_rules, rule
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import GlobalOptions, ca_certs_path_to_file_content
 from pants.option.option_types import ArgsListOption
 from pants.util.frozendict import FrozenDict
@@ -99,6 +106,7 @@ class PexCliProcess:
         level: LogLevel = LogLevel.INFO,
         concurrency_available: int = 0,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
+        with_keyring_trampoline: bool = False,
     ) -> None:
         object.__setattr__(self, "subcommand", tuple(subcommand))
         object.__setattr__(self, "extra_args", tuple(extra_args))
@@ -120,6 +128,73 @@ class PexCliProcess:
             raise ValueError("`--pex-root` flag not allowed. We set its value for you.")
 
 
+@union
+@dataclass(frozen=True)
+class PexKeyringConfigurationRequest:
+    """Request sent to keyring plugins to request credentials to expose to Pex/Pip."""
+
+    name: ClassVar[str]
+
+
+@dataclass(frozen=True)
+class PexKeyringConfigurationResponse:
+    """Response containing credentials to expose to Pex/Pip via simulating the `keyring` package's
+    binary."""
+
+    # Nested map from SITE -> USER -> PASSWORD.
+    credentials: FrozenDict[str, tuple[str, str]] | None
+
+
+# The following script is injected into any Pex CLI process where credentials will be exposed via
+# the `keyring` package. Pip will be configured to use its `subprocess` mode which will obtain
+# credentials by invoking this "keyring" binary from the PATH.
+#
+# Credentials are stored in the file stored in the `__PANTS_KEYRING_DATA` environment variable.
+# The file is sourced to define a `pants_keyring_credentials` associate array.
+_KEYRING_SCRIPT = """\
+#!__BASH_PATH__
+if [ "$1" != "get" ]; then
+  echo "ERROR: The `keyring` trampoline script only supports the `get` subcommand." 1>&2
+  exit 111
+fi
+shift
+
+if [ -z "$__PANTS_KEYRING_DATA" ]; then
+  echo "ERROR: __PANTS_KEYRING_DATA env var was not set." 1>&2
+  exit 111
+fi
+
+if [ ! -e "$__PANTS_KEYRING_DATA" ]; then
+  echo "ERROR: __PANTS_KEYRING_DATA file '${__PANTS_KEYRING_DATA}' does not exist." 1>&2
+  exit 111
+fi
+source "$__PANTS_KEYRING_DATA"
+
+if [ -z "$1" ]; then
+  echo "ERROR: Site not provided on command-line." 1>&2
+  exit 111
+fi
+site="$1"
+shift
+
+if [ -z "$1" ]; then
+  echo "ERROR: User not provided on command-line." 1>&2
+  exit 111
+fi
+user="$1"
+shift
+
+password="${pants_keyring_credentials[$site:$user]}"
+if [ -z "$password" ]; then
+  # If the password is not set, then ordinary `keyring` exits with no output and code 1.
+  exit 1
+fi
+
+echo "$password"
+exit 0
+"""
+
+
 class PexPEX(DownloadedExternalTool):
     """The Pex PEX binary."""
 
@@ -128,6 +203,108 @@ class PexPEX(DownloadedExternalTool):
 async def download_pex_pex(pex_cli: PexCli, platform: Platform) -> PexPEX:
     pex_pex = await Get(DownloadedExternalTool, ExternalToolRequest, pex_cli.get_request(platform))
     return PexPEX(digest=pex_pex.digest, exe=pex_pex.exe)
+
+
+@dataclass(frozen=True)
+class _KeyringScript:
+    digest: Digest
+
+
+@rule
+async def setup_keyring_script(bash: BashBinary) -> _KeyringScript:
+    digest = await Get(
+        Digest,
+        CreateDigest(
+            [
+                FileContent(
+                    path=".keyring/keyring",
+                    content=_KEYRING_SCRIPT.replace("__BASH_PATH__", bash.path).encode(),
+                    is_executable=True,
+                )
+            ]
+        ),
+    )
+    return _KeyringScript(digest=digest)
+
+
+@dataclass(frozen=True)
+class _KeyringState:
+    keyring_data_path: Path | None
+
+
+def _always_shlex_quote(str: str) -> str:
+    shlexed_str = shlex.quote(str)
+    if shlexed_str != str:
+        return shlexed_str
+    return f"'{str}'"
+
+
+@_uncacheable_rule
+async def setup_keyring_state(
+    union_membership: UnionMembership,
+    env_tgt: EnvironmentTarget,
+    build_root: BuildRoot,
+    run_id: RunId,
+) -> _KeyringState:
+    # TODO: Consider how to enable credential injection in remote execution and other contexts
+    # where Pants rule code cannot directly control where the credentials are stored.
+    if not env_tgt.can_access_local_system_paths:
+        return _KeyringState(keyring_data_path=None)
+
+    keyring_plugin_request_types = union_membership.get(PexKeyringConfigurationRequest)
+    if not keyring_plugin_request_types:
+        return _KeyringState(keyring_data_path=None)
+
+    credentials_responses: dict[str, list[tuple[str, tuple[str, str]]]] = {}
+    for keyring_plugin_request_type in keyring_plugin_request_types:
+        keyring_plugin_request = keyring_plugin_request_type()
+        keyring_plugin_response = await Get(  # noqa: PNT30: Only one provider expected.
+            PexKeyringConfigurationResponse, PexKeyringConfigurationRequest, keyring_plugin_request
+        )
+
+        keyring_plugin_credentials = keyring_plugin_response.credentials
+        if not keyring_plugin_credentials:
+            continue
+
+        for site, user_password in keyring_plugin_credentials.items():
+            if site not in credentials_responses:
+                credentials_responses[site] = []
+            credentials_responses[site].append((keyring_plugin_request_type.name, user_password))
+
+    # Check for multiple responses for a single site. Keyring and our simulation of it only supports
+    # a single user/password per site.
+    credentials: list[tuple[str, str, str]] = []
+    for site, user_password_creds_by_provider in credentials_responses.items():
+        if len(user_password_creds_by_provider) > 1:
+            providers = [x[0] for x in user_password_creds_by_provider]
+            raise Exception(
+                f"Multiple keyring plugins returned responses for `{site}`. "
+                "The keyring support only supports a single user/password per site. "
+                f"The keyring plugins in conflict are: {', '.join(providers)}."
+            )
+        user_password_creds = user_password_creds_by_provider[0][1]
+        credentials.append((site, user_password_creds[0], user_password_creds[1]))
+    credentials.sort()
+
+    # Write the credentials to a file based on the current session ID.
+    content = StringIO()
+    content.write("declare -A pants_keyring_credentials\n")
+    for site, user, password in credentials:
+        content.write(
+            f"pants_keyring_credentials[{_always_shlex_quote(site)}]={_always_shlex_quote(user)}\n"
+        )
+        site_user = f"{site}:{user}"
+        content.write(
+            f"pants_keyring_credentials[{_always_shlex_quote(site_user)}]={_always_shlex_quote(password)}\n"
+        )
+
+    # TODO: Consider removing the run ID so that this value does not contribute to the cache key
+    # and cause unneeded invalidation of build actions as it changes for each run.
+    keyring_data_path = build_root.pathlib_path / ".pants.d" / "keyring" / str(run_id) / "data.sh"
+    keyring_data_path.parent.mkdir(parents=True, exist_ok=True)
+    keyring_data_path.write_bytes(content.getvalue().encode())
+
+    return _KeyringState(keyring_data_path=keyring_data_path)
 
 
 @rule
@@ -143,16 +320,24 @@ async def setup_pex_cli_process(
     python_setup: PythonSetup,
 ) -> Process:
     tmpdir = ".tmp"
-    gets: List[Get] = [Get(Digest, CreateDigest([Directory(tmpdir)]))]
+
+    digests_to_merge = [pex_pex.digest]
+    digest_gets: list[Get] = [Get(Digest, CreateDigest([Directory(tmpdir)]))]
 
     cert_args = []
     if global_options.ca_certs_path:
         ca_certs_fc = ca_certs_path_to_file_content(global_options.ca_certs_path)
-        gets.append(Get(Digest, CreateDigest((ca_certs_fc,))))
+        digest_gets.append(Get(Digest, CreateDigest((ca_certs_fc,))))
         cert_args = ["--cert", ca_certs_fc.path]
 
-    digests_to_merge = [pex_pex.digest]
-    digests_to_merge.extend(await MultiGet(gets))
+    keyring_state = await Get(_KeyringState)
+    keyring_args: list[str] = []
+    if keyring_state.keyring_data_path:
+        keyring_script = await Get(_KeyringScript)
+        digests_to_merge.append(keyring_script.digest)
+        keyring_args.append("--keyring-provider=subprocess")
+
+    digests_to_merge.extend(await MultiGet(digest_gets))
     if request.additional_input_digest:
         digests_to_merge.append(request.additional_input_digest)
     input_digest = await Get(Digest, MergeDigests(digests_to_merge))
@@ -188,9 +373,11 @@ async def setup_pex_cli_process(
     # All old-style pex runs take the --pip-version flag, but only certain subcommands of the
     # `pex3` console script do. So if invoked with a subcommand, the caller must selectively
     # set --pip-version only on subcommands that take it.
-    pip_version_args = [] if request.subcommand else ["--pip-version", python_setup.pip_version]
+    # pip_version_args = [] if request.subcommand else ["--pip-version", python_setup.pip_version]
+    pip_version_args = ["--pip-version", python_setup.pip_version]
     args = [
         *request.subcommand,
+        *keyring_args,
         *global_args,
         *verbosity_args,
         *warnings_args,
@@ -211,6 +398,14 @@ async def setup_pex_cli_process(
         # If a subcommand is used, we need to use the `pex3` console script.
         **({"PEX_SCRIPT": "pex3"} if request.subcommand else {}),
     }
+
+    if keyring_state.keyring_data_path:
+        env["__PANTS_KEYRING_DATA"] = str(keyring_state.keyring_data_path)
+        # TODO: Get the path from the keyring script dataclass.
+        if "PATH" in env:
+            env["PATH"] = f"{{chroot}}/.keyring:{env['PATH']}"
+        else:
+            env["PATH"] = "{chroot}/.keyring"
 
     return Process(
         normalized_argv,
@@ -241,5 +436,6 @@ def rules():
         *external_tool.rules(),
         *pex_environment.rules(),
         *adhoc_binaries.rules(),
+        *system_binaries.rules(),
         UnionRule(ExportableTool, PexCli),
     ]
