@@ -60,3 +60,7 @@ python-gnupg==0.4.9 # For validating signatures
 
 # Only used for release management
 PyGithub==2.4.0
+
+# For AWS CodeArtifact support.
+# TODO: Figure out why the backend-specific requirements.txt was not loading this into project venv.
+boto3>=1.35.62

@@ -13,6 +13,7 @@
 //     "PyYAML<7.0,>=6.0",
 //     "ansicolors==1.1.8",
 //     "beautifulsoup4==4.11.1",
+//     "boto3>=1.35.62",
 //     "chevron==0.14.0",
 //     "debugpy==1.6.0",
 //     "fastapi==0.78.0",
@@ -57,7 +58,6 @@
   "allow_wheels": true,
   "build_isolation": true,
   "constraints": [],
-  "elide_unused_requires_dist": false,
   "excluded": [],
   "locked_resolves": [
     {
@@ -241,6 +241,53 @@
           ],
           "requires_python": ">=3.6.0",
           "version": "4.11.1"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "eb21380d73fec6645439c0d802210f72a0cdb3295b02953f246ff53f512faa8f",
+              "url": "https://files.pythonhosted.org/packages/2b/ed/464e1df3901fbfedd5a0786e551240216f0c867440fa6156595178227b3f/boto3-1.36.1-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "258ab77225a81d3cf3029c9afe9920cd9dec317689dfadec6f6f0a23130bb60a",
+              "url": "https://files.pythonhosted.org/packages/bf/04/0c6cea060653eee75f4348152dfc0aa0b241f7d1f99a530079ee44d61e4b/boto3-1.36.1.tar.gz"
+            }
+          ],
+          "project_name": "boto3",
+          "requires_dists": [
+            "botocore<1.37.0,>=1.36.1",
+            "botocore[crt]<2.0a0,>=1.21.0; extra == \"crt\"",
+            "jmespath<2.0.0,>=0.7.1",
+            "s3transfer<0.12.0,>=0.11.0"
+          ],
+          "requires_python": ">=3.8",
+          "version": "1.36.1"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "dec513b4eb8a847d79bbefdcdd07040ed9d44c20b0001136f0890a03d595705a",
+              "url": "https://files.pythonhosted.org/packages/be/bb/5431f12e2dadd881fd023fb57e7e3ab82f7b697c38dc837fc8d70cca51bd/botocore-1.36.1-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "f789a6f272b5b3d8f8756495019785e33868e5e00dd9662a3ee7959ac939bb12",
+              "url": "https://files.pythonhosted.org/packages/39/aa/556720b3ee9629b7c4366b5a0d9797a84e83a97f78435904cbb9bdc41939/botocore-1.36.1.tar.gz"
+            }
+          ],
+          "project_name": "botocore",
+          "requires_dists": [
+            "awscrt==0.23.4; extra == \"crt\"",
+            "jmespath<2.0.0,>=0.7.1",
+            "python-dateutil<3.0.0,>=2.1",
+            "urllib3!=2.2.0,<3,>=1.25.4; python_version >= \"3.10\"",
+            "urllib3<1.27,>=1.25.4; python_version < \"3.10\""
+          ],
+          "requires_python": ">=3.8",
+          "version": "1.36.1"
         },
         {
           "artifacts": [
@@ -884,6 +931,24 @@
           "requires_dists": [],
           "requires_python": ">=3.7",
           "version": "2.0.0"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "02e2e4cc71b5bcab88332eebf907519190dd9e6e82107fa7f83b1003a6252980",
+              "url": "https://files.pythonhosted.org/packages/31/b4/b9b800c45527aadd64d5b442f9b932b00648617eb5d63d2c7a6587b7cafc/jmespath-1.0.1-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "90261b206d6defd58fdd5e85f478bf633a2901798906be2ad389150c5c60edbe",
+              "url": "https://files.pythonhosted.org/packages/00/2a/e867e8531cf3e36b41201936b7fa7ba7b5702dbef42922193f05c8976cd6/jmespath-1.0.1.tar.gz"
+            }
+          ],
+          "project_name": "jmespath",
+          "requires_dists": [],
+          "requires_python": ">=3.7",
+          "version": "1.0.1"
         },
         {
           "artifacts": [
@@ -1545,6 +1610,27 @@
           ],
           "requires_python": ">=3.8",
           "version": "2.32.3"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "8fa0aa48177be1f3425176dfe1ab85dcd3d962df603c3dbfc585e6bf857ef0ff",
+              "url": "https://files.pythonhosted.org/packages/5f/ce/22673f4a85ccc640735b4f8d12178a0f41b5d3c6eda7f33756d10ce56901/s3transfer-0.11.1-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "3f25c900a367c8b7f7d8f9c34edc87e300bde424f779dc9f0a8ae4f9df9264f6",
+              "url": "https://files.pythonhosted.org/packages/1a/aa/fdd958c626b00e3f046d4004363e7f1a2aba4354f78d65ceb3b217fa5eb8/s3transfer-0.11.1.tar.gz"
+            }
+          ],
+          "project_name": "s3transfer",
+          "requires_dists": [
+            "botocore<2.0a.0,>=1.36.0",
+            "botocore[crt]<2.0a.0,>=1.36.0; extra == \"crt\""
+          ],
+          "requires_python": ">=3.8",
+          "version": "0.11.1"
         },
         {
           "artifacts": [
@@ -2319,7 +2405,7 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.29.0",
+  "pex_version": "2.24.1",
   "pip_version": "24.3.1",
   "prefer_older_binary": false,
   "requirements": [
@@ -2327,6 +2413,7 @@
     "PyYAML<7.0,>=6.0",
     "ansicolors==1.1.8",
     "beautifulsoup4==4.11.1",
+    "boto3>=1.35.62",
     "chevron==0.14.0",
     "debugpy==1.6.0",
     "fastapi==0.78.0",
