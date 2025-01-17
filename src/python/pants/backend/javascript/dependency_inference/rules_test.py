@@ -263,6 +263,37 @@ def test_infers_js_dependencies_via_config_and_extension_less_imports(
     assert set(addresses) == {Address("root/project/src/components", relative_file_path="index.js")}
 
 
+def test_infers_js_dependencies_with_compiled_typescript_modules(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": dedent(
+                """\
+                javascript_sources()
+                typescript_sources(name="ts")
+                """
+            ),
+            "src/js/index.js": dedent(
+                """\
+                import { x } from "./moduleA";
+                """
+            ),
+            "src/js/moduleA.ts": "",
+            "src/js/moduleA.js": "",  # Compiled output from tsc
+        }
+    )
+
+    index_tgt = rule_runner.get_target(Address("src/js", relative_file_path="index.js"))
+    addresses = rule_runner.request(
+        InferredDependencies,
+        [InferJSDependenciesRequest(JSSourceInferenceFieldSet.create(index_tgt))],
+    ).include
+
+    assert set(addresses) == {
+        Address("src/js", relative_file_path="moduleA.js"),
+        Address("src/js", target_name="ts", relative_file_path="moduleA.ts"),
+    }
+
+
 def test_unmatched_js_dependencies_and_error_unowned_behaviour(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(["--nodejs-infer-unowned-dependency-behavior=error"])
     rule_runner.write_files(
