@@ -43,8 +43,7 @@ class DuplicateHelmChartNamesFound(Exception):
 class HelmArtifactLocationSpec(ABC):
     @property
     @abstractmethod
-    def spec(self) -> str:
-        ...
+    def spec(self) -> str: ...
 
     @property
     def is_url(self) -> bool:

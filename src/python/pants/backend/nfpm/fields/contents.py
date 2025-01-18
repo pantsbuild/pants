@@ -127,21 +127,21 @@ class NfpmContentFileModeField(IntField):
         For example to specify world readable/executable and user writable, these
         are equivalent:
 
-        - `0o755`
-        - `'755'`
-        - `'rwxr-xr-x'`
+          - `0o755`
+          - `'755'`
+          - `'rwxr-xr-x'`
 
         Another example for a file with read/write permissions for only the user:
 
-        - `0o600`
-        - `'600'`
-        - `'rw-------'`
+          - `0o600`
+          - `'600'`
+          - `'rw-------'`
 
         Another example for a file with the group sticky bit set:
 
-        - `0o2660`
-        - `'2660'`
-        - `'rw-rwS---'`
+          - `0o2660`
+          - `'2660'`
+          - `'rw-rwS---'`
 
         WARNING: If you forget to include the `0o` prefix on a numeric octal, then
         it will be interpreted as an integer which is probably not what you want.
@@ -255,7 +255,7 @@ class _SrcDstSequenceField(TupleSequenceField):
         if dst_dupes:
             raise InvalidFieldException(
                 help_text(
-                    lambda: f"""
+                    f"""
                     '{cls._dst_alias}' must be unique in '{cls.alias}', but
                     found duplicate entries for: {repr(dst_dupes)}
                     """

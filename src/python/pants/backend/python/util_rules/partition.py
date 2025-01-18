@@ -19,12 +19,10 @@ ResolveName = str
 
 class _FieldSetWithResolveAndICs(Protocol):
     @property
-    def resolve(self) -> PythonResolveField:
-        ...
+    def resolve(self) -> PythonResolveField: ...
 
     @property
-    def interpreter_constraints(self) -> InterpreterConstraintsField:
-        ...
+    def interpreter_constraints(self) -> InterpreterConstraintsField: ...
 
 
 _FS = TypeVar("_FS", bound=_FieldSetWithResolveAndICs)

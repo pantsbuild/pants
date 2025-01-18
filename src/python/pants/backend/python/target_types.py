@@ -164,6 +164,10 @@ class PythonResolveField(StringField, AsyncFieldMixin):
         return resolve
 
 
+class PrefixedPythonResolveField(PythonResolveField):
+    alias = "python_resolve"
+
+
 class PythonRunGoalUseSandboxField(TriBoolField):
     alias = "run_goal_use_sandbox"
     help = help_text(
@@ -214,13 +218,11 @@ class PexBinaryDependenciesField(Dependencies):
 
 class MainSpecification(ABC):
     @abstractmethod
-    def iter_pex_args(self) -> Iterator[str]:
-        ...
+    def iter_pex_args(self) -> Iterator[str]: ...
 
     @property
     @abstractmethod
-    def spec(self) -> str:
-        ...
+    def spec(self) -> str: ...
 
 
 @dataclass(frozen=True)
@@ -1341,7 +1343,7 @@ class PythonRequirementTypeStubModulesField(StringSequenceField):
 
 
 def normalize_module_mapping(
-    mapping: Mapping[str, Iterable[str]] | None
+    mapping: Mapping[str, Iterable[str]] | None,
 ) -> FrozenDict[str, tuple[str, ...]]:
     return FrozenDict({canonicalize_project_name(k): tuple(v) for k, v in (mapping or {}).items()})
 

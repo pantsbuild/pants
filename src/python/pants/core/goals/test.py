@@ -36,7 +36,7 @@ from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_FILE_DIGEST, Digest, FileDigest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.session import RunId
@@ -517,10 +517,10 @@ class TestSubsystem(GoalSubsystem):
     class EnvironmentAware:
         extra_env_vars = StrListOption(
             help=softwrap(
-                """
+                f"""
                 Additional environment variables to include in test processes.
-                Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
-                `ENV_VAR` to copy the value of a variable in Pants's own environment.
+
+                {EXTRA_ENV_VARS_USAGE_HELP}
                 """
             ),
         )
@@ -745,13 +745,12 @@ class TestTimeoutField(IntField, metaclass=ABCMeta):
 class TestExtraEnvVarsField(StringSequenceField, metaclass=ABCMeta):
     alias = "extra_env_vars"
     help = help_text(
-        """
-         Additional environment variables to include in test processes.
+        f"""
+        Additional environment variables to include in test processes.
 
-         Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
-         `ENV_VAR` to copy the value of a variable in Pants's own environment.
+        {EXTRA_ENV_VARS_USAGE_HELP}
 
-         This will be merged with and override values from `[test].extra_env_vars`.
+        This will be merged with and override values from `[test].extra_env_vars`.
         """
     )
 

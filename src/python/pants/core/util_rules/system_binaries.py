@@ -11,6 +11,7 @@ import shlex
 import subprocess
 from dataclasses import dataclass
 from enum import Enum
+from itertools import groupby
 from textwrap import dedent  # noqa: PNT20
 from typing import Iterable, Mapping, Sequence
 
@@ -243,6 +244,21 @@ class BinaryShimsRequest:
         *paths: BinaryPath,
         rationale: str,
     ) -> BinaryShimsRequest:
+        # Remove any duplicates (which may result if the caller merges `BinaryPath` instances from multiple sources)
+        # and also sort to ensure a stable order for better caching.
+        paths = tuple(sorted(set(paths), key=lambda bp: bp.path))
+
+        # Then ensure that there are no duplicate paths with mismatched content.
+        duplicate_paths = set()
+        for path, group in groupby(paths, key=lambda x: x.path):
+            if len(list(group)) > 1:
+                duplicate_paths.add(path)
+        if duplicate_paths:
+            raise ValueError(
+                "Detected duplicate paths with mismatched content at paths: "
+                f"{', '.join(sorted(duplicate_paths))}"
+            )
+
         return cls(
             paths=paths,
             rationale=rationale,
@@ -294,10 +310,7 @@ class ArchiveFormat(Enum):
 
 
 class ZipBinary(BinaryPath):
-    def create_archive_argv(
-        self, output_filename: str, input_files: Sequence[str]
-    ) -> tuple[str, ...]:
-        return (self.path, output_filename, *input_files)
+    pass
 
 
 class UnzipBinary(BinaryPath):
@@ -1075,8 +1088,13 @@ async def find_mv(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> 
 
 
 @rule(desc="Finding the `open` binary", level=LogLevel.DEBUG)
-async def find_open(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> OpenBinary:
-    request = BinaryPathRequest(binary_name="open", search_path=system_binaries.system_binary_paths)
+async def find_open(
+    platform: Platform, system_binaries: SystemBinariesSubsystem.EnvironmentAware
+) -> OpenBinary:
+    request = BinaryPathRequest(
+        binary_name=("open" if platform.is_macos else "xdg-open"),
+        search_path=system_binaries.system_binary_paths,
+    )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="open URLs with default browser")
     return OpenBinary(first_path.path, first_path.fingerprint)

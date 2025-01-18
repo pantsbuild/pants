@@ -211,7 +211,7 @@ class KnownPythonUserResolveNamesRequest(KnownUserResolveNamesRequest):
 
 
 @rule
-def determine_python_user_resolves(
+async def determine_python_user_resolves(
     _: KnownPythonUserResolveNamesRequest,
     python_setup: PythonSetup,
     union_membership: UnionMembership,
@@ -219,10 +219,16 @@ def determine_python_user_resolves(
     """Find all know Python resolves, from both user-created resolves and internal tools."""
     python_tool_resolves = ExportableTool.filter_for_subclasses(union_membership, PythonToolBase)
 
+    tools_using_default_resolve = [
+        resolve_name
+        for resolve_name, subsystem_cls in python_tool_resolves.items()
+        if (await _construct_subsystem(subsystem_cls)).install_from_resolve is None
+    ]
+
     return KnownUserResolveNames(
         names=(
             *python_setup.resolves.keys(),
-            *python_tool_resolves.keys(),
+            *tools_using_default_resolve,
         ),  # the order of the keys doesn't matter since shadowing is done in `setup_user_lockfile_requests`
         option_name="[python].resolves",
         requested_resolve_names_cls=RequestedPythonUserResolveNames,
@@ -255,10 +261,10 @@ async def setup_user_lockfile_requests(
 
     tools = ExportableTool.filter_for_subclasses(union_membership, PythonToolBase)
 
-    out = []
+    out = set()
     for resolve in requested:
         if resolve in python_setup.resolves:
-            out.append(
+            out.add(
                 GeneratePythonLockfile(
                     requirements=PexRequirements.req_strings_from_requirement_fields(
                         resolve_to_requirements_fields[resolve]
@@ -285,7 +291,7 @@ async def setup_user_lockfile_requests(
             else:
                 ic = InterpreterConstraints(tool.default_interpreter_constraints)
 
-            out.append(
+            out.add(
                 GeneratePythonLockfile(
                     requirements=FrozenOrderedSet(sorted(tool.requirements)),
                     find_links=FrozenOrderedSet(find_links),
@@ -337,7 +343,7 @@ async def python_lockfile_synthetic_targets(
                     TargetAdaptor(
                         "_lockfiles",
                         name=synthetic_lockfile_target_name(name),
-                        sources=[lockfile],
+                        sources=(lockfile,),
                         __description_of_origin__=f"the [python].resolves option {name!r}",
                     )
                     for _, lockfile, name in lockfiles
