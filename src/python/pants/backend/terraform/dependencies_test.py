@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import dataclasses
 import json
 import textwrap
 from pathlib import Path
@@ -74,9 +75,9 @@ def test_init_terraform(rule_runner: RuleRunner, standard_deployment: StandardDe
     assert stub_tfstate["backend"]["config"]["path"] == str(standard_deployment.state_file)
 
     # Assert dependencies are initialised by checking for the dependency itself
-    assert find_file(
-        initialised_files,
-        ".terraform/providers/registry.terraform.io/hashicorp/null/*/*/terraform-provider-null*",
+    assert find_link(
+        initialised_links,
+        ".terraform/providers/registry.terraform.io/hashicorp/null/*/*",
     ), "Did not find expected provider"
 
     # Assert lockfile is included
@@ -89,8 +90,9 @@ def test_init_terraform_uses_lockfiles(
     """Test that we can use generated lockfiles."""
     requested_version = "3.2.0"
 
-    deployment_with_lockfile = standard_deployment.with_files(
-        {"src/tf/.terraform.lock.hcl": terraform_lockfile}
+    deployment_with_lockfile = dataclasses.replace(
+        standard_deployment,
+        files={**standard_deployment.files, **{"src/tf/.terraform.lock.hcl": terraform_lockfile}},
     )
 
     initialised_files, initialised_entries = _do_init_terraform(
@@ -128,9 +130,9 @@ def test_init_terraform_without_backends(
     ), "Terraform state file should not be present if the request was to not initialise the backend"
 
     # The dependencies should still be present
-    assert find_file(
-        initialised_files,
-        ".terraform/providers/registry.terraform.io/hashicorp/null/*/*/terraform-provider-null*",
+    assert find_link(
+        initialised_entries,
+        ".terraform/providers/registry.terraform.io/hashicorp/null/*/*",
     ), "Did not find expected provider"
 
 
@@ -190,7 +192,7 @@ def test_init_terraform_with_transitive_module(rule_runner: RuleRunner, tmpdir) 
     )
 
     # Assert that the provider dependency was initialised
-    assert find_file(
-        initialised_files,
-        ".terraform/providers/registry.terraform.io/hashicorp/null/*/*/terraform-provider-null*",
+    assert find_link(
+        initialised_entries,
+        ".terraform/providers/registry.terraform.io/hashicorp/null/*/*",
     ), "Did not find expected provider contained in module, did we successfully include it in the files passed to `init`?"
