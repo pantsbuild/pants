@@ -33,6 +33,7 @@ pub fn launch_pantsd() -> (BuildRoot, OptionParser, TempDir) {
         false,
         None,
         None,
+        None,
     )
     .unwrap();
 

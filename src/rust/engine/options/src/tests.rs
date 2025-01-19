@@ -72,6 +72,7 @@ fn with_setup(
         true,
         Some(BuildRoot::find_from(buildroot.path()).unwrap()),
         None,
+        None,
     )
     .unwrap();
     do_check(option_parser);
@@ -576,7 +577,16 @@ fn test_do_not_load_pantsrc_if_configs_passed() {
         }
     }
 
-    let load_0 = OptionParser::new(mk_args(), mk_env(), Some(vec![]), true, true, None, None);
+    let load_0 = OptionParser::new(
+        mk_args(),
+        mk_env(),
+        Some(vec![]),
+        true,
+        true,
+        None,
+        None,
+        None,
+    );
 
     let found_sources = load_0.unwrap().sources;
     println!("{:?}", found_sources.keys());
@@ -658,6 +668,7 @@ fn test_config_path_discovery() {
             false,
             Some(BuildRoot::find_from(buildroot.path()).unwrap()),
             None,
+            None,
         )
         .unwrap()
         .get_config_file_paths()
@@ -677,6 +688,7 @@ fn test_config_path_discovery() {
             false,
             Some(BuildRoot::find_from(buildroot.path()).unwrap()),
             None,
+            None,
         )
         .unwrap()
         .get_config_file_paths()
@@ -695,8 +707,111 @@ fn test_config_path_discovery() {
             false,
             Some(BuildRoot::find_from(buildroot.path()).unwrap()),
             None,
+            None,
         )
         .unwrap()
         .get_config_file_paths()
+    );
+}
+
+#[test]
+fn test_cli_alias() {
+    let config = "[cli.alias]\npyupgrade = \"--backend-packages=pants.backend.python.lint.pyupgrade fmt\"\ngreen = \"lint test --force check\"";
+    let extra_config = "[cli]\nalias = \"+{'shell': 'repl'}\"";
+
+    with_setup(
+        vec!["pyupgrade", "green"],
+        vec![],
+        config,
+        extra_config,
+        |option_parser| {
+            assert_eq!(
+                vec![
+                    "--backend-packages=pants.backend.python.lint.pyupgrade".to_string(),
+                    "fmt".to_string(),
+                    "lint".to_string(),
+                    "test".to_string(),
+                    "--force".to_string(),
+                    "check".to_string()
+                ],
+                option_parser
+                    .get_args()
+                    .unwrap()
+                    .into_iter()
+                    .skip(1) // Skip the --config-files flag we add above.
+                    .collect::<Vec<_>>()
+            );
+        },
+    );
+
+    with_setup(
+        vec!["shell"],
+        vec![],
+        config,
+        extra_config,
+        |option_parser| {
+            assert_eq!(
+                vec!["repl".to_string()],
+                option_parser
+                    .get_args()
+                    .unwrap()
+                    .into_iter()
+                    .skip(1) // Skip the --config-files flag we add above.
+                    .collect::<Vec<_>>()
+            );
+        },
+    );
+}
+
+#[test]
+fn test_cli_alias_validation() {
+    let buildroot = TempDir::new().unwrap();
+    File::create(&buildroot.path().join("BUILDROOT")).unwrap();
+    assert_eq!(
+        "Invalid alias in `[cli].alias` option: foo. This is already a registered goal or subsytem.",
+    OptionParser::new(
+        Args::new(vec![]),
+        Env {
+            env: hashmap!{"PANTS_CLI_ALIAS".to_string() => "{\"foo\": \"fail_on_known_scope\"}".to_string()},
+        },
+        Some(vec![]),
+        false,
+        true,
+        Some(BuildRoot::find_from(buildroot.path()).unwrap()),
+        Some(&hashmap!{"foo".to_string() => hashset!{}}),
+        None,
+    ).err().unwrap());
+}
+
+#[test]
+fn test_spec_files() {
+    let buildroot = TempDir::new().unwrap();
+    File::create(&buildroot.path().join("BUILDROOT")).unwrap();
+    File::create(&buildroot.path().join("extra_specs.txt"))
+        .unwrap()
+        .write_all("path/to/spec\nanother:spec".as_bytes())
+        .unwrap();
+    assert_eq!(
+        vec![
+            "some/initial/spec".to_string(),
+            "path/to/spec".to_string(),
+            "another:spec".to_string()
+        ],
+        OptionParser::new(
+            Args::new(vec![
+                "--spec-files=extra_specs.txt".to_string(),
+                "some/initial/spec".to_string()
+            ]),
+            Env { env: hashmap! {} },
+            Some(vec![]),
+            false,
+            true,
+            Some(BuildRoot::find_from(buildroot.path()).unwrap()),
+            None,
+            None,
+        )
+        .unwrap()
+        .command
+        .specs
     );
 }

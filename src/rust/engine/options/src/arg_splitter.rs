@@ -19,13 +19,36 @@ lazy_static! {
         HashSet::from(["-ltrace", "-ldebug", "-linfo", "-lwarn", "-lerror", "-h", "-v", "-V"]);
 }
 
-#[derive(Debug, Eq, PartialEq)]
-pub struct SplitArgs {
+// The details of a Pants invocation command, not including option flags.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PantsCommand {
     pub builtin_or_auxiliary_goal: Option<String>, // Requested builtin/auxiliary goal.
     pub goals: Vec<String>,                        // Requested known goals.
     pub unknown_goals: Vec<String>,                // Any requested but unknown goals.
     pub specs: Vec<String>, // What to run against, e.g. targets or files/dirs.
     pub passthru: Vec<String>, // Any remaining args specified after a -- separator.
+}
+
+impl PantsCommand {
+    pub fn empty() -> Self {
+        Self {
+            builtin_or_auxiliary_goal: None,
+            goals: vec![],
+            unknown_goals: vec![],
+            specs: vec![],
+            passthru: vec![],
+        }
+    }
+
+    pub fn add_specs(self, extra_specs: Vec<String>) -> Self {
+        Self {
+            builtin_or_auxiliary_goal: self.builtin_or_auxiliary_goal,
+            goals: self.goals,
+            unknown_goals: self.unknown_goals,
+            specs: [self.specs, extra_specs].concat(),
+            passthru: self.passthru,
+        }
+    }
 }
 
 pub struct ArgSplitter {
@@ -34,7 +57,7 @@ pub struct ArgSplitter {
 }
 
 impl ArgSplitter {
-    pub fn new<I: IntoIterator<Item = GoalInfo>>(build_root: &Path, known_goals: I) -> ArgSplitter {
+    pub fn new<I: IntoIterator<Item = GoalInfo>>(build_root: &Path, known_goals: I) -> Self {
         let mut known_goals_map = HashMap::new();
         for goal_info in known_goals.into_iter() {
             for alias in &goal_info.aliases {
@@ -43,13 +66,14 @@ impl ArgSplitter {
             known_goals_map.insert(goal_info.scope_name.to_owned(), goal_info);
         }
 
-        ArgSplitter {
+        Self {
             build_root: build_root.to_owned(),
             known_goals: known_goals_map,
         }
     }
 
-    pub fn split_args(&self, args: Vec<String>) -> SplitArgs {
+    // Split the given args, which must *not* include the argv[0] process name.
+    pub fn split_args(&self, args: Vec<String>) -> PantsCommand {
         let mut builtin_or_auxiliary_goal: Option<String> = None;
         let mut goals = vec![];
         let mut unknown_goals: Vec<String> = vec![];
@@ -58,8 +82,6 @@ impl ArgSplitter {
 
         let mut unconsumed_args = args;
         unconsumed_args.reverse();
-        // The first arg is the binary name, so skip it.
-        unconsumed_args.pop();
 
         // Scan the args looking for goals and specs.
         // The one hard case is a single word like `foo` with no path- or target-like qualities
@@ -117,7 +139,7 @@ impl ArgSplitter {
             }
         }
 
-        SplitArgs {
+        PantsCommand {
             builtin_or_auxiliary_goal,
             goals,
             unknown_goals,
