@@ -149,7 +149,7 @@ class PexKeyringConfigurationResponse:
 # credentials by invoking this "keyring" binary from the PATH.
 #
 # Credentials are stored in the file stored in the `__PANTS_KEYRING_DATA` environment variable.
-# The file is sourced to define a `pants_keyring_credentials` associate array.
+# The file is sourced to define a `pants_keyring_credentials` associative array.
 _KEYRING_SCRIPT = """\
 #!__BASH_PATH__
 if [ "$1" != "get" ]; then
@@ -291,7 +291,7 @@ async def setup_keyring_state(
         credentials.append((site, user_password_creds[0], user_password_creds[1]))
     credentials.sort()
 
-    # Write the credentials to a file based on the current session ID.
+    # Write the credentials to a file based on the current run ID.
     content = StringIO()
     content.write("declare -A pants_keyring_credentials\n")
     for site, user, password in credentials:
