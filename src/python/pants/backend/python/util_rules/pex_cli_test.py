@@ -12,7 +12,6 @@ from pants.backend.python.util_rules.pex_cli import (
     PexKeyringConfigurationRequest,
     PexKeyringConfigurationResponse,
 )
-from pants.core.util_rules import distdir, system_binaries
 from pants.engine.fs import DigestContents
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import QueryRule, rule
@@ -26,8 +25,6 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *pex_cli.rules(),
-            *system_binaries.rules(),
-            *distdir.rules(),
             QueryRule(Process, (PexCliProcess,)),
         ]
     )
