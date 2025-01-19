@@ -30,8 +30,7 @@ from pants.core.util_rules.external_tool import (
     TemplatedExternalTool,
 )
 from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP, EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import EMPTY_DIGEST, Digest, CreateDigest, Directory
-from pants.engine.internals.native_engine import MergeDigests
+from pants.engine.fs import EMPTY_DIGEST, Digest
 from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
 from pants.engine.process import Process
@@ -401,8 +400,9 @@ class TerraformTool(TemplatedExternalTool):
     def plugin_cache_dir(self) -> str:
         return "__terraform_filesystem_mirror"
 
-    def append_only_caches(self, module_path: str) -> dict[str, str]:
-        return {Path("terraform_plugins", module_path).as_posix().replace("/", "__"): self.plugin_cache_dir}
+    @property
+    def append_only_caches(self) -> dict[str, str]:
+        return {"terraform_plugins": self.plugin_cache_dir}
 
 
 @dataclass(frozen=True)
@@ -459,7 +459,7 @@ async def setup_terraform_process(
         immutable_input_digests=immutable_input_digests,
         output_files=prepend_paths(request.output_files),
         output_directories=prepend_paths(request.output_directories),
-        append_only_caches=terraform.append_only_caches(request.chdir),
+        append_only_caches=terraform.append_only_caches,
         env=env,
         description=request.description,
         level=LogLevel.DEBUG,
