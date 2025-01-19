@@ -207,23 +207,25 @@ async def download_pex_pex(pex_cli: PexCli, platform: Platform) -> PexPEX:
 @dataclass(frozen=True)
 class _KeyringScript:
     digest: Digest
+    path: str
 
 
 @rule
 async def setup_keyring_script(bash: BashBinary) -> _KeyringScript:
+    keyring_path = ".keyring/keyring"
     digest = await Get(
         Digest,
         CreateDigest(
             [
                 FileContent(
-                    path=".keyring/keyring",
+                    path=keyring_path,
                     content=_KEYRING_SCRIPT.replace("__BASH_PATH__", bash.path).encode(),
                     is_executable=True,
                 )
             ]
         ),
     )
-    return _KeyringScript(digest=digest)
+    return _KeyringScript(digest=digest, path=keyring_path)
 
 
 @dataclass(frozen=True)
@@ -335,7 +337,9 @@ async def setup_pex_cli_process(
 
     keyring_state = await Get(_KeyringState)
     keyring_args: list[str] = []
-    if keyring_state.keyring_data_path:
+    keyring_data_path = keyring_state.keyring_data_path
+    keyring_script: _KeyringScript | None = None
+    if keyring_data_path:
         keyring_script = await Get(_KeyringScript)
         digests_to_merge.append(keyring_script.digest)
         keyring_args.append("--keyring-provider=subprocess")
@@ -402,13 +406,15 @@ async def setup_pex_cli_process(
         **({"PEX_SCRIPT": "pex3"} if request.subcommand else {}),
     }
 
-    if keyring_state.keyring_data_path:
-        env["__PANTS_KEYRING_DATA"] = str(keyring_state.keyring_data_path)
-        # TODO: Get the path from the keyring script dataclass.
+    keyring_data_path = keyring_state.keyring_data_path
+    if keyring_data_path:
+        assert keyring_script is not None
+        keyring_script_parent_path = os.path.dirname(keyring_script.path)
+        env["__PANTS_KEYRING_DATA"] = str(keyring_data_path)
         if "PATH" in env:
-            env["PATH"] = f"{{chroot}}/.keyring:{env['PATH']}"
+            env["PATH"] = f"{{chroot}}/{keyring_script_parent_path}:{env['PATH']}"
         else:
-            env["PATH"] = "{chroot}/.keyring"
+            env["PATH"] = "{chroot}/{keyring_script_parent_path}"
 
     return Process(
         normalized_argv,
