@@ -29,11 +29,12 @@ from pants.core.util_rules.external_tool import (
     ExternalToolRequest,
     TemplatedExternalTool,
 )
+from pants.core.util_rules.system_binaries import MkdirBinary
 from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_DIGEST, Digest
 from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
-from pants.engine.process import Process
+from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, StrListOption
@@ -421,6 +422,7 @@ class TerraformProcess:
 async def setup_terraform_process(
     request: TerraformProcess,
     terraform: TerraformTool,
+    mkdir: MkdirBinary,
     platform: Platform,
 ) -> Process:
     downloaded_terraform = await Get(
@@ -430,18 +432,18 @@ async def setup_terraform_process(
     )
     env = await Get(EnvironmentVars, EnvironmentVarsRequest(terraform.extra_env_vars))
 
+    extra_env_vars = {}
+
     path = []
     user_path = env.get("PATH")
     if user_path:
         path.append(user_path)
+    extra_env_vars["PATH"] = os.pathsep.join(path)
 
-    env = EnvironmentVars(
-        {
-            **env,
-            "PATH": ":".join(path),
-            "TF_PLUGIN_CACHE_DIR": (os.path.join("{chroot}", terraform.plugin_cache_dir)),
-        }
-    )
+    tf_plugin_cache_dir = os.path.join(terraform.plugin_cache_dir, request.chdir)
+    extra_env_vars["TF_PLUGIN_CACHE_DIR"] = os.path.join("{chroot}", tf_plugin_cache_dir)
+
+    env = EnvironmentVars({**env, **extra_env_vars})
 
     immutable_input_digests = {
         "__terraform": downloaded_terraform.digest,
@@ -449,6 +451,17 @@ async def setup_terraform_process(
 
     def prepend_paths(paths: Tuple[str, ...]) -> Tuple[str, ...]:
         return tuple((Path(request.chdir) / path).as_posix() for path in paths)
+
+    # Initialise the Terraform provider cache, since Terraform expects the directory to already exist.
+    await Get(
+        FallibleProcessResult,
+        Process(
+            argv=[mkdir.path, "-p", tf_plugin_cache_dir],
+            append_only_caches=terraform.append_only_caches,
+            description="initialise Terraform plugin cache dir",
+            level=LogLevel.DEBUG,
+        ),
+    )
 
     return Process(
         argv=("__terraform/terraform", f"-chdir={shlex.quote(request.chdir)}") + request.args,
