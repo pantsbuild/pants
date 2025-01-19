@@ -1,8 +1,5 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from __future__ import annotations
-
-import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent  # noqa: PNT20
@@ -68,10 +65,6 @@ class StandardDeployment:
     files: dict[str, str]
     state_file: Path
     target: Address = Address("src/tf", target_name="stg")
-
-    def with_files(self, files: dict[str, str]) -> StandardDeployment:
-        """Get a new StandardDeployment with additional files."""
-        return dataclasses.replace(self, files={**self.files, **files})
 
 
 @pytest.fixture
