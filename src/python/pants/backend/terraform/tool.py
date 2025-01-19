@@ -29,11 +29,12 @@ from pants.core.util_rules.external_tool import (
     ExternalToolRequest,
     TemplatedExternalTool,
 )
+from pants.core.util_rules.system_binaries import MkdirBinary
 from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_DIGEST, Digest
 from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
-from pants.engine.process import Process
+from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, StrListOption
@@ -450,6 +451,17 @@ async def setup_terraform_process(
 
     def prepend_paths(paths: Tuple[str, ...]) -> Tuple[str, ...]:
         return tuple((Path(request.chdir) / path).as_posix() for path in paths)
+
+    # Initialise the Terraform provider cache, since Terraform expects the directory to already exist.
+    await Get(
+        FallibleProcessResult,
+        Process(
+            argv=[mkdir.path, "-p", tf_plugin_cache_dir],
+            append_only_caches=terraform.append_only_caches,
+            description="initialise Terraform plugin cache dir",
+            level=LogLevel.DEBUG,
+        ),
+    )
 
     return Process(
         argv=("__terraform/terraform", f"-chdir={shlex.quote(request.chdir)}") + request.args,
