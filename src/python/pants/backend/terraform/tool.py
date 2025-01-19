@@ -415,15 +415,13 @@ class TerraformProcess:
     output_files: tuple[str, ...] = ()
     output_directories: tuple[str, ...] = ()
     chdir: str = "."  # directory for terraform's `-chdir` argument
-    use_provider_cache: bool = (
-        True  # The Terraform provider cache is not concurrency-safe for writes (ex generating lockfiles or initialising without a lockfile)
-    )
 
 
 @rule
 async def setup_terraform_process(
     request: TerraformProcess,
     terraform: TerraformTool,
+    mkdir: MkdirBinary,
     platform: Platform,
 ) -> Process:
     downloaded_terraform = await Get(
@@ -441,8 +439,8 @@ async def setup_terraform_process(
         path.append(user_path)
     extra_env_vars["PATH"] = os.pathsep.join(path)
 
-    if request.use_provider_cache:
-        extra_env_vars["TF_PLUGIN_CACHE_DIR"] = os.path.join("{chroot}", terraform.plugin_cache_dir)
+    tf_plugin_cache_dir = os.path.join(terraform.plugin_cache_dir, request.chdir)
+    extra_env_vars["TF_PLUGIN_CACHE_DIR"] = os.path.join("{chroot}", tf_plugin_cache_dir)
 
     env = EnvironmentVars({**env, **extra_env_vars})
 
