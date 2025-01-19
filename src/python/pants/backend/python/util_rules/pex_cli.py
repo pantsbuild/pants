@@ -140,7 +140,7 @@ class PexKeyringConfigurationResponse:
     """Response containing credentials to expose to Pex/Pip via simulating the `keyring` package's
     binary."""
 
-    # Nested map from SITE -> USER -> PASSWORD.
+    # Nested map from SITE -> (USER, PASSWORD).
     credentials: FrozenDict[str, tuple[str, str]] | None
 
 
