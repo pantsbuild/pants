@@ -414,7 +414,7 @@ async def setup_pex_cli_process(
         if "PATH" in env:
             env["PATH"] = f"{{chroot}}/{keyring_script_parent_path}:{env['PATH']}"
         else:
-            env["PATH"] = "{chroot}/{keyring_script_parent_path}"
+            env["PATH"] = f"{{chroot}}/{keyring_script_parent_path}"
 
     return Process(
         normalized_argv,
