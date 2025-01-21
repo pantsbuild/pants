@@ -153,7 +153,7 @@ async fn load_without_validation_missing() {
 
 async fn assert_store(provider: &Provider, testdata: &TestData) {
     let result = provider.operator.read(&test_path(testdata)).await.unwrap();
-    assert_eq!(result, testdata.bytes());
+    assert_eq!(result.to_bytes(), testdata.bytes());
 }
 
 #[tokio::test]
@@ -182,7 +182,7 @@ async fn store_bytes_empty() {
     // We don't actually store an empty file.
     assert!(!provider
         .operator
-        .is_exist(&test_path(&testdata))
+        .exists(&test_path(&testdata))
         .await
         .unwrap());
 }
@@ -237,7 +237,7 @@ async fn store_file_empty_file() {
     // We don't actually store an empty file.
     assert!(!provider
         .operator
-        .is_exist(&test_path(&testdata))
+        .exists(&test_path(&testdata))
         .await
         .unwrap());
 }
