@@ -19,6 +19,7 @@ from pants.backend.nfpm.util_rules.generate_config import (
     generate_nfpm_yaml,
 )
 from pants.backend.nfpm.util_rules.generate_config import rules as generate_config_rules
+from pants.backend.nfpm.util_rules.inject_config import rules as inject_config_rules
 from pants.backend.nfpm.util_rules.sandbox import (
     NfpmContentSandboxRequest,
     populate_nfpm_content_sandbox,
@@ -160,6 +161,7 @@ def rules():
     return [
         *package.rules(),
         *field_sets_rules(),
+        *inject_config_rules(),
         *generate_config_rules(),
         *sandbox_rules(),
         *collect_rules(),

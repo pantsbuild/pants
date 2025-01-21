@@ -161,10 +161,10 @@ pub enum ChildOutput {
 ///
 /// Collect the outputs of a child process.
 ///
-pub async fn collect_child_outputs<'a, 'b>(
+pub async fn collect_child_outputs<'a>(
     stdout: &'a mut BytesMut,
     stderr: &'a mut BytesMut,
-    mut stream: BoxStream<'b, Result<ChildOutput, String>>,
+    mut stream: BoxStream<'_, Result<ChildOutput, String>>,
 ) -> Result<i32, String> {
     let mut exit_code = 1;
 

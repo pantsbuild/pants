@@ -7,14 +7,14 @@
     "features": {
       "ghcr.io/devcontainers/features/docker-in-docker:2": {},
       "ghcr.io/devcontainers/features/python:1": {
-        "version": "3.11.10"
+        "version": "3.11.11"
       },
       "ghcr.io/stuartleeks/dev-container-features/shell-history:0": {}
     },
     "customizations": {
       "vscode": {
         "extensions": [
-          // VS Code extensions installed by the Python feature.
+          // These following VS Code extensions are installed by the Python feature.
           // See: https://github.com/devcontainers/features/tree/main/src/python#vs-code-extensions
           // "ms-python.python",
           // "ms-python.vscode-pylance",
@@ -40,9 +40,9 @@
           "python.analysis.extraPaths": ["src/python"],
           "black-formatter.args": ["--config=pyproject.toml"],
           "flake8.args": ["--config=build-support/flake8/.flake8"],
-          "flake8.path": ["dist/export/python/virtualenvs/flake8/3.11.10/bin/flake8"],
+          "flake8.path": ["dist/export/python/virtualenvs/flake8/3.11.11/bin/flake8"],
           "mypy-type-checker.args": ["--config-file=pyproject.toml"],
-          "mypy-type-checker.path": ["dist/export/python/virtualenvs/mypy/3.11.10/bin/mypy"],
+          "mypy-type-checker.path": ["dist/export/python/virtualenvs/mypy/3.11.11/bin/mypy"],
           "rust-analyzer.linkedProjects": ["src/rust/engine/Cargo.toml"]
         }
       }
