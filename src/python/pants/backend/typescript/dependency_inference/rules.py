@@ -25,6 +25,7 @@ from pants.backend.javascript.package_json import (
 )
 from pants.backend.javascript.subsystems.nodejs_infer import NodeJSInfer
 from pants.backend.javascript.target_types import JS_FILE_EXTENSIONS
+from pants.backend.tsx.target_types import TSX_FILE_EXTENSIONS
 from pants.backend.typescript import tsconfig
 from pants.backend.typescript.target_types import (
     TS_FILE_EXTENSIONS,
@@ -77,18 +78,13 @@ def _create_inference_metadata(
     )
 
 
-async def _prepare_inference_metadata(address: Address, file_path: str) -> InferenceMetadata:
-    owning_pkg, maybe_config = await concurrently(
-        find_owning_package(OwningNodePackageRequest(address)),
-        find_parent_ts_config(ParentTSConfigRequest(file_path, "tsconfig.json"), **implicitly()),
-    )
-
+async def _prepare_inference_metadata(owning_pkg, maybe_config, spec_path) -> InferenceMetadata:
     if not owning_pkg.target:
         return InferenceMetadata.javascript(
             (
                 os.path.dirname(maybe_config.ts_config.path)
                 if maybe_config.ts_config
-                else address.spec_path
+                else spec_path
             ),
             {},
             maybe_config.ts_config.resolution_root_dir if maybe_config.ts_config else None,
@@ -98,7 +94,6 @@ async def _prepare_inference_metadata(address: Address, file_path: str) -> Infer
         await subpath_imports_for_source(owning_pkg.target[PackageJsonSourceField]),
         maybe_config.ts_config,
     )
-
 
 @rule
 async def infer_typescript_source_dependencies(
@@ -112,7 +107,11 @@ async def infer_typescript_source_dependencies(
     sources = await Get(
         HydratedSources, HydrateSourcesRequest(source, for_sources_types=[TypeScriptSourceField])
     )
-    metadata = await _prepare_inference_metadata(request.field_set.address, source.file_path)
+    owning_pkg, maybe_config = await concurrently(
+        find_owning_package(OwningNodePackageRequest(request.field_set.address)),
+        find_parent_ts_config(ParentTSConfigRequest(source.file_path, "tsconfig.json"), **implicitly()),
+    )
+    metadata = await _prepare_inference_metadata(owning_pkg, maybe_config, request.field_set.address.spec_path)
 
     import_strings, candidate_pkgs = await concurrently(
         parse_javascript_deps(NativeDependenciesRequest(sources.snapshot.digest, metadata)),
@@ -128,7 +127,8 @@ async def infer_typescript_source_dependencies(
                 _determine_import_from_candidates(
                     candidates,
                     candidate_pkgs,
-                    file_extensions=TS_FILE_EXTENSIONS + JS_FILE_EXTENSIONS,
+                    tsconfig=maybe_config.ts_config,
+                    file_extensions=TS_FILE_EXTENSIONS + JS_FILE_EXTENSIONS + TSX_FILE_EXTENSIONS,
                 )
                 for string, candidates in import_strings.imports.items()
             ),
