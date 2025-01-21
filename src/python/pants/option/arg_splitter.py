@@ -5,26 +5,9 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass
-from typing import Iterable, Iterator, Sequence
 
-from pants.base.deprecated import warn_or_error
-from pants.engine.internals.native_engine import PyArgSplitter, PyGoalInfo
-from pants.option.scope import ScopeInfo
-
-
-class ArgSplitterError(Exception):
-    pass
-
-
-@dataclass(frozen=True)
-class SplitArgs:
-    """The result of splitting args."""
-
-    builtin_or_auxiliary_goal: str | None  # Requested builtin goal (explicitly or implicitly).
-    goals: list[str]  # Explicitly requested goals.
-    unknown_goals: list[str]  # Any unknown goals.
-    specs: list[str]  # The specifications for what to run against, e.g. the targets or files/dirs.
-    passthru: list[str]  # Any remaining args specified after a -- separator.
+# TODO: Move these remaining classes elsewhere (probably in the help package), and
+#  delete this file.
 
 
 class HelpRequest(ABC):
@@ -64,63 +47,3 @@ class NoGoalHelp(HelpRequest):
 # the goal help output.
 NO_GOAL_NAME = "__no_goal"
 UNKNOWN_GOAL_NAME = "__unknown_goal"
-
-
-class ArgSplitter:
-    """Splits a command-line into scoped sets of flags and a set of specs.
-
-    Recognizes, e.g.:
-
-    pants check --foo lint target1: dir f.ext
-    pants --global-opt check target1: dir f.ext --check-flag
-    pants --check-flag check target1: dir f.ext
-    pants goal -- passthru foo
-    """
-
-    def __init__(self, known_scope_infos: Iterable[ScopeInfo], buildroot: str) -> None:
-        self._known_goal_scopes = dict(self._get_known_goal_scopes(known_scope_infos))
-        native_known_goals = tuple(
-            PyGoalInfo(si.scope, si.is_builtin, si.is_auxiliary, si.scope_aliases)
-            for si in known_scope_infos
-            if si.is_goal
-        )
-        self._native_arg_splitter = PyArgSplitter(buildroot, native_known_goals)
-
-    @staticmethod
-    def _get_known_goal_scopes(
-        known_scope_infos: Iterable[ScopeInfo],
-    ) -> Iterator[tuple[str, ScopeInfo]]:
-        for si in known_scope_infos:
-            if not si.is_goal:
-                continue
-            yield si.scope, si
-            for alias in si.scope_aliases:
-                yield alias, si
-
-    def split_args(self, args: Sequence[str]) -> SplitArgs:
-        native_split_args = self._native_arg_splitter.split_args(tuple(args))
-
-        for goal in native_split_args.goals():
-            si = self._known_goal_scopes.get(goal)
-            if not si or not si.scope:
-                continue  # Should never happen.
-
-            if (
-                si.deprecated_scope
-                and goal == si.deprecated_scope
-                and si.subsystem_cls
-                and si.deprecated_scope_removal_version
-            ):
-                warn_or_error(
-                    si.deprecated_scope_removal_version,
-                    f"the {si.deprecated_scope} goal",
-                    f"The {si.deprecated_scope} goal was renamed to {si.subsystem_cls.options_scope}",
-                )
-
-        return SplitArgs(
-            builtin_or_auxiliary_goal=native_split_args.builtin_or_auxiliary_goal(),
-            goals=native_split_args.goals(),
-            unknown_goals=native_split_args.unknown_goals(),
-            specs=native_split_args.specs(),
-            passthru=native_split_args.passthru(),
-        )

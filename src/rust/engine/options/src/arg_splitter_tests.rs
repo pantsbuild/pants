@@ -1,7 +1,7 @@
 // Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use crate::arg_splitter::{ArgSplitter, SplitArgs, NO_GOAL_NAME, UNKNOWN_GOAL_NAME};
+use crate::arg_splitter::{ArgSplitter, PantsCommand, NO_GOAL_NAME, UNKNOWN_GOAL_NAME};
 use crate::scope::GoalInfo;
 use shlex;
 use std::fs::File;
@@ -12,7 +12,7 @@ fn _sv(v: &[&str]) -> Vec<String> {
     v.iter().map(|s| String::from(*s)).collect()
 }
 
-fn shlex_and_split_args(build_root: Option<&Path>, args_str: &str) -> SplitArgs {
+fn shlex_and_split_args(build_root: Option<&Path>, args_str: &str) -> PantsCommand {
     ArgSplitter::new(
         &build_root.unwrap_or(TempDir::new().unwrap().path()),
         vec![
@@ -27,7 +27,15 @@ fn shlex_and_split_args(build_root: Option<&Path>, args_str: &str) -> SplitArgs 
             GoalInfo::new("version", true, false, vec!["-v", "-V"]),
         ],
     )
-    .split_args(shlex::split(args_str).unwrap())
+    .split_args(
+        shlex::split(args_str)
+            .unwrap()
+            .into_iter()
+            .skip(1)
+            .collect(),
+    )
+    // Note that for readability the cmd lines in the test include the arg[0] binary name,
+    // which we skip here.
 }
 
 #[test]
@@ -35,7 +43,7 @@ fn test_spec_detection() {
     #[track_caller]
     fn assert_spec(build_root: Option<&Path>, maybe_spec: &str) {
         assert_eq!(
-            SplitArgs {
+            PantsCommand {
                 builtin_or_auxiliary_goal: Some(NO_GOAL_NAME.to_string()),
                 goals: vec![],
                 unknown_goals: vec![],
@@ -49,7 +57,7 @@ fn test_spec_detection() {
     #[track_caller]
     fn assert_goal(build_root: Option<&Path>, spec: &str) {
         assert_eq!(
-            SplitArgs {
+            PantsCommand {
                 builtin_or_auxiliary_goal: Some(UNKNOWN_GOAL_NAME.to_string()),
                 goals: vec![],
                 unknown_goals: _sv(&[spec]),
@@ -102,7 +110,7 @@ fn test_valid_arg_splits() {
     #[track_caller]
     fn assert(goals: &[&str], specs: &[&str], args_str: &str) {
         assert_eq!(
-            SplitArgs {
+            PantsCommand {
                 builtin_or_auxiliary_goal: None,
                 goals: _sv(goals),
                 unknown_goals: vec![],
@@ -158,7 +166,7 @@ fn test_valid_arg_splits() {
 #[test]
 fn test_passthru_args() {
     assert_eq!(
-        SplitArgs {
+        PantsCommand {
             builtin_or_auxiliary_goal: None,
             goals: _sv(&["test"]),
             unknown_goals: vec![],
@@ -169,7 +177,7 @@ fn test_passthru_args() {
     );
 
     assert_eq!(
-        SplitArgs {
+        PantsCommand {
             builtin_or_auxiliary_goal: None,
             goals: _sv(&["check", "test"]),
             unknown_goals: vec![],
@@ -191,7 +199,7 @@ fn test_passthru_args() {
 #[test]
 fn test_split_args_simple() {
     assert_eq!(
-        SplitArgs {
+        PantsCommand {
             builtin_or_auxiliary_goal: Some(NO_GOAL_NAME.to_string()),
             goals: vec![],
             unknown_goals: vec![],
@@ -202,7 +210,7 @@ fn test_split_args_simple() {
     );
 
     assert_eq!(
-        SplitArgs {
+        PantsCommand {
             builtin_or_auxiliary_goal: Some("help".to_string()),
             goals: vec![],
             unknown_goals: vec![],
@@ -213,7 +221,7 @@ fn test_split_args_simple() {
     );
 
     assert_eq!(
-        SplitArgs {
+        PantsCommand {
             builtin_or_auxiliary_goal: None,
             goals: _sv(&["fmt", "check"]),
             unknown_goals: vec![],
@@ -224,7 +232,7 @@ fn test_split_args_simple() {
     );
 
     assert_eq!(
-        SplitArgs {
+        PantsCommand {
             builtin_or_auxiliary_goal: None,
             goals: _sv(&["fmt", "check"]),
             unknown_goals: vec![],
@@ -239,7 +247,7 @@ fn test_split_args_simple() {
     );
 
     assert_eq!(
-        SplitArgs {
+        PantsCommand {
             builtin_or_auxiliary_goal: None,
             goals: _sv(&["run"]),
             unknown_goals: vec![],
@@ -250,7 +258,7 @@ fn test_split_args_simple() {
     );
 
     assert_eq!(
-        SplitArgs {
+        PantsCommand {
             builtin_or_auxiliary_goal: Some("help".to_string()),
             goals: vec![],
             unknown_goals: vec![],
@@ -261,7 +269,7 @@ fn test_split_args_simple() {
     );
 
     assert_eq!(
-        SplitArgs {
+        PantsCommand {
             builtin_or_auxiliary_goal: Some("help".to_string()),
             goals: _sv(&["test"]),
             unknown_goals: vec![],
@@ -272,7 +280,7 @@ fn test_split_args_simple() {
     );
 
     assert_eq!(
-        SplitArgs {
+        PantsCommand {
             builtin_or_auxiliary_goal: Some("help".to_string()),
             goals: _sv(&["test"]),
             unknown_goals: vec![],
@@ -286,7 +294,7 @@ fn test_split_args_simple() {
 #[test]
 fn test_split_args_short_flags() {
     assert_eq!(
-        SplitArgs {
+        PantsCommand {
             builtin_or_auxiliary_goal: None,
             goals: _sv(&["run"]),
             unknown_goals: vec![],
@@ -297,7 +305,7 @@ fn test_split_args_short_flags() {
     );
 
     assert_eq!(
-        SplitArgs {
+        PantsCommand {
             builtin_or_auxiliary_goal: None,
             goals: _sv(&["run"]),
             unknown_goals: vec![],
@@ -314,7 +322,7 @@ fn test_help() {
     #[track_caller]
     fn assert_help(args_str: &str, expected_goals: Vec<&str>, expected_specs: Vec<&str>) {
         assert_eq!(
-            SplitArgs {
+            PantsCommand {
                 builtin_or_auxiliary_goal: Some("help".to_string()),
                 goals: _sv(&expected_goals),
                 unknown_goals: vec![],
@@ -352,7 +360,7 @@ fn test_help() {
     #[track_caller]
     fn assert_help_advanced(args_str: &str, expected_goals: Vec<&str>, expected_specs: Vec<&str>) {
         assert_eq!(
-            SplitArgs {
+            PantsCommand {
                 builtin_or_auxiliary_goal: Some("help-advanced".to_string()),
                 goals: _sv(&expected_goals),
                 unknown_goals: vec![],
@@ -388,7 +396,7 @@ fn test_help() {
     assert_help_advanced("pants --help-advanced help", vec!["help"], vec![]);
 
     assert_eq!(
-        SplitArgs {
+        PantsCommand {
             builtin_or_auxiliary_goal: Some("help-all".to_string()),
             goals: vec![],
             unknown_goals: vec![],

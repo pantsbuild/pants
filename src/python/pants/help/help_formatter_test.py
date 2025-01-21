@@ -68,6 +68,7 @@ class TestOptionHelpFormatter:
             allow_pantsrc=False,
             include_derivation=True,
             known_scopes_to_flags={},
+            known_goals=[],
         )
 
     @classmethod

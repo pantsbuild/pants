@@ -22,7 +22,13 @@ def registrar() -> OptionRegistrar:
 @pytest.fixture
 def native_parser() -> NativeOptionParser:
     return NativeOptionParser(
-        [], {}, [], allow_pantsrc=False, include_derivation=True, known_scopes_to_flags={}
+        [],
+        {},
+        [],
+        allow_pantsrc=False,
+        include_derivation=True,
+        known_scopes_to_flags={},
+        known_goals=[],
     )
 
 
