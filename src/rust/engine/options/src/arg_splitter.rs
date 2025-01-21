@@ -42,11 +42,8 @@ impl PantsCommand {
 
     pub fn add_specs(self, extra_specs: Vec<String>) -> Self {
         Self {
-            builtin_or_auxiliary_goal: self.builtin_or_auxiliary_goal,
-            goals: self.goals,
-            unknown_goals: self.unknown_goals,
             specs: [self.specs, extra_specs].concat(),
-            passthru: self.passthru,
+            ..self
         }
     }
 }
