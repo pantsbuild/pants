@@ -10,7 +10,7 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     name: AlexTereshenkov/cheeseshop-query
     permissions: {}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -95,7 +95,7 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     name: Ars-Linguistica/mlconjug3
     permissions: {}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -147,7 +147,7 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     name: OpenSaMD/OpenSaMD
     permissions: {}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -232,7 +232,7 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     name: StackStorm/st2
     permissions: {}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -330,7 +330,7 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     name: fucina/treb
     permissions: {}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -402,7 +402,7 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     name: ghandic/jsf
     permissions: {}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -464,7 +464,7 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     name: komprenilo/liga
     permissions: {}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -516,7 +516,7 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     name: lablup/backend.ai
     permissions: {}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -606,7 +606,7 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     name: mitodl/ol-django
     permissions: {}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -660,7 +660,7 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     name: mitodl/ol-infrastructure
     permissions: {}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -712,7 +712,7 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     name: naccdata/flywheel-gear-extensions
     permissions: {}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -775,7 +775,7 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     name: pantsbuild/example-adhoc
     permissions: {}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -841,7 +841,7 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     name: pantsbuild/example-codegen
     permissions: {}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -938,7 +938,7 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     name: pantsbuild/example-django
     permissions: {}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1024,7 +1024,7 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     name: pantsbuild/example-docker
     permissions: {}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1109,7 +1109,7 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     name: pantsbuild/example-golang
     permissions: {}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1198,7 +1198,7 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     name: pantsbuild/example-jvm
     permissions: {}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1283,7 +1283,7 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     name: pantsbuild/example-kotlin
     permissions: {}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1368,7 +1368,7 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     name: pantsbuild/example-python
     permissions: {}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1453,7 +1453,7 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     name: pantsbuild/example-visibility
     permissions: {}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1528,7 +1528,7 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     name: pantsbuild/scie-pants
     permissions: {}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4

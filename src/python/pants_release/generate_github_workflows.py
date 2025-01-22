@@ -1077,7 +1077,7 @@ def cache_comparison_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
 
     jobs = {
         "cache_comparison": {
-            "runs-on": "ubuntu-latest",
+            "runs-on": "ubuntu-22.04",
             "timeout-minutes": 90,
             "steps": [
                 *checkout(),
@@ -1125,7 +1125,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
     jobs = {
         "release_info": {
             "name": "Create draft release and output info",
-            "runs-on": "ubuntu-latest",
+            "runs-on": "ubuntu-22.04",
             "if": IS_PANTS_OWNER,
             "steps": [
                 {
@@ -1195,7 +1195,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
         },
         **wheels_jobs,
         "publish": {
-            "runs-on": "ubuntu-latest",
+            "runs-on": "ubuntu-22.04",
             "needs": [*wheels_job_names, "release_info"],
             "if": f"{IS_PANTS_OWNER} && needs.release_info.outputs.is-release == 'true'",
             "env": {
@@ -1544,7 +1544,7 @@ def public_repos() -> PublicReposOutput:
         }
         return {
             "name": repo.name,
-            "runs-on": "ubuntu-latest",
+            "runs-on": "ubuntu-22.04",
             "env": job_env,
             # we're running untrusted code, so this token shouldn't be able to do anything. We also
             # need to be sure we don't add any secrets to the job
@@ -1757,7 +1757,7 @@ def generate() -> dict[Path, str]:
             },
             "jobs": {
                 "audit": {
-                    "runs-on": "ubuntu-latest",
+                    "runs-on": "ubuntu-22.04",
                     "if": IS_PANTS_OWNER,
                     "steps": [
                         *checkout(),
