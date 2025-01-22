@@ -7,18 +7,45 @@ use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
+// These are the names for the built in goals to print help message when there is no goal, or any
+// unknown goals respectively. They begin with underlines to exclude them from the list of goals in
+// the goal help output.
+pub const NO_GOAL_NAME: &str = "__no_goal";
+pub const UNKNOWN_GOAL_NAME: &str = "__unknown_goal";
+
 lazy_static! {
     static ref SPEC_RE: Regex = Regex::new(r"[/\\.:*#]").unwrap();
     static ref SINGLE_DASH_FLAGS: HashSet<&'static str> =
         HashSet::from(["-ltrace", "-ldebug", "-linfo", "-lwarn", "-lerror", "-h", "-v", "-V"]);
 }
 
-#[derive(Debug, Eq, PartialEq)]
-pub struct SplitArgs {
-    pub goals: Vec<String>,         // The requested known goals.
-    pub unknown_goals: Vec<String>, // Any requested but unknown goals.
-    pub specs: Vec<String>,         // What to run against, e.g. targets or files/dirs.
-    pub passthru: Vec<String>,      // Any remaining args specified after a -- separator.
+// The details of a Pants invocation command, not including option flags.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PantsCommand {
+    pub builtin_or_auxiliary_goal: Option<String>, // Requested builtin/auxiliary goal.
+    pub goals: Vec<String>,                        // Requested known goals.
+    pub unknown_goals: Vec<String>,                // Any requested but unknown goals.
+    pub specs: Vec<String>, // What to run against, e.g. targets or files/dirs.
+    pub passthru: Vec<String>, // Any remaining args specified after a -- separator.
+}
+
+impl PantsCommand {
+    pub fn empty() -> Self {
+        Self {
+            builtin_or_auxiliary_goal: None,
+            goals: vec![],
+            unknown_goals: vec![],
+            specs: vec![],
+            passthru: vec![],
+        }
+    }
+
+    pub fn add_specs(self, extra_specs: Vec<String>) -> Self {
+        Self {
+            specs: [self.specs, extra_specs].concat(),
+            ..self
+        }
+    }
 }
 
 pub struct ArgSplitter {
@@ -27,7 +54,7 @@ pub struct ArgSplitter {
 }
 
 impl ArgSplitter {
-    pub fn new<I: IntoIterator<Item = GoalInfo>>(build_root: &Path, known_goals: I) -> ArgSplitter {
+    pub fn new<I: IntoIterator<Item = GoalInfo>>(build_root: &Path, known_goals: I) -> Self {
         let mut known_goals_map = HashMap::new();
         for goal_info in known_goals.into_iter() {
             for alias in &goal_info.aliases {
@@ -36,13 +63,15 @@ impl ArgSplitter {
             known_goals_map.insert(goal_info.scope_name.to_owned(), goal_info);
         }
 
-        ArgSplitter {
+        Self {
             build_root: build_root.to_owned(),
             known_goals: known_goals_map,
         }
     }
 
-    pub fn split_args(&self, args: Vec<String>) -> SplitArgs {
+    // Split the given args, which must *not* include the argv[0] process name.
+    pub fn split_args(&self, args: Vec<String>) -> PantsCommand {
+        let mut builtin_or_auxiliary_goal: Option<String> = None;
         let mut goals = vec![];
         let mut unknown_goals: Vec<String> = vec![];
         let mut specs = vec![];
@@ -50,8 +79,6 @@ impl ArgSplitter {
 
         let mut unconsumed_args = args;
         unconsumed_args.reverse();
-        // The first arg is the binary name, so skip it.
-        unconsumed_args.pop();
 
         // Scan the args looking for goals and specs.
         // The one hard case is a single word like `foo` with no path- or target-like qualities
@@ -64,10 +91,21 @@ impl ArgSplitter {
         //  We might want to deprecate this behavior and consistently assume that these are goals,
         //  since the user can always add a `./` prefix to override.
         while let Some(arg) = unconsumed_args.pop() {
+            let goal_info = self.known_goals.get(&arg);
             // Some special flags, such as `-v` and `--help`, are implemented as
             // goal aliases, so we must check this before checking for any dash prefixes.
-            if self.known_goals.contains_key(arg.as_str()) {
-                goals.push(arg);
+            if let Some(goal_info) = goal_info {
+                let canonical_scope_name = goal_info.scope_name.clone();
+                if (goal_info.is_auxiliary || goal_info.is_builtin)
+                    && (builtin_or_auxiliary_goal.is_none() || arg.starts_with("-"))
+                {
+                    if let Some(boag) = builtin_or_auxiliary_goal {
+                        goals.push(boag);
+                    }
+                    builtin_or_auxiliary_goal = Some(canonical_scope_name);
+                } else {
+                    goals.push(canonical_scope_name);
+                }
             } else if arg == "--" {
                 // Arg is the passthru delimiter.
                 for item in unconsumed_args.drain(..) {
@@ -90,7 +128,16 @@ impl ArgSplitter {
             }
         }
 
-        SplitArgs {
+        if builtin_or_auxiliary_goal.is_none() {
+            if !unknown_goals.is_empty() {
+                builtin_or_auxiliary_goal = Some(UNKNOWN_GOAL_NAME.to_string());
+            } else if goals.is_empty() {
+                builtin_or_auxiliary_goal = Some(NO_GOAL_NAME.to_string())
+            }
+        }
+
+        PantsCommand {
+            builtin_or_auxiliary_goal,
             goals,
             unknown_goals,
             specs,

@@ -31,6 +31,7 @@ from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
 from pants.backend.nfpm.target_types import APK_FIELDS, ARCHLINUX_FIELDS, DEB_FIELDS, RPM_FIELDS
 from pants.core.goals.package import PackageFieldSet
 from pants.engine.fs import FileEntry
+from pants.engine.internals.native_engine import Field
 from pants.engine.rules import collect_rules
 from pants.engine.target import DescriptionField, FieldSet, Target
 from pants.engine.unions import UnionRule, union
@@ -48,7 +49,13 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
     description: DescriptionField
     scripts: NfpmPackageScriptsField
 
-    def nfpm_config(self, tgt: Target, *, default_mtime: str | None) -> dict[str, Any]:
+    def nfpm_config(
+        self,
+        tgt: Target,
+        injected_fields: FrozenDict[type[Field], Field],
+        *,
+        default_mtime: str | None,
+    ) -> dict[str, Any]:
         config: dict[str, Any] = {
             # pants handles any globbing before passing contents to nFPM.
             "disable_globbing": True,
@@ -84,7 +91,7 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
                 # field opted out of being included in this config (like dependencies)
                 continue
 
-            field_value = tgt[field].value
+            field_value = injected_fields.get(field, tgt[field]).value
             # NB: This assumes that nfpm fields have 'none_is_valid_value=False'.
             if not field.required and field_value is None:
                 # Omit any undefined optional values unless default applied.
@@ -137,8 +144,14 @@ class NfpmRpmPackageFieldSet(NfpmPackageFieldSet):
     required_fields = RPM_FIELDS
     ghost_contents: NfpmRpmGhostContents
 
-    def nfpm_config(self, tgt: Target, *, default_mtime: str | None) -> dict[str, Any]:
-        config = super().nfpm_config(tgt, default_mtime=default_mtime)
+    def nfpm_config(
+        self,
+        tgt: Target,
+        injected_fields: FrozenDict[type[Field], Field],
+        *,
+        default_mtime: str | None,
+    ) -> dict[str, Any]:
+        config = super().nfpm_config(tgt, injected_fields, default_mtime=default_mtime)
         config["contents"].extend(self.ghost_contents.nfpm_contents)
         return config
 

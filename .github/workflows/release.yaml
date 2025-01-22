@@ -230,7 +230,7 @@ jobs:
       with:
         key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain')
           }}-v2
-        path: '~/.rustup/toolchains/1.83.0-*
+        path: '~/.rustup/toolchains/1.84.0-*
 
           ~/.rustup/update-hashes
 
@@ -327,7 +327,7 @@ jobs:
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain')
           }}-v2
-        path: '~/.rustup/toolchains/1.83.0-*
+        path: '~/.rustup/toolchains/1.84.0-*
 
           ~/.rustup/update-hashes
 
@@ -429,7 +429,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.83.0-*
+        path: '~/.rustup/toolchains/1.84.0-*
 
           ~/.rustup/update-hashes
 

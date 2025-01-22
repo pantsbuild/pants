@@ -118,17 +118,11 @@ class OptionsBootstrapper:
         union_membership: UnionMembership,
         allow_unknown_options: bool = False,
     ) -> Options:
-        extra_specs = []
-        for spec_file in self.bootstrap_options.for_global_scope().spec_files:
-            with open(spec_file) as f:
-                extra_specs.extend([line for line in [line.strip() for line in f] if line])
-
         options = Options.create(
             args=self.args,
             env=self.env,
             config_sources=None,
             known_scope_infos=known_scope_infos,
-            extra_specs=extra_specs,
             allow_unknown_options=allow_unknown_options,
             allow_pantsrc=self.allow_pantsrc,
         )

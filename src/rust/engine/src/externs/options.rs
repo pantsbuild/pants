@@ -6,22 +6,20 @@ use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
 use pyo3::{prelude::*, BoundObject};
 
 use options::{
-    apply_dict_edits, apply_list_edits, ArgSplitter, Args, ConfigSource, DictEdit, DictEditAction,
-    Env, GoalInfo, ListEdit, ListEditAction, ListOptionValue, OptionId, OptionParser,
-    OptionalOptionValue, Scope, Source, SplitArgs, Val,
+    apply_dict_edits, apply_list_edits, Args, ConfigSource, DictEdit, DictEditAction, Env,
+    GoalInfo, ListEdit, ListEditAction, ListOptionValue, OptionId, OptionParser,
+    OptionalOptionValue, PantsCommand, Scope, Source, Val,
 };
 
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
 
 pyo3::import_exception!(pants.option.errors, ParseError);
 
 pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyGoalInfo>()?;
     m.add_class::<PyOptionId>()?;
-    m.add_class::<PySplitArgs>()?;
-    m.add_class::<PyArgSplitter>()?;
+    m.add_class::<PyPantsCommand>()?;
     m.add_class::<PyConfigSource>()?;
     m.add_class::<PyOptionParser>()?;
     Ok(())
@@ -172,10 +170,14 @@ impl PyOptionId {
 }
 
 #[pyclass]
-struct PySplitArgs(SplitArgs);
+struct PyPantsCommand(PantsCommand);
 
 #[pymethods]
-impl PySplitArgs {
+impl PyPantsCommand {
+    fn builtin_or_auxiliary_goal(&self) -> &Option<String> {
+        &self.0.builtin_or_auxiliary_goal
+    }
+
     fn goals(&self) -> &Vec<String> {
         &self.0.goals
     }
@@ -190,27 +192,6 @@ impl PySplitArgs {
 
     fn passthru(&self) -> &Vec<String> {
         &self.0.passthru
-    }
-}
-
-#[pyclass]
-struct PyArgSplitter(ArgSplitter);
-
-#[pymethods]
-impl PyArgSplitter {
-    #[new]
-    fn __new__(build_root: &str, known_goals: Vec<Bound<'_, PyGoalInfo>>) -> Self {
-        Self(ArgSplitter::new(
-            Path::new(build_root),
-            known_goals
-                .iter()
-                .map(|pgi| pgi.borrow().0.clone())
-                .collect::<Vec<_>>(),
-        ))
-    }
-
-    fn split_args(&self, args: Vec<String>) -> PySplitArgs {
-        PySplitArgs(self.0.split_args(args))
     }
 }
 
@@ -414,7 +395,7 @@ impl PyOptionParser {
 #[pymethods]
 impl PyOptionParser {
     #[new]
-    #[pyo3(signature = (args, env, configs, allow_pantsrc, include_derivation, known_scopes_to_flags))]
+    #[pyo3(signature = (args, env, configs, allow_pantsrc, include_derivation, known_scopes_to_flags, known_goals))]
     fn __new__<'py>(
         args: Vec<String>,
         env: &Bound<'py, PyDict>,
@@ -422,6 +403,7 @@ impl PyOptionParser {
         allow_pantsrc: bool,
         include_derivation: bool,
         known_scopes_to_flags: Option<HashMap<String, HashSet<String>>>,
+        known_goals: Option<Vec<Bound<'py, PyGoalInfo>>>,
     ) -> PyResult<Self> {
         let env = env
             .items()
@@ -437,6 +419,7 @@ impl PyOptionParser {
             include_derivation,
             None,
             known_scopes_to_flags.as_ref(),
+            known_goals.map(|gis| gis.iter().map(|gi| gi.borrow().0.clone()).collect()),
         )
         .map_err(ParseError::new_err)?;
         Ok(Self(option_parser))
@@ -569,12 +552,8 @@ impl PyOptionParser {
         ))
     }
 
-    fn get_args(&self) -> PyResult<Vec<String>> {
-        self.0.get_args().map_err(PyException::new_err)
-    }
-
-    fn get_passthrough_args(&self) -> PyResult<Option<Vec<String>>> {
-        self.0.get_passthrough_args().map_err(PyException::new_err)
+    fn get_command(&self) -> PyPantsCommand {
+        PyPantsCommand(self.0.command.clone())
     }
 
     fn get_unconsumed_flags(&self) -> PyResult<HashMap<String, Vec<String>>> {
