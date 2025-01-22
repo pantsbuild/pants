@@ -8,7 +8,7 @@ import logging
 import os.path
 from dataclasses import dataclass, field
 from itertools import groupby
-from typing import ClassVar, Collection, Iterable, Mapping, Sequence, cast
+from typing import ClassVar, Collection, Iterable, Mapping, Sequence
 
 from nodesemver import min_satisfying
 

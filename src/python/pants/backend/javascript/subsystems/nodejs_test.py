@@ -45,13 +45,8 @@ from pants.core.util_rules.system_binaries import (
     BinaryShimsRequest,
 )
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import (
-    CreateDigest,
-    Digest,
-    MergeDigests,
-    Snapshot,
-)
-from pants.engine.internals.native_engine import EMPTY_DIGEST
+from pants.engine.fs import CreateDigest, Digest, MergeDigests, Snapshot
+from pants.engine.internals.native_engine import EMPTY_DIGEST, EMPTY_FILE_DIGEST
 from pants.engine.platform import Platform
 from pants.engine.process import (
     Process,
@@ -421,7 +416,9 @@ def test_node_process_environment_with_tools(rule_runner: RuleRunner) -> None:
         # These are the tools that are required by default for any nodejs process to work.
         default_required_tools = ["sh", "bash", "mkdir", "rm", "touch", "which", "sed", "dirname"]
         if request.binary_name in default_required_tools:
-            return BinaryPaths(request.binary_name, paths=[BinaryPath(f"/bin/{request.binary_name}")])
+            return BinaryPaths(
+                request.binary_name, paths=[BinaryPath(f"/bin/{request.binary_name}")]
+            )
 
         if request.binary_name == "real-tool":
             return BinaryPaths("real-tool", paths=[BinaryPath("/bin/a-real-tool")])
@@ -443,9 +440,9 @@ def test_node_process_environment_with_tools(rule_runner: RuleRunner) -> None:
     def mock_enable_corepack_process_result(request: Process) -> ProcessResult:
         return ProcessResult(
             stdout=b"",
-            stdout_digest=EMPTY_DIGEST,
+            stdout_digest=EMPTY_FILE_DIGEST,
             stderr=b"",
-            stderr_digest=EMPTY_DIGEST,
+            stderr_digest=EMPTY_FILE_DIGEST,
             output_digest=EMPTY_DIGEST,
             metadata=ProcessResultMetadata(
                 0,
