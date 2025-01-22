@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 use async_lock::{Mutex, MutexGuardArc};
 use futures::future;
 use lazy_static::lazy_static;
-use log::{debug, info};
+use log::debug;
 use regex::Regex;
 use tempfile::TempDir;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
