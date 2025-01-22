@@ -16,6 +16,8 @@ from pants.engine.fs import Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, collect_rules, goal_rule
 from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.util.docutil import doc_url
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +53,26 @@ class FmtFilesRequest(AbstractFmtRequest, FixFilesRequest):
 
 class FmtSubsystem(GoalSubsystem):
     name = "fmt"
-    help = "Autoformat source code."
+    help = softwrap(
+        f"""
+        Autoformat source code.
+
+        This goal runs tools that make 'syntactic' changes to source code, where the meaning of the
+        code doesn't (usually) change.
+
+        See also:
+
+        - [The `fix` goal]({doc_url('reference/goals/fix')}) will run code-editing tools that may make semantic
+          changes, not just syntactic ones.
+
+        - [The `lint` goal]({doc_url('reference/goals/lint')}) will validate code is formatted, by running these
+          formatters and checking there's no change.
+
+        - Documentation about formatters for various ecosystems, such as:
+          [Python]({doc_url('docs/python/overview/linters-and-formatters')}), [Go]({doc_url('docs/go#gofmt')}),
+          [JVM]({doc_url('jvm/java-and-scala#lint-and-format')}), [Shell]({doc_url('docs/shell#shfmt-autoformatter')}).
+        """
+    )
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:

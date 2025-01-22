@@ -1,14 +1,14 @@
 ---
-    title: Linters and formatters
+    title: Linters, formatters and fixers
     sidebar_position: 4
 ---
 
-How to activate and use the Python linters and formatters bundled with Pants.
+How to activate and use the Python linters, formatters and fixers bundled with Pants.
 
 ---
 
 :::tip Benefit of Pants: consistent interface
-`pants lint` and `pants fmt` will consistently and correctly run all your linters and formatters. No need to remember how to invoke each tool, and no need to write custom scripts.
+`pants lint`, `pants fmt` and `pants fix` will consistently and correctly run all your linters, formatters and fixers. No need to remember how to invoke each tool, and no need to write custom scripts.
 
 This consistent interface even works with multiple languages, like running Python linters at the same time as Go, Shell, Java, and Scala.
 :::
@@ -24,22 +24,22 @@ Pants does several things to speed up running formatters and linters:
 
 ## Activating linters and formatters
 
-Linter/formatter support is implemented in separate [backends](../../using-pants/key-concepts/backends.mdx) so that they are easy to opt in to individually:
+Linter/formatter/fixer support is implemented in separate [backends](../../using-pants/key-concepts/backends.mdx) so that they are easy to opt in to individually:
 
-| Backend                                              | Tool                                                                                                                       |
-| :--------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------- |
-| `pants.backend.python.lint.bandit`                   | [Bandit](https://bandit.readthedocs.io/en/latest/): security linter                                                        |
-| `pants.backend.python.lint.black`                    | [Black](https://black.readthedocs.io/en/stable/): code formatter                                                           |
-| `pants.backend.python.lint.docformatter`             | [Docformatter](https://pypi.org/project/docformatter/): docstring formatter                                                |
-| `pants.backend.python.lint.flake8`                   | [Flake8](https://flake8.pycqa.org/en/latest/): style and bug linter                                                        |
-| `pants.backend.python.lint.isort`                    | [isort](https://readthedocs.org/projects/isort/): import statement formatter                                               |
-| `pants.backend.python.lint.pydocstyle`               | [Pydocstyle](https://pypi.org/project/pydocstyle/): docstring linter                                                       |
-| `pants.backend.python.lint.pylint`                   | [Pylint](https://pylint.pycqa.org/): style and bug linter                                                                  |
-| `pants.backend.python.lint.yapf`                     | [Yapf](https://github.com/google/yapf): code formatter                                                                     |
-| `pants.backend.python.lint.autoflake`                | [Autoflake](https://github.com/myint/autoflake): remove unused imports                                                     |
-| `pants.backend.python.lint.pyupgrade`                | [Pyupgrade](https://github.com/asottile/pyupgrade): automatically update code to use modern Python idioms like `f-strings` |
-| `pants.backend.experimental.python.lint.ruff.check`  | [Ruff (for linting)](https://docs.astral.sh/ruff/linter/): an extremely fast Python linter, written in Rust.               |
-| `pants.backend.experimental.python.lint.ruff.format` | [Ruff (for formatting)](https://docs.astral.sh/ruff/formatter/): an extremely fast Python code formatter, written in Rust. |
+| Backend                                                                                    | Tool                                                                                                                       |
+|:-------------------------------------------------------------------------------------------|:---------------------------------------------------------------------------------------------------------------------------|
+| [`pants.backend.python.lint.bandit`](../../../reference/subsystems/bandit)                 | [Bandit](https://bandit.readthedocs.io/en/latest/): security linter                                                        |
+| [`pants.backend.python.lint.black`](../../../reference/subsystems/black)                   | [Black](https://black.readthedocs.io/en/stable/): code formatter                                                           |
+| [`pants.backend.python.lint.docformatter`](../../../reference/subsystems/docformatter)     | [Docformatter](https://pypi.org/project/docformatter/): docstring formatter                                                |
+| [`pants.backend.python.lint.flake8`](../../../reference/subsystems/flake8)                 | [Flake8](https://flake8.pycqa.org/en/latest/): style and bug linter                                                        |
+| [`pants.backend.python.lint.isort`](../../../reference/subsystems/isort)                   | [isort](https://readthedocs.org/projects/isort/): import statement formatter                                               |
+| [`pants.backend.python.lint.pydocstyle`](../../../reference/subsystems/pydocstyle)         | [Pydocstyle](https://pypi.org/project/pydocstyle/): docstring linter                                                       |
+| [`pants.backend.python.lint.pylint`](../../../reference/subsystems/pylint)                 | [Pylint](https://pylint.pycqa.org/): style and bug linter                                                                  |
+| [`pants.backend.python.lint.yapf`](../../../reference/subsystems/yapf)                     | [Yapf](https://github.com/google/yapf): code formatter                                                                     |
+| [`pants.backend.python.lint.autoflake`](../../../reference/subsystems/autoflake)           | [Autoflake](https://github.com/myint/autoflake): remove unused imports                                                     |
+| [`pants.backend.python.lint.pyupgrade`](../../../reference/subsystems/pyupgrade)           | [Pyupgrade](https://github.com/asottile/pyupgrade): automatically update code to use modern Python idioms like `f-strings` |
+| [`pants.backend.experimental.python.lint.ruff.check`](../../../reference/subsystems/ruff)  | [Ruff (for linting)](https://docs.astral.sh/ruff/linter/): an extremely fast Python linter, written in Rust.               |
+| [`pants.backend.experimental.python.lint.ruff.format`](../../../reference/subsystems/ruff) | [Ruff (for formatting)](https://docs.astral.sh/ruff/formatter/): an extremely fast Python code formatter, written in Rust. |
 
 To enable, add the appropriate backends in `pants.toml`:
 
@@ -53,7 +53,7 @@ backend_packages = [
 ]
 ```
 
-You should now be able to run `pants lint`, and possibly `pants fmt`:
+You should now be able to run [`pants lint`](../../../reference/goals/lint), and possibly [`pants fmt`](../../../reference/goals/fmt) or [`pants fix`](../../../reference/goals/fix):
 
 ```
 $ pants lint src/py/project.py
@@ -75,7 +75,7 @@ MyPy is run with the [check goal](../goals/check.mdx), rather than `lint`.
 
 ## Configuring the tools, for example, adding plugins
 
-You can configure each formatter and linter using these options:
+You can configure each formatter, fixer and linter using these options:
 
 | Option                    | What it does                                                                                                                                                              |
 | :------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -131,7 +131,7 @@ For tools that autodiscover config files—such as Black, isort, Flake8, and Pyl
 If your config file is in a non-standard location, you must instead set the `--config` option, e.g. `[isort].config`. This will ensure that the config file is included in the process's sandbox and Pants will instruct the tool to load the config.
 :::
 
-## Running only certain formatters or linters
+## Running only certain formatters, fixers or linters
 
 To temporarily skip a tool, use the `--skip` option for that tool. For example, run:
 
@@ -139,7 +139,7 @@ To temporarily skip a tool, use the `--skip` option for that tool. For example, 
 ❯  pants --black-skip --flake8-skip lint ::
 ```
 
-You can also use the `--lint-only` and `--fmt-only` options with the names of the tools:
+You can also use the `--lint-only`, `--fmt-only` or `--fix-only` options with the names of the tools:
 
 ```bash
 ❯ pants lint --only=black ::
@@ -169,7 +169,7 @@ python_tests(
 )
 ```
 
-When you run `pants fmt` and `pants lint`, Pants will ignore any files belonging to skipped targets.
+When you run `pants fmt`, `pants fix` and `pants lint`, Pants will ignore any files belonging to skipped targets.
 
 ## Tip: only run over changed files
 
@@ -191,9 +191,9 @@ Pants will find which files have changed and only run over those files. See [Adv
 
 ## Tips for specific tools
 
-### Order of `backend_packages` matters for `fmt`
+### Order of `backend_packages` matters for `fmt` and `fix`
 
-Pants will run formatters in the order in which they appear in the `backend_packages` option.
+Pants will run formatters and fixers in the order in which they appear in the `backend_packages` option.
 
 For example, you likely want to put Autoflake (which removes unused imports) before Black and Isort, which will format your import statements.
 
