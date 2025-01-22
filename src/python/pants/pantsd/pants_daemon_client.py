@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass
 
+from pants.engine.internals.native_engine import py_bin_name
 from pants.option.options import Options
 from pants.pantsd import pants_daemon
 from pants.pantsd.process_manager import PantsDaemonProcessManager
@@ -55,6 +57,8 @@ class PantsDaemonClient(PantsDaemonProcessManager):
 
         N.B. This should always be called under care of the `lifecycle_lock`.
         """
+        # Propagate the bin name to pantsd.
+        os.environ["__PANTS_BIN_NAME"] = py_bin_name()
         self.terminate()
         logger.debug("Launching pantsd")
         self.daemon_spawn()

@@ -3,14 +3,15 @@
 
 use crate::config::ConfigSource;
 use crate::{
-    option_id, Args, BuildRoot, DictEdit, DictEditAction, Env, ListEdit, ListEditAction,
-    OptionParser, Source, Val,
+    munge_bin_name, option_id, Args, BuildRoot, DictEdit, DictEditAction, Env, ListEdit,
+    ListEditAction, OptionParser, Source, Val,
 };
 use itertools::Itertools;
 use maplit::{hashmap, hashset};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
+use std::path::PathBuf;
 use tempfile::TempDir;
 
 fn config_source() -> Source {
@@ -814,4 +815,28 @@ fn test_spec_files() {
         .command
         .specs
     );
+}
+
+#[test]
+fn test_munge_bin_name() {
+    let buildroot = BuildRoot::for_path(PathBuf::from("/my/repo"));
+
+    let munge = |input: &str, expected: &str| {
+        assert_eq!(
+            expected.to_owned(),
+            munge_bin_name(input.to_owned(), &buildroot)
+        );
+    };
+
+    munge("pants", "pants");
+    munge("pantsv2", "pantsv2");
+    munge("bin/pantsv2", "bin/pantsv2");
+    munge("./pants", "./pants");
+    munge(buildroot.join("pants").to_str().unwrap(), "./pants");
+    munge(
+        buildroot.join("bin").join("pants").to_str().unwrap(),
+        "./bin/pants",
+    );
+    munge("/foo/pants", "pants");
+    munge("/foo/bar/pants", "pants");
 }
