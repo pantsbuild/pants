@@ -159,6 +159,38 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
             return f"{self.package_manager}@{self.package_managers[self.package_manager]}"
         return self.package_manager
 
+    _tools = StrListOption(
+        default=[],
+        help=softwrap(
+            """
+            List any additional executable tools required for node processes to work. The paths to
+            these tools will be included in the PATH used in the execution sandbox, so that
+            they may be used by nodejs processes execution.
+            """
+        ),
+        advanced=True,
+    )
+
+    _optional_tools = StrListOption(
+        default=[],
+        help=softwrap(
+            """
+            List any additional executable which are not mandatory for node processes to work, but
+            which should be included if available. The paths to these tools will be included in the
+            PATH used in the execution sandbox, so that they may be used by nodejs processes execution.
+            """
+        ),
+        advanced=True,
+    )
+
+    @property
+    def tools(self) -> tuple[str, ...]:
+        return tuple(sorted(set(self._tools)))
+
+    @property
+    def optional_tools(self) -> tuple[str, ...]:
+        return tuple(sorted(set(self._optional_tools)))
+
     class EnvironmentAware(ExecutableSearchPathsOptionMixin, Subsystem.EnvironmentAware):
         search_path = StrListOption(
             default=["<PATH>"],
@@ -348,24 +380,66 @@ async def add_corepack_shims_to_digest(
     return await Get(Digest, MergeDigests((binary_digest, enable_corepack_result.output_digest)))
 
 
+async def get_nodejs_process_tools_shims(
+    *,
+    tools: Sequence[str],
+    optional_tools: Sequence[str],
+    search_path: Sequence[str],
+    rationale: str,
+) -> BinaryShims:
+    requests = [
+        BinaryPathRequest(binary_name=binary_name, search_path=search_path)
+        for binary_name in (*tools, *optional_tools)
+    ]
+    paths = await MultiGet(Get(BinaryPaths, BinaryPathRequest, request) for request in requests)
+    required_tools_paths = [
+        path.first_path_or_raise(request, rationale=rationale)
+        for request, path in zip(requests, paths)
+        if request.binary_name in tools
+    ]
+    optional_tools_paths = [
+        path.first_path
+        for request, path in zip(requests, paths)
+        if request.binary_name in optional_tools and path.first_path
+    ]
+
+    tools_shims = await Get(
+        BinaryShims,
+        BinaryShimsRequest,
+        BinaryShimsRequest.for_paths(
+            *required_tools_paths,
+            *optional_tools_paths,
+            rationale=rationale,
+        ),
+    )
+
+    return tools_shims
+
+
 @rule(level=LogLevel.DEBUG)
 async def node_process_environment(
-    binaries: NodeJSBinaries, nodejs: NodeJS.EnvironmentAware
+    binaries: NodeJSBinaries,
+    nodejs: NodeJS,
+    nodejs_environment: NodeJS.EnvironmentAware,
 ) -> NodeJSProcessEnvironment:
     default_required_tools = ["sh", "bash"]
     tools_used_by_setup_scripts = ["mkdir", "rm", "touch", "which"]
     pnpm_shim_tools = ["sed", "dirname"]
-    binary_shims = await Get(
-        BinaryShims,
-        BinaryShimsRequest.for_binaries(
+
+    binary_shims = await get_nodejs_process_tools_shims(
+        tools=[
             *default_required_tools,
             *tools_used_by_setup_scripts,
             *pnpm_shim_tools,
-            rationale="execute a nodejs process",
-            search_path=nodejs.executable_search_path,
-        ),
+            *nodejs.tools,
+        ],
+        optional_tools=nodejs.optional_tools,
+        search_path=nodejs_environment.executable_search_path,
+        rationale="execute a nodejs process",
     )
-    corepack_env_vars = await Get(EnvironmentVars, EnvironmentVarsRequest(nodejs.corepack_env_vars))
+    corepack_env_vars = await Get(
+        EnvironmentVars, EnvironmentVarsRequest(nodejs_environment.corepack_env_vars)
+    )
     binary_digest_with_shims = await add_corepack_shims_to_digest(
         binaries, binary_shims, corepack_env_vars
     )

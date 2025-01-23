@@ -13,7 +13,7 @@ from typing import Any, Mapping, Optional, Sequence, Tuple
 from pants.base.build_environment import get_buildroot
 from pants.engine.fs import FileContent
 from pants.engine.internals import native_engine
-from pants.engine.internals.native_engine import PyConfigSource
+from pants.engine.internals.native_engine import PyConfigSource, PyGoalInfo, PyPantsCommand
 from pants.option.custom_types import _flatten_shlexed_list, dir_option, file_option, shell_str
 from pants.option.errors import BooleanOptionNameWithNo, OptionsError, ParseError
 from pants.option.option_types import OptionInfo
@@ -64,6 +64,7 @@ class NativeOptionParser:
         allow_pantsrc: bool,
         include_derivation: bool,
         known_scopes_to_flags: dict[str, frozenset[str]],
+        known_goals: Sequence[PyGoalInfo],
     ):
         # Remember these args so this object can clone itself in with_derivation() below.
         (
@@ -72,12 +73,14 @@ class NativeOptionParser:
             self._config_sources,
             self._allow_pantsrc,
             self._known_scopes_to_flags,
+            self._known_goals,
         ) = (
             args,
             env,
             config_sources,
             allow_pantsrc,
             known_scopes_to_flags,
+            known_goals,
         )
 
         py_config_sources = (
@@ -92,6 +95,7 @@ class NativeOptionParser:
             allow_pantsrc,
             include_derivation,
             known_scopes_to_flags,
+            known_goals,
         )
 
         # (type, member_type) -> native get for that type.
@@ -119,6 +123,7 @@ class NativeOptionParser:
             allow_pantsrc=self._allow_pantsrc,
             include_derivation=True,
             known_scopes_to_flags=self._known_scopes_to_flags,
+            known_goals=self._known_goals,
         )
 
     def get_value(self, *, scope: str, option_info: OptionInfo) -> Tuple[Any, Rank]:
@@ -242,7 +247,7 @@ class NativeOptionParser:
                 elif callable(member_type):
                     v = [apply_callable(member_type, x) for x in v]
                 if passthrough:
-                    v += self._native_parser.get_passthrough_args() or []
+                    v += self._native_parser.get_command().passthru() or []
             elif callable(option_type):
                 v = apply_callable(option_type, v)
             return v
@@ -285,8 +290,8 @@ class NativeOptionParser:
 
         return (val, rank, derivation)
 
-    def get_args(self) -> tuple[str, ...]:
-        return tuple(self._native_parser.get_args())
+    def get_command(self) -> PyPantsCommand:
+        return self._native_parser.get_command()
 
     def get_unconsumed_flags(self) -> dict[str, tuple[str, ...]]:
         return {k: tuple(v) for k, v in self._native_parser.get_unconsumed_flags().items()}

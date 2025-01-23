@@ -22,6 +22,7 @@ from pants.backend.javascript.subsystems.nodejs import (
     _BinaryPathsPerVersion,
     _get_nvm_root,
     determine_nodejs_binaries,
+    node_process_environment,
 )
 from pants.backend.javascript.target_types import JSSourcesGeneratorTarget
 from pants.backend.python import target_types_rules
@@ -35,11 +36,25 @@ from pants.core.util_rules.search_paths import (
     VersionManagerSearchPaths,
     VersionManagerSearchPathsRequest,
 )
-from pants.core.util_rules.system_binaries import BinaryNotFoundError, BinaryPath, BinaryShims
+from pants.core.util_rules.system_binaries import (
+    BinaryNotFoundError,
+    BinaryPath,
+    BinaryPathRequest,
+    BinaryPaths,
+    BinaryShims,
+    BinaryShimsRequest,
+)
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, Snapshot
+from pants.engine.fs import CreateDigest, Digest, MergeDigests, Snapshot
+from pants.engine.internals.native_engine import EMPTY_DIGEST, EMPTY_FILE_DIGEST
 from pants.engine.platform import Platform
-from pants.engine.process import ProcessResult
+from pants.engine.process import (
+    Process,
+    ProcessExecutionEnvironment,
+    ProcessResult,
+    ProcessResultMetadata,
+)
+from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.contextutil import temporary_dir
 
@@ -381,7 +396,7 @@ def test_get_nvm_root(env: dict[str, str], expected_directory: str | None) -> No
         ),
     ],
 )
-def test_process_environment_variables_are_merged(
+def test_node_process_environment_variables_are_merged(
     extra_environment: dict[str, str] | None, expected: dict[str, str]
 ) -> None:
     environment = NodeJSProcessEnvironment(
@@ -394,3 +409,106 @@ def test_process_environment_variables_are_merged(
     )
 
     assert environment.to_env_dict(extra_environment) == expected
+
+
+def test_node_process_environment_with_tools(rule_runner: RuleRunner) -> None:
+    def mock_get_binary_path(request: BinaryPathRequest) -> BinaryPaths:
+        # These are the tools that are required by default for any nodejs process to work.
+        default_required_tools = ["sh", "bash", "mkdir", "rm", "touch", "which", "sed", "dirname"]
+        if request.binary_name in default_required_tools:
+            return BinaryPaths(
+                request.binary_name, paths=[BinaryPath(f"/bin/{request.binary_name}")]
+            )
+
+        if request.binary_name == "real-tool":
+            return BinaryPaths("real-tool", paths=[BinaryPath("/bin/a-real-tool")])
+
+        return BinaryPaths(request.binary_name, ())
+
+    def mock_get_binary_shims(request: BinaryShimsRequest) -> BinaryShims:
+        return BinaryShims(EMPTY_DIGEST, "cache_name")
+
+    def mock_environment_vars(request: EnvironmentVarsRequest) -> EnvironmentVars:
+        return EnvironmentVars({})
+
+    def mock_create_digest(request: CreateDigest) -> Digest:
+        return EMPTY_DIGEST
+
+    def mock_merge_digests(request: MergeDigests) -> Digest:
+        return EMPTY_DIGEST
+
+    def mock_enable_corepack_process_result(request: Process) -> ProcessResult:
+        return ProcessResult(
+            stdout=b"",
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr=b"",
+            stderr_digest=EMPTY_FILE_DIGEST,
+            output_digest=EMPTY_DIGEST,
+            metadata=ProcessResultMetadata(
+                0,
+                ProcessExecutionEnvironment(
+                    environment_name=None,
+                    platform=Platform.create_for_localhost().value,
+                    docker_image=None,
+                    remote_execution=False,
+                    remote_execution_extra_platform_properties=[],
+                    execute_in_workspace=False,
+                ),
+                "ran_locally",
+                0,
+            ),
+        )
+
+    def run(tools: list[str], optional_tools: list[str]) -> None:
+        nodejs_binaries = NodeJSBinaries("__node/v18")
+        nodejs_options = create_subsystem(
+            NodeJS,
+            tools=tools,
+            optional_tools=optional_tools,
+        )
+        nodejs_options_env_aware = MagicMock(spec=NodeJS.EnvironmentAware)
+
+        run_rule_with_mocks(
+            node_process_environment,
+            rule_args=[nodejs_binaries, nodejs_options, nodejs_options_env_aware],
+            mock_gets=[
+                MockGet(
+                    output_type=BinaryPaths,
+                    input_types=(BinaryPathRequest,),
+                    mock=mock_get_binary_path,
+                ),
+                MockGet(
+                    output_type=BinaryShims,
+                    input_types=(BinaryShimsRequest,),
+                    mock=mock_get_binary_shims,
+                ),
+                MockGet(
+                    output_type=EnvironmentVars,
+                    input_types=(EnvironmentVarsRequest,),
+                    mock=mock_environment_vars,
+                ),
+                MockGet(
+                    output_type=Digest,
+                    input_types=(CreateDigest,),
+                    mock=mock_create_digest,
+                ),
+                MockGet(
+                    output_type=Digest,
+                    input_types=(MergeDigests,),
+                    mock=mock_merge_digests,
+                ),
+                MockGet(
+                    output_type=ProcessResult,
+                    input_types=(Process,),
+                    mock=mock_enable_corepack_process_result,
+                ),
+            ],
+        )
+
+    run(tools=["real-tool"], optional_tools=[])
+
+    with pytest.raises(BinaryNotFoundError, match="Cannot find `nonexistent-tool`"):
+        run(tools=["real-tool", "nonexistent-tool"], optional_tools=[])
+
+    # Optional non-existent tool should still succeed.
+    run(tools=[], optional_tools=["real-tool", "nonexistent-tool"])
