@@ -11,7 +11,7 @@ from textwrap import dedent
 from pants.base.build_environment import get_buildroot
 from pants.engine.unions import UnionMembership
 from pants.option.option_value_container import OptionValueContainer
-from pants.option.options_bootstrapper import OptionsBootstrapper, munge_bin_name
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import ScopeInfo
 from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.logging import LogLevel
@@ -352,22 +352,6 @@ class TestOptionsBootstrapper:
         )
         logdir = ob.bootstrap_options.for_global_scope().logdir
         assert "logdir1" == logdir
-
-
-def test_munge_bin_name():
-    build_root = "/my/repo"
-
-    def munge(bin_name: str) -> str:
-        return munge_bin_name(bin_name, build_root)
-
-    assert munge("pants") == "pants"
-    assert munge("pantsv2") == "pantsv2"
-    assert munge("bin/pantsv2") == "bin/pantsv2"
-    assert munge("./pants") == "./pants"
-    assert munge(os.path.join(build_root, "pants")) == "./pants"
-    assert munge(os.path.join(build_root, "bin", "pants")) == "./bin/pants"
-    assert munge("/foo/pants") == "pants"
-    assert munge("/foo/bar/pants") == "pants"
 
 
 def test_file_spec_args() -> None:

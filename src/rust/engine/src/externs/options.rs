@@ -6,8 +6,8 @@ use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
 use pyo3::{prelude::*, BoundObject};
 
 use options::{
-    apply_dict_edits, apply_list_edits, Args, ConfigSource, DictEdit, DictEditAction, Env,
-    GoalInfo, ListEdit, ListEditAction, ListOptionValue, OptionId, OptionParser,
+    apply_dict_edits, apply_list_edits, bin_name, Args, ConfigSource, DictEdit, DictEditAction,
+    Env, GoalInfo, ListEdit, ListEditAction, ListOptionValue, OptionId, OptionParser,
     OptionalOptionValue, PantsCommand, Scope, Source, Val,
 };
 
@@ -16,7 +16,13 @@ use std::collections::{HashMap, HashSet};
 
 pyo3::import_exception!(pants.option.errors, ParseError);
 
+#[pyfunction]
+fn py_bin_name() -> String {
+    bin_name()
+}
+
 pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(py_bin_name, m)?)?;
     m.add_class::<PyGoalInfo>()?;
     m.add_class::<PyOptionId>()?;
     m.add_class::<PyPantsCommand>()?;

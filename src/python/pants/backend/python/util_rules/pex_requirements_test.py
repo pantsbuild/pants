@@ -209,7 +209,7 @@ def test_validate_lockfiles(
     contains("The `no_binary` arguments have changed", if_=invalid_no_binary)
     contains("The `manylinux` argument has changed", if_=invalid_manylinux)
 
-    contains("./pants generate-lockfiles --resolve=a`")
+    contains("pants generate-lockfiles --resolve=a`")
 
 
 def test_is_probably_pex_json_lockfile():
