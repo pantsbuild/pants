@@ -3,11 +3,10 @@
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Iterable, Mapping, Sequence
 
-from pants.base.build_environment import get_buildroot, pants_version
+from pants.base.build_environment import pants_version
 from pants.base.exceptions import BuildConfigurationError
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import BootstrapOptions, GlobalOptions
@@ -58,16 +57,6 @@ class OptionsBootstrapper:
           decision of whether to respect pantsrc files.
         """
         args = tuple(args)
-        bootstrap_options = cls._create_bootstrap_options(args, env, allow_pantsrc)
-
-        # We need to set this env var to allow various static help strings to reference the
-        # right name (via `pants.util.docutil`), and we need to do it as early as possible to
-        # avoid needing to lazily import code to avoid chicken-and-egg-problems. This is the
-        # earliest place it makes sense to do so and is generically used by both the local and
-        # remote pants runners.
-        os.environ["__PANTS_BIN_NAME"] = munge_bin_name(
-            bootstrap_options.for_global_scope().pants_bin_name, get_buildroot()
-        )
 
         # TODO: We really only need the env vars starting with PANTS_, plus any env
         #  vars used in env.FOO-style interpolation in config files.
@@ -118,17 +107,11 @@ class OptionsBootstrapper:
         union_membership: UnionMembership,
         allow_unknown_options: bool = False,
     ) -> Options:
-        extra_specs = []
-        for spec_file in self.bootstrap_options.for_global_scope().spec_files:
-            with open(spec_file) as f:
-                extra_specs.extend([line for line in [line.strip() for line in f] if line])
-
         options = Options.create(
             args=self.args,
             env=self.env,
             config_sources=None,
             known_scope_infos=known_scope_infos,
-            extra_specs=extra_specs,
             allow_unknown_options=allow_unknown_options,
             allow_pantsrc=self.allow_pantsrc,
         )
@@ -181,19 +164,3 @@ class OptionsBootstrapper:
             )
         GlobalOptions.validate_instance(options.for_global_scope())
         return options
-
-
-def munge_bin_name(pants_bin_name: str, build_root: str) -> str:
-    # Determine a useful bin name to embed in help strings.
-    # The bin name gets embedded in help comments in generated lockfiles,
-    # so we never want to use an abspath.
-    if os.path.isabs(pants_bin_name):
-        pants_bin_name = os.path.realpath(pants_bin_name)
-        build_root = os.path.realpath(os.path.abspath(build_root))
-        # If it's in the buildroot, use the relpath from there. Otherwise use the basename.
-        pants_bin_relpath = os.path.relpath(pants_bin_name, build_root)
-        if pants_bin_relpath.startswith(".."):
-            pants_bin_name = os.path.basename(pants_bin_name)
-        else:
-            pants_bin_name = os.path.join(".", pants_bin_relpath)
-    return pants_bin_name

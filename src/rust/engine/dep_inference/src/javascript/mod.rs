@@ -198,7 +198,7 @@ impl ImportCollector<'_> {
         };
         comment_after_semicolon(node)
             .or_else(|| comment_after_no_semicolon(node))
-            .map_or(false, |comment| contains_pragma(node, comment))
+            .is_some_and(|comment| contains_pragma(node, comment))
     }
 
     fn insert_import(&mut self, import_string: Option<Node>) {

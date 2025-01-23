@@ -77,7 +77,7 @@ class CompletionBuiltinGoal(BuiltinGoal):
         arguments, then we're generating completion options. If there are no passthrough arguments, then we're generating
         a completion script.
         """
-        if options._passthru:
+        if options.native_parser.get_command().passthru():
             completion_options = self._generate_completion_options(options)
             if completion_options:
                 print("\n".join(completion_options))
@@ -121,8 +121,9 @@ class CompletionBuiltinGoal(BuiltinGoal):
         :param options: The options object for the current Pants run.
         :return: A list of candidate completion options.
         """
-        logger.debug(f"Completion passthrough options: {options._passthru}")
-        args = [arg for arg in options._passthru if arg != "pants"]
+        passthru = options.native_parser.get_command().passthru()
+        logger.debug(f"Completion passthrough options: {passthru}")
+        args = [arg for arg in passthru if arg != "pants"]
         current_word = args.pop()
         previous_goal = self._get_previous_goal(args)
         logger.debug(f"Current word is '{current_word}', and previous goal is '{previous_goal}'")
@@ -147,9 +148,7 @@ class CompletionBuiltinGoal(BuiltinGoal):
 
         # If there is a previous goal and current_word does not start with a hyphen, then show remaining goals
         # excluding the goals that are already in the command
-        candidate_goals = [
-            g for g in all_goals if g.startswith(current_word) and g not in options._passthru
-        ]
+        candidate_goals = [g for g in all_goals if g.startswith(current_word) and g not in passthru]
         return candidate_goals
 
     def _get_previous_goal(self, args: list[str]) -> str | None:

@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import json
-import re
 import shlex
 import unittest.mock
 from contextlib import contextmanager
@@ -1069,7 +1068,7 @@ def test_passthru_args_subsystems_and_goals():
 def test_at_most_one_goal_with_passthru_args():
     with pytest.raises(Options.AmbiguousPassthroughError) as exc:
         Options.create(
-            args=["pants", "test", "fmt", "target", "--", "bar", "--baz"],
+            args=["pants", "test", "fmt", "path/to/target", "--", "bar", "--baz"],
             env={},
             config_sources=_create_config(),
             known_scope_infos=[global_scope(), task("test"), task("fmt")],
@@ -1111,86 +1110,6 @@ def test_passthru_args_not_interpreted():
     assert ["from config", "b", "[bar]", "multi token from passthrough"] == options.for_scope(
         "consumer"
     ).string
-
-
-def test_alias() -> None:
-    config0_content = dedent(
-        """\
-                [cli.alias]
-                pyupgrade = "--backend-packages=pants.backend.python.lint.pyupgrade fmt"
-                green = "lint test"
-                """
-    )
-
-    config1_content = dedent(
-        """\
-                [cli]
-                alias.add = {green = "lint test --force check"}
-                """
-    )
-
-    config2_content = dedent(
-        """\
-                [cli]
-                alias = "+{'shell': 'repl'}"
-                """
-    )
-
-    config_sources = [
-        FileContent("config0", config0_content.encode()),
-        FileContent("config1", config1_content.encode()),
-        FileContent("config2", config2_content.encode()),
-    ]
-
-    options = Options.create(
-        args=["pants", "pyupgrade", "green"],
-        env={},
-        config_sources=config_sources,
-        known_scope_infos=[],
-    )
-
-    assert (
-        "--backend-packages=pants.backend.python.lint.pyupgrade",
-        "fmt",
-        "lint",
-        "test",
-        "--force",
-        "check",
-    ) == options.get_args()
-
-    options = Options.create(
-        args=["pants", "shell"],
-        env={},
-        config_sources=config_sources,
-        known_scope_infos=[],
-    )
-    assert ("repl",) == options.get_args()
-
-
-def test_alias_validation() -> None:
-    config_content = dedent(
-        """\
-                [cli.alias]
-                foo = "fail_on_known_scope"
-                """
-    )
-    config_sources = [
-        FileContent("config", config_content.encode()),
-    ]
-
-    with pytest.raises(
-        ParseError,
-        match=re.escape(
-            "Invalid alias in `[cli].alias` option: foo. This is already a "
-            "registered goal or subsytem."
-        ),
-    ):
-        Options.create(
-            args=["pants"],
-            env={},
-            config_sources=config_sources,
-            known_scope_infos=[ScopeInfo("foo")],
-        )
 
 
 def test_global_scope_env_vars():

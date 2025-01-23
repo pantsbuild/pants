@@ -74,7 +74,7 @@ def test_creates_npm_run_requests_package_json_scripts(rule_runner: RuleRunner) 
         tgt = rule_runner.get_target(Address("src/js", generated_name=script))
         result = rule_runner.request(RunRequest, [RunNodeBuildScriptFieldSet.create(tgt)])
 
-        assert result.args == ("npm", "--prefix", "{chroot}", "run", script)
+        assert result.args == ("npm", "--prefix", "{chroot}/src/js", "run", script)
 
 
 def test_creates_yarn_run_requests_package_json_scripts(rule_runner: RuleRunner) -> None:
@@ -117,7 +117,7 @@ def test_creates_yarn_run_requests_package_json_scripts(rule_runner: RuleRunner)
         tgt = rule_runner.get_target(Address("src/js", generated_name=script))
         result = rule_runner.request(RunRequest, [RunNodeBuildScriptFieldSet.create(tgt)])
 
-        assert result.args == ("yarn", "--cwd", "{chroot}", "run", script)
+        assert result.args == ("yarn", "--cwd", "{chroot}/src/js", "run", script)
 
 
 def test_extra_envs(rule_runner: RuleRunner) -> None:

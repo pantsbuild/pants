@@ -16,19 +16,23 @@ from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.goal.builtin_goal import BuiltinGoal
 from pants.help.help_info_extracter import HelpInfoExtracter
-from pants.help.help_printer import HelpPrinter
-from pants.init.engine_initializer import GraphSession
-from pants.option.arg_splitter import (
-    NO_GOAL_NAME,
-    UNKNOWN_GOAL_NAME,
+from pants.help.help_printer import (
     AllHelp,
+    HelpPrinter,
     HelpRequest,
     NoGoalHelp,
     ThingHelp,
     UnknownGoalHelp,
     VersionHelp,
 )
+from pants.init.engine_initializer import GraphSession
 from pants.option.options import Options
+
+# These are the names for the built in goals to print help message when there is no goal, or any
+# unknown goals respectively. They begin with underlines to exclude them from the list of goals in
+# the goal help output.
+NO_GOAL_NAME = "__no_goal"
+UNKNOWN_GOAL_NAME = "__unknown_goal"
 
 
 class HelpBuiltinGoalBase(BuiltinGoal):
