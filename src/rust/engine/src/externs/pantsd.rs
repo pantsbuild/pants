@@ -29,6 +29,7 @@ fn pantsd_fingerprint_compute(expected_option_names: HashSet<String>) -> PyResul
         false,
         None,
         None,
+        None,
     )
     .map_err(PyException::new_err)?;
     let options = pantsd::fingerprinted_options(&build_root).map_err(PyException::new_err)?;

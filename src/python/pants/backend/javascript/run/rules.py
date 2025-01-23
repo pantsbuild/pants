@@ -45,6 +45,7 @@ async def run_node_build_script(
     target_env_vars = await Get(
         EnvironmentVars, EnvironmentVarsRequest(field_set.extra_env_vars.value or ())
     )
+    package_dir = "{chroot}" + "/" + installation.project_env.package_dir()
 
     process = await Get(
         Process,
@@ -52,7 +53,7 @@ async def run_node_build_script(
             installation.project_env,
             args=(
                 *installation.package_manager.current_directory_args,
-                "{chroot}",
+                package_dir,
                 "run",
                 str(field_set.entry_point.value),
             ),

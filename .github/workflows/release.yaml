@@ -230,7 +230,7 @@ jobs:
       with:
         key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain')
           }}-v2
-        path: '~/.rustup/toolchains/1.83.0-*
+        path: '~/.rustup/toolchains/1.84.0-*
 
           ~/.rustup/update-hashes
 
@@ -327,7 +327,7 @@ jobs:
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain')
           }}-v2
-        path: '~/.rustup/toolchains/1.83.0-*
+        path: '~/.rustup/toolchains/1.84.0-*
 
           ~/.rustup/update-hashes
 
@@ -394,7 +394,7 @@ jobs:
     - build_wheels_macos13_x86_64
     - build_wheels_macos14_arm64
     - release_info
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Checkout Pants at Release Tag
       uses: actions/checkout@v4
@@ -429,7 +429,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.83.0-*
+        path: '~/.rustup/toolchains/1.84.0-*
 
           ~/.rustup/update-hashes
 
@@ -520,7 +520,7 @@ jobs:
       is-release: ${{ steps.get_info.outputs.is-release }}
       release-asset-upload-url: ${{ steps.make_draft_release.outputs.release-asset-upload-url
         }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - env:
         REF: ${{ github.event.inputs.ref }}

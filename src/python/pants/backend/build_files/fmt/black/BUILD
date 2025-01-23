@@ -8,6 +8,7 @@ python_tests(
     overrides={
         "integration_test.py": {
             "tags": ["platform_specific_behavior"],
+            "timeout": 120,
         }
     },
 )

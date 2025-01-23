@@ -46,17 +46,7 @@ mod tests;
 
 mod types;
 
-use std::any::Any;
-use std::collections::{BTreeMap, HashMap, HashSet};
-use std::fmt::Debug;
-use std::fs;
-use std::hash::Hash;
-use std::path::Path;
-use std::sync::Arc;
-
-use serde::Deserialize;
-
-pub use self::arg_splitter::{ArgSplitter, SplitArgs};
+pub use self::arg_splitter::{ArgSplitter, PantsCommand};
 pub use self::args::Args;
 use self::args::ArgsReader;
 pub use self::config::ConfigSource;
@@ -67,8 +57,55 @@ use crate::fromfile::FromfileExpander;
 use crate::parse::Parseable;
 pub use build_root::BuildRoot;
 pub use id::OptionId;
+use lazy_static::lazy_static;
+use parking_lot::Mutex;
 pub use scope::{GoalInfo, Scope};
+use serde::Deserialize;
+use std::any::Any;
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fmt::Debug;
+use std::fs;
+use std::hash::Hash;
+use std::path::Path;
+use std::sync::Arc;
 pub use types::OptionType;
+
+lazy_static! {
+    static ref BIN_NAME: Mutex<String> = Mutex::new("pants".to_string());
+}
+
+// NB: This will be called at import time in several Python files to define static help strings
+// (e.g. "help=f'run `{bin_name()} fmt`"). So it must be set early. But on the other hand it can
+// only be set after we parse options and have access to the pants_bin_name option, which may
+// be too late: Some of the files that register options may already be using `bin_name()`.
+//
+// Fortunately, this only applies in pantsd; The native client does not have this problem because
+// it parses options without registration. So we use the __PANTS_BIN_NAME env var to propagate
+// this value from the native client to its spawned pantsd process (see pants_daemon_client.py).
+pub fn bin_name() -> String {
+    if let Ok(bin_name) = std::env::var("__PANTS_BIN_NAME") {
+        bin_name
+    } else {
+        BIN_NAME.lock().clone()
+    }
+}
+
+fn munge_bin_name(pants_bin_name: String, build_root: &BuildRoot) -> String {
+    // Determine a useful bin name to embed in help strings.
+    // The bin name gets embedded in help comments in generated lockfiles,
+    // so we never want to use an abspath.
+    let pants_bin = Path::new(&pants_bin_name);
+    if pants_bin.is_absolute() {
+        if let Ok(suffix) = pants_bin.strip_prefix(build_root.as_path()) {
+            return Path::new(".").join(suffix).to_string_lossy().to_string();
+        }
+        return pants_bin
+            .file_name()
+            .map(|osstr| osstr.to_string_lossy().to_string())
+            .unwrap_or("pants".to_string());
+    }
+    pants_bin_name
+}
 
 // NB: The legacy Python options parser supported dicts with member_type "Any", which means
 // the values can be arbitrarily-nested lists, tuples and dicts, including heterogeneous
@@ -324,6 +361,7 @@ pub struct DictOptionValue<'a> {
 pub struct OptionParser {
     sources: BTreeMap<Source, Arc<dyn OptionsSource>>,
     include_derivation: bool,
+    pub command: PantsCommand,
 }
 
 impl OptionParser {
@@ -336,17 +374,21 @@ impl OptionParser {
         allow_pantsrc: bool,
         include_derivation: bool,
         buildroot: Option<BuildRoot>,
-        // TODO: pass the raw option registration data in instead, so we can also use it
-        //  for validating config files and other uses.
-        //  For now this is just what we need to validate CLI aliases.
+        // TODO: pass the raw option registration data in instead, so that a single
+        //  arg can serve instead of these two args, and can also be used for
+        //  validating config files.
+        //  For now this is just what we need to validate CLI aliases and
+        //  detect goals.
         known_scopes_to_flags: Option<&HashMap<String, HashSet<String>>>,
+        known_goals: Option<Vec<GoalInfo>>,
     ) -> Result<OptionParser, String> {
         let has_provided_configs = config_sources.is_some();
 
         let buildroot = buildroot.unwrap_or(BuildRoot::find()?);
         let buildroot_string = buildroot.convert_to_string()?;
-        let fromfile_expander = FromfileExpander::relative_to(buildroot);
 
+        let arg_splitter = ArgSplitter::new(buildroot.as_path(), known_goals.unwrap_or_default());
+        let fromfile_expander = FromfileExpander::relative_to(buildroot.clone());
         let args_reader = ArgsReader::new(args, fromfile_expander.clone());
         let mut sources: BTreeMap<Source, Arc<dyn OptionsSource>> = BTreeMap::new();
 
@@ -369,6 +411,7 @@ impl OptionParser {
         let mut parser = OptionParser {
             sources: sources.clone(),
             include_derivation: false,
+            command: PantsCommand::empty(),
         };
 
         fn path_join(prefix: &str, suffix: &str) -> String {
@@ -458,6 +501,7 @@ impl OptionParser {
         parser = OptionParser {
             sources: sources.clone(),
             include_derivation: false,
+            command: PantsCommand::empty(),
         };
 
         if allow_pantsrc
@@ -499,6 +543,7 @@ impl OptionParser {
         parser = OptionParser {
             sources: sources.clone(),
             include_derivation: false,
+            command: PantsCommand::empty(),
         };
         let alias_strings = parser
             .parse_dict(&option_id!(["cli"], "alias"), HashMap::new())?
@@ -518,23 +563,64 @@ impl OptionParser {
 
         let alias_map = cli_alias::create_alias_map(known_scopes_to_flags, &alias_strings)?;
 
-        // Step #4: Return the final OptionParser, which reads from
-        // alias-expanded args, env, config and rcfiles.
+        // Step #4: Read any spec_files from alias-expanded args, env, config and rcfiles.
 
         // Add the args reader back in, after expanding aliases.
         let unexpanded_args_reader = unexpanded_args_source
             .as_any()
             .downcast_ref::<ArgsReader>()
             .unwrap();
-        sources.insert(
-            Source::Flag,
-            Arc::new(unexpanded_args_reader.expand_aliases(&alias_map)),
-        );
+        let expanded_args_reader = unexpanded_args_reader.expand_aliases(&alias_map);
 
-        Ok(OptionParser {
-            sources,
+        // Now get the PantsCommand based on the expanded aliases.
+        // For historical reasons, getting the SplitArgs (for goals and specs) is done
+        // in ArgSplitter, in a separate pass from getting the Args (for CLI flags).
+        // TODO: Combine the two passes?
+        let command = arg_splitter.split_args(expanded_args_reader.get_args());
+
+        sources.insert(Source::Flag, Arc::new(expanded_args_reader));
+
+        parser = OptionParser {
+            sources: sources.clone(),
             include_derivation,
-        })
+            command,
+        };
+
+        // Apply the bin name set by the user, if any.
+        if let Ok(val) = parser.parse_string_optional(&option_id!("pants", "bin", "name"), None) {
+            if let Some(bin_name) = val.value {
+                *BIN_NAME.lock() = munge_bin_name(bin_name, &buildroot);
+            }
+        }
+
+        // Step #5: Return the final OptionParser, with any extra specs from spec_files added
+        // to the command.
+
+        let extra_specs = parser
+            .parse_string_list(&option_id!("spec", "files"), vec![])?
+            .value;
+        if extra_specs.is_empty() {
+            Ok(parser)
+        } else {
+            let mut extra_specs = vec![];
+            for spec_file in parser
+                .parse_string_list(&option_id!("spec", "files"), vec![])?
+                .value
+            {
+                extra_specs.extend(
+                    fs::read_to_string(buildroot.as_path().join(&spec_file))
+                        .map_err(|e| e.to_string())?
+                        .lines()
+                        .filter(|s| !s.is_empty())
+                        .map(str::to_string),
+                );
+            }
+            Ok(OptionParser {
+                sources,
+                include_derivation,
+                command: parser.command.add_specs(extra_specs),
+            })
+        }
     }
 
     #[allow(clippy::type_complexity)]

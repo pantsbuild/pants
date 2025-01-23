@@ -5,6 +5,8 @@ import difflib
 import json
 import re
 import textwrap
+from abc import ABC
+from dataclasses import dataclass
 from itertools import cycle
 from typing import Callable, Dict, Iterable, List, Literal, Optional, Set, Tuple, cast
 
@@ -13,17 +15,41 @@ from pants.help.help_formatter import HelpFormatter
 from pants.help.help_info_extracter import AllHelpInfo, HelpJSONEncoder
 from pants.help.help_tools import ToolHelpInfo
 from pants.help.maybe_color import MaybeColor
-from pants.option.arg_splitter import (
-    AllHelp,
-    HelpRequest,
-    NoGoalHelp,
-    ThingHelp,
-    UnknownGoalHelp,
-    VersionHelp,
-)
 from pants.option.scope import GLOBAL_SCOPE
 from pants.util.docutil import bin_name, terminal_width
 from pants.util.strutil import first_paragraph, hard_wrap, pluralize, softwrap
+
+
+class HelpRequest(ABC):
+    """Represents an implicit or explicit request for help by the user."""
+
+
+@dataclass(frozen=True)
+class ThingHelp(HelpRequest):
+    """The user requested help on one or more things: e.g., an options scope or a target type."""
+
+    advanced: bool = False
+    things: tuple[str, ...] = ()
+    likely_specs: tuple[str, ...] = ()
+
+
+class VersionHelp(HelpRequest):
+    """The user asked for the version of this instance of pants."""
+
+
+class AllHelp(HelpRequest):
+    """The user requested a dump of all help info."""
+
+
+@dataclass(frozen=True)
+class UnknownGoalHelp(HelpRequest):
+    """The user specified an unknown goal (or task)."""
+
+    unknown_goals: tuple[str, ...]
+
+
+class NoGoalHelp(HelpRequest):
+    """The user specified no goals."""
 
 
 class HelpPrinter(MaybeColor):
