@@ -46,15 +46,6 @@ mod tests;
 
 mod types;
 
-use serde::Deserialize;
-use std::any::Any;
-use std::collections::{BTreeMap, HashMap, HashSet};
-use std::fmt::Debug;
-use std::fs;
-use std::hash::Hash;
-use std::path::Path;
-use std::sync::Arc;
-
 pub use self::arg_splitter::{ArgSplitter, PantsCommand};
 pub use self::args::Args;
 use self::args::ArgsReader;
@@ -66,8 +57,55 @@ use crate::fromfile::FromfileExpander;
 use crate::parse::Parseable;
 pub use build_root::BuildRoot;
 pub use id::OptionId;
+use lazy_static::lazy_static;
+use parking_lot::Mutex;
 pub use scope::{GoalInfo, Scope};
+use serde::Deserialize;
+use std::any::Any;
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fmt::Debug;
+use std::fs;
+use std::hash::Hash;
+use std::path::Path;
+use std::sync::Arc;
 pub use types::OptionType;
+
+lazy_static! {
+    static ref BIN_NAME: Mutex<String> = Mutex::new("pants".to_string());
+}
+
+// NB: This will be called at import time in several Python files to define static help strings
+// (e.g. "help=f'run `{bin_name()} fmt`"). So it must be set early. But on the other hand it can
+// only be set after we parse options and have access to the pants_bin_name option, which may
+// be too late: Some of the files that register options may already be using `bin_name()`.
+//
+// Fortunately, this only applies in pantsd; The native client does not have this problem because
+// it parses options without registration. So we use the __PANTS_BIN_NAME env var to propagate
+// this value from the native client to its spawned pantsd process (see pants_daemon_client.py).
+pub fn bin_name() -> String {
+    if let Ok(bin_name) = std::env::var("__PANTS_BIN_NAME") {
+        bin_name
+    } else {
+        BIN_NAME.lock().clone()
+    }
+}
+
+fn munge_bin_name(pants_bin_name: String, build_root: &BuildRoot) -> String {
+    // Determine a useful bin name to embed in help strings.
+    // The bin name gets embedded in help comments in generated lockfiles,
+    // so we never want to use an abspath.
+    let pants_bin = Path::new(&pants_bin_name);
+    if pants_bin.is_absolute() {
+        if let Ok(suffix) = pants_bin.strip_prefix(build_root.as_path()) {
+            return Path::new(".").join(suffix).to_string_lossy().to_string();
+        }
+        return pants_bin
+            .file_name()
+            .map(|osstr| osstr.to_string_lossy().to_string())
+            .unwrap_or("pants".to_string());
+    }
+    pants_bin_name
+}
 
 // NB: The legacy Python options parser supported dicts with member_type "Any", which means
 // the values can be arbitrarily-nested lists, tuples and dicts, including heterogeneous
@@ -547,6 +585,13 @@ impl OptionParser {
             include_derivation,
             command,
         };
+
+        // Apply the bin name set by the user, if any.
+        if let Ok(val) = parser.parse_string_optional(&option_id!("pants", "bin", "name"), None) {
+            if let Some(bin_name) = val.value {
+                *BIN_NAME.lock() = munge_bin_name(bin_name, &buildroot);
+            }
+        }
 
         // Step #5: Return the final OptionParser, with any extra specs from spec_files added
         // to the command.

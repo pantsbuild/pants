@@ -224,9 +224,9 @@ def test_specialized_options() -> None:
 
     assert list(collect_options_info(MySubsystem)) == [
         expected_skip_opt_info(
-            "If true, don't use Wrench when running `./pants fmt` and `./pants lint`."
+            "If true, don't use Wrench when running `pants fmt` and `pants lint`."
         ),
-        expected_skip_opt_info("If true, don't use Wrench when running `./pants fmt`."),
+        expected_skip_opt_info("If true, don't use Wrench when running `pants fmt`."),
         expected_args_opt_info(
             "Arguments to pass directly to Wrench, e.g. `--my-subsystem-args='--foo'`."
         ),
@@ -238,7 +238,7 @@ def test_specialized_options() -> None:
         ),
     ]
     assert list(collect_options_info(SubsystemWithName)) == [
-        expected_skip_opt_info("If true, don't use Hammer when running `./pants fmt`."),
+        expected_skip_opt_info("If true, don't use Hammer when running `pants fmt`."),
         expected_args_opt_info(
             "Arguments to pass directly to Hammer, e.g. `--other-subsystem-args='--nail'`."
         ),

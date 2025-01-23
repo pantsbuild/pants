@@ -686,6 +686,8 @@ OptionValueDerivation = list[Tuple[T, int, str]]
 # A tuple (value, rank of value, optional derivation of value).
 OptionValue = Tuple[Optional[T], int, Optional[OptionValueDerivation]]
 
+def py_bin_name() -> str: ...
+
 class PyOptionParser:
     def __init__(
         self,
