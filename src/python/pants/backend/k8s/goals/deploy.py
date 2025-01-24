@@ -137,7 +137,7 @@ async def kubectl_apply_process(
     request: KubectlApply, platform: Platform, kubectl: Kubectl
 ) -> Process:
     tool_relpath = "__kubectl"
-    argv: tuple[str, ...] = (f"{tool_relpath}/{kubectl.generate_exe(platform)}",)
+    argv: tuple[str, ...] = (f"{tool_relpath}/kubectl",)
 
     if request.context is not None:
         argv += ("--context", request.context)

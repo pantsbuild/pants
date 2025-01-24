@@ -119,32 +119,6 @@ class Kubectl(TemplatedExternalTool):
             """
         )
 
-    def apply_configs(
-        self,
-        paths: Sequence[str],
-        input_digest: Digest,
-        platform: Platform,
-        env: Optional[Mapping[str, str]] = None,
-        context: Optional[str] = None,
-    ) -> Process:
-        argv: tuple[str, ...] = (self.generate_exe(platform),)
-
-        if context is not None:
-            argv += ("--context", context)
-
-        argv += ("apply", "-o", "yaml")
-
-        for path in paths:
-            argv += ("-f", path)
-
-        return Process(
-            argv=argv,
-            input_digest=input_digest,
-            cache_scope=ProcessCacheScope.PER_SESSION,
-            description=f"Applying kubernetes config {paths}",
-            env=env,
-        )
-
 
 def rules():
     return collect_rules()
