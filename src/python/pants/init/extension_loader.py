@@ -3,6 +3,7 @@
 
 import importlib
 import logging
+import re
 import traceback
 from typing import Dict, List, Optional
 
@@ -139,6 +140,15 @@ def load_backend(build_configuration: BuildConfiguration.Builder, backend_packag
     :raises: :class:``pants.base.exceptions.BuildConfigurationError`` if there is a problem loading
       the build configuration.
     """
+    backend_package = backend_package.strip()
+    is_templated_backend = ('(' in backend_package) and backend_package.endswith(')')
+    if is_templated_backend:
+        kwargs_str = backend_package[backend_package.find('('):]
+        backend_package = backend_package[:backend_package.find('(')]
+        kwargs = eval('dict' + kwargs_str)
+    else:
+        kwargs = {}
+
     backend_module = backend_package + ".register"
     try:
         module = importlib.import_module(backend_module)
@@ -146,10 +156,13 @@ def load_backend(build_configuration: BuildConfiguration.Builder, backend_packag
         traceback.print_exc()
         raise BackendConfigurationError(f"Failed to load the {backend_module} backend: {ex!r}")
 
+    def return_nothing(**kwargs):
+        return None
+
     def invoke_entrypoint(name: str):
-        entrypoint = getattr(module, name, lambda: None)
+        entrypoint = getattr(module, name, return_nothing)
         try:
-            return entrypoint()
+            return entrypoint(**kwargs)
         except TypeError as e:
             traceback.print_exc()
             raise BackendConfigurationError(
