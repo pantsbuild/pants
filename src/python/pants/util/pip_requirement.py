@@ -7,6 +7,7 @@ import logging
 import urllib.parse
 
 from packaging.requirements import InvalidRequirement, Requirement
+from packaging.specifiers import SpecifierSet
 
 logger = logging.getLogger(__name__)
 
@@ -54,11 +55,11 @@ class PipRequirement:
         return self._req
 
     @property
-    def project_name(self) -> str:
+    def name(self) -> str:
         return self._req.name
 
     @property
-    def specs(self):
+    def specifier_set(self) -> SpecifierSet:
         return self._req.specifier
 
     @property

@@ -241,11 +241,11 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
         first_default_requirement = PipRequirement.parse(cls.default_requirements[0])
         return next(
             _PackageNameAndVersion(
-                name=first_default_requirement.project_name, version=requirement["version"]
+                name=first_default_requirement.name, version=requirement["version"]
             )
             for resolve in lockfile_contents["locked_resolves"]
             for requirement in resolve["locked_requirements"]
-            if requirement["project_name"] == first_default_requirement.project_name
+            if requirement["project_name"] == first_default_requirement.name
         )
 
     def pex_requirements(

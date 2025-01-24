@@ -701,10 +701,10 @@ async def _setup_constraints_repository_pex(
             url_reqs.add(req)
         else:
             name_reqs.add(req)
-            name_req_projects.add(canonicalize_project_name(req.project_name))
+            name_req_projects.add(canonicalize_project_name(req.name))
 
     constraint_file_projects = {
-        canonicalize_project_name(req.project_name) for req in constraints_file_reqs
+        canonicalize_project_name(req.name) for req in constraints_file_reqs
     }
     # Constraints files must only contain name reqs, not URL reqs (those are already
     # constrained by their very nature). See https://github.com/pypa/pip/issues/8210.

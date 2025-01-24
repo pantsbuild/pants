@@ -257,9 +257,9 @@ async def get_python_requirements(
     result: defaultdict[str, dict[str, Address]] = defaultdict(dict)
     for target in python_targets.third_party:
         for python_requirement in target[PythonRequirementsField].value:
-            project_name = canonicalize_project_name(python_requirement.project_name)
+            name = canonicalize_project_name(python_requirement.name)
             resolve = target[PythonRequirementResolveField].normalized_value(python_setup)
-            result[resolve][project_name] = target.address
+            result[resolve][name] = target.address
 
     return PythonRequirements(
         resolves_to_requirements_to_addresses=FrozenDict(
@@ -314,7 +314,7 @@ async def infer_openapi_python_dependencies(
 
     addresses, missing_requirements = [], []
     for runtime_dependency in compiled_sources.runtime_dependencies:
-        project_name = runtime_dependency.project_name
+        project_name = runtime_dependency.name
         address = requirements_to_addresses.get(project_name.lower())
         if address is not None:
             addresses.append(address)

@@ -237,7 +237,7 @@ async def validate_pytest_cov_included(_pytest: PyTest):
         if not isinstance(lockfile_metadata, (PythonLockfileMetadataV2, PythonLockfileMetadataV3)):
             return
         requirements = lockfile_metadata.requirements
-    if not any(canonicalize_project_name(req.project_name) == "pytest-cov" for req in requirements):
+    if not any(canonicalize_project_name(req.name) == "pytest-cov" for req in requirements):
         raise ValueError(
             softwrap(
                 f"""\
