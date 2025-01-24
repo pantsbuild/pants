@@ -146,16 +146,17 @@ def test_export_venv_new_codepath(
             # don't easily know here, so we ignore it in this comparison.
 
             # The second arg is expected to be tmpdir/./pex.
-            tmpdir, pex_pex_name = os.path.split(os.path.normpath(ppc0.argv[1]))
-            assert pex_pex_name == "pex"
+            tmpdir, pex_name = os.path.split(os.path.normpath(ppc0.argv[2]))
+            assert pex_name.startswith("pex")  # May either be either a Pex SCIE or PEX!
+            assert pex_name == "pex"
             assert re.match(r"\{digest_root\}/\.[0-9a-f]{32}\.tmp", tmpdir)
 
             # The third arg is expected to be tmpdir/{resolve}.pex.
-            req_pex_dir, req_pex_name = os.path.split(ppc0.argv[2])
+            req_pex_dir, req_pex_name = os.path.split(ppc0.argv[3])
             assert req_pex_dir == tmpdir
             assert req_pex_name == f"{resolve}.pex"
 
-            assert ppc0.argv[3:7] == (
+            assert ppc0.argv[4:8] == (
                 "venv",
                 "--pip",
                 "--collisions-ok",
@@ -164,7 +165,7 @@ def test_export_venv_new_codepath(
             if py_hermetic_scripts:
                 assert "--non-hermetic-scripts" not in ppc0.argv
             else:
-                assert ppc0.argv[7] == "--non-hermetic-scripts"
+                assert ppc0.argv[8] == "--non-hermetic-scripts"
             assert ppc0.argv[-1] == "{digest_root}"
             assert ppc0.extra_env["PEX_MODULE"] == "pex.tools"
             assert ppc0.extra_env.get("PEX_ROOT") is not None

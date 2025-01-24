@@ -15,16 +15,18 @@ def test_run_script_from_3rdparty_dist_issue_13747() -> None:
             """
         ),
     }
-    with setup_tmpdir(sources) as tmpdir:
+    with setup_tmpdir(sources, cleanup=False) as tmpdir:
         SAY = "moooo"
         args = [
             "--backend-packages=pants.backend.python",
             f"--source-root-patterns=['/{tmpdir}/src']",
+            "-ldebug",
+            "--keep-sandboxes=on_failure",
             "run",
             f"{tmpdir}/src:cowsay",
             "--",
             SAY,
         ]
-        result = run_pants(args)
+        result = run_pants(args, cleanup=False)
         result.assert_success()
         assert SAY in result.stdout.strip()

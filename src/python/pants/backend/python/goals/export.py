@@ -21,7 +21,7 @@ from pants.backend.python.util_rules.local_dists_pep660 import (
     EditableLocalDistsRequest,
 )
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex
-from pants.backend.python.util_rules.pex_cli import PexPEX
+from pants.backend.python.util_rules.pex_cli import PexCliTool
 from pants.backend.python.util_rules.pex_environment import PexEnvironment, PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import EntireLockfile, Lockfile
 from pants.core.goals.export import (
@@ -204,7 +204,7 @@ class VenvExportRequest:
 @rule
 async def do_export(
     req: VenvExportRequest,
-    pex_pex: PexPEX,
+    pex_cli_tool: PexCliTool,
     pex_env: PexEnvironment,
     export_subsys: ExportSubsystem,
 ) -> ExportResult:
@@ -269,7 +269,9 @@ async def do_export(
             f"(using Python {req.py_version})"
         )
 
-        merged_digest = await Get(Digest, MergeDigests([pex_pex.digest, requirements_pex.digest]))
+        merged_digest = await Get(
+            Digest, MergeDigests([pex_cli_tool.digest, requirements_pex.digest])
+        )
         tmpdir_prefix = f".{uuid.uuid4().hex}.tmp"
         tmpdir_under_digest_root = os.path.join("{digest_root}", tmpdir_prefix)
         merged_digest_under_tmpdir = await Get(Digest, AddPrefix(merged_digest, tmpdir_prefix))
@@ -290,12 +292,18 @@ async def do_export(
         ):
             pex_args.insert(-1, "--non-hermetic-scripts")
 
+        args_for_pex_invocation: tuple[str, ...]
+        if pex_cli_tool.is_scie:
+            args_for_pex_invocation = (
+                os.path.join(tmpdir_under_digest_root, pex_cli_tool.exe),
+                "pex",
+                *pex_args,
+            )
+        else:
+            args_for_pex_invocation = complete_pex_env.create_argv(pex_args)
         post_processing_cmds = [
             PostProcessingCommand(
-                complete_pex_env.create_argv(
-                    os.path.join(tmpdir_under_digest_root, pex_pex.exe),
-                    *pex_args,
-                ),
+                args_for_pex_invocation,
                 {
                     **complete_pex_env.environment_dict(python=requirements_pex.python),
                     "PEX_MODULE": "pex.tools",
