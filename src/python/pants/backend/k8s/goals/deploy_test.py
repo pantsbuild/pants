@@ -84,7 +84,7 @@ def test_run_k8s_deploy(rule_runner: RuleRunner) -> None:
 
     assert deploy_process.process
     assert deploy_process.process.process.argv == (
-        kubectl.generate_exe(platform),
+        "__kubectl/kubectl",
         "--context",
         "local",
         "apply",
