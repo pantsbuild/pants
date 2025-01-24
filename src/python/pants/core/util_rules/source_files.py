@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import sys
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Collection, Iterable, Set, Tuple, Type, Union
@@ -60,6 +61,8 @@ async def determine_source_files(request: SourceFilesRequest) -> SourceFiles:
     )
 
     for hydrated_sources, sources_field in zip(all_hydrated_sources, request.sources_fields):
+        sys.stderr.write(f"{type(sources_field)=}\n")
+        sys.stderr.write(f"{sources_field.uses_source_roots=}\n")
         if not sources_field.uses_source_roots:
             unrooted_files.update(hydrated_sources.snapshot.files)
 
