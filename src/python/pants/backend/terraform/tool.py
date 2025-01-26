@@ -20,7 +20,7 @@ import os
 import shlex
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Tuple
+from typing import Iterable, Tuple
 
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import external_tool
@@ -29,12 +29,12 @@ from pants.core.util_rules.external_tool import (
     ExternalToolRequest,
     TemplatedExternalTool,
 )
-from pants.core.util_rules.system_binaries import MkdirBinary
+from pants.core.util_rules.system_binaries import BashBinary, MkdirBinary
 from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_DIGEST, Digest
 from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
-from pants.engine.process import FallibleProcessResult, Process
+from pants.engine.process import Process
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, StrListOption
@@ -418,10 +418,17 @@ class TerraformProcess:
     chdir: str = "."  # directory for terraform's `-chdir` argument
 
 
+def _make_launcher_script(bash: BashBinary, commands: Iterable[Iterable[str]]) -> tuple[str, ...]:
+    """Assemble several command invocations into an inline launcher script, suitable for passing as
+    `Process(argv=(bash.path, "-c", script), ...)`"""
+    return (bash.path, "-c", " && ".join([shlex.join(command) for command in commands]))
+
+
 @rule
 async def setup_terraform_process(
     request: TerraformProcess,
     terraform: TerraformTool,
+    bash: BashBinary,
     mkdir: MkdirBinary,
     platform: Platform,
 ) -> Process:
@@ -453,18 +460,20 @@ async def setup_terraform_process(
         return tuple((Path(request.chdir) / path).as_posix() for path in paths)
 
     # Initialise the Terraform provider cache, since Terraform expects the directory to already exist.
-    await Get(
-        FallibleProcessResult,
-        Process(
-            argv=[mkdir.path, "-p", tf_plugin_cache_dir],
-            append_only_caches=terraform.append_only_caches,
-            description="initialise Terraform plugin cache dir",
-            level=LogLevel.DEBUG,
-        ),
-    )
+    initialize_provider_cache_cmd = (mkdir.path, "-p", tf_plugin_cache_dir)
+    run_terraform_cmd = (
+        "__terraform/terraform",
+        f"-chdir={shlex.quote(request.chdir)}",
+    ) + request.args
 
     return Process(
-        argv=("__terraform/terraform", f"-chdir={shlex.quote(request.chdir)}") + request.args,
+        argv=_make_launcher_script(
+            bash,
+            (
+                initialize_provider_cache_cmd,
+                run_terraform_cmd,
+            ),
+        ),
         input_digest=request.input_digest,
         immutable_input_digests=immutable_input_digests,
         output_files=prepend_paths(request.output_files),
