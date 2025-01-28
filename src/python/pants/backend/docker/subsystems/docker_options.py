@@ -231,6 +231,15 @@ class DockerOptions(Subsystem):
             """
         ),
     )
+    publish_noninteractively = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            If true, publish images non-interactively. This allows for pushes to be parallelized, but requires
+            docker to be pre-authenticated to the registries to which it is pushing.
+            """
+        ),
+    )
     _tools = StrListOption(
         default=[],
         help=softwrap(
