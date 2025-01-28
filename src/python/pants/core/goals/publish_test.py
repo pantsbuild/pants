@@ -21,7 +21,7 @@ from pants.core.goals.publish import (
     PublishProcesses,
     PublishRequest,
 )
-from pants.engine.process import InteractiveProcess
+from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import rule
 from pants.engine.target import StringSequenceField
 from pants.testutil.rule_runner import RuleRunner
@@ -57,7 +57,7 @@ async def mock_publish(request: MockPublishRequest) -> PublishProcesses:
                 for artifact in pkg.artifacts
                 if artifact.relpath
             ),
-            process=None if repo == "skip" else InteractiveProcess(["echo", repo]),
+            process=None if repo == "skip" else Process(["/bin/echo", repo], cache_scope=ProcessCacheScope.PER_SESSION, description="mock publish"),
             description="(requested)" if repo == "skip" else repo,
         )
         for repo in request.field_set.repositories.value
@@ -189,8 +189,6 @@ def test_structured_output(rule_runner: RuleRunner) -> None:
             assert data == expected
 
 
-@pytest.mark.skip("Can not run interactive process from test..?")
-@pytest.mark.no_error_if_skipped
 def test_mocked_publish(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -217,6 +215,5 @@ def test_mocked_publish(rule_runner: RuleRunner) -> None:
     )
 
     assert result.exit_code == 0
-    assert "my-package-0.1.0.tar.gz published." in result.stderr
-    assert "my_package-0.1.0-py3-none-any.whl published." in result.stderr
-    assert "mocked-repo" in result.stdout
+    assert "my_package-0.1.0.tar.gz published to mocked-repo." in result.stderr
+    assert "my_package-0.1.0-py3-none-any.whl published to mocked-repo." in result.stderr

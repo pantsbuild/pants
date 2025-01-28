@@ -15,7 +15,7 @@ from pants.engine.console import Console
 from pants.engine.environment import EnvironmentName
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.intrinsics import run_interactive_process
-from pants.engine.process import InteractiveProcess
+from pants.engine.process import InteractiveProcess, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
@@ -146,7 +146,7 @@ async def _all_publish_processes(targets: Iterable[Target]) -> PublishProcesses:
 
 async def _invoke_process(
     console: Console,
-    process: InteractiveProcess | None,
+    process: InteractiveProcess | Process | None,
     *,
     names: Iterable[str],
     success_status: str,
