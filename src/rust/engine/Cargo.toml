@@ -215,7 +215,7 @@ default-members = [
 # https://doc.rust-lang.org/nightly/cargo/reference/specifying-dependencies.html#\
 #  inheriting-a-dependency-from-a-workspace
 [workspace.dependencies]
-arc-swap = "1.6"
+arc-swap = "1.7"
 async-lock = "2.8"
 async-oncecell = "0.2"
 async-stream = "0.3"
@@ -239,7 +239,7 @@ digest = "0.10"
 dirs-next = "2"
 docker_credential = "1.2"
 either = "1"
-env_logger = "0.10.0"
+env_logger = "0.10.2"
 errno = "0.2.8"
 fixedbitset = "0.4"
 fnv = "1.0.5"
@@ -260,7 +260,7 @@ hyper-rustls = "0.27"
 hyper-util = "0.1"
 ignore = "0.4.23"
 indexmap = { version = "1.9", features = ["std", "serde"] }
-indicatif = "0.17.8"
+indicatif = "0.17.9"
 internment = "0.6"
 itertools = "0.10"
 lazy_static = "1"
@@ -275,7 +275,7 @@ notify = { git = "https://github.com/pantsbuild/notify", rev = "276af0f3c5f300bf
 num_cpus = "1"
 num_enum = "0.5"
 once_cell = "1.20"
-opendal = { version = "0.45.1", default-features = false, features = [
+opendal = { version = "0.51.1", default-features = false, features = [
   "services-memory",
   "services-fs",
   "services-ghac",
@@ -294,8 +294,8 @@ prodash = { git = "https://github.com/stuhood/prodash", rev = "stuhood/raw-messa
 prost = "0.13"
 prost-build = "0.13"
 prost-types = "0.13"
-pyo3 = "0.23.3"
-pyo3-build-config = "0.23.3"
+pyo3 = "0.23.4"
+pyo3-build-config = "0.23.4"
 rand = "0.8"
 regex = "1"
 rlimit = "0.8"

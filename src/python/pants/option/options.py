@@ -9,10 +9,9 @@ from collections import defaultdict
 from enum import Enum
 from typing import Any, Iterable, Mapping, Sequence
 
-from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import warn_or_error
 from pants.engine.fs import FileContent
-from pants.option.arg_splitter import ArgSplitter
+from pants.engine.internals.native_engine import PyGoalInfo, PyPantsCommand
 from pants.option.errors import (
     ConfigValidationError,
     MutuallyExclusiveOptionError,
@@ -121,7 +120,6 @@ class Options:
         env: Mapping[str, str],
         config_sources: Sequence[FileContent] | None,
         known_scope_infos: Sequence[ScopeInfo],
-        extra_specs: Sequence[str] = tuple(),
         allow_unknown_options: bool = False,
         allow_pantsrc: bool = True,
         include_derivation: bool = False,
@@ -132,7 +130,6 @@ class Options:
         :param env: a dict of environment variables.
         :param config_sources: sources of config data.
         :param known_scope_infos: ScopeInfos for all scopes that may be encountered.
-        :param extra_specs: Extra specs to add to those specified in the args (e.g., from --spec-files).
         :param allow_unknown_options: Whether to ignore or error on unknown cmd-line flags.
         :param allow_pantsrc: Whether to read config from local .rc files. Typically
           disabled in tests, for hermeticity.
@@ -149,6 +146,11 @@ class Options:
         known_scope_to_flags = {
             scope: registrar.known_scoped_args for scope, registrar in registrar_by_scope.items()
         }
+        known_goals = tuple(
+            PyGoalInfo(si.scope, si.is_builtin, si.is_auxiliary, si.scope_aliases)
+            for si in known_scope_infos
+            if si.is_goal
+        )
 
         native_parser = NativeOptionParser(
             args[1:],  # The native parser expects args without the sys.argv[0] binary name.
@@ -157,18 +159,15 @@ class Options:
             allow_pantsrc=allow_pantsrc,
             include_derivation=include_derivation,
             known_scopes_to_flags=known_scope_to_flags,
+            known_goals=known_goals,
         )
 
-        splitter = ArgSplitter(complete_known_scope_infos, get_buildroot())
-        # We take the cli alias-expanded args[1:] from the native parser.
-        split_args = splitter.split_args([args[0], *native_parser.get_args()])
-        split_args.specs.extend(extra_specs)
-
-        if split_args.passthru and len(split_args.goals) > 1:
+        command = native_parser.get_command()
+        if command.passthru() and len(command.goals()) > 1:
             raise cls.AmbiguousPassthroughError(
                 softwrap(
                     f"""
-                    Specifying multiple goals (in this case: {split_args.goals})
+                    Specifying multiple goals (in this case: {command.goals()})
                     along with passthrough args (args after `--`) is ambiguous.
 
                     Try either specifying only a single goal, or passing the passthrough args
@@ -178,11 +177,7 @@ class Options:
             )
 
         return cls(
-            builtin_or_auxiliary_goal=split_args.builtin_or_auxiliary_goal,
-            goals=split_args.goals,
-            unknown_goals=split_args.unknown_goals,
-            specs=split_args.specs,
-            passthru=split_args.passthru,
+            command=command,
             registrar_by_scope=registrar_by_scope,
             native_parser=native_parser,
             known_scope_to_info=known_scope_to_info,
@@ -191,11 +186,7 @@ class Options:
 
     def __init__(
         self,
-        builtin_or_auxiliary_goal: str | None,
-        goals: list[str],
-        unknown_goals: list[str],
-        specs: list[str],
-        passthru: list[str],
+        command: PyPantsCommand,
         registrar_by_scope: dict[str, OptionRegistrar],
         native_parser: NativeOptionParser,
         known_scope_to_info: dict[str, ScopeInfo],
@@ -205,11 +196,7 @@ class Options:
 
         Dependents should use `Options.create` instead.
         """
-        self._builtin_or_auxiliary_goal = builtin_or_auxiliary_goal
-        self._goals = goals
-        self._unknown_goals = unknown_goals
-        self._specs = specs
-        self._passthru = passthru
+        self._command = command
         self._registrar_by_scope = registrar_by_scope
         self._native_parser = native_parser
         self._known_scope_to_info = known_scope_to_info
@@ -225,7 +212,7 @@ class Options:
 
         :API: public
         """
-        return self._specs
+        return self._command.specs()
 
     @property
     def builtin_or_auxiliary_goal(self) -> str | None:
@@ -233,7 +220,7 @@ class Options:
 
         :API: public
         """
-        return self._builtin_or_auxiliary_goal
+        return self._command.builtin_or_auxiliary_goal()
 
     @property
     def goals(self) -> list[str]:
@@ -241,7 +228,7 @@ class Options:
 
         :API: public
         """
-        return self._goals
+        return self._command.goals()
 
     @property
     def unknown_goals(self) -> list[str]:
@@ -249,7 +236,7 @@ class Options:
 
         :API: public
         """
-        return self._unknown_goals
+        return self._command.unknown_goals()
 
     @property
     def known_scope_to_info(self) -> dict[str, ScopeInfo]:
@@ -284,9 +271,6 @@ class Options:
                     """
                 )
             )
-
-    def get_args(self) -> tuple[str, ...]:
-        return self._native_parser.get_args()
 
     def verify_args(self):
         # Consume all known args, and see if any are left.

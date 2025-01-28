@@ -3,7 +3,8 @@
 
 use std::env;
 
-use super::id::{is_valid_scope_name, NameTransform, OptionId, Scope};
+use super::id::{NameTransform, OptionId};
+use super::scope::{is_valid_scope_name, Scope};
 use super::{DictEdit, OptionsSource};
 use crate::cli_alias::{expand_aliases, AliasMap};
 use crate::fromfile::FromfileExpander;
