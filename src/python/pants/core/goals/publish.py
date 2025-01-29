@@ -301,7 +301,8 @@ async def run_publish(
     # Process all interactive publishes
     for pub in foreground_publishes:
         logger.debug(f"Execute {pub.process}")
-        if not pub.process:
+        fg_process = pub.process
+        if not fg_process:
             sigil = console.sigil_skipped()
             status = "skipped"
             if pub.description:
@@ -310,8 +311,7 @@ async def run_publish(
                 results.append(f"{sigil} {name} {status}.")
             outputs.append(pub.get_output_data(published=False, status=status))
         else:
-            process = cast(InteractiveProcess, pub.process)
-            res = await run_interactive_process_in_environment(process, local_environment.val)
+            res = await run_interactive_process_in_environment(cast(InteractiveProcess, fg_process), local_environment.val)
             pub_results, pub_output = _to_publish_output_results_and_data(pub, res, console)
             results.extend(pub_results)
             outputs.extend(pub_output)
