@@ -15,7 +15,13 @@ from pants.engine.console import Console
 from pants.engine.environment import EnvironmentName
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.intrinsics import run_interactive_process
-from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveProcessResult, Process, ProcessResult
+from pants.engine.process import (
+    FallibleProcessResult,
+    InteractiveProcess,
+    InteractiveProcessResult,
+    Process,
+    ProcessResult,
+)
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
@@ -143,7 +149,15 @@ async def _all_publish_processes(targets: Iterable[Target]) -> PublishProcesses:
 
     return PublishProcesses(chain.from_iterable(processes_per_target))
 
-def _process_results_to_string(console: Console, res: InteractiveProcessResult | FallibleProcessResult, *, names: Iterable[str], success_status: str, description: str | None = None) -> tuple[int, tuple[str, ...]]:
+
+def _process_results_to_string(
+    console: Console,
+    res: InteractiveProcessResult | FallibleProcessResult,
+    *,
+    names: Iterable[str],
+    success_status: str,
+    description: str | None = None,
+) -> tuple[int, tuple[str, ...]]:
     results = []
     if res.exit_code == 0:
         sigil = console.sigil_succeeded()
@@ -160,6 +174,7 @@ def _process_results_to_string(console: Console, res: InteractiveProcessResult |
     for name in names:
         results.append(f"{sigil} {name} {status}")
     return res.exit_code, tuple(results)
+
 
 async def _invoke_process(
     console: Console,
@@ -182,7 +197,9 @@ async def _invoke_process(
 
     logger.debug(f"Execute {process}")
     res = await run_interactive_process(process)
-    return _process_results_to_string(console, res, names=names, success_status=success_status, description=description)
+    return _process_results_to_string(
+        console, res, names=names, success_status=success_status, description=description
+    )
 
 
 @goal_rule
@@ -215,11 +232,20 @@ async def run_deploy(console: Console, deploy_subsystem: DeploySubsystem) -> Dep
 
     if publish_processes:
         logger.info(f"Publishing {pluralize(len(publish_processes), 'dependency')}...")
-        background_publish_processes = [publish for publish in publish_processes if isinstance(publish.process, Process)]
-        foreground_publish_processes = [publish for publish in publish_processes if isinstance(publish.process, InteractiveProcess) or publish.process is None]
+        background_publish_processes = [
+            publish for publish in publish_processes if isinstance(publish.process, Process)
+        ]
+        foreground_publish_processes = [
+            publish
+            for publish in publish_processes
+            if isinstance(publish.process, InteractiveProcess) or publish.process is None
+        ]
 
         # Publish all background deployments first
-        background_results = await MultiGet(Get(FallibleProcessResult, Process, cast(Process, publish.process)) for publish in background_publish_processes)
+        background_results = await MultiGet(
+            Get(FallibleProcessResult, Process, cast(Process, publish.process))
+            for publish in background_publish_processes
+        )
         for pub, res in zip(background_publish_processes, background_results):
             ec, statuses = _process_results_to_string(
                 console,
