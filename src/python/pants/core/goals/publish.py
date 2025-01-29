@@ -271,31 +271,21 @@ async def run_publish(
     outputs: list[PublishOutputData] = []
     results: list[str] = []
 
-    background_publishes: list[PublishPackages] = []
+    flattened_processes = chain.from_iterable(processes)
+    background_publishes: list[PublishPackages] = [pub for pub in flattened_processes if isinstance(pub.process, Process)]
+    foreground_publishes: list[PublishPackages] = [pub for pub in flattened_processes if isinstance(pub.process, InteractiveProcess) or pub.process is None]
     background_requests: list[Get[FallibleProcessResult]] = []
-    foreground_publishes: list[PublishPackages] = []
-    for pub in chain.from_iterable(processes):
-        process = pub.process
-        if not process:
-            sigil = console.sigil_skipped()
-            status = "skipped"
-            if pub.description:
-                status += f" {pub.description}"
-            for name in pub.names:
-                results.append(f"{sigil} {name} {status}.")
-            outputs.append(pub.get_output_data(published=False, status=status))
-        elif isinstance(process, Process):
-            # Because this is a publish process, we want to ensure we don't cache this process.
-            assert process.cache_scope == ProcessCacheScope.PER_SESSION
-            background_requests.append(
-                Get(
-                    FallibleProcessResult,
-                    {process: Process, local_environment.val: EnvironmentName},
-                )
+    for pub in background_publishes:
+        process = cast(Process, pub.process)
+        # Because this is a publish process, we want to ensure we don't cache this process.
+        assert process.cache_scope == ProcessCacheScope.PER_SESSION
+        background_requests.append(
+            Get(
+                FallibleProcessResult,
+                {process: Process, local_environment.val: EnvironmentName},
             )
-            background_publishes.append(pub)
-        else:
-            foreground_publishes.append(pub)
+        )
+        background_publishes.append(pub)
 
     # Process all non-interactive publishes
     logger.debug(f"Awaiting {len(background_requests)} background publishes")
@@ -311,13 +301,22 @@ async def run_publish(
     # Process all interactive publishes
     for pub in foreground_publishes:
         logger.debug(f"Execute {pub.process}")
-        process = cast(InteractiveProcess, pub.process)
-        res = await run_interactive_process_in_environment(process, local_environment.val)
-        pub_results, pub_output = _to_publish_output_results_and_data(pub, res, console)
-        results.extend(pub_results)
-        outputs.extend(pub_output)
-        if res.exit_code != 0:
-            exit_code = res.exit_code
+        if not pub.process:
+            sigil = console.sigil_skipped()
+            status = "skipped"
+            if pub.description:
+                status += f" {pub.description}"
+            for name in pub.names:
+                results.append(f"{sigil} {name} {status}.")
+            outputs.append(pub.get_output_data(published=False, status=status))
+        else:
+            process = cast(InteractiveProcess, pub.process)
+            res = await run_interactive_process_in_environment(process, local_environment.val)
+            pub_results, pub_output = _to_publish_output_results_and_data(pub, res, console)
+            results.extend(pub_results)
+            outputs.extend(pub_output)
+            if res.exit_code != 0:
+                exit_code = res.exit_code
 
     console.print_stderr("")
     if not results:
