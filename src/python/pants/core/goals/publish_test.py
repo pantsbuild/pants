@@ -57,7 +57,15 @@ async def mock_publish(request: MockPublishRequest) -> PublishProcesses:
                 for artifact in pkg.artifacts
                 if artifact.relpath
             ),
-            process=None if repo == "skip" else Process(["/bin/echo", repo], cache_scope=ProcessCacheScope.PER_SESSION, description="mock publish"),
+            process=(
+                None
+                if repo == "skip"
+                else Process(
+                    ["/bin/echo", repo],
+                    cache_scope=ProcessCacheScope.PER_SESSION,
+                    description="mock publish",
+                )
+            ),
             description="(requested)" if repo == "skip" else repo,
         )
         for repo in request.field_set.repositories.value

@@ -36,7 +36,13 @@ from pants.engine.console import Console
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.intrinsics import run_interactive_process_in_environment
-from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveProcessResult, Process, ProcessCacheScope
+from pants.engine.process import (
+    FallibleProcessResult,
+    InteractiveProcess,
+    InteractiveProcessResult,
+    Process,
+    ProcessCacheScope,
+)
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
@@ -187,7 +193,9 @@ class Publish(Goal):
     environment_behavior = Goal.EnvironmentBehavior.USES_ENVIRONMENTS
 
 
-def _to_publish_output_results_and_data(pub: PublishPackages, res: FallibleProcessResult | InteractiveProcessResult, console: Console) -> tuple[list[str], list[PublishOutputData]]:
+def _to_publish_output_results_and_data(
+    pub: PublishPackages, res: FallibleProcessResult | InteractiveProcessResult, console: Console
+) -> tuple[list[str], list[PublishOutputData]]:
     if res.exit_code == 0:
         sigil = console.sigil_succeeded()
         status = "published"
@@ -205,12 +213,15 @@ def _to_publish_output_results_and_data(pub: PublishPackages, res: FallibleProce
     for name in pub.names:
         results.append(f"{sigil} {name} {status}.")
 
-        output_data.append(pub.get_output_data(
-            exit_code=res.exit_code,
-            published=res.exit_code == 0,
-            status=status,
-        ))
+        output_data.append(
+            pub.get_output_data(
+                exit_code=res.exit_code,
+                published=res.exit_code == 0,
+                status=status,
+            )
+        )
     return results, output_data
+
 
 @goal_rule
 async def run_publish(
@@ -276,7 +287,12 @@ async def run_publish(
         elif isinstance(process, Process):
             # Because this is a publish process, we want to ensure we don't cache this process.
             assert process.cache_scope == ProcessCacheScope.PER_SESSION
-            background_requests.append(Get(FallibleProcessResult, {process: Process, local_environment.val: EnvironmentName}))
+            background_requests.append(
+                Get(
+                    FallibleProcessResult,
+                    {process: Process, local_environment.val: EnvironmentName},
+                )
+            )
             background_publishes.append(pub)
         else:
             foreground_publishes.append(pub)
