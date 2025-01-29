@@ -12,7 +12,7 @@ from typing import Iterable, cast
 from pants.core.goals.package import PackageFieldSet
 from pants.core.goals.publish import PublishFieldSet, PublishProcesses, PublishProcessesRequest
 from pants.engine.console import Console
-from pants.engine.environment import EnvironmentName, ChosenLocalEnvironmentName
+from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.intrinsics import run_interactive_process
 from pants.engine.process import (
@@ -202,7 +202,11 @@ async def _invoke_process(
 
 
 @goal_rule
-async def run_deploy(console: Console, deploy_subsystem: DeploySubsystem, local_environment: ChosenLocalEnvironmentName) -> Deploy:
+async def run_deploy(
+    console: Console,
+    deploy_subsystem: DeploySubsystem,
+    local_environment: ChosenLocalEnvironmentName,
+) -> Deploy:
     target_roots_to_deploy_field_sets = await Get(
         TargetRootsToFieldSets,
         TargetRootsToFieldSetsRequest(
@@ -242,7 +246,10 @@ async def run_deploy(console: Console, deploy_subsystem: DeploySubsystem, local_
 
         # Publish all background deployments first
         background_results = await MultiGet(
-            Get(FallibleProcessResult, {cast(Process, publish.process): Process, local_environment.val: EnvironmentName})
+            Get(
+                FallibleProcessResult,
+                {cast(Process, publish.process): Process, local_environment.val: EnvironmentName},
+            )
             for publish in background_publish_processes
         )
         for pub, res in zip(background_publish_processes, background_results):

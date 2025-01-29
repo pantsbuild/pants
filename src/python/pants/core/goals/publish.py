@@ -272,8 +272,14 @@ async def run_publish(
     results: list[str] = []
 
     flattened_processes = chain.from_iterable(processes)
-    background_publishes: list[PublishPackages] = [pub for pub in flattened_processes if isinstance(pub.process, Process)]
-    foreground_publishes: list[PublishPackages] = [pub for pub in flattened_processes if isinstance(pub.process, InteractiveProcess) or pub.process is None]
+    background_publishes: list[PublishPackages] = [
+        pub for pub in flattened_processes if isinstance(pub.process, Process)
+    ]
+    foreground_publishes: list[PublishPackages] = [
+        pub
+        for pub in flattened_processes
+        if isinstance(pub.process, InteractiveProcess) or pub.process is None
+    ]
     background_requests: list[Get[FallibleProcessResult]] = []
     for pub in background_publishes:
         process = cast(Process, pub.process)
@@ -311,7 +317,9 @@ async def run_publish(
                 results.append(f"{sigil} {name} {status}.")
             outputs.append(pub.get_output_data(published=False, status=status))
         else:
-            res = await run_interactive_process_in_environment(cast(InteractiveProcess, fg_process), local_environment.val)
+            res = await run_interactive_process_in_environment(
+                cast(InteractiveProcess, fg_process), local_environment.val
+            )
             pub_results, pub_output = _to_publish_output_results_and_data(pub, res, console)
             results.extend(pub_results)
             outputs.extend(pub_output)
