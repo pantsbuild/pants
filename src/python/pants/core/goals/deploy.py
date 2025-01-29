@@ -20,7 +20,6 @@ from pants.engine.process import (
     InteractiveProcess,
     InteractiveProcessResult,
     Process,
-    ProcessResult,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
