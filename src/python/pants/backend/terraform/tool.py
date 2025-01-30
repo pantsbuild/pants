@@ -20,7 +20,7 @@ import os
 import shlex
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Tuple
+from typing import Iterable, Tuple
 
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import external_tool
@@ -29,6 +29,7 @@ from pants.core.util_rules.external_tool import (
     ExternalToolRequest,
     TemplatedExternalTool,
 )
+from pants.core.util_rules.system_binaries import BashBinary, MkdirBinary
 from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_DIGEST, Digest
 from pants.engine.internals.selectors import Get
@@ -417,10 +418,18 @@ class TerraformProcess:
     chdir: str = "."  # directory for terraform's `-chdir` argument
 
 
+def _make_launcher_script(bash: BashBinary, commands: Iterable[Iterable[str]]) -> tuple[str, ...]:
+    """Assemble several command invocations into an inline launcher script, suitable for passing as
+    `Process(argv=(bash.path, "-c", script), ...)`"""
+    return (bash.path, "-c", " && ".join([shlex.join(command) for command in commands]))
+
+
 @rule
 async def setup_terraform_process(
     request: TerraformProcess,
     terraform: TerraformTool,
+    bash: BashBinary,
+    mkdir: MkdirBinary,
     platform: Platform,
 ) -> Process:
     downloaded_terraform = await Get(
@@ -430,18 +439,18 @@ async def setup_terraform_process(
     )
     env = await Get(EnvironmentVars, EnvironmentVarsRequest(terraform.extra_env_vars))
 
+    extra_env_vars = {}
+
     path = []
     user_path = env.get("PATH")
     if user_path:
         path.append(user_path)
+    extra_env_vars["PATH"] = os.pathsep.join(path)
 
-    env = EnvironmentVars(
-        {
-            **env,
-            "PATH": ":".join(path),
-            "TF_PLUGIN_CACHE_DIR": (os.path.join("{chroot}", terraform.plugin_cache_dir)),
-        }
-    )
+    tf_plugin_cache_dir = os.path.join(terraform.plugin_cache_dir, request.chdir)
+    extra_env_vars["TF_PLUGIN_CACHE_DIR"] = os.path.join("{chroot}", tf_plugin_cache_dir)
+
+    env = EnvironmentVars({**env, **extra_env_vars})
 
     immutable_input_digests = {
         "__terraform": downloaded_terraform.digest,
@@ -450,8 +459,21 @@ async def setup_terraform_process(
     def prepend_paths(paths: Tuple[str, ...]) -> Tuple[str, ...]:
         return tuple((Path(request.chdir) / path).as_posix() for path in paths)
 
+    # Initialise the Terraform provider cache, since Terraform expects the directory to already exist.
+    initialize_provider_cache_cmd = (mkdir.path, "-p", tf_plugin_cache_dir)
+    run_terraform_cmd = (
+        "__terraform/terraform",
+        f"-chdir={shlex.quote(request.chdir)}",
+    ) + request.args
+
     return Process(
-        argv=("__terraform/terraform", f"-chdir={shlex.quote(request.chdir)}") + request.args,
+        argv=_make_launcher_script(
+            bash,
+            (
+                initialize_provider_cache_cmd,
+                run_terraform_cmd,
+            ),
+        ),
         input_digest=request.input_digest,
         immutable_input_digests=immutable_input_digests,
         output_files=prepend_paths(request.output_files),
