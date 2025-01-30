@@ -259,7 +259,7 @@ hyper = "1"
 hyper-rustls = "0.27"
 hyper-util = "0.1"
 ignore = "0.4.23"
-indexmap = { version = "1.9", features = ["std", "serde"] }
+indexmap = { version = "2.2", features = ["std", "serde"] }
 indicatif = "0.17.9"
 internment = "0.6"
 itertools = "0.10"
