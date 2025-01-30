@@ -201,10 +201,9 @@ def main(*dockerfile_names: str) -> Iterator[ParsedDockerfileInfo]:
                 return None
 
             return tuple(
-                f"{stage} {tag}"
+                f"{stage} {tag}" if tag else stage
                 for stage, name_parts in self.from_baseimages()
                 for tag in [_get_tag(name_parts[-1])]
-                if tag
             )
 
         def build_args(self) -> tuple[str, ...]:

@@ -219,7 +219,7 @@ def test_baseimage_tags(rule_runner: RuleRunner) -> None:
     assert info.version_tags == (
         "stage0 latest",
         "stage1 v1.2",
-        # Stage 2 is not pinned with a tag.
+        "stage2",  # Stage 2 is not pinned with a tag.
         "stage3 v0.54.0",
         "python build-arg:PYTHON_VERSION",  # Parse tag from build arg.
         "stage5 $VERSION",
