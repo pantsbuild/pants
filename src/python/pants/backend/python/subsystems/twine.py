@@ -33,6 +33,10 @@ class TwineSubsystem(PythonToolBase):
         # requirements.
         # See: https://github.com/pantsbuild/pants/pull/13594#issuecomment-968154931
         "colorama>=0.4.3",
+        # Remove this constraint once on twine > 5. See:
+        # https://github.com/pypa/twine/issues/977
+        # https://github.com/pypa/twine/issues/1125
+        "importlib-metadata<8",
     ]
 
     register_interpreter_constraints = True
