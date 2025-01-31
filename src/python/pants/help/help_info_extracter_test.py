@@ -103,7 +103,13 @@ def test_default() -> None:
             scope=GlobalOptions.options_scope,
         )
         native_parser = NativeOptionParser(
-            [], {}, [], allow_pantsrc=False, include_derivation=True, known_scopes_to_flags={}
+            [],
+            {},
+            [],
+            allow_pantsrc=False,
+            include_derivation=True,
+            known_scopes_to_flags={},
+            known_goals=[],
         )
         registrar.register(*args, **kwargs)
         oshi = HelpInfoExtracter(registrar.scope).get_option_scope_help_info(
@@ -201,7 +207,13 @@ def test_grouping():
 
         registrar = OptionRegistrar(scope=GlobalOptions.options_scope)
         native_parser = NativeOptionParser(
-            [], {}, [], allow_pantsrc=False, include_derivation=True, known_scopes_to_flags={}
+            [],
+            {},
+            [],
+            allow_pantsrc=False,
+            include_derivation=True,
+            known_scopes_to_flags={},
+            known_goals=[],
         )
         registrar.register("--foo", **kwargs)
         oshi = HelpInfoExtracter("").get_option_scope_help_info(

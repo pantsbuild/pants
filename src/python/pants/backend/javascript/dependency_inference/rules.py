@@ -29,7 +29,9 @@ from pants.backend.javascript.target_types import (
     JSRuntimeSourceField,
 )
 from pants.backend.jsx.target_types import JSX_FILE_EXTENSIONS
+from pants.backend.tsx.target_types import TSX_FILE_EXTENSIONS
 from pants.backend.typescript import tsconfig
+from pants.backend.typescript.target_types import TS_FILE_EXTENSIONS
 from pants.backend.typescript.tsconfig import ParentTSConfigRequest, TSConfig, find_parent_ts_config
 from pants.build_graph.address import Address
 from pants.core.util_rules.unowned_dependency_behavior import (
@@ -258,7 +260,12 @@ async def infer_js_source_dependencies(
                 _determine_import_from_candidates(
                     candidates,
                     candidate_pkgs,
-                    file_extensions=JS_FILE_EXTENSIONS + JSX_FILE_EXTENSIONS,
+                    file_extensions=(
+                        JS_FILE_EXTENSIONS
+                        + JSX_FILE_EXTENSIONS
+                        + TS_FILE_EXTENSIONS
+                        + TSX_FILE_EXTENSIONS
+                    ),
                 )
                 for string, candidates in import_strings.imports.items()
             ),

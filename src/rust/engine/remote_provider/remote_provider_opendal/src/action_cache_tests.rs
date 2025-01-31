@@ -4,7 +4,6 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use bytes::Bytes;
 use grpc_util::prost::MessageExt;
 use grpc_util::tls;
 use hashing::Digest;
@@ -105,7 +104,7 @@ async fn update_action_cache() {
         .await
         .unwrap();
     assert_eq!(
-        remexec::ActionResult::decode(Bytes::from(stored)).unwrap(),
+        remexec::ActionResult::decode(stored.to_bytes()).unwrap(),
         action_result
     );
 }
