@@ -372,6 +372,7 @@ fn path_metadata_request(single_path: Value) -> PyGeneratorResponseNativeCall {
             let path = externs::getattr_as_optional_string(arg, "path")
                 .map_err(|e| format!("Failed to get `path` for field: {e}"))?;
             let path = path.ok_or_else(|| "Path must not be `None`.".to_string())?;
+            let path = shellexpand::tilde(&path).to_string();
 
             let namespace: PyPathNamespace = externs::getattr(arg, "namespace")
                 .map_err(|e| format!("Failed to get `namespace` for field: {e}"))?;

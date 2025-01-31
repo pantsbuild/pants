@@ -1153,6 +1153,7 @@ dependencies = [
  "rule_graph",
  "serde",
  "serde_json",
+ "shellexpand",
  "smallvec",
  "stdio",
  "store",
