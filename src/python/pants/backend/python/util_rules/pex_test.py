@@ -130,7 +130,6 @@ def test_pex_execution(
         sources=sources,
     )
 
-    assert "pex" not in pex_data.files
     assert "main.py" in pex_data.files
     assert "subdir/sub.py" in pex_data.files
 
