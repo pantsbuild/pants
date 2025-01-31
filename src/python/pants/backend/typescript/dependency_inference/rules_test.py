@@ -14,6 +14,7 @@ from pants.backend.javascript.dependency_inference.rules import (
 )
 from pants.backend.javascript.package_json import AllPackageJson
 from pants.backend.javascript.target_types import JSSourcesGeneratorTarget, JSSourceTarget
+from pants.backend.tsx.target_types import TSXSourcesGeneratorTarget, TSXSourceTarget
 from pants.backend.typescript.dependency_inference.rules import (
     InferTypeScriptDependenciesRequest,
     TypeScriptSourceInferenceFieldSet,
@@ -50,6 +51,8 @@ def rule_runner() -> RuleRunner:
             *typescript_register.target_types(),
             TypeScriptSourceTarget,
             TypeScriptSourcesGeneratorTarget,
+            TSXSourceTarget,
+            TSXSourcesGeneratorTarget,
             JSSourceTarget,
             JSSourcesGeneratorTarget,
         ],
@@ -61,7 +64,13 @@ def rule_runner() -> RuleRunner:
 def test_infers_typescript_file_imports_dependencies(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "src/ts/BUILD": "typescript_sources()\njavascript_sources(name='js')",
+            "src/ts/BUILD": dedent(
+                """\
+                typescript_sources()
+                tsx_sources(name='tsx')
+                javascript_sources(name='js')
+                """
+            ),
             "src/ts/index.ts": dedent(
                 """\
                 import { x } from "./localModuleA";
@@ -77,6 +86,9 @@ def test_infers_typescript_file_imports_dependencies(rule_runner: RuleRunner) ->
 
                 // You can import a JS module in a TypeScript module
                 import { x } from './localModuleJs';
+
+                // You can import a TSX module in a TypeScript module
+                import { x } from './localModuleTsx';
                 """
             ),
             "src/ts/localModuleA.ts": "",
@@ -88,6 +100,7 @@ def test_infers_typescript_file_imports_dependencies(rule_runner: RuleRunner) ->
             "src/ts/localModuleG.ts": "",
             "src/ts/localModuleH.ts": "",
             "src/ts/localModuleJs.js": "",
+            "src/ts/localModuleTsx.tsx": "",
         }
     )
 
@@ -107,6 +120,7 @@ def test_infers_typescript_file_imports_dependencies(rule_runner: RuleRunner) ->
         Address("src/ts", relative_file_path="localModuleG.ts"),
         Address("src/ts", relative_file_path="localModuleH.ts"),
         Address("src/ts", relative_file_path="localModuleJs.js", target_name="js"),
+        Address("src/ts", relative_file_path="localModuleTsx.tsx", target_name="tsx"),
     }
 
 

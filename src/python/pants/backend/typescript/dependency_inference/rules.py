@@ -25,6 +25,7 @@ from pants.backend.javascript.package_json import (
 )
 from pants.backend.javascript.subsystems.nodejs_infer import NodeJSInfer
 from pants.backend.javascript.target_types import JS_FILE_EXTENSIONS
+from pants.backend.tsx.target_types import TSX_FILE_EXTENSIONS
 from pants.backend.typescript import tsconfig
 from pants.backend.typescript.target_types import (
     TS_FILE_EXTENSIONS,
@@ -128,7 +129,7 @@ async def infer_typescript_source_dependencies(
                 _determine_import_from_candidates(
                     candidates,
                     candidate_pkgs,
-                    file_extensions=TS_FILE_EXTENSIONS + JS_FILE_EXTENSIONS,
+                    file_extensions=TS_FILE_EXTENSIONS + TSX_FILE_EXTENSIONS + JS_FILE_EXTENSIONS,
                 )
                 for string, candidates in import_strings.imports.items()
             ),
