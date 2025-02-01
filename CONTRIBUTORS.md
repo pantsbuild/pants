@@ -115,6 +115,7 @@ Created as part of the release process.
 + Flo
 + Florian Leibert
 + Fredrik Ekholdt
++ Fredrik Wärnsberg
 + Gabriel Gonzalez
 + Garrett Malmquist
 + Gary M. Josack
