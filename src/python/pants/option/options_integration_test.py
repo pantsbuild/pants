@@ -108,3 +108,32 @@ def test_pants_symlink_workdirs(tmp_path: Path) -> None:
     pants_run.assert_success()
     # Make sure symlink workdir is pointing to physical workdir
     assert Path(os.readlink(symlink_workdir.as_posix())) == physical_workdir
+
+
+def test_fromfile_invalidation(tmp_path: Path) -> None:
+    workdir = (tmp_path / "workdir").as_posix()
+
+    fromfile_path = tmp_path / "fromfile.txt"
+    fromfile_path.write_text("dist1")
+    pants_run = run_pants_with_workdir(
+        [f"--pants-distdir=@{fromfile_path}"],
+        use_pantsd=True,
+        workdir=workdir,
+    )
+    assert "Scheduler initialized." in pants_run.stderr
+
+    pants_run = run_pants_with_workdir(
+        [f"--pants-distdir=@{fromfile_path}"],
+        use_pantsd=True,
+        workdir=workdir,
+    )
+    assert "Scheduler initialized." not in pants_run.stderr
+
+    fromfile_path.write_text("dist2")
+    pants_run = run_pants_with_workdir(
+        [f"--pants-distdir=@{fromfile_path}"],
+        use_pantsd=True,
+        workdir=workdir,
+    )
+    assert "Initialization options changed: reinitializing scheduler..." in pants_run.stderr
+    assert "Scheduler initialized." in pants_run.stderr
