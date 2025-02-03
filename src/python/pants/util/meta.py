@@ -6,7 +6,7 @@ from collections.abc import Callable
 from typing import Any, TypeVar
 
 T = TypeVar("T")
-C = TypeVar("C", bound=type)
+C = TypeVar("C", bound=type[Any])
 
 
 class SingletonMetaclass(type):

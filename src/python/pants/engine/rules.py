@@ -152,10 +152,10 @@ class DuplicateRuleError(TypeError):
 
 def _ensure_type_annotation(
     *,
-    type_annotation: type | None,
+    type_annotation: type[Any] | None,
     name: str,
     raise_type: type[InvalidTypeAnnotation],
-) -> type:
+) -> type[Any]:
     if type_annotation is None:
         raise raise_type(f"{name} is missing a type annotation.")
     if not isinstance(type_annotation, type):

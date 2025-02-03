@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Optional, cast
+from typing import Any, Optional, cast
 
 from pants.option.option_value_container import OptionValueContainer
 
@@ -26,7 +26,7 @@ class ScopeInfo:
     """Information about a scope."""
 
     scope: str
-    subsystem_cls: type | None = None
+    subsystem_cls: type[Any] | None = None
     # A ScopeInfo may have a deprecated_scope (from its associated subsystem_cls), which represents
     # a previous/deprecated name for a current/non-deprecated ScopeInfo. It may also be directly
     # deprecated via this `removal_version`, which allows for the deprecation of an entire scope.
