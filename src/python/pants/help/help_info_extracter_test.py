@@ -812,5 +812,5 @@ def test_pretty_print_type_hint() -> None:
     )
     assert (
         pretty_print_type_hint(Union[Iterable[list[ExampleCls]], Optional[float], Any])
-        == f"Iterable[List[{example_cls_repr}]] | float | None | Any"
+        == f"Iterable[list[{example_cls_repr}]] | float | None | Any"
     )
