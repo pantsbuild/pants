@@ -7,7 +7,8 @@ import itertools
 import logging
 import re
 from collections import defaultdict
-from typing import Iterable, Iterator, Protocol, Sequence, Tuple, TypeVar
+from collections.abc import Iterable, Iterator, Sequence
+from typing import Protocol, TypeVar
 
 from packaging.requirements import InvalidRequirement
 from pkg_resources import Requirement
@@ -39,7 +40,7 @@ class FieldSetWithInterpreterConstraints(Protocol):
 _FS = TypeVar("_FS", bound=FieldSetWithInterpreterConstraints)
 
 
-RawConstraints = Tuple[str, ...]
+RawConstraints = tuple[str, ...]
 
 
 # The current maxes are 2.7.18 and 3.6.15.  We go much higher, for safety.

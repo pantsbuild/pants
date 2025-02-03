@@ -6,9 +6,10 @@ from __future__ import annotations
 import json
 import os.path
 import zipfile
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Iterable, Iterator, Mapping
+from typing import Any
 
 from pants.backend.python.target_types import MainSpecification, PexLayout
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints

@@ -6,10 +6,9 @@ from __future__ import annotations
 import os
 import re
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from typing import Callable, ClassVar, Iterator, Optional, cast
-
-from typing_extensions import final
+from typing import ClassVar, cast, final
 
 from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
 from pants.backend.docker.subsystems.docker_options import DockerOptions
@@ -81,7 +80,7 @@ class DockerImageContextRootField(StringField):
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
+    def compute_value(cls, raw_value: str | None, address: Address) -> str | None:
         value_or_default = super().compute_value(raw_value, address=address)
         if isinstance(value_or_default, str) and value_or_default.startswith("/"):
             val = value_or_default.strip("/")

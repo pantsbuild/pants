@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 import string
-from typing import Iterable, Sequence
+from collections.abc import Iterable, Sequence
 
 from pants.util.memo import memoized
 

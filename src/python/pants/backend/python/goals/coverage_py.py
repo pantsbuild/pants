@@ -4,11 +4,12 @@
 from __future__ import annotations
 
 import configparser
+from collections.abc import MutableMapping
 from dataclasses import dataclass
 from enum import Enum
 from io import StringIO
 from pathlib import PurePath
-from typing import Any, MutableMapping, cast
+from typing import Any, cast
 
 import toml
 

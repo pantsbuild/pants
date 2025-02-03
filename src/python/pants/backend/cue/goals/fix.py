@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from pants.backend.cue import subsystem
 from pants.backend.cue.rules import _run_cue

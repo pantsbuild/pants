@@ -8,10 +8,11 @@ import json
 import logging
 import os
 import shlex
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent  # noqa: PNT20
-from typing import Iterable, Iterator, Mapping, Sequence, TypeVar
+from typing import TypeVar
 
 import packaging.specifiers
 import packaging.version

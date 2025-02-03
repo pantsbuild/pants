@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Iterable, Set, cast
+from typing import Any, cast
 
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.util_rules.lockfile_metadata import (
@@ -167,7 +168,7 @@ class PythonLockfileMetadataV2(PythonLockfileMetadata):
 
         requirements = metadata(
             "generated_with_requirements",
-            Set[PipRequirement],
+            set[PipRequirement],
             lambda l: {
                 PipRequirement.parse(i, description_of_origin=lockfile_description) for i in l
             },
@@ -232,13 +233,13 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
         manylinux = metadata("manylinux", str, lambda l: l)
         requirement_constraints = metadata(
             "requirement_constraints",
-            Set[PipRequirement],
+            set[PipRequirement],
             lambda l: {
                 PipRequirement.parse(i, description_of_origin=lockfile_description) for i in l
             },
         )
-        only_binary = metadata("only_binary", Set[str], lambda l: set(l))
-        no_binary = metadata("no_binary", Set[str], lambda l: set(l))
+        only_binary = metadata("only_binary", set[str], lambda l: set(l))
+        no_binary = metadata("no_binary", set[str], lambda l: set(l))
 
         return PythonLockfileMetadataV3(
             valid_for_interpreter_constraints=v2_metadata.valid_for_interpreter_constraints,

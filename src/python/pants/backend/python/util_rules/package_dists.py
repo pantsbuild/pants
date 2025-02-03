@@ -9,10 +9,11 @@ import os
 import pickle
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import partial
 from pathlib import PurePath
-from typing import Any, DefaultDict, Dict, List, Mapping, Tuple, cast
+from typing import Any, DefaultDict, cast
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -217,7 +218,7 @@ class SetupKwargs:
     """The keyword arguments to the `setup()` function in the generated `setup.py`."""
 
     _pickled_bytes: bytes
-    _overwrite_banned_keys: Tuple[str, ...]
+    _overwrite_banned_keys: tuple[str, ...]
 
     def __init__(
         self,
@@ -225,7 +226,7 @@ class SetupKwargs:
         *,
         address: Address,
         _allow_banned_keys: bool = False,
-        _overwrite_banned_keys: Tuple[str, ...] = (),
+        _overwrite_banned_keys: tuple[str, ...] = (),
     ) -> None:
         super().__init__()
         if "name" not in kwargs:
@@ -270,7 +271,7 @@ class SetupKwargs:
 
     @memoized_property
     def kwargs(self) -> dict[str, Any]:
-        return cast(Dict[str, Any], pickle.loads(self._pickled_bytes))
+        return cast(dict[str, Any], pickle.loads(self._pickled_bytes))
 
     @property
     def name(self) -> str:
@@ -303,7 +304,7 @@ class SetupKwargsRequest(ABC):
         """Whether the kwargs implementation should be used for this target or not."""
 
     @property
-    def explicit_kwargs(self) -> Dict[str, Any]:
+    def explicit_kwargs(self) -> dict[str, Any]:
         # We return a dict copy of the underlying FrozenDict, because the caller expects a
         # dict (and we have documented as much).
         return dict(self.target[PythonProvidesField].value.kwargs)
@@ -1017,7 +1018,7 @@ def is_ownable_target(tgt: Target, union_membership: UnionMembership) -> bool:
 
 
 # Convenient type alias for the pair (package name, data files in the package).
-PackageDatum = Tuple[str, Tuple[str, ...]]
+PackageDatum = tuple[str, tuple[str, ...]]
 
 
 def find_packages(
@@ -1136,7 +1137,7 @@ def merge_entry_points(
     """Merge all entry points, throwing ValueError if there are any conflicts."""
     merged = cast(
         # this gives us a two level deep defaultdict with the inner values being of list type
-        DefaultDict[str, DefaultDict[str, List[Tuple[str, str]]]],
+        DefaultDict[str, DefaultDict[str, list[tuple[str, str]]]],
         defaultdict(partial(defaultdict, list)),
     )
 
