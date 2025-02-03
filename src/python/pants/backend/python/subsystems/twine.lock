@@ -1646,7 +1646,7 @@
   "overridden": [],
   "path_mappings": {},
   "pex_version": "2.32.0",
-  "pip_version": "25.0",
+  "pip_version": "24.2",
   "prefer_older_binary": false,
   "requirements": [
     "colorama>=0.4.3",
