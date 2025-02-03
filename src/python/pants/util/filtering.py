@@ -4,17 +4,15 @@
 from __future__ import annotations
 
 import operator
-from typing import TYPE_CHECKING, Callable, Iterable, Tuple, TypeVar
-
-if TYPE_CHECKING:
-    from pants.engine.target import Target
+from collections.abc import Callable, Iterable
+from typing import TypeVar
 
 _T = TypeVar("_T")
 Filter = Callable[[_T], bool]
 TargetFilter = Callable[["Target"], bool]
 
 
-def _extract_modifier(modified_param: str) -> Tuple[Callable[[bool], bool], str]:
+def _extract_modifier(modified_param: str) -> tuple[Callable[[bool], bool], str]:
     if modified_param.startswith("-"):
         return operator.not_, modified_param[1:]
 
