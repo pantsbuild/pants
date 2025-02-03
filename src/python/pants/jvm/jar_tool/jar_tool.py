@@ -4,9 +4,9 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import Enum, unique
-from typing import Iterable, Mapping
 
 import pkg_resources
 

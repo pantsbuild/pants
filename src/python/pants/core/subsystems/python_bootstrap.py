@@ -7,8 +7,8 @@ import itertools
 import logging
 import os
 import sys
+from collections.abc import Collection
 from dataclasses import dataclass
-from typing import Collection, Optional
 
 from pants.core.util_rules import asdf, search_paths
 from pants.core.util_rules.asdf import AsdfPathString, AsdfToolPathsResult
@@ -227,7 +227,7 @@ async def _expand_interpreter_search_paths(
 
 # This method is copied from the pex package, located at pex.variables.Variables._get_kv().
 # It is copied here to avoid a hard dependency on pex.
-def _get_kv(variable: str) -> Optional[list[str]]:
+def _get_kv(variable: str) -> list[str] | None:
     kv = variable.strip().split("=")
     if len(list(filter(None, kv))) == 2:
         return kv
@@ -237,7 +237,7 @@ def _get_kv(variable: str) -> Optional[list[str]]:
 
 # This method is copied from the pex package, located at pex.variables.Variables.from_rc().
 # It is copied here to avoid a hard dependency on pex.
-def _read_pex_rc(rc: Optional[str] = None) -> dict[str, str]:
+def _read_pex_rc(rc: str | None = None) -> dict[str, str]:
     """Read pex runtime configuration variables from a pexrc file.
 
     :param rc: an absolute path to a pexrc file.

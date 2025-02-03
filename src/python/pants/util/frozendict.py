@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Iterable, Iterator, Mapping, TypeVar, cast, overload
+from collections.abc import Callable, Iterable, Iterator, Mapping
+from typing import Any, TypeVar, cast, overload
 
 from pants.util.memo import memoized_method
 from pants.util.strutil import softwrap

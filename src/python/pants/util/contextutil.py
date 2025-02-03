@@ -10,11 +10,12 @@ import sys
 import tempfile
 import threading
 import zipfile
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
 from queue import Queue
 from socketserver import TCPServer
-from typing import IO, Any, Callable, Iterator, Mapping
+from typing import IO, Any
 
 from pants.util.dirutil import safe_delete
 

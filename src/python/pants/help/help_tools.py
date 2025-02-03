@@ -2,11 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from collections.abc import Generator, Iterable
 from dataclasses import dataclass
 from functools import partial
 from itertools import chain
 from textwrap import wrap
-from typing import Generator, Iterable, cast
+from typing import cast
 
 from pants.help.help_info_extracter import AllHelpInfo, OptionScopeHelpInfo
 from pants.help.maybe_color import MaybeColor

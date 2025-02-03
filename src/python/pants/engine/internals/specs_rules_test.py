@@ -3,9 +3,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Iterable, Type
 
 import pytest
 
@@ -877,7 +877,7 @@ def test_find_valid_field_sets(caplog) -> None:
     invalid_spec = AddressLiteralSpec("", "invalid")
 
     def find_valid_field_sets(
-        superclass: Type,
+        superclass: type,
         specs: Iterable[Spec],
         *,
         no_applicable_behavior: NoApplicableTargetsBehavior = NoApplicableTargetsBehavior.ignore,

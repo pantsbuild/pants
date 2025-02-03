@@ -7,10 +7,10 @@ import dataclasses
 import itertools
 import logging
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import Iterable, List, Type
 
 import pytest
 
@@ -254,8 +254,8 @@ async def fix_with_bricky(request: BrickyBuildFileFixer.Batch) -> FixResult:
 
 
 def fix_rule_runner(
-    target_types: List[Type[Target]],
-    request_types: List[Type[AbstractFixRequest]] = [],
+    target_types: list[type[Target]],
+    request_types: list[type[AbstractFixRequest]] = [],
 ) -> RuleRunner:
     return RuleRunner(
         rules=[
@@ -272,7 +272,7 @@ def fix_rule_runner(
 def run_fix(
     rule_runner: RuleRunner,
     *,
-    target_specs: List[str],
+    target_specs: list[str],
     only: list[str] | None = None,
     extra_args: Iterable[str] = (),
 ) -> str:

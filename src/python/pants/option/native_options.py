@@ -6,9 +6,10 @@ from __future__ import annotations
 import inspect
 import logging
 import shlex
+from collections.abc import Mapping, Sequence
 from enum import Enum
 from pathlib import Path
-from typing import Any, Mapping, Optional, Sequence, Tuple
+from typing import Any
 
 from pants.base.build_environment import get_buildroot
 from pants.engine.fs import FileContent
@@ -58,9 +59,9 @@ class NativeOptionParser:
 
     def __init__(
         self,
-        args: Optional[Sequence[str]],
+        args: Sequence[str] | None,
         env: Mapping[str, str],
-        config_sources: Optional[Sequence[FileContent]],
+        config_sources: Sequence[FileContent] | None,
         allow_pantsrc: bool,
         include_derivation: bool,
         known_scopes_to_flags: dict[str, frozenset[str]],
@@ -126,7 +127,7 @@ class NativeOptionParser:
             known_goals=self._known_goals,
         )
 
-    def get_value(self, *, scope: str, option_info: OptionInfo) -> Tuple[Any, Rank]:
+    def get_value(self, *, scope: str, option_info: OptionInfo) -> tuple[Any, Rank]:
         val, rank, _ = self._get_value_and_derivation(scope, option_info)
         return (val, rank)
 
@@ -134,7 +135,7 @@ class NativeOptionParser:
         self,
         scope: str,
         option_info: OptionInfo,
-    ) -> list[Tuple[Any, Rank, Optional[str]]]:
+    ) -> list[tuple[Any, Rank, str | None]]:
         _, _, derivation = self._get_value_and_derivation(scope, option_info)
         return derivation
 
@@ -142,7 +143,7 @@ class NativeOptionParser:
         self,
         scope: str,
         option_info: OptionInfo,
-    ) -> Tuple[Any, Rank, list[Tuple[Any, Rank, Optional[str]]]]:
+    ) -> tuple[Any, Rank, list[tuple[Any, Rank, str | None]]]:
         return self._get(
             scope=scope,
             dest=parse_dest(option_info),
@@ -165,7 +166,7 @@ class NativeOptionParser:
         member_type=None,
         choices=None,
         passthrough=False,
-    ) -> Tuple[Any, Rank, list[Tuple[Any, Rank, Optional[str]]]]:
+    ) -> tuple[Any, Rank, list[tuple[Any, Rank, str | None]]]:
         def scope_str() -> str:
             return "global scope" if scope == GLOBAL_SCOPE else f"scope '{scope}'"
 

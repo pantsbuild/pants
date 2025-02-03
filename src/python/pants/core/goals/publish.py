@@ -25,9 +25,7 @@ import logging
 from abc import ABCMeta
 from dataclasses import asdict, dataclass, field, is_dataclass, replace
 from itertools import chain
-from typing import ClassVar, Generic, Type, TypeVar
-
-from typing_extensions import final
+from typing import ClassVar, Generic, TypeVar, final
 
 from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
 from pants.engine.addresses import Address
@@ -98,7 +96,7 @@ class PublishFieldSet(Generic[_T], FieldSet, metaclass=ABCMeta):
     """
 
     # Subclasses must provide this, to a union member (subclass) of `PublishRequest`.
-    publish_request_type: ClassVar[Type[_T]]  # type: ignore[misc]
+    publish_request_type: ClassVar[type[_T]]  # type: ignore[misc]
 
     @final
     def _request(self, packages: tuple[BuiltPackage, ...]) -> _T:

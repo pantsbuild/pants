@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Iterator
 
 from pants.core.util_rules import system_binaries
 from pants.core.util_rules.system_binaries import UnzipBinary

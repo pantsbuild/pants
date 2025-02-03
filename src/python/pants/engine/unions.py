@@ -4,8 +4,9 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any, Callable, DefaultDict, Generic, Iterable, Mapping, TypeVar, cast, overload
+from typing import Any, DefaultDict, Generic, TypeVar, cast, overload
 
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_method

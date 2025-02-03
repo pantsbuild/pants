@@ -5,9 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass
-from typing import Any
-
-from typing_extensions import final
+from typing import Any, final
 
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter

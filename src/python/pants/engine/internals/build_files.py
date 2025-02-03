@@ -11,9 +11,10 @@ import os.path
 import sys
 import typing
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Sequence, cast
+from typing import Any, cast
 
 import typing_extensions
 

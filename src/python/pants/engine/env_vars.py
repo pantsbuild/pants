@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import fnmatch
 import re
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
-from typing import Dict, Iterator, Optional, Sequence
 
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
@@ -29,7 +29,7 @@ class CompleteEnvironmentVars(FrozenDict):
     """
 
     def get_subset(
-        self, requested: Sequence[str], *, allowed: Optional[Sequence[str]] = None
+        self, requested: Sequence[str], *, allowed: Sequence[str] | None = None
     ) -> FrozenDict[str, str]:
         """Extract a subset of named env vars.
 
@@ -44,9 +44,9 @@ class CompleteEnvironmentVars(FrozenDict):
         will be raised.
         """
         allowed_set = None if allowed is None else set(allowed)
-        env_var_subset: Dict[str, str] = {}
+        env_var_subset: dict[str, str] = {}
 
-        def check_and_set(name: str, value: Optional[str]):
+        def check_and_set(name: str, value: str | None):
             if allowed_set is not None and name not in allowed_set:
                 raise ValueError(
                     f"{name} is not in the list of variable names that are allowed to be set. "
@@ -97,9 +97,9 @@ class EnvironmentVarsRequest:
     """
 
     requested: FrozenOrderedSet[str]
-    allowed: Optional[FrozenOrderedSet[str]]
+    allowed: FrozenOrderedSet[str] | None
 
-    def __init__(self, requested: Sequence[str], allowed: Optional[Sequence[str]] = None):
+    def __init__(self, requested: Sequence[str], allowed: Sequence[str] | None = None):
         object.__setattr__(self, "requested", FrozenOrderedSet(requested))
         object.__setattr__(self, "allowed", None if allowed is None else FrozenOrderedSet(allowed))
 

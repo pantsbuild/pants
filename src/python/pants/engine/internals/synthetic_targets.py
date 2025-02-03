@@ -75,8 +75,9 @@ from __future__ import annotations
 
 import itertools
 import os.path
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Iterator, Sequence
+from typing import ClassVar
 
 from pants.base.specs import GlobSpecsProtocol
 from pants.engine.collection import Collection
