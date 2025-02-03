@@ -2,10 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from textwrap import dedent
-from typing import Iterator
 
 from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
 from pants.testutil.pants_integration_test import run_pants
