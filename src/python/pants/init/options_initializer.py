@@ -135,6 +135,7 @@ class OptionsInitializer:
     TODO: We would eventually like to use the bootstrap Scheduler to construct the
     OptionsBootstrapper as well, but for now we do the opposite thing, and the Scheduler is
     used only to resolve plugins.
+      see https://github.com/pantsbuild/pants/pull/11568
     """
 
     def __init__(
