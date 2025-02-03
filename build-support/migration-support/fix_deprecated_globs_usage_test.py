@@ -4,16 +4,16 @@
 from functools import partial
 from pathlib import Path
 from textwrap import dedent
-from typing import List, Optional, Tuple
+from typing import Optional
 
 from fix_deprecated_globs_usage import SCRIPT_RESTRICTIONS, generate_possibly_new_build, warning_msg
 
 from pants.util.contextutil import temporary_dir
 
-Result = Optional[List[str]]
+Result = Optional[list[str]]
 
 
-def run_on_build_file(content: str) -> Tuple[Result, Path]:
+def run_on_build_file(content: str) -> tuple[Result, Path]:
     with temporary_dir() as tmpdir:
         build = Path(tmpdir, "BUILD")
         build.write_text(content)
@@ -351,7 +351,7 @@ def test_warns_on_bundles(caplog) -> None:
         build_file_content: str,
         warning_slice: slice,
         *,
-        replacements_and_line_numbers: List[Tuple[str, int]],
+        replacements_and_line_numbers: list[tuple[str, int]],
     ) -> None:
         result, build = run_on_build_file(build_file_content)
         assert result is None
