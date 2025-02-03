@@ -10,6 +10,9 @@ from typing import TYPE_CHECKING, TypeVar
 if TYPE_CHECKING:
     from pants.engine.target import Target
 
+    # Working around pyupgrade erasing this import, breaking mypy
+    _ = Target
+
 
 _T = TypeVar("_T")
 Filter = Callable[[_T], bool]
