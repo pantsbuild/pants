@@ -3,6 +3,7 @@
 
 import sys
 from pathlib import PurePath
+from typing import Set
 
 #
 # Note: This file is used as a pex entry point in the execution sandbox.
@@ -26,7 +27,7 @@ def resolve_pure_path(base: PurePath, relative_path: PurePath) -> PurePath:
     return PurePath(*parts)
 
 
-def extract_module_source_paths(path: PurePath, raw_content: bytes) -> set[str]:
+def extract_module_source_paths(path: PurePath, raw_content: bytes) -> Set[str]:
     # Import here so we can still test this file with pytest (since `hcl2` is not present in
     # normal Pants venv.)
     import hcl2  # type: ignore[import-not-found]  # pants: no-infer-dep

@@ -184,7 +184,9 @@ def pretty_print_type_hint(hint: Any) -> str:
         hint_str = hint.__name__
     else:
         hint_str = str(hint)
-    return hint_str.replace("collections.abc.", "").replace("typing.", "").replace("NoneType", "None")
+    return (
+        hint_str.replace("collections.abc.", "").replace("typing.", "").replace("NoneType", "None")
+    )
 
 
 @dataclass(frozen=True)
