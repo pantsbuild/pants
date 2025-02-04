@@ -79,7 +79,7 @@ class PantsJoinHandle:
         def worker(in_stream: BytesIO, buffer: bytearray, out_stream: TextIO) -> None:
             while data := in_stream.read1(1024):
                 buffer.extend(data)
-                out_stream.write(buffer.decode(errors="ignore"))
+                out_stream.write(data.decode(errors="ignore"))
                 out_stream.flush()
 
         if stream_output:
