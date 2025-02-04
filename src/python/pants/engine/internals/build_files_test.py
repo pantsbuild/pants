@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Mapping
 from textwrap import dedent
-from typing import Any, Mapping, cast
+from typing import Any, cast
 
 import pytest
 

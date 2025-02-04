@@ -9,10 +9,11 @@ import itertools
 import logging
 import os
 from collections import defaultdict
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from functools import total_ordering
 from pathlib import PurePath
-from typing import DefaultDict, Iterable, Mapping, Tuple
+from typing import DefaultDict
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
@@ -103,7 +104,7 @@ def find_all_python_projects(all_targets: AllTargets) -> AllPythonTargets:
 
 
 class FirstPartyPythonMappingImpl(
-    FrozenDict[ResolveName, FrozenDict[str, Tuple[ModuleProvider, ...]]]
+    FrozenDict[ResolveName, FrozenDict[str, tuple[ModuleProvider, ...]]]
 ):
     """A mapping of each resolve name to the first-party module names contained and their owning
     addresses.
@@ -143,7 +144,7 @@ class FirstPartyPythonMappingImplMarker:
 @dataclass(frozen=True)
 class FirstPartyPythonModuleMapping:
     resolves_to_modules_to_providers: FrozenDict[
-        ResolveName, FrozenDict[str, Tuple[ModuleProvider, ...]]
+        ResolveName, FrozenDict[str, tuple[ModuleProvider, ...]]
     ]
 
     """A merged mapping of each resolve name to the first-party module names contained and their
@@ -277,7 +278,7 @@ class ThirdPartyPythonModuleMapping:
     modules."""
 
     resolves_to_modules_to_providers: FrozenDict[
-        ResolveName, FrozenDict[str, Tuple[ModuleProvider, ...]]
+        ResolveName, FrozenDict[str, tuple[ModuleProvider, ...]]
     ]
 
     def _providers_for_resolve(
@@ -317,7 +318,7 @@ class ThirdPartyPythonModuleMapping:
 
 
 @functools.cache
-def generate_mappings_from_pattern(proj_name: str, is_type_stub: bool) -> Tuple[str, ...]:
+def generate_mappings_from_pattern(proj_name: str, is_type_stub: bool) -> tuple[str, ...]:
     """Generate a tuple of possible module mappings from a project name using a regex pattern.
 
     e.g. google-cloud-foo -> [google.cloud.foo, google.cloud.foo_v1, google.cloud.foo_v2]
@@ -377,7 +378,7 @@ async def map_third_party_modules_to_addresses(
             proj_name = canonicalize_project_name(req.project_name)
             fallback_value = req.project_name.strip().lower().replace("-", "_")
 
-            modules_to_add: Tuple[str, ...]
+            modules_to_add: tuple[str, ...]
             is_type_stub: bool
             if proj_name in DEFAULT_MODULE_MAPPING:
                 modules_to_add = DEFAULT_MODULE_MAPPING[proj_name]

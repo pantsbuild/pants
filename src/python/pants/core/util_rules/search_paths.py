@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, ClassVar, Iterable
+from typing import Any, ClassVar
 
 from pants.base.build_environment import get_buildroot
 from pants.core.util_rules.environments import EnvironmentTarget

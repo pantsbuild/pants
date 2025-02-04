@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from pants.backend.go.util_rules.pkg_pattern import match_pattern, match_simple_pattern
 

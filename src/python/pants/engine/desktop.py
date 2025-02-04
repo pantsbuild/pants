@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Tuple
 
 from pants.core.util_rules.environments import ChosenLocalEnvironmentName, EnvironmentName
 from pants.core.util_rules.system_binaries import BinaryPathRequest, BinaryPaths
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class OpenFilesRequest:
-    files: Tuple[PurePath, ...]
+    files: tuple[PurePath, ...]
     error_if_open_not_found: bool
 
     def __init__(self, files: Iterable[PurePath], *, error_if_open_not_found: bool = True) -> None:
@@ -28,7 +28,7 @@ class OpenFilesRequest:
 
 @dataclass(frozen=True)
 class OpenFiles:
-    processes: Tuple[InteractiveProcess, ...]
+    processes: tuple[InteractiveProcess, ...]
 
 
 @rule

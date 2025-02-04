@@ -6,7 +6,6 @@ import dataclasses
 import json
 import textwrap
 from pathlib import Path
-from typing import Optional
 
 from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
 from pants.backend.terraform.goals.deploy import DeployTerraformFieldSet
@@ -46,11 +45,11 @@ def _do_init_terraform(
     return initialised_files, initialised_entries
 
 
-def find_file(files: DigestContents, pattern: str) -> Optional[FileContent]:
+def find_file(files: DigestContents, pattern: str) -> FileContent | None:
     return next((file for file in files if Path(file.path).match(pattern)), None)
 
 
-def find_link(entries: DigestEntries, pattern: str) -> Optional[SymlinkEntry]:
+def find_link(entries: DigestEntries, pattern: str) -> SymlinkEntry | None:
     for entry in entries:
         if not isinstance(entry, SymlinkEntry):
             continue

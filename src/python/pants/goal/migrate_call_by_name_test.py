@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from copy import deepcopy
 from pathlib import PurePath
-from typing import Final, Iterable
+from typing import Final
 
 import libcst as cst
 import pytest

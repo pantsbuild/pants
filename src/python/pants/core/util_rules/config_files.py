@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterable, Mapping
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents, PathGlobs, Snapshot

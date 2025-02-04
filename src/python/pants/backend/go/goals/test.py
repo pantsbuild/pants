@@ -8,8 +8,9 @@ import json
 import logging
 import os
 from collections import deque
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 from pants.backend.go.dependency_inference import GoModuleImportPathsMapping
 from pants.backend.go.subsystems.gotest import GoTestSubsystem

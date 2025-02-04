@@ -4,10 +4,11 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Iterable, Optional, Tuple, Type, TypeVar
+from typing import Any, TypeVar
 
 import pytest
 
@@ -312,7 +313,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner()
 
 
-def make_target(address: Optional[Address] = None) -> Target:
+def make_target(address: Address | None = None) -> Target:
     return MockTarget(
         {MockRequiredField.alias: "present"}, address or Address("", target_name="tests")
     )
@@ -321,13 +322,13 @@ def make_target(address: Optional[Address] = None) -> Target:
 def run_lint_rule(
     rule_runner: RuleRunner,
     *,
-    lint_request_types: Iterable[Type[_LintRequestT]],
+    lint_request_types: Iterable[type[_LintRequestT]],
     targets: list[Target],
     batch_size: int = 128,
     only: list[str] | None = None,
     skip_formatters: bool = False,
     skip_fixers: bool = False,
-) -> Tuple[int, str]:
+) -> tuple[int, str]:
     union_membership = UnionMembership(
         {
             AbstractLintRequest: lint_request_types,

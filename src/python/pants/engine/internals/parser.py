@@ -11,11 +11,12 @@ import threading
 import tokenize
 import traceback
 import typing
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import InitVar, dataclass, field
 from difflib import get_close_matches
 from io import StringIO
 from pathlib import PurePath
-from typing import Annotated, Any, Callable, Iterable, Mapping, TypeVar
+from typing import Annotated, Any, TypeVar
 
 import typing_extensions
 

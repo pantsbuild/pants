@@ -4,9 +4,9 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 from textwrap import dedent
-from typing import Iterable, Optional, Sequence, Tuple, Type
 
 import pytest
 
@@ -143,7 +143,7 @@ class InvalidRequest(MockCheckRequest):
         return -1
 
 
-def make_target(address: Optional[Address] = None) -> Target:
+def make_target(address: Address | None = None) -> Target:
     if address is None:
         address = Address("", target_name="tests")
     return MockTarget({}, address)
@@ -151,10 +151,10 @@ def make_target(address: Optional[Address] = None) -> Target:
 
 def run_typecheck_rule(
     *,
-    request_types: Sequence[Type[CheckRequest]],
+    request_types: Sequence[type[CheckRequest]],
     targets: list[Target],
     only: list[str] | None = None,
-) -> Tuple[int, str]:
+) -> tuple[int, str]:
     union_membership = UnionMembership({CheckRequest: request_types})
     check_subsystem = create_subsystem(CheckSubsystem, only=only or [])
     rule_runner = RuleRunner(bootstrap_args=["-lwarn"])

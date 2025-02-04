@@ -8,7 +8,7 @@ import os
 import shlex
 import sys
 import textwrap
-from typing import Mapping
+from collections.abc import Mapping
 
 from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode

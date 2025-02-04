@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import DefaultDict, Mapping, Tuple
+from collections.abc import Mapping
+from typing import DefaultDict
 
 from pants.backend.codegen.soap.java.extra_fields import JavaPackageField
 from pants.backend.codegen.soap.target_types import AllWsdlTargets
@@ -27,7 +28,7 @@ class FirstPartyWsdlJaxWsTargetsMappingRequest(FirstPartyMappingRequest):
 async def map_first_party_wsdl_jaxws_targets_to_symbols(
     _: FirstPartyWsdlJaxWsTargetsMappingRequest, wsdl_targets: AllWsdlTargets, jvm: JvmSubsystem
 ) -> SymbolMap:
-    package_mapping: DefaultDict[Tuple[_ResolveName, str], OrderedSet[Address]] = defaultdict(
+    package_mapping: DefaultDict[tuple[_ResolveName, str], OrderedSet[Address]] = defaultdict(
         OrderedSet
     )
     for target in wsdl_targets:

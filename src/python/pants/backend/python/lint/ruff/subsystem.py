@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import os.path
+from collections.abc import Iterable
 from enum import Enum
-from typing import Iterable
 
 from packaging.version import parse
 

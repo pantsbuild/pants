@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
+from collections.abc import Iterable
 from pathlib import PurePath
-from typing import Iterable
 
 from pants.base.build_root import BuildRoot
 from pants.build_graph.address import BuildFileAddressRequest

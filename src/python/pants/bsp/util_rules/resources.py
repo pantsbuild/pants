@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Type, TypeVar
+from typing import TypeVar
 
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec.base import BuildTargetIdentifier
@@ -45,10 +45,10 @@ async def resources_bsp_target(
     union_membership: UnionMembership,
 ) -> BSPResourcesResult:
     targets = await Get(Targets, BSPBuildTargetInternal, request.bsp_target)
-    resources_request_types: FrozenOrderedSet[Type[BSPResourcesRequest]] = union_membership.get(
+    resources_request_types: FrozenOrderedSet[type[BSPResourcesRequest]] = union_membership.get(
         BSPResourcesRequest
     )
-    field_sets_by_request_type: dict[Type[BSPResourcesRequest], set[FieldSet]] = defaultdict(set)
+    field_sets_by_request_type: dict[type[BSPResourcesRequest], set[FieldSet]] = defaultdict(set)
     for target in targets:
         for resources_request_type in resources_request_types:
             field_set_type = resources_request_type.field_set_type

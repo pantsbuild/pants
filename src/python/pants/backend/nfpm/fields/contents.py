@@ -6,8 +6,9 @@ from __future__ import annotations
 import os
 import stat
 from abc import ABCMeta
+from collections.abc import Iterable
 from enum import Enum
-from typing import Any, ClassVar, Iterable, Optional, Union, cast
+from typing import Any, ClassVar, cast
 
 from pants.backend.nfpm.fields.all import NfpmDependencies
 from pants.backend.nfpm.subsystem import MTIME_DEFAULT
@@ -156,7 +157,7 @@ class NfpmContentFileModeField(IntField):
     valid_numbers = ValidNumbers.positive_and_zero
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[Union[int, str]], address: Address) -> Optional[int]:
+    def compute_value(cls, raw_value: int | str | None, address: Address) -> int | None:
         if isinstance(raw_value, str):
             try:
                 octal_value = int(raw_value, 8)
@@ -235,7 +236,7 @@ class _SrcDstSequenceField(TupleSequenceField):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Iterable[Iterable[str]]], address: Address
+        cls, raw_value: Iterable[Iterable[str]] | None, address: Address
     ) -> tuple[tuple[str, str], ...]:
         src_dst_map = super().compute_value(raw_value, address)
         if not src_dst_map:
@@ -272,9 +273,9 @@ class _NfpmContentOverridesField(OverridesField):
     @classmethod
     def compute_value(
         cls,
-        raw_value: Optional[dict[Union[str, tuple[str, ...]], dict[str, Any]]],
+        raw_value: dict[str | tuple[str, ...], dict[str, Any]] | None,
         address: Address,
-    ) -> Optional[FrozenDict[tuple[str, ...], FrozenDict[str, ImmutableValue]]]:
+    ) -> FrozenDict[tuple[str, ...], FrozenDict[str, ImmutableValue]] | None:
         value = super().compute_value(raw_value, address)
         if not value:
             return None
@@ -316,7 +317,7 @@ class NfpmContentFileSourceField(OptionalSingleSourceField):
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
+    def compute_value(cls, raw_value: str | None, address: Address) -> str | None:
         value_or_default = super().compute_value(raw_value, address)
         # This field should either have a path to a file or it should be None.
         # If it is a path to a file, we rely on standard glob_match_error_behavior
@@ -585,7 +586,7 @@ class NfpmContentDirsField(StringSequenceField):
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[Iterable[str]], address: Address) -> tuple[str, ...]:
+    def compute_value(cls, raw_value: Iterable[str] | None, address: Address) -> tuple[str, ...]:
         dst_dirs = super().compute_value(raw_value, address)
         assert dst_dirs is not None  # it is required
         # nFPM normalizes paths to be absolute, so "" is effectively the same as "/".

@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Tuple
 
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.rules import Get, collect_rules, rule
@@ -38,7 +37,7 @@ class SubprocessEnvironment(Subsystem):
         )
 
         @property
-        def env_vars_to_pass_to_subprocesses(self) -> Tuple[str, ...]:
+        def env_vars_to_pass_to_subprocesses(self) -> tuple[str, ...]:
             return tuple(sorted(set(self._env_vars)))
 
 

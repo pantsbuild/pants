@@ -9,13 +9,12 @@ import os
 import re
 import sys
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path, PurePath
-from typing import Any, Callable, Type, TypeVar, cast
-
-from typing_extensions import assert_never
+from typing import Any, Type, TypeVar, assert_never, cast
 
 from pants.base.build_environment import (
     get_buildroot,

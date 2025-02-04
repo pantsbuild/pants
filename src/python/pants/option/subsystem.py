@@ -7,7 +7,8 @@ import functools
 import inspect
 import re
 from abc import ABCMeta
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Iterable, Sequence, TypeVar, cast
+from collections.abc import Callable, Iterable, Sequence
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, cast
 
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.selectors import AwaitableConstraints, Get

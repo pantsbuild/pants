@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 import os.path
 from dataclasses import dataclass
-from typing import Optional
 
 from pants.backend.terraform.dependency_inference import (
     TerraformDeploymentInvocationFiles,
@@ -37,7 +36,7 @@ from pants.option.global_options import KeepSandboxes
 @dataclass(frozen=True)
 class TerraformDependenciesRequest:
     chdir: str
-    backend_config: Optional[str]
+    backend_config: str | None
     lockfile: bool
     dependencies_files: Digest
 

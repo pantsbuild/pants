@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import os
-from typing import Iterable, Optional, Sequence, Tuple
+from collections.abc import Iterable, Sequence
 
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
@@ -359,8 +359,8 @@ class GoPackageSourcesField(MultipleSourcesField):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Iterable[str]], address: Address
-    ) -> Optional[Tuple[str, ...]]:
+        cls, raw_value: Iterable[str] | None, address: Address
+    ) -> tuple[str, ...] | None:
         value_or_default = super().compute_value(raw_value, address)
         if not value_or_default:
             raise InvalidFieldException(

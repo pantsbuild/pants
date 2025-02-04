@@ -7,7 +7,7 @@ import time
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Type, TypeVar
+from typing import TypeVar
 
 from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPHandlerMapping
@@ -53,10 +53,10 @@ async def compile_bsp_target(
     union_membership: UnionMembership,
 ) -> BSPCompileResult:
     targets = await Get(Targets, BSPBuildTargetInternal, request.bsp_target)
-    compile_request_types: FrozenOrderedSet[Type[BSPCompileRequest]] = union_membership.get(
+    compile_request_types: FrozenOrderedSet[type[BSPCompileRequest]] = union_membership.get(
         BSPCompileRequest
     )
-    field_sets_by_request_type: dict[Type[BSPCompileRequest], set[FieldSet]] = defaultdict(set)
+    field_sets_by_request_type: dict[type[BSPCompileRequest], set[FieldSet]] = defaultdict(set)
     for target in targets:
         for compile_request_type in compile_request_types:
             field_set_type = compile_request_type.field_set_type

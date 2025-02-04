@@ -6,10 +6,11 @@ from __future__ import annotations
 import importlib.util
 import json
 import logging
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path, PurePath
-from typing import Callable, Iterable, TypedDict
+from typing import TypedDict
 
 import libcst as cst
 import libcst.helpers as h

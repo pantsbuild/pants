@@ -1,8 +1,8 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import dataclasses
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable, Union
 
 from pants.backend.typescript.target_types import (
     TS_FILE_EXTENSIONS,
@@ -55,7 +55,7 @@ async def find_putative_ts_targets(
     )
 
 
-def rules() -> Iterable[Union[Rule, UnionRule]]:
+def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
         UnionRule(PutativeTargetsRequest, PutativeTypeScriptTargetsRequest),

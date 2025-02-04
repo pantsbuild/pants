@@ -3,7 +3,6 @@
 
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Optional
 
 from pants.backend.python.goals.run_helper import (
     _create_python_source_run_dap_request,
@@ -51,7 +50,7 @@ class PythonSourceFieldSet(RunFieldSet):
             return python_setup.default_run_goal_use_sandbox
         return self._run_goal_use_sandbox.value
 
-    def _executable_main(self) -> Optional[Executable]:
+    def _executable_main(self) -> Executable | None:
         source = PurePath(self.source.value)
         source_name = source.stem if source.suffix == ".py" else source.name
         if not all(part.isidentifier() for part in source_name.split(".")):

@@ -4,7 +4,7 @@ import ast
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, DefaultDict, List, Set, Tuple, cast
+from typing import Any, DefaultDict, cast
 
 from pants.backend.python.dependency_inference.module_mapper import (
     FirstPartyPythonModuleMapping,
@@ -186,7 +186,7 @@ class ImportVisitor(ast.NodeVisitor):
     def __init__(self, search_for_modules: set[str]) -> None:
         super().__init__()
         self._search_for = search_for_modules
-        self._found: Set[Var] = set()
+        self._found: set[Var] = set()
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> Any:
         if node.module not in self._search_for:
@@ -216,7 +216,7 @@ async def get_python_constant_targets(targets: AllTargets) -> AllPythonConstantT
     )
 
 
-class BackwardMapping(FrozenDict[ResolveName, FrozenDict[str, Tuple[str, ...]]]):
+class BackwardMapping(FrozenDict[ResolveName, FrozenDict[str, tuple[str, ...]]]):
     pass
 
 
@@ -236,7 +236,7 @@ async def get_backward_mapping(
     )
     search_for = {file for path in paths for file in path.files}
 
-    result: DefaultDict[str, DefaultDict[str, List[str]]] = defaultdict(lambda: defaultdict(list))
+    result: DefaultDict[str, DefaultDict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
     for resolve, m in mapping.resolves_to_modules_to_providers.items():
         for module, module_providers in m.items():
             for module_provider in module_providers:
@@ -290,7 +290,7 @@ async def infer_python_dependencies_on_python_constants(
     vars = ImportVisitor.search_for_vars(content, interesting_modules)
     logger.debug("vars %s", vars)
 
-    filenames_to_python_constant_targets: DefaultDict[str, List[PythonConstantTarget]] = (
+    filenames_to_python_constant_targets: DefaultDict[str, list[PythonConstantTarget]] = (
         defaultdict(list)
     )
     for path, target in zip(paths, python_constant_targets):

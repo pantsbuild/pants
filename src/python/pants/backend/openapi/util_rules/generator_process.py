@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import dataclasses
 import re
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
-from typing import Iterable, Iterator, Mapping
 
 from pants.backend.openapi.subsystems import openapi_generator
 from pants.backend.openapi.subsystems.openapi_generator import OpenAPIGenerator

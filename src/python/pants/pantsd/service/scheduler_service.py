@@ -3,7 +3,7 @@
 
 import logging
 import time
-from typing import Optional, Tuple, cast
+from typing import cast
 
 import psutil
 
@@ -33,7 +33,7 @@ class SchedulerService(PantsService):
         *,
         graph_scheduler: GraphScheduler,
         build_root: str,
-        invalidation_globs: Tuple[str, ...],
+        invalidation_globs: tuple[str, ...],
         pidfile: str,
         pid: int,
         max_memory_usage_in_bytes: int,
@@ -62,7 +62,7 @@ class SchedulerService(PantsService):
         self._logger = logging.getLogger(__name__)
 
         # NB: We declare these as a single field so that they can be changed atomically.
-        self._invalidation_globs_and_snapshot: Tuple[Tuple[str, ...], Optional[Snapshot]] = (
+        self._invalidation_globs_and_snapshot: tuple[tuple[str, ...], Snapshot | None] = (
             invalidation_globs,
             None,
         )
@@ -71,7 +71,7 @@ class SchedulerService(PantsService):
         self._pid = pid
         self._max_memory_usage_in_bytes = max_memory_usage_in_bytes
 
-    def _get_snapshot(self, globs: Tuple[str, ...], poll: bool) -> Optional[Snapshot]:
+    def _get_snapshot(self, globs: tuple[str, ...], poll: bool) -> Snapshot | None:
         """Returns a Snapshot of the input globs.
 
         If poll=True, will wait for up to INVALIDATION_POLL_INTERVAL for the globs to have changed,

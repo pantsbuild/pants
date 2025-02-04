@@ -6,10 +6,11 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+from collections.abc import Callable, Iterator
 from functools import partial
 from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import Any, Callable, Iterator
+from typing import Any
 
 import pytest
 

@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.base.exceptions import MappingError
 from pants.engine.engine_aware import EngineAwareParameter

@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from pants.backend.openapi import dependency_inference
 from pants.backend.openapi.goals import tailor

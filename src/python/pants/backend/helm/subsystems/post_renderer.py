@@ -7,10 +7,11 @@ import logging
 import os
 import pkgutil
 import shlex
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent  # noqa: PNT20
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 import yaml
 

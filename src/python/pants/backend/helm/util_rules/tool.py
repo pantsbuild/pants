@@ -7,11 +7,11 @@ import dataclasses
 import logging
 import os
 from abc import ABCMeta
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any, ClassVar, Generic, Iterable, Mapping, Type, TypeVar
+from typing import Any, ClassVar, Generic, TypeVar, final
 
 import yaml
-from typing_extensions import final
 
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.utils.yaml import snake_case_attr_dict
@@ -168,13 +168,13 @@ _EHPB = TypeVar("_EHPB", bound="ExternalHelmPluginBinding")
 class ExternalHelmPluginBinding(Generic[_ExternalHelmPlugin], metaclass=ABCMeta):
     """Union type allowing Pants to discover global external Helm plugins."""
 
-    plugin_subsystem_cls: ClassVar[Type[ExternalHelmPlugin]]
+    plugin_subsystem_cls: ClassVar[type[ExternalHelmPlugin]]
 
     name: str
 
     @final
     @classmethod
-    def create(cls: Type[_EHPB]) -> _EHPB:
+    def create(cls: type[_EHPB]) -> _EHPB:
         return cls(name=cls.plugin_subsystem_cls.plugin_name)
 
 

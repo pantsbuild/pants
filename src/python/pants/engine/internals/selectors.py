@@ -5,20 +5,9 @@ from __future__ import annotations
 
 import ast
 import itertools
+from collections.abc import Coroutine, Generator, Iterable, Sequence
 from dataclasses import dataclass
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Coroutine,
-    Generator,
-    Generic,
-    Iterable,
-    Sequence,
-    Tuple,
-    TypeVar,
-    cast,
-    overload,
-)
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast, overload
 
 from pants.engine.internals.native_engine import PyGeneratorResponseCall, PyGeneratorResponseGet
 from pants.util.strutil import softwrap
@@ -172,7 +161,7 @@ class _MultiGet:
 
     def __await__(self) -> Generator[tuple[Get | Coroutine, ...], None, tuple]:
         result = yield self.gets
-        return cast(Tuple, result)
+        return cast(tuple, result)
 
 
 # These type variables are used to parametrize from 1 to 10 Gets when used in a tuple-style

@@ -4,11 +4,12 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Iterable
+from typing import Any
 
 import pytest
 from _pytest.monkeypatch import MonkeyPatch

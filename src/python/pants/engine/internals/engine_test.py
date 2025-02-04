@@ -6,7 +6,6 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from textwrap import dedent
-from typing import List, Optional, Tuple
 
 import pytest
 
@@ -274,8 +273,8 @@ class WorkunitTracker(WorkunitsCallback):
     """This class records every non-empty batch of started and completed workunits received from the
     engine."""
 
-    finished_workunit_chunks: List[List[dict]] = field(default_factory=list)
-    started_workunit_chunks: List[List[dict]] = field(default_factory=list)
+    finished_workunit_chunks: list[list[dict]] = field(default_factory=list)
+    started_workunit_chunks: list[list[dict]] = field(default_factory=list)
     finished: bool = False
 
     @property
@@ -310,7 +309,7 @@ def run_tracker() -> RunTracker:
 class TestStreamingWorkunit(SchedulerTestBase):
     def _fixture_for_rules(
         self, tmp_path: Path, rules, max_workunit_verbosity: LogLevel = LogLevel.INFO
-    ) -> Tuple[SchedulerSession, WorkunitTracker, StreamingWorkunitHandler]:
+    ) -> tuple[SchedulerSession, WorkunitTracker, StreamingWorkunitHandler]:
         scheduler = self.mk_scheduler(
             tmp_path,
             rules,
@@ -547,7 +546,7 @@ class TestStreamingWorkunit(SchedulerTestBase):
         # If level() returns None, the engine shouldn't try to set
         # a new workunit level.
         class ModifiedOutput(EngineAwareReturnType):
-            _level: Optional[LogLevel]
+            _level: LogLevel | None
             val: int
 
             def level(self):

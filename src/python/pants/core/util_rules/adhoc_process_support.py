@@ -8,11 +8,12 @@ import json
 import logging
 import os
 import shlex
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from textwrap import dedent  # noqa: PNT20
-from typing import Iterable, Mapping, TypeVar, Union
+from typing import TypeVar
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.build_graph.address import Address
@@ -858,7 +859,7 @@ def _output_at_build_root(process: Process, bash: BashBinary) -> Process:
     )
 
 
-def parse_relative_directory(workdir_in: str, relative_to: Union[Address, str]) -> str:
+def parse_relative_directory(workdir_in: str, relative_to: Address | str) -> str:
     """Convert the `workdir` field into something that can be understood by `Process`."""
 
     if isinstance(relative_to, Address):

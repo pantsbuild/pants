@@ -5,8 +5,8 @@ from __future__ import annotations
 import os
 import pprint
 import subprocess
+from collections.abc import Callable, Iterable
 from textwrap import dedent
-from typing import Callable, Iterable
 
 import pytest
 

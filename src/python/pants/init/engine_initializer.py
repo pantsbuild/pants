@@ -4,9 +4,10 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, ClassVar, Iterable, Mapping, cast
+from typing import Any, ClassVar, cast
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot

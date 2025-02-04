@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.cc.subsystems.compiler import CCSubsystem, ExternalCCSubsystem
 from pants.backend.cc.target_types import CCLanguage

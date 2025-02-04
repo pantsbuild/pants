@@ -5,10 +5,9 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
-from typing import Any, Callable, ClassVar, Iterable, Iterator, Protocol, Sequence, TypeVar, cast
-
-from typing_extensions import final
+from typing import Any, ClassVar, Protocol, TypeVar, cast, final
 
 from pants.base.specs import Specs
 from pants.core.goals.multi_tool_goal_helper import (

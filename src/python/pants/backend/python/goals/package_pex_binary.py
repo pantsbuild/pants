@@ -3,7 +3,6 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Tuple
 
 from pants.backend.python.target_types import (
     PexArgsField,
@@ -86,7 +85,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     def _execution_mode(self) -> PexExecutionMode:
         return PexExecutionMode(self.execution_mode.value)
 
-    def generate_additional_args(self, pex_binary_defaults: PexBinaryDefaults) -> Tuple[str, ...]:
+    def generate_additional_args(self, pex_binary_defaults: PexBinaryDefaults) -> tuple[str, ...]:
         args = []
         if self.emit_warnings.value_or_global_default(pex_binary_defaults) is False:
             args.append("--no-emit-warnings")

@@ -7,9 +7,10 @@ import inspect
 import itertools
 import logging
 import sys
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from functools import partial
-from typing import Any, Callable, Iterator, List, Sequence, get_type_hints
+from typing import Any, get_type_hints
 
 import typing_extensions
 
@@ -144,7 +145,7 @@ class _AwaitableCollector(ast.NodeVisitor):
         self.source_file = inspect.getsourcefile(func) or "<unknown>"
 
         self.types = _TypeStack(func)
-        self.awaitables: List[AwaitableConstraints] = []
+        self.awaitables: list[AwaitableConstraints] = []
         self.visit(ast.parse(source))
 
     def _format(self, node: ast.AST, msg: str) -> str:
@@ -201,7 +202,7 @@ class _AwaitableCollector(ast.NodeVisitor):
             )
         return resolved
 
-    def _get_inputs(self, input_nodes: Sequence[Any]) -> tuple[Sequence[Any], List[Any]]:
+    def _get_inputs(self, input_nodes: Sequence[Any]) -> tuple[Sequence[Any], list[Any]]:
         if not input_nodes:
             return input_nodes, []
         if len(input_nodes) != 1:
@@ -390,5 +391,5 @@ class _AwaitableCollector(ast.NodeVisitor):
 
 
 @memoized
-def collect_awaitables(func: Callable) -> List[AwaitableConstraints]:
+def collect_awaitables(func: Callable) -> list[AwaitableConstraints]:
     return _AwaitableCollector(func).awaitables

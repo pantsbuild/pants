@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Iterable, Sequence
 
 from pants.build_graph.address import Address as Address
 from pants.build_graph.address import AddressInput as AddressInput  # noqa: F401: rexport.

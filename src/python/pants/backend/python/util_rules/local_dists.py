@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import logging
 import shlex
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints

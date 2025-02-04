@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable
 
 from pants.backend.codegen.avro.java.subsystem import AvroSubsystem
 from pants.backend.codegen.avro.target_types import (

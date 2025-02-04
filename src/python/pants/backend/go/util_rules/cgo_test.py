@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import os
 import subprocess
+from collections.abc import Iterable
 from pathlib import Path
 from textwrap import dedent
-from typing import Iterable
 
 import pytest
 

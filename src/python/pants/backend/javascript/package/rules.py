@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import ClassVar, Iterable
+from typing import ClassVar
 
 from pants.backend.javascript import install_node_package
 from pants.backend.javascript.install_node_package import (

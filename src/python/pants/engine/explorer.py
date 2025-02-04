@@ -3,8 +3,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, TypeVar, cast
+from typing import Any, TypeVar, cast
 
 from pants.base.exiter import ExitCode
 from pants.build_graph.build_configuration import BuildConfiguration

@@ -3,10 +3,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
-from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Union
 
 # Note: several of these types are re-exported as the public API of `engine/fs.py`.
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior as GlobMatchErrorBehavior
@@ -38,8 +39,8 @@ class Paths:
     or save them to the LMDB store.
     """
 
-    files: Tuple[str, ...]
-    dirs: Tuple[str, ...]
+    files: tuple[str, ...]
+    dirs: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -155,7 +156,7 @@ class GlobExpansionConjunction(Enum):
 
 @dataclass(frozen=True)
 class PathGlobs:
-    globs: Tuple[str, ...]
+    globs: tuple[str, ...]
     glob_match_error_behavior: GlobMatchErrorBehavior
     conjunction: GlobExpansionConjunction
     description_of_origin: str | None
@@ -221,7 +222,7 @@ class PathGlobsAndRoot:
 
     path_globs: PathGlobs
     root: str
-    digest_hint: Optional[Digest] = None
+    digest_hint: Digest | None = None
 
 
 @dataclass(frozen=True)
@@ -302,7 +303,7 @@ class Workspace(SideEffecting):
         self,
         digest: Digest,
         *,
-        path_prefix: Optional[str] = None,
+        path_prefix: str | None = None,
         clear_paths: Sequence[str] = (),
         side_effecting: bool = True,
     ) -> None:

@@ -6,9 +6,10 @@ from __future__ import annotations
 import os
 import shlex
 import textwrap
+from collections.abc import Iterable
 from dataclasses import dataclass
 from hashlib import sha256
-from typing import ClassVar, Iterable, Tuple
+from typing import ClassVar
 
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import external_tool
@@ -239,10 +240,10 @@ class Coursier:
 
 @dataclass(frozen=True)
 class CoursierFetchProcess:
-    args: Tuple[str, ...]
+    args: tuple[str, ...]
     input_digest: Digest
-    output_directories: Tuple[str, ...]
-    output_files: Tuple[str, ...]
+    output_directories: tuple[str, ...]
+    output_files: tuple[str, ...]
     description: str
 
 

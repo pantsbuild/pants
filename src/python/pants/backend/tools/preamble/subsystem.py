@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
 
 from pants.option.option_types import DictOption, SkipOption
 from pants.option.subsystem import Subsystem

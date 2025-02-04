@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-from typing import DefaultDict, Sequence
+from collections.abc import Sequence
+from typing import DefaultDict
 from unittest import mock
 
 import pytest

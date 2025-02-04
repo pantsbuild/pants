@@ -7,8 +7,8 @@ import signal
 import sys
 import termios
 import time
+from collections.abc import Mapping
 from contextlib import contextmanager
-from typing import List, Mapping
 
 from pants.base.exiter import ExitCode
 from pants.engine.internals.native_engine import (
@@ -97,7 +97,7 @@ class RemotePantsRunner:
 
     def __init__(
         self,
-        args: List[str],
+        args: list[str],
         env: Mapping[str, str],
         options_bootstrapper: OptionsBootstrapper,
     ) -> None:

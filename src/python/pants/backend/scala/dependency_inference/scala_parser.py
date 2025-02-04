@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 import logging
 import os
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
-from typing import Any, Iterator, Mapping
+from typing import Any
 
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scalac import Scalac

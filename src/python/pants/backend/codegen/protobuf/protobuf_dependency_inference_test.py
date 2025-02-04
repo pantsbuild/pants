@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from textwrap import dedent
-from typing import Set
 
 import pytest
 
@@ -69,7 +68,7 @@ from pants.util.frozendict import FrozenDict
         ),
     ],
 )
-def test_parse_proto_imports(file_content: str, expected: Set[str]) -> None:
+def test_parse_proto_imports(file_content: str, expected: set[str]) -> None:
     assert set(parse_proto_imports(file_content)) == expected
 
 

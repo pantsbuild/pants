@@ -8,10 +8,11 @@ import logging
 import os
 import re
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
 from itertools import chain
-from typing import Any, Iterable
+from typing import Any
 
 from pants.backend.helm.subsystems import post_renderer
 from pants.backend.helm.subsystems.post_renderer import HelmPostRenderer

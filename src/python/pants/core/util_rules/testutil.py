@@ -2,9 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterable, Sequence, TypeVar
+from typing import TypeVar
 
 from pants.util.contextutil import temporary_dir
 

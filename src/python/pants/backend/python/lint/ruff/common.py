@@ -1,9 +1,7 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from dataclasses import dataclass
-from typing import Tuple
-
-from typing_extensions import assert_never
+from typing import assert_never
 
 from pants.backend.python.lint.ruff.subsystem import Ruff, RuffMode
 from pants.core.goals.lint import REPORT_DIR
@@ -56,7 +54,7 @@ async def run_ruff(
 
     conf_args = [f"--config={ruff.config}"] if ruff.config else []
 
-    extra_initial_args: Tuple[str, ...] = ()
+    extra_initial_args: tuple[str, ...] = ()
     if request.mode is RuffMode.FORMAT:
         extra_initial_args = ("format",)
     elif request.mode is RuffMode.FIX:

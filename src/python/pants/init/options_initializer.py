@@ -7,9 +7,9 @@ import dataclasses
 import importlib
 import logging
 import sys
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, List
 
 import pkg_resources
 
@@ -66,7 +66,7 @@ def _initialize_build_configuration(
     )
 
 
-def _collect_backends_requirements(backends: List[str]) -> List[str]:
+def _collect_backends_requirements(backends: list[str]) -> list[str]:
     """Collects backend package dependencies, in case those are declared in an adjacent
     requirements.txt. Ignores any loading errors, assuming those will be later on handled by the
     backends loader.

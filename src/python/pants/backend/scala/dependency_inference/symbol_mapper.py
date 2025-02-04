@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Mapping
+from collections.abc import Mapping
 
 from pants.backend.scala.dependency_inference.scala_parser import ScalaSourceDependencyAnalysis
 from pants.backend.scala.target_types import ScalaSourceField

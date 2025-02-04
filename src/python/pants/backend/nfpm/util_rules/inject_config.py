@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
 from pants.engine.environment import EnvironmentName

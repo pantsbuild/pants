@@ -7,9 +7,9 @@ import errno
 import os
 import unittest
 import unittest.mock
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Iterator
 
 import pytest
 

@@ -12,8 +12,9 @@ parser.
 """
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Mapping, Tuple, Union
+from typing import Any, Union
 
 from pants.engine.addresses import Address
 from pants.engine.internals.parametrize import Parametrize
@@ -29,7 +30,7 @@ from pants.engine.unions import UnionMembership
 from pants.util.frozendict import FrozenDict
 
 SetDefaultsValueT = Mapping[str, Any]
-SetDefaultsKeyT = Union[str, Tuple[str, ...]]
+SetDefaultsKeyT = Union[str, tuple[str, ...]]
 SetDefaultsT = Mapping[SetDefaultsKeyT, SetDefaultsValueT]
 
 

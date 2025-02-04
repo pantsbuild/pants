@@ -8,12 +8,13 @@ import logging
 import os
 import re
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
 from io import StringIO
 from os import PathLike
 from pathlib import Path, PurePath
-from typing import Any, DefaultDict, Iterable
+from typing import Any, DefaultDict
 
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException, MaybeGitBinary
 from pants.engine.engine_aware import EngineAwareReturnType

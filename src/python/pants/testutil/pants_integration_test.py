@@ -7,9 +7,10 @@ import glob
 import os
 import subprocess
 import sys
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Iterator, List, Mapping, Union, cast
+from typing import Any, Union, cast
 
 import pytest
 import toml
@@ -24,7 +25,7 @@ from pants.util.osutil import Pid
 from pants.util.strutil import ensure_binary
 
 # NB: If `shell=True`, it's a single `str`.
-Command = Union[str, List[str]]
+Command = Union[str, list[str]]
 
 # Sometimes we mix strings and bytes as keys and/or values, but in most
 # cases we pass strict str->str, and we want both to typecheck.
@@ -143,7 +144,7 @@ def run_pants_with_workdir_without_waiting(
     # Only allow-listed entries will be included in the environment if hermetic=True. Note that
     # the env will already be fairly hermetic thanks to the v2 engine; this provides an
     # additional layer of hermiticity.
-    env: dict[Union[str, bytes], Union[str, bytes]]
+    env: dict[str | bytes, str | bytes]
     if hermetic:
         # With an empty environment, we would generally get the true underlying system default
         # encoding, which is unlikely to be what we want (it's generally ASCII, still). So we

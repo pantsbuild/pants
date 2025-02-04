@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import DefaultDict, Mapping, Tuple
+from collections.abc import Mapping
+from typing import DefaultDict
 
 from pants.backend.openapi.codegen.java.extra_fields import (
     OpenApiJavaApiPackageField,
@@ -36,7 +37,7 @@ async def map_first_party_openapi_java_targets_to_symbols(
     all_openapi_document_targets: AllOpenApiDocumentTargets,
     jvm: JvmSubsystem,
 ) -> SymbolMap:
-    package_mapping: DefaultDict[Tuple[_ResolveName, str], OrderedSet[Address]] = defaultdict(
+    package_mapping: DefaultDict[tuple[_ResolveName, str], OrderedSet[Address]] = defaultdict(
         OrderedSet
     )
     for target in all_openapi_document_targets:

@@ -11,8 +11,9 @@ But this module should include `@rules` for multiple languages, even though the 
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from textwrap import dedent
-from typing import Sequence, Type, cast
+from typing import cast
 
 import chevron
 import pytest
@@ -262,7 +263,7 @@ def test_request_classification(
     all_members = [CompileJavaSourceRequest, CompileScalaSourceRequest, CoursierFetchRequest]
     generators = FrozenDict(
         {
-            CompileJavaSourceRequest: frozenset([cast(Type[SourcesField], ProtobufSourceField)]),
+            CompileJavaSourceRequest: frozenset([cast(type[SourcesField], ProtobufSourceField)]),
             CompileScalaSourceRequest: frozenset(),
         }
     )

@@ -10,8 +10,8 @@ import signal
 import sys
 import threading
 import traceback
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from typing import Callable, Dict, Iterator
 
 import psutil
 import setproctitle
@@ -34,7 +34,7 @@ class SignalHandler:
     """
 
     @property
-    def signal_handler_mapping(self) -> Dict[signal.Signals, Callable]:
+    def signal_handler_mapping(self) -> dict[signal.Signals, Callable]:
         """A dict mapping (signal number) -> (a method handling the signal)."""
         # Could use an enum here, but we never end up doing any matching on the specific signal value,
         # instead just iterating over the registered signals to set handlers, so a dict is probably

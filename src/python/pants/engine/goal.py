@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Type, cast
-
-from typing_extensions import final
+from typing import TYPE_CHECKING, ClassVar, cast, final
 
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.unions import UnionMembership
@@ -99,7 +98,7 @@ class Goal:
         USES_ENVIRONMENTS = 3
 
     exit_code: int
-    subsystem_cls: ClassVar[Type[GoalSubsystem]]
+    subsystem_cls: ClassVar[type[GoalSubsystem]]
 
     f"""Indicates that a Goal has been migrated to compute EnvironmentNames to build targets in.
 

@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 from fnmatch import fnmatch
-from typing import ClassVar, Optional
+from typing import ClassVar
 from urllib.parse import urlparse
 
 from pants.engine.fs import Digest, DownloadFile, NativeDownloadFile
@@ -43,14 +43,14 @@ class URLDownloadHandler:
             ]
     """
 
-    match_scheme: ClassVar[Optional[str]] = None
+    match_scheme: ClassVar[str | None] = None
     """The scheme to match (e.g. 'ftp' or 's3') or `None` to match all schemes.
 
     The scheme is matched using `fnmatch`, see https://docs.python.org/3/library/fnmatch.html for more
     information.
     """
 
-    match_authority: ClassVar[Optional[str]] = None
+    match_authority: ClassVar[str | None] = None
     """The authority to match (e.g. 'pantsbuild.org' or 's3.amazonaws.com') or `None` to match all authorities.
 
     The authority is matched using `fnmatch`, see https://docs.python.org/3/library/fnmatch.html for more

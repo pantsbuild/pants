@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-from typing import Tuple
-
 from pants.backend.python.lint.pydocstyle.subsystem import Pydocstyle, PydocstyleFieldSet
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
@@ -25,7 +23,7 @@ class PydocstyleRequest(LintTargetsRequest):
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
-def generate_argv(source_files: SourceFiles, pydocstyle: Pydocstyle) -> Tuple[str, ...]:
+def generate_argv(source_files: SourceFiles, pydocstyle: Pydocstyle) -> tuple[str, ...]:
     args = []
     if pydocstyle.config is not None:
         args.append(f"--config={pydocstyle.config}")

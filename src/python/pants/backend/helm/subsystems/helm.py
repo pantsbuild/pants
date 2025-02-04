@@ -4,7 +4,8 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 from pants.backend.helm.resolve.remotes import HelmRemotes
 from pants.backend.helm.target_types import HelmChartTarget, HelmRegistriesField

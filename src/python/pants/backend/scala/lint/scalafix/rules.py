@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import os.path
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, cast
+from typing import cast
 
 from pants.backend.scala.lint.scalafix.extra_fields import SkipScalafixField
 from pants.backend.scala.lint.scalafix.subsystem import ScalafixSubsystem

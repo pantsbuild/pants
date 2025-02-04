@@ -5,10 +5,11 @@ from __future__ import annotations
 import itertools
 import logging
 import os.path
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from pathlib import PurePath
 from pprint import pformat
-from typing import Any, Iterable, Iterator, Sequence, cast
+from typing import Any, cast
 
 from pants.backend.visibility.glob import TargetGlob
 from pants.engine.addresses import Address

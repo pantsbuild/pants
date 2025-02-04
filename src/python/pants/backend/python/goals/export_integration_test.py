@@ -7,8 +7,8 @@ import os
 import platform
 import re
 import shutil
+from collections.abc import Mapping, MutableMapping
 from textwrap import dedent
-from typing import Mapping, MutableMapping
 
 import pytest
 

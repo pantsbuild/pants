@@ -10,9 +10,10 @@ import re
 import textwrap
 import urllib
 import uuid
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Mapping, Sequence, TypedDict, TypeVar, cast
+from typing import TypedDict, TypeVar, cast
 
 from packaging.version import InvalidVersion
 

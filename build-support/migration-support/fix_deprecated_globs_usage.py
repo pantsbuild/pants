@@ -18,19 +18,19 @@ from difflib import unified_diff
 from enum import Enum
 from functools import partial
 from pathlib import Path
-from typing import Dict, List, NamedTuple, Optional, Set, Union
+from typing import NamedTuple, Optional
 
 
 def main() -> None:
     args = create_parser().parse_args()
-    build_files: Set[Path] = {
+    build_files: set[Path] = {
         fp
         for folder in args.folders
         for fp in [*folder.rglob("BUILD"), *folder.rglob("BUILD.*")]
         # Check that it really is a BUILD file
         if fp.is_file() and fp.stem == "BUILD"
     }
-    updates: Dict[Path, List[str]] = {}
+    updates: dict[Path, list[str]] = {}
     for build in build_files:
         try:
             possibly_new_build = generate_possibly_new_build(build)
@@ -70,8 +70,8 @@ class GlobType(Enum):
 
 class GlobFunction(NamedTuple):
     glob_type: GlobType
-    includes: List[str]
-    excludes: Optional[List[str]]
+    includes: list[str]
+    excludes: list[str] | None
 
     @staticmethod
     def normalize_rglob(rglob: str) -> str:
@@ -84,7 +84,7 @@ class GlobFunction(NamedTuple):
         for the original implementation.
         """
         components = rglob.split(os.path.sep)
-        out: List[str] = []
+        out: list[str] = []
         for component in components:
             if component == "**":
                 if out and out[-1].startswith("**"):
@@ -118,25 +118,25 @@ class GlobFunction(NamedTuple):
                 f"using variables instead of raw strings. Please manually update."
             )
             return None
-        include_globs: List[str] = [arg.s for arg in glob_func.args]  # type: ignore[attr-defined]
+        include_globs: list[str] = [arg.s for arg in glob_func.args]  # type: ignore[attr-defined]
 
         # Excludes are tricky...The optional `exclude` keyword is guaranteed to have a list as its
         # value, but that list can have any of these elements:
         #  * `str`
         #  * `glob`, `rglob`, or `zglob`
         #  * list of either of the above options
-        exclude_globs: Optional[List[str]] = None
-        exclude_arg: Optional[ast.keyword] = next(iter(glob_func.keywords), None)
+        exclude_globs: list[str] | None = None
+        exclude_arg: ast.keyword | None = next(iter(glob_func.keywords), None)
         if exclude_arg is not None and isinstance(exclude_arg.value, ast.List):
-            exclude_elements: List[Union[ast.Call, ast.Str, ast.List]] = exclude_arg.value.elts  # type: ignore[assignment]
-            nested_exclude_elements: List[Union[ast.Call, ast.Str]] = list(
+            exclude_elements: list[ast.Call | ast.Str | ast.List] = exclude_arg.value.elts  # type: ignore[assignment]
+            nested_exclude_elements: list[ast.Call | ast.Str] = list(
                 itertools.chain.from_iterable(
                     nested_list.elts  # type: ignore[misc]
                     for nested_list in exclude_elements
                     if isinstance(nested_list, ast.List)
                 )
             )
-            combined_exclude_elements: List[Union[ast.Call, ast.Str]] = [
+            combined_exclude_elements: list[ast.Call | ast.Str] = [
                 element
                 for element in (*exclude_elements, *nested_exclude_elements)
                 # Lists are already flattened, so we want to remove them from this collection.
@@ -202,19 +202,19 @@ SCRIPT_RESTRICTIONS = {
 }
 
 
-def generate_possibly_new_build(build_file: Path) -> Optional[List[str]]:
+def generate_possibly_new_build(build_file: Path) -> list[str] | None:
     """If any targets use `globs`, `rglobs`, or `zglobs`, this will return a replaced BUILD file."""
     original_text = build_file.read_text()
     original_text_lines = original_text.splitlines()
     updated_text_lines = original_text_lines.copy()
 
-    targets: List[ast.Call] = [
+    targets: list[ast.Call] = [
         target.value
         for target in ast.parse(original_text).body
         if isinstance(target, ast.Expr) and isinstance(target.value, ast.Call)
     ]
     for target in targets:
-        bundles_arg: Optional[ast.keyword] = next(
+        bundles_arg: ast.keyword | None = next(
             (
                 kwarg
                 for kwarg in target.keywords
@@ -223,7 +223,7 @@ def generate_possibly_new_build(build_file: Path) -> Optional[List[str]]:
             None,
         )
         if bundles_arg is not None:
-            bundle_funcs: List[ast.Call] = [
+            bundle_funcs: list[ast.Call] = [
                 element
                 for element in bundles_arg.value.elts  # type: ignore[attr-defined]
                 if isinstance(element, ast.Call) and element.func.id == "bundle"  # type: ignore[attr-defined]
@@ -254,7 +254,7 @@ def generate_possibly_new_build(build_file: Path) -> Optional[List[str]]:
                         script_restriction=SCRIPT_RESTRICTIONS["no_bundles"],
                     )
                 )
-        sources_arg: Optional[ast.keyword] = next(
+        sources_arg: ast.keyword | None = next(
             (kwarg for kwarg in target.keywords if kwarg.arg == "sources"), None
         )
         if not sources_arg or not isinstance(sources_arg.value, ast.Call):
@@ -305,7 +305,7 @@ def generate_possibly_new_build(build_file: Path) -> Optional[List[str]]:
     return updated_text_lines if updated_text_lines != original_text_lines else None
 
 
-def generate_diff(build_file: Path, new_content: List[str]) -> str:
+def generate_diff(build_file: Path, new_content: list[str]) -> str:
     def green(s: str) -> str:
         return f"\x1b[32m{s}\x1b[0m"
 

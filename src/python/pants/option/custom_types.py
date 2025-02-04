@@ -7,8 +7,9 @@ import inspect
 import os
 import re
 import shlex
+from collections.abc import Iterable, Sequence
 from enum import Enum
-from typing import Iterable, Pattern, Sequence
+from re import Pattern
 
 from pants.option.errors import ParseError
 from pants.util.eval import parse_expression

@@ -5,8 +5,9 @@ from __future__ import annotations
 import os
 import re
 from collections import defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import DefaultDict, Mapping
+from typing import DefaultDict
 
 from pants.backend.codegen.protobuf.target_types import AllProtobufTargets, ProtobufSourceField
 from pants.engine.addresses import Address

@@ -6,8 +6,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass, replace
-from typing import Iterable
 
 import toml
 

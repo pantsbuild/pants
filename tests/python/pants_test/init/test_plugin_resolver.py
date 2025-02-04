@@ -6,11 +6,11 @@ from __future__ import annotations
 import os
 import shutil
 import sys
+from collections.abc import Iterable, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import Dict, Iterable, Sequence
 
 import pytest
 from pkg_resources import Distribution, Requirement, WorkingSet
@@ -148,7 +148,7 @@ def plugin_resolution(
     )
 
     with provide_chroot(chroot) as (root_dir, create_artifacts):
-        env: Dict[str, str] = {}
+        env: dict[str, str] = {}
         repo_dir = os.path.join(root_dir, "repo")
 
         def _create_artifact(name, version, install_requires):

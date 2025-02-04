@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Tuple
 
 import pkg_resources
 
@@ -33,7 +32,7 @@ class StripJarTool(JvmToolBase):
 @dataclass(frozen=True)
 class StripJarRequest:
     digest: Digest
-    filenames: Tuple[str, ...]
+    filenames: tuple[str, ...]
 
 
 @dataclass(frozen=True)

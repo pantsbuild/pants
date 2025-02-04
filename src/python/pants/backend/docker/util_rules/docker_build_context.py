@@ -7,8 +7,8 @@ import logging
 import re
 import shlex
 from abc import ABC
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Iterable, Mapping
 
 from pants.backend.docker.package_types import BuiltDockerImage
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo, DockerfileInfoRequest

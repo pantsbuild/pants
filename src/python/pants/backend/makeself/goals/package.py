@@ -6,9 +6,9 @@ from __future__ import annotations
 import dataclasses
 import logging
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Optional, Tuple
 
 from pants.backend.makeself.subsystem import MakeselfTool
 from pants.backend.makeself.system_binaries import MakeselfBinaryShimsRequest
@@ -77,10 +77,10 @@ class CreateMakeselfArchive:
     input_digest: Digest
     description: str = dataclasses.field(compare=False)
     output_filename: str
-    extra_tools: Optional[Tuple[str, ...]] = None
+    extra_tools: tuple[str, ...] | None = None
     level: LogLevel = LogLevel.INFO
-    cache_scope: Optional[ProcessCacheScope] = None
-    timeout_seconds: Optional[int] = None
+    cache_scope: ProcessCacheScope | None = None
+    timeout_seconds: int | None = None
 
 
 @rule

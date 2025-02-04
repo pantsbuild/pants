@@ -3,8 +3,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import ClassVar, Mapping, TypeVar, Union
+from typing import ClassVar, TypeVar, Union
 
 from pants.engine.addresses import Address
 from pants.util.frozendict import FrozenDict

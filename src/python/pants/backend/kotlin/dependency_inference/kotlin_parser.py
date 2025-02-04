@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any, Iterator
+from typing import Any
 
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.source_files import SourceFiles

@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from collections.abc import Iterable
 from pathlib import PurePath
-from typing import Iterable, Optional
 
 import pytest
 
@@ -27,9 +27,9 @@ from pants.testutil.rule_runner import MockGet, RuleRunner, run_rule_with_mocks
 def _find_root(
     path: str,
     patterns: Iterable[str],
-    marker_filenames: Optional[Iterable[str]] = None,
-    existing_marker_files: Optional[Iterable[str]] = None,
-) -> Optional[str]:
+    marker_filenames: Iterable[str] | None = None,
+    existing_marker_files: Iterable[str] | None = None,
+) -> str | None:
     source_root_config = create_subsystem(
         SourceRootConfig,
         root_patterns=list(patterns),

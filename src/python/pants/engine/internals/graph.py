@@ -10,21 +10,10 @@ import json
 import logging
 import os.path
 from collections import defaultdict
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import (
-    Any,
-    DefaultDict,
-    FrozenSet,
-    Iterable,
-    Iterator,
-    Mapping,
-    NamedTuple,
-    Sequence,
-    Type,
-    TypeVar,
-    cast,
-)
+from typing import Any, DefaultDict, NamedTuple, Type, TypeVar, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
@@ -1042,7 +1031,7 @@ def calc_source_block_mapping(
     )
 
 
-class FilesWithSourceBlocks(FrozenSet[str]):
+class FilesWithSourceBlocks(frozenset[str]):
     pass
 
 

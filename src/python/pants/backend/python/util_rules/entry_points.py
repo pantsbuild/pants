@@ -1,8 +1,8 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from collections import defaultdict
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import Callable, Iterable
 
 from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,

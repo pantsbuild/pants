@@ -7,12 +7,11 @@ import dataclasses
 import itertools
 import operator
 from collections import abc, defaultdict
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from enum import Enum
 from functools import reduce
-from typing import Any, Iterator, Mapping, cast
-
-from typing_extensions import Self
+from typing import Any, Self, cast
 
 from pants.build_graph.address import BANNED_CHARS_IN_PARAMETERS
 from pants.engine.addresses import Address

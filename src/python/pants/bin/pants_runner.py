@@ -6,8 +6,8 @@ import os
 import platform
 import sys
 import warnings
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import List, Mapping
 
 from packaging.version import Version
 
@@ -35,7 +35,7 @@ class PantsRunner:
     """A higher-level runner that delegates runs to either a LocalPantsRunner or
     RemotePantsRunner."""
 
-    args: List[str]
+    args: list[str]
     env: Mapping[str, str]
 
     # This could be a bootstrap option, but it's preferable to keep these very limited to make it

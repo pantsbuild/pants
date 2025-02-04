@@ -7,8 +7,8 @@ import os
 import re
 import shlex
 import string
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping
 
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules import first_party_pkg, goroot, sdk

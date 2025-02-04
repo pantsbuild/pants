@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import re
-from typing import Callable
+from collections.abc import Callable
 
 
 def assert_equal_with_printing(

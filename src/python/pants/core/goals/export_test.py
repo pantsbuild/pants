@@ -6,7 +6,6 @@ from __future__ import annotations
 import os
 import subprocess
 from pathlib import Path
-from typing import List, Tuple
 
 from _pytest.monkeypatch import MonkeyPatch
 
@@ -89,9 +88,9 @@ def list_files_with_paths(directory):
 def run_export_rule(
     rule_runner: RuleRunner,
     monkeypatch: MonkeyPatch,
-    resolves: List[str] | None = None,
-    binaries: List[str] | None = None,
-) -> Tuple[int, str]:
+    resolves: list[str] | None = None,
+    binaries: list[str] | None = None,
+) -> tuple[int, str]:
     resolves = resolves or []
     binaries = binaries or []
     union_membership = UnionMembership({ExportRequest: [MockExportRequest]})

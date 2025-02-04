@@ -11,11 +11,12 @@ import socket
 import ssl
 import tarfile
 import time
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Optional, Set, Union
+from typing import Any
 
 import pytest
 
@@ -408,7 +409,7 @@ def test_path_globs_symlink_loop(rule_runner: RuleRunner) -> None:
 def test_path_globs_to_digest_contents(rule_runner: RuleRunner) -> None:
     setup_fs_test_tar(rule_runner)
 
-    def get_contents(globs: Iterable[str]) -> Set[FileContent]:
+    def get_contents(globs: Iterable[str]) -> set[FileContent]:
         return set(rule_runner.request(DigestContents, [PathGlobs(globs)]))
 
     assert get_contents(["4.txt", "a/4.txt.ln"]) == {
@@ -425,7 +426,7 @@ def test_path_globs_to_digest_contents(rule_runner: RuleRunner) -> None:
 def test_path_globs_to_digest_entries(rule_runner: RuleRunner) -> None:
     setup_fs_test_tar(rule_runner)
 
-    def get_entries(globs: Iterable[str]) -> Set[Union[FileEntry, Directory, SymlinkEntry]]:
+    def get_entries(globs: Iterable[str]) -> set[FileEntry | Directory | SymlinkEntry]:
         return set(rule_runner.request(DigestEntries, [PathGlobs(globs)]))
 
     assert get_entries(["4.txt", "a/4.txt.ln"]) == {
@@ -1332,7 +1333,7 @@ def test_invalidated_after_parent_deletion(rule_runner: RuleRunner) -> None:
     """Test that FileContent is invalidated after deleting the parent directory."""
     setup_fs_test_tar(rule_runner)
 
-    def read_file() -> Optional[str]:
+    def read_file() -> str | None:
         digest_contents = rule_runner.request(DigestContents, [PathGlobs(["a/b/1.txt"])])
         if not digest_contents:
             return None
@@ -1491,8 +1492,8 @@ def test_snapshot_hash_and_eq() -> None:
 )
 def test_snapshot_diff(
     rule_runner: RuleRunner,
-    before: Dict[str, str],
-    after: Dict[str, str],
+    before: dict[str, str],
+    after: dict[str, str],
     expected_diff: SnapshotDiff,
 ) -> None:
     diff = SnapshotDiff.from_snapshots(

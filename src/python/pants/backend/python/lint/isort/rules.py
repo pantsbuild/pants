@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple
 
 from pants.backend.python.lint.isort.skip_field import SkipIsortField
 from pants.backend.python.lint.isort.subsystem import Isort
@@ -41,7 +40,7 @@ class IsortRequest(FmtTargetsRequest):
 
 def generate_argv(
     source_files: tuple[str, ...], isort: Isort, *, is_isort5: bool
-) -> Tuple[str, ...]:
+) -> tuple[str, ...]:
     args = [*isort.args]
     if is_isort5 and len(isort.config) == 1:
         explicitly_configured_config_args = [

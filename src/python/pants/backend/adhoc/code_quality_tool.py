@@ -1,7 +1,8 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import ClassVar, Iterable
+from typing import ClassVar
 
 from pants.core.goals.fix import Fix, FixFilesRequest, FixResult
 from pants.core.goals.fmt import Fmt, FmtFilesRequest, FmtResult

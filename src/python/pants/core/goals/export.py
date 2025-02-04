@@ -6,9 +6,10 @@ from __future__ import annotations
 import itertools
 import os
 from collections import defaultdict
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Mapping, Sequence, cast
+from typing import cast
 
 from pants.base.build_root import BuildRoot
 from pants.core.goals.generate_lockfiles import (

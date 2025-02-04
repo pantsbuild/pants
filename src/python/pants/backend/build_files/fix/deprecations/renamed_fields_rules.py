@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import tokenize
 from collections import defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import DefaultDict, Mapping
+from typing import DefaultDict
 
 from pants.backend.build_files.fix.base import FixBuildFilesRequest
 from pants.backend.build_files.fix.deprecations.base import FixBUILDFileRequest, FixedBUILDFile

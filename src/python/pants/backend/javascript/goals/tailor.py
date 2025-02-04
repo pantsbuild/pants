@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import dataclasses
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.javascript.package_json import PackageJsonTarget
 from pants.backend.javascript.target_types import (

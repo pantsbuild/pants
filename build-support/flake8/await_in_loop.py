@@ -4,9 +4,9 @@
 from __future__ import annotations
 
 import ast
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import PurePath
-from typing import Iterator, Sequence
 
 
 def check_for_await_in_loop(tree: ast.AST, filename: str) -> Iterator[tuple[int, int, str, None]]:

@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import os
-from typing import Iterable, Tuple
+from collections.abc import Iterable
 
 from pants.backend.makeself.goals.package import MakeselfArchiveFieldSet, package_makeself_binary
 from pants.backend.makeself.subsystem import RunMakeselfArchive
@@ -27,7 +27,7 @@ async def run_makeself_archive(request: RunMakeselfArchive) -> Process:
         )
     )
     output_directories = []
-    argv: Tuple[str, ...] = (request.exe,)
+    argv: tuple[str, ...] = (request.exe,)
 
     if output_directory := request.output_directory:
         output_directories = [output_directory]

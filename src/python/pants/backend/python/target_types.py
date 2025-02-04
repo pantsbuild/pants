@@ -7,20 +7,10 @@ import collections.abc
 import logging
 import os.path
 from abc import ABC, abstractmethod
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
-from typing import (
-    TYPE_CHECKING,
-    ClassVar,
-    Iterable,
-    Iterator,
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
-    Union,
-    cast,
-)
+from typing import TYPE_CHECKING, ClassVar, cast
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
@@ -118,7 +108,7 @@ class InterpreterConstraintsField(StringSequenceField, AsyncFieldMixin):
         """
     )
 
-    def value_or_global_default(self, python_setup: PythonSetup) -> Tuple[str, ...]:
+    def value_or_global_default(self, python_setup: PythonSetup) -> tuple[str, ...]:
         """Return either the given `compatibility` field or the global interpreter constraints.
 
         If interpreter constraints are supplied by the CLI flag, return those only.
@@ -351,7 +341,7 @@ class EntryPointField(AsyncFieldMixin, Field):
     value: EntryPoint | None
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[EntryPoint]:
+    def compute_value(cls, raw_value: str | None, address: Address) -> EntryPoint | None:
         value = super().compute_value(raw_value, address)
         if value is None:
             return None
@@ -397,7 +387,7 @@ class PexScriptField(Field):
     value: ConsoleScript | None
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[ConsoleScript]:
+    def compute_value(cls, raw_value: str | None, address: Address) -> ConsoleScript | None:
         value = super().compute_value(raw_value, address)
         if value is None:
             return None
@@ -422,7 +412,7 @@ class PexExecutableField(Field):
     value: Executable | None
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[Executable]:
+    def compute_value(cls, raw_value: str | None, address: Address) -> Executable | None:
         value = super().compute_value(raw_value, address)
         if value is None:
             return None
@@ -524,9 +514,7 @@ class PexInheritPathField(StringField):
 
     # TODO(#9388): deprecate allowing this to be a `bool`.
     @classmethod
-    def compute_value(
-        cls, raw_value: Optional[Union[str, bool]], address: Address
-    ) -> Optional[str]:
+    def compute_value(cls, raw_value: str | bool | None, address: Address) -> str | None:
         if isinstance(raw_value, bool):
             return "prefer" if raw_value else "false"
         return super().compute_value(raw_value, address)
@@ -972,7 +960,7 @@ class PythonTestsTimeoutField(IntField):
     )
     valid_numbers = ValidNumbers.positive_only
 
-    def calculate_from_global_options(self, test: TestSubsystem, pytest: PyTest) -> Optional[int]:
+    def calculate_from_global_options(self, test: TestSubsystem, pytest: PyTest) -> int | None:
         """Determine the timeout (in seconds) after resolving conflicting global options in the
         `pytest` and `test` scopes.
 
@@ -1244,8 +1232,8 @@ class _PipRequirementSequenceField(Field):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Iterable[str]], address: Address
-    ) -> Tuple[PipRequirement, ...]:
+        cls, raw_value: Iterable[str] | None, address: Address
+    ) -> tuple[PipRequirement, ...]:
         value = super().compute_value(raw_value, address)
         if value is None:
             return ()
@@ -1452,7 +1440,7 @@ class PythonProvidesField(ScalarField, AsyncFieldMixin):
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[PythonArtifact], address: Address) -> PythonArtifact:
+    def compute_value(cls, raw_value: PythonArtifact | None, address: Address) -> PythonArtifact:
         return cast(PythonArtifact, super().compute_value(raw_value, address))
 
 
@@ -1508,7 +1496,7 @@ class PythonDistributionEntryPoint:
     """Note that this stores if the entry point comes from an address to a `pex_binary` target."""
 
     entry_point: EntryPoint
-    pex_binary_address: Optional[Address]
+    pex_binary_address: Address | None
 
 
 # See `target_type_rules.py` for the `Resolve..Request -> Resolved..` rule
@@ -1556,8 +1544,8 @@ class ResolvePythonDistributionEntryPointsRequest:
     logic for resolving pex_binary addresses etc.
     """
 
-    entry_points_field: Optional[PythonDistributionEntryPointsField] = None
-    provides_field: Optional[PythonProvidesField] = None
+    entry_points_field: PythonDistributionEntryPointsField | None = None
+    provides_field: PythonProvidesField | None = None
 
     def __post_init__(self):
         # Must provide at least one of these fields.

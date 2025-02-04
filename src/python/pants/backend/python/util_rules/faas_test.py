@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 from textwrap import dedent
-from typing import Optional
 from unittest.mock import Mock
 
 import pytest
@@ -171,7 +170,7 @@ def test_infer_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
         }
     )
 
-    def assert_inferred(address: Address, *, expected: Optional[Address]) -> None:
+    def assert_inferred(address: Address, *, expected: Address | None) -> None:
         tgt = rule_runner.get_target(address)
         inferred = rule_runner.request(
             InferredDependencies,

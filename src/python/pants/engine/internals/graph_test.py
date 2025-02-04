@@ -6,10 +6,10 @@ from __future__ import annotations
 import dataclasses
 import itertools
 import os.path
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Iterable, List, Set, Tuple, Type
 
 import pytest
 
@@ -484,7 +484,7 @@ def test_coarsened_targets(transitive_targets_rule_runner: RuleRunner) -> None:
     )
 
     def assert_coarsened(
-        a: Address, expected_members: List[Address], expected_dependencies: List[Address]
+        a: Address, expected_members: list[Address], expected_dependencies: list[Address]
     ) -> None:
         coarsened_targets = transitive_targets_rule_runner.request(
             CoarsenedTargets,
@@ -551,7 +551,7 @@ def assert_failed_cycle(
     *,
     root_target_name: str,
     subject_target_name: str,
-    path_target_names: Tuple[str, ...],
+    path_target_names: tuple[str, ...],
 ) -> None:
     with pytest.raises(ExecutionError) as e:
         rule_runner.request(
@@ -845,7 +845,7 @@ def assert_owners(
     rule_runner: RuleRunner,
     requested: Iterable[str],
     *,
-    expected: Set[Address],
+    expected: set[Address],
     match_if_owning_build_file_included_in_sources: bool = False,
 ) -> None:
     result = rule_runner.request(
@@ -1884,7 +1884,7 @@ def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
 
     sources_rule_runner.write_files(dict.fromkeys(["f1.txt", "f2.txt", "f3.txt", "f4.txt"], ""))
 
-    def hydrate(sources_cls: Type[MultipleSourcesField], sources: Iterable[str]) -> HydratedSources:
+    def hydrate(sources_cls: type[MultipleSourcesField], sources: Iterable[str]) -> HydratedSources:
         return sources_rule_runner.request(
             HydratedSources,
             [

@@ -9,9 +9,10 @@ import os
 import re
 import shlex
 import textwrap
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import Enum
-from typing import ClassVar, Iterable, Mapping
+from typing import ClassVar
 
 from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.system_binaries import BashBinary, LnBinary

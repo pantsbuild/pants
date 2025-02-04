@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import itertools
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.openapi.dependency_inference import OpenApiDependencies, ParseOpenApiSources
 from pants.backend.openapi.subsystems.openapi import OpenApiSubsystem

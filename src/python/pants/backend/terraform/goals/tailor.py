@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import os.path
 from dataclasses import dataclass
-from typing import List
 
 from pants.backend.terraform.target_types import (
     TerraformBackendTarget,
@@ -40,7 +39,7 @@ async def find_putative_terraform_module_targets(
 ) -> PutativeTargets:
     if not terraform.tailor:
         return PutativeTargets()
-    putative_targets: List[PutativeTarget] = []
+    putative_targets: list[PutativeTarget] = []
 
     all_terraform_files = await Get(Paths, PathGlobs, request.path_globs("*.tf"))
     unowned_terraform_files = set(all_terraform_files.files) - set(all_owned_sources)

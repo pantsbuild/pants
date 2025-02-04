@@ -7,9 +7,9 @@ import logging
 import os
 import shlex
 import textwrap
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable
 
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.util_rules import cgo_binaries, cgo_pkgconfig

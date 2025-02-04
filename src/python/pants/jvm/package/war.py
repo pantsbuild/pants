@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import logging
 import textwrap
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable
 
 from pants.build_graph.address import Address
 from pants.core.goals.package import (

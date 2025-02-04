@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import os
-from typing import ClassVar, Optional
+from typing import ClassVar
 
 from pants.engine.internals.native_engine import Address
 from pants.engine.target import AsyncFieldMixin, DictStringToStringField, InvalidFieldException
@@ -27,8 +27,8 @@ class NfpmPackageScriptsField(AsyncFieldMixin, DictStringToStringField):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[dict[str, str]], address: Address
-    ) -> Optional[FrozenDict[str, str]]:
+        cls, raw_value: dict[str, str] | None, address: Address
+    ) -> FrozenDict[str, str] | None:
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default:
             invalid_keys = value_or_default.keys() - cls.nfpm_aliases.keys()

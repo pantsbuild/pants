@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from collections.abc import Iterable
 from textwrap import dedent
-from typing import Iterable
 
 import pytest
 

@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import importlib.resources
 import logging
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Iterable, Iterator
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from pants.backend.python.subsystems.repos import PythonRepos

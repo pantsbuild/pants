@@ -5,8 +5,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable, Union
 
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class WrapSource:
-    rules: tuple[Union[Rule, UnionRule], ...]
+    rules: tuple[Rule | UnionRule, ...]
     target_types: tuple[type[Target], ...]
 
 

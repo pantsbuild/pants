@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-from typing import Dict, cast
+from typing import cast
 
 from pants.engine.addresses import Address, Addresses
 from pants.engine.console import Console
@@ -41,7 +41,7 @@ async def list_targets(
         # We must preserve target generators, not replace with their generated targets.
         targets = await Get(UnexpandedTargets, Addresses, addresses)
         addresses_with_descriptions = cast(
-            Dict[Address, str],
+            dict[Address, str],
             {
                 tgt.address: tgt[DescriptionField].value
                 for tgt in targets

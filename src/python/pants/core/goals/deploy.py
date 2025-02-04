@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import logging
 from abc import ABCMeta
+from collections.abc import Iterable
 from dataclasses import dataclass
 from itertools import chain
-from typing import Iterable
 
 from pants.core.goals.package import PackageFieldSet
 from pants.core.goals.publish import PublishFieldSet, PublishProcesses, PublishProcessesRequest

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os
 from collections import defaultdict
-from typing import Iterable
+from collections.abc import Iterable
 
 
 def partition_files_by_directory(filepaths: Iterable[str]) -> dict[str, list[str]]:

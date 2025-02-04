@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.python.dependency_inference.subsystem import PythonInferSubsystem
 from pants.backend.python.target_types import PythonSourceField

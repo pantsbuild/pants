@@ -7,11 +7,12 @@ import argparse
 import difflib
 import os
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import Enum, ReprEnum
 from pathlib import Path
 from textwrap import dedent  # noqa: PNT20
-from typing import Any, Dict, Sequence, cast
+from typing import Any, cast
 
 import toml
 import yaml
@@ -52,9 +53,9 @@ HEADER = dedent(
 )
 
 
-Step = Dict[str, Any]
-Jobs = Dict[str, Any]
-Env = Dict[str, str]
+Step = dict[str, Any]
+Jobs = dict[str, Any]
+Env = dict[str, str]
 
 
 class Platform(Enum):

@@ -10,8 +10,9 @@ import re
 import shlex
 import textwrap
 from collections import abc
+from collections.abc import Callable, Iterable, Mapping
 from logging import Logger
-from typing import Any, Callable, Iterable, Mapping, TypeVar
+from typing import Any, TypeVar
 
 import colors
 from typing_extensions import ParamSpec
