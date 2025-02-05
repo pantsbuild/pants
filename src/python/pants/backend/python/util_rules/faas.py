@@ -37,7 +37,6 @@ from pants.backend.python.util_rules.pex_from_targets import (
 from pants.backend.python.util_rules.pex_from_targets import rules as pex_from_targets_rules
 from pants.backend.python.util_rules.pex_venv import PexVenv, PexVenvLayout, PexVenvRequest
 from pants.backend.python.util_rules.pex_venv import rules as pex_venv_rules
-from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, OutputPathField
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.fs import (
@@ -445,10 +444,7 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
         known_runtimes_str = ", ".join(
             FrozenOrderedSet(r.name for r in request.runtime.known_runtimes)
         )
-        warn_or_error(
-            # Replace this with an unconditional `InvalidTargetException`
-            "2.26.0.dev0",
-            "implicitly resolving platforms for unknown FaaS runtimes",
+        raise InvalidTargetException(
             softwrap(
                 f"""
                 Could not find a known runtime for the {version_adjective} Python version and machine architecture!
@@ -465,11 +461,8 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
                 architecture.
                 """
             ),
-        )
-        return RuntimePlatforms(
-            interpreter_version=version,
-            pex_platforms=PexPlatforms((_format_platform_from_major_minor(*version),)),
-        )
+            description_of_origin=f"In the {request.target_name!r} target",
+        ) from None
 
     module = request.runtime.known_runtimes_complete_platforms_module()
 
