@@ -50,7 +50,7 @@ from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import AllTargets, HydratedSources, HydrateSourcesRequest, SourcesField
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.option.option_types import BoolOption, EnumOption, StrListOption
+from pants.option.option_types import EnumOption, StrListOption
 from pants.util.strutil import path_safe, softwrap
 
 logger = logging.getLogger(__name__)
@@ -108,38 +108,6 @@ class ExportPluginOptions:
             """
         ),
         advanced=True,
-    )
-
-    py_hermetic_scripts = BoolOption(
-        default=True,
-        help=softwrap(
-            """
-            When exporting a mutable virtualenv for a resolve, by default
-            modify console script shebang lines to make them "hermetic".
-            The shebang of hermetic console scripts uses the python args: `-sE`:
-
-              - `-s` skips inclusion of the user site-packages directory,
-              - `-E` ignores all `PYTHON*` env vars like `PYTHONPATH`.
-
-            Set this to false if you need non-hermetic scripts with
-            simple python shebangs that respect vars like `PYTHONPATH`,
-            to, for example, allow IDEs like PyCharm to inject its debugger,
-            coverage, or other IDE-specific libs when running a script.
-
-            This only applies when when exporting a `mutable_virtualenv`
-            (`symlinked_immutable_virtualenv` exports are not "full"
-            virtualenvs because they are used internally by pants itself.
-            Pants requires hermetic scripts to provide its reproduciblity
-            guarantee, fine-grained caching, and other features).
-            """
-        ),
-        advanced=True,
-        removal_version="2.26.0.dev0",
-        removal_hint=softwrap(
-            """
-            Use `--export-py-non-hermetic-scripts-in-resolve` instead.
-            """
-        ),
     )
 
     py_non_hermetic_scripts_in_resolve = StrListOption(
@@ -284,10 +252,7 @@ async def do_export(
             f"--prompt={venv_prompt}",
             output_path,
         ]
-        if (
-            req.resolve_name in export_subsys.options.py_non_hermetic_scripts_in_resolve
-            or not export_subsys.options.py_hermetic_scripts
-        ):
+        if req.resolve_name in export_subsys.options.py_non_hermetic_scripts_in_resolve:
             pex_args.insert(-1, "--non-hermetic-scripts")
 
         post_processing_cmds = [
