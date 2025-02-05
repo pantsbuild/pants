@@ -68,7 +68,7 @@ class SystemBinariesSubsystem(Subsystem):
                             for prefix in path.split(os.pathsep):
                                 if prefix.startswith("$") or prefix.startswith("~"):
                                     logger.warning(
-                                        f"unescaped literal prefix {prefix} in PATH ignored. Check the value of the PATH variable in your SHELL"
+                                        f"Ignored unexpanded path prefix `{prefix}` in the `PATH` environment variable while processing the `<PATH>` marker from the `[system-binaries].system_binary_paths` option. Please check the value of the `PATH` environment variable in your shell."
                                     )
                                 else:
                                     yield prefix
