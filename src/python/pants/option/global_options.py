@@ -1809,7 +1809,7 @@ class BootstrapOptions:
             {doc_url("community/getting-help")}.
             """
         ),
-        removal_version="2.26.0.dev0",
+        removal_version="2.27.0.dev0",
         removal_hint='Upgrade your operating system or write `allow_deprecated_macos_versions = ["10", "11"]` instead.',
     )
 
