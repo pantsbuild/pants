@@ -35,6 +35,7 @@ from pants.core.goals.test import (
     TestsBatchCompatibilityTagField,
     TestSubsystem,
 )
+from pants.core.target_types import ResolveLikeField, ResolveLikeFieldToValueRequest
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import (
@@ -137,7 +138,11 @@ class InterpreterConstraintsField(StringSequenceField, AsyncFieldMixin):
         return python_setup.compatibility_or_constraints(self.value)
 
 
-class PythonResolveField(StringField, AsyncFieldMixin):
+class PythonResolveLikeFieldToValueRequest(ResolveLikeFieldToValueRequest):
+    pass
+
+
+class PythonResolveField(StringField, AsyncFieldMixin, ResolveLikeField):
     alias = "resolve"
     required = False
     help = help_text(
@@ -162,6 +167,9 @@ class PythonResolveField(StringField, AsyncFieldMixin):
                 description_of_origin=f"the field `{self.alias}` in the target {self.address}",
             )
         return resolve
+
+    def get_resolve_like_field_to_value_request(self) -> type[ResolveLikeFieldToValueRequest]:
+        return PythonResolveLikeFieldToValueRequest
 
 
 class PrefixedPythonResolveField(PythonResolveField):
