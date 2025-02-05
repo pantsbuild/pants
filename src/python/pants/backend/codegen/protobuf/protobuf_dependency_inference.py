@@ -108,7 +108,7 @@ async def map_protobuf_files(
     protobuf_targets: AllProtobufTargets, union_membership: UnionMembership
 ) -> ProtobufMapping:
     # Determine the resolve-like fields installed on the `protobuf_source` target type.
-    resolve_like_field_types: type[Field] = set()
+    resolve_like_field_types: set[type[Field]] = set()
     for field_type in ProtobufSourceTarget.class_field_types(union_membership):
         if issubclass(field_type, ResolveLikeField):
             resolve_like_field_types.add(field_type)
@@ -152,10 +152,7 @@ async def map_protobuf_files(
         for tgt in protobuf_targets
     )
     target_to_stripped_file: dict[Target, StrippedFileName] = dict(
-        {  # noqa: C402
-            tgt: stripped_file
-            for tgt, stripped_file in zip(protobuf_targets, stripped_file_per_target)
-        }
+        zip(protobuf_targets, stripped_file_per_target)
     )
 
     stripped_files_to_addresses: dict[ProtobufMappingResolveKey, dict[str, Address]] = defaultdict(
@@ -237,7 +234,7 @@ async def get_resolve_key_from_target(address: Address) -> ProtobufMappingResolv
                     f"TODO: Multiple resolve-like fields on target at address `{address}`."
                 )
             resolve_field_type = field_type
-    if resolve_field_type is not None:
+    if resolve_field_type is None:
         raise ValueError(f"Failed to find resolve-like field on target at address `{address}.")
 
     resolve_request_type = typing.cast(

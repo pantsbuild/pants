@@ -4,10 +4,12 @@
 from textwrap import dedent
 from typing import Set
 
+from pants.engine.environment import EnvironmentName
 import pytest
 
 from pants.backend.codegen.protobuf import protobuf_dependency_inference
 from pants.backend.codegen.protobuf.protobuf_dependency_inference import (
+    _NO_RESOLVE_LIKE_FIELDS_DEFINED,
     InferProtobufDependencies,
     ProtobufDependencyInferenceFieldSet,
     ProtobufMapping,
@@ -15,11 +17,12 @@ from pants.backend.codegen.protobuf.protobuf_dependency_inference import (
 )
 from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
 from pants.backend.codegen.protobuf.target_types import rules as target_types_rules
-from pants.core.util_rules import stripped_source_files
+from pants.core.util_rules import environments, stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.target import InferredDependencies
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
+from pants.engine.internals import graph
 
 
 @pytest.mark.parametrize(
@@ -80,10 +83,13 @@ def rule_runner() -> RuleRunner:
             *stripped_source_files.rules(),
             *protobuf_dependency_inference.rules(),
             *target_types_rules(),
+            *graph.rules(),
+            *environments.rules(),
             QueryRule(ProtobufMapping, []),
             QueryRule(InferredDependencies, [InferProtobufDependencies]),
         ],
         target_types=[ProtobufSourcesGeneratorTarget],
+        inherent_environment=None, #EnvironmentName(None),
     )
 
 
@@ -106,15 +112,23 @@ def test_protobuf_mapping(rule_runner: RuleRunner) -> None:
     assert result == ProtobufMapping(
         mapping=FrozenDict(
             {
-                "protos/f1.proto": Address("root1/protos", relative_file_path="f1.proto"),
-                "protos/f2.proto": Address("root1/protos", relative_file_path="f2.proto"),
+                _NO_RESOLVE_LIKE_FIELDS_DEFINED: FrozenDict(
+                    {
+                        "protos/f1.proto": Address("root1/protos", relative_file_path="f1.proto"),
+                        "protos/f2.proto": Address("root1/protos", relative_file_path="f2.proto"),
+                    }
+                )
             }
         ),
         ambiguous_modules=FrozenDict(
             {
-                "two_owners/f.proto": (
-                    Address("root1/two_owners", relative_file_path="f.proto"),
-                    Address("root2/two_owners", relative_file_path="f.proto"),
+                _NO_RESOLVE_LIKE_FIELDS_DEFINED: FrozenDict(
+                    {
+                        "two_owners/f.proto": (
+                            Address("root1/two_owners", relative_file_path="f.proto"),
+                            Address("root2/two_owners", relative_file_path="f.proto"),
+                        )
+                    }
                 )
             }
         ),
