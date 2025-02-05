@@ -598,3 +598,9 @@ def test_junit_report() -> None:
     coverage_report = Path(get_buildroot(), "dist", "coverage", "python", "report.json")
     assert coverage_report.read_text() == "foo"
 ```
+
+### Debugging integration tests
+
+While developing and debugging integration tests, you can have Pants stream the output for the Pants invocation under test to the console. This is useful, for example, when debugging long-running integration tests which would otherwise show no output while they run.
+
+To use, adjust specific test(s) to use the `stream_output` parameter, for example, `run_pants_with_workdir(..., stream_output=True)` or `run_pants(..., stream_output=True)`, and then run the test with `pants test --debug path/to:test -- --capture=no` so the test is invoked as an interactive process and pytest does not capture the output during the run.
