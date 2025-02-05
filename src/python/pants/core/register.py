@@ -5,6 +5,7 @@
 
 These are always activated and cannot be disabled.
 """
+
 from pants.backend.codegen import export_codegen_goal
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals import (
@@ -63,7 +64,11 @@ from pants.source import source_root
 from pants.vcs import git
 from pants.version import PANTS_SEMVER
 
-wrap_as_resources = wrap_source_rule_and_target(ResourceSourceField, "resources")
+wrap_as_resources = wrap_source_rule_and_target(
+    ResourceSourceField,
+    "resources",
+    uses_source_roots=True,
+)
 
 
 def rules():

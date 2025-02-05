@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Iterable
+import sys
 
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import ancestor_files
@@ -134,6 +135,7 @@ async def prepare_python_sources(
         )
         for tgt in codegen_targets
     )
+    sys.stderr.write(f"{codegen_sources=}\n")
     source_root_requests = [
         *(SourceRootRequest.for_target(tgt) for tgt in python_and_resources_targets),
         *(
@@ -142,11 +144,14 @@ async def prepare_python_sources(
             for f in sources.snapshot.files
         ),
     ]
+    sys.stderr.write(f"{source_root_requests=}\n")
 
     source_root_objs = await MultiGet(
         Get(SourceRoot, SourceRootRequest, req) for req in source_root_requests
     )
     source_root_paths = {source_root_obj.path for source_root_obj in source_root_objs}
+    sys.stderr.write(f"{sources.unrooted_files=}\n")
+    sys.stderr.write(f"{init_injected=}\n")
     return PythonSourceFiles(
         SourceFiles(init_injected, sources.unrooted_files), tuple(sorted(source_root_paths))
     )

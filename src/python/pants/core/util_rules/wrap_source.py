@@ -45,6 +45,12 @@ class ActivateWrapSourceTargetFieldBase(MultipleSourcesField):
     uses_source_roots = False
     expected_num_files = 0
 
+class ActivateWrapSourceTargetFieldBase(MultipleSourcesField):
+    # We solely register so that codegen can match a fieldset.
+    # One unique subclass must be defined per target type.
+    alias = "_sources"
+    uses_source_roots = False
+    expected_num_files = 0
 
 class WrapSourceInputsField(SpecialCasedDependencies):
     alias = "inputs"
@@ -99,7 +105,9 @@ async def _wrap_source(wrapper: GenerateSourcesRequest) -> GeneratedSources:
 
 
 def wrap_source_rule_and_target(
-    source_field_type: type[SourcesField], target_name_suffix: str
+    source_field_type: type[SourcesField],
+    target_name_suffix: str,
+    uses_source_roots: bool = False,
 ) -> WrapSource:
     if source_field_type.expected_file_extensions:
         outputs_help = (
