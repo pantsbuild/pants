@@ -4,7 +4,6 @@
 from textwrap import dedent
 from typing import Set
 
-from pants.engine.environment import EnvironmentName
 import pytest
 
 from pants.backend.codegen.protobuf import protobuf_dependency_inference
@@ -17,12 +16,11 @@ from pants.backend.codegen.protobuf.protobuf_dependency_inference import (
 )
 from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
 from pants.backend.codegen.protobuf.target_types import rules as target_types_rules
-from pants.core.util_rules import environments, stripped_source_files
+from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.target import InferredDependencies
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
-from pants.engine.internals import graph
 
 
 @pytest.mark.parametrize(
@@ -83,13 +81,10 @@ def rule_runner() -> RuleRunner:
             *stripped_source_files.rules(),
             *protobuf_dependency_inference.rules(),
             *target_types_rules(),
-            *graph.rules(),
-            *environments.rules(),
             QueryRule(ProtobufMapping, []),
             QueryRule(InferredDependencies, [InferProtobufDependencies]),
         ],
         target_types=[ProtobufSourcesGeneratorTarget],
-        inherent_environment=None, #EnvironmentName(None),
     )
 
 

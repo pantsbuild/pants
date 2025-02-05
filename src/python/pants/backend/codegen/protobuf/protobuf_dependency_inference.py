@@ -36,6 +36,7 @@ from pants.engine.target import (
     InferredDependencies,
     Target,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.frozendict import FrozenDict
@@ -225,7 +226,9 @@ class InferProtobufDependencies(InferDependenciesRequest):
 
 
 async def get_resolve_key_from_target(address: Address) -> ProtobufMappingResolveKey:
-    wrapped_target = await Get(WrappedTarget, Address, address)
+    wrapped_target = await Get(
+        WrappedTarget, WrappedTargetRequest(address=address, description_of_origin="protobuf")
+    )
     resolve_field_type: type[Field] | None = None
     for field_type in wrapped_target.target.field_types:
         if issubclass(field_type, ResolveLikeField):
@@ -238,7 +241,7 @@ async def get_resolve_key_from_target(address: Address) -> ProtobufMappingResolv
         raise ValueError(f"Failed to find resolve-like field on target at address `{address}.")
 
     resolve_request_type = typing.cast(
-        ResolveLikeField, resolve_field_type
+        ResolveLikeField, wrapped_target.target[resolve_field_type]
     ).get_resolve_like_field_to_value_request()
     resolve_request = resolve_request_type(target=wrapped_target.target)
     resolve_result = await Get(
@@ -276,8 +279,14 @@ async def infer_protobuf_dependencies(
 
     result: OrderedSet[Address] = OrderedSet()
     for import_path in parse_proto_imports(file_content.content.decode()):
-        unambiguous = protobuf_mapping.mapping[resolve_key].get(import_path)
-        ambiguous = protobuf_mapping.ambiguous_modules[resolve_key].get(import_path)
+        mapping_in_resolve = protobuf_mapping.mapping.get(resolve_key)
+        unambiguous = mapping_in_resolve.get(import_path) if mapping_in_resolve else None
+
+        ambiguous_modules_in_resolve = protobuf_mapping.ambiguous_modules.get(resolve_key)
+        ambiguous = (
+            ambiguous_modules_in_resolve.get(import_path) if ambiguous_modules_in_resolve else None
+        )
+
         if unambiguous:
             result.add(unambiguous)
         elif ambiguous:
