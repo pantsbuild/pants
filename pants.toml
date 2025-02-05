@@ -8,6 +8,7 @@ backend_packages.add = [
   "pants.backend.build_files.fmt.black",
   "pants.backend.python",
   "pants.backend.experimental.python.packaging.pyoxidizer",
+  "pants.backend.experimental.audit",
   "pants.backend.python.lint.autoflake",
   "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
@@ -246,3 +247,6 @@ args = ["-Yrangepos", "-Xlint:unused"]
 
 [scala-infer]
 force_add_siblings_as_dependencies = false
+
+[pypi-audit]
+lockfile_vulnerability_excludes = { "python-default" = ["GHSA-w596-4wvx-j9j6"] }
