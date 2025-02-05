@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import errno
 import glob
 import os
 import subprocess
@@ -69,12 +70,41 @@ class PantsJoinHandle:
     process: subprocess.Popen
     workdir: str
 
+    # Write data to the child's stdin pipe and then close the pipe. (Copied from Python source
+    # at https://github.com/python/cpython/blob/e41ec8e18b078024b02a742272e675ae39778536/Lib/subprocess.py#L1151
+    # to handle the same edge cases handled by `subprocess.Popen.communicate`.)
+    def _stdin_write(self, input: bytes | str | None):
+        assert self.process.stdin
+
+        if input:
+            try:
+                binary_input = ensure_binary(input)
+                self.process.stdin.write(binary_input)
+            except BrokenPipeError:
+                pass  # communicate() must ignore broken pipe errors.
+            except OSError as exc:
+                if exc.errno == errno.EINVAL:
+                    # bpo-19612, bpo-30418: On Windows, stdin.write() fails
+                    # with EINVAL if the child process exited or if the child
+                    # process is still running but closed the pipe.
+                    pass
+                else:
+                    raise
+
+        try:
+            self.process.stdin.close()
+        except BrokenPipeError:
+            pass  # communicate() must ignore broken pipe errors.
+        except OSError as exc:
+            if exc.errno == errno.EINVAL:
+                pass
+            else:
+                raise
+
     def join(
         self, stdin_data: bytes | str | None = None, stream_output: bool = False
     ) -> PantsResult:
         """Wait for the pants process to complete, and return a PantsResult for it."""
-        if stdin_data is not None:
-            stdin_data = ensure_binary(stdin_data)
 
         def worker(in_stream: BytesIO, buffer: bytearray, out_stream: TextIO) -> None:
             while data := in_stream.read1(1024):
@@ -97,11 +127,12 @@ class PantsJoinHandle:
             stderr_thread.daemon = True
             stderr_thread.start()
 
-            if stdin_data and self.process.stdin:
-                self.process.stdin.write(stdin_data)
+            self._stdin_write(stdin_data)
             self.process.wait()
             stdout, stderr = (bytes(stdout_buffer), bytes(stderr_buffer))
         else:
+            if stdin_data is not None:
+                stdin_data = ensure_binary(stdin_data)
             stdout, stderr = self.process.communicate(stdin_data)
 
         if self.process.returncode != PANTS_SUCCEEDED_EXIT_CODE or stream_output:
