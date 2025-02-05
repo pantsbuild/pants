@@ -65,7 +65,13 @@ class SystemBinariesSubsystem(Subsystem):
                     if entry == "<PATH>":
                         path = self._options_env.get("PATH")
                         if path:
-                            yield from path.split(os.pathsep)
+                            for prefix in path.split(os.pathsep):
+                                if prefix.startswith("$") or prefix.startswith("~"):
+                                    logger.warning(
+                                        f"unescaped literal prefix {prefix} in PATH ignored. Check the value of the PATH variable in your SHELL"
+                                    )
+                                else:
+                                    yield prefix
                     else:
                         yield entry
 
