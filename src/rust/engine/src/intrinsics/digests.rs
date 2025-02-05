@@ -377,7 +377,7 @@ fn path_metadata_request(single_path: Value) -> PyGeneratorResponseNativeCall {
                 }),
                 PyPathNamespace::System => SubjectPath::new_system(&path).map_err(|_| {
                     format!(
-                        "path_metadata_request error: path for PathNamespace.SYSTEM must an absolute path. Instead, got `{}`", path
+                        "path_metadata_request error: path for PathNamespace.SYSTEM must be an absolute path. Instead, got `{}`", path
                     )
                 }),
             }
