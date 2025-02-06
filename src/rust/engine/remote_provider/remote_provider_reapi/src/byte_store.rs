@@ -397,13 +397,15 @@ impl ByteStoreProvider for Provider {
     ) -> Result<HashSet<Digest>, String> {
         let blob_digests = digests.into_iter().map(|d| d.into()).collect::<Vec<_>>();
 
-        let max_digests_per_request: usize = (4 * 1024 * 1024
+        const DEFAULT_MAX_GRPC_MESSAGE_SIZE: usize = 4 * 1024 * 1024;
+        let max_digests_per_request: usize = (DEFAULT_MAX_GRPC_MESSAGE_SIZE
             - self
                 .instance_name
                 .as_ref()
                 .cloned()
                 .unwrap_or_default()
-                .len())
+                .len()
+            - 10)
             / RPC_DIGEST_SIZE;
 
         let requests = blob_digests.chunks(max_digests_per_request).map(|digests| {
@@ -415,11 +417,14 @@ impl ByteStoreProvider for Provider {
             msg
         });
 
-        workunit_store::increment_counter_if_in_workunit(Metric::RemoteStoreExistsAttempts, 1);
-
         let client = self.cas_client.as_ref();
         let futures = requests
             .map(|request| {
+                workunit_store::increment_counter_if_in_workunit(
+                    Metric::RemoteStoreExistsAttempts,
+                    1,
+                );
+
                 let client = client.clone();
                 retry_call(
                     client,
@@ -461,7 +466,6 @@ impl ByteStoreProvider for Provider {
 
 #[cfg(test)]
 mod tests {
-
     use super::RPC_DIGEST_SIZE;
     use crate::remexec::FindMissingBlobsRequest;
     use prost::Message;
@@ -471,9 +475,9 @@ mod tests {
     fn test_size_of_find_missing_blobs_request() {
         let mut blobs = Vec::new();
         let instance_name = "";
-        // NOTE[TSolberg]:
-        // This test is a bit of a hack, but it's the best way I could think of to ensure that the size of the
-        // FindMissingBlobsRequest is roughly what we expect. The only delta would be the encoding of the
+        // NOTE[TSolberg]: This test is a bit of a hack, but it's the best way I could think of to
+        // ensure that the size of the FindMissingBlobsRequest is roughly what we expect. The only
+        // delta would be the encoding of the instance name.
         for it in (0..10).into_iter().chain(1000..1010).chain(10000..10010) {
             while blobs.len() < it {
                 blobs.push(TestData::roland().digest().into());
