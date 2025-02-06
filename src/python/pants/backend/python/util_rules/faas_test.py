@@ -35,7 +35,7 @@ from pants.backend.python.util_rules.faas import (
     RuntimePlatformsRequest,
     build_python_faas,
 )
-from pants.backend.python.util_rules.pex import CompletePlatforms, Pex, PexPlatforms
+from pants.backend.python.util_rules.pex import CompletePlatforms, Pex
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.pex_venv import PexVenv, PexVenvLayout, PexVenvRequest
 from pants.build_graph.address import Address
@@ -269,20 +269,17 @@ class TestRuntimeField(PythonFaaSRuntimeField):
 
 
 @pytest.mark.parametrize(
-    ("value", "expected_interpreter_version", "expected_platforms", "expected_complete_platforms"),
+    ("value", "expected_interpreter_version", "expected_complete_platforms"),
     [
+        pytest.param("3.45", (3, 45), ["complete_platform_faas-test-3-45.json"], id="known 3.45"),
         pytest.param(
-            "3.45", (3, 45), [], ["complete_platform_faas-test-3-45.json"], id="known 3.45"
-        ),
-        pytest.param(
-            "67.89", (67, 89), [], ["complete_platform_faas-test-67-89.json"], id="known 67.89"
+            "67.89", (67, 89), ["complete_platform_faas-test-67-89.json"], id="known 67.89"
         ),
     ],
 )
 def test_infer_runtime_platforms_when_known_runtime_and_no_complete_platforms(
     value: str,
     expected_interpreter_version: tuple[int, int],
-    expected_platforms: list[str],
     expected_complete_platforms: list[str],
     rule_runner: RuleRunner,
 ) -> None:
@@ -300,7 +297,6 @@ def test_infer_runtime_platforms_when_known_runtime_and_no_complete_platforms(
 
     assert platforms == RuntimePlatforms(
         expected_interpreter_version,
-        PexPlatforms(expected_platforms),
         CompletePlatforms(expected_complete_platforms),
     )
 
@@ -340,16 +336,15 @@ def test_infer_runtime_platforms_when_complete_platforms(
 
     platforms = rule_runner.request(RuntimePlatforms, [request])
 
-    assert platforms == RuntimePlatforms(None, PexPlatforms(), CompletePlatforms(["path/cp.json"]))
+    assert platforms == RuntimePlatforms(None, CompletePlatforms(["path/cp.json"]))
 
 
 @pytest.mark.parametrize(
-    ("ics", "expected_interpreter_version", "expected_platforms", "expected_complete_platforms"),
+    ("ics", "expected_interpreter_version", "expected_complete_platforms"),
     [
         pytest.param(
             "==3.45.*",
             (3, 45),
-            [],
             ["complete_platform_faas-test-3-45.json"],
             id="known 3.45",
         ),
@@ -358,7 +353,6 @@ def test_infer_runtime_platforms_when_complete_platforms(
 def test_infer_runtime_platforms_when_known_narrow_ics_only(
     ics: str,
     expected_interpreter_version: tuple[int, int],
-    expected_platforms: list[str],
     expected_complete_platforms: list[str],
     rule_runner: RuleRunner,
 ) -> None:
@@ -382,7 +376,6 @@ def test_infer_runtime_platforms_when_known_narrow_ics_only(
 
     assert platforms == RuntimePlatforms(
         expected_interpreter_version,
-        PexPlatforms(expected_platforms),
         CompletePlatforms(expected_complete_platforms),
     )
 

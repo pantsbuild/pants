@@ -29,7 +29,7 @@ from pants.backend.python.target_types import (
     PythonResolveField,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import CompletePlatforms, Pex, PexPlatforms
+from pants.backend.python.util_rules.pex import CompletePlatforms, Pex
 from pants.backend.python.util_rules.pex_from_targets import (
     InterpreterConstraintsRequest,
     PexFromTargetsRequest,
@@ -368,7 +368,6 @@ class RuntimePlatformsRequest:
 @dataclass(frozen=True)
 class RuntimePlatforms:
     interpreter_version: None | tuple[int, int]
-    pex_platforms: PexPlatforms = PexPlatforms()
     complete_platforms: CompletePlatforms = CompletePlatforms()
 
 
@@ -560,7 +559,6 @@ async def build_python_faas(
         include_requirements=request.include_requirements,
         include_source_files=request.include_sources,
         output_filename=repository_filename,
-        platforms=platforms.pex_platforms,
         complete_platforms=platforms.complete_platforms,
         layout=PexLayout.PACKED,
         additional_args=additional_pex_args,
@@ -582,7 +580,6 @@ async def build_python_faas(
         PexVenvRequest(
             pex=pex_result,
             layout=layout,
-            platforms=platforms.pex_platforms,
             complete_platforms=platforms.complete_platforms,
             extra_args=request.pex3_venv_create_extra_args.value or (),
             prefix=request.prefix_in_artifact,
