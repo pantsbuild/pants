@@ -346,7 +346,10 @@ def test_infer_runtime_platforms_when_complete_platforms(
             "==3.45.*",
             (3, 45),
             ["complete_platform_faas-test-3-45.json"],
-            id="known 3.45",
+            id="star",
+        ),
+        pytest.param(
+            ">=3.45,<3.46", (3, 45), ["complete_platform_faas-test-3-45.json"], id="range"
         ),
     ],
 )
