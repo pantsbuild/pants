@@ -457,7 +457,6 @@ async fn list_missing_digests_more_than_4mb() {
     assert_eq!(cas.request_count(RequestType::CASFindMissingBlobs), 2)
 }
 
-
 #[tokio::test]
 async fn list_missing_digests_more_than_4mb_some_missing() {
     let testdata = TestData::roland();
@@ -466,12 +465,11 @@ async fn list_missing_digests_more_than_4mb_some_missing() {
 
     let provider = new_provider(&cas).await;
 
-
-	let henries = TestData::all_the_henries();
-	let robin = TestData::robin();
-	let mut test_data = vec![henries.digest()];
+    let henries = TestData::all_the_henries();
+    let robin = TestData::robin();
+    let mut test_data = vec![henries.digest()];
     test_data.extend((0..100_000).map(|_| testdata.digest()));
-	test_data.push(robin.digest());
+    test_data.push(robin.digest());
 
     assert_eq!(
         provider
