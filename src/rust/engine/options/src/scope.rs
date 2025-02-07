@@ -16,6 +16,7 @@ lazy_static! {
     static ref SCOPE_NAME_RE: Regex = Regex::new(r"^(?:[a-z0-9_])+(?:-(?:[a-z0-9_])+)*$").unwrap();
 }
 
+#[allow(dead_code)]
 pub(crate) fn is_valid_scope_name(name: &str) -> bool {
     // The exact string "pants" is not allowed as a scope name: if we encounter it on the
     // command line, it is part of the invocation: /path/to/python -m pants <actual args>.

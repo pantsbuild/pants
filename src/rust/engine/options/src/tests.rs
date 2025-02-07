@@ -2,9 +2,10 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use crate::config::ConfigSource;
+use crate::flags::Flag;
 use crate::{
-    munge_bin_name, option_id, Args, BuildRoot, DictEdit, DictEditAction, Env, ListEdit,
-    ListEditAction, OptionParser, Source, Val,
+    munge_bin_name, option_id, Args, BuildRoot, DictEdit, DictEditAction, Env, GoalInfo, ListEdit,
+    ListEditAction, OptionParser, Scope, Source, Val,
 };
 use itertools::Itertools;
 use maplit::{hashmap, hashset};
@@ -51,6 +52,15 @@ fn with_setup(
         extra_config_path.to_str().unwrap()
     )];
 
+    fn mk_goal(name: &str) -> GoalInfo {
+        GoalInfo {
+            scope_name: name.to_string(),
+            is_builtin: false,
+            is_auxiliary: false,
+            aliases: vec![],
+        }
+    }
+
     let option_parser = OptionParser::new(
         Args::new(
             config_file_arg
@@ -73,7 +83,13 @@ fn with_setup(
         true,
         Some(BuildRoot::find_from(buildroot.path()).unwrap()),
         None,
-        None,
+        Some(vec![
+            mk_goal("test"),
+            mk_goal("fmt"),
+            mk_goal("lint"),
+            mk_goal("check"),
+            mk_goal("repl"),
+        ]),
     )
     .unwrap();
     do_check(option_parser);
@@ -728,19 +744,32 @@ fn test_cli_alias() {
         |option_parser| {
             assert_eq!(
                 vec![
-                    "--backend-packages=pants.backend.python.lint.pyupgrade".to_string(),
                     "fmt".to_string(),
                     "lint".to_string(),
                     "test".to_string(),
-                    "--force".to_string(),
                     "check".to_string()
                 ],
+                option_parser.command.goals
+            );
+            assert_eq!(
+                vec![
+                    Flag {
+                        context: Scope::Global,
+                        key: "--backend-packages".to_string(),
+                        value: Some("pants.backend.python.lint.pyupgrade".to_string()),
+                    },
+                    Flag {
+                        context: Scope::Scope("test".to_string()),
+                        key: "--force".to_string(),
+                        value: None,
+                    }
+                ],
                 option_parser
-                    .get_args()
-                    .unwrap()
+                    .command
+                    .flags
                     .into_iter()
                     .skip(1) // Skip the --config-files flag we add above.
-                    .collect::<Vec<_>>()
+                    .collect::<Vec<_>>(),
             );
         },
     );
@@ -751,15 +780,8 @@ fn test_cli_alias() {
         config,
         extra_config,
         |option_parser| {
-            assert_eq!(
-                vec!["repl".to_string()],
-                option_parser
-                    .get_args()
-                    .unwrap()
-                    .into_iter()
-                    .skip(1) // Skip the --config-files flag we add above.
-                    .collect::<Vec<_>>()
-            );
+            assert_eq!(vec!["repl".to_string()], option_parser.command.goals);
+            assert_eq!(1, option_parser.command.flags.len()); // Just the --config-files flag we add above.
         },
     );
 }
