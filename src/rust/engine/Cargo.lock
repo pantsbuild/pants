@@ -3400,6 +3400,7 @@ dependencies = [
  "hashing",
  "mock",
  "parking_lot 0.12.3",
+ "prost",
  "protos",
  "remote_provider_traits",
  "tempfile",
