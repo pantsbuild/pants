@@ -24,12 +24,3 @@ pex_binary(
     name="terraform_tool_versions",
     entry_point="terraform_tool_versions.py",
 )
-
-pex_binary(
-    name="external-tool-versions",
-    entry_point="external_tool_versions.py",
-    dependencies=[
-        "src/python/pants/backend/k8s/kubectl_subsystem.py",
-    ],
-    execution_mode="venv",
-)
