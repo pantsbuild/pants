@@ -225,7 +225,7 @@ async def _group_files_by_templater(request: _GroupByTemplaterRequest) -> Partit
         determine_source_files(SourceFilesRequest(field_set.source for field_set in field_sets))
         for field_sets in result.groups.values()
     ]
-    all_source_files = await concurrently(*gets)
+    all_source_files = (await concurrently(*gets)) if gets else []
 
     partitions = Partitions(
         Partition(
