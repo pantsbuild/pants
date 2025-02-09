@@ -3,10 +3,9 @@
 
 from typing import Iterable
 
+from pants.backend.sql.target_types import SqlSourcesGeneratorTarget, SqlSourceTarget
 from pants.engine.target import BoolField
 from pants.engine.unions import UnionRule
-
-from pants.backend.sql.target_types import SqlSourcesGeneratorTarget, SqlSourceTarget
 
 
 class SkipSqlfluffField(BoolField):

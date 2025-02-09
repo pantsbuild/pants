@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pants.backend.sql.target_types import SqlSourcesGeneratorTarget
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -17,8 +18,6 @@ from pants.engine.unions import UnionRule
 from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel
 
-from pants.backend.sql.target_types import SqlSourcesGeneratorTarget
-
 
 @dataclass(frozen=True)
 class PutativeSqlTargetsRequest(PutativeTargetsRequest):
@@ -26,7 +25,9 @@ class PutativeSqlTargetsRequest(PutativeTargetsRequest):
 
 
 @rule(level=LogLevel.DEBUG, desc="Determine candidate sql targets to create")
-async def find_putative_targets(req: PutativeSqlTargetsRequest, all_owned_sources: AllOwnedSources) -> PutativeTargets:
+async def find_putative_targets(
+    req: PutativeSqlTargetsRequest, all_owned_sources: AllOwnedSources
+) -> PutativeTargets:
     all_sql_files = await path_globs_to_paths(req.path_globs("*.sql"))
     unowned_sql_files = set(all_sql_files.files) - set(all_owned_sources)
     targets = PutativeTargets(

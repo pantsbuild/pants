@@ -8,8 +8,11 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Generic, Iterable, Iterator, Sequence, Tuple, TypeVar
 
+from typing_extensions import assert_never
+
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPexProcess, create_venv_pex
+from pants.backend.sql.lint.sqlfluff.subsystem import Sqlfluff, SqlfluffFieldSet, SqlfluffMode
 from pants.core.goals.fix import FixResult, FixTargetsRequest, Partitions
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.goals.lint import LintResult, LintTargetsRequest
@@ -26,9 +29,6 @@ from pants.engine.target import FieldSet
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 from pants.util.strutil import pluralize
-from typing_extensions import assert_never
-
-from pants.backend.sql.lint.sqlfluff.subsystem import Sqlfluff, SqlfluffFieldSet, SqlfluffMode
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,9 @@ async def run_sqlfluff(
     sqlfluff_pex_get = create_venv_pex(**implicitly({sqlfluff.to_pex_request(): PexRequest}))
     config_files_get = find_config_file(sqlfluff.config_request(request.snapshot.dirs))
     sqlfluff_pex, config_files = await concurrently(sqlfluff_pex_get, config_files_get)
-    input_digest = await merge_digests(MergeDigests((request.snapshot.digest, config_files.snapshot.digest)))
+    input_digest = await merge_digests(
+        MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
+    )
 
     initial_args: Tuple[str, ...] = ()
     if request.mode is SqlfluffMode.FMT:
@@ -96,7 +98,13 @@ async def run_sqlfluff(
         **implicitly(
             VenvPexProcess(
                 sqlfluff_pex,
-                argv=(*initial_args, *templater_args, *conf_args, *sqlfluff.args, *request.snapshot.files),
+                argv=(
+                    *initial_args,
+                    *templater_args,
+                    *conf_args,
+                    *sqlfluff.args,
+                    *request.snapshot.files,
+                ),
                 input_digest=input_digest,
                 output_files=request.snapshot.files,
                 description=f"Run sqlfluff {' '.join(initial_args)} on {pluralize(len(request.snapshot.files), 'file')}.",
@@ -171,7 +179,11 @@ def recursively(directory: str) -> Iterator[str]:
 
 @rule
 async def group_by_templater(request: GroupByTemplaterRequest, sqlfluff: Sqlfluff) -> Partitions:
-    dirs = [directory for field_set in request.field_sets for directory in recursively(field_set.address.spec_path)]
+    dirs = [
+        directory
+        for field_set in request.field_sets
+        for directory in recursively(field_set.address.spec_path)
+    ]
 
     (config_files,) = await concurrently(find_config_file(sqlfluff.config_request(dirs)))
     logger.debug("sqlfluff config files: %s", config_files.snapshot.files)
@@ -230,12 +242,18 @@ async def sqlfluff_fix(request: SqlfluffFixRequest.Batch, sqlfluff: Sqlfluff) ->
 
 @rule
 async def sqlfluff_fix_partition(request: SqlfluffFixRequest.PartitionRequest) -> Partitions:
-    return await Get(Partitions, GroupByTemplaterRequest(field_sets=request.field_sets, by_file=True))
+    return await Get(
+        Partitions, GroupByTemplaterRequest(field_sets=request.field_sets, by_file=True)
+    )
 
 
 @rule(desc="Lint with sqlfluff lint", level=LogLevel.DEBUG)
-async def sqlfluff_lint(request: SqlfluffLintRequest.Batch[SqlfluffFieldSet, Any], sqlfluff: Sqlfluff) -> LintResult:
-    source_files = await determine_source_files(SourceFilesRequest(field_set.source for field_set in request.elements))
+async def sqlfluff_lint(
+    request: SqlfluffLintRequest.Batch[SqlfluffFieldSet, Any], sqlfluff: Sqlfluff
+) -> LintResult:
+    source_files = await determine_source_files(
+        SourceFilesRequest(field_set.source for field_set in request.elements)
+    )
     result = await run_sqlfluff(
         _RunSqlfluffRequest(
             snapshot=source_files.snapshot,
@@ -267,7 +285,9 @@ async def sqlfluff_fmt(request: SqlfluffFormatRequest.Batch, sqlfluff: Sqlfluff)
 
 @rule
 async def sqlfluff_fmt_partition(request: SqlfluffFormatRequest.PartitionRequest) -> Partitions:
-    return await Get(Partitions, GroupByTemplaterRequest(field_sets=request.field_sets, by_file=True))
+    return await Get(
+        Partitions, GroupByTemplaterRequest(field_sets=request.field_sets, by_file=True)
+    )
 
 
 def rules() -> Iterable[Rule]:
