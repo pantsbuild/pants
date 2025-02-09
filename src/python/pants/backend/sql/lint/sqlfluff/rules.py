@@ -6,7 +6,7 @@ import logging
 import re
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Generic, Iterable, Iterator, Mapping, Sequence, Tuple, TypeVar
+from typing import Any, Iterable, Iterator, Sequence, Tuple
 
 from typing_extensions import assert_never
 
@@ -26,6 +26,7 @@ from pants.engine.intrinsics import execute_process, merge_digests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, Rule, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import FieldSet
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 from pants.util.strutil import pluralize
@@ -171,19 +172,21 @@ def recursively(directory: str) -> Iterator[str]:
         directory, _ = parts
 
 
-_FS = TypeVar("_FS", bound=FieldSet)
+@dataclass(frozen=True)
+class _GroupByTemplaterRequest:
+    field_sets: Sequence[FieldSet]
 
 
 @dataclass(frozen=True)
-class _GroupByTemplaterRequest(Generic[_FS]):
-    field_sets: Sequence[_FS]
+class _GroupByTemplaterResult:
+    groups: FrozenDict[str, tuple[FieldSet, ...]]
 
 
 @rule
 async def _group_by_templater(
-    request: _GroupByTemplaterRequest[_FS],
+    request: _GroupByTemplaterRequest,
     sqlfluff: Sqlfluff,
-) -> Mapping[str, Sequence[_FS]]:
+) -> _GroupByTemplaterResult:
     dirs = [
         directory
         for field_set in request.field_sets
@@ -207,11 +210,11 @@ async def _group_by_templater(
             raise ValueError(f"templater must be defined for {field_set.address}")
 
         result[templater].append(field_set)
-    return result
+    return _GroupByTemplaterResult(groups=FrozenDict((k, tuple(v)) for k, v in result.items()))
 
 
 @dataclass(frozen=True)
-class _GroupFilesByTemplaterRequest(Generic[_FS], _GroupByTemplaterRequest[_FS]):
+class _GroupFilesByTemplaterRequest(_GroupByTemplaterRequest):
     pass
 
 
@@ -220,7 +223,7 @@ async def _group_files_by_templater(request: _GroupByTemplaterRequest) -> Partit
     result = await _group_by_templater(**implicitly(request))
     gets = [
         determine_source_files(SourceFilesRequest(field_set.source for field_set in field_sets))
-        for field_sets in result.values()
+        for field_sets in result.groups.values()
     ]
     all_source_files = await concurrently(*gets)
 
@@ -229,26 +232,26 @@ async def _group_files_by_templater(request: _GroupByTemplaterRequest) -> Partit
             elements=source_files.files,
             metadata=TemplaterMetadata(templater),
         )
-        for templater, source_files in zip(result, all_source_files)
+        for templater, source_files in zip(result.groups, all_source_files)
     )
     return partitions
 
 
 @dataclass(frozen=True)
-class _GroupFieldSetsByTemplaterRequest(Generic[_FS], _GroupByTemplaterRequest[_FS]):
+class _GroupFieldSetsByTemplaterRequest(_GroupByTemplaterRequest):
     pass
 
 
 async def _group_field_sets_by_templater(
     request: _GroupFieldSetsByTemplaterRequest,
 ) -> Partitions:
-    result: Mapping[str, Sequence[FieldSet]] = await _group_by_templater(**implicitly(request))
+    result = await _group_by_templater(**implicitly(request))
     partitions = Partitions(
         Partition(
             elements=tuple(sorted(field_sets, key=lambda fs: fs.address)),
             metadata=TemplaterMetadata(templater),
         )
-        for templater, field_sets in result.items()
+        for templater, field_sets in result.groups.items()
     )
     logger.debug("sqlfluff partitions: %s", partitions)
     return partitions
