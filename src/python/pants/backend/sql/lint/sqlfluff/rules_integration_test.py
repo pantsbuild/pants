@@ -7,17 +7,17 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.sql.lint.sqlfluff import rules as sqlfluff_rules
-from pants.backend.sql.lint.sqlfluff import skip_field
-from pants.backend.sql.lint.sqlfluff import subsystem as sqlfluff_subsystem
-from pants.backend.sql.lint.sqlfluff.rules import (
+from experimental.sql.lint.sqlfluff import rules as sqlfluff_rules
+from experimental.sql.lint.sqlfluff import skip_field
+from experimental.sql.lint.sqlfluff import subsystem as sqlfluff_subsystem
+from experimental.sql.lint.sqlfluff.rules import (
     SqlfluffFixRequest,
     SqlfluffFormatRequest,
     SqlfluffLintRequest,
 )
-from pants.backend.sql.lint.sqlfluff.skip_field import SkipSqlfluffField
-from pants.backend.sql.lint.sqlfluff.subsystem import SqlfluffFieldSet
-from pants.backend.sql.target_types import SqlSourcesGeneratorTarget
+from experimental.sql.lint.sqlfluff.skip_field import SkipSqlfluffField
+from experimental.sql.lint.sqlfluff.subsystem import SqlfluffFieldSet
+from experimental.sql.target_types import SqlSourcesGeneratorTarget
 from pants.core.goals.fix import FixResult
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult
@@ -82,7 +82,7 @@ def run_sqlfluff(
     extra_args: list[str] | None = None,
 ) -> tuple[FixResult, LintResult, FmtResult]:
     args = [
-        "--backend-packages=pants.backend.sql.lint.sqlfluff",
+        "--backend-packages=experimental.sql.lint.sqlfluff",
         '--sqlfluff-fix-args="--force"',
         *(extra_args or ()),
     ]
