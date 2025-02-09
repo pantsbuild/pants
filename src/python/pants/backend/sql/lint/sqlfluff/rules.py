@@ -242,6 +242,7 @@ class _GroupFieldSetsByTemplaterRequest(_GroupByTemplaterRequest):
     pass
 
 
+@rule
 async def _group_field_sets_by_templater(
     request: _GroupFieldSetsByTemplaterRequest,
 ) -> Partitions:

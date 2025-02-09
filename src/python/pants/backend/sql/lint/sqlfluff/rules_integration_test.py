@@ -2,12 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from textwrap import dedent
 
 import pytest
 
-import os
 from pants.backend.sql.lint.sqlfluff import rules as sqlfluff_rules
 from pants.backend.sql.lint.sqlfluff import skip_field
 from pants.backend.sql.lint.sqlfluff import subsystem as sqlfluff_subsystem
@@ -23,9 +23,8 @@ from pants.core.goals.lint import LintResult
 from pants.core.util_rules import config_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.testutil.rule_runner import QueryRule, RuleRunner
-
 from pants.testutil.pants_integration_test import PantsResult, run_pants
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 GOOD_FILE = dedent(
     """\
@@ -277,9 +276,7 @@ def test_config_file(
     )
 
     spec_path = str(file_path.parent).replace(".", "")
-    rel_file_path = (
-        file_path.relative_to(*file_path.parts[:1]) if spec_path else file_path
-    )
+    rel_file_path = file_path.relative_to(*file_path.parts[:1]) if spec_path else file_path
     address = Address(spec_path, relative_file_path=str(rel_file_path))
     fix_result, lint_result, _ = run_sqlfluff(
         rule_runner,
