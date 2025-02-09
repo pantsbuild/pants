@@ -7,6 +7,7 @@ from textwrap import dedent
 
 import pytest
 
+import os
 from pants.backend.sql.lint.sqlfluff import rules as sqlfluff_rules
 from pants.backend.sql.lint.sqlfluff import skip_field
 from pants.backend.sql.lint.sqlfluff import subsystem as sqlfluff_subsystem
@@ -15,18 +16,16 @@ from pants.backend.sql.lint.sqlfluff.rules import (
     SqlfluffFormatRequest,
     SqlfluffLintRequest,
 )
-from pants.backend.sql.lint.sqlfluff.skip_field import SkipSqlfluffField
-from pants.backend.sql.lint.sqlfluff.subsystem import SqlfluffFieldSet
 from pants.backend.sql.target_types import SqlSourcesGeneratorTarget
 from pants.core.goals.fix import FixResult
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult
 from pants.core.util_rules import config_files
-from pants.core.util_rules.partitions import _EmptyMetadata
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+
+from pants.testutil.pants_integration_test import PantsResult, run_pants
 
 GOOD_FILE = dedent(
     """\
@@ -77,57 +76,32 @@ def rule_runner() -> RuleRunner:
 
 def run_sqlfluff(
     rule_runner: RuleRunner,
-    targets: list[Target],
+    addresses: list[Address],
     *,
     extra_args: list[str] | None = None,
-) -> tuple[FixResult, LintResult, FmtResult]:
+) -> tuple[PantsResult, PantsResult, PantsResult]:
     args = [
-        "--backend-packages=pants.backend.sql.lint.sqlfluff",
+        "--backend-packages=pants.backend.experimental.sql.lint.sqlfluff",
         '--sqlfluff-fix-args="--force"',
         *(extra_args or ()),
     ]
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
 
-    field_sets = [
-        SqlfluffFieldSet.create(tgt) for tgt in targets if SqlfluffFieldSet.is_applicable(tgt)
-    ]
-    source_reqs = [SourceFilesRequest(field_set.source for field_set in field_sets)]
-    input_sources = rule_runner.request(SourceFiles, source_reqs)
+    addresses_args = [a.spec for a in addresses]
 
-    fix_result = rule_runner.request(
-        FixResult,
-        [
-            SqlfluffFixRequest.Batch(
-                "",
-                tuple(field_sets),
-                partition_metadata=_EmptyMetadata(),
-                snapshot=input_sources.snapshot,
-            ),
-        ],
-    )
-    lint_result = rule_runner.request(
-        LintResult,
-        [
-            SqlfluffLintRequest.Batch(
-                "",
-                tuple(field_sets),
-                partition_metadata=_EmptyMetadata(),
-            ),
-        ],
-    )
-    fmt_result = rule_runner.request(
-        FmtResult,
-        [
-            SqlfluffFormatRequest.Batch(
-                "",
-                tuple(field_sets),
-                partition_metadata=_EmptyMetadata(),
-                snapshot=input_sources.snapshot,
-            )
-        ],
-    )
-
+    fix_result = run_pants(command=[*args, "fix", *addresses_args])
+    lint_result = run_pants(command=[*args, "lint", *addresses_args])
+    fmt_result = run_pants(command=[*args, "fmt", *addresses_args])
     return fix_result, lint_result, fmt_result
+
+
+def collect_files(rootdir: str) -> dict:
+    result = {}
+    for root, _, files in os.walk(rootdir):
+        for file in files:
+            path = f"{root}/{file}"
+            result[path] = Path(path).read_text()
+    return result
 
 
 @pytest.mark.platform_specific_behavior
@@ -139,8 +113,9 @@ def test_passing(rule_runner: RuleRunner) -> None:
             ".sqlfluff": CONFIG_POSTGRES,
         }
     )
-    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="query.sql"))
-    fix_result, lint_result, fmt_result = run_sqlfluff(rule_runner, [tgt])
+    address = Address("", target_name="t", relative_file_path="query.sql")
+    fix_result, lint_result, fmt_result = run_sqlfluff(rule_runner, [address])
+    assert fix_result.stderr == ""
     assert fix_result.stdout == dedent(
         """\
         ==== finding fixable violations ====
@@ -151,10 +126,8 @@ def test_passing(rule_runner: RuleRunner) -> None:
     )
     assert fix_result.stderr == ""
     assert lint_result.exit_code == 0
-    assert not fix_result.did_change
-    assert fix_result.output == rule_runner.make_snapshot({"query.sql": GOOD_FILE})
-    assert not fmt_result.did_change
-    assert fmt_result.output == rule_runner.make_snapshot({"query.sql": GOOD_FILE})
+    assert collect_files(fix_result.workdir) == {"query.sql": GOOD_FILE}
+    assert collect_files(fmt_result.workdir) == {"query.sql": GOOD_FILE}
 
 
 def test_failing(rule_runner: RuleRunner) -> None:
@@ -165,8 +138,8 @@ def test_failing(rule_runner: RuleRunner) -> None:
             ".sqlfluff": CONFIG_POSTGRES,
         }
     )
-    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="query.sql"))
-    fix_result, lint_result, fmt_result = run_sqlfluff(rule_runner, [tgt])
+    address = Address("", target_name="t", relative_file_path="query.sql")
+    fix_result, lint_result, fmt_result = run_sqlfluff(rule_runner, [address])
     assert fix_result.stdout == dedent(
         """\
         ==== finding fixable violations ====
@@ -209,12 +182,12 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
             ".sqlfluff": CONFIG_POSTGRES,
         }
     )
-    tgts = [
-        rule_runner.get_target(Address("", target_name="t", relative_file_path="good.sql")),
-        rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.sql")),
-        rule_runner.get_target(Address("", target_name="t", relative_file_path="unformatted.sql")),
+    addresses = [
+        Address("", target_name="t", relative_file_path="good.sql"),
+        Address("", target_name="t", relative_file_path="bad.sql"),
+        Address("", target_name="t", relative_file_path="unformatted.sql"),
     ]
-    fix_result, lint_result, fmt_result = run_sqlfluff(rule_runner, tgts)
+    fix_result, lint_result, fmt_result = run_sqlfluff(rule_runner, addresses)
     assert lint_result.exit_code == 1
     assert fix_result.output == rule_runner.make_snapshot(
         {"good.sql": GOOD_FILE, "bad.sql": GOOD_FILE, "unformatted.sql": GOOD_FILE}
@@ -235,15 +208,13 @@ def test_skip_field(rule_runner: RuleRunner) -> None:
             "BUILD": "sql_sources(name='t', skip_sqlfluff=True)",
         }
     )
-    tgts = [
-        rule_runner.get_target(Address("", target_name="t", relative_file_path="good.sql")),
-        rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.sql")),
-        rule_runner.get_target(Address("", target_name="t", relative_file_path="unformatted.sql")),
+    addresses = [
+        Address("", target_name="t", relative_file_path="good.sql"),
+        Address("", target_name="t", relative_file_path="bad.sql"),
+        Address("", target_name="t", relative_file_path="unformatted.sql"),
     ]
-    for tgt in tgts:
-        assert tgt.get(SkipSqlfluffField).value is True
 
-    fix_result, lint_result, fmt_result = run_sqlfluff(rule_runner, tgts)
+    fix_result, lint_result, fmt_result = run_sqlfluff(rule_runner, addresses)
 
     assert lint_result.exit_code == 0
     assert fix_result.output == rule_runner.make_snapshot({})
@@ -306,9 +277,14 @@ def test_config_file(
     )
 
     spec_path = str(file_path.parent).replace(".", "")
-    rel_file_path = file_path.relative_to(*file_path.parts[:1]) if spec_path else file_path
-    addr = Address(spec_path, relative_file_path=str(rel_file_path))
-    tgt = rule_runner.get_target(addr)
-    fix_result, lint_result, _ = run_sqlfluff(rule_runner, [tgt], extra_args=extra_args)
+    rel_file_path = (
+        file_path.relative_to(*file_path.parts[:1]) if spec_path else file_path
+    )
+    address = Address(spec_path, relative_file_path=str(rel_file_path))
+    fix_result, lint_result, _ = run_sqlfluff(
+        rule_runner,
+        [address],
+        extra_args=extra_args,
+    )
     assert lint_result.exit_code == (1 if should_change else 0)
     assert fix_result.did_change is should_change
