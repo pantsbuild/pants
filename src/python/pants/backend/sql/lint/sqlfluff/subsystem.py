@@ -16,8 +16,8 @@ from pants.engine.target import FieldSet, Target
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
 from pants.util.strutil import softwrap
 
-from experimental.sql.lint.sqlfluff.skip_field import SkipSqlfluffField
-from experimental.sql.target_types import SqlSourceField
+from pants.backend.sql.lint.sqlfluff.skip_field import SkipSqlfluffField
+from pants.backend.sql.target_types import SqlSourceField
 
 
 @dataclass(frozen=True)
@@ -53,7 +53,7 @@ class Sqlfluff(PythonToolBase):
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.8,<4"]
 
-    default_lockfile_resource = ("experimental.sql.lint.sqlfluff", "sqlfluff.lock")
+    default_lockfile_resource = ("pants.backend.sql.lint.sqlfluff", "sqlfluff.lock")
 
     skip = SkipOption("fmt", "fix", "lint")
     args = ArgsListOption(example="--dialect=postgres --exclude-rules LT08,RF02")

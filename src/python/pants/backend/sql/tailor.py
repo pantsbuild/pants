@@ -17,7 +17,7 @@ from pants.engine.unions import UnionRule
 from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel
 
-from experimental.sql.target_types import SqlSourcesGeneratorTarget
+from pants.backend.sql.target_types import SqlSourcesGeneratorTarget
 
 
 @dataclass(frozen=True)

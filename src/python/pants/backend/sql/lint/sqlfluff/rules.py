@@ -28,7 +28,7 @@ from pants.util.meta import classproperty
 from pants.util.strutil import pluralize
 from typing_extensions import assert_never
 
-from experimental.sql.lint.sqlfluff.subsystem import Sqlfluff, SqlfluffFieldSet, SqlfluffMode
+from pants.backend.sql.lint.sqlfluff.subsystem import Sqlfluff, SqlfluffFieldSet, SqlfluffMode
 
 logger = logging.getLogger(__name__)
 
