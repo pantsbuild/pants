@@ -219,7 +219,7 @@ class _GroupFilesByTemplaterRequest(_GroupByTemplaterRequest):
 
 
 @rule
-async def _group_files_by_templater(request: _GroupByTemplaterRequest) -> Partitions:
+async def _group_files_by_templater(request: _GroupFilesByTemplaterRequest) -> Partitions:
     result = await _group_by_templater(**implicitly(request))
     gets = [
         determine_source_files(SourceFilesRequest(field_set.source for field_set in field_sets))
