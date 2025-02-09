@@ -79,9 +79,6 @@ def test_run_k8s_deploy(rule_runner: RuleRunner) -> None:
         rule_runner, "src/k8s", "pod", args=("--k8s-available-contexts=['local']",)
     )
 
-    kubectl = rule_runner.request(Kubectl, [])
-    platform = rule_runner.request(Platform, [])
-
     assert deploy_process.process
     assert deploy_process.process.process.argv == (
         "__kubectl/kubectl",

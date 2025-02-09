@@ -1,14 +1,9 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import logging
-from collections.abc import Mapping, Sequence
-from typing import Optional
 
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.core.util_rules.search_paths import ExecutableSearchPathsOptionMixin
-from pants.engine.internals.native_engine import Digest
-from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import collect_rules
 from pants.option.option_types import BoolOption, StrListOption
 from pants.option.subsystem import Subsystem
