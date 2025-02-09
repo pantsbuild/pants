@@ -6,18 +6,18 @@ import logging
 import re
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Generic, Iterable, Iterator, Sequence, Tuple, TypeVar
+from typing import Any, Generic, Iterable, Iterator, Mapping, Sequence, Tuple, TypeVar
 
 from typing_extensions import assert_never
 
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPexProcess, create_venv_pex
 from pants.backend.sql.lint.sqlfluff.subsystem import Sqlfluff, SqlfluffFieldSet, SqlfluffMode
-from pants.core.goals.fix import FixResult, FixTargetsRequest, Partitions
+from pants.core.goals.fix import FixResult, FixTargetsRequest
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.config_files import find_config_file
-from pants.core.util_rules.partitions import Partition, PartitionerType
+from pants.core.util_rules.partitions import Partition, PartitionerType, Partitions
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.collection import Collection
 from pants.engine.fs import Digest, DigestContents, FileContent, MergeDigests
@@ -124,15 +124,6 @@ class TemplaterMetadata:
         return self.templater
 
 
-_FS = TypeVar("_FS", bound=FieldSet)
-
-
-@dataclass(frozen=True)
-class GroupByTemplaterRequest(Generic[_FS]):
-    field_sets: Sequence[_FS]
-    by_file: bool = False
-
-
 class ConfigParser:
     def __init__(self) -> None:
         self.regex = re.compile("^templater *= *(?P<templater>[^ ]+) *$")
@@ -154,6 +145,9 @@ class NestedConfig:
         for file_content in contents:
             content = file_content.content.decode("utf-8")
             templater = parser.parse_templater(content)
+            if templater is None:
+                continue
+
             directory = file_content.path.rsplit("/", 1)[0]
             templaters[directory] = templater
 
@@ -177,15 +171,27 @@ def recursively(directory: str) -> Iterator[str]:
         directory, _ = parts
 
 
+_FS = TypeVar("_FS", bound=FieldSet)
+
+
+@dataclass(frozen=True)
+class _GroupByTemplaterRequest(Generic[_FS]):
+    field_sets: Sequence[_FS]
+
+
 @rule
-async def group_by_templater(request: GroupByTemplaterRequest, sqlfluff: Sqlfluff) -> Partitions:
+async def _group_by_templater(
+    request: _GroupByTemplaterRequest[_FS],
+    sqlfluff: Sqlfluff,
+) -> Mapping[str, Sequence[_FS]]:
     dirs = [
         directory
         for field_set in request.field_sets
         for directory in recursively(field_set.address.spec_path)
     ]
 
-    (config_files,) = await concurrently(find_config_file(sqlfluff.config_request(dirs)))
+    config_files = await find_config_file(sqlfluff.config_request(dirs))
+
     logger.debug("sqlfluff config files: %s", config_files.snapshot.files)
     contents = await Get(DigestContents, Digest, config_files.snapshot.digest)
 
@@ -199,30 +205,51 @@ async def group_by_templater(request: GroupByTemplaterRequest, sqlfluff: Sqlfluf
         templater = nested_config.find_templater(directory)
         if templater is None:
             raise ValueError(f"templater must be defined for {field_set.address}")
+
         result[templater].append(field_set)
+    return result
 
-    if request.by_file:
-        gets = [
-            determine_source_files(SourceFilesRequest(field_set.source for field_set in field_sets))
-            for field_sets in result.values()
-        ]
-        all_source_files = await concurrently(*gets)
 
-        partitions = Partitions(
-            Partition(
-                elements=source_files.files,
-                metadata=TemplaterMetadata(templater),
-            )
-            for templater, source_files in zip(result, all_source_files)
+@dataclass(frozen=True)
+class _GroupFilesByTemplaterRequest(Generic[_FS], _GroupByTemplaterRequest[_FS]):
+    pass
+
+
+@rule
+async def _group_files_by_templater(request: _GroupByTemplaterRequest) -> Partitions:
+    result = await _group_by_templater(**implicitly(request))
+    gets = [
+        determine_source_files(SourceFilesRequest(field_set.source for field_set in field_sets))
+        for field_sets in result.values()
+    ]
+    all_source_files = await concurrently(*gets)
+
+    partitions = Partitions(
+        Partition(
+            elements=source_files.files,
+            metadata=TemplaterMetadata(templater),
         )
-    else:
-        partitions = Partitions(
-            Partition(
-                elements=tuple(sorted(field_sets, key=lambda fs: fs.address)),
-                metadata=TemplaterMetadata(templater),
-            )
-            for templater, field_sets in result.items()
+        for templater, source_files in zip(result, all_source_files)
+    )
+    return partitions
+
+
+@dataclass(frozen=True)
+class _GroupFieldSetsByTemplaterRequest(Generic[_FS], _GroupByTemplaterRequest[_FS]):
+    pass
+
+
+async def _group_field_sets_by_templater(
+    request: _GroupFieldSetsByTemplaterRequest,
+) -> Partitions:
+    result: Mapping[str, Sequence[FieldSet]] = await _group_by_templater(**implicitly(request))
+    partitions = Partitions(
+        Partition(
+            elements=tuple(sorted(field_sets, key=lambda fs: fs.address)),
+            metadata=TemplaterMetadata(templater),
         )
+        for templater, field_sets in result.items()
+    )
     logger.debug("sqlfluff partitions: %s", partitions)
     return partitions
 
@@ -241,9 +268,12 @@ async def sqlfluff_fix(request: SqlfluffFixRequest.Batch, sqlfluff: Sqlfluff) ->
 
 
 @rule
-async def sqlfluff_fix_partition(request: SqlfluffFixRequest.PartitionRequest) -> Partitions:
+async def sqlfluff_fix_partition(
+    request: SqlfluffFixRequest.PartitionRequest,
+) -> Partitions:
     return await Get(
-        Partitions, GroupByTemplaterRequest(field_sets=request.field_sets, by_file=True)
+        Partitions,
+        _GroupFilesByTemplaterRequest(field_sets=request.field_sets),
     )
 
 
@@ -266,8 +296,13 @@ async def sqlfluff_lint(
 
 
 @rule
-async def sqlfluff_lint_partition(request: SqlfluffLintRequest.PartitionRequest) -> Partitions:
-    return await Get(Partitions, GroupByTemplaterRequest(field_sets=request.field_sets))
+async def sqlfluff_lint_partition(
+    request: SqlfluffLintRequest.PartitionRequest,
+) -> Partitions:
+    return await Get(
+        Partitions,
+        _GroupFieldSetsByTemplaterRequest(field_sets=request.field_sets),
+    )
 
 
 @rule(desc="Format with sqlfluff format", level=LogLevel.DEBUG)
@@ -284,9 +319,12 @@ async def sqlfluff_fmt(request: SqlfluffFormatRequest.Batch, sqlfluff: Sqlfluff)
 
 
 @rule
-async def sqlfluff_fmt_partition(request: SqlfluffFormatRequest.PartitionRequest) -> Partitions:
+async def sqlfluff_fmt_partition(
+    request: SqlfluffFormatRequest.PartitionRequest,
+) -> Partitions:
     return await Get(
-        Partitions, GroupByTemplaterRequest(field_sets=request.field_sets, by_file=True)
+        Partitions,
+        _GroupFilesByTemplaterRequest(field_sets=request.field_sets),
     )
 
 
