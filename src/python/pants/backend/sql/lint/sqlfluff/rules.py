@@ -214,20 +214,18 @@ async def _group_by_templater(
 
 
 @dataclass(frozen=True)
-class _GroupFilesByTemplaterRequest:
-    field_sets: Sequence[FieldSet]
+class _GroupFilesByTemplaterRequest(_GroupByTemplaterRequest):
+    pass
 
 
 @rule
-async def _group_files_by_templater(
-    request: _GroupFilesByTemplaterRequest,
-) -> Partitions:
-    result = await Get(_GroupByTemplaterResult, _GroupByTemplaterRequest(request.field_sets))
+async def _group_files_by_templater(request: _GroupByTemplaterRequest) -> Partitions:
+    result = await _group_by_templater(**implicitly(request))
     gets = [
         determine_source_files(SourceFilesRequest(field_set.source for field_set in field_sets))
         for field_sets in result.groups.values()
     ]
-    all_source_files = (await concurrently(*gets)) if gets else []
+    all_source_files = await concurrently(*gets)
 
     partitions = Partitions(
         Partition(
@@ -240,15 +238,14 @@ async def _group_files_by_templater(
 
 
 @dataclass(frozen=True)
-class _GroupFieldSetsByTemplaterRequest:
-    field_sets: Sequence[FieldSet]
+class _GroupFieldSetsByTemplaterRequest(_GroupByTemplaterRequest):
+    pass
 
 
-@rule
 async def _group_field_sets_by_templater(
     request: _GroupFieldSetsByTemplaterRequest,
 ) -> Partitions:
-    result = await Get(_GroupByTemplaterResult, _GroupByTemplaterRequest(request.field_sets))
+    result = await _group_by_templater(**implicitly(request))
     partitions = Partitions(
         Partition(
             elements=tuple(sorted(field_sets, key=lambda fs: fs.address)),
