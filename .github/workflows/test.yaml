@@ -59,3 +59,7 @@ jobs:
     - run: |
         python -VV
         file $(which python)
+
+name: Pull Request CI
+'on':
+  pull_request: {}
