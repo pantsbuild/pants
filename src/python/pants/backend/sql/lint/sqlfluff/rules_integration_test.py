@@ -214,31 +214,60 @@ def test_failing_fmt(args: list[str]) -> None:
     assert files["project/query.sql"] == BAD_FILE
 
 
-def test_multiple_targets(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "good.sql": GOOD_FILE,
-            "bad.sql": BAD_FILE,
-            "unformatted.sql": UNFORMATTED_FILE,
-            "BUILD": "sql_sources(name='t')",
-            ".sqlfluff": CONFIG_POSTGRES,
-        }
+@pytest.fixture
+def multiple_queries() -> dict[str, str]:
+    return {
+        "project/good.sql": GOOD_FILE,
+        "project/bad.sql": BAD_FILE,
+        "project/unformatted.sql": UNFORMATTED_FILE,
+        "project/BUILD": "sql_sources(name='t')",
+        "project/.sqlfluff": CONFIG_POSTGRES,
+    }
+
+
+def test_multiple_targets_lint(multiple_queries: dict[str, str], args: list[str]) -> None:
+    with setup_tmpdir(multiple_queries) as tmpdir:
+        result = run_pants([*args, "lint", f"{tmpdir}/project:"])
+    result.assert_failure()
+    assert (
+        dedent(
+            f"""\
+            == [{tmpdir}/project/bad.sql] FAIL
+            L:   3 | P:   5 | RF03 | Unqualified reference 'name' found in single table
+                                   | select. [references.consistent]
+            L:   3 | P:   5 | RF03 | Unqualified reference 'name' found in single table
+                                   | select which is inconsistent with previous references.
+                                   | [references.consistent]
+            == [{tmpdir}/project/unformatted.sql] FAIL
+            L:   1 | P:   1 | LT09 | Select targets should be on a new line unless there is
+                                   | only one select target. [layout.select_targets]
+            All Finished!
+            """
+        )
+        in result.stderr
     )
-    addresses = [
-        Address("", target_name="t", relative_file_path="good.sql"),
-        Address("", target_name="t", relative_file_path="bad.sql"),
-        Address("", target_name="t", relative_file_path="unformatted.sql"),
-    ]
-    fix_result, lint_result, fmt_result = run_sqlfluff(rule_runner, addresses)
-    assert lint_result.exit_code == 1
-    assert fix_result.output == rule_runner.make_snapshot(
-        {"good.sql": GOOD_FILE, "bad.sql": GOOD_FILE, "unformatted.sql": GOOD_FILE}
-    )
-    assert fix_result.did_change is True
-    assert fmt_result.output == rule_runner.make_snapshot(
-        {"good.sql": GOOD_FILE, "bad.sql": BAD_FILE, "unformatted.sql": GOOD_FILE}
-    )
-    assert fmt_result.did_change is True
+
+
+def test_multiple_targets_fix(multiple_queries: dict[str, str], args: list[str]) -> None:
+    with setup_tmpdir(multiple_queries) as tmpdir:
+        result = run_pants([*args, "fix", f"{tmpdir}/project:"])
+        files = collect_files(tmpdir)
+    result.assert_success()
+    assert "sqlfluff made changes." in result.stderr
+    assert files["project/good.sql"] == GOOD_FILE
+    assert files["project/bad.sql"] == GOOD_FILE
+    assert files["project/unformatted.sql"] == GOOD_FILE
+
+
+def test_multiple_targets_fmt(multiple_queries: dict[str, str], args: list[str]) -> None:
+    with setup_tmpdir(multiple_queries) as tmpdir:
+        result = run_pants([*args, "fmt", f"{tmpdir}/project:"])
+        files = collect_files(tmpdir)
+    result.assert_success()
+    assert "sqlfluff format made changes." in result.stderr
+    assert files["project/good.sql"] == GOOD_FILE
+    assert files["project/bad.sql"] == BAD_FILE
+    assert files["project/unformatted.sql"] == GOOD_FILE
 
 
 def test_skip_field(rule_runner: RuleRunner) -> None:
