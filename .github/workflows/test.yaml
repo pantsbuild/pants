@@ -38,6 +38,9 @@ jobs:
         python -VV
         file $(which python)
 
+    - run: |
+        python -c 'import sysconfig; print(sysconfig.get_platform())'
+
 name: Pull Request CI
 'on':
   pull_request: {}
