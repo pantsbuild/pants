@@ -119,24 +119,23 @@ def args():
     ]
 
 
-def test_passing_lint(args: list[str]) -> None:
-    sources = {
+@pytest.fixture
+def good_query():
+    return {
         "project/query.sql": GOOD_FILE,
         "project/BUILD": "sql_sources()",
         "project/.sqlfluff": CONFIG_POSTGRES,
     }
-    with setup_tmpdir(sources) as tmpdir:
+
+
+def test_passing_lint(good_query: dict[str, str], args: list[str]) -> None:
+    with setup_tmpdir(good_query) as tmpdir:
         result = run_pants([*args, "lint", f"{tmpdir}/project:"])
     result.assert_success()
 
 
-def test_passing_fix(args: list[str]) -> None:
-    sources = {
-        "project/query.sql": GOOD_FILE,
-        "project/BUILD": "sql_sources()",
-        "project/.sqlfluff": CONFIG_POSTGRES,
-    }
-    with setup_tmpdir(sources) as tmpdir:
+def test_passing_fix(good_query: dict[str, str], args: list[str]) -> None:
+    with setup_tmpdir(good_query) as tmpdir:
         result = run_pants([*args, "fix", f"{tmpdir}/project:"])
         files = collect_files(tmpdir)
     result.assert_success()
@@ -146,13 +145,8 @@ def test_passing_fix(args: list[str]) -> None:
     assert files["project/query.sql"] == GOOD_FILE
 
 
-def test_passing_fmt(args: list[str]) -> None:
-    sources = {
-        "project/query.sql": GOOD_FILE,
-        "project/BUILD": "sql_sources()",
-        "project/.sqlfluff": CONFIG_POSTGRES,
-    }
-    with setup_tmpdir(sources) as tmpdir:
+def test_passing_fmt(good_query: dict[str, str], args: list[str]) -> None:
+    with setup_tmpdir(good_query) as tmpdir:
         result = run_pants([*args, "fmt", f"{tmpdir}/project:"])
         files = collect_files(tmpdir)
     result.assert_success()
@@ -161,13 +155,17 @@ def test_passing_fmt(args: list[str]) -> None:
     assert files["project/query.sql"] == GOOD_FILE
 
 
-def test_failing_lint(args: list[str]) -> None:
-    sources = {
+@pytest.fixture
+def bad_query():
+    return {
         "project/query.sql": BAD_FILE,
         "project/BUILD": "sql_sources()",
         "project/.sqlfluff": CONFIG_POSTGRES,
     }
-    with setup_tmpdir(sources) as tmpdir:
+
+
+def test_failing_lint(bad_query: dict[str, str], args: list[str]) -> None:
+    with setup_tmpdir(bad_query) as tmpdir:
         result = run_pants([*args, "lint", f"{tmpdir}/project:"])
     result.assert_failure()
     assert (
@@ -186,13 +184,8 @@ def test_failing_lint(args: list[str]) -> None:
     )
 
 
-def test_failing_fix(args: list[str]) -> None:
-    sources = {
-        "project/query.sql": BAD_FILE,
-        "project/BUILD": "sql_sources()",
-        "project/.sqlfluff": CONFIG_POSTGRES,
-    }
-    with setup_tmpdir(sources) as tmpdir:
+def test_failing_fix(bad_query: dict[str, str], args: list[str]) -> None:
+    with setup_tmpdir(bad_query) as tmpdir:
         result = run_pants([*args, "fix", f"{tmpdir}/project:"])
         files = collect_files(tmpdir)
     result.assert_success()
@@ -200,13 +193,8 @@ def test_failing_fix(args: list[str]) -> None:
     assert files["project/query.sql"] == GOOD_FILE
 
 
-def test_failing_fmt(args: list[str]) -> None:
-    sources = {
-        "project/query.sql": BAD_FILE,
-        "project/BUILD": "sql_sources()",
-        "project/.sqlfluff": CONFIG_POSTGRES,
-    }
-    with setup_tmpdir(sources) as tmpdir:
+def test_failing_fmt(bad_query: dict[str, str], args: list[str]) -> None:
+    with setup_tmpdir(bad_query) as tmpdir:
         result = run_pants([*args, "fmt", f"{tmpdir}/project:"])
         files = collect_files(tmpdir)
     result.assert_success()
