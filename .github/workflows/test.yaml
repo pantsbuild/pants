@@ -50,6 +50,22 @@ jobs:
         file dist/*
         unzip -l dist/*
 
+    - run: |
+        mkdir -p testing2
+        cd testing2
+        python3.11 -m venv .venv
+        . .venv/bin/activate
+        python -m pip install -U setuptools==74.1.2 wheel==0.44.0
+        echo 'from setuptools import setup; setup(name="test", ext_modules=[("native_engine", {"sources": ["test/dummy.c"]})], packages=["test"])' > setup.py
+        mkdir -p test
+        touch test/dummy.c test/__init__.py
+        python setup.py bdist_wheel
+
+        file dist/*
+        unzip -l dist/*
+      env:
+        _PYTHON_HOST_PLATFORM: macosx-14.0-arm64
+
 name: Pull Request CI
 'on':
   pull_request: {}
