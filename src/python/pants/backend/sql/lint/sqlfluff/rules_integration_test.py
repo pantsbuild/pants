@@ -128,29 +128,49 @@ def test_passing_lint() -> None:
     result.assert_success()
 
 
-@pytest.mark.platform_specific_behavior
-def test_passing(rule_runner: RuleRunner) -> None:
-    files = {
+def test_passing_fix() -> None:
+    sources = {
         "project/query.sql": GOOD_FILE,
         "project/BUILD": "sql_sources()",
         "project/.sqlfluff": CONFIG_POSTGRES,
     }
-    fix_result, lint_result, fmt_result = run_sqlfluff(
-        rule_runner, ["project/query.sql"], files
-    )
-    assert fix_result.stderr == ""
-    assert fix_result.stdout == dedent(
-        """\
-        ==== finding fixable violations ====
-        FORCE MODE: Attempting fixes...
-        ==== no fixable linting violations found ====
-        All Finished!
-        """
-    )
-    assert fix_result.stderr == ""
-    assert lint_result.exit_code == 0
-    assert collect_files(fix_result.workdir) == {"query.sql": GOOD_FILE}
-    assert collect_files(fmt_result.workdir) == {"query.sql": GOOD_FILE}
+    with setup_tmpdir(sources) as tmpdir:
+        result = run_pants(
+            [
+                "--backend-packages=['pants.backend.experimental.sql','pants.backend.experimental.sql.lint.sqlfluff']",
+                "--python-interpreter-constraints=['==3.12.*']",
+                "fix",
+                f"{tmpdir}/project:",
+            ],
+        )
+        files = collect_files(tmpdir)
+    result.assert_success()
+    assert result.stdout == ""
+    assert "sqlfluff format made no changes." in result.stderr
+    assert "sqlfluff made no changes." in result.stderr
+    assert files["project/query.sql"] == GOOD_FILE
+
+
+def test_passing_fmt() -> None:
+    sources = {
+        "project/query.sql": GOOD_FILE,
+        "project/BUILD": "sql_sources()",
+        "project/.sqlfluff": CONFIG_POSTGRES,
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        result = run_pants(
+            [
+                "--backend-packages=['pants.backend.experimental.sql','pants.backend.experimental.sql.lint.sqlfluff']",
+                "--python-interpreter-constraints=['==3.12.*']",
+                "fmt",
+                f"{tmpdir}/project:",
+            ],
+        )
+        files = collect_files(tmpdir)
+    result.assert_success()
+    assert result.stdout == ""
+    assert "sqlfluff format made no changes." in result.stderr
+    assert files["project/query.sql"] == GOOD_FILE
 
 
 def test_failing(rule_runner: RuleRunner) -> None:
@@ -300,9 +320,7 @@ def test_config_file(
     )
 
     spec_path = str(file_path.parent).replace(".", "")
-    rel_file_path = (
-        file_path.relative_to(*file_path.parts[:1]) if spec_path else file_path
-    )
+    rel_file_path = file_path.relative_to(*file_path.parts[:1]) if spec_path else file_path
     address = Address(spec_path, relative_file_path=str(rel_file_path))
     fix_result, lint_result, _ = run_sqlfluff(
         rule_runner,
