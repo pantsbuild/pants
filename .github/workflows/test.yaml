@@ -37,6 +37,7 @@ jobs:
         _PYTHON_HOST_PLATFORM=x python -c 'import sysconfig; print(sysconfig.get_platform())'
 
     - run: |
+        mkdir -p testing
         cd testing
         python3.11 -m venv .venv
         . .venv/bin/activate
