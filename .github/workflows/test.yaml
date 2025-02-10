@@ -36,6 +36,18 @@ jobs:
     - run: |
         _PYTHON_HOST_PLATFORM=x python -c 'import sysconfig; print(sysconfig.get_platform())'
 
+    - run: |
+        python3.11 -m venv .venv
+        . .venv/bin/activate
+        python -m pip install -U setuptools==74.1.2 wheel==0.44.0
+        echo 'from setuptools import setup; setup(name="test", ext_modules=[("native_engine", {"sources": ["test/dummy.c"]})], packages=["test"])' > setup.py
+        mkdir -p test
+        touch test/dummy.c test/__init__.py
+        python setup.py bdist_wheel
+
+        file dist/*
+        unzip -l dist/*
+
 name: Pull Request CI
 'on':
   pull_request: {}
