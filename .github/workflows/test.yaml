@@ -29,7 +29,7 @@ jobs:
         python-version: '3.9'
     - run: |
         python3.9 -VV
-        file $(which python3.9)
+        file $(python3.9 -c 'import sys; print(sys.executable)')
 
     - run: |
         python3.9 -c 'import sysconfig; print(sysconfig.get_platform())'
