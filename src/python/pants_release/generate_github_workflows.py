@@ -443,8 +443,17 @@ class Helper:
             # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
             # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
             ret["ARCHFLAGS"] = "-arch x86_64"
+            # Be explicit about the platform we've built our native code for: without this, Python
+            # builds and tags wheels based on the interpreter's build.
+            #
+            # At the time of writing, the GitHub-hosted runners' Pythons are built as
+            # macosx-10.9-universal2. Thus, without this env var, we tag our single-platform wheels
+            # as universal2... this is a lie and understandably leads to installing the wrong wheel
+            # and thus things do not work (see #21938 for an example).
+            ret["_PYTHON_HOST_PLATFORM"] = "macosx-13.0-x86_64"
         if self.platform in {Platform.MACOS14_ARM64}:
             ret["ARCHFLAGS"] = "-arch arm64"
+            ret["_PYTHON_HOST_PLATFORM"] = "macosx-14.0-arm64"
         if self.platform == Platform.LINUX_X86_64:
             # Currently we run Linux x86_64 CI on GitHub Actions-hosted hardware, and
             # these are weak dual-core machines. Default parallelism on those machines
