@@ -26,21 +26,21 @@ jobs:
       uses: actions/setup-python@v5
       if: matrix.os == 'macos-13' || matrix.os == 'macos-14'
       with:
-        python-version: '3.11'
+        python-version: '3.9'
     - run: |
-        python -VV
-        file $(which python)
+        python3.9 -VV
+        file $(which python3.9)
 
     - run: |
-        python -c 'import sysconfig; print(sysconfig.get_platform())'
+        python3.9 -c 'import sysconfig; print(sysconfig.get_platform())'
 
     - run: |
-        _PYTHON_HOST_PLATFORM=x python -c 'import sysconfig; print(sysconfig.get_platform())'
+        _PYTHON_HOST_PLATFORM=x python3.9 -c 'import sysconfig; print(sysconfig.get_platform())'
 
     - run: |
         mkdir -p testing
         cd testing
-        python -m venv .venv
+        python3.9 -m venv .venv
         . .venv/bin/activate
         python -m pip install -U setuptools==74.1.2 wheel==0.44.0
         echo 'from setuptools import setup; setup(name="test", ext_modules=[("native_engine", {"sources": ["test/dummy.c"]})], packages=["test"])' > setup.py
@@ -54,7 +54,7 @@ jobs:
     - run: |
         mkdir -p testing2
         cd testing2
-        python -m venv .venv
+        python3.9 -m venv .venv
         . .venv/bin/activate
         python -m pip install -U setuptools==74.1.2 wheel==0.44.0
         echo 'from setuptools import setup; setup(name="test", ext_modules=[("native_engine", {"sources": ["test/dummy.c"]})], packages=["test"])' > setup.py
