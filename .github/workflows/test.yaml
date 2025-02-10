@@ -24,6 +24,7 @@ jobs:
         fetch-depth: 10
     - name: Set up Python 3.11
       uses: actions/setup-python@v5
+      if: matrix.os == 'macos-13' || matrix.os == 'macos-14'
       with:
         python-version: '3.11'
     - run: |
