@@ -40,7 +40,7 @@ jobs:
     - run: |
         mkdir -p testing
         cd testing
-        python3.11 -m venv .venv
+        python -m venv .venv
         . .venv/bin/activate
         python -m pip install -U setuptools==74.1.2 wheel==0.44.0
         echo 'from setuptools import setup; setup(name="test", ext_modules=[("native_engine", {"sources": ["test/dummy.c"]})], packages=["test"])' > setup.py
@@ -54,7 +54,7 @@ jobs:
     - run: |
         mkdir -p testing2
         cd testing2
-        python3.11 -m venv .venv
+        python -m venv .venv
         . .venv/bin/activate
         python -m pip install -U setuptools==74.1.2 wheel==0.44.0
         echo 'from setuptools import setup; setup(name="test", ext_modules=[("native_engine", {"sources": ["test/dummy.c"]})], packages=["test"])' > setup.py
