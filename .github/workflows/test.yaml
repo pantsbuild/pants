@@ -33,6 +33,9 @@ jobs:
     - run: |
         python -c 'import sysconfig; print(sysconfig.get_platform())'
 
+    - run: |
+        _PYTHON_HOST_PLATFORM=x python -c 'import sysconfig; print(sysconfig.get_platform())'
+
 name: Pull Request CI
 'on':
   pull_request: {}
