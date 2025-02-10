@@ -35,6 +35,10 @@ jobs:
           3.13
 
           3.11'
+    - run: |
+        python -VV
+        file $(which python)
+
   build_wheels_macos14_arm64:
     name: MacOS14
     runs-on:
@@ -56,3 +60,6 @@ jobs:
           3.13
 
           3.11'
+    - run: |
+        python -VV
+        file $(which python)
