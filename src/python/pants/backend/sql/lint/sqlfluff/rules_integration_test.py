@@ -110,39 +110,34 @@ def collect_files(rootdir: str) -> dict:
     return result
 
 
-def test_passing_lint() -> None:
+@pytest.fixture
+def args():
+    return [
+        "--backend-packages=['pants.backend.experimental.sql','pants.backend.experimental.sql.lint.sqlfluff']",
+        '--sqlfluff-fix-args="--force"',
+        "--python-interpreter-constraints=['==3.12.*']",
+    ]
+
+
+def test_passing_lint(args: list[str]) -> None:
     sources = {
         "project/query.sql": GOOD_FILE,
         "project/BUILD": "sql_sources()",
         "project/.sqlfluff": CONFIG_POSTGRES,
     }
     with setup_tmpdir(sources) as tmpdir:
-        result = run_pants(
-            [
-                "--backend-packages=['pants.backend.experimental.sql','pants.backend.experimental.sql.lint.sqlfluff']",
-                "--python-interpreter-constraints=['==3.12.*']",
-                "lint",
-                f"{tmpdir}/project:",
-            ],
-        )
+        result = run_pants([*args, "lint", f"{tmpdir}/project:"])
     result.assert_success()
 
 
-def test_passing_fix() -> None:
+def test_passing_fix(args: list[str]) -> None:
     sources = {
         "project/query.sql": GOOD_FILE,
         "project/BUILD": "sql_sources()",
         "project/.sqlfluff": CONFIG_POSTGRES,
     }
     with setup_tmpdir(sources) as tmpdir:
-        result = run_pants(
-            [
-                "--backend-packages=['pants.backend.experimental.sql','pants.backend.experimental.sql.lint.sqlfluff']",
-                "--python-interpreter-constraints=['==3.12.*']",
-                "fix",
-                f"{tmpdir}/project:",
-            ],
-        )
+        result = run_pants([*args, "fix", f"{tmpdir}/project:"])
         files = collect_files(tmpdir)
     result.assert_success()
     assert result.stdout == ""
@@ -151,21 +146,14 @@ def test_passing_fix() -> None:
     assert files["project/query.sql"] == GOOD_FILE
 
 
-def test_passing_fmt() -> None:
+def test_passing_fmt(args: list[str]) -> None:
     sources = {
         "project/query.sql": GOOD_FILE,
         "project/BUILD": "sql_sources()",
         "project/.sqlfluff": CONFIG_POSTGRES,
     }
     with setup_tmpdir(sources) as tmpdir:
-        result = run_pants(
-            [
-                "--backend-packages=['pants.backend.experimental.sql','pants.backend.experimental.sql.lint.sqlfluff']",
-                "--python-interpreter-constraints=['==3.12.*']",
-                "fmt",
-                f"{tmpdir}/project:",
-            ],
-        )
+        result = run_pants([*args, "fmt", f"{tmpdir}/project:"])
         files = collect_files(tmpdir)
     result.assert_success()
     assert result.stdout == ""
@@ -173,46 +161,57 @@ def test_passing_fmt() -> None:
     assert files["project/query.sql"] == GOOD_FILE
 
 
-def test_failing(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "query.sql": BAD_FILE,
-            "BUILD": "sql_sources(name='t')",
-            ".sqlfluff": CONFIG_POSTGRES,
-        }
+def test_failing_lint(args: list[str]) -> None:
+    sources = {
+        "project/query.sql": BAD_FILE,
+        "project/BUILD": "sql_sources()",
+        "project/.sqlfluff": CONFIG_POSTGRES,
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        result = run_pants([*args, "lint", f"{tmpdir}/project:"])
+    result.assert_failure()
+    assert (
+        dedent(
+            f"""\
+    == [{tmpdir}/project/query.sql] FAIL
+    L:   3 | P:   5 | RF03 | Unqualified reference 'name' found in single table
+                           | select. [references.consistent]
+    L:   3 | P:   5 | RF03 | Unqualified reference 'name' found in single table
+                           | select which is inconsistent with previous references.
+                           | [references.consistent]
+    All Finished!
+    """
+        )
+        in result.stderr
     )
-    address = Address("", target_name="t", relative_file_path="query.sql")
-    fix_result, lint_result, fmt_result = run_sqlfluff(rule_runner, [address])
-    assert fix_result.stdout == dedent(
-        """\
-        ==== finding fixable violations ====
-        FORCE MODE: Attempting fixes...
-        == [query.sql] FAIL
-        L:   3 | P:   5 | RF03 | Unqualified reference 'name' found in single table
-                               | select. [references.consistent]
-        == [query.sql] FIXED
-        1 fixable linting violations found
-          [1 unfixable linting violations found]
-        """
-    )
-    assert fix_result.stderr == ""
-    assert lint_result.stdout == dedent(
-        """\
-         == [query.sql] FAIL
-         L:   3 | P:   5 | RF03 | Unqualified reference 'name' found in single table
-                                | select. [references.consistent]
-         L:   3 | P:   5 | RF03 | Unqualified reference 'name' found in single table
-                                | select which is inconsistent with previous references.
-                                | [references.consistent]
-         All Finished!
-         """
-    )
-    assert lint_result.stderr == ""
-    assert lint_result.exit_code == 1
-    assert fix_result.did_change
-    assert fix_result.output == rule_runner.make_snapshot({"query.sql": GOOD_FILE})
-    assert not fmt_result.did_change
-    assert fmt_result.output == rule_runner.make_snapshot({"query.sql": BAD_FILE})
+
+
+def test_failing_fix(args: list[str]) -> None:
+    sources = {
+        "project/query.sql": BAD_FILE,
+        "project/BUILD": "sql_sources()",
+        "project/.sqlfluff": CONFIG_POSTGRES,
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        result = run_pants([*args, "fix", f"{tmpdir}/project:"])
+        files = collect_files(tmpdir)
+    result.assert_success()
+    assert "sqlfluff made changes." in result.stderr
+    assert files["project/query.sql"] == GOOD_FILE
+
+
+def test_failing_fmt(args: list[str]) -> None:
+    sources = {
+        "project/query.sql": BAD_FILE,
+        "project/BUILD": "sql_sources()",
+        "project/.sqlfluff": CONFIG_POSTGRES,
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        result = run_pants([*args, "fmt", f"{tmpdir}/project:"])
+        files = collect_files(tmpdir)
+    result.assert_success()
+    assert "sqlfluff format made no changes." in result.stderr
+    assert files["project/query.sql"] == BAD_FILE
 
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
