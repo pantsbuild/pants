@@ -23,7 +23,7 @@ from pants.core.goals.lint import LintResult
 from pants.core.util_rules import config_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.testutil.pants_integration_test import PantsResult, run_pants
+from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_tmpdir
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 GOOD_FILE = dedent(
@@ -75,22 +75,28 @@ def rule_runner() -> RuleRunner:
 
 def run_sqlfluff(
     rule_runner: RuleRunner,
-    addresses: list[Address],
+    paths: list[str],
+    files: dict[str, str],
     *,
     extra_args: list[str] | None = None,
 ) -> tuple[PantsResult, PantsResult, PantsResult]:
     args = [
-        "--backend-packages=pants.backend.experimental.sql.lint.sqlfluff",
+        "--backend-packages=['pants.backend.experimental.sql','pants.backend.experimental.sql.lint.sqlfluff']",
+        "--no-watch-filesystem",
+        "--no-pantsd",
         '--sqlfluff-fix-args="--force"',
         *(extra_args or ()),
     ]
-    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
 
-    addresses_args = [a.spec for a in addresses]
+    with setup_tmpdir(files) as workdir:
+        result = run_pants(command=[*args, "list", f"{workdir}/::"])
+        result.assert_success()
+        assert result.stdout == "abc"
 
-    fix_result = run_pants(command=[*args, "fix", *addresses_args])
-    lint_result = run_pants(command=[*args, "lint", *addresses_args])
-    fmt_result = run_pants(command=[*args, "fmt", *addresses_args])
+        addresses = [f"{workdir}/{path}" for path in paths]
+        fix_result = run_pants(command=[*args, "fix", *addresses])
+        lint_result = run_pants(command=[*args, "lint", *addresses])
+        fmt_result = run_pants(command=[*args, "fmt", *addresses])
     return fix_result, lint_result, fmt_result
 
 
@@ -99,21 +105,39 @@ def collect_files(rootdir: str) -> dict:
     for root, _, files in os.walk(rootdir):
         for file in files:
             path = f"{root}/{file}"
-            result[path] = Path(path).read_text()
+            relpath = os.path.relpath(path, rootdir)
+            result[relpath] = Path(path).read_text()
     return result
+
+
+def test_passing_lint() -> None:
+    sources = {
+        "project/query.sql": GOOD_FILE,
+        "project/BUILD": "sql_sources()",
+        "project/.sqlfluff": CONFIG_POSTGRES,
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        result = run_pants(
+            [
+                "--backend-packages=['pants.backend.experimental.sql','pants.backend.experimental.sql.lint.sqlfluff']",
+                "--python-interpreter-constraints=['==3.12.*']",
+                "lint",
+                f"{tmpdir}/project:",
+            ],
+        )
+    result.assert_success()
 
 
 @pytest.mark.platform_specific_behavior
 def test_passing(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "query.sql": GOOD_FILE,
-            "BUILD": "sql_sources(name='t')",
-            ".sqlfluff": CONFIG_POSTGRES,
-        }
+    files = {
+        "project/query.sql": GOOD_FILE,
+        "project/BUILD": "sql_sources()",
+        "project/.sqlfluff": CONFIG_POSTGRES,
+    }
+    fix_result, lint_result, fmt_result = run_sqlfluff(
+        rule_runner, ["project/query.sql"], files
     )
-    address = Address("", target_name="t", relative_file_path="query.sql")
-    fix_result, lint_result, fmt_result = run_sqlfluff(rule_runner, [address])
     assert fix_result.stderr == ""
     assert fix_result.stdout == dedent(
         """\
@@ -276,7 +300,9 @@ def test_config_file(
     )
 
     spec_path = str(file_path.parent).replace(".", "")
-    rel_file_path = file_path.relative_to(*file_path.parts[:1]) if spec_path else file_path
+    rel_file_path = (
+        file_path.relative_to(*file_path.parts[:1]) if spec_path else file_path
+    )
     address = Address(spec_path, relative_file_path=str(rel_file_path))
     fix_result, lint_result, _ = run_sqlfluff(
         rule_runner,

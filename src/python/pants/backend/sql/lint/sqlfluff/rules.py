@@ -93,7 +93,7 @@ async def run_sqlfluff(
         assert_never(request.mode)
 
     conf_args = ["--config", sqlfluff.config] if sqlfluff.config else []
-    templater_args = ["--templater", request.templater]
+    templater_args = ["--templater", request.templater] if request.templater is not None else []
 
     result = await execute_process(
         **implicitly(
@@ -179,7 +179,7 @@ class _GroupByTemplaterRequest:
 
 @dataclass(frozen=True)
 class _GroupByTemplaterResult:
-    groups: FrozenDict[str, tuple[FieldSet, ...]]
+    groups: FrozenDict[str | None, tuple[FieldSet, ...]]
 
 
 @rule
@@ -207,7 +207,8 @@ async def _group_by_templater(
         directory = field_set.address.spec_path
         templater = nested_config.find_templater(directory)
         if templater is None:
-            raise ValueError(f"templater must be defined for {field_set.address}")
+            result[None].append(field_set)
+            continue
 
         result[templater].append(field_set)
     return _GroupByTemplaterResult(groups=FrozenDict((k, tuple(v)) for k, v in result.items()))
