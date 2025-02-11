@@ -308,36 +308,46 @@ def test_skip_field_fmt(skip_queries: dict[str, str], args: list[str]) -> None:
 
 
 @pytest.mark.parametrize(
-    ("file_path", "config_path"),
+    ("files",),
     (
-        pytest.param(Path("query.sql"), Path("pyproject.toml"), id="root:query.sql+pyproject.toml"),
-        pytest.param(Path("query.sql"), Path(".sqlfluff"), id="root:query.sql+.sqlfluff"),
         pytest.param(
-            Path("project/query.sql"),
-            Path("project/pyproject.toml"),
+            {
+                "query.sql": BAD_FILE,
+                "BUILD": "sql_sources()",
+                "pyproject.toml": CONFIG_PYPROJECT,
+            },
+            id="root:query.sql+pyproject.toml",
+        ),
+        pytest.param(
+            {
+                "query.sql": BAD_FILE,
+                "BUILD": "sql_sources()",
+                ".sqlfluff": CONFIG_NATIVE,
+            },
+            id="root:query.sql+.sqlfluff",
+        ),
+        pytest.param(
+            {
+                "project/query.sql": BAD_FILE,
+                "project/BUILD": "sql_sources()",
+                "project/pyproject.toml": CONFIG_PYPROJECT,
+            },
             id="subdir:query.sql+pyproject.toml",
         ),
         pytest.param(
-            Path("project/query.sql"), Path("project/.sqlfluff"), id="subdir:query.sql+.sqlfluff"
+            {
+                "project/query.sql": BAD_FILE,
+                "project/BUILD": "sql_sources()",
+                "project/.sqlfluff": CONFIG_NATIVE,
+            },
+            id="subdir:query.sql+.sqlfluff",
         ),
     ),
 )
 def test_config_file(
-    file_path: Path,
-    config_path: Path,
+    files: dict[str, str],
     args: list[str],
 ) -> None:
-    if config_path.stem == "pyproject":
-        config = CONFIG_PYPROJECT
-    else:
-        config = CONFIG_NATIVE
-
-    files = {
-        str(file_path): BAD_FILE,
-        str(file_path.parent / "BUILD"): "sql_sources()",
-        str(config_path): config,
-    }
-
     with setup_tmpdir(files) as tmpdir:
         result = run_pants([*args, "fix", f"{tmpdir}::"])
 
