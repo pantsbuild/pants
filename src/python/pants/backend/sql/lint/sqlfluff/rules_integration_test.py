@@ -258,28 +258,40 @@ def test_multiple_targets_fmt(multiple_queries: dict[str, str], args: list[str])
     assert files["project/unformatted.sql"] == GOOD_FILE
 
 
-def test_skip_field(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "good.sql": GOOD_FILE,
-            "bad.sql": BAD_FILE,
-            "unformatted.sql": UNFORMATTED_FILE,
-            "BUILD": "sql_sources(name='t', skip_sqlfluff=True)",
-        }
-    )
-    addresses = [
-        Address("", target_name="t", relative_file_path="good.sql"),
-        Address("", target_name="t", relative_file_path="bad.sql"),
-        Address("", target_name="t", relative_file_path="unformatted.sql"),
-    ]
+@pytest.fixture
+def skip_queries() -> dict[str, str]:
+    return {
+        "project/good.sql": GOOD_FILE,
+        "project/bad.sql": BAD_FILE,
+        "project/unformatted.sql": UNFORMATTED_FILE,
+        "project/BUILD": "sql_sources(skip_sqlfluff=True)",
+    }
 
-    fix_result, lint_result, fmt_result = run_sqlfluff(rule_runner, addresses)
 
-    assert lint_result.exit_code == 0
-    assert fix_result.output == rule_runner.make_snapshot({})
-    assert fix_result.did_change is False
-    assert fmt_result.output == rule_runner.make_snapshot({})
-    assert fmt_result.did_change is False
+def test_skip_field_lint(skip_queries: dict[str, str], args: list[str]) -> None:
+    with setup_tmpdir(skip_queries) as tmpdir:
+        result = run_pants([*args, "lint", f"{tmpdir}/project:"])
+    result.assert_success()
+
+
+def test_skip_field_fix(skip_queries: dict[str, str], args: list[str]) -> None:
+    with setup_tmpdir(skip_queries) as tmpdir:
+        result = run_pants([*args, "fix", f"{tmpdir}/project:"])
+        files = collect_files(tmpdir)
+    result.assert_success()
+    assert files["project/good.sql"] == GOOD_FILE
+    assert files["project/bad.sql"] == BAD_FILE
+    assert files["project/unformatted.sql"] == UNFORMATTED_FILE
+
+
+def test_skip_field_fmt(skip_queries: dict[str, str], args: list[str]) -> None:
+    with setup_tmpdir(skip_queries) as tmpdir:
+        result = run_pants([*args, "fmt", f"{tmpdir}/project:"])
+        files = collect_files(tmpdir)
+    result.assert_success()
+    assert files["project/good.sql"] == GOOD_FILE
+    assert files["project/bad.sql"] == BAD_FILE
+    assert files["project/unformatted.sql"] == UNFORMATTED_FILE
 
 
 @pytest.mark.parametrize(
