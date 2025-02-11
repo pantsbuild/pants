@@ -546,6 +546,21 @@ def build_pants_wheels() -> None:
                         """
                     )
                 )
+
+            # We also only build for a single architecture at a time, so lets confirm that the wheel
+            # isn't potentially reporting itself as applicable to arm64 and x86-64 ('universal2', in
+            # macOS parlance) (see #21938):
+            wheel = found_wheels[0]
+            if "universal2" in str(wheel):
+                die(
+                    softwrap(
+                        f"""
+                        Found universal wheel for {package} in the `dist/` folder, but was
+                        expecting a specific architecture: {wheel}.
+                        """
+                    )
+                )
+
         for wheel in found_wheels:
             wheel_dest = dest / wheel.name
             if not wheel_dest.exists():
