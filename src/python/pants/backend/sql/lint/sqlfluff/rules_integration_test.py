@@ -344,10 +344,7 @@ def test_skip_field_fmt(skip_queries: dict[str, str], args: list[str]) -> None:
         ),
     ),
 )
-def test_config_file(
-    files: dict[str, str],
-    args: list[str],
-) -> None:
+def test_config_file(files: dict[str, str], args: list[str]) -> None:
     with setup_tmpdir(files) as tmpdir:
         result = run_pants([*args, "fix", f"{tmpdir}::"])
 
@@ -355,46 +352,31 @@ def test_config_file(
     assert "sqlfluff made no changes" in result.stderr
 
 
-@pytest.mark.parametrize(
-    ("file_path", "config_path", "extra_args", "should_change"),
-    (
-        [
-            Path("query.sql"),
-            Path("custom/config.sqlfluff"),
-            ["--sqlfluff-config=custom/config.sqlfluff"],
-            False,
-        ],
-        [
-            Path("query.sql"),
-            Path("custom/.sqlfluff"),
-            ['--sqlfluff-args="--dialect=postgres"'],
-            True,
-        ],
-    ),
-)
-def test_extra_args(
-    file_path: Path,
-    config_path: Path,
-    args: list[str],
-    extra_args: list[str],
-    should_change: bool,
-) -> None:
-    if config_path.stem == "pyproject":
-        config = CONFIG_PYPROJECT
-    else:
-        config = CONFIG_NATIVE
-
+def test_custom_config_path(args: list[str]) -> None:
     files = {
-        str(file_path): BAD_FILE,
-        str(file_path.parent / "BUILD"): "sql_sources()",
-        str(config_path): config,
+        "query.sql": BAD_FILE,
+        "BUILD": "sql_sources()",
+        "custom/config.sqlfluff": CONFIG_NATIVE,
     }
+
+    with setup_tmpdir(files) as tmpdir:
+        extra_args = [f"--sqlfluff-config={tmpdir}/custom/config.sqlfluff"]
+        result = run_pants([*args, *extra_args, "fix", f"{tmpdir}::"])
+
+    result.assert_success()
+    assert "sqlfluff made no changes" in result.stderr
+
+
+def test_project_config_doesnt_affect_root_query(args: list[str]) -> None:
+    files = {
+        "query.sql": BAD_FILE,
+        "BUILD": "sql_sources()",
+        "custom/.sqlfluff": CONFIG_NATIVE,
+    }
+    extra_args = ['--sqlfluff-args="--dialect=postgres"']
 
     with setup_tmpdir(files) as tmpdir:
         result = run_pants([*args, *extra_args, "fix", f"{tmpdir}::"])
 
     result.assert_success()
-    if should_change:
-        assert "sqlfluff made changes" in result.stderr
-    else:
-        assert "sqlfluff made no changes" in result.stderr
+    assert "sqlfluff made changes" in result.stderr
