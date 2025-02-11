@@ -34,7 +34,11 @@ from pants.backend.python.target_types import (
     ResolvePexEntryPointRequest,
 )
 from pants.backend.python.util_rules.pex import CompletePlatforms, Pex
-from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.util_rules.pex_environment import PythonExecutable
+from pants.backend.python.util_rules.pex_from_targets import (
+    InterpreterConstraintsRequest,
+    PexFromTargetsRequest,
+)
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,
@@ -143,6 +147,12 @@ async def package_pex_binary(
     complete_platforms = await Get(
         CompletePlatforms, PexCompletePlatformsField, field_set.complete_platforms
     )
+    python = await Get(
+        PythonExecutable,
+        InterpreterConstraintsRequest(
+            addresses=[field_set.address],
+        ),
+    )
 
     request = PexFromTargetsRequest(
         addresses=[field_set.address],
@@ -158,6 +168,7 @@ async def package_pex_binary(
         include_source_files=field_set.include_sources.value,
         include_local_dists=True,
         warn_for_transitive_files_targets=True,
+        python=python,
     )
 
     return PexFromTargetsRequestForBuiltPackage(request)
@@ -169,7 +180,9 @@ async def built_pacakge_for_pex_from_targets_request(
 ) -> BuiltPackage:
     pft_request = request.request
     pex = await Get(Pex, PexFromTargetsRequest, pft_request)
-    return BuiltPackage(pex.digest, (BuiltPackageArtifact(pft_request.output_filename),))
+    return BuiltPackage(
+        pex.digest, (BuiltPackageArtifact(pft_request.output_filename),)
+    )
 
 
 def rules():
