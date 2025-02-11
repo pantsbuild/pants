@@ -55,8 +55,9 @@ pants lint --only=sqlfluff ::
 
 ## Using different templaters
 
-Sqlfluff doesn't support using different templaters in subdirectories. If you
-try to set `templater` in a subdirectory you'll get something like this:
+As of 3.2.5, sqlfluff doesn't support using different templaters in
+subdirectories. If you try to set `templater` in a subdirectory you'll get
+something like this:
 
 ```
 WARNING    Attempt to set templater to jinja failed. Using python templater.
