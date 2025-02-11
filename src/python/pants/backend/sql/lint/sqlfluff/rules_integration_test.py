@@ -22,7 +22,6 @@ from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult
 from pants.core.util_rules import config_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Address
 from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_tmpdir
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -52,6 +51,20 @@ CONFIG_POSTGRES = dedent(
     """\
     [sqlfluff]
     dialect = postgres
+    """
+)
+CONFIG_PYPROJECT = dedent(
+    """\
+    [tool.sqlfluff.core]
+    dialect = "postgres"
+    exclude_rules = ["RF03"]
+    """
+)
+CONFIG_NATIVE = dedent(
+    """\
+    [sqlfluff]
+    dialect = postgres
+    exclude_rules = RF03
     """
 )
 
@@ -295,12 +308,46 @@ def test_skip_field_fmt(skip_queries: dict[str, str], args: list[str]) -> None:
 
 
 @pytest.mark.parametrize(
-    "file_path,config_path,extra_args,should_change",
+    ("file_path", "config_path"),
     (
-        [Path("query.sql"), Path("pyproject.toml"), [], False],
-        [Path("query.sql"), Path(".sqlfluff"), [], False],
-        [Path("custom/query.sql"), Path("custom/pyproject.toml"), [], False],
-        [Path("custom/query.sql"), Path("custom/.sqlfluff"), [], False],
+        pytest.param(Path("query.sql"), Path("pyproject.toml"), id="root:query.sql+pyproject.toml"),
+        pytest.param(Path("query.sql"), Path(".sqlfluff"), id="root:query.sql+.sqlfluff"),
+        pytest.param(
+            Path("project/query.sql"),
+            Path("project/pyproject.toml"),
+            id="subdir:query.sql+pyproject.toml",
+        ),
+        pytest.param(
+            Path("project/query.sql"), Path("project/.sqlfluff"), id="subdir:query.sql+.sqlfluff"
+        ),
+    ),
+)
+def test_config_file(
+    file_path: Path,
+    config_path: Path,
+    args: list[str],
+) -> None:
+    if config_path.stem == "pyproject":
+        config = CONFIG_PYPROJECT
+    else:
+        config = CONFIG_NATIVE
+
+    files = {
+        str(file_path): BAD_FILE,
+        str(file_path.parent / "BUILD"): "sql_sources()",
+        str(config_path): config,
+    }
+
+    with setup_tmpdir(files) as tmpdir:
+        result = run_pants([*args, "fix", f"{tmpdir}::"])
+
+    result.assert_success()
+    assert "sqlfluff made no changes" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("file_path", "config_path", "extra_args", "should_change"),
+    (
         [
             Path("query.sql"),
             Path("custom/config.sqlfluff"),
@@ -315,45 +362,29 @@ def test_skip_field_fmt(skip_queries: dict[str, str], args: list[str]) -> None:
         ],
     ),
 )
-def test_config_file(
-    rule_runner: RuleRunner,
+def test_extra_args(
     file_path: Path,
     config_path: Path,
+    args: list[str],
     extra_args: list[str],
     should_change: bool,
 ) -> None:
     if config_path.stem == "pyproject":
-        config = dedent(
-            """\
-            [tool.sqlfluff.core]
-            dialect = "postgres"
-            exclude_rules = ["RF03"]
-            """
-        )
+        config = CONFIG_PYPROJECT
     else:
-        config = dedent(
-            """\
-            [sqlfluff]
-            dialect = postgres
-            exclude_rules = RF03
-            """
-        )
+        config = CONFIG_NATIVE
 
-    rule_runner.write_files(
-        {
-            file_path: BAD_FILE,
-            file_path.parent / "BUILD": "sql_sources()",
-            config_path: config,
-        }
-    )
+    files = {
+        str(file_path): BAD_FILE,
+        str(file_path.parent / "BUILD"): "sql_sources()",
+        str(config_path): config,
+    }
 
-    spec_path = str(file_path.parent).replace(".", "")
-    rel_file_path = file_path.relative_to(*file_path.parts[:1]) if spec_path else file_path
-    address = Address(spec_path, relative_file_path=str(rel_file_path))
-    fix_result, lint_result, _ = run_sqlfluff(
-        rule_runner,
-        [address],
-        extra_args=extra_args,
-    )
-    assert lint_result.exit_code == (1 if should_change else 0)
-    assert fix_result.did_change is should_change
+    with setup_tmpdir(files) as tmpdir:
+        result = run_pants([*args, *extra_args, "fix", f"{tmpdir}::"])
+
+    result.assert_success()
+    if should_change:
+        assert "sqlfluff made changes" in result.stderr
+    else:
+        assert "sqlfluff made no changes" in result.stderr
