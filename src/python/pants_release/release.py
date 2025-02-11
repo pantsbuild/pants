@@ -532,19 +532,20 @@ def build_pants_wheels() -> None:
 
     for package in PACKAGES:
         found_wheels = sorted(Path("dist").glob(f"{package}-{version}-*.whl"))
-        # NB: For any platform-specific wheels, like pantsbuild.pants, we assume that the
-        # top-level `dist` will only have wheels built for the current platform. This
-        # should be safe because it is not possible to build native wheels for another
-        # platform.
-        if not is_cross_platform(found_wheels) and len(found_wheels) > 1:
-            die(
-                softwrap(
-                    f"""
-                    Found multiple wheels for {package} in the `dist/` folder, but was
-                    expecting only one wheel: {sorted(wheel.name for wheel in found_wheels)}.
-                    """
+        if not is_cross_platform(found_wheels):
+            # NB: For any platform-specific wheels, like pantsbuild.pants, we assume that the
+            # top-level `dist` will only have wheels built for the current platform. This
+            # should be safe because it is not possible to build native wheels for another
+            # platform.
+            if len(found_wheels) > 1:
+                die(
+                    softwrap(
+                        f"""
+                        Found multiple wheels for {package} in the `dist/` folder, but was
+                        expecting only one wheel: {sorted(wheel.name for wheel in found_wheels)}.
+                        """
+                    )
                 )
-            )
         for wheel in found_wheels:
             wheel_dest = dest / wheel.name
             if not wheel_dest.exists():
