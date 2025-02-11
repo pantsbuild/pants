@@ -134,6 +134,7 @@ fn test_valid_arg_splits() {
             "src/java/org/pantsbuild/foo",
             "-src/java/org/pantsbuild/foo/ignore.py",
             "src/java/org/pantsbuild/bar:baz",
+            "-folder::",
         ],
         &[
             Flag {
@@ -164,7 +165,7 @@ fn test_valid_arg_splits() {
         ],
         "pants --check-long-flag --gg -ltrace check --cc test --ii \
         src/java/org/pantsbuild/foo -src/java/org/pantsbuild/foo/ignore.py \
-        src/java/org/pantsbuild/bar:baz",
+        src/java/org/pantsbuild/bar:baz -folder::",
     );
     assert(
         &["check", "test"],

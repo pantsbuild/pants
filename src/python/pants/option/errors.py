@@ -4,7 +4,7 @@
 from typing import Tuple
 
 from pants.option.scope import GLOBAL_SCOPE
-from pants.util.strutil import softwrap, pluralize
+from pants.util.strutil import pluralize, softwrap
 
 
 class OptionsError(Exception):
