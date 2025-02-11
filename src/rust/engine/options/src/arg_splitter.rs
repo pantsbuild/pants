@@ -45,7 +45,7 @@ impl Args {
                      //  skipping argv[0] may not be sufficient to get just the set of args to split.
                      //  In practice our tests pass despite these extra args being interpreted as specs
                      //  or goals, but that is skating on thin ice.
-        Self::new(env::args().collect::<Vec<_>>())
+        Self::new(args.collect::<Vec<_>>())
     }
 }
 
