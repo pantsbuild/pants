@@ -22,6 +22,7 @@ from pants.core.goals.package import (
 from pants.core.util_rules.archive import ArchiveFormat, CreateArchive
 from pants.core.util_rules.archive import rules as archive_rules
 from pants.engine.addresses import Address, UnparsedAddressInputs
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -61,7 +62,7 @@ from pants.engine.target import (
     generate_file_based_overrides_field_help_message,
     generate_multiple_sources_field_help_message,
 )
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionRule, union
 from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
@@ -912,6 +913,31 @@ class LockfilesGeneratorTarget(TargetFilesGenerator):
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (LockfileDependenciesField,)
     help = "Generate a `_lockfile` target for each file in the `sources` field."
+
+
+# -----------------------------------------------------------------------------------------------
+# `_lockfile` and `_lockfiles` targets
+# -----------------------------------------------------------------------------------------------
+
+
+@union(in_scope_types=[EnvironmentName])
+@dataclass(frozen=True)
+class ResolveLikeFieldToValueRequest:
+    target: Target
+
+
+@dataclass(frozen=True)
+class ResolveLikeFieldToValueResult:
+    value: str
+
+
+class ResolveLikeField:
+    """Mix-in for any field which behaves like a `resolve` field."""
+
+    def get_resolve_like_field_to_value_request(self) -> type[ResolveLikeFieldToValueRequest]:
+        """Return a `ResolveLikeFieldToValueRequest` subclass which can be used to obtain a string
+        field value."""
+        raise NotImplementedError()
 
 
 def rules():
