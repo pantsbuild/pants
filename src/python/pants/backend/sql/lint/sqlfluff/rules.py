@@ -6,7 +6,7 @@ import logging
 import re
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Iterable, Iterator, Sequence, Tuple
+from typing import Any, DefaultDict, Iterable, Iterator, Sequence, Tuple
 
 from typing_extensions import assert_never
 
@@ -25,7 +25,6 @@ from pants.engine.internals.native_engine import Snapshot
 from pants.engine.intrinsics import execute_process, merge_digests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, Rule, collect_rules, concurrently, implicitly, rule
-from pants.engine.target import FieldSet
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
@@ -118,11 +117,11 @@ async def run_sqlfluff(
 
 @dataclass(frozen=True)
 class TemplaterMetadata:
-    templater: str
+    templater: str | None
 
     @property
     def description(self) -> str:
-        return self.templater
+        return f"templater={self.templater}"
 
 
 class ConfigParser:
@@ -174,12 +173,12 @@ def recursively(directory: str) -> Iterator[str]:
 
 @dataclass(frozen=True)
 class _GroupByTemplaterRequest:
-    field_sets: Sequence[FieldSet]
+    field_sets: Sequence[SqlfluffFieldSet]
 
 
 @dataclass(frozen=True)
 class _GroupByTemplaterResult:
-    groups: FrozenDict[str | None, tuple[FieldSet, ...]]
+    groups: FrozenDict[str | None, tuple[SqlfluffFieldSet, ...]]
 
 
 @rule
@@ -202,7 +201,7 @@ async def _group_by_templater(
     nested_config = NestedConfig.new(parser, contents)
     logger.debug("sqlfluff nested config: %s", nested_config)
 
-    result = defaultdict(list)
+    result: DefaultDict[str | None, list[SqlfluffFieldSet]] = defaultdict(list)
     for field_set in request.field_sets:
         directory = field_set.address.spec_path
         templater = nested_config.find_templater(directory)
@@ -216,7 +215,7 @@ async def _group_by_templater(
 
 @dataclass(frozen=True)
 class _GroupFilesByTemplaterRequest:
-    field_sets: Sequence[FieldSet]
+    field_sets: Sequence[SqlfluffFieldSet]
 
 
 @rule
@@ -240,7 +239,7 @@ async def _group_files_by_templater(request: _GroupFilesByTemplaterRequest) -> P
 
 @dataclass(frozen=True)
 class _GroupFieldSetsByTemplaterRequest:
-    field_sets: Sequence[FieldSet]
+    field_sets: Sequence[SqlfluffFieldSet]
 
 
 @rule
