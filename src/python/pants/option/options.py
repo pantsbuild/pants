@@ -301,6 +301,13 @@ class Options:
 
         for scope, flags in self._native_parser.get_unconsumed_flags().items():
             flags = tuple(flag for flag in flags if flag not in scope_aliases_that_look_like_flags)
+            # The native options parser currently sees negative specs (e.g., `-path/to/target`)
+            # as short flags. We filter these out here so we don't report a spurious error.
+            # In 2.24.x we don't consume flags from the native parser, so this doesn't cause
+            # correctness issues beyond this spurious error.
+            # This is fixed properly in 2.25.x, where all parsing is done in the native parser,
+            # but we can't cherrypick that to 2.24.x as it would be too disruptive.
+            flags = [flag for flag in flags if flag.startswith("--")]
             if flags:
                 # We may have unconsumed flags in multiple positional contexts, but our
                 # error handling expects just one, so pick the first one. After the user
