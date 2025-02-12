@@ -1,10 +1,12 @@
 // Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use crate::GoalInfo;
+use crate::flags::Flag;
+use crate::{GoalInfo, Scope};
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
+use std::env;
 use std::path::{Path, PathBuf};
 
 // These are the names for the built in goals to print help message when there is no goal, or any
@@ -15,8 +17,36 @@ pub const UNKNOWN_GOAL_NAME: &str = "__unknown_goal";
 
 lazy_static! {
     static ref SPEC_RE: Regex = Regex::new(r"[/\\.:*#]").unwrap();
-    static ref SINGLE_DASH_FLAGS: HashSet<&'static str> =
-        HashSet::from(["-ltrace", "-ldebug", "-linfo", "-lwarn", "-lerror", "-h", "-v", "-V"]);
+    static ref SINGLE_DASH_FLAGS: HashSet<&'static str> = HashSet::from([
+        "-h", "-v", "-V", "-ltrace", "-ldebug", "-linfo", "-lwarn", "-lerror", "-l=trace",
+        "-l=debug", "-l=info", "-l=warn", "-l=error",
+    ]);
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Args {
+    pub(crate) arg_strings: Vec<String>,
+}
+
+impl Args {
+    // Create an Args instance with the provided args, which must *not* include the
+    // argv[0] process name.
+    pub fn new<I: IntoIterator<Item = String>>(arg_strs: I) -> Self {
+        Self {
+            arg_strings: arg_strs.into_iter().collect(),
+        }
+    }
+
+    pub fn argv() -> Self {
+        let mut args = env::args().collect::<Vec<_>>().into_iter();
+        args.next(); // Consume the process name (argv[0]).
+                     // TODO: In Pants's own integration tests we may invoke Pants in a subprocess via
+                     //  `python -m pants` or `python path/to/__main__.py` or similar. So
+                     //  skipping argv[0] may not be sufficient to get just the set of args to split.
+                     //  In practice our tests pass despite these extra args being interpreted as specs
+                     //  or goals, but that is skating on thin ice.
+        Self::new(args.collect::<Vec<_>>())
+    }
 }
 
 // The details of a Pants invocation command, not including option flags.
@@ -26,7 +56,8 @@ pub struct PantsCommand {
     pub goals: Vec<String>,                        // Requested known goals.
     pub unknown_goals: Vec<String>,                // Any requested but unknown goals.
     pub specs: Vec<String>, // What to run against, e.g. targets or files/dirs.
-    pub passthru: Vec<String>, // Any remaining args specified after a -- separator.
+    pub(crate) flags: Vec<Flag>, // Option values set via flag.
+    pub passthru: Option<Vec<String>>, // Any remaining args specified after a -- separator.
 }
 
 impl PantsCommand {
@@ -36,7 +67,8 @@ impl PantsCommand {
             goals: vec![],
             unknown_goals: vec![],
             specs: vec![],
-            passthru: vec![],
+            flags: vec![],
+            passthru: None,
         }
     }
 
@@ -70,17 +102,18 @@ impl ArgSplitter {
     }
 
     // Split the given args, which must *not* include the argv[0] process name.
-    pub fn split_args(&self, args: Vec<String>) -> PantsCommand {
+    pub fn split_args(&self, args: Args) -> PantsCommand {
         let mut builtin_or_auxiliary_goal: Option<String> = None;
         let mut goals = vec![];
         let mut unknown_goals: Vec<String> = vec![];
         let mut specs = vec![];
-        let mut passthru = vec![];
+        let mut flags = vec![];
+        let mut passthru = None;
+        let mut scope = Scope::Global;
 
-        let mut unconsumed_args = args;
-        unconsumed_args.reverse();
+        let mut unconsumed_args = args.arg_strings.into_iter();
 
-        // Scan the args looking for goals and specs.
+        // Scan the args looking for goals, specs and flags.
         // The one hard case is a single word like `foo` with no path- or target-like qualities
         // (e.g., a slash or a colon). It could be a goal, or it could be a top-level directory.
         // We disambiguate thus: If it is a known goal name, assume the user intended a goal.
@@ -90,7 +123,7 @@ impl ArgSplitter {
         //  changes to plugins (as they can introduce new goals) or changes on the filesystem.
         //  We might want to deprecate this behavior and consistently assume that these are goals,
         //  since the user can always add a `./` prefix to override.
-        while let Some(arg) = unconsumed_args.pop() {
+        while let Some(arg) = unconsumed_args.next() {
             let goal_info = self.known_goals.get(&arg);
             // Some special flags, such as `-v` and `--help`, are implemented as
             // goal aliases, so we must check this before checking for any dash prefixes.
@@ -106,13 +139,38 @@ impl ArgSplitter {
                 } else {
                     goals.push(canonical_scope_name);
                 }
+                scope = Scope::Scope(arg.clone());
             } else if arg == "--" {
                 // Arg is the passthru delimiter.
-                for item in unconsumed_args.drain(..) {
-                    passthru.push(item);
+                let mut remainder = vec![];
+                for s in unconsumed_args.by_ref() {
+                    remainder.push(s);
                 }
-                passthru.reverse();
-            } else if !(arg.starts_with("--") || SINGLE_DASH_FLAGS.contains(arg.as_str())) {
+                passthru = Some(remainder);
+            } else if arg.starts_with("--") {
+                let mut components = arg.splitn(2, '=');
+                let flag_name = components.next().unwrap();
+                flags.push(Flag {
+                    context: scope.clone(),
+                    key: flag_name.to_string(),
+                    value: components.next().map(str::to_string),
+                });
+            } else if SINGLE_DASH_FLAGS.contains(arg.as_str()) {
+                let (flag_name, mut flag_value) = arg.split_at(2);
+                // We support both -ldebug and -l=debug, so strip that extraneous equals sign.
+                if let Some(stripped) = flag_value.strip_prefix('=') {
+                    flag_value = stripped;
+                }
+                flags.push(Flag {
+                    context: scope.clone(),
+                    key: flag_name.to_string(),
+                    value: if flag_value.is_empty() {
+                        None
+                    } else {
+                        Some(flag_value.to_string())
+                    },
+                });
+            } else {
                 // This is not a flag, so it must be an unknown goal or a spec (or a negative spec,
                 // which starts with a single dash, and we know is not a single dash flag).
                 if arg.starts_with("-")
@@ -121,9 +179,11 @@ impl ArgSplitter {
                 {
                     // Arg is a spec.
                     specs.push(arg);
+                    // Revert to global context for any trailing flags.
+                    scope = Scope::Global;
                 } else {
                     // Arg is an unknown goal.
-                    unknown_goals.push(arg);
+                    unknown_goals.push(arg.clone());
                 }
             }
         }
@@ -141,6 +201,7 @@ impl ArgSplitter {
             goals,
             unknown_goals,
             specs,
+            flags,
             passthru,
         }
     }
