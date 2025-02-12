@@ -63,7 +63,6 @@ def test_infer_scala_imports_same_target(rule_runner: RuleRunner) -> None:
                 """\
                 scala_sources(
                     name = 't',
-
                 )
                 """
             ),
