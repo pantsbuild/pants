@@ -1,22 +1,33 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use core::fmt::Debug;
-use maplit::hashmap;
-
-use crate::args::{Args, ArgsReader};
+use crate::arg_splitter::ArgSplitter;
+use crate::arg_splitter::Args;
+use crate::flags::FlagsReader;
 use crate::fromfile::test_util::write_fromfile;
 use crate::fromfile::FromfileExpander;
-use crate::{option_id, DictEdit, DictEditAction, Scope, Val};
+use crate::{option_id, DictEdit, DictEditAction, GoalInfo, Scope, Val};
 use crate::{ListEdit, ListEditAction, OptionId, OptionsSource};
+use core::fmt::Debug;
+use maplit::hashmap;
+use tempfile::TempDir;
 
-fn mk_args<I>(args: I) -> ArgsReader
+fn mk_args<I>(args: I) -> FlagsReader
 where
     I: IntoIterator,
     I::Item: ToString,
 {
-    ArgsReader::new(
-        Args::new(args.into_iter().map(|x| x.to_string())),
+    let command = ArgSplitter::new(
+        TempDir::new().unwrap().path(),
+        vec![
+            GoalInfo::new("scope", false, false, vec![]),
+            GoalInfo::new("lunch", false, false, vec![]),
+        ],
+    );
+    FlagsReader::new(
+        command
+            .split_args(Args::new(args.into_iter().map(|s| s.to_string())))
+            .flags,
         FromfileExpander::relative_to_cwd(),
     )
 }
@@ -38,7 +49,7 @@ fn test_display() {
 #[test]
 fn test_string() {
     let args = mk_args([
-        "-u=swallow",
+        "--unladen-capacity=swallow",
         "-ldebug",
         "--foo=bar",
         "--baz-spam=eggs",
@@ -54,21 +65,20 @@ fn test_string() {
 
     assert_string("bar", option_id!("foo"));
     assert_string("cheese", option_id!("baz", "spam"));
-    assert_string("swallow", option_id!(-'u', "unladen", "capacity"));
+    assert_string("swallow", option_id!("unladen", "capacity"));
     assert_string("debug", option_id!(-'l', "level"));
     assert_string("qux", option_id!(["scope"], "qux"));
     assert_string("quux", option_id!(["scope"], "quux"));
 
     assert!(args.get_string(&option_id!("dne")).unwrap().is_none());
-    assert!(args.get_passthrough_args().is_none());
 }
 
 #[test]
 fn test_bool() {
     let args = mk_args([
-        "-c=swallow",
+        "--unladen-capacity=swallow",
         "--foo=false",
-        "-f",
+        "--foo",
         "--no-bar",
         "--baz=true",
         "--baz=FALSE",
@@ -85,9 +95,9 @@ fn test_bool() {
     let assert_bool =
         |expected: bool, id: OptionId| assert_eq!(expected, args.get_bool(&id).unwrap().unwrap());
 
-    assert_bool(true, option_id!(-'f', "foo"));
+    assert_bool(true, option_id!("foo"));
     assert_bool(false, option_id!("bar"));
-    assert_bool(false, option_id!(-'b', "baz"));
+    assert_bool(false, option_id!("baz"));
     assert_bool(true, option_id!("spam", "eggs"));
     assert_bool(true, option_id!(["scope"], "quxt"));
     assert_bool(false, option_id!(["scope"], "quxf"));
@@ -96,10 +106,9 @@ fn test_bool() {
     assert_bool(true, option_id!("global", "flag"));
 
     assert!(args.get_bool(&option_id!("dne")).unwrap().is_none());
-    assert!(args.get_passthrough_args().is_none());
     assert_eq!(
-        "Problem parsing -c bool value:\n1:swallow\n  ^\nExpected 'true' or 'false' at line 1 column 1".to_owned(),
-        args.get_bool(&option_id!(-'c', "unladen", "capacity"))
+        "Problem parsing --unladen-capacity bool value:\n1:swallow\n  ^\nExpected 'true' or 'false' at line 1 column 1".to_owned(),
+        args.get_bool(&option_id!("unladen", "capacity"))
             .unwrap_err()
     );
 }
@@ -107,7 +116,7 @@ fn test_bool() {
 #[test]
 fn test_float() {
     let args = mk_args([
-        "-j=4",
+        "--jobs=4",
         "--foo=42",
         "--foo=3.14",
         "--baz-spam=1.137",
@@ -117,12 +126,11 @@ fn test_float() {
     let assert_float =
         |expected: f64, id: OptionId| assert_eq!(expected, args.get_float(&id).unwrap().unwrap());
 
-    assert_float(4_f64, option_id!(-'j', "jobs"));
+    assert_float(4_f64, option_id!("jobs"));
     assert_float(3.14, option_id!("foo"));
     assert_float(1.137, option_id!("baz", "spam"));
 
     assert!(args.get_float(&option_id!("dne")).unwrap().is_none());
-    assert!(args.get_passthrough_args().is_none());
 
     assert_eq!(
         "Problem parsing --bad float value:\n1:swallow\n  ^\n\
@@ -137,7 +145,7 @@ fn test_string_list() {
     let args = mk_args([
         "--bad=['mis', 'matched')",
         "--phases=initial",
-        "-p=['one']",
+        "--phases=['one']",
         "--phases=+['two','three'],-['one']",
         "--lunch-veggies=['tomatoes', 'peppers']",
         "lunch",
@@ -163,7 +171,7 @@ fn test_string_list() {
                 items: vec!["one".to_owned()]
             },
         ],
-        args.get_string_list(&option_id!(-'p', "phases"))
+        args.get_string_list(&option_id!("phases"))
             .unwrap()
             .unwrap()
     );
@@ -185,7 +193,6 @@ fn test_string_list() {
     );
 
     assert!(args.get_string_list(&option_id!("dne")).unwrap().is_none());
-    assert!(args.get_passthrough_args().is_none());
 
     let expected_error_msg = "\
 Problem parsing --bad string list value:
@@ -205,7 +212,7 @@ fn test_scalar_fromfile() {
     fn do_test<T: PartialEq + Debug>(
         content: &str,
         expected: T,
-        getter: fn(&ArgsReader, &OptionId) -> Result<Option<T>, String>,
+        getter: fn(&FlagsReader, &OptionId) -> Result<Option<T>, String>,
         negate: bool,
     ) {
         let (_tmpdir, fromfile_path) = write_fromfile("fromfile.txt", content);
@@ -219,16 +226,16 @@ fn test_scalar_fromfile() {
         assert_eq!(expected, actual)
     }
 
-    do_test("true", true, ArgsReader::get_bool, false);
-    do_test("false", false, ArgsReader::get_bool, false);
-    do_test("true", false, ArgsReader::get_bool, true);
-    do_test("false", true, ArgsReader::get_bool, true);
-    do_test("-42", -42, ArgsReader::get_int, false);
-    do_test("3.14", 3.14, ArgsReader::get_float, false);
+    do_test("true", true, FlagsReader::get_bool, false);
+    do_test("false", false, FlagsReader::get_bool, false);
+    do_test("true", false, FlagsReader::get_bool, true);
+    do_test("false", true, FlagsReader::get_bool, true);
+    do_test("-42", -42, FlagsReader::get_int, false);
+    do_test("3.14", 3.14, FlagsReader::get_float, false);
     do_test(
         "EXPANDED",
         "EXPANDED".to_owned(),
-        ArgsReader::get_string,
+        FlagsReader::get_string,
         false,
     );
 
@@ -370,41 +377,6 @@ fn test_nonexistent_required_fromfile() {
 fn test_nonexistent_optional_fromfile() {
     let args = mk_args(vec!["--foo=@?/does/not/exist"]);
     assert!(args.get_string(&option_id!("foo")).unwrap().is_none());
-}
-
-#[test]
-fn test_passthrough_args() {
-    let args = mk_args([
-        "-ldebug",
-        "--foo=bar",
-        "--",
-        "--passthrough0",
-        "passthrough1",
-        "-p",
-    ]);
-
-    let assert_string = |expected: &str, id: OptionId| {
-        assert_eq!(expected.to_owned(), args.get_string(&id).unwrap().unwrap())
-    };
-
-    assert_string("bar", option_id!("foo"));
-    assert_string("debug", option_id!(-'l', "level"));
-
-    assert_eq!(
-        Some(vec![
-            "--passthrough0".to_string(),
-            "passthrough1".to_string(),
-            "-p".to_string(),
-        ]),
-        args.get_passthrough_args()
-    );
-}
-
-#[test]
-fn test_empty_passthrough_args() {
-    let args = mk_args(["-ldebug", "--foo=bar", "--"]);
-
-    assert_eq!(Some(vec![]), args.get_passthrough_args());
 }
 
 #[test]

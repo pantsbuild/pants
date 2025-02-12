@@ -4,7 +4,7 @@
 from typing import Tuple
 
 from pants.option.scope import GLOBAL_SCOPE
-from pants.util.strutil import softwrap
+from pants.util.strutil import pluralize, softwrap
 
 
 class OptionsError(Exception):
@@ -116,7 +116,7 @@ class UnknownFlagsError(ParseError):
         self.flags = flags
         self.arg_scope = arg_scope
         scope = f"scope {self.arg_scope}" if self.arg_scope else "global scope"
-        msg = f"Unknown flags {', '.join(self.flags)} on {scope}"
+        msg = f"Unknown {pluralize(len(self.flags), 'flag')} {', '.join(self.flags)} on {scope}"
         super().__init__(msg)
 
 
