@@ -29,6 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "protos/googleapis/google/rpc/status.proto",
         "protos/googleapis/google/longrunning/operations.proto",
         "protos/pants/cache.proto",
+        "protos/pants/sandboxer.proto",
         "protos/standard/google/protobuf/empty.proto",
       ],
       &[

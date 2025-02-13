@@ -61,6 +61,9 @@ pub mod gen {
         pub mod cache {
             tonic::include_proto!("pants.cache");
         }
+        pub mod sandboxer {
+            tonic::include_proto!("pants.sandboxer");
+        }
     }
 }
 

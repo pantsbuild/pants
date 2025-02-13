@@ -65,6 +65,8 @@ pub mod workspace;
 #[cfg(test)]
 pub mod workspace_tests;
 
+pub mod sandboxer;
+
 extern crate uname;
 
 pub use crate::children::ManagedChild;

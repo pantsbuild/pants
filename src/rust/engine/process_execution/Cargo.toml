@@ -5,6 +5,14 @@ name = "process_execution"
 authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
+[[bin]]
+name = "sandboxer"
+path = "src/sandboxer_server_main.rs"
+
+[[bin]]
+name = "sandboxer_client"
+path = "src/sandboxer_client_main.rs"
+
 [dependencies]
 async-stream = { workspace = true }
 async-trait = { workspace = true }
@@ -15,11 +23,13 @@ protos = { path = "../protos" }
 bytes = { workspace = true }
 cache = { path = "../cache" }
 derivative = { workspace = true }
+env_logger = { workspace = true }
 deepsize = { workspace = true, features = ["log"] }
 grpc_util = { path = "../grpc_util" }
 fs = { path = "../fs" }
 futures = { workspace = true }
 hashing = { path = "../hashing" }
+hyper-util = { workspace = true }
 libc = { workspace = true }
 log = { workspace = true }
 nails = { workspace = true }
@@ -32,6 +42,7 @@ tempfile = { workspace = true }
 concrete_time = { path = "../concrete_time" }
 tokio = { workspace = true, features = ["net", "process", "rt-multi-thread", "sync", "time"] }
 tokio-rustls = { workspace = true }
+tokio-stream = { workspace = true }
 tokio-util = { workspace = true, features = ["codec"] }
 uname = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
@@ -49,6 +60,7 @@ shlex = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 tonic = { workspace = true, features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
+tower = { workspace = true }
 tryfuture = { path = "../tryfuture" }
 
 [dev-dependencies]
