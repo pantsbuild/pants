@@ -336,6 +336,10 @@ jobs:
     name: Build wheels (Linux-ARM64)
     needs:
     - classify_changes
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
     runs-on:
     - self-hosted
     - runs-on
@@ -406,6 +410,10 @@ jobs:
     name: Build wheels (Linux-x86_64)
     needs:
     - classify_changes
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
     runs-on:
     - ubuntu-22.04
     steps:
@@ -474,6 +482,10 @@ jobs:
     name: Build wheels (macOS13-x86_64)
     needs:
     - classify_changes
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
     runs-on:
     - macos-13
     steps:
@@ -560,6 +572,10 @@ jobs:
     name: Build wheels (macOS14-ARM64)
     needs:
     - classify_changes
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
     runs-on:
     - macos-14
     steps:

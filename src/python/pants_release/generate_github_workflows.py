@@ -881,6 +881,11 @@ def build_wheels_job(
             "if": if_condition,
             "name": f"Build wheels ({str(platform.value)})",
             "runs-on": helper.runs_on(),
+            "permissions": {
+                "id-token": "write",
+                "contents": "read",
+                "attestations": "write",
+            },
             **({"container": container} if container else {}),
             **({"needs": needs} if needs else {}),
             "timeout-minutes": 90,
