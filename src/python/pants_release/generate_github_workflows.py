@@ -925,7 +925,7 @@ def build_wheels_job(
                             "uses": action("attest-build-provenance"),
                             "with": {
                                 "subject-path": "dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants-*.whl",
-                            }
+                            },
                         },
                         {
                             "name": "Rename the Pex file for attestation",
@@ -935,7 +935,7 @@ def build_wheels_job(
                                 PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
                                 mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
                                 """
-                            )
+                            ),
                         },
                         {
                             "name": "Attest the Pex",
@@ -943,7 +943,7 @@ def build_wheels_job(
                             "uses": action("attest-build-provenance"),
                             "with": {
                                 "subject-path": "dist/src.python.pants/*.pex",
-                            }
+                            },
                         },
                         {
                             "name": "Upload Wheel and Pex",
@@ -984,7 +984,7 @@ def build_wheels_job(
                                     "uses": action("attest-build-provenance"),
                                     "with": {
                                         "subject-path": "dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants.testutil*.whl",
-                                    }
+                                    },
                                 },
                                 {
                                     "name": "Upload testutil Wheel",
