@@ -77,20 +77,17 @@ jobs:
         name: logs-wheels-and-pex-Linux-ARM64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
-    - if: needs.release_info.outputs.is-release == 'true'
-      name: Attest the pantsbuild.pants wheel
+    - name: Attest the pantsbuild.pants wheel
       uses: actions/attest-build-provenance@v2
       with:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants-*.whl
-    - if: needs.release_info.outputs.is-release == 'true'
-      name: Rename the Pex file for attestation
+    - name: Rename the Pex file for attestation
       run: 'PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
 
         mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
 
         '
-    - if: needs.release_info.outputs.is-release == 'true'
-      name: Attest the Pex
+    - name: Attest the Pex
       uses: actions/attest-build-provenance@v2
       with:
         subject-path: dist/src.python.pants/*.pex
@@ -184,20 +181,17 @@ jobs:
         name: logs-wheels-and-pex-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
-    - if: needs.release_info.outputs.is-release == 'true'
-      name: Attest the pantsbuild.pants wheel
+    - name: Attest the pantsbuild.pants wheel
       uses: actions/attest-build-provenance@v2
       with:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants-*.whl
-    - if: needs.release_info.outputs.is-release == 'true'
-      name: Rename the Pex file for attestation
+    - name: Rename the Pex file for attestation
       run: 'PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
 
         mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
 
         '
-    - if: needs.release_info.outputs.is-release == 'true'
-      name: Attest the Pex
+    - name: Attest the Pex
       uses: actions/attest-build-provenance@v2
       with:
         subject-path: dist/src.python.pants/*.pex
@@ -217,8 +211,7 @@ jobs:
         \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
         \ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)\"\
         \ \\\n    --data-binary \"@$WHL\";\n"
-    - if: needs.release_info.outputs.is-release == 'true'
-      name: Attest the pantsbuild.pants.testutil wheel
+    - name: Attest the pantsbuild.pants.testutil wheel
       uses: actions/attest-build-provenance@v2
       with:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants.testutil*.whl
@@ -319,20 +312,17 @@ jobs:
         name: logs-wheels-and-pex-macOS13-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
-    - if: needs.release_info.outputs.is-release == 'true'
-      name: Attest the pantsbuild.pants wheel
+    - name: Attest the pantsbuild.pants wheel
       uses: actions/attest-build-provenance@v2
       with:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants-*.whl
-    - if: needs.release_info.outputs.is-release == 'true'
-      name: Rename the Pex file for attestation
+    - name: Rename the Pex file for attestation
       run: 'PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
 
         mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
 
         '
-    - if: needs.release_info.outputs.is-release == 'true'
-      name: Attest the Pex
+    - name: Attest the Pex
       uses: actions/attest-build-provenance@v2
       with:
         subject-path: dist/src.python.pants/*.pex
@@ -438,20 +428,17 @@ jobs:
         name: logs-wheels-and-pex-macOS14-ARM64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
-    - if: needs.release_info.outputs.is-release == 'true'
-      name: Attest the pantsbuild.pants wheel
+    - name: Attest the pantsbuild.pants wheel
       uses: actions/attest-build-provenance@v2
       with:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants-*.whl
-    - if: needs.release_info.outputs.is-release == 'true'
-      name: Rename the Pex file for attestation
+    - name: Rename the Pex file for attestation
       run: 'PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
 
         mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
 
         '
-    - if: needs.release_info.outputs.is-release == 'true'
-      name: Attest the Pex
+    - name: Attest the Pex
       uses: actions/attest-build-provenance@v2
       with:
         subject-path: dist/src.python.pants/*.pex
