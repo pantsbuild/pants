@@ -21,6 +21,7 @@ from pants_release.common import die
 def action(name: str) -> str:
     version_map = {
         "action-send-mail": "dawidd6/action-send-mail@v3.8.0",
+        "attest-build-provenance": "actions/attest-build-provenance@v2",
         "cache": "actions/cache@v4",
         "checkout": "actions/checkout@v4",
         "download-artifact": "actions/download-artifact@v4",
@@ -914,6 +915,32 @@ def build_wheels_job(
                 *(
                     [
                         {
+                            "name": "Attest the pantsbuild.pants wheel",
+                            "if": "needs.release_info.outputs.is-release == 'true'",
+                            "uses": action("attest-build-provenance"),
+                            "with": {
+                                "subject-path": "dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants-*.whl",
+                            }
+                        },
+                        {
+                            "name": "Rename the Pex file for attestation",
+                            "if": "needs.release_info.outputs.is-release == 'true'",
+                            "run": dedent(
+                                """\
+                                PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
+                                mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
+                                """
+                            )
+                        },
+                        {
+                            "name": "Attest the Pex",
+                            "if": "needs.release_info.outputs.is-release == 'true'",
+                            "uses": action("attest-build-provenance"),
+                            "with": {
+                                "subject-path": "dist/src.python.pants/*.pex",
+                            }
+                        },
+                        {
                             "name": "Upload Wheel and Pex",
                             "if": "needs.release_info.outputs.is-release == 'true'",
                             # NB: We can't use `gh` or even `./pants run 3rdparty/tools/gh` reliably
@@ -926,8 +953,6 @@ def build_wheels_job(
                                 PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')")
                                 PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
                                 PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
-
-                                mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
 
                                 curl -L --fail \\
                                     -X POST \\
@@ -948,6 +973,14 @@ def build_wheels_job(
                         },
                         *(
                             [
+                                {
+                                    "name": "Attest the pantsbuild.pants.testutil wheel",
+                                    "if": "needs.release_info.outputs.is-release == 'true'",
+                                    "uses": action("attest-build-provenance"),
+                                    "with": {
+                                        "subject-path": "dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants.testutil*.whl",
+                                    }
+                                },
                                 {
                                     "name": "Upload testutil Wheel",
                                     "if": "needs.release_info.outputs.is-release == 'true'",
