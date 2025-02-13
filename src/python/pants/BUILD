@@ -18,8 +18,9 @@ python_distribution(
     dependencies=[
         "./__main__.py",
         ":resources",
-        # Include the native client binary in the distribution.
+        # Include the native client and sandboxer binaries in the distribution.
         "src/python/pants/bin:native_client",
+        "src/python/pants/bin:sandboxer",
     ],
     # Because we have native code, this will cause the wheel to use whatever the ABI is for the
     # interpreter used to run setup.py, e.g. `cp39m-macosx_10_15_x86_64`.

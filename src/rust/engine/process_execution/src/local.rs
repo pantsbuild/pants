@@ -1,7 +1,9 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::ffi::{OsStr, OsString};
 use std::fmt::{self, Debug};
+use std::fs::{copy, rename};
 use std::io::Write;
 use std::ops::Neg;
 use std::os::unix::{fs::OpenOptionsExt, process::ExitStatusExt};
@@ -681,8 +683,36 @@ pub async fn prepare_workdir(
             )
             .await?;
 
+        // If the process will execute a file that it materialized, we must prevent ETXTBSY.
+        // TODO: Actually check in the digest for executable_path. Right now we assume that
+        //  a relpath is in the digest, but it's better to be sure.
         if let Some(executable_path) = maybe_executable_path {
-            Ok(tokio::fs::metadata(executable_path).await.is_ok())
+            if tokio::fs::metadata(&executable_path).await.is_ok() {
+                // There should always be a non-None file_name for a file
+                // we're about to execute, but we check anyway.
+                if let Some(file_name) = executable_path.file_name() {
+                    // TODO: This should be gated on an option, so we can cautiously
+                    //  let users who encounter the ETXTBSY problem test this solution out.
+                    let mut tmp_file_name = OsString::new();
+                    tmp_file_name.push(file_name);
+                    // We reasonably assume that this path is not used in the sandbox.
+                    tmp_file_name.push(OsStr::new("._sandboxer.src.tmp"));
+                    let mut tmp_path = executable_path.clone();
+                    tmp_path.set_file_name(&tmp_file_name);
+                    // Move the executable to a tmp location.
+                    rename(&executable_path, &tmp_path)
+                        .map_err(|e| StoreError::Unclassified(e.to_string()))?;
+                    // Copy the executable back to its original path.
+                    // TODO: Replace this with a call to the sandboxer, so that
+                    //  the copy doesn't incur the ETXTBSY errors.
+                    //  This is just a proof-of-concept of the rename-and-copy dance.
+                    copy(&tmp_path, &executable_path)
+                        .map_err(|e| StoreError::Unclassified(e.to_string()))?;
+                }
+                Ok(true)
+            } else {
+                Ok(false)
+            }
         } else {
             Ok(false)
         }
