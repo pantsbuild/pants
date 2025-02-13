@@ -12,65 +12,20 @@ from dataclasses import dataclass
 from pants.backend.python.subsystems.python_native_code import PythonNativeCodeSubsystem
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules import pex_environment
+from pants.backend.python.util_rules.pex_cli_tool import PexCli, PexPEX
+from pants.backend.python.util_rules.pex_cli_tool import rules as pex_cli_tools_rules
 from pants.backend.python.util_rules.pex_environment import PexEnvironment, PexSubsystem
-from pants.core.goals.resolves import ExportableTool
-from pants.core.util_rules import adhoc_binaries, external_tool
+from pants.core.util_rules import adhoc_binaries
 from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
-from pants.core.util_rules.external_tool import (
-    DownloadedExternalTool,
-    ExternalToolRequest,
-    TemplatedExternalTool,
-)
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests
 from pants.engine.internals.selectors import MultiGet
-from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions, ca_certs_path_to_file_content
-from pants.option.option_types import ArgsListOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import classproperty
-from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
-
-
-class PexCli(TemplatedExternalTool):
-    options_scope = "pex-cli"
-    name = "pex"
-    help = "The PEX (Python EXecutable) tool (https://github.com/pex-tool/pex)."
-
-    default_version = "v2.33.1"
-    default_url_template = "https://github.com/pex-tool/pex/releases/download/{version}/pex"
-    version_constraints = ">=2.13.0,<3.0"
-
-    # extra args to be passed to the pex tool; note that they
-    # are going to apply to all invocations of the pex tool.
-    global_args = ArgsListOption(
-        example="--check=error --no-compile",
-        extra_help=softwrap(
-            """
-            Note that these apply to all invocations of the pex tool, including building `pex_binary`
-            targets, preparing `python_test` targets to run, and generating lockfiles.
-            """
-        ),
-    )
-
-    @classproperty
-    def default_known_versions(cls):
-        return [
-            "|".join(
-                (
-                    cls.default_version,
-                    plat,
-                    "5ebed0e2ba875983a72b4715ee3b2ca6ae5fedbf28d738634e02e30e3bb5ed28",
-                    "4559974",
-                )
-            )
-            for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
-        ]
 
 
 @dataclass(frozen=True)
@@ -118,16 +73,6 @@ class PexCliProcess:
     def __post_init__(self) -> None:
         if "--pex-root-path" in self.extra_args:
             raise ValueError("`--pex-root` flag not allowed. We set its value for you.")
-
-
-class PexPEX(DownloadedExternalTool):
-    """The Pex PEX binary."""
-
-
-@rule
-async def download_pex_pex(pex_cli: PexCli, platform: Platform) -> PexPEX:
-    pex_pex = await Get(DownloadedExternalTool, ExternalToolRequest, pex_cli.get_request(platform))
-    return PexPEX(digest=pex_pex.digest, exe=pex_pex.exe)
 
 
 @rule
@@ -238,8 +183,7 @@ def maybe_log_pex_stderr(stderr: bytes, pex_verbosity: int) -> None:
 def rules():
     return [
         *collect_rules(),
-        *external_tool.rules(),
+        *pex_cli_tools_rules(),
         *pex_environment.rules(),
         *adhoc_binaries.rules(),
-        UnionRule(ExportableTool, PexCli),
     ]

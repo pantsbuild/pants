@@ -21,7 +21,7 @@ from pants.backend.python.util_rules.local_dists_pep660 import (
     EditableLocalDistsRequest,
 )
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex
-from pants.backend.python.util_rules.pex_cli import PexPEX
+from pants.backend.python.util_rules.pex_cli_tool import PexPEX
 from pants.backend.python.util_rules.pex_environment import PexEnvironment, PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import EntireLockfile, Lockfile
 from pants.core.goals.export import (
