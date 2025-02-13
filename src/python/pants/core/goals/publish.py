@@ -282,7 +282,6 @@ async def run_publish(
     ]
     background_requests: list[Get[FallibleProcessResult]] = []
     for pub in background_publishes:
-        logger.debug(f"Processing {pub} background package")
         process = cast(Process, pub.process)
         # Because this is a publish process, we want to ensure we don't cache this process.
         assert process.cache_scope == ProcessCacheScope.PER_SESSION
@@ -297,7 +296,7 @@ async def run_publish(
     logger.debug(f"Awaiting {len(background_requests)} background publishes")
     background_results = await MultiGet(background_requests)
     for pub, background_res in zip(background_publishes, background_results):
-        logger.debug(f"Processing {pub} results")
+        logger.debug(f"Processing {pub.process} background process")
         pub_results, pub_output = _to_publish_output_results_and_data(pub, background_res, console)
         results.extend(pub_results)
         outputs.extend(pub_output)
