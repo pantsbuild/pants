@@ -213,13 +213,13 @@ def _to_publish_output_results_and_data(
     for name in pub.names:
         results.append(f"{sigil} {name} {status}.")
 
-        output_data.append(
-            pub.get_output_data(
-                exit_code=res.exit_code,
-                published=res.exit_code == 0,
-                status=status,
-            )
+    output_data.append(
+        pub.get_output_data(
+            exit_code=res.exit_code,
+            published=res.exit_code == 0,
+            status=status,
         )
+    )
     return results, output_data
 
 
@@ -271,14 +271,19 @@ async def run_publish(
     outputs: list[PublishOutputData] = []
     results: list[str] = []
 
-    flattened_processes = chain.from_iterable(processes)
+    flattened_processes = list(chain.from_iterable(processes))
     background_publishes: list[PublishPackages] = [
         pub for pub in flattened_processes if isinstance(pub.process, Process)
     ]
     foreground_publishes: list[PublishPackages] = [
         pub
         for pub in flattened_processes
-        if isinstance(pub.process, InteractiveProcess) or pub.process is None
+        if isinstance(pub.process, InteractiveProcess)
+    ]
+    skipped_publishes: list[PublishPackages] = [
+        pub
+        for pub in flattened_processes
+        if pub.process is None
     ]
     background_requests: list[Get[FallibleProcessResult]] = []
     for pub in background_publishes:
@@ -303,27 +308,26 @@ async def run_publish(
         if background_res.exit_code != 0:
             exit_code = background_res.exit_code
 
+    for pub in skipped_publishes:
+        sigil = console.sigil_skipped()
+        status = "skipped"
+        if pub.description:
+            status += f" {pub.description}"
+        for name in pub.names:
+            results.append(f"{sigil} {name} {status}.")
+        outputs.append(pub.get_output_data(published=False, status=status))
+
     # Process all interactive publishes
     for pub in foreground_publishes:
         logger.debug(f"Execute {pub.process}")
-        fg_process = pub.process
-        if not fg_process:
-            sigil = console.sigil_skipped()
-            status = "skipped"
-            if pub.description:
-                status += f" {pub.description}"
-            for name in pub.names:
-                results.append(f"{sigil} {name} {status}.")
-            outputs.append(pub.get_output_data(published=False, status=status))
-        else:
-            res = await run_interactive_process_in_environment(
-                cast(InteractiveProcess, fg_process), local_environment.val
-            )
-            pub_results, pub_output = _to_publish_output_results_and_data(pub, res, console)
-            results.extend(pub_results)
-            outputs.extend(pub_output)
-            if res.exit_code != 0:
-                exit_code = res.exit_code
+        res = await run_interactive_process_in_environment(
+            cast(InteractiveProcess, pub.process), local_environment.val
+        )
+        pub_results, pub_output = _to_publish_output_results_and_data(pub, res, console)
+        results.extend(pub_results)
+        outputs.extend(pub_output)
+        if res.exit_code != 0:
+            exit_code = res.exit_code
 
     console.print_stderr("")
     if not results:
