@@ -119,7 +119,7 @@ def test_shell_command_as_test(rule_runner: RuleRunner) -> None:
         pass_debug_result = rule_runner.run_interactive_process(pass_debug_request.process)
         assert pass_debug_result.exit_code == 0
 
-    fail_debug_request = rule_runner.request(TestDebugRequest, [test_batch_for_target(pass_target)])
+    fail_debug_request = rule_runner.request(TestDebugRequest, [test_batch_for_target(fail_target)])
     with mock_console(rule_runner.options_bootstrapper):
         fail_debug_result = rule_runner.run_interactive_process(fail_debug_request.process)
-        assert fail_debug_result.exit_code == 0
+        assert fail_debug_result.exit_code == 1
