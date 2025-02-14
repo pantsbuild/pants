@@ -276,14 +276,10 @@ async def run_publish(
         pub for pub in flattened_processes if isinstance(pub.process, Process)
     ]
     foreground_publishes: list[PublishPackages] = [
-        pub
-        for pub in flattened_processes
-        if isinstance(pub.process, InteractiveProcess)
+        pub for pub in flattened_processes if isinstance(pub.process, InteractiveProcess)
     ]
     skipped_publishes: list[PublishPackages] = [
-        pub
-        for pub in flattened_processes
-        if pub.process is None
+        pub for pub in flattened_processes if pub.process is None
     ]
     background_requests: list[Get[FallibleProcessResult]] = []
     for pub in background_publishes:
