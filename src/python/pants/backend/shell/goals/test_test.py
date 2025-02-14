@@ -17,11 +17,11 @@ from pants.backend.shell.target_types import (
 )
 from pants.build_graph.address import Address
 from pants.core.goals import package
-from pants.core.goals.test import TestResult, get_filtered_environment
+from pants.core.goals.test import TestDebugRequest, TestResult, get_filtered_environment
 from pants.core.util_rules import archive, source_files
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import RuleRunner, mock_console
 
 ATTEMPTS_DEFAULT_OPTION = 2
 
@@ -36,6 +36,7 @@ def rule_runner() -> RuleRunner:
             *package.rules(),
             get_filtered_environment,
             QueryRule(TestResult, (ShellTestRequest.Batch,)),
+            QueryRule(TestDebugRequest, [ShellTestRequest.Batch]),
         ],
         target_types=[
             ShellSourcesGeneratorTarget,
@@ -95,11 +96,11 @@ def test_shell_command_as_test(rule_runner: RuleRunner) -> None:
     )
     (Path(rule_runner.build_root) / "test.sh").chmod(0o555)
 
+    def test_batch_for_target(test_target: Target) -> ShellTestRequest.Batch:
+        return ShellTestRequest.Batch("", (TestShellCommandFieldSet.create(test_target),), None)
+
     def run_test(test_target: Target) -> TestResult:
-        input: ShellTestRequest.Batch = ShellTestRequest.Batch(
-            "", (TestShellCommandFieldSet.create(test_target),), None
-        )
-        return rule_runner.request(TestResult, [input])
+        return rule_runner.request(TestResult, [test_batch_for_target(test_target)])
 
     pass_target = rule_runner.get_target(Address("", target_name="pass"))
     pass_result = run_test(pass_target)
@@ -111,3 +112,14 @@ def test_shell_command_as_test(rule_runner: RuleRunner) -> None:
     assert fail_result.exit_code == 1
     assert fail_result.stdout_bytes == b"does not contain 'xyzzy'\n"
     assert len(fail_result.process_results) == ATTEMPTS_DEFAULT_OPTION
+
+    # Check whether interactive execution via the `test` goal's `--debug` flags succeeds.
+    pass_debug_request = rule_runner.request(TestDebugRequest, [test_batch_for_target(pass_target)])
+    with mock_console(rule_runner.options_bootstrapper):
+        pass_debug_result = rule_runner.run_interactive_process(pass_debug_request.process)
+        assert pass_debug_result.exit_code == 0
+
+    fail_debug_request = rule_runner.request(TestDebugRequest, [test_batch_for_target(pass_target)])
+    with mock_console(rule_runner.options_bootstrapper):
+        fail_debug_result = rule_runner.run_interactive_process(fail_debug_request.process)
+        assert fail_debug_result.exit_code == 0
