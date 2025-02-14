@@ -55,6 +55,12 @@ def monkeypatch_botocore(monkeypatch):
             assert session is fake_session
             return SimpleNamespace(load_credentials=lambda: fake_creds)
 
+        # Replace the simple fake_session object with a SimpleNamespace that has get_config_variable
+        fake_session = SimpleNamespace(
+            get_config_variable=lambda name: "us-west-2" if name == "region" else None
+        )
+        botocore.session = SimpleNamespace(get_session=lambda: fake_session)
+
         def fake_creds_ctor(access_key, secret_key):
             assert access_key == fake_creds.access_key
             assert secret_key == fake_creds.secret_key
@@ -64,8 +70,10 @@ def monkeypatch_botocore(monkeypatch):
             create_credential_resolver=fake_resolver_creator, Credentials=fake_creds_ctor
         )
 
-        def fake_auth_ctor(creds):
+        def fake_auth_ctor(creds, service_name, region_name):
             assert creds is fake_creds
+            assert service_name == "s3"
+            assert region_name in ["us-east-1", "us-west-2"]
 
             def add_auth(request):
                 request.url == expected_url
@@ -73,7 +81,7 @@ def monkeypatch_botocore(monkeypatch):
 
             return SimpleNamespace(add_auth=add_auth)
 
-        botocore.auth = SimpleNamespace(HmacV1Auth=fake_auth_ctor)
+        botocore.auth = SimpleNamespace(SigV4Auth=fake_auth_ctor)
 
         monkeypatch.setitem(sys.modules, "botocore", botocore)
 
