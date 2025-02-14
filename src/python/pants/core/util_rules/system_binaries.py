@@ -652,9 +652,11 @@ async def get_bash(system_binaries: SystemBinariesSubsystem.EnvironmentAware) ->
 async def _find_candidate_paths_via_path_metadata_lookups(
     request: BinaryPathRequest,
 ) -> tuple[str, ...]:
+    search_path = [os.path.abspath(path) for path in request.search_path]
+
     metadata_results = await MultiGet(
         Get(PathMetadataResult, PathMetadataRequest(path=path, namespace=PathNamespace.SYSTEM))
-        for path in request.search_path
+        for path in search_path
     )
 
     found_paths_and_requests: list[str | PathMetadataRequest] = []
