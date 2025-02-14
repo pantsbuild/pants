@@ -240,6 +240,10 @@ class DockerOptions(Subsystem):
             """
         ),
     )
+    publish_noninteractively_verbose = BoolOption(
+        default=False,
+        help="If true, output logs to console when running with `publish_noninteractively=True`.",
+    )
     _tools = StrListOption(
         default=[],
         help=softwrap(

@@ -136,12 +136,16 @@ class PublishPackages:
     However, some tools have non-interactive publishing modes and can leverage parallelism. See
     https://github.com/pantsbuild/pants/issues/17613#issuecomment-1323913381 for more context.
 
+    If running a background process and verbose_background_process is True, all logs are output always output to
+    logs.
+
     The `description` may be a reason explaining why the publish was skipped, or identifying which
     repository the artifacts are published to.
     """
 
     names: tuple[str, ...]
     process: InteractiveProcess | Process | None = None
+    verbose_background_process: bool = False
     description: str | None = None
     data: PublishOutputData = field(default_factory=PublishOutputData)
 
@@ -301,6 +305,23 @@ async def run_publish(
         pub_results, pub_output = _to_publish_output_results_and_data(pub, background_res, console)
         results.extend(pub_results)
         outputs.extend(pub_output)
+
+        names = "'" + "', '".join(pub.names) + "'"
+        output_msg = "\n".join(
+            (
+                f"Output for publishing {names}",
+                "stdout:",
+                background_res.stdout.decode(),
+                "stderr:",
+                background_res.stderr.decode(),
+            )
+        )
+
+        if background_res.exit_code != 0 or pub.verbose_background_process:
+            logger.info(output_msg)
+        else:
+            logger.debug(output_msg)
+
         if background_res.exit_code != 0:
             exit_code = background_res.exit_code
 
