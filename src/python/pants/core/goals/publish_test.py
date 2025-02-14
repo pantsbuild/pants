@@ -143,8 +143,7 @@ def test_skipped_publish(rule_runner: RuleRunner) -> None:
     )
 
     assert result.exit_code == 0
-    assert "my_package-0.1.0.tar.gz skipped (requested)." in result.stderr
-    assert "my_package-0.1.0-py3-none-any.whl skipped (requested)." in result.stderr
+    assert "Nothing published" in result.stderr
 
 
 def test_structured_output(rule_runner: RuleRunner) -> None:
@@ -176,8 +175,7 @@ def test_structured_output(rule_runner: RuleRunner) -> None:
     )
 
     assert result.exit_code == 0
-    assert "my_package-0.1.0.tar.gz skipped (requested)." in result.stderr
-    assert "my_package-0.1.0-py3-none-any.whl skipped (requested)." in result.stderr
+    assert "Nothing published." in result.stderr
 
     expected = [
         {
