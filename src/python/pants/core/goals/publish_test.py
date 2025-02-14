@@ -169,7 +169,7 @@ def test_structured_output(rule_runner: RuleRunner) -> None:
     result = rule_runner.run_goal_rule(
         Publish,
         args=(
-            f"--output=published.json",
+            "--output=published.json",
             "src:dist",
         ),
         env_inherit={"HOME", "PATH", "PYENV_ROOT"},
