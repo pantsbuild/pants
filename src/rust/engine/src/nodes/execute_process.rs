@@ -10,11 +10,12 @@ use fs::RelativePath;
 use graph::CompoundNode;
 use process_execution::{
     self, CacheName, InputDigests, Process, ProcessCacheScope, ProcessExecutionStrategy,
-    ProcessResultSource,
+    ProcessResultSource, ProcessConcurrency,
 };
 use pyo3::Bound;
 use pyo3::prelude::{PyAny, Python};
 use pyo3::pybacked::PyBackedStr;
+use pyo3::types::{PyAnyMethods, PyStringMethods, PyTypeMethods};
 use store::{self, Store, StoreError};
 use workunit_store::{
     Metric, ObservationMetric, RunningWorkunit, UserMetadataItem, WorkunitMetadata,
@@ -124,6 +125,27 @@ impl ExecuteProcess {
                 .map_err(|e| format!("Failed to get `execution_slot_variable` for field: {e}"))?;
 
         let concurrency_available: usize = externs::getattr(value, "concurrency_available")?;
+        
+        let concurrency_value: Option<Bound<'_, PyAny>> = externs::getattr(value, "concurrency")?;
+        let concurrency: Option<ProcessConcurrency> = match concurrency_value {
+            None => Ok(None),
+            Some(conc) => {
+                let py_type = conc.get_type();
+                let py_name = py_type.name().unwrap();
+                let type_name = py_name.to_str().unwrap();
+                match type_name {
+                    "ProcessConcurrencyRange" => {
+                        let min: Option<usize> = externs::getattr(&conc, "min")?;
+                        let max: Option<usize> = externs::getattr(&conc, "max")?;
+                        Ok(Some(ProcessConcurrency::Range { min, max }))
+                    }
+                    "ProcessConcurrencyExclusive" => Ok(Some(ProcessConcurrency::Exclusive)),
+                    _ => Err(format!("Unknown ProcessConcurrency type: {}", type_name)),
+                }
+            }
+        }?;
+        
+        log::debug!("Parsed concurrency: {:?}", concurrency);
 
         let cache_scope: ProcessCacheScope = {
             let cache_scope_enum: Bound<'_, PyAny> = externs::getattr(value, "cache_scope")?;
@@ -151,6 +173,7 @@ impl ExecuteProcess {
             jdk_home,
             execution_slot_variable,
             concurrency_available,
+            concurrency,
             cache_scope,
             execution_environment: process_config.environment,
             remote_cache_speculation_delay,

@@ -51,6 +51,18 @@ class ProcessCacheScope(Enum):
 
 
 @dataclass(frozen=True)
+class ProcessConcurrencyRange:
+    min: int | None = None
+    max: int | None = None
+
+@dataclass(frozen=True)
+class ProcessConcurrencyExclusive:
+    pass
+
+ProcessConcurrency = ProcessConcurrencyRange | ProcessConcurrencyExclusive
+
+
+@dataclass(frozen=True)
 class Process:
     argv: tuple[str, ...]
     description: str = dataclasses.field(compare=False)
@@ -66,7 +78,7 @@ class Process:
     timeout_seconds: int | float
     jdk_home: str | None
     execution_slot_variable: str | None
-    concurrency_available: int
+    concurrency: ProcessConcurrency | None
     cache_scope: ProcessCacheScope
     remote_cache_speculation_delay_millis: int
     attempt: int
@@ -89,6 +101,7 @@ class Process:
         jdk_home: str | None = None,
         execution_slot_variable: str | None = None,
         concurrency_available: int = 0,
+        concurrency: ProcessConcurrency | None = None,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
         remote_cache_speculation_delay_millis: int = 0,
         attempt: int = 0,
@@ -146,6 +159,7 @@ class Process:
         object.__setattr__(self, "jdk_home", jdk_home)
         object.__setattr__(self, "execution_slot_variable", execution_slot_variable)
         object.__setattr__(self, "concurrency_available", concurrency_available)
+        object.__setattr__(self, "concurrency", concurrency)
         object.__setattr__(self, "cache_scope", cache_scope)
         object.__setattr__(
             self, "remote_cache_speculation_delay_millis", remote_cache_speculation_delay_millis
