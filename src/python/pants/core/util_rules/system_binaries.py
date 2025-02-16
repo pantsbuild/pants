@@ -65,7 +65,13 @@ class SystemBinariesSubsystem(Subsystem):
                     if entry == "<PATH>":
                         path = self._options_env.get("PATH")
                         if path:
-                            yield from path.split(os.pathsep)
+                            for prefix in path.split(os.pathsep):
+                                if prefix.startswith("$") or prefix.startswith("~"):
+                                    logger.warning(
+                                        f"Ignored unexpanded path prefix `{prefix}` in the `PATH` environment variable while processing the `<PATH>` marker from the `[system-binaries].system_binary_paths` option. Please check the value of the `PATH` environment variable in your shell."
+                                    )
+                                else:
+                                    yield prefix
                     else:
                         yield entry
 

@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use crate::dockerfile::DockerFileInfoCollector;
 
-fn assert_from_tags<const N: usize>(code: &str, imports: [(&str, &str); N]) {
+fn assert_from_tags<const N: usize>(code: &str, imports: [(&str, Option<&str>); N]) {
     let mut collector = DockerFileInfoCollector::new(code);
     collector.collect();
     assert_eq!(
@@ -12,7 +12,7 @@ fn assert_from_tags<const N: usize>(code: &str, imports: [(&str, &str); N]) {
         HashSet::from_iter(
             imports
                 .iter()
-                .map(|(s1, s2)| (s1.to_string(), s2.to_string()))
+                .map(|(s1, s2)| (s1.to_string(), s2.map(|s| s.to_string())))
         )
     );
 }
@@ -64,19 +64,19 @@ fn assert_from_image_build_args<const N: usize>(code: &str, files: [&str; N]) {
 
 #[test]
 fn from_instructions() {
-    assert_from_tags("FROM python:3.10", [("stage0", "3.10")]);
-    assert_from_tags("FROM docker.io/python:3.10", [("stage0", "3.10")]);
-    assert_from_tags("FROM ${ARG}", [("stage0", "build-arg:ARG")]);
-    assert_from_tags("FROM $ARG", [("stage0", "build-arg:ARG")]);
-    assert_from_tags("FROM $ARG AS dynamic", [("dynamic", "build-arg:ARG")]);
-    assert_from_tags("FROM python:$VERSION", [("stage0", "$VERSION")]);
+    assert_from_tags("FROM python:3.10", [("stage0", Some("3.10"))]);
+    assert_from_tags("FROM docker.io/python:3.10", [("stage0", Some("3.10"))]);
+    assert_from_tags("FROM ${ARG}", [("stage0", Some("build-arg:ARG"))]);
+    assert_from_tags("FROM $ARG", [("stage0", Some("build-arg:ARG"))]);
+    assert_from_tags("FROM $ARG AS dynamic", [("dynamic", Some("build-arg:ARG"))]);
+    assert_from_tags("FROM python:$VERSION", [("stage0", Some("$VERSION"))]);
     assert_from_tags(
         "FROM digest@sha256:d1f0463b35135852308ea815c2ae54c1734b876d90288ce35828aeeff9899f9d",
-        [],
+        [("stage0", None)],
     );
     assert_from_tags(
         "FROM gcr.io/tekton-releases/github.com/tektoncd/operator/cmd/kubernetes/operator:v0.54.0@sha256:d1f0463b35135852308ea815c2ae54c1734b876d90288ce35828aeeff9899f9d",
-        [("stage0", "v0.54.0")],
+        [("stage0", Some("v0.54.0"))],
     );
 }
 
@@ -92,12 +92,12 @@ FROM $PYTHON_VERSION AS python
 FROM python:$VERSION
 ",
         [
-            ("stage0", "latest"),
-            ("stage1", "v1.2"),
-            // Stage 2 is not pinned with a tag.
-            ("stage3", "v0.54.0"),
-            ("python", "build-arg:PYTHON_VERSION"), // Parse tag from build arg.
-            ("stage5", "$VERSION"),
+            ("stage0", Some("latest")),
+            ("stage1", Some("v1.2")),
+            ("stage2", None), // Stage 2 is not pinned with a tag.
+            ("stage3", Some("v0.54.0")),
+            ("python", Some("build-arg:PYTHON_VERSION")), // Parse tag from build arg.
+            ("stage5", Some("$VERSION")),
         ],
     )
 }

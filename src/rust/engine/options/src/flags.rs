@@ -1,31 +1,31 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::env;
-
 use super::id::{NameTransform, OptionId};
-use super::scope::{is_valid_scope_name, Scope};
+use super::scope::Scope;
 use super::{DictEdit, OptionsSource};
-use crate::cli_alias::{expand_aliases, AliasMap};
 use crate::fromfile::FromfileExpander;
 use crate::parse::{ParseError, Parseable};
 use crate::ListEdit;
-use core::iter::once;
 use itertools::{chain, Itertools};
 use parking_lot::Mutex;
 use std::any::Any;
 use std::collections::{HashMap, HashSet};
+use std::iter::once;
 use std::sync::Arc;
 
+// Represents a single cli flag used to set an option value, e.g., `--foo`, or `--bar=baz`.
+// The `context` field tracks the scope in which the flag was found, e.g., in
+// `pants --foo goal --bar=baz` the scope for `--foo` is GLOBAL and for `--bar` it is `goal`.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-struct Arg {
-    context: Scope,
-    flag: String,
-    value: Option<String>,
+pub(crate) struct Flag {
+    pub(crate) context: Scope,
+    pub(crate) key: String,           // E.g., `--foo` or `--bar`.
+    pub(crate) value: Option<String>, // E.g., None or Some(`baz`).
 }
 
-impl Arg {
-    /// Checks if this arg's flag is equal to the provided strings concatenated with dashes.
+impl Flag {
+    /// Checks if the flag is equal to the provided strings concatenated with dashes.
     /// E.g., "--foo-bar" matches ["-", "foo", "bar"].
     fn _flag_match<'a>(&self, dash_separated_strs: impl Iterator<Item = &'a str>) -> bool {
         #[allow(unstable_name_collisions)]
@@ -33,7 +33,7 @@ impl Arg {
         // as an experimental feature of standard Iterator. If/when that becomes standard we
         // can use it, but for now we must squelch the name collision.
         itertools::equal(
-            self.flag.chars(),
+            self.key.chars(),
             dash_separated_strs
                 .map(str::chars)
                 .intersperse("-".chars())
@@ -80,175 +80,86 @@ impl Arg {
             || self._matches_short(id)
     }
 
-    fn matches(&self, id: &OptionId) -> bool {
+    pub(crate) fn matches(&self, id: &OptionId) -> bool {
         self._matches(id, false)
     }
 
-    fn matches_negation(&self, id: &OptionId) -> bool {
+    pub(crate) fn matches_negation(&self, id: &OptionId) -> bool {
         self._matches(id, true)
     }
 }
 
-#[derive(Debug)]
-pub struct Args {
-    // The arg strings this struct was instantiated with.
-    arg_strs: Vec<String>,
-
-    // The structured args parsed from the arg strings.
-    args: Vec<Arg>,
-    passthrough_args: Option<Vec<String>>,
+pub(crate) struct FlagsTracker {
+    unconsumed_flags: Mutex<HashSet<Flag>>,
 }
 
-impl Args {
-    // Create an Args instance with the provided args, which must *not* include the
-    // argv[0] process name.
-    pub fn new<I: IntoIterator<Item = String>>(arg_strs: I) -> Self {
-        let arg_strs = arg_strs.into_iter().collect::<Vec<_>>();
-        let mut args: Vec<Arg> = vec![];
-        let mut passthrough_args: Option<Vec<String>> = None;
-        let mut scope = Scope::Global;
-
-        let mut args_iter = arg_strs.iter();
-        while let Some(arg_str) = args_iter.next() {
-            if arg_str == "--" {
-                // We've hit the passthrough args delimiter (`--`).
-                passthrough_args = Some(args_iter.cloned().collect::<Vec<String>>());
-                break;
-            } else if arg_str.starts_with("--") {
-                let mut components = arg_str.splitn(2, '=');
-                let flag = components.next().unwrap();
-                args.push(Arg {
-                    context: scope.clone(),
-                    flag: flag.to_string(),
-                    value: components.next().map(str::to_string),
-                });
-            } else if arg_str.starts_with('-') && arg_str.len() >= 2 {
-                let (flag, mut value) = arg_str.split_at(2);
-                // We support -ldebug and -l=debug, so strip that extraneous equals sign.
-                if let Some(stripped) = value.strip_prefix('=') {
-                    value = stripped;
-                }
-                args.push(Arg {
-                    context: scope.clone(),
-                    flag: flag.to_string(),
-                    value: if value.is_empty() {
-                        None
-                    } else {
-                        Some(value.to_string())
-                    },
-                });
-            } else if is_valid_scope_name(arg_str) {
-                scope = Scope::Scope(arg_str.to_string())
-            } else {
-                // The arg is a spec, so revert to global context for any trailing flags.
-                scope = Scope::Global;
-            }
-        }
-
+impl FlagsTracker {
+    pub(crate) fn new(flags: &[Flag]) -> Self {
         Self {
-            arg_strs,
-            args,
-            passthrough_args,
+            unconsumed_flags: Mutex::new(flags.iter().cloned().collect()),
         }
     }
 
-    pub fn argv() -> Self {
-        let mut args = env::args().collect::<Vec<_>>().into_iter();
-        args.next(); // Consume the process name (argv[0]).
-        Self::new(env::args().collect::<Vec<_>>())
-    }
-
-    pub fn expand_aliases(&self, alias_map: &AliasMap) -> Self {
-        Self::new(expand_aliases(self.arg_strs.clone(), alias_map))
-    }
-}
-
-pub(crate) struct ArgsTracker {
-    unconsumed_args: Mutex<HashSet<Arg>>,
-}
-
-impl ArgsTracker {
-    fn new(args: &Args) -> Self {
-        Self {
-            unconsumed_args: Mutex::new(args.args.clone().into_iter().collect()),
-        }
-    }
-
-    fn consume_arg(&self, arg: &Arg) {
-        self.unconsumed_args.lock().remove(arg);
+    pub(crate) fn consume_flag(&self, flag: &Flag) {
+        self.unconsumed_flags.lock().remove(flag);
     }
 
     pub fn get_unconsumed_flags(&self) -> HashMap<Scope, Vec<String>> {
         // Map from positional context (GLOBAL or a goal name) to unconsumed flags encountered
         // at that position in the CLI args.
         let mut ret: HashMap<Scope, Vec<String>> = HashMap::new();
-        for arg in self.unconsumed_args.lock().iter() {
-            if let Some(flags_for_context) = ret.get_mut(&arg.context) {
-                flags_for_context.push(arg.flag.clone());
+        for flag in self.unconsumed_flags.lock().iter() {
+            if let Some(flags_for_context) = ret.get_mut(&flag.context) {
+                flags_for_context.push(flag.key.clone());
             } else {
-                let flags_for_context = vec![arg.flag.clone()];
-                ret.insert(arg.context.clone(), flags_for_context);
+                let flags_for_context = vec![flag.key.clone()];
+                ret.insert(flag.context.clone(), flags_for_context);
             };
         }
         for entry in ret.iter_mut() {
-            entry.1.sort(); // For stability in tests and when reporting unconsumed args.
+            entry.1.sort(); // For stability in tests and when reporting unconsumed flags.
         }
         ret
     }
 }
 
-pub(crate) struct ArgsReader {
-    args: Args,
+pub(crate) struct FlagsReader {
+    flags: Vec<Flag>,
     fromfile_expander: FromfileExpander,
-    tracker: Arc<ArgsTracker>,
+    tracker: Arc<FlagsTracker>,
 }
 
-impl ArgsReader {
-    pub fn new(args: Args, fromfile_expander: FromfileExpander) -> Self {
-        let tracker = Arc::new(ArgsTracker::new(&args));
+impl FlagsReader {
+    pub fn new(flags: Vec<Flag>, fromfile_expander: FromfileExpander) -> Self {
+        let tracker = Arc::new(FlagsTracker::new(&flags));
         Self {
-            args,
+            flags,
             fromfile_expander,
             tracker,
         }
     }
 
-    pub fn expand_aliases(&self, alias_map: &AliasMap) -> Self {
-        Self::new(
-            self.args.expand_aliases(alias_map),
-            self.fromfile_expander.clone(),
-        )
-    }
-
-    pub fn get_args(&self) -> Vec<String> {
-        self.args.arg_strs.clone()
-    }
-
-    pub fn get_passthrough_args(&self) -> Option<Vec<String>> {
-        self.args.passthrough_args.clone()
-    }
-
-    pub fn get_tracker(&self) -> Arc<ArgsTracker> {
+    pub fn get_tracker(&self) -> Arc<FlagsTracker> {
         self.tracker.clone()
     }
 
-    fn matches(&self, arg: &Arg, id: &OptionId) -> bool {
-        let ret = arg.matches(id);
+    fn matches(&self, flag: &Flag, id: &OptionId) -> bool {
+        let ret = flag.matches(id);
         if ret {
-            self.tracker.consume_arg(arg);
+            self.tracker.consume_flag(flag);
         }
         ret
     }
 
-    fn matches_negation(&self, arg: &Arg, id: &OptionId) -> bool {
-        let ret = arg.matches_negation(id);
+    fn matches_negation(&self, flag: &Flag, id: &OptionId) -> bool {
+        let ret = flag.matches_negation(id);
         if ret {
-            self.tracker.consume_arg(arg);
+            self.tracker.consume_flag(flag);
         }
         ret
     }
 
-    fn to_bool(&self, arg: &Arg) -> Result<Option<bool>, ParseError> {
+    fn to_bool(&self, arg: &Flag) -> Result<Option<bool>, ParseError> {
         // An arg can represent a bool either by having an explicit value parseable as a bool,
         // or by having no value (in which case it represents true).
         match &arg.value {
@@ -262,15 +173,15 @@ impl ArgsReader {
 
     fn get_list<T: Parseable>(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String> {
         let mut edits = vec![];
-        for arg in &self.args.args {
-            if self.matches(arg, id) {
-                let value = arg.value.as_ref().ok_or_else(|| {
+        for flag in &self.flags {
+            if self.matches(flag, id) {
+                let value = flag.value.as_ref().ok_or_else(|| {
                     format!("Expected list option {} to have a value.", self.display(id))
                 })?;
                 if let Some(es) = self
                     .fromfile_expander
                     .expand_to_list::<T>(value.to_string())
-                    .map_err(|e| e.render(&arg.flag))?
+                    .map_err(|e| e.render(&flag.key))?
                 {
                     edits.extend(es);
                 }
@@ -284,7 +195,7 @@ impl ArgsReader {
     }
 }
 
-impl OptionsSource for ArgsReader {
+impl OptionsSource for FlagsReader {
     fn display(&self, id: &OptionId) -> String {
         format!(
             "--{}{}",
@@ -301,16 +212,16 @@ impl OptionsSource for ArgsReader {
     }
 
     fn get_string(&self, id: &OptionId) -> Result<Option<String>, String> {
-        // We iterate in reverse so that the rightmost arg wins in case an option
+        // We iterate in reverse so that the rightmost flag wins in case an option
         // is specified multiple times.
-        for arg in self.args.args.iter().rev() {
-            if self.matches(arg, id) {
+        for flag in self.flags.iter().rev() {
+            if self.matches(flag, id) {
                 return self
                     .fromfile_expander
-                    .expand(arg.value.clone().ok_or_else(|| {
+                    .expand(flag.value.clone().ok_or_else(|| {
                         format!("Expected list option {} to have a value.", self.display(id))
                     })?)
-                    .map_err(|e| e.render(&arg.flag));
+                    .map_err(|e| e.render(&flag.key));
             };
         }
         Ok(None)
@@ -319,14 +230,14 @@ impl OptionsSource for ArgsReader {
     fn get_bool(&self, id: &OptionId) -> Result<Option<bool>, String> {
         // We iterate in reverse so that the rightmost arg wins in case an option
         // is specified multiple times.
-        for arg in self.args.args.iter().rev() {
+        for arg in self.flags.iter().rev() {
             if self.matches(arg, id) {
-                return self.to_bool(arg).map_err(|e| e.render(&arg.flag));
+                return self.to_bool(arg).map_err(|e| e.render(&arg.key));
             } else if self.matches_negation(arg, id) {
                 return self
                     .to_bool(arg)
                     .map(|ob| ob.map(|b| b ^ true))
-                    .map_err(|e| e.render(&arg.flag));
+                    .map_err(|e| e.render(&arg.key));
             }
         }
         Ok(None)
@@ -350,15 +261,15 @@ impl OptionsSource for ArgsReader {
 
     fn get_dict(&self, id: &OptionId) -> Result<Option<Vec<DictEdit>>, String> {
         let mut edits = vec![];
-        for arg in self.args.args.iter() {
-            if self.matches(arg, id) {
-                let value = arg.value.clone().ok_or_else(|| {
+        for flag in self.flags.iter() {
+            if self.matches(flag, id) {
+                let value = flag.value.clone().ok_or_else(|| {
                     format!("Expected dict option {} to have a value.", self.display(id))
                 })?;
                 if let Some(es) = self
                     .fromfile_expander
                     .expand_to_dict(value)
-                    .map_err(|e| e.render(&arg.flag))?
+                    .map_err(|e| e.render(&flag.key))?
                 {
                     edits.extend(es);
                 }

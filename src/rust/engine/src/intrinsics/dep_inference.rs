@@ -166,7 +166,10 @@ fn parse_dockerfile_info(deps_request: Value) -> PyGeneratorResponseNativeCall {
                             result
                                 .version_tags
                                 .into_iter()
-                                .map(|(stage, tag)| format!("{stage} {tag}"))
+                                .map(|(stage, tag)| match tag {
+                                    Some(tag) => format!("{stage} {tag}"),
+                                    None => stage.to_string(),
+                                })
                                 .collect::<Vec<_>>()
                                 .into_pyobject(py)?
                                 .into_any()
