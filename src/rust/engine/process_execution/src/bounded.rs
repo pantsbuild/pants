@@ -18,7 +18,7 @@ use tokio::sync::{Notify, Semaphore, SemaphorePermit};
 use tokio::time::sleep;
 use workunit_store::{RunningWorkunit, in_workunit};
 
-use crate::{Context, FallibleProcessResultWithPlatform, Process, ProcessError};
+use crate::{Context, FallibleProcessResultWithPlatform, Process, ProcessError, ProcessConcurrency};
 
 // TODO: Runtime formatting is unstable in Rust, so we imitate it.
 static CONCURRENCY_TEMPLATE_RE: LazyLock<Regex> =
@@ -30,6 +30,11 @@ static CONCURRENCY_TEMPLATE_RE: LazyLock<Regex> =
 ///
 /// If a Process sets a non-zero `concurrency_available` value, it may be preempted (i.e. canceled
 /// and restarted) with a new concurrency value for a short period after starting.
+///
+/// If a Process provides a `concurrency` value with different min and max values, 
+/// it will occupy a minimum of `min` cores and a maximum of `max` cores on the semaphore and 
+/// may be preempted (i.e. canceled and restarted) with a new concurrency value for a short 
+/// period after starting.
 ///
 #[derive(Clone)]
 pub struct CommandRunner {
@@ -71,7 +76,26 @@ impl crate::CommandRunner for CommandRunner {
         workunit: &mut RunningWorkunit,
         process: Process,
     ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
-        let semaphore_acquisition = self.sema.acquire(process.concurrency_available);
+        
+        let total_concurrency = self.sema.state.lock().total_concurrency;
+        let min_concurrency = match process.concurrency {
+            Some(ProcessConcurrency::Range { min, .. }) => min.unwrap_or(1),
+            Some(ProcessConcurrency::Exclusive) => total_concurrency,
+            None => process.concurrency_available,
+        };
+
+        let max_concurrency = match process.concurrency {
+            Some(ProcessConcurrency::Range { max, .. }) => max.unwrap_or(min_concurrency),
+            Some(ProcessConcurrency::Exclusive) => total_concurrency,
+            None => process.concurrency_available,
+        };
+
+        let min_concurrency = min(max(min_concurrency, 1), total_concurrency);
+        let max_concurrency = min(max_concurrency, total_concurrency);
+
+        log::debug!("Acquiring semaphore for process {} with min_concurrency: {}, max_concurrency: {}", process.description, min_concurrency, max_concurrency);
+        
+        let semaphore_acquisition = self.sema.acquire(min_concurrency, max_concurrency);
         let permit = in_workunit!(
             "acquire_command_runner_slot",
             // TODO: The UI uses the presence of a blocked workunit below a parent as an indication that
@@ -242,7 +266,7 @@ impl AsyncSemaphore {
         F: FnOnce(usize) -> B,
         B: Future<Output = O>,
     {
-        let permit = self.acquire(1).await;
+        let permit = self.acquire(1, 1).await;
         let res = f(permit.task.id).await;
         drop(permit);
         res
@@ -253,8 +277,8 @@ impl AsyncSemaphore {
     /// the given amount of concurrency. The amount actually acquired will be reported on the
     /// returned Permit.
     ///
-    pub async fn acquire(&self, concurrency_desired: usize) -> Permit<'_> {
-        let permit = self.sema.acquire().await.expect("semaphore closed");
+    pub async fn acquire(&self, min_concurrency: usize, max_concurrency: usize,) -> Permit<'_> {
+        let permit = self.sema.acquire_many(min_concurrency as u32).await.expect("semaphore closed");
         let task = {
             let mut state = self.state.lock();
             let id = state
@@ -269,7 +293,7 @@ impl AsyncSemaphore {
             //
             // This is because we cannot anticipate the number of inbound processes, and we never want to
             // delay a process from starting.
-            let concurrency_desired = max(concurrency_desired, 1);
+            let concurrency_desired = max(max_concurrency, min_concurrency);
             let concurrency_actual = min(
                 concurrency_desired,
                 state.total_concurrency / (state.tasks.len() + 1),

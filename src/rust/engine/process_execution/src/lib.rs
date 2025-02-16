@@ -8,6 +8,7 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::convert::TryFrom;
 use std::fmt::{self, Debug, Display};
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -484,6 +485,29 @@ pub struct ProcessExecutionEnvironment {
     pub local_keep_sandboxes: local::KeepSandboxes,
 }
 
+#[derive(DeepSizeOf, Debug, Clone, Hash, PartialEq, Eq, Serialize)]
+pub enum ProcessConcurrency {
+    /// A range of acceptable cpu cores with optional bounds
+    Range {
+        // Minimum number of cores to use, defaults to 1
+        min: Option<usize>,
+        // Maximum number of cores to use, defaults to min
+        max: Option<usize>,
+    },
+    /// Exclusive access to all cores
+    Exclusive,
+}
+
+// TODO Unclear why I need this or when its invoked, compile error for CommandSpec
+impl FromStr for ProcessConcurrency {
+    type Err = core::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        log::warn!("Parsing process concurrency from string: {s}");
+        Ok(ProcessConcurrency::Range { min: Some(1), max: Some(1) })
+    }
+}
+
 ///
 /// A process to be executed.
 ///
@@ -541,6 +565,9 @@ pub struct Process {
     /// period after starting if available resources have changed (because other processes have
     /// started or finished).
     pub concurrency_available: usize,
+
+    /// The number of cores required for this process to run.
+    pub concurrency: Option<ProcessConcurrency>,
 
     #[derivative(PartialEq = "ignore", Hash = "ignore")]
     pub description: String,
@@ -615,6 +642,7 @@ impl Process {
             jdk_home: None,
             execution_slot_variable: None,
             concurrency_available: 0,
+            concurrency: None,
             cache_scope: ProcessCacheScope::Successful,
             execution_environment: ProcessExecutionEnvironment {
                 name: None,
