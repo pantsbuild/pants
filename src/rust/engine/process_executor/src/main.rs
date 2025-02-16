@@ -15,7 +15,7 @@ use fs::{DirectoryDigest, Permissions, RelativePath};
 use hashing::{Digest, Fingerprint};
 use process_execution::{
     local::KeepSandboxes, CacheContentBehavior, Context, InputDigests, NamedCaches, Platform,
-    ProcessCacheScope, ProcessExecutionEnvironment, ProcessExecutionStrategy,
+    ProcessCacheScope, ProcessConcurrency, ProcessExecutionEnvironment, ProcessExecutionStrategy,
 };
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
@@ -74,6 +74,9 @@ struct CommandSpec {
 
     #[structopt(long)]
     concurrency_available: Option<usize>,
+
+    #[structopt(long)]
+    concurrency: Option<ProcessConcurrency>,
 
     #[structopt(long)]
     cache_key_gen_version: Option<String>,
@@ -547,6 +550,7 @@ async fn make_request_from_flat_args(
         jdk_home: args.command.jdk.clone(),
         execution_slot_variable: None,
         concurrency_available: args.command.concurrency_available.unwrap_or(0),
+        concurrency: args.command.concurrency.clone(),
         cache_scope: ProcessCacheScope::Always,
         execution_environment,
         remote_cache_speculation_delay: Duration::from_millis(0),
@@ -633,6 +637,7 @@ async fn extract_request_from_action_digest(
         }),
         execution_slot_variable: None,
         concurrency_available: 0,
+        concurrency: None,
         description: "".to_string(),
         level: Level::Error,
         append_only_caches: BTreeMap::new(),
