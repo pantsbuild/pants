@@ -84,7 +84,7 @@ tempfile = { workspace = true }
 testutil_mock = { package = "mock", path = "testutil/mock" }
 time = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
-tokio-retry = { workspace = true }
+tokio-retry2 = { workspace = true }
 tokio-util = { workspace = true, features = ["io"] }
 tryfuture = { path = "tryfuture" }
 ui = { path = "ui" }
@@ -319,7 +319,7 @@ tempfile = "3.5.0"
 terminal_size = "0.1.15"
 time = "0.3.37"
 tokio = "1.32"
-tokio-retry = "0.3"
+tokio-retry2 = "0.5"
 tokio-rustls = "0.26"
 tokio-stream = "0.1"
 tokio-util = "0.7"
