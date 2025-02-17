@@ -938,7 +938,7 @@ def build_wheels_job(
                                 PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
 
                                 mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
-                                echo "PEX_FILENAME=$PEX_FILENAME" >> "$GITHUB_ENV"
+                                echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
                                 """
                             ),
                         },
