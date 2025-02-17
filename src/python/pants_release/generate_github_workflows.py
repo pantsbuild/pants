@@ -921,15 +921,15 @@ def build_wheels_job(
                     [
                         {
                             "name": "Attest the pantsbuild.pants wheel",
-                            #"if": "needs.release_info.outputs.is-release == 'true'",
+                            "if": "needs.release_info.outputs.is-release == 'true'",
                             "uses": action("attest-build-provenance"),
                             "with": {
                                 "subject-path": "dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants-*.whl",
                             },
                         },
                         {
-                            "name": "Rename the Pex file for attestation",
-                            #"if": "needs.release_info.outputs.is-release == 'true'",
+                            "name": "Rename the Pants Pex to its final name for upload",
+                            "if": "needs.release_info.outputs.is-release == 'true'",
                             "run": dedent(
                                 """\
                                 PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
@@ -938,8 +938,8 @@ def build_wheels_job(
                             ),
                         },
                         {
-                            "name": "Attest the Pex",
-                            #"if": "needs.release_info.outputs.is-release == 'true'",
+                            "name": "Attest the Pants Pex artifact",
+                            "if": "needs.release_info.outputs.is-release == 'true'",
                             "uses": action("attest-build-provenance"),
                             "with": {
                                 "subject-path": "dist/src.python.pants/*.pex",
@@ -980,7 +980,7 @@ def build_wheels_job(
                             [
                                 {
                                     "name": "Attest the pantsbuild.pants.testutil wheel",
-                                    #"if": "needs.release_info.outputs.is-release == 'true'",
+                                    "if": "needs.release_info.outputs.is-release == 'true'",
                                     "uses": action("attest-build-provenance"),
                                     "with": {
                                         "subject-path": "dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants.testutil*.whl",
