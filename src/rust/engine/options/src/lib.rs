@@ -5,9 +5,9 @@ pub mod arg_splitter;
 #[cfg(test)]
 mod arg_splitter_tests;
 
-mod args;
+mod flags;
 #[cfg(test)]
-mod args_tests;
+mod flags_tests;
 
 mod build_root;
 #[cfg(test)]
@@ -38,21 +38,20 @@ mod parse;
 mod parse_tests;
 
 mod scope;
-#[cfg(test)]
-mod scope_tests;
 
 #[cfg(test)]
 mod tests;
 
 mod types;
 
-pub use self::arg_splitter::{ArgSplitter, PantsCommand};
-pub use self::args::Args;
-use self::args::ArgsReader;
+use self::arg_splitter::ArgSplitter;
+pub use self::arg_splitter::{Args, PantsCommand};
 pub use self::config::ConfigSource;
 use self::config::{Config, ConfigReader};
 pub use self::env::Env;
 use self::env::EnvReader;
+use self::flags::FlagsReader;
+use crate::cli_alias::expand_aliases;
 use crate::fromfile::FromfileExpander;
 use crate::parse::Parseable;
 pub use build_root::BuildRoot;
@@ -387,10 +386,10 @@ impl OptionParser {
         let buildroot = buildroot.unwrap_or(BuildRoot::find()?);
         let buildroot_string = buildroot.convert_to_string()?;
 
+        let mut sources: BTreeMap<Source, Arc<dyn OptionsSource>> = BTreeMap::new();
+
         let arg_splitter = ArgSplitter::new(buildroot.as_path(), known_goals.unwrap_or_default());
         let fromfile_expander = FromfileExpander::relative_to(buildroot.clone());
-        let args_reader = ArgsReader::new(args, fromfile_expander.clone());
-        let mut sources: BTreeMap<Source, Arc<dyn OptionsSource>> = BTreeMap::new();
 
         let mut seed_values = HashMap::from_iter(
             env.env
@@ -407,7 +406,13 @@ impl OptionParser {
             Source::Env,
             Arc::new(EnvReader::new(env, fromfile_expander.clone())),
         );
-        sources.insert(Source::Flag, Arc::new(args_reader));
+        sources.insert(
+            Source::Flag,
+            Arc::new(FlagsReader::new(
+                arg_splitter.split_args(args.clone()).flags,
+                fromfile_expander.clone(),
+            )),
+        );
         let mut parser = OptionParser {
             sources: sources.clone(),
             include_derivation: false,
@@ -538,7 +543,7 @@ impl OptionParser {
         // Step #3: Read env and config (but not args) to find cli aliases.
 
         // Remove the args source, as we don't support providing cli aliases on the cli...
-        let unexpanded_args_source = sources.remove(&Source::Flag).unwrap();
+        sources.remove(&Source::Flag).unwrap();
 
         parser = OptionParser {
             sources: sources.clone(),
@@ -563,22 +568,18 @@ impl OptionParser {
 
         let alias_map = cli_alias::create_alias_map(known_scopes_to_flags, &alias_strings)?;
 
-        // Step #4: Read any spec_files from alias-expanded args, env, config and rcfiles.
+        // Step #4: Read any spec_files from alias-expanded flags, env, config and rcfiles.
 
-        // Add the args reader back in, after expanding aliases.
-        let unexpanded_args_reader = unexpanded_args_source
-            .as_any()
-            .downcast_ref::<ArgsReader>()
-            .unwrap();
-        let expanded_args_reader = unexpanded_args_reader.expand_aliases(&alias_map);
-
-        // Now get the PantsCommand based on the expanded aliases.
-        // For historical reasons, getting the SplitArgs (for goals and specs) is done
-        // in ArgSplitter, in a separate pass from getting the Args (for CLI flags).
-        // TODO: Combine the two passes?
-        let command = arg_splitter.split_args(expanded_args_reader.get_args());
-
-        sources.insert(Source::Flag, Arc::new(expanded_args_reader));
+        let expanded_args = Args::new(expand_aliases(args.arg_strings.clone(), &alias_map));
+        // Now get the final PantsCommand based on the expanded aliases.
+        let command = arg_splitter.split_args(expanded_args);
+        sources.insert(
+            Source::Flag,
+            Arc::new(FlagsReader::new(
+                command.flags.clone(),
+                fromfile_expander.clone(),
+            )),
+        );
 
         parser = OptionParser {
             sources: sources.clone(),
@@ -870,25 +871,24 @@ impl OptionParser {
         ret
     }
 
-    pub fn get_args(&self) -> Result<Vec<String>, String> {
-        Ok(self.get_args_reader()?.get_args())
-    }
-
     pub fn get_passthrough_args(&self) -> Result<Option<Vec<String>>, String> {
-        Ok(self.get_args_reader()?.get_passthrough_args())
+        Ok(self.command.passthru.clone())
     }
 
     pub fn get_unconsumed_flags(&self) -> Result<HashMap<Scope, Vec<String>>, String> {
-        Ok(self.get_args_reader()?.get_tracker().get_unconsumed_flags())
+        Ok(self
+            .get_flags_reader()?
+            .get_tracker()
+            .get_unconsumed_flags())
     }
 
-    fn get_args_reader(&self) -> Result<&ArgsReader, String> {
-        if let Some(args_reader) = self
+    fn get_flags_reader(&self) -> Result<&FlagsReader, String> {
+        if let Some(flags_reader) = self
             .sources
             .get(&Source::Flag)
-            .and_then(|source| source.as_any().downcast_ref::<ArgsReader>())
+            .and_then(|source| source.as_any().downcast_ref::<FlagsReader>())
         {
-            Ok(args_reader)
+            Ok(flags_reader)
         } else {
             Err("This OptionParser does not have command-line args as a source".to_string())
         }
