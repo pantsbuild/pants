@@ -89,7 +89,8 @@ jobs:
         mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
 
         '
-    - if: needs.release_info.outputs.is-release == 'true'
+    - continue-on-error: true
+      if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v2
       with:
@@ -196,7 +197,8 @@ jobs:
         mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
 
         '
-    - if: needs.release_info.outputs.is-release == 'true'
+    - continue-on-error: true
+      if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v2
       with:
@@ -217,7 +219,8 @@ jobs:
         \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
         \ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)\"\
         \ \\\n    --data-binary \"@$WHL\";\n"
-    - if: needs.release_info.outputs.is-release == 'true'
+    - continue-on-error: true
+      if: needs.release_info.outputs.is-release == 'true'
       name: Attest the pantsbuild.pants.testutil wheel
       uses: actions/attest-build-provenance@v2
       with:
@@ -331,7 +334,8 @@ jobs:
         mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
 
         '
-    - if: needs.release_info.outputs.is-release == 'true'
+    - continue-on-error: true
+      if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v2
       with:
@@ -450,7 +454,8 @@ jobs:
         mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
 
         '
-    - if: needs.release_info.outputs.is-release == 'true'
+    - continue-on-error: true
+      if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v2
       with:
