@@ -516,6 +516,60 @@ def test_infers_third_party_package_json_field_js_source_dependency(
     assert set(addresses) == {Address("src/js", generated_name="chalk")}
 
 
+def test_infers_scoped_third_party_package_json_field_js_source_dependency(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": "package_json()",
+            "src/js/package.json": given_package(
+                "ham", "0.0.1", main="lib/index.js", dependencies={"@angular/core": "14.0.0"}
+            ),
+            "src/js/lib/BUILD": "javascript_sources()",
+            "src/js/lib/index.js": dedent(
+                """\
+                import { Component } from "@angular/core";
+                """
+            ),
+        }
+    )
+
+    pkg_tgt = rule_runner.get_target(Address("src/js/lib", relative_file_path="index.js"))
+    addresses = rule_runner.request(
+        InferredDependencies,
+        [InferJSDependenciesRequest(JSSourceInferenceFieldSet.create(pkg_tgt))],
+    ).include
+
+    assert set(addresses) == {Address("src/js", generated_name="__angular/core")}
+
+
+def test_infers_third_party_package_json_field_js_source_dependency_with_subpath(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": "package_json()",
+            "src/js/package.json": given_package(
+                "ham", "0.0.1", main="lib/index.js", dependencies={"@mui/material": "5.0.0"}
+            ),
+            "src/js/lib/BUILD": "javascript_sources()",
+            "src/js/lib/index.js": dedent(
+                """\
+                import Button from '@mui/material/Button';
+                """
+            ),
+        }
+    )
+
+    pkg_tgt = rule_runner.get_target(Address("src/js/lib", relative_file_path="index.js"))
+    addresses = rule_runner.request(
+        InferredDependencies,
+        [InferJSDependenciesRequest(JSSourceInferenceFieldSet.create(pkg_tgt))],
+    ).include
+
+    assert set(addresses) == {Address("src/js", generated_name="__mui/material")}
+
+
 def test_infers_third_party_package_json_field_js_source_dependency_with_import_subpaths(
     rule_runner: RuleRunner,
 ) -> None:

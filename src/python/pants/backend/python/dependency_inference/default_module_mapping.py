@@ -196,6 +196,7 @@ DEFAULT_MODULE_MAPPING: Dict[str, Tuple[str, ...]] = {
     "opentelemetry-exporter-otlp-proto-grpc": ("opentelemetry.exporter.otlp.proto.grpc",),
     "opentelemetry-exporter-otlp-proto-http": ("opentelemetry.exporter.otlp.proto.http",),
     "opentelemetry-instrumentation-kafka-python": ("opentelemetry.instrumentation.kafka",),
+    "opentelemetry-proto": ("opentelemetry.proto",),
     "opentelemetry-sdk": ("opentelemetry.sdk",),
     "opentelemetry-semantic-conventions": ("opentelemetry.semconv",),
     "opentelemetry-test-utils": ("opentelemetry.test",),

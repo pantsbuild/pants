@@ -40,7 +40,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: Linux-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.84.0-*
+        path: '~/.rustup/toolchains/1.84.1-*
 
           ~/.rustup/update-hashes
 
@@ -145,7 +145,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.84.0-*
+        path: '~/.rustup/toolchains/1.84.1-*
 
           ~/.rustup/update-hashes
 
@@ -260,7 +260,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.84.0-*
+        path: '~/.rustup/toolchains/1.84.1-*
 
           ~/.rustup/update-hashes
 
@@ -508,7 +508,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.84.0-*
+        path: '~/.rustup/toolchains/1.84.1-*
 
           ~/.rustup/update-hashes
 
@@ -532,10 +532,12 @@ jobs:
         go-version: 1.19.5
     - env:
         ARCHFLAGS: -arch x86_64
+        _PYTHON_HOST_PLATFORM: macosx-13.0-x86_64
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
     - env:
         ARCHFLAGS: -arch x86_64
+        _PYTHON_HOST_PLATFORM: macosx-13.0-x86_64
       name: Build Pants PEX
       run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
@@ -588,7 +590,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.84.0-*
+        path: '~/.rustup/toolchains/1.84.1-*
 
           ~/.rustup/update-hashes
 
@@ -612,10 +614,12 @@ jobs:
         go-version: 1.19.5
     - env:
         ARCHFLAGS: -arch arm64
+        _PYTHON_HOST_PLATFORM: macosx-14.0-arm64
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
     - env:
         ARCHFLAGS: -arch arm64
+        _PYTHON_HOST_PLATFORM: macosx-14.0-arm64
       name: Build Pants PEX
       run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
@@ -1870,6 +1874,7 @@ jobs:
   test_python_macos13_x86_64:
     env:
       ARCHFLAGS: -arch x86_64
+      _PYTHON_HOST_PLATFORM: macosx-13.0-x86_64
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (macOS13-x86_64)
     needs:

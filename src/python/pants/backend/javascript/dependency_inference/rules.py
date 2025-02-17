@@ -190,7 +190,14 @@ async def _determine_import_from_candidates(
     addresses = Addresses(tgt.address for tgt in owning_targets)
     if not local_owners:
         non_path_string_bases = FrozenOrderedSet(
-            non_path_string.partition(os.path.sep)[0]
+            (
+                # Handle scoped packages like "@foo/bar"
+                # Ref: https://docs.npmjs.com/cli/v11/using-npm/scope
+                "/".join(non_path_string.split("/")[:2])
+                if non_path_string.startswith("@")
+                # Handle regular packages like "foo"
+                else non_path_string.partition("/")[0]
+            )
             for non_path_string in candidates.package_imports
         )
         addresses = Addresses(

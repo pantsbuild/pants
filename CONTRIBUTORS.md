@@ -115,6 +115,7 @@ Created as part of the release process.
 + Flo
 + Florian Leibert
 + Fredrik Ekholdt
++ Fredrik Wärnsberg
 + Gabriel Gonzalez
 + Garrett Malmquist
 + Gary M. Josack
@@ -351,6 +352,7 @@ Created as part of the release process.
 + Travis Crawford
 + Troy Howard
 + Tushar Singh
++ Tyler Rhodes
 + Ugo Di Girolamo
 + Ulugbek Adilbekov
 + Viktor Kleen

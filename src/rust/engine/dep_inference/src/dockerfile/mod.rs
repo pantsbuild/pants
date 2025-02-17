@@ -47,6 +47,8 @@ lazy_static! {
     .unwrap();
 }
 
+type DockerStagesMap = IndexMap<String, Option<String>>; // mapping of stages to their tags
+
 #[derive(Serialize, Deserialize)]
 pub struct ParsedDockerfileDependencies {
     pub path: PathBuf,
@@ -54,7 +56,7 @@ pub struct ParsedDockerfileDependencies {
     pub copy_build_args: Vec<String>,
     pub copy_source_paths: Vec<String>,
     pub from_image_build_args: Vec<String>,
-    pub version_tags: IndexMap<String, String>,
+    pub version_tags: DockerStagesMap,
 }
 
 pub fn get_info(contents: &str, filepath: PathBuf) -> Result<ParsedDockerfileDependencies, String> {
@@ -71,7 +73,7 @@ pub fn get_info(contents: &str, filepath: PathBuf) -> Result<ParsedDockerfileDep
 }
 
 struct DockerFileInfoCollector<'a> {
-    pub version_tags: IndexMap<String, String>,
+    pub version_tags: DockerStagesMap,
     pub build_args: Vec<String>,
     pub seen_build_args: IndexMap<String, Option<String>>,
     pub copy_build_args: Vec<String>,
@@ -140,12 +142,12 @@ impl Visitor for DockerFileInfoCollector<'_> {
             Tag::Explicit(e) => Some(e.to_string()),
             Tag::None => None,
         };
-        if let Some(tag) = tag {
-            let mut stage_collector = StageCollector::new(self.code);
-            stage_collector.walk(&mut cursor);
-            self.version_tags
-                .insert(stage_collector.get_stage(self.stage_counter), tag);
-        }
+
+        let mut stage_collector = StageCollector::new(self.code);
+        stage_collector.walk(&mut cursor);
+        self.version_tags
+            .insert(stage_collector.get_stage(self.stage_counter), tag);
+
         self.stage_counter += 1;
         ChildBehavior::Ignore
     }

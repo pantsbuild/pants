@@ -14,10 +14,18 @@ from pants.backend.shell.target_types import (
 )
 from pants.backend.shell.util_rules import shell_command
 from pants.backend.shell.util_rules.shell_command import ShellCommandProcessFromTargetRequest
-from pants.core.goals.test import TestExtraEnv, TestFieldSet, TestRequest, TestResult, TestSubsystem
+from pants.core.goals.test import (
+    TestDebugRequest,
+    TestExtraEnv,
+    TestFieldSet,
+    TestRequest,
+    TestResult,
+    TestSubsystem,
+)
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.internals.selectors import Get
 from pants.engine.process import (
+    InteractiveProcess,
     Process,
     ProcessCacheScope,
     ProcessResultWithRetries,
@@ -46,6 +54,7 @@ class TestShellCommandFieldSet(TestFieldSet):
 class ShellTestRequest(TestRequest):
     tool_subsystem = ShellTestSubsystem
     field_set_type = TestShellCommandFieldSet
+    supports_debug = True
 
 
 @rule(desc="Test with shell command", level=LogLevel.DEBUG)
@@ -85,6 +94,31 @@ async def test_shell_command(
         process_results=shell_result.results,
         address=field_set.address,
         output_setting=test_subsystem.output,
+    )
+
+
+@rule(desc="Test with shell command (interactively)", level=LogLevel.DEBUG)
+async def test_shell_command_interactively(
+    batch: ShellTestRequest.Batch[TestShellCommandFieldSet, Any],
+) -> TestDebugRequest:
+    field_set = batch.single_element
+    wrapped_tgt = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(field_set.address, description_of_origin="<infallible>"),
+    )
+
+    shell_process = await Get(
+        Process,
+        ShellCommandProcessFromTargetRequest(wrapped_tgt.target),
+    )
+
+    # This is probably not strictly necessary given the use of `InteractiveProcess` but good to be correct in any event.
+    shell_process = dataclasses.replace(shell_process, cache_scope=ProcessCacheScope.PER_SESSION)
+
+    return TestDebugRequest(
+        InteractiveProcess.from_process(
+            shell_process, forward_signals_to_process=False, restartable=True
+        )
     )
 
 
