@@ -8,6 +8,7 @@ python_sources(
 
 python_tests(
     name="tests",
+    timeout=600,
     overrides={
         "rules_integration_test.py": {
             "tags": ["platform_specific_behavior"],

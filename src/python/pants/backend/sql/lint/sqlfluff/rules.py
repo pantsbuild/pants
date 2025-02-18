@@ -2,8 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import logging
+import re
+from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Iterable, Tuple
+from typing import Any, DefaultDict, Iterable, Iterator, Sequence, Tuple
 
 from typing_extensions import assert_never
 
@@ -14,22 +17,26 @@ from pants.core.goals.fix import FixResult, FixTargetsRequest
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.config_files import find_config_file
-from pants.core.util_rules.partitions import PartitionerType
+from pants.core.util_rules.partitions import Partition, PartitionerType, Partitions
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
-from pants.engine.fs import MergeDigests
+from pants.engine.collection import Collection
+from pants.engine.fs import Digest, DigestContents, FileContent, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.intrinsics import execute_process, merge_digests
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Rule, collect_rules, concurrently, implicitly, rule
+from pants.engine.rules import Get, Rule, collect_rules, concurrently, implicitly, rule
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 from pants.util.strutil import pluralize
+
+logger = logging.getLogger(__name__)
 
 
 class SqlfluffFixRequest(FixTargetsRequest):
     field_set_type = SqlfluffFieldSet
     tool_subsystem = Sqlfluff
-    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
+    partitioner_type = PartitionerType.CUSTOM
 
     # We don't need to include automatically added lint rules for this SqlfluffFixRequest,
     # because these lint rules are already checked by SqlfluffLintRequest.
@@ -39,13 +46,13 @@ class SqlfluffFixRequest(FixTargetsRequest):
 class SqlfluffLintRequest(LintTargetsRequest):
     field_set_type = SqlfluffFieldSet
     tool_subsystem = Sqlfluff
-    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
+    partitioner_type = PartitionerType.CUSTOM
 
 
 class SqlfluffFormatRequest(FmtTargetsRequest):
     field_set_type = SqlfluffFieldSet
     tool_subsystem = Sqlfluff
-    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
+    partitioner_type = PartitionerType.CUSTOM
 
     @classproperty
     def tool_name(cls) -> str:
@@ -59,6 +66,7 @@ class SqlfluffFormatRequest(FmtTargetsRequest):
 @dataclass(frozen=True)
 class _RunSqlfluffRequest:
     snapshot: Snapshot
+    templater: str
     mode: SqlfluffMode
 
 
@@ -84,12 +92,19 @@ async def run_sqlfluff(
         assert_never(request.mode)
 
     conf_args = ["--config", sqlfluff.config] if sqlfluff.config else []
+    templater_args = ["--templater", request.templater] if request.templater is not None else []
 
     result = await execute_process(
         **implicitly(
             VenvPexProcess(
                 sqlfluff_pex,
-                argv=(*initial_args, *conf_args, *sqlfluff.args, *request.snapshot.files),
+                argv=(
+                    *initial_args,
+                    *templater_args,
+                    *conf_args,
+                    *sqlfluff.args,
+                    *request.snapshot.files,
+                ),
                 input_digest=input_digest,
                 output_files=request.snapshot.files,
                 description=f"Run sqlfluff {' '.join(initial_args)} on {pluralize(len(request.snapshot.files), 'file')}.",
@@ -100,12 +115,170 @@ async def run_sqlfluff(
     return result
 
 
+@dataclass(frozen=True)
+class TemplaterMetadata:
+    templater: str | None
+
+    @property
+    def description(self) -> str:
+        return f"templater={self.templater}"
+
+
+class ConfigParser:
+    def __init__(self) -> None:
+        self.regex = re.compile("^templater *= *(?P<templater>[^ ]+) *$")
+
+    def parse_templater(self, content: str) -> str | None:
+        for line in content.splitlines():
+            if match := self.regex.match(line):
+                return match.group("templater").strip('"')
+        return None
+
+
+@dataclass(frozen=True)
+class NestedConfig:
+    templaters: dict[str, str]
+
+    @classmethod
+    def new(cls, parser: ConfigParser, contents: Collection[FileContent]) -> NestedConfig:
+        templaters = {}
+        for file_content in contents:
+            content = file_content.content.decode("utf-8")
+            templater = parser.parse_templater(content)
+            if templater is None:
+                continue
+
+            directory = file_content.path.rsplit("/", 1)[0]
+            templaters[directory] = templater
+
+        return NestedConfig(templaters)
+
+    def find_templater(self, directory: str) -> str | None:
+        for d in recursively(directory):
+            templater = self.templaters.get(d)
+            if templater is not None:
+                return templater
+        return None
+
+
+def recursively(directory: str) -> Iterator[str]:
+    while True:
+        yield directory
+        parts = directory.rsplit("/", 1)
+        if len(parts) == 1:
+            return
+
+        directory, _ = parts
+
+
+@dataclass(frozen=True)
+class _GroupByTemplaterRequest:
+    field_sets: Sequence[SqlfluffFieldSet]
+
+
+@dataclass(frozen=True)
+class _GroupByTemplaterResult:
+    groups: FrozenDict[str | None, tuple[SqlfluffFieldSet, ...]]
+
+
+@rule
+async def _group_by_templater(
+    request: _GroupByTemplaterRequest,
+    sqlfluff: Sqlfluff,
+) -> _GroupByTemplaterResult:
+    dirs = [
+        directory
+        for field_set in request.field_sets
+        for directory in recursively(field_set.address.spec_path)
+    ]
+
+    config_files = await find_config_file(sqlfluff.config_request(dirs))
+
+    logger.debug("sqlfluff config files: %s", config_files.snapshot.files)
+    contents = await Get(DigestContents, Digest, config_files.snapshot.digest)
+
+    parser = ConfigParser()
+    nested_config = NestedConfig.new(parser, contents)
+    logger.debug("sqlfluff nested config: %s", nested_config)
+
+    result: DefaultDict[str | None, list[SqlfluffFieldSet]] = defaultdict(list)
+    for field_set in request.field_sets:
+        directory = field_set.address.spec_path
+        templater = nested_config.find_templater(directory)
+        if templater is None:
+            result[None].append(field_set)
+            continue
+
+        result[templater].append(field_set)
+    return _GroupByTemplaterResult(groups=FrozenDict((k, tuple(v)) for k, v in result.items()))
+
+
+@dataclass(frozen=True)
+class _GroupFilesByTemplaterRequest:
+    field_sets: Sequence[SqlfluffFieldSet]
+
+
+@rule
+async def _group_files_by_templater(request: _GroupFilesByTemplaterRequest) -> Partitions:
+    result = await _group_by_templater(**implicitly(_GroupByTemplaterRequest(request.field_sets)))
+    gets = [
+        determine_source_files(SourceFilesRequest(field_set.source for field_set in field_sets))
+        for field_sets in result.groups.values()
+    ]
+    all_source_files = (await concurrently(*gets)) if gets else []
+
+    partitions = Partitions(
+        Partition(
+            elements=source_files.files,
+            metadata=TemplaterMetadata(templater),
+        )
+        for templater, source_files in zip(result.groups, all_source_files)
+    )
+    return partitions
+
+
+@dataclass(frozen=True)
+class _GroupFieldSetsByTemplaterRequest:
+    field_sets: Sequence[SqlfluffFieldSet]
+
+
+@rule
+async def _group_field_sets_by_templater(
+    request: _GroupFieldSetsByTemplaterRequest,
+) -> Partitions:
+    result = await _group_by_templater(**implicitly(_GroupByTemplaterRequest(request.field_sets)))
+    partitions = Partitions(
+        Partition(
+            elements=tuple(sorted(field_sets, key=lambda fs: fs.address)),
+            metadata=TemplaterMetadata(templater),
+        )
+        for templater, field_sets in result.groups.items()
+    )
+    logger.debug("sqlfluff partitions: %s", partitions)
+    return partitions
+
+
 @rule(desc="Fix with sqlfluff fix", level=LogLevel.DEBUG)
 async def sqlfluff_fix(request: SqlfluffFixRequest.Batch, sqlfluff: Sqlfluff) -> FixResult:
     result = await run_sqlfluff(
-        _RunSqlfluffRequest(snapshot=request.snapshot, mode=SqlfluffMode.FIX), sqlfluff
+        _RunSqlfluffRequest(
+            snapshot=request.snapshot,
+            templater=request.partition_metadata.templater,
+            mode=SqlfluffMode.FIX,
+        ),
+        sqlfluff,
     )
     return await FixResult.create(request, result)
+
+
+@rule
+async def sqlfluff_fix_partition(
+    request: SqlfluffFixRequest.PartitionRequest,
+) -> Partitions:
+    return await Get(
+        Partitions,
+        _GroupFilesByTemplaterRequest(field_sets=request.field_sets),
+    )
 
 
 @rule(desc="Lint with sqlfluff lint", level=LogLevel.DEBUG)
@@ -116,17 +289,47 @@ async def sqlfluff_lint(
         SourceFilesRequest(field_set.source for field_set in request.elements)
     )
     result = await run_sqlfluff(
-        _RunSqlfluffRequest(snapshot=source_files.snapshot, mode=SqlfluffMode.LINT), sqlfluff
+        _RunSqlfluffRequest(
+            snapshot=source_files.snapshot,
+            templater=request.partition_metadata.templater,
+            mode=SqlfluffMode.LINT,
+        ),
+        sqlfluff,
     )
     return LintResult.create(request, result)
+
+
+@rule
+async def sqlfluff_lint_partition(
+    request: SqlfluffLintRequest.PartitionRequest,
+) -> Partitions:
+    return await Get(
+        Partitions,
+        _GroupFieldSetsByTemplaterRequest(field_sets=request.field_sets),
+    )
 
 
 @rule(desc="Format with sqlfluff format", level=LogLevel.DEBUG)
 async def sqlfluff_fmt(request: SqlfluffFormatRequest.Batch, sqlfluff: Sqlfluff) -> FmtResult:
     result = await run_sqlfluff(
-        _RunSqlfluffRequest(snapshot=request.snapshot, mode=SqlfluffMode.FMT), sqlfluff
+        _RunSqlfluffRequest(
+            snapshot=request.snapshot,
+            templater=request.partition_metadata.templater,
+            mode=SqlfluffMode.FMT,
+        ),
+        sqlfluff,
     )
     return await FmtResult.create(request, result)
+
+
+@rule
+async def sqlfluff_fmt_partition(
+    request: SqlfluffFormatRequest.PartitionRequest,
+) -> Partitions:
+    return await Get(
+        Partitions,
+        _GroupFilesByTemplaterRequest(field_sets=request.field_sets),
+    )
 
 
 def rules() -> Iterable[Rule]:

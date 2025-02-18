@@ -52,3 +52,40 @@ You can run the linter via `lint` goal:
 ```
 pants lint --only=sqlfluff ::
 ```
+
+## Using different templaters
+
+As of 3.2.5, sqlfluff doesn't support using different templaters in
+subdirectories. If you try to set `templater` in a subdirectory you'll get
+something like this:
+
+```
+WARNING    Attempt to set templater to jinja failed. Using python templater.
+Templater cannot be set in a .sqlfluff file in a subdirectory of the current
+working directory. It can be set in a .sqlfluff in the current working
+directory. See Nesting section of the docs for more details.
+```
+
+However, pants overcomes this limitation by running multiple sqlfluff processes
+in parallel. You can set the `templater` config value and pants will figure out
+how to partition your files:
+
+```toml tab={"label":"a/.sqlfluff"}
+[sqlfluff]
+templater = python
+dialect = postgres
+```
+
+```sql tab={"label":"a/query.sql"}
+select * from {table}
+```
+
+```toml tab={"label":"b/.sqlfluff"}
+[sqlfluff]
+templater = jinja
+dialect = postgres
+```
+
+```sql tab={"label":"b/query.sql"}
+select * from {{table}}
+```
