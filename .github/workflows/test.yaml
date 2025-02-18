@@ -338,7 +338,7 @@ jobs:
     - classify_changes
     permissions:
       attestations: write
-      contents: read
+      contents: write
       id-token: write
     runs-on:
     - self-hosted
@@ -412,7 +412,7 @@ jobs:
     - classify_changes
     permissions:
       attestations: write
-      contents: read
+      contents: write
       id-token: write
     runs-on:
     - ubuntu-22.04
@@ -484,7 +484,7 @@ jobs:
     - classify_changes
     permissions:
       attestations: write
-      contents: read
+      contents: write
       id-token: write
     runs-on:
     - macos-13
@@ -574,7 +574,7 @@ jobs:
     - classify_changes
     permissions:
       attestations: write
-      contents: read
+      contents: write
       id-token: write
     runs-on:
     - macos-14
