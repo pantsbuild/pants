@@ -883,7 +883,7 @@ def build_wheels_job(
             "runs-on": helper.runs_on(),
             "permissions": {
                 "id-token": "write",
-                "contents": "read",
+                "contents": "write",
                 "attestations": "write",
             },
             **({"container": container} if container else {}),
