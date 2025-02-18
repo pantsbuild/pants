@@ -12,7 +12,7 @@ Example rule:
 
     @rule
     async def publish_example(request: PublishToMyRepoRequest, ...) -> PublishProcesses:
-      # Create `InteractiveProcess` instances as required by the `request`.
+      # Create `InteractiveProcess` instances or `Process` instances as required by the `request`.
       return PublishProcesses(...)
 """
 
@@ -25,7 +25,7 @@ import logging
 from abc import ABCMeta
 from dataclasses import asdict, dataclass, field, is_dataclass, replace
 from itertools import chain
-from typing import ClassVar, Generic, Type, TypeVar
+from typing import ClassVar, Generic, Type, TypeVar, cast
 
 from typing_extensions import final
 
@@ -36,7 +36,13 @@ from pants.engine.console import Console
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.intrinsics import run_interactive_process_in_environment
-from pants.engine.process import InteractiveProcess
+from pants.engine.process import (
+    FallibleProcessResult,
+    InteractiveProcess,
+    InteractiveProcessResult,
+    Process,
+    ProcessCacheScope,
+)
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
@@ -125,14 +131,21 @@ class PublishPackages:
     The `names` should list all artifacts being published by the `process` command.
 
     The `process` may be `None`, indicating that it will not be published. This will be logged as
-    `skipped`. If the process returns a non-zero exit code, it will be logged as `failed`.
+    `skipped`. If the process returns a non-zero exit code, it will be logged as `failed`. The `process`
+    can either be a Process or an InteractiveProcess. In most cases, InteractiveProcess will be wanted.
+    However, some tools have non-interactive publishing modes and can leverage parallelism. See
+    https://github.com/pantsbuild/pants/issues/17613#issuecomment-1323913381 for more context.
+
+    If running a background process and verbose_background_process is True, all logs are output always output to
+    logs.
 
     The `description` may be a reason explaining why the publish was skipped, or identifying which
     repository the artifacts are published to.
     """
 
     names: tuple[str, ...]
-    process: InteractiveProcess | None = None
+    process: InteractiveProcess | Process | None = None
+    verbose_background_process: bool = False
     description: str | None = None
     data: PublishOutputData = field(default_factory=PublishOutputData)
 
@@ -184,6 +197,36 @@ class Publish(Goal):
     environment_behavior = Goal.EnvironmentBehavior.USES_ENVIRONMENTS
 
 
+def _to_publish_output_results_and_data(
+    pub: PublishPackages, res: FallibleProcessResult | InteractiveProcessResult, console: Console
+) -> tuple[list[str], list[PublishOutputData]]:
+    if res.exit_code == 0:
+        sigil = console.sigil_succeeded()
+        status = "published"
+        prep = "to"
+    else:
+        sigil = console.sigil_failed()
+        status = "failed"
+        prep = "for"
+
+    if pub.description:
+        status += f" {prep} {pub.description}"
+
+    results = []
+    output_data = []
+    for name in pub.names:
+        results.append(f"{sigil} {name} {status}.")
+
+    output_data.append(
+        pub.get_output_data(
+            exit_code=res.exit_code,
+            published=res.exit_code == 0,
+            status=status,
+        )
+    )
+    return results, output_data
+
+
 @goal_rule
 async def run_publish(
     console: Console, publish: PublishSubsystem, local_environment: ChosenLocalEnvironmentName
@@ -228,47 +271,80 @@ async def run_publish(
         for tgt in targets
     )
 
-    # Run all processes interactively.
     exit_code: int = 0
     outputs: list[PublishOutputData] = []
     results: list[str] = []
 
-    for pub in chain.from_iterable(processes):
-        if not pub.process:
-            sigil = console.sigil_skipped()
-            status = "skipped"
-            if pub.description:
-                status += f" {pub.description}"
-            for name in pub.names:
-                results.append(f"{sigil} {name} {status}.")
-            outputs.append(pub.get_output_data(published=False, status=status))
-            continue
-
-        logger.debug(f"Execute {pub.process}")
-        res = await run_interactive_process_in_environment(pub.process, local_environment.val)
-        if res.exit_code == 0:
-            sigil = console.sigil_succeeded()
-            status = "published"
-            prep = "to"
-        else:
-            sigil = console.sigil_failed()
-            status = "failed"
-            prep = "for"
-            exit_code = res.exit_code
-
-        if pub.description:
-            status += f" {prep} {pub.description}"
-
-        for name in pub.names:
-            results.append(f"{sigil} {name} {status}.")
-
-        outputs.append(
-            pub.get_output_data(
-                exit_code=res.exit_code,
-                published=res.exit_code == 0,
-                status=status,
+    flattened_processes = list(chain.from_iterable(processes))
+    background_publishes: list[PublishPackages] = [
+        pub for pub in flattened_processes if isinstance(pub.process, Process)
+    ]
+    foreground_publishes: list[PublishPackages] = [
+        pub for pub in flattened_processes if isinstance(pub.process, InteractiveProcess)
+    ]
+    skipped_publishes: list[PublishPackages] = [
+        pub for pub in flattened_processes if pub.process is None
+    ]
+    background_requests: list[Get[FallibleProcessResult]] = []
+    for pub in background_publishes:
+        process = cast(Process, pub.process)
+        # Because this is a publish process, we want to ensure we don't cache this process.
+        assert process.cache_scope == ProcessCacheScope.PER_SESSION
+        background_requests.append(
+            Get(
+                FallibleProcessResult,
+                {process: Process, local_environment.val: EnvironmentName},
             )
         )
+
+    # Process all non-interactive publishes
+    logger.debug(f"Awaiting {len(background_requests)} background publishes")
+    background_results = await MultiGet(background_requests)
+    for pub, background_res in zip(background_publishes, background_results):
+        logger.debug(f"Processing {pub.process} background process")
+        pub_results, pub_output = _to_publish_output_results_and_data(pub, background_res, console)
+        results.extend(pub_results)
+        outputs.extend(pub_output)
+
+        names = "'" + "', '".join(pub.names) + "'"
+        output_msg = "\n".join(
+            (
+                f"Output for publishing {names}",
+                "stdout:",
+                background_res.stdout.decode(),
+                "stderr:",
+                background_res.stderr.decode(),
+            )
+        )
+
+        if background_res.exit_code != 0 or pub.verbose_background_process:
+            logger.info(output_msg)
+        else:
+            logger.debug(output_msg)
+
+        if background_res.exit_code != 0:
+            exit_code = background_res.exit_code
+
+    for pub in skipped_publishes:
+        sigil = console.sigil_skipped()
+        status = "skipped"
+        if pub.description:
+            status += f" {pub.description}"
+        for name in pub.names:
+            results.append(f"{sigil} {name} {status}.")
+        outputs.append(pub.get_output_data(published=False, status=status))
+
+    # Process all interactive publishes
+    for pub in foreground_publishes:
+        logger.debug(f"Execute {pub.process}")
+        res = await run_interactive_process_in_environment(
+            cast(InteractiveProcess, pub.process), local_environment.val
+        )
+        pub_results, pub_output = _to_publish_output_results_and_data(pub, res, console)
+        results.extend(pub_results)
+        outputs.extend(pub_output)
+        if res.exit_code != 0:
+            exit_code = res.exit_code
 
     console.print_stderr("")
     if not results:
