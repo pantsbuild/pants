@@ -21,6 +21,7 @@ from pants_release.common import die
 def action(name: str) -> str:
     version_map = {
         "action-send-mail": "dawidd6/action-send-mail@v3.8.0",
+        "attest-build-provenance": "actions/attest-build-provenance@v2",
         "cache": "actions/cache@v4",
         "checkout": "actions/checkout@v4",
         "download-artifact": "actions/download-artifact@v4",
@@ -880,6 +881,11 @@ def build_wheels_job(
             "if": if_condition,
             "name": f"Build wheels ({str(platform.value)})",
             "runs-on": helper.runs_on(),
+            "permissions": {
+                "id-token": "write",
+                "contents": "write",
+                "attestations": "write",
+            },
             **({"container": container} if container else {}),
             **({"needs": needs} if needs else {}),
             "timeout-minutes": 90,
@@ -914,12 +920,16 @@ def build_wheels_job(
                 *(
                     [
                         {
-                            "name": "Upload Wheel and Pex",
+                            "name": "Attest the pantsbuild.pants wheel",
                             "if": "needs.release_info.outputs.is-release == 'true'",
-                            # NB: We can't use `gh` or even `./pants run 3rdparty/tools/gh` reliably
-                            #   in this job. Certain variations run on docker images without `gh`,
-                            #   and we could be building on a tag that doesn't have the `pants run <gh>`
-                            #   support. `curl` is a good lowest-common-denominator way to upload the assets.
+                            "uses": action("attest-build-provenance"),
+                            "with": {
+                                "subject-path": "dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants-*.whl",
+                            },
+                        },
+                        {
+                            "name": "Rename the Pants Pex to its final name for upload",
+                            "if": "needs.release_info.outputs.is-release == 'true'",
                             "run": dedent(
                                 """\
                                 PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
@@ -928,7 +938,29 @@ def build_wheels_job(
                                 PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
 
                                 mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
-
+                                echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
+                                """
+                            ),
+                        },
+                        {
+                            "name": "Attest the Pants Pex artifact",
+                            "if": "needs.release_info.outputs.is-release == 'true'",
+                            "uses": action("attest-build-provenance"),
+                            "with": {
+                                "subject-path": "dist/src.python.pants/*.pex",
+                            },
+                            # Temporary: Allow errors in this step while we test the release workflow.
+                            "continue-on-error": True,
+                        },
+                        {
+                            "name": "Upload Wheel and Pex",
+                            "if": "needs.release_info.outputs.is-release == 'true'",
+                            # NB: We can't use `gh` or even `./pants run 3rdparty/tools/gh` reliably
+                            #   in this job. Certain variations run on docker images without `gh`,
+                            #   and we could be building on a tag that doesn't have the `pants run <gh>`
+                            #   support. `curl` is a good lowest-common-denominator way to upload the assets.
+                            "run": dedent(
+                                """\
                                 curl -L --fail \\
                                     -X POST \\
                                     -H "Authorization: Bearer ${{ github.token }}" \\
@@ -948,6 +980,16 @@ def build_wheels_job(
                         },
                         *(
                             [
+                                {
+                                    "name": "Attest the pantsbuild.pants.testutil wheel",
+                                    "if": "needs.release_info.outputs.is-release == 'true'",
+                                    "uses": action("attest-build-provenance"),
+                                    "with": {
+                                        "subject-path": "dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants.testutil*.whl",
+                                    },
+                                    # Temporary: Allow errors in this step while we test the release workflow.
+                                    "continue-on-error": True,
+                                },
                                 {
                                     "name": "Upload testutil Wheel",
                                     "if": "needs.release_info.outputs.is-release == 'true'",
