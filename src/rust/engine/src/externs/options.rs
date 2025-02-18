@@ -196,7 +196,7 @@ impl PyPantsCommand {
         &self.0.specs
     }
 
-    fn passthru(&self) -> &Vec<String> {
+    fn passthru(&self) -> &Option<Vec<String>> {
         &self.0.passthru
     }
 }
