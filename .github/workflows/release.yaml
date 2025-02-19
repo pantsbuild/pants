@@ -100,8 +100,7 @@ jobs:
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
 
         '
-    - continue-on-error: true
-      if: needs.release_info.outputs.is-release == 'true'
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v2
       with:
@@ -214,8 +213,7 @@ jobs:
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
 
         '
-    - continue-on-error: true
-      if: needs.release_info.outputs.is-release == 'true'
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v2
       with:
@@ -231,8 +229,7 @@ jobs:
         \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
         \ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)\"\
         \ \\\n    --data-binary \"@$WHL\";\n"
-    - continue-on-error: true
-      if: needs.release_info.outputs.is-release == 'true'
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the pantsbuild.pants.testutil wheel
       uses: actions/attest-build-provenance@v2
       with:
@@ -357,8 +354,7 @@ jobs:
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
 
         '
-    - continue-on-error: true
-      if: needs.release_info.outputs.is-release == 'true'
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v2
       with:
@@ -483,8 +479,7 @@ jobs:
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
 
         '
-    - continue-on-error: true
-      if: needs.release_info.outputs.is-release == 'true'
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v2
       with:
