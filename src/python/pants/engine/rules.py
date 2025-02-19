@@ -52,7 +52,9 @@ AsyncRuleT = Callable[P, Coroutine[Any, Any, R]]
 RuleDecorator = Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]
 
 
-def _rule_call_trampoline(rule_id: str, output_type: type[Any], func: Callable[P, R]) -> Callable[P, R]:
+def _rule_call_trampoline(
+    rule_id: str, output_type: type[Any], func: Callable[P, R]
+) -> Callable[P, R]:
     @functools.wraps(func)  # type: ignore
     async def wrapper(*args, __implicitly: Sequence[Any] = (), **kwargs):
         call = Call(rule_id, output_type, args, *__implicitly)
