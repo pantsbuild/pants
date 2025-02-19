@@ -950,8 +950,6 @@ def build_wheels_job(
                             "with": {
                                 "subject-path": "dist/src.python.pants/*.pex",
                             },
-                            # Temporary: Allow errors in this step while we test the release workflow.
-                            "continue-on-error": True,
                         },
                         {
                             "name": "Upload Wheel and Pex",
@@ -988,8 +986,6 @@ def build_wheels_job(
                                     "with": {
                                         "subject-path": "dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants.testutil*.whl",
                                     },
-                                    # Temporary: Allow errors in this step while we test the release workflow.
-                                    "continue-on-error": True,
                                 },
                                 {
                                     "name": "Upload testutil Wheel",
