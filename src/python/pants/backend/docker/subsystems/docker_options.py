@@ -6,13 +6,13 @@ from __future__ import annotations
 import sys
 from typing import Any
 
-from pants.core.goals.publish import ShowOutput
 from pants.backend.docker.registries import DockerRegistries
+from pants.core.goals.publish import ShowOutput
 from pants.core.util_rules.search_paths import ExecutableSearchPathsOptionMixin
 from pants.option.option_types import (
-    EnumOption,
     BoolOption,
     DictOption,
+    EnumOption,
     ShellStrListOption,
     StrListOption,
     StrOption,
