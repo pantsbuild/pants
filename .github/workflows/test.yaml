@@ -336,6 +336,10 @@ jobs:
     name: Build wheels (Linux-ARM64)
     needs:
     - classify_changes
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
     runs-on:
     - self-hosted
     - runs-on
@@ -406,6 +410,10 @@ jobs:
     name: Build wheels (Linux-x86_64)
     needs:
     - classify_changes
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
     runs-on:
     - ubuntu-22.04
     steps:
@@ -474,6 +482,10 @@ jobs:
     name: Build wheels (macOS13-x86_64)
     needs:
     - classify_changes
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
     runs-on:
     - macos-13
     steps:
@@ -532,10 +544,12 @@ jobs:
         go-version: 1.19.5
     - env:
         ARCHFLAGS: -arch x86_64
+        _PYTHON_HOST_PLATFORM: macosx-13.0-x86_64
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
     - env:
         ARCHFLAGS: -arch x86_64
+        _PYTHON_HOST_PLATFORM: macosx-13.0-x86_64
       name: Build Pants PEX
       run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
@@ -558,6 +572,10 @@ jobs:
     name: Build wheels (macOS14-ARM64)
     needs:
     - classify_changes
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
     runs-on:
     - macos-14
     steps:
@@ -612,10 +630,12 @@ jobs:
         go-version: 1.19.5
     - env:
         ARCHFLAGS: -arch arm64
+        _PYTHON_HOST_PLATFORM: macosx-14.0-arm64
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
     - env:
         ARCHFLAGS: -arch arm64
+        _PYTHON_HOST_PLATFORM: macosx-14.0-arm64
       name: Build Pants PEX
       run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
@@ -1870,6 +1890,7 @@ jobs:
   test_python_macos13_x86_64:
     env:
       ARCHFLAGS: -arch x86_64
+      _PYTHON_HOST_PLATFORM: macosx-13.0-x86_64
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (macOS13-x86_64)
     needs:

@@ -29,7 +29,7 @@ from pants.backend.python.target_types import (
     PythonResolveField,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import CompletePlatforms, Pex, PexPlatforms
+from pants.backend.python.util_rules.pex import CompletePlatforms, Pex
 from pants.backend.python.util_rules.pex_from_targets import (
     InterpreterConstraintsRequest,
     PexFromTargetsRequest,
@@ -37,7 +37,6 @@ from pants.backend.python.util_rules.pex_from_targets import (
 from pants.backend.python.util_rules.pex_from_targets import rules as pex_from_targets_rules
 from pants.backend.python.util_rules.pex_venv import PexVenv, PexVenvLayout, PexVenvRequest
 from pants.backend.python.util_rules.pex_venv import rules as pex_venv_rules
-from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, OutputPathField
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.fs import (
@@ -369,7 +368,6 @@ class RuntimePlatformsRequest:
 @dataclass(frozen=True)
 class RuntimePlatforms:
     interpreter_version: None | tuple[int, int]
-    pex_platforms: PexPlatforms = PexPlatforms()
     complete_platforms: CompletePlatforms = CompletePlatforms()
 
 
@@ -445,10 +443,7 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
         known_runtimes_str = ", ".join(
             FrozenOrderedSet(r.name for r in request.runtime.known_runtimes)
         )
-        warn_or_error(
-            # Replace this with an unconditional `InvalidTargetException`
-            "2.26.0.dev0",
-            "implicitly resolving platforms for unknown FaaS runtimes",
+        raise InvalidTargetException(
             softwrap(
                 f"""
                 Could not find a known runtime for the {version_adjective} Python version and machine architecture!
@@ -465,11 +460,8 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
                 architecture.
                 """
             ),
-        )
-        return RuntimePlatforms(
-            interpreter_version=version,
-            pex_platforms=PexPlatforms((_format_platform_from_major_minor(*version),)),
-        )
+            description_of_origin=f"In the {request.target_name!r} target",
+        ) from None
 
     module = request.runtime.known_runtimes_complete_platforms_module()
 
@@ -567,7 +559,6 @@ async def build_python_faas(
         include_requirements=request.include_requirements,
         include_source_files=request.include_sources,
         output_filename=repository_filename,
-        platforms=platforms.pex_platforms,
         complete_platforms=platforms.complete_platforms,
         layout=PexLayout.PACKED,
         additional_args=additional_pex_args,
@@ -589,7 +580,6 @@ async def build_python_faas(
         PexVenvRequest(
             pex=pex_result,
             layout=layout,
-            platforms=platforms.pex_platforms,
             complete_platforms=platforms.complete_platforms,
             extra_args=request.pex3_venv_create_extra_args.value or (),
             prefix=request.prefix_in_artifact,

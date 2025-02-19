@@ -22,6 +22,7 @@ from pants_release.common import die
 def action(name: str) -> str:
     version_map = {
         "action-send-mail": "dawidd6/action-send-mail@v3.8.0",
+        "attest-build-provenance": "actions/attest-build-provenance@v2",
         "cache": "actions/cache@v4",
         "checkout": "actions/checkout@v4",
         "download-artifact": "actions/download-artifact@v4",
@@ -444,8 +445,17 @@ class Helper:
             # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
             # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
             ret["ARCHFLAGS"] = "-arch x86_64"
+            # Be explicit about the platform we've built our native code for: without this, Python
+            # builds and tags wheels based on the interpreter's build.
+            #
+            # At the time of writing, the GitHub-hosted runners' Pythons are built as
+            # macosx-10.9-universal2. Thus, without this env var, we tag our single-platform wheels
+            # as universal2... this is a lie and understandably leads to installing the wrong wheel
+            # and thus things do not work (see #21938 for an example).
+            ret["_PYTHON_HOST_PLATFORM"] = "macosx-13.0-x86_64"
         if self.platform in {Platform.MACOS14_ARM64}:
             ret["ARCHFLAGS"] = "-arch arm64"
+            ret["_PYTHON_HOST_PLATFORM"] = "macosx-14.0-arm64"
         if self.platform == Platform.LINUX_X86_64:
             # Currently we run Linux x86_64 CI on GitHub Actions-hosted hardware, and
             # these are weak dual-core machines. Default parallelism on those machines
@@ -872,6 +882,11 @@ def build_wheels_job(
             "if": if_condition,
             "name": f"Build wheels ({str(platform.value)})",
             "runs-on": helper.runs_on(),
+            "permissions": {
+                "id-token": "write",
+                "contents": "write",
+                "attestations": "write",
+            },
             **({"container": container} if container else {}),
             **({"needs": needs} if needs else {}),
             "timeout-minutes": 90,
@@ -906,12 +921,16 @@ def build_wheels_job(
                 *(
                     [
                         {
-                            "name": "Upload Wheel and Pex",
+                            "name": "Attest the pantsbuild.pants wheel",
                             "if": "needs.release_info.outputs.is-release == 'true'",
-                            # NB: We can't use `gh` or even `./pants run 3rdparty/tools/gh` reliably
-                            #   in this job. Certain variations run on docker images without `gh`,
-                            #   and we could be building on a tag that doesn't have the `pants run <gh>`
-                            #   support. `curl` is a good lowest-common-denominator way to upload the assets.
+                            "uses": action("attest-build-provenance"),
+                            "with": {
+                                "subject-path": "dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants-*.whl",
+                            },
+                        },
+                        {
+                            "name": "Rename the Pants Pex to its final name for upload",
+                            "if": "needs.release_info.outputs.is-release == 'true'",
                             "run": dedent(
                                 """\
                                 PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
@@ -920,7 +939,29 @@ def build_wheels_job(
                                 PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
 
                                 mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
-
+                                echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
+                                """
+                            ),
+                        },
+                        {
+                            "name": "Attest the Pants Pex artifact",
+                            "if": "needs.release_info.outputs.is-release == 'true'",
+                            "uses": action("attest-build-provenance"),
+                            "with": {
+                                "subject-path": "dist/src.python.pants/*.pex",
+                            },
+                            # Temporary: Allow errors in this step while we test the release workflow.
+                            "continue-on-error": True,
+                        },
+                        {
+                            "name": "Upload Wheel and Pex",
+                            "if": "needs.release_info.outputs.is-release == 'true'",
+                            # NB: We can't use `gh` or even `./pants run 3rdparty/tools/gh` reliably
+                            #   in this job. Certain variations run on docker images without `gh`,
+                            #   and we could be building on a tag that doesn't have the `pants run <gh>`
+                            #   support. `curl` is a good lowest-common-denominator way to upload the assets.
+                            "run": dedent(
+                                """\
                                 curl -L --fail \\
                                     -X POST \\
                                     -H "Authorization: Bearer ${{ github.token }}" \\
@@ -940,6 +981,16 @@ def build_wheels_job(
                         },
                         *(
                             [
+                                {
+                                    "name": "Attest the pantsbuild.pants.testutil wheel",
+                                    "if": "needs.release_info.outputs.is-release == 'true'",
+                                    "uses": action("attest-build-provenance"),
+                                    "with": {
+                                        "subject-path": "dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants.testutil*.whl",
+                                    },
+                                    # Temporary: Allow errors in this step while we test the release workflow.
+                                    "continue-on-error": True,
+                                },
                                 {
                                     "name": "Upload testutil Wheel",
                                     "if": "needs.release_info.outputs.is-release == 'true'",

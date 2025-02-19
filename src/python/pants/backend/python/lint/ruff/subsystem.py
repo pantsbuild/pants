@@ -153,7 +153,7 @@ class Ruff(TemplatedExternalTool):
     install_from_resolve = StrOption(
         advanced=True,
         default=None,
-        removal_version="2.26.0.dev0",
+        removal_version="2.27.0.dev0",
         removal_hint=_removal_hint,
         help="Formerly used to customise the version of Ruff to install.",
     )
@@ -161,28 +161,28 @@ class Ruff(TemplatedExternalTool):
     requirements = StrListOption(
         advanced=True,
         default=None,
-        removal_version="2.26.0.dev0",
+        removal_version="2.27.0.dev0",
         removal_hint=_removal_hint,
         help="Formerly used to customise the version of Ruff to install.",
     )
     interpreter_constraints = StrListOption(
         advanced=True,
         default=None,
-        removal_version="2.26.0.dev0",
+        removal_version="2.27.0.dev0",
         removal_hint=_removal_hint,
         help="Formerly used to customise the version of Ruff to install.",
     )
     console_script = StrOption(
         advanced=True,
         default=None,
-        removal_version="2.26.0.dev0",
+        removal_version="2.27.0.dev0",
         removal_hint=_removal_hint,
         help="Formerly used to customise the version of Ruff to install.",
     )
     entry_point = StrOption(
         advanced=True,
         default=None,
-        removal_version="2.26.0.dev0",
+        removal_version="2.27.0.dev0",
         removal_hint=_removal_hint,
         help="Formerly used to customise the version of Ruff to install.",
     )

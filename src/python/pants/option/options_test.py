@@ -80,7 +80,10 @@ def create_options(
         args=["pants", *(args or ())],
         env=env or {},
         config_sources=[FileContent("pants.toml", toml.dumps(config or {}).encode())],
-        known_scope_infos=[*(ScopeInfo(scope) for scope in scopes), *(extra_scope_infos or ())],
+        known_scope_infos=[
+            *(ScopeInfo(scope, is_goal=scope != GLOBAL_SCOPE) for scope in scopes),
+            *(extra_scope_infos or ()),
+        ],
     )
     register_fn(options)
     return options
@@ -479,26 +482,28 @@ def _parse(
 
 
 _known_scope_infos = [
-    ScopeInfo(scope)
-    for scope in (
-        GLOBAL_SCOPE,
-        "anotherscope",
-        "compile",
-        "compile.java",
-        "stale",
-        "test",
-        "test.junit",
-        "passconsumer",
-        "simple",
-        "simple-dashed",
-        "scoped.a.bit",
-        "scoped.and-dashed",
-        "fromfile",
-        "fingerprinting",
-        "enum-opt",
-        "separate-enum-opt-scope",
-        "other-enum-scope",
-    )
+    ScopeInfo(GLOBAL_SCOPE),
+    *[
+        ScopeInfo(scope, is_goal=True)
+        for scope in (
+            "anotherscope",
+            "compile",
+            "compile.java",
+            "stale",
+            "test",
+            "test.junit",
+            "passconsumer",
+            "simple",
+            "simple-dashed",
+            "scoped.a.bit",
+            "scoped.and-dashed",
+            "fromfile",
+            "fingerprinting",
+            "enum-opt",
+            "separate-enum-opt-scope",
+            "other-enum-scope",
+        )
+    ],
 ]
 
 

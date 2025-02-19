@@ -11,13 +11,13 @@ use std::time::Duration;
 use async_trait::async_trait;
 use bytes::{BufMut, Bytes};
 use futures::stream::StreamExt;
+use futures::TryFutureExt;
 use hashing::Digest;
 use humansize::{file_size_opts, FileSize};
 use reqwest::header::{HeaderMap, HeaderName};
 use reqwest::Error;
 use store::Store;
-use tokio_retry::strategy::{jitter, ExponentialBackoff};
-use tokio_retry::RetryIf;
+use tokio_retry2::{strategy::ExponentialFactorBackoff, Retry, RetryError};
 use url::Url;
 
 use workunit_store::{in_workunit, Level};
@@ -216,6 +216,10 @@ async fn attempt_download(
     Ok((digest, bytewriter.writer.into_inner().freeze()))
 }
 
+pub fn jitter(duration: Duration) -> Duration {
+    duration.mul_f64(rand::random::<f64>())
+}
+
 pub async fn download(
     http_client: &reqwest::Client,
     store: Store,
@@ -238,30 +242,30 @@ pub async fn download(
                 .unwrap()
         )),
         |_workunit| async move {
-            let retry_strategy = ExponentialBackoff::from_millis(error_delay.as_millis() as u64)
-                .map(jitter)
-                .take(max_attempts.get() - 1);
-            RetryIf::spawn(
-                retry_strategy,
-                || {
-                    attempt_number += 1;
-                    log::debug!("Downloading {} (attempt #{})", &url, &attempt_number);
+            let retry_strategy =
+                ExponentialFactorBackoff::from_millis(error_delay.as_millis() as u64, 2.0)
+                    .map(jitter)
+                    .take(max_attempts.get() - 1);
 
-                    attempt_download(
-                        http_client,
-                        &url,
-                        &auth_headers,
-                        file_name.clone(),
-                        expected_digest,
-                    )
-                },
-                |err: &StreamingError| {
-                    let is_retryable = matches!(err, StreamingError::Retryable(_));
+            return Retry::spawn(retry_strategy, || {
+                attempt_number += 1;
+                log::debug!("Downloading {} (attempt #{})", &url, &attempt_number);
+                attempt_download(
+                    http_client,
+                    &url,
+                    &auth_headers,
+                    file_name.clone(),
+                    expected_digest,
+                )
+                .map_err(|err| {
                     log::debug!("Error while downloading {}: {}", &url, err);
-                    is_retryable
-                },
-            )
-            .await
+                    match err {
+                        StreamingError::Retryable(msg) => RetryError::transient(msg),
+                        StreamingError::Permanent(msg) => RetryError::permanent(msg),
+                    }
+                })
+            })
+            .await;
         }
     )
     .await?;

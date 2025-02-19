@@ -21,6 +21,7 @@ tokio-util = { workspace = true, features = ["io"] }
 tonic = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 workunit_store = { path = "../../workunit_store" }
+prost = { workspace = true }
 
 [dev-dependencies]
 mock = { path = "../../testutil/mock" }
