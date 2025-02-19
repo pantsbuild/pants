@@ -6,9 +6,10 @@ from __future__ import annotations
 import itertools
 import logging
 import os.path
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from itertools import groupby
-from typing import ClassVar, Collection, Iterable, Mapping, Sequence
+from typing import ClassVar
 
 from nodesemver import min_satisfying
 

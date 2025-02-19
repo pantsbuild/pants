@@ -6,7 +6,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import ClassVar, Match, Optional, Tuple, cast
+from re import Match
+from typing import ClassVar, cast
 
 from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
 from pants.backend.python.util_rules.faas import (
@@ -104,7 +105,7 @@ class PythonAwsLambdaFunctionRuntimes(Enum):
     PYTHON_312 = "python3.12"
     PYTHON_313 = "python3.13"
 
-    def to_interpreter_version(self) -> Tuple[int, int]:
+    def to_interpreter_version(self) -> tuple[int, int]:
         """Returns the Python version implied by the runtime, as (major, minor)."""
         mo = cast(Match, re.match(PYTHON_RUNTIME_REGEX, self.value))
         return int(mo.group("major")), int(mo.group("minor"))
@@ -153,7 +154,7 @@ class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
+    def compute_value(cls, raw_value: str | None, address: Address) -> str | None:
         value = super().compute_value(raw_value, address)
         if value is None:
             return None
@@ -168,7 +169,7 @@ class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
             )
         return value
 
-    def to_interpreter_version(self) -> Optional[Tuple[int, int]]:
+    def to_interpreter_version(self) -> tuple[int, int] | None:
         """Returns the Python version implied by the runtime, as (major, minor)."""
         if self.value is None:
             return None

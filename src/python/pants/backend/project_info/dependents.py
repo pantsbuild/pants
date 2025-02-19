@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import json
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterable, Set
 
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import DeduplicatedCollection
@@ -88,7 +88,7 @@ def find_dependents(
     request: DependentsRequest, address_to_dependents: AddressToDependents
 ) -> Dependents:
     check = set(request.addresses)
-    known_dependents: Set[Address] = set()
+    known_dependents: set[Address] = set()
     while True:
         dependents = set(known_dependents)
         for target in check:

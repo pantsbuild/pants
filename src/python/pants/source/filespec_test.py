@@ -1,7 +1,6 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Tuple
 
 import pytest
 
@@ -16,7 +15,7 @@ def rule_runner() -> RuleRunner:
 
 
 def assert_rule_match(
-    rule_runner: RuleRunner, glob: str, paths: Tuple[str, ...], *, should_match: bool
+    rule_runner: RuleRunner, glob: str, paths: tuple[str, ...], *, should_match: bool
 ) -> None:
     # Confirm in-memory behavior.
     matched_filespec = tuple(FilespecMatcher([glob], ()).matches(paths))
@@ -63,7 +62,7 @@ def assert_rule_match(
         ("a/b/c.py", ("a/b/c.py",)),
     ],
 )
-def test_valid_matches(rule_runner: RuleRunner, glob: str, paths: Tuple[str, ...]) -> None:
+def test_valid_matches(rule_runner: RuleRunner, glob: str, paths: tuple[str, ...]) -> None:
     assert_rule_match(rule_runner, glob, paths, should_match=True)
 
 
@@ -96,5 +95,5 @@ def test_valid_matches(rule_runner: RuleRunner, glob: str, paths: Tuple[str, ...
         ("**/BUILD", ("src/rust/build.rs",)),
     ],
 )
-def test_invalid_matches(rule_runner: RuleRunner, glob: str, paths: Tuple[str, ...]) -> None:
+def test_invalid_matches(rule_runner: RuleRunner, glob: str, paths: tuple[str, ...]) -> None:
     assert_rule_match(rule_runner, glob, paths, should_match=False)

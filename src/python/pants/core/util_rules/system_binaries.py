@@ -9,13 +9,12 @@ import logging
 import os
 import shlex
 import subprocess
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
 from itertools import groupby
 from textwrap import dedent  # noqa: PNT20
-from typing import Iterable, Mapping, Sequence
-
-from typing_extensions import Self
+from typing import Self
 
 from pants.core.subsystems import python_bootstrap
 from pants.core.util_rules.environments import EnvironmentTarget

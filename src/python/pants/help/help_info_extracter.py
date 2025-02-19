@@ -11,25 +11,13 @@ import itertools
 import json
 import re
 from collections import defaultdict, namedtuple
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from enum import Enum
 from functools import reduce
 from itertools import chain
 from pathlib import Path
-from typing import (
-    Any,
-    Callable,
-    DefaultDict,
-    Iterator,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
-    TypeVar,
-    Union,
-    cast,
-    get_type_hints,
-)
+from typing import Any, DefaultDict, TypeVar, Union, cast, get_type_hints
 
 import pkg_resources
 
@@ -146,7 +134,7 @@ class OptionScopeHelpInfo:
     description: str
     provider: str
     is_goal: bool  # True iff the scope belongs to a GoalSubsystem.
-    deprecated_scope: Optional[str]
+    deprecated_scope: str | None
     basic: tuple[OptionHelpInfo, ...]
     advanced: tuple[OptionHelpInfo, ...]
     deprecated: tuple[OptionHelpInfo, ...]
@@ -196,7 +184,9 @@ def pretty_print_type_hint(hint: Any) -> str:
         hint_str = hint.__name__
     else:
         hint_str = str(hint)
-    return hint_str.replace("typing.", "").replace("NoneType", "None")
+    return (
+        hint_str.replace("collections.abc.", "").replace("typing.", "").replace("NoneType", "None")
+    )
 
 
 @dataclass(frozen=True)
@@ -470,7 +460,7 @@ class AllHelpInfo:
         }
 
 
-ConsumedScopesMapper = Callable[[str], Tuple[str, ...]]
+ConsumedScopesMapper = Callable[[str], tuple[str, ...]]
 
 
 class HelpInfoExtracter:
@@ -529,7 +519,7 @@ class HelpInfoExtracter:
                         build_configuration.subsystem_to_providers.get(subsystem_cls),
                         subsystem_cls.__module__,
                     )
-                goal_subsystem_cls = cast(Type[GoalSubsystem], subsystem_cls)
+                goal_subsystem_cls = cast(type[GoalSubsystem], subsystem_cls)
                 return GoalHelpInfo(
                     goal_subsystem_cls.name,
                     scope_info.description,
@@ -1008,7 +998,7 @@ class HelpInfoExtracter:
         native_parser: NativeOptionParser,
         is_goal: bool,
         provider: str = "",
-        deprecated_scope: Optional[str] = None,
+        deprecated_scope: str | None = None,
     ) -> OptionScopeHelpInfo:
         """Returns an OptionScopeHelpInfo for the options parsed by the given parser."""
 

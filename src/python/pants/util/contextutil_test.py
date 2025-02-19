@@ -6,8 +6,8 @@ import shutil
 import subprocess
 import sys
 import zipfile
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator
 
 import pytest
 

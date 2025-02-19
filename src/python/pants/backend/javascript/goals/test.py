@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import dataclasses
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable
 
 from pants.backend.javascript import install_node_package, nodejs_project_environment
 from pants.backend.javascript.install_node_package import (

@@ -6,26 +6,11 @@ from __future__ import annotations
 import functools
 import inspect
 import sys
+from collections.abc import Callable, Coroutine, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
 from types import FrameType, ModuleType
-from typing import (
-    Any,
-    Callable,
-    Coroutine,
-    Iterable,
-    Mapping,
-    Optional,
-    Protocol,
-    Sequence,
-    Tuple,
-    Type,
-    TypeVar,
-    Union,
-    cast,
-    get_type_hints,
-    overload,
-)
+from typing import Any, Protocol, TypeVar, Union, cast, get_type_hints, overload
 
 from typing_extensions import ParamSpec
 
@@ -67,7 +52,9 @@ AsyncRuleT = Callable[P, Coroutine[Any, Any, R]]
 RuleDecorator = Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]
 
 
-def _rule_call_trampoline(rule_id: str, output_type: type, func: Callable[P, R]) -> Callable[P, R]:
+def _rule_call_trampoline(
+    rule_id: str, output_type: type[Any], func: Callable[P, R]
+) -> Callable[P, R]:
     @functools.wraps(func)  # type: ignore
     async def wrapper(*args, __implicitly: Sequence[Any] = (), **kwargs):
         call = Call(rule_id, output_type, args, *__implicitly)
@@ -79,13 +66,13 @@ def _rule_call_trampoline(rule_id: str, output_type: type, func: Callable[P, R])
 def _make_rule(
     func_id: str,
     rule_type: RuleType,
-    return_type: Type,
-    parameter_types: dict[str, Type],
-    masked_types: Iterable[Type],
+    return_type: type[Any],
+    parameter_types: dict[str, type[Any]],
+    masked_types: Iterable[type[Any]],
     *,
     cacheable: bool,
     canonical_name: str,
-    desc: Optional[str],
+    desc: str | None,
     level: LogLevel,
 ) -> RuleDecorator:
     """A @decorator that declares that a particular static function may be used as a TaskRule.
@@ -167,10 +154,10 @@ class DuplicateRuleError(TypeError):
 
 def _ensure_type_annotation(
     *,
-    type_annotation: Optional[Type],
+    type_annotation: type[Any] | None,
     name: str,
-    raise_type: Type[InvalidTypeAnnotation],
-) -> Type:
+    raise_type: type[InvalidTypeAnnotation],
+) -> type[Any]:
     if type_annotation is None:
         raise raise_type(f"{name} is missing a type annotation.")
     if not isinstance(type_annotation, type):
@@ -312,8 +299,8 @@ def rule_decorator(func: SyncRuleT | AsyncRuleT, **kwargs) -> AsyncRuleT:
 
 def validate_requirements(
     func_id: str,
-    parameter_types: dict[str, Type],
-    awaitables: Tuple[AwaitableConstraints, ...],
+    parameter_types: dict[str, type],
+    awaitables: tuple[AwaitableConstraints, ...],
     cacheable: bool,
 ) -> None:
     # TODO: Technically this will also fire for an @_uncacheable_rule, but we don't expose those as
@@ -367,7 +354,7 @@ def rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]: ...
 @overload
 def rule(
     *args, func: None = None, **kwargs: Any
-) -> Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]: ...
+) -> Callable[[SyncRuleT | AsyncRuleT], AsyncRuleT]: ...
 
 
 def rule(*args, **kwargs):
@@ -385,7 +372,7 @@ def goal_rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]: ...
 @overload
 def goal_rule(
     *args, func: None = None, **kwargs: Any
-) -> Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]: ...
+) -> Callable[[SyncRuleT | AsyncRuleT], AsyncRuleT]: ...
 
 
 def goal_rule(*args, **kwargs):
@@ -407,7 +394,7 @@ def _uncacheable_rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R
 @overload
 def _uncacheable_rule(
     *args, func: None = None, **kwargs: Any
-) -> Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]: ...
+) -> Callable[[SyncRuleT | AsyncRuleT], AsyncRuleT]: ...
 
 
 # This has a "private" name, as we don't (yet?) want it to be part of the rule API, at least
@@ -428,7 +415,7 @@ class Rule(Protocol):
         """An output `type` for the rule."""
 
 
-def collect_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable[Rule]:
+def collect_rules(*namespaces: ModuleType | Mapping[str, Any]) -> Iterable[Rule]:
     """Collects all @rules in the given namespaces.
 
     If no namespaces are given, collects all the @rules in the caller's module namespace.
@@ -471,13 +458,13 @@ class TaskRule:
     prefer the `@rule` constructor.
     """
 
-    output_type: Type
-    parameters: FrozenDict[str, Type]
-    awaitables: Tuple[AwaitableConstraints, ...]
-    masked_types: Tuple[Type, ...]
+    output_type: type[Any]
+    parameters: FrozenDict[str, type[Any]]
+    awaitables: tuple[AwaitableConstraints, ...]
+    masked_types: tuple[type[Any], ...]
     func: Callable
     canonical_name: str
-    desc: Optional[str] = None
+    desc: str | None = None
     level: LogLevel = LogLevel.TRACE
     cacheable: bool = True
 
@@ -499,10 +486,10 @@ class QueryRule:
     that the relevant portions of the RuleGraph are generated.
     """
 
-    output_type: Type
-    input_types: Tuple[Type, ...]
+    output_type: type[Any]
+    input_types: tuple[type[Any], ...]
 
-    def __init__(self, output_type: Type, input_types: Iterable[Type]) -> None:
+    def __init__(self, output_type: type[Any], input_types: Iterable[type[Any]]) -> None:
         object.__setattr__(self, "output_type", output_type)
         object.__setattr__(self, "input_types", tuple(input_types))
 

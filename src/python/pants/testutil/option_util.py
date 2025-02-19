@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-from typing import Iterable, Mapping, TypeVar
+from collections.abc import Iterable, Mapping
+from typing import TypeVar
 
 from pants.engine.goal import GoalSubsystem
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder

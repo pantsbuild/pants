@@ -5,10 +5,10 @@ from __future__ import annotations
 
 import itertools
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Dict, Iterable, Optional
 
 from pants.backend.python.dependency_inference import module_mapper, parse_python_dependencies
 from pants.backend.python.dependency_inference.default_unowned_dependencies import (
@@ -248,7 +248,7 @@ class UnownedImportPossibleOwnerRequest:
 
 @dataclass(frozen=True)
 class UnownedImportsPossibleOwners:
-    value: Dict[str, list[tuple[Address, ResolveName]]]
+    value: dict[str, list[tuple[Address, ResolveName]]]
 
 
 @dataclass(frozen=True)
@@ -375,7 +375,7 @@ async def _exec_parse_deps(
 class ResolvedParsedPythonDependenciesRequest:
     field_set: PythonImportDependenciesInferenceFieldSet
     parsed_dependencies: ParsedPythonDependencies
-    resolve: Optional[str]
+    resolve: str | None
 
 
 @dataclass(frozen=True)

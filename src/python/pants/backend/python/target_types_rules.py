@@ -11,9 +11,10 @@ import dataclasses
 import logging
 import os.path
 from collections import defaultdict
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from itertools import chain
-from typing import Callable, DefaultDict, Dict, Generator, Optional, Tuple, cast
+from typing import DefaultDict, cast
 
 from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
@@ -294,10 +295,10 @@ async def infer_pex_binary_entry_point_dependency(
 
 
 def _determine_entry_point_owner(
-    maybe_disambiguated: Optional[Address],
+    maybe_disambiguated: Address | None,
     owners: PythonModuleOwners,
     unresolved_ambiguity_handler: Callable[[], None],
-) -> Tuple[Address, ...]:
+) -> tuple[Address, ...]:
     """Determine what should be the unambiguous owner for a PEX's entrypoint.
 
     This might be empty.
@@ -341,12 +342,12 @@ def _handle_unresolved_pex_entrypoint(
 # -----------------------------------------------------------------------------------------------
 
 
-_EntryPointsDictType = Dict[str, Dict[str, str]]
+_EntryPointsDictType = dict[str, dict[str, str]]
 
 
 def _classify_entry_points(
     all_entry_points: _EntryPointsDictType,
-) -> Generator[Tuple[bool, str, str, str], None, None]:
+) -> Generator[tuple[bool, str, str, str], None, None]:
     """Looks at each entry point to see if it is a target address or not.
 
     Yields tuples: is_target, category, name, entry_point_str.
@@ -445,11 +446,11 @@ async def resolve_python_distribution_entry_points(
         target.address: entry_point for target, entry_point in zip(targets, binary_entry_points)
     }
 
-    entry_points: DefaultDict[str, Dict[str, PythonDistributionEntryPoint]] = defaultdict(dict)
+    entry_points: DefaultDict[str, dict[str, PythonDistributionEntryPoint]] = defaultdict(dict)
 
     # Parse refs/replace with resolved pex entry point, and validate console entry points have function.
     for is_target, category, name, ref in classified_entry_points:
-        owner: Optional[Address] = None
+        owner: Address | None = None
         if is_target:
             owner = address_by_ref[ref]
             entry_point = binary_entry_point_by_address[owner].val

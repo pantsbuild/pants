@@ -1,8 +1,9 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from collections.abc import Iterable
 from enum import Enum
-from typing import Any, Iterable, List, Optional, Tuple, Union
+from typing import Any, Optional, Union
 
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.build_configuration import BuildConfiguration
@@ -134,7 +135,7 @@ def test_default() -> None:
 
 
 def test_compute_default():
-    def do_test(expected_default: Optional[Any], **kwargs):
+    def do_test(expected_default: Any | None, **kwargs):
         assert expected_default == HelpInfoExtracter.compute_default(**kwargs)
 
     do_test(False, type=bool, default=False)
@@ -286,7 +287,7 @@ def test_get_all_help_info(tmp_path) -> None:
         """This rule is for testing info extraction only."""
         ...
 
-    def fake_consumed_scopes_mapper(scope: str) -> Tuple[str, ...]:
+    def fake_consumed_scopes_mapper(scope: str) -> tuple[str, ...]:
         return ("somescope", f"used_by_{scope or 'GLOBAL_SCOPE'}")
 
     bc_builder = BuildConfiguration.Builder()
@@ -810,6 +811,6 @@ def test_pretty_print_type_hint() -> None:
         f"{__name__}.{test_pretty_print_type_hint.__name__}.<locals>.{ExampleCls.__name__}"
     )
     assert (
-        pretty_print_type_hint(Union[Iterable[List[ExampleCls]], Optional[float], Any])
-        == f"Iterable[List[{example_cls_repr}]] | float | None | Any"
+        pretty_print_type_hint(Union[Iterable[list[ExampleCls]], Optional[float], Any])
+        == f"Iterable[list[{example_cls_repr}]] | float | None | Any"
     )

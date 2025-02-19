@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import ClassVar, Optional, cast
+from typing import ClassVar, cast
 
 from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
@@ -131,7 +131,7 @@ class PythonFaaSHandlerField(StringField, AsyncFieldMixin):
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> str:
+    def compute_value(cls, raw_value: str | None, address: Address) -> str:
         value = cast(str, super().compute_value(raw_value, address))
         if ":" not in value:
             raise InvalidFieldException(

@@ -8,7 +8,6 @@ import re
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
@@ -200,18 +199,18 @@ class TestMetadata:
 
 @dataclass(frozen=True)
 class TestSetupRequest:
-    field_sets: Tuple[PythonTestFieldSet, ...]
+    field_sets: tuple[PythonTestFieldSet, ...]
     metadata: TestMetadata
     is_debug: bool
     extra_env: FrozenDict[str, str] = FrozenDict()
-    prepend_argv: Tuple[str, ...] = ()
-    additional_pexes: Tuple[Pex, ...] = ()
+    prepend_argv: tuple[str, ...] = ()
+    additional_pexes: tuple[Pex, ...] = ()
 
 
 @dataclass(frozen=True)
 class TestSetup:
     process: Process
-    results_file_name: Optional[str]
+    results_file_name: str | None
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False

@@ -7,8 +7,9 @@ import collections
 import collections.abc
 import gc
 import math
+from collections.abc import Callable, Iterable, Iterator, MutableMapping
 from sys import getsizeof
-from typing import Any, Callable, Iterable, Iterator, MutableMapping, TypeVar
+from typing import Any, TypeVar
 
 from pants.engine.internals import native_engine
 from pants.util.strutil import softwrap

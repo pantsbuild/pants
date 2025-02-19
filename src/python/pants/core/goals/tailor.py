@@ -9,9 +9,10 @@ import logging
 import os
 from abc import ABCMeta
 from collections import defaultdict
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Iterator, Mapping, cast
+from typing import cast
 
 from pants.base.specs import AncestorGlobSpec, DirLiteralSpec, RawSpecs, Specs
 from pants.build_graph.address import Address

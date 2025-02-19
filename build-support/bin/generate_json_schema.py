@@ -14,7 +14,8 @@ import argparse
 import itertools
 import json
 import re
-from typing import Any, Dict, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 from packaging.version import Version
 
@@ -133,7 +134,7 @@ def main() -> None:
             scope=scope,
         )
 
-    schema: Dict[str, Any] = dict()
+    schema: dict[str, Any] = dict()
     schema["$schema"] = "http://json-schema.org/draft-04/schema#"
     schema["description"] = "Pants configuration file schema: https://www.pantsbuild.org/"
     schema["properties"] = ruleset

@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Tuple
 
 from pants.backend.python.lint.flake8.subsystem import (
     Flake8,
@@ -32,7 +31,7 @@ class Flake8Request(LintTargetsRequest):
     tool_subsystem = Flake8
 
 
-def generate_argv(source_files: SourceFiles, flake8: Flake8) -> Tuple[str, ...]:
+def generate_argv(source_files: SourceFiles, flake8: Flake8) -> tuple[str, ...]:
     args = []
     if flake8.config:
         args.append(f"--config={flake8.config}")

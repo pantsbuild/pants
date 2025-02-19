@@ -8,8 +8,9 @@ import collections.abc
 import json
 import logging
 from abc import ABCMeta
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, fields, is_dataclass, replace
-from typing import Any, Iterable, Mapping, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from pants.core.goals.deploy import Deploy, DeployFieldSet
 from pants.core.goals.package import Package, PackageFieldSet

@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Optional, Sequence
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
@@ -151,7 +151,7 @@ class TerraformDeploymentInvocationFiles:
 
     backend_configs: tuple[TerraformBackendTarget, ...]
     vars_files: tuple[TerraformVarFileTarget, ...]
-    lockfile: Optional[LockfileTarget]
+    lockfile: LockfileTarget | None
 
 
 @rule

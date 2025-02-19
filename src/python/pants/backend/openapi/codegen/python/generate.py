@@ -8,7 +8,6 @@ import logging
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Tuple
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
@@ -147,7 +146,7 @@ async def compile_openapi_into_python(
         Get(Digest, DigestSubset(normalized_digest, PathGlobs(["**/*.py"]))),
     )
     requirements_contents = await Get(DigestContents, Digest, requirements_digest)
-    runtime_dependencies: Tuple[PipRequirement, ...] = ()
+    runtime_dependencies: tuple[PipRequirement, ...] = ()
     if len(requirements_contents) > 0:
         file = requirements_contents[0]
         runtime_dependencies = tuple(

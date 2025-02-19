@@ -6,10 +6,11 @@ from __future__ import annotations
 import logging
 import os
 import time
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import PurePath
 from types import CoroutineType
-from typing import Any, Callable, Dict, Iterable, NoReturn, Sequence, cast
+from typing import Any, NoReturn, cast
 
 from typing_extensions import TypedDict
 
@@ -80,7 +81,7 @@ from pants.util.strutil import pluralize
 logger = logging.getLogger(__name__)
 
 
-Workunit = Dict[str, Any]
+Workunit = dict[str, Any]
 
 
 class PolledWorkunits(TypedDict):

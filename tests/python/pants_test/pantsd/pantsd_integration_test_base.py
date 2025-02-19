@@ -7,9 +7,10 @@ import functools
 import os
 import time
 import unittest
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Callable, Iterator, Mapping
+from typing import Any
 
 from colors import bold, cyan, magenta
 

@@ -2,10 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Optional, Type, TypeVar, Union
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 T = TypeVar("T")
-C = TypeVar("C", bound=Type)
+C = TypeVar("C", bound=type[Any])
 
 
 class SingletonMetaclass(type):
@@ -32,12 +33,12 @@ class _ClassPropertyDescriptor:
     # definition beyond declaring a @classproperty.  It seems overriding __set__ and __delete__ would
     # require defining a metaclass or overriding __setattr__/__delattr__ (see
     # https://stackoverflow.com/questions/5189699/how-to-make-a-class-property).
-    def __init__(self, fget: Union[classmethod, staticmethod], doc: Optional[str]) -> None:
+    def __init__(self, fget: classmethod | staticmethod, doc: str | None) -> None:
         self.fget = fget
         self.__doc__ = doc
 
     # See https://docs.python.org/3/howto/descriptor.html for more details.
-    def __get__(self, obj: T, objtype: Optional[Type[T]] = None) -> Any:
+    def __get__(self, obj: T, objtype: type[T] | None = None) -> Any:
         if objtype is None:
             objtype = type(obj)
             # Get the callable field for this object, which may be a property.
@@ -122,10 +123,10 @@ class _ClassDecoratorWithSentinelAttribute(ABC):
     """
 
     @abstractmethod
-    def __call__(self, cls: Type) -> Type: ...
+    def __call__(self, cls: type[Any]) -> type[Any]: ...
 
-    def define_instance_of(self, obj: Type, **kwargs) -> Type:
+    def define_instance_of(self, obj: type[Any], **kwargs) -> type[Any]:
         return type(obj.__name__, (obj,), {"_decorated_type_checkable_type": type(self), **kwargs})
 
-    def is_instance(self, obj: Type) -> bool:
+    def is_instance(self, obj: type[Any]) -> bool:
         return getattr(obj, "_decorated_type_checkable_type", None) is type(self)

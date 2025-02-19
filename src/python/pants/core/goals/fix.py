@@ -6,20 +6,9 @@ from __future__ import annotations
 import itertools
 import logging
 from collections import defaultdict
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
-from typing import (
-    Any,
-    Callable,
-    ClassVar,
-    Iterable,
-    Iterator,
-    NamedTuple,
-    Protocol,
-    Sequence,
-    Tuple,
-    Type,
-    TypeVar,
-)
+from typing import Any, ClassVar, NamedTuple, Protocol, TypeVar
 
 from pants.base.specs import Specs
 from pants.core.goals.lint import (
@@ -346,7 +335,7 @@ async def _do_fix(
             yield tuple(batch)
 
     def _make_disjoint_batch_requests() -> Iterable[_FixBatchRequest]:
-        partition_infos: Iterable[Tuple[Type[AbstractFixRequest], Any]]
+        partition_infos: Iterable[tuple[type[AbstractFixRequest], Any]]
         files: Sequence[str]
 
         partition_infos_by_files = defaultdict(list)

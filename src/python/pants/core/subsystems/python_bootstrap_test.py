@@ -4,8 +4,9 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterable, Sequence
 from contextlib import contextmanager
-from typing import Iterable, List, Sequence, TypeVar
+from typing import TypeVar
 
 import pytest
 
@@ -86,7 +87,7 @@ def fake_pyenv_root(fake_versions, fake_local_version):
         yield pyenv_root, fake_version_dirs, fake_local_version_dirs
 
 
-def materialize_indices(sequence: Sequence[_T], indices: Iterable[int]) -> List[_T]:
+def materialize_indices(sequence: Sequence[_T], indices: Iterable[int]) -> list[_T]:
     return [sequence[i] for i in indices]
 
 
