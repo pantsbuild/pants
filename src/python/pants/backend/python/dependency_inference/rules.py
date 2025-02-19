@@ -343,7 +343,7 @@ async def _handle_unowned_imports(
 
         {bullet_list(unowned_imports_with_lines)}{other_resolves_snippet}
 
-        If you do not expect an import to be inferrable, add `# pants: no-infer-dep` to the
+        If you do not expect an import to be inferable, add `# pants: no-infer-dep` to the
         import line. Otherwise, see
         {doc_url('docs/using-pants/troubleshooting-common-issues#import-errors-and-missing-dependencies')} for common problems.
         """
