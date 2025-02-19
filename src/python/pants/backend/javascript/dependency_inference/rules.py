@@ -225,7 +225,7 @@ def _handle_unowned_imports(
 
         {bullet_list(sorted(unowned_imports))}
 
-        If you do not expect an import to be inferrable, add `// pants: no-infer-dep` to the
+        If you do not expect an import to be inferable, add `// pants: no-infer-dep` to the
         import line. Otherwise, see {url} for common problems.
         """
     )
