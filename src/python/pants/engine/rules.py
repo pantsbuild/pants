@@ -52,7 +52,7 @@ AsyncRuleT = Callable[P, Coroutine[Any, Any, R]]
 RuleDecorator = Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]
 
 
-def _rule_call_trampoline(rule_id: str, output_type: type, func: Callable[P, R]) -> Callable[P, R]:
+def _rule_call_trampoline(rule_id: str, output_type: type[Any], func: Callable[P, R]) -> Callable[P, R]:
     @functools.wraps(func)  # type: ignore
     async def wrapper(*args, __implicitly: Sequence[Any] = (), **kwargs):
         call = Call(rule_id, output_type, args, *__implicitly)
@@ -64,9 +64,9 @@ def _rule_call_trampoline(rule_id: str, output_type: type, func: Callable[P, R])
 def _make_rule(
     func_id: str,
     rule_type: RuleType,
-    return_type: type,
-    parameter_types: dict[str, type],
-    masked_types: Iterable[type],
+    return_type: type[Any],
+    parameter_types: dict[str, type[Any]],
+    masked_types: Iterable[type[Any]],
     *,
     cacheable: bool,
     canonical_name: str,
@@ -456,10 +456,10 @@ class TaskRule:
     prefer the `@rule` constructor.
     """
 
-    output_type: type
-    parameters: FrozenDict[str, type]
+    output_type: type[Any]
+    parameters: FrozenDict[str, type[Any]]
     awaitables: tuple[AwaitableConstraints, ...]
-    masked_types: tuple[type, ...]
+    masked_types: tuple[type[Any], ...]
     func: Callable
     canonical_name: str
     desc: str | None = None
@@ -484,10 +484,10 @@ class QueryRule:
     that the relevant portions of the RuleGraph are generated.
     """
 
-    output_type: type
-    input_types: tuple[type, ...]
+    output_type: type[Any]
+    input_types: tuple[type[Any], ...]
 
-    def __init__(self, output_type: type, input_types: Iterable[type]) -> None:
+    def __init__(self, output_type: type[Any], input_types: Iterable[type[Any]]) -> None:
         object.__setattr__(self, "output_type", output_type)
         object.__setattr__(self, "input_types", tuple(input_types))
 

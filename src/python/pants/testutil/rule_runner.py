@@ -623,7 +623,7 @@ class RuleRunner:
                 ),
             )
 
-    def do_not_use_mock(self, output_type: type, input_types: Iterable[type]) -> MockGet:
+    def do_not_use_mock(self, output_type: type[Any], input_types: Iterable[type[Any]]) -> MockGet:
         """Returns a `MockGet` whose behavior is to run the actual rule using this `RuleRunner`"""
         return MockGet(
             output_type=output_type,

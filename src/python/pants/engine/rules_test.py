@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from textwrap import dedent
-from typing import get_type_hints
+from typing import Any, get_type_hints
 
 import pytest
 
@@ -112,9 +112,9 @@ class RuleFormatRequest:
 
 
 def fmt_param_edge(
-    param: type,
-    product: type | tuple[type, ...],
-    via_func: type | RuleFormatRequest,
+    param: type[Any],
+    product: type[Any] | tuple[type[Any], ...],
+    via_func: type[Any] | RuleFormatRequest,
     return_func: RuleFormatRequest | None = None,
 ) -> str:
     if isinstance(via_func, type):
