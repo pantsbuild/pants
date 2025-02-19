@@ -93,6 +93,7 @@ class PexFromTargetsRequest:
     # This field doesn't participate in comparison (and therefore hashing), as it doesn't affect
     # the result.
     description: str | None = dataclasses.field(compare=False)
+    python: PythonExecutable | None
 
     def __init__(
         self,
@@ -116,6 +117,7 @@ class PexFromTargetsRequest:
         hardcoded_interpreter_constraints: InterpreterConstraints | None = None,
         description: str | None = None,
         warn_for_transitive_files_targets: bool = False,
+        python: PythonExecutable | None = None,
     ) -> None:
         """Request to create a Pex from the transitive closure of the given addresses.
 
@@ -179,7 +181,7 @@ class PexFromTargetsRequest:
         object.__setattr__(
             self, "warn_for_transitive_files_targets", warn_for_transitive_files_targets
         )
-
+        object.__setattr__(self, "python", python)
         self.__post_init__()
 
     def __post_init__(self):
@@ -606,7 +608,7 @@ async def create_pex_from_targets(
         internal_only=request.internal_only,
         layout=request.layout,
         requirements=requirements,
-        interpreter_constraints=interpreter_constraints,
+        #        interpreter_constraints=interpreter_constraints,
         platforms=request.platforms,
         complete_platforms=request.complete_platforms,
         main=request.main,
@@ -617,6 +619,7 @@ async def create_pex_from_targets(
         additional_args=additional_args,
         description=description,
         pex_path=additional_pexes,
+        python=request.python,
     )
 
 
