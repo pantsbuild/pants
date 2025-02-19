@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from io import BytesIO
 from threading import Thread
-from typing import Any, Iterator, Mapping, TextIO, Union, cast
+from typing import Any, TextIO, Union, cast
 
 import pytest
 import toml
