@@ -6,9 +6,11 @@ from __future__ import annotations
 import sys
 from typing import Any
 
+from pants.core.goals.publish import ShowOutput
 from pants.backend.docker.registries import DockerRegistries
 from pants.core.util_rules.search_paths import ExecutableSearchPathsOptionMixin
 from pants.option.option_types import (
+    EnumOption,
     BoolOption,
     DictOption,
     ShellStrListOption,
@@ -240,6 +242,11 @@ class DockerOptions(Subsystem):
             """
         ),
     )
+    background_process_output = EnumOption(
+        default=ShowOutput.ALL,
+        help="Show stdout/stderr for publishing with publish_noninteractively=true.",
+    )
+
     publish_noninteractively_verbose = BoolOption(
         default=False,
         help="If true, output logs to console when running with `publish_noninteractively=True`.",

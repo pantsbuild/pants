@@ -24,6 +24,7 @@ import json
 import logging
 from abc import ABCMeta
 from dataclasses import asdict, dataclass, field, is_dataclass, replace
+from enum import Enum
 from itertools import chain
 from typing import ClassVar, Generic, Type, TypeVar, cast
 
@@ -124,6 +125,16 @@ class PublishFieldSet(Generic[_T], FieldSet, metaclass=ABCMeta):
         return PublishOutputData({"target": self.address})
 
 
+# This is the same as the Enum in the test goal.  It is initially separate as
+# DRYing out is easier than undoing pre-mature abstraction.
+class ShowOutput(Enum):
+    """Which publish actions to emit detailed output for."""
+
+    ALL = "all"
+    FAILED = "failed"
+    NONE = "none"
+
+
 @dataclass(frozen=True)
 class PublishPackages:
     """Processes to run in order to publish the named artifacts.
@@ -136,8 +147,7 @@ class PublishPackages:
     However, some tools have non-interactive publishing modes and can leverage parallelism. See
     https://github.com/pantsbuild/pants/issues/17613#issuecomment-1323913381 for more context.
 
-    If running a background process and verbose_background_process is True, all logs are output always output to
-    logs.
+    If running a background process, output is controlled by `background_process_output`.
 
     The `description` may be a reason explaining why the publish was skipped, or identifying which
     repository the artifacts are published to.
@@ -145,7 +155,7 @@ class PublishPackages:
 
     names: tuple[str, ...]
     process: InteractiveProcess | Process | None = None
-    verbose_background_process: bool = False
+    background_process_output: ShowOutput = ShowOutput.ALL
     description: str | None = None
     data: PublishOutputData = field(default_factory=PublishOutputData)
 
@@ -307,20 +317,16 @@ async def run_publish(
         outputs.extend(pub_output)
 
         names = "'" + "', '".join(pub.names) + "'"
-        output_msg = "\n".join(
-            (
-                f"Output for publishing {names}",
-                "stdout:",
-                background_res.stdout.decode(),
-                "stderr:",
-                background_res.stderr.decode(),
-            )
-        )
+        output_msg = f"Output for publishing {names}"
+        if background_res.stdout:
+            output_msg += f"\n{background_res.stdout.decode()}"
+        if background_res.stderr:
+            output_msg += f"\n{background_res.stderr.decode()}"
 
-        if background_res.exit_code != 0 or pub.verbose_background_process:
-            logger.info(output_msg)
-        else:
-            logger.debug(output_msg)
+        if pub.background_process_output == ShowOutput.ALL or (
+            pub.background_process_output == ShowOutput.FAILED and background_res.exit_code == 0
+        ):
+            console.print_stdout(output_msg)
 
         if background_res.exit_code != 0:
             exit_code = background_res.exit_code
