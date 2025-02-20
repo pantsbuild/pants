@@ -3,8 +3,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any, Iterator, cast
+from typing import Any, cast
 
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_method

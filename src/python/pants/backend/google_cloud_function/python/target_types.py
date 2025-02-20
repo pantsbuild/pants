@@ -3,7 +3,8 @@
 
 import re
 from enum import Enum
-from typing import Match, Optional, Tuple, cast
+from re import Match
+from typing import cast
 
 from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
 from pants.backend.python.util_rules.faas import (
@@ -56,7 +57,7 @@ class PythonGoogleCloudFunctionRuntimes(Enum):
     PYTHON_311 = "python311"
     PYTHON_312 = "python312"
 
-    def to_interpreter_version(self) -> Tuple[int, int]:
+    def to_interpreter_version(self) -> tuple[int, int]:
         """Returns the Python version implied by the runtime, as (major, minor)."""
         mo = cast(Match, re.match(PYTHON_RUNTIME_REGEX, self.value))
         return int(mo.group("major")), int(mo.group("minor"))
@@ -115,7 +116,7 @@ class PythonGoogleCloudFunctionRuntime(PythonFaaSRuntimeField):
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
+    def compute_value(cls, raw_value: str | None, address: Address) -> str | None:
         value = super().compute_value(raw_value, address)
         if value is None:
             return None
@@ -126,7 +127,7 @@ class PythonGoogleCloudFunctionRuntime(PythonFaaSRuntimeField):
             )
         return value
 
-    def to_interpreter_version(self) -> Optional[Tuple[int, int]]:
+    def to_interpreter_version(self) -> tuple[int, int] | None:
         """Returns the Python version implied by the runtime, as (major, minor)."""
         if self.value is None:
             return None
@@ -176,7 +177,7 @@ class PythonGoogleCloudFunction(Target):
         f"""
         A self-contained Python function suitable for uploading to Google Cloud Function.
 
-        See {doc_url('docs/python/integrations/google-cloud-functions')}.
+        See {doc_url("docs/python/integrations/google-cloud-functions")}.
         """
     )
 

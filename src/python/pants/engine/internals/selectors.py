@@ -5,20 +5,9 @@ from __future__ import annotations
 
 import ast
 import itertools
+from collections.abc import Coroutine, Generator, Iterable, Sequence
 from dataclasses import dataclass
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Coroutine,
-    Generator,
-    Generic,
-    Iterable,
-    Sequence,
-    Tuple,
-    TypeVar,
-    cast,
-    overload,
-)
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast, overload
 
 from pants.engine.internals.native_engine import PyGeneratorResponseCall, PyGeneratorResponseGet
 from pants.util.strutil import softwrap
@@ -172,7 +161,7 @@ class _MultiGet:
 
     def __await__(self) -> Generator[tuple[Get | Coroutine, ...], None, tuple]:
         result = yield self.gets
-        return cast(Tuple, result)
+        return cast(tuple, result)
 
 
 # These type variables are used to parametrize from 1 to 10 Gets when used in a tuple-style
@@ -192,7 +181,7 @@ _Out9 = TypeVar("_Out9")
 
 @overload
 async def MultiGet(
-    __gets: Iterable[Get[_Output] | Coroutine[Any, Any, _Output]]
+    __gets: Iterable[Get[_Output] | Coroutine[Any, Any, _Output]],
 ) -> tuple[_Output, ...]: ...
 
 
@@ -553,9 +542,9 @@ async def MultiGet(
         raise ValueError(
             softwrap(
                 f"""
-                Unexpected MultiGet None arguments: {', '.join(
-                    map(str, likely_args_explicitly_passed)
-                )}
+                Unexpected MultiGet None arguments: {
+                    ", ".join(map(str, likely_args_explicitly_passed))
+                }
 
                 When constructing a MultiGet from individual Gets, all leading arguments must be
                 Gets.
@@ -566,7 +555,7 @@ async def MultiGet(
     raise TypeError(
         softwrap(
             f"""
-            Unexpected MultiGet argument types: {', '.join(map(str, likely_args_explicitly_passed))}
+            Unexpected MultiGet argument types: {", ".join(map(str, likely_args_explicitly_passed))}
 
             A MultiGet can be constructed in two ways:
               1. MultiGet(Iterable[Get[T]]) -> Tuple[T]

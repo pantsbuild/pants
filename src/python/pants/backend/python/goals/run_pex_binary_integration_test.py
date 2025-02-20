@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from textwrap import dedent
-from typing import Callable, Optional
 
 import pytest
 
@@ -15,9 +15,9 @@ from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_
 def run_generic_test(
     *,
     entry_point: str = "app.py",
-    execution_mode: Optional[PexExecutionMode] = None,
+    execution_mode: PexExecutionMode | None = None,
     include_tools: bool = False,
-    layout: Optional[PexLayout] = None,
+    layout: PexLayout | None = None,
     venv_site_packages_copies: bool = False,
 ) -> Callable[..., PantsResult]:
     sources = {
@@ -105,7 +105,7 @@ def test_entry_point(
 @pytest.mark.parametrize("execution_mode", [None, PexExecutionMode.VENV])
 @pytest.mark.parametrize("include_tools", [True, False])
 def test_execution_mode_and_include_tools(
-    execution_mode: Optional[PexExecutionMode],
+    execution_mode: PexExecutionMode | None,
     include_tools: bool,
 ):
     run = run_generic_test(
@@ -126,7 +126,7 @@ def test_execution_mode_and_include_tools(
 
 @pytest.mark.parametrize("layout", PexLayout)
 def test_layout(
-    layout: Optional[PexLayout],
+    layout: PexLayout | None,
 ):
     run_generic_test(layout=layout)
 

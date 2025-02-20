@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest, BuiltGoPackage

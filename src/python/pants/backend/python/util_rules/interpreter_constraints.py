@@ -7,7 +7,8 @@ import itertools
 import logging
 import re
 from collections import defaultdict
-from typing import Iterable, Iterator, Protocol, Sequence, Tuple, TypeVar
+from collections.abc import Iterable, Iterator, Sequence
+from typing import Protocol, TypeVar
 
 from packaging.requirements import InvalidRequirement
 from pkg_resources import Requirement
@@ -39,7 +40,7 @@ class FieldSetWithInterpreterConstraints(Protocol):
 _FS = TypeVar("_FS", bound=FieldSetWithInterpreterConstraints)
 
 
-RawConstraints = Tuple[str, ...]
+RawConstraints = tuple[str, ...]
 
 
 # The current maxes are 2.7.18 and 3.6.15.  We go much higher, for safety.
@@ -302,11 +303,13 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
 
         def valid_constraint(constraint: Requirement) -> bool:
             if any(
-                constraint.specifier.contains(prior) for prior in prior_versions  # type: ignore[attr-defined]
+                constraint.specifier.contains(prior)  # type: ignore[attr-defined]
+                for prior in prior_versions
             ):
                 return False
             if not any(
-                constraint.specifier.contains(allowed) for allowed in allowed_versions  # type: ignore[attr-defined]
+                constraint.specifier.contains(allowed)  # type: ignore[attr-defined]
+                for allowed in allowed_versions
             ):
                 return False
             return True

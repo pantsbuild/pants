@@ -93,20 +93,23 @@ def test_parsed_injectables(files: list[tuple[str, str]], rule_runner: RuleRunne
         "PEX_BIN_DOTTED_PATH": "dotted.path.as.arg/dpaa.pex",
         "OTHER_FILE": "other/file",
     }
-    assert (
-        "NO_DEFAULT" not in docker_copy_build_args
-    ), "ARG with no value should not be included as it cannot be a reference to a target"
-    assert (
-        docker_copy_build_args.get("OTHER_FILE") == "other/file"
-    ), "A file reference should still be copied even if it isn't an output path or an obvious target"
+    assert "NO_DEFAULT" not in docker_copy_build_args, (
+        "ARG with no value should not be included as it cannot be a reference to a target"
+    )
+    assert docker_copy_build_args.get("OTHER_FILE") == "other/file", (
+        "A file reference should still be copied even if it isn't an output path or an obvious target"
+    )
 
-    assert info.copy_source_paths == (
-        "some.target/binary.pex",
-        "some.target/tool.pex",
-        "binary",
-        "another/cli.pex",
-        "tool",
-        ":technically_a_file",  # we don't resolve inline targets, since we'd need to rewrite the Dockerfile
+    assert (
+        info.copy_source_paths
+        == (
+            "some.target/binary.pex",
+            "some.target/tool.pex",
+            "binary",
+            "another/cli.pex",
+            "tool",
+            ":technically_a_file",  # we don't resolve inline targets, since we'd need to rewrite the Dockerfile
+        )
     )
 
 

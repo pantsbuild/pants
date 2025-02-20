@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.cc.target_types import CC_FILE_EXTENSIONS, CCSourcesGeneratorTarget
 from pants.core.goals.tailor import (

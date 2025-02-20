@@ -6,9 +6,10 @@ from __future__ import annotations
 import itertools
 import logging
 from collections import defaultdict
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
 from enum import Enum
-from typing import Callable, Iterable, Iterator, Mapping, Protocol, Sequence, Tuple, Type, cast
+from typing import Protocol, cast
 
 from pants.core.goals.resolves import ExportableTool
 from pants.engine.collection import Collection, DeduplicatedCollection
@@ -134,7 +135,7 @@ class PackageVersion(Protocol):
 
 PackageName = str
 LockfilePackages = FrozenDict[PackageName, PackageVersion]
-ChangedPackages = FrozenDict[PackageName, Tuple[PackageVersion, PackageVersion]]
+ChangedPackages = FrozenDict[PackageName, tuple[PackageVersion, PackageVersion]]
 
 
 @dataclass(frozen=True)
@@ -379,7 +380,7 @@ def determine_resolves_to_generate(
 
 def filter_lockfiles_for_unconfigured_exportable_tools(
     generate_lockfile_requests: Sequence[GenerateLockfile],
-    exportabletools_by_name: dict[str, Type[ExportableTool]],
+    exportabletools_by_name: dict[str, type[ExportableTool]],
     *,
     resolve_specified: bool,
 ) -> tuple[tuple[str, ...], tuple[GenerateLockfile, ...]]:

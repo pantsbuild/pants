@@ -317,7 +317,7 @@ async def setup_full_package_build_request(
                 f"""
                 Expected Go files generated from Protobuf sources to be output to a single directory.
                 - import path: {request.import_path}
-                - protobuf files: {', '.join(pkg_files)}
+                - protobuf files: {", ".join(pkg_files)}
                 """
             ).strip(),
         )
@@ -373,7 +373,7 @@ async def setup_full_package_build_request(
                             f"""
                             Multiple addresses match import of `{dep_import_path}`.
 
-                            addresses: {', '.join(str(a) for a in candidate_addresses.addresses)}
+                            addresses: {", ".join(str(a) for a in candidate_addresses.addresses)}
                             """
                         ).strip(),
                     )

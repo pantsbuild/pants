@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import logging
 import shlex
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -73,7 +73,7 @@ async def isolate_local_dist_wheels(
                 code will be used directly from sources, without a distribution being built,
                 and any native extensions in it will not be built.
 
-                See {doc_url('docs/python/overview/building-distributions')} for details on how to set up a
+                See {doc_url("docs/python/overview/building-distributions")} for details on how to set up a
                 {tgt.target.alias} target to produce a wheel.
                 """
             )
@@ -87,7 +87,7 @@ async def isolate_local_dist_wheels(
                 "-c",
                 f"""
                 set -ex
-                for f in {' '.join(shlex.quote(f) for f in wheels)}; do
+                for f in {" ".join(shlex.quote(f) for f in wheels)}; do
                   {unzip_binary.path} -Z1 "$f"
                 done
                 """,

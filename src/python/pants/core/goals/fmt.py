@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Iterable
+from collections.abc import Iterable
 
 from pants.base.specs import Specs
 from pants.core.goals.fix import AbstractFixRequest, FixFilesRequest, FixResult, FixTargetsRequest
@@ -62,15 +62,15 @@ class FmtSubsystem(GoalSubsystem):
 
         See also:
 
-        - [The `fix` goal]({doc_url('reference/goals/fix')}) will run code-editing tools that may make semantic
+        - [The `fix` goal]({doc_url("reference/goals/fix")}) will run code-editing tools that may make semantic
           changes, not just syntactic ones.
 
-        - [The `lint` goal]({doc_url('reference/goals/lint')}) will validate code is formatted, by running these
+        - [The `lint` goal]({doc_url("reference/goals/lint")}) will validate code is formatted, by running these
           formatters and checking there's no change.
 
         - Documentation about formatters for various ecosystems, such as:
-          [Python]({doc_url('docs/python/overview/linters-and-formatters')}), [Go]({doc_url('docs/go#gofmt')}),
-          [JVM]({doc_url('jvm/java-and-scala#lint-and-format')}), [Shell]({doc_url('docs/shell#shfmt-autoformatter')}).
+          [Python]({doc_url("docs/python/overview/linters-and-formatters")}), [Go]({doc_url("docs/go#gofmt")}),
+          [JVM]({doc_url("jvm/java-and-scala#lint-and-format")}), [Shell]({doc_url("docs/shell#shfmt-autoformatter")}).
         """
     )
 

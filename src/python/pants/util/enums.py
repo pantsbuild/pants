@@ -1,8 +1,9 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from collections.abc import Mapping
 from enum import Enum
-from typing import FrozenSet, Mapping, TypeVar
+from typing import TypeVar
 
 
 class EnumMatchError(ValueError):
@@ -24,7 +25,7 @@ _V = TypeVar("_V")
 def match(enum_instance: _E, enum_values_to_results: Mapping[_E, _V]) -> _V:
     # TODO: consider memoizing the result of this entire method, as well as the value of
     # `all_instances` for a given enum class!
-    all_instances: FrozenSet[_E] = frozenset(type(enum_instance))
+    all_instances: frozenset[_E] = frozenset(type(enum_instance))
     unrecognized_values = [value for value in enum_values_to_results if value not in all_instances]
     missing_values = [value for value in all_instances if value not in enum_values_to_results]
     if unrecognized_values:

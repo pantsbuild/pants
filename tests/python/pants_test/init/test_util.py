@@ -2,8 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator, cast
+from typing import cast
 
 from pants.fs.fs import safe_filename_from_path
 from pants.init.util import init_workdir

@@ -6,12 +6,13 @@ from __future__ import annotations
 import json
 import shlex
 import unittest.mock
+from collections.abc import Callable
 from contextlib import contextmanager
 from enum import Enum
 from functools import partial
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Callable, Dict, List, cast
+from typing import Any, cast
 
 import pytest
 import toml
@@ -452,7 +453,7 @@ def test_scope_deprecation(caplog) -> None:
 def _create_config(
     config: dict[str, dict[str, str]] | None = None,
     config2: dict[str, dict[str, str]] | None = None,
-) -> List[FileContent]:
+) -> list[FileContent]:
     return [
         FileContent("test_config.toml", toml.dumps(config or {}).encode()),
         FileContent("test_config2.toml", toml.dumps(config2 or {}).encode()),
@@ -1483,7 +1484,7 @@ def test_pants_global_with_default() -> None:
     # This cast shouldn't be necessary - likely a bug in MyPy. Once this gets fixed, MyPy will
     # tell us that we can remove the cast.
     config = cast(
-        Dict[str, Dict[str, Any]],
+        dict[str, dict[str, Any]],
         {"DEFAULT": {"num": "99"}, "GLOBAL": {"store_true_flag": True}},
     )
     global_options = _parse(config=config).for_global_scope()

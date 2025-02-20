@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from textwrap import dedent
-from typing import Callable
 
 import pytest
 

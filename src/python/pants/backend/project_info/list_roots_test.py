@@ -1,7 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List, Optional
 
 import pytest
 
@@ -17,10 +16,10 @@ def rule_runner() -> RuleRunner:
 
 def assert_roots(
     rule_runner: RuleRunner,
-    configured: List[str],
+    configured: list[str],
     *,
-    marker_files: Optional[List[str]] = None,
-    expected: Optional[List[str]] = None,
+    marker_files: list[str] | None = None,
+    expected: list[str] | None = None,
 ) -> None:
     result = rule_runner.run_goal_rule(
         Roots,

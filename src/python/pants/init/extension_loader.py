@@ -4,7 +4,6 @@
 import importlib
 import logging
 import traceback
-from typing import Dict, List, Optional
 
 from pkg_resources import Requirement, WorkingSet
 
@@ -29,10 +28,10 @@ class PluginLoadOrderError(PluginLoadingError):
 
 
 def load_backends_and_plugins(
-    plugins: List[str],
+    plugins: list[str],
     working_set: WorkingSet,
-    backends: List[str],
-    bc_builder: Optional[BuildConfiguration.Builder] = None,
+    backends: list[str],
+    bc_builder: BuildConfiguration.Builder | None = None,
 ) -> BuildConfiguration:
     """Load named plugins and source backends.
 
@@ -50,7 +49,7 @@ def load_backends_and_plugins(
 
 def load_plugins(
     build_configuration: BuildConfiguration.Builder,
-    plugins: List[str],
+    plugins: list[str],
     working_set: WorkingSet,
 ) -> None:
     """Load named plugins from the current working_set into the supplied build_configuration.
@@ -76,7 +75,7 @@ def load_plugins(
                               eg ['widgetpublish', 'widgetgen==1.2'].
     :param working_set: A pkg_resources.WorkingSet to load plugins from.
     """
-    loaded: Dict = {}
+    loaded: dict = {}
     for plugin in plugins or []:
         req = Requirement.parse(plugin)
         dist = working_set.find(req)
@@ -115,7 +114,7 @@ def load_plugins(
 
 
 def load_build_configuration_from_source(
-    build_configuration: BuildConfiguration.Builder, backends: List[str]
+    build_configuration: BuildConfiguration.Builder, backends: list[str]
 ) -> None:
     """Installs pants backend packages to provide BUILD file symbols and cli goals.
 

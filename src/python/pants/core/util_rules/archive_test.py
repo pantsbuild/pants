@@ -6,8 +6,9 @@ import gzip
 import subprocess
 import tarfile
 import zipfile
+from collections.abc import Callable
 from io import BytesIO
-from typing import Callable, cast
+from typing import cast
 
 import pytest
 

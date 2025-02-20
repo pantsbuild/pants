@@ -8,8 +8,9 @@ import collections.abc
 import json
 import logging
 from abc import ABCMeta
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, fields, is_dataclass, replace
-from typing import Any, Iterable, Mapping, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from pants.core.goals.deploy import Deploy, DeployFieldSet
 from pants.core.goals.package import Package, PackageFieldSet
@@ -242,9 +243,9 @@ async def _create_target_alias_to_goals_map() -> dict[str, tuple[str, ...]]:
         TestFieldSet: Test.name,
     }
 
-    assert len(peekable_field_sets) == len(
-        field_set_to_goal_map
-    ), "Must have a goal string for each field set"
+    assert len(peekable_field_sets) == len(field_set_to_goal_map), (
+        "Must have a goal string for each field set"
+    )
     peekable_goals = [field_set_to_goal_map[fs] for fs in peekable_field_sets]
 
     target_roots_to_field_sets_get = [

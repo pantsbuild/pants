@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from textwrap import dedent
-from typing import Dict, List, Union
+from typing import Union
 
 import pytest
 
@@ -16,8 +16,8 @@ from pants.option.custom_types import (
 from pants.option.errors import ParseError
 
 ValidPrimitives = Union[int, str]
-ParsedList = List[ValidPrimitives]
-ParsedDict = Dict[str, Union[ValidPrimitives, ParsedList]]
+ParsedList = list[ValidPrimitives]
+ParsedDict = dict[str, Union[ValidPrimitives, ParsedList]]
 
 
 def test_memory_size() -> None:
@@ -70,7 +70,7 @@ class TestCustomTypes:
         assert expected == ListValueComponent.create(s).val
 
     @staticmethod
-    def assert_split_list(s: str, *, expected: List[str]) -> None:
+    def assert_split_list(s: str, *, expected: list[str]) -> None:
         assert expected == ListValueComponent._split_modifier_expr(s)
 
     def test_unset_bool(self):

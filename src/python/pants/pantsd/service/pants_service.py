@@ -5,8 +5,8 @@ import logging
 import threading
 import time
 from abc import ABC, abstractmethod
+from collections.abc import KeysView
 from dataclasses import dataclass
-from typing import Dict, KeysView, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class PantsService(ABC):
         self.name = self.__class__.__name__
         self._state = _ServiceState()
 
-    def setup(self, services: Tuple["PantsService", ...]):
+    def setup(self, services: tuple["PantsService", ...]):
         """Called before `run` to allow for service->service or other side-effecting setup."""
         self.services = services
 
@@ -199,9 +199,9 @@ class PantsServices:
 
     JOIN_TIMEOUT_SECONDS = 1
 
-    _service_threads: Dict[PantsService, threading.Thread]
+    _service_threads: dict[PantsService, threading.Thread]
 
-    def __init__(self, services: Tuple[PantsService, ...] = ()) -> None:
+    def __init__(self, services: tuple[PantsService, ...] = ()) -> None:
         object.__setattr__(self, "_service_threads", self._start(services))
 
     @classmethod
@@ -212,7 +212,7 @@ class PantsServices:
         return t
 
     @classmethod
-    def _start(cls, services: Tuple[PantsService, ...]) -> Dict[PantsService, threading.Thread]:
+    def _start(cls, services: tuple[PantsService, ...]) -> dict[PantsService, threading.Thread]:
         """Launch a thread per service."""
 
         for service in services:
