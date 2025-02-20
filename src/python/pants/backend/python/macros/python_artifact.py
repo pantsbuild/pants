@@ -10,7 +10,7 @@ from pants.util.strutil import softwrap
 
 
 def _normalize_entry_points(
-    all_entry_points: dict[str, list[str] | dict[str, str]]
+    all_entry_points: dict[str, list[str] | dict[str, str]],
 ) -> dict[str, dict[str, str]]:
     """Ensure any entry points are in the form Dict[str, Dict[str, str]]."""
     if not isinstance(all_entry_points, collections.abc.Mapping):

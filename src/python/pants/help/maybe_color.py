@@ -34,8 +34,7 @@ class MaybeColor:
             formatted_candidates = " or ".join(self.maybe_cyan(g) for g in did_you_mean)
         else:
             formatted_candidates = (
-                f"{', '.join(self.maybe_cyan(g) for g in did_you_mean[:-1])}"
-                f", or {did_you_mean[-1]}"
+                f"{', '.join(self.maybe_cyan(g) for g in did_you_mean[:-1])}, or {did_you_mean[-1]}"
             )
         return str(formatted_candidates)
 

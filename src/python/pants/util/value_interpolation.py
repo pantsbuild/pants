@@ -17,7 +17,7 @@ class InterpolationError(ValueError):
     def attribute_error(cls, value: str | InterpolationValue, attribute: str) -> InterpolationError:
         msg = f"The placeholder {attribute!r} is unknown."
         if value and isinstance(value, InterpolationValue):
-            msg += f' Try with one of: {", ".join(value.keys())}.'
+            msg += f" Try with one of: {', '.join(value.keys())}."
         return cls(msg)
 
 

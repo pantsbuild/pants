@@ -213,16 +213,16 @@ class FixSubsystem(GoalSubsystem):
 
         See also:
 
-        - [The `fmt` goal]({doc_url('reference/goals/fix')} will run code-editing tools that may make only
+        - [The `fmt` goal]({doc_url("reference/goals/fix")} will run code-editing tools that may make only
           syntactic changes, not semantic ones. The `fix` includes running these `fmt` tools by
           default (see [the `skip_formatters` option](#skip_formatters) to control this).
 
-        - [The `lint` goal]({doc_url('reference/goals/lint')}) will validate code is formatted, by running these
+        - [The `lint` goal]({doc_url("reference/goals/lint")}) will validate code is formatted, by running these
           fixers and checking there's no change.
 
         - Documentation about formatters for various ecosystems, such as:
-          [Python]({doc_url('docs/python/overview/linters-and-formatters')}), [JVM]({doc_url('jvm/java-and-scala#lint-and-format')}),
-          [SQL]({doc_url('docs/sql#enable-sqlfluff-linter')})
+          [Python]({doc_url("docs/python/overview/linters-and-formatters")}), [JVM]({doc_url("jvm/java-and-scala#lint-and-format")}),
+          [SQL]({doc_url("docs/sql#enable-sqlfluff-linter")})
         """
     )
 

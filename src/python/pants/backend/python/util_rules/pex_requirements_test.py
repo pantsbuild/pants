@@ -190,8 +190,7 @@ def test_validate_lockfiles(
 
     reqs_desc = comma_separated_list(f"`{rs}`" for rs in req_strings)
     contains(
-        f"You are consuming {reqs_desc} from the `a` lockfile at lock.txt "
-        "with incompatible inputs"
+        f"You are consuming {reqs_desc} from the `a` lockfile at lock.txt with incompatible inputs"
     )
     contains(
         "The lockfile does not provide all the necessary requirements",

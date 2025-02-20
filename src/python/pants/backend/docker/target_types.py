@@ -89,7 +89,7 @@ class DockerImageContextRootField(StringField):
                     f"""
                     The `{cls.alias}` field in target {address} must be a relative path, but was
                     {value_or_default!r}. Use {val!r} for a path relative to the build root, or
-                    {'./' + val!r} for a path relative to the BUILD file
+                    {"./" + val!r} for a path relative to the BUILD file
                     (i.e. {os.path.join(address.spec_path, val)!r}).
                     """
                 )
@@ -150,7 +150,7 @@ class DockerImageTagsField(StringSequenceField):
 
         {_interpolation_help.format(kind="tag")}
 
-        See {doc_url('docs/docker/tagging-docker-images')}.
+        See {doc_url("docs/docker/tagging-docker-images")}.
         """
     )
 

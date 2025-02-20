@@ -422,7 +422,7 @@ class Options:
                             f"""
                             Can only provide one of these mutually exclusive options in
                             {scope_str}, but multiple given:
-                            {', '.join(mutex_map[mutex_map_key])}
+                            {", ".join(mutex_map[mutex_map_key])}
                             """
                         )
                     )

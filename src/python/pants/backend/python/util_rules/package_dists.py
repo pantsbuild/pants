@@ -122,7 +122,7 @@ class OwnershipError(SetupPyError):
         super().__init__(
             softwrap(
                 f"""
-                {msg} See {doc_url('docs/python/overview/building-distributions')} for
+                {msg} See {doc_url("docs/python/overview/building-distributions")} for
                 how python_sources targets are mapped to distributions.
                 """
             )
@@ -981,7 +981,7 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
                         f"""
                         Found multiple sibling python_distribution targets that are the closest
                         ancestor dependents of {target.address} and are therefore candidates to
-                        own it: {', '.join(o.address.spec for o in all_owners)}. Only a
+                        own it: {", ".join(o.address.spec for o in all_owners)}. Only a
                         single such owner is allowed, to avoid ambiguity.
                         """
                     )
@@ -1132,7 +1132,7 @@ def declares_pkg_resources_namespace_package(python_src: str) -> bool:
 
 
 def merge_entry_points(
-    *all_entry_points_with_descriptions_of_source: tuple[str, dict[str, dict[str, str]]]
+    *all_entry_points_with_descriptions_of_source: tuple[str, dict[str, dict[str, str]]],
 ) -> dict[str, dict[str, str]]:
     """Merge all entry points, throwing ValueError if there are any conflicts."""
     merged = cast(
@@ -1154,7 +1154,7 @@ def merge_entry_points(
                 softwrap(
                     f"""
                     Multiple entry_points registered for {category} {name} in:
-                    {', '.join(ep_source for ep_source, _ in entry_points_with_source)}
+                    {", ".join(ep_source for ep_source, _ in entry_points_with_source)}
                     """
                 )
             )

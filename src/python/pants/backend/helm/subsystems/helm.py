@@ -49,7 +49,7 @@ class InvalidHelmPassthroughArgs(Exception):
         super().__init__(
             softwrap(
                 f"""
-                The following command line arguments are not valid: {' '.join(args)}.
+                The following command line arguments are not valid: {" ".join(args)}.
 
                 Only the following passthrough arguments are allowed:
 

@@ -532,17 +532,17 @@ async def check_outputs(
             message += f"\n\nDirectories in output ({len(snapshot.dirs)} total):"
             dirs = sorted(snapshot.dirs, key=lambda x: x.count(os.pathsep))
             if len(dirs) > 15:
-                message += f" {', ' .join(dirs[0:15])}, ... (trimmed for brevity)"
+                message += f" {', '.join(dirs[0:15])}, ... (trimmed for brevity)"
             else:
-                message += f" {', ' .join(dirs)}"
+                message += f" {', '.join(dirs)}"
 
         if snapshot.files:
             message += f"\n\nFiles in output ({len(snapshot.files)} total):"
             files = sorted(snapshot.files, key=lambda x: x.count(os.pathsep))
             if len(files) > 15:
-                message += f" {', ' .join(files[0:15])}, ... (trimmed for brevity)"
+                message += f" {', '.join(files[0:15])}, ... (trimmed for brevity)"
             else:
-                message += f" {', ' .join(files)}"
+                message += f" {', '.join(files)}"
 
         if outputs_match_error_behavior == GlobMatchErrorBehavior.error:
             raise ValueError(message)

@@ -123,7 +123,7 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
 
         This does not handle the full Pants upgrade. You must still manually change
         `pants_version` in `pants.toml` and you may need to manually address some deprecations.
-        See {doc_url('docs/releases/upgrade-tips')} for upgrade tips.
+        See {doc_url("docs/releases/upgrade-tips")} for upgrade tips.
         """
     )
 
@@ -285,7 +285,7 @@ async def update_build_files(
                 softwrap(
                     f"""
                     However, there may still be deprecations that `update-build-files` doesn't know
-                    how to fix. See {doc_url('docs/releases/upgrade-tips')} for upgrade tips.
+                    how to fix. See {doc_url("docs/releases/upgrade-tips")} for upgrade tips.
                     """
                 )
             )

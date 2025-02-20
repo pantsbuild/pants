@@ -107,7 +107,7 @@ class Pylint(PythonToolBase):
             example, if your plugin is at `build-support/pylint/custom_plugin.py`, add
             `'build-support/pylint'` to `[source].root_patterns` in `pants.toml`. This is
             necessary for Pants to know how to tell Pylint to discover your plugin. See
-            {doc_url('docs/using-pants/key-concepts/source-roots')}
+            {doc_url("docs/using-pants/key-concepts/source-roots")}
 
             You must also set `load-plugins=$module_name` in your Pylint config file.
 

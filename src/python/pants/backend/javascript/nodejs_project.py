@@ -273,14 +273,14 @@ def _merge_workspaces(node_js_projects: set[_TentativeProject]) -> Iterable[_Ten
 
 
 def _ensure_one_parent(
-    project_to_parents: dict[_TentativeProject, list[_TentativeProject]]
+    project_to_parents: dict[_TentativeProject, list[_TentativeProject]],
 ) -> None:
     for project, parents in project_to_parents.items():
         if len(parents) > 1:
             raise ValueError(
                 softwrap(
                     f"""
-                    Nodejs projects {', '.join(parent.root_dir for parent in parents)}
+                    Nodejs projects {", ".join(parent.root_dir for parent in parents)}
                     are specifying {project.root_dir} to be part of their workspaces.
 
                     A package can only be part of one project.

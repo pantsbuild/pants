@@ -460,8 +460,7 @@ class TestRuleGraph:
         with pytest.raises(Exception) as cm:
             create_scheduler(rules)
         assert (
-            "No installed rules return the type B, and it was not provided by potential "
-            "callers of "
+            "No installed rules return the type B, and it was not provided by potential callers of "
         ) in str(cm.value)
         assert (
             "If that type should be computed by a rule, ensure that that rule is installed."

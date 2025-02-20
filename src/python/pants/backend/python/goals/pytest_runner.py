@@ -375,7 +375,7 @@ async def setup_pytest_for_target(
         results_file_prefix = request.field_sets[0].address.path_safe_spec
         if len(request.field_sets) > 1:
             results_file_prefix = (
-                f"batch-of-{results_file_prefix}+{len(request.field_sets)-1}-files"
+                f"batch-of-{results_file_prefix}+{len(request.field_sets) - 1}-files"
             )
         results_file_name = f"{results_file_prefix}.xml"
         pytest_args.extend(
@@ -578,7 +578,7 @@ async def run_python_tests(
 
 @rule(desc="Set up Pytest to run interactively", level=LogLevel.DEBUG)
 async def debug_python_test(
-    batch: PyTestRequest.Batch[PythonTestFieldSet, TestMetadata]
+    batch: PyTestRequest.Batch[PythonTestFieldSet, TestMetadata],
 ) -> TestDebugRequest:
     setup = await Get(
         TestSetup, TestSetupRequest(batch.elements, batch.partition_metadata, is_debug=True)

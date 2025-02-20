@@ -1322,7 +1322,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     },
                     "run": dedent(
                         f"""\
-                        gh release edit {gha_expr("needs.release_info.outputs.build-ref") } --draft=false --notes-file notes.txt
+                        gh release edit {gha_expr("needs.release_info.outputs.build-ref")} --draft=false --notes-file notes.txt
                         """
                     ),
                 },
@@ -1741,7 +1741,7 @@ def merge_ok(pr_jobs: list[str]) -> Jobs:
                 {
                     "run": dedent(
                         f"""\
-                merge_ok="{gha_expr('needs.set_merge_ok.outputs.merge_ok')}"
+                merge_ok="{gha_expr("needs.set_merge_ok.outputs.merge_ok")}"
                 if [[ "${{merge_ok}}" == "true" ]]; then
                     echo "Merge OK"
                     exit 0

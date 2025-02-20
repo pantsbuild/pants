@@ -110,7 +110,7 @@ class JarToolRequest:
 
     @staticmethod
     def __parse_policies(
-        policies: Iterable[tuple[str, str | JarDuplicateAction]]
+        policies: Iterable[tuple[str, str | JarDuplicateAction]],
     ) -> Iterable[tuple[str, JarDuplicateAction]]:
         return [
             (

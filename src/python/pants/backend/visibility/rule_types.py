@@ -312,7 +312,7 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
                             {visibility_rule.action.name}: type={adaptor.type_alias}
                             address={address} [{relpath}] other={other_address} [{path}]
                             rule={str(visibility_rule)!r} {self.path}:
-                            {', '.join(map(str, ruleset.rules))}
+                            {", ".join(map(str, ruleset.rules))}
                             """
                         )
                     )

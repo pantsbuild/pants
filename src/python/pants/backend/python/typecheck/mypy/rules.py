@@ -301,7 +301,7 @@ async def mypy_typecheck_partition(
                             {mkdir.path} -p "$SANDBOX_CACHE_DIR" > /dev/null 2>&1
                             {cp.path} "$NAMED_CACHE_DB" "$SANDBOX_CACHE_DB" > /dev/null 2>&1
 
-                            {' '.join((shell_quote(arg) for arg in argv))}
+                            {" ".join((shell_quote(arg) for arg in argv))}
                             EXIT_CODE=$?
 
                             if ! {ln.path} "$SANDBOX_CACHE_DB" "$NAMED_CACHE_DB" > /dev/null 2>&1; then

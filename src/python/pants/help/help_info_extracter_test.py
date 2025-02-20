@@ -63,8 +63,7 @@ def test_global_scope():
         ["--foo"],
         {"type": list, "member_type": dict},
         [
-            "--foo=\"[{'key1': val1, 'key2': val2, ...}, "
-            "{'key1': val1, 'key2': val2, ...}, ...]\"",
+            "--foo=\"[{'key1': val1, 'key2': val2, ...}, {'key1': val1, 'key2': val2, ...}, ...]\"",
         ],
         ["--foo"],
     )

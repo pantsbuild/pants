@@ -291,7 +291,7 @@ def _check_flags(
 
                 if i + 1 < len(flags):
                     raise CGoFlagSecurityError(
-                        f"invalid flag in {source}: {flag} {flags[i+1]} (see https://golang.org/s/invalidflag)"
+                        f"invalid flag in {source}: {flag} {flags[i + 1]} (see https://golang.org/s/invalidflag)"
                     )
 
                 raise CGoFlagSecurityError(

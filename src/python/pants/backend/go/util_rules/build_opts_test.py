@@ -271,7 +271,7 @@ def test_runtime_check_enable_fields_work_as_expected(
         Address("mod_false", target_name="pkg"),
         True,
         for_tests=True,
-        msg=f"for go_package when --go-test-force-{field_name }and when {field_name}=False on go_mod",
+        msg=f"for go_package when --go-test-force-{field_name}and when {field_name}=False on go_mod",
     )
 
 
