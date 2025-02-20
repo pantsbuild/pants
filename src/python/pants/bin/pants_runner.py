@@ -84,10 +84,13 @@ class PantsRunner:
         stdin_fileno = sys.stdin.fileno()
         stdout_fileno = sys.stdout.fileno()
         stderr_fileno = sys.stderr.fileno()
-        with initialize_stdio(global_bootstrap_options), stdio_destination(
-            stdin_fileno=stdin_fileno,
-            stdout_fileno=stdout_fileno,
-            stderr_fileno=stderr_fileno,
+        with (
+            initialize_stdio(global_bootstrap_options),
+            stdio_destination(
+                stdin_fileno=stdin_fileno,
+                stdout_fileno=stdout_fileno,
+                stderr_fileno=stderr_fileno,
+            ),
         ):
             run_via_scie = "SCIE" in os.environ
             enable_scie_warnings = "NO_SCIE_WARNING" not in os.environ

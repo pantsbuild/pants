@@ -1096,7 +1096,9 @@ async def find_owners(
     live_dirs = FrozenOrderedSet(os.path.dirname(s) for s in live_files)
     deleted_dirs = FrozenOrderedSet(os.path.dirname(s) for s in deleted_files)
 
-    def create_live_and_deleted_gets(*, filter_by_global_options: bool) -> tuple[
+    def create_live_and_deleted_gets(
+        *, filter_by_global_options: bool
+    ) -> tuple[
         Get[FilteredTargets | Targets],
         Get[UnexpandedTargets],
     ]:
@@ -1642,7 +1644,9 @@ async def resolve_dependencies(
         Get(
             ValidatedDependencies,
             {
-                vd_request_type(vd_request_type.field_set_type.create(tgt), result): ValidateDependenciesRequest,  # type: ignore[misc]
+                vd_request_type(
+                    vd_request_type.field_set_type.create(tgt), result
+                ): ValidateDependenciesRequest,  # type: ignore[misc]
                 environment_name: EnvironmentName,
             },
         )

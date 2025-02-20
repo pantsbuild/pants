@@ -428,9 +428,9 @@ async def fix_batch(
         )
         results.append(result)
 
-        assert set(result.output.files) == set(
-            batch.files
-        ), f"Expected {result.output.files} to match {batch.files}"
+        assert set(result.output.files) == set(batch.files), (
+            f"Expected {result.output.files} to match {batch.files}"
+        )
         current_snapshot = result.output
     return _FixBatchResult(tuple(results))
 

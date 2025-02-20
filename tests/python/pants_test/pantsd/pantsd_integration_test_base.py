@@ -111,9 +111,9 @@ class PantsDaemonMonitor(ProcessManager):
 
     def _check_pantsd_is_alive(self):
         self._log()
-        assert (
-            self._started
-        ), "cannot assert that pantsd is running. Try calling assert_started before calling this method."
+        assert self._started, (
+            "cannot assert that pantsd is running. Try calling assert_started before calling this method."
+        )
         assert self.is_alive(), "pantsd was not alive."
         return self.pid
 
@@ -133,9 +133,9 @@ class PantsDaemonMonitor(ProcessManager):
 
     def assert_stopped(self):
         self._log()
-        assert (
-            self._started
-        ), "cannot assert pantsd stoppage. Try calling assert_started before calling this method."
+        assert self._started, (
+            "cannot assert pantsd stoppage. Try calling assert_started before calling this method."
+        )
         for _ in attempts("pantsd should be stopped!"):
             if self.is_dead():
                 break

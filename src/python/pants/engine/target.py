@@ -419,7 +419,7 @@ class Target:
 
     def __str__(self) -> str:
         fields = ", ".join(str(field) for field in self.field_values.values())
-        address = f"address=\"{self.address}\"{', ' if fields else ''}"
+        address = f'address="{self.address}"{", " if fields else ""}'
         return f"{self.alias}({address}{fields})"
 
     def __hash__(self) -> int:
@@ -1745,7 +1745,7 @@ class UnrecognizedTargetTypeException(InvalidTargetException):
                 All valid target types: {sorted(registered_target_types.aliases)}
 
                 (If {target_type!r} is a custom target type, refer to
-                {doc_url('docs/writing-plugins/the-target-api/concepts')} for getting it registered with Pants.)
+                {doc_url("docs/writing-plugins/the-target-api/concepts")} for getting it registered with Pants.)
 
                 """
             ),
@@ -2660,7 +2660,7 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
         `{bin_name()} dependencies` or `{bin_name()} peek` on this target to get the final
         result.
 
-        See {doc_url('docs/using-pants/key-concepts/targets-and-build-files')} for more about how addresses are formed, including for generated
+        See {doc_url("docs/using-pants/key-concepts/targets-and-build-files")} for more about how addresses are formed, including for generated
         targets. You can also run `{bin_name()} list ::` to find all addresses in your project, or
         `{bin_name()} list dir` to find all addresses defined in that directory.
 
@@ -2960,7 +2960,7 @@ class DependenciesRuleApplication:
             raise DependencyRuleActionDeniedError(
                 softwrap(
                     f"""
-                    {self.address} has {pluralize(err_count, 'dependency violation')}:
+                    {self.address} has {pluralize(err_count, "dependency violation")}:
 
                     {bullet_list(errors)}
                     """

@@ -84,10 +84,11 @@ def logging(original_function=None, *, level: LogLevel = LogLevel.INFO):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             stdout_fileno, stderr_fileno = sys.stdout.fileno(), sys.stderr.fileno()
-            with temporary_dir() as tempdir, initialize_stdio_raw(
-                level, False, False, {}, True, [], tempdir
-            ), stdin_context() as stdin, stdio_destination(
-                stdin.fileno(), stdout_fileno, stderr_fileno
+            with (
+                temporary_dir() as tempdir,
+                initialize_stdio_raw(level, False, False, {}, True, [], tempdir),
+                stdin_context() as stdin,
+                stdio_destination(stdin.fileno(), stdout_fileno, stderr_fileno),
             ):
                 return func(*args, **kwargs)
 
@@ -857,20 +858,23 @@ def mock_console(
             .colors
         )
 
-    with initialize_stdio(global_bootstrap_options), stdin_context(
-        stdin_content
-    ) as stdin, temporary_file(binary_mode=False) as stdout, temporary_file(
-        binary_mode=False
-    ) as stderr, stdio_destination(
-        stdin_fileno=stdin.fileno(),
-        stdout_fileno=stdout.fileno(),
-        stderr_fileno=stderr.fileno(),
+    with (
+        initialize_stdio(global_bootstrap_options),
+        stdin_context(stdin_content) as stdin,
+        temporary_file(binary_mode=False) as stdout,
+        temporary_file(binary_mode=False) as stderr,
+        stdio_destination(
+            stdin_fileno=stdin.fileno(),
+            stdout_fileno=stdout.fileno(),
+            stderr_fileno=stderr.fileno(),
+        ),
     ):
         # NB: We yield a Console without overriding the destination argument, because we have
         # already done a sys.std* level replacement. The replacement is necessary in order for
         # InteractiveProcess to have native file handles to interact with.
-        yield Console(use_colors=colors), StdioReader(
-            _stdout=Path(stdout.name), _stderr=Path(stderr.name)
+        yield (
+            Console(use_colors=colors),
+            StdioReader(_stdout=Path(stdout.name), _stderr=Path(stderr.name)),
         )
 
 

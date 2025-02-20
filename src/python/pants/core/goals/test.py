@@ -1071,9 +1071,9 @@ _SOURCE_MAP = {
 
 def _format_test_summary(result: TestResult, run_id: RunId, console: Console) -> str:
     """Format the test summary printed to the console."""
-    assert (
-        result.result_metadata is not None
-    ), "Skipped test results should not be outputted in the test summary"
+    assert result.result_metadata is not None, (
+        "Skipped test results should not be outputted in the test summary"
+    )
     succeeded = result.exit_code == 0
     retried = len(result.process_results) > 1
 

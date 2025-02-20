@@ -586,9 +586,12 @@ async def get_dependencies_rule_application(
         return DependenciesRuleApplication.allow_all()
 
     (
-        origin_rules_family,
-        origin_target,
-    ), *dependencies_family_adaptor = await _get_target_family_and_adaptor_for_dep_rules(
+        (
+            origin_rules_family,
+            origin_target,
+        ),
+        *dependencies_family_adaptor,
+    ) = await _get_target_family_and_adaptor_for_dep_rules(
         request.address,
         *request.dependencies,
         description_of_origin=request.description_of_origin,

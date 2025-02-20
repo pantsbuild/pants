@@ -1014,11 +1014,23 @@ class TestRuleGraph:
                   */
                   // root entries
                 {fmt_non_param_edge(A, ())}
-                {fmt_non_param_edge(RuleFormatRequest(a, gets=[("B", "D")]), (), rule_type=GraphVertexType.singleton)}
+                {
+                    fmt_non_param_edge(
+                        RuleFormatRequest(a, gets=[("B", "D")]),
+                        (),
+                        rule_type=GraphVertexType.singleton,
+                    )
+                }
                 {fmt_non_param_edge(A, (), RuleFormatRequest(a, gets=[("B", "D")]))}
                   // internal entries
-                {fmt_non_param_edge(RuleFormatRequest(a, (), gets=[("B", "D")]), D, RuleFormatRequest(b_from_d),
-                                    append_for_product=False)}
+                {
+                    fmt_non_param_edge(
+                        RuleFormatRequest(a, (), gets=[("B", "D")]),
+                        D,
+                        RuleFormatRequest(b_from_d),
+                        append_for_product=False,
+                    )
+                }
                 {fmt_param_edge(D, D, RuleFormatRequest(b_from_d))}
                 }}"""
             ).strip(),

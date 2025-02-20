@@ -479,9 +479,9 @@ async def create_dist_build_request(
     prefixed_input = await Get(Digest, AddPrefix(input_digest, chroot_prefix))
     build_system = await Get(BuildSystem, BuildSystemRequest(prefixed_input, working_directory))
     output_path = dist_tgt.get(PythonDistributionOutputPathField).value
-    assert (
-        output_path is not None
-    ), "output_path should take a default string value if the user has not provided it."
+    assert output_path is not None, (
+        "output_path should take a default string value if the user has not provided it."
+    )
 
     return DistBuildRequest(
         build_system=build_system,

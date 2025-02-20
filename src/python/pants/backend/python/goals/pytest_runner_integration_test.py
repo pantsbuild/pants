@@ -152,9 +152,9 @@ def run_pytest(
                 debug_adapter_result = rule_runner.run_interactive_process(
                     debug_adapter_request.process
                 )
-                assert (
-                    test_result.exit_code == debug_adapter_result.exit_code
-                ), f"{stdioreader.get_stdout()}\n{stdioreader.get_stderr()}"
+                assert test_result.exit_code == debug_adapter_result.exit_code, (
+                    f"{stdioreader.get_stdout()}\n{stdioreader.get_stderr()}"
+                )
 
     return test_result
 

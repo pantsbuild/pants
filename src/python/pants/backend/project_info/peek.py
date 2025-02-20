@@ -243,9 +243,9 @@ async def _create_target_alias_to_goals_map() -> dict[str, tuple[str, ...]]:
         TestFieldSet: Test.name,
     }
 
-    assert len(peekable_field_sets) == len(
-        field_set_to_goal_map
-    ), "Must have a goal string for each field set"
+    assert len(peekable_field_sets) == len(field_set_to_goal_map), (
+        "Must have a goal string for each field set"
+    )
     peekable_goals = [field_set_to_goal_map[fs] for fs in peekable_field_sets]
 
     target_roots_to_field_sets_get = [

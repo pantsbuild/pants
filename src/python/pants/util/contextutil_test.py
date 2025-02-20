@@ -121,24 +121,24 @@ class TestContextutilTest:
     def test_temporary_file_no_args(self) -> None:
         with temporary_file() as fp:
             assert os.path.exists(fp.name), "Temporary file should exist within the context."
-        assert (
-            os.path.exists(fp.name) is False
-        ), "Temporary file should not exist outside of the context."
+        assert os.path.exists(fp.name) is False, (
+            "Temporary file should not exist outside of the context."
+        )
 
     def test_temporary_file_without_cleanup(self) -> None:
         with temporary_file(cleanup=False) as fp:
             assert os.path.exists(fp.name), "Temporary file should exist within the context."
-        assert os.path.exists(
-            fp.name
-        ), "Temporary file should exist outside of context if cleanup=False."
+        assert os.path.exists(fp.name), (
+            "Temporary file should exist outside of context if cleanup=False."
+        )
         os.unlink(fp.name)
 
     def test_temporary_file_within_other_dir(self) -> None:
         with temporary_dir() as path:
             with temporary_file(root_dir=path) as f:
-                assert os.path.realpath(f.name).startswith(
-                    os.path.realpath(path)
-                ), "file should be created in root_dir if specified."
+                assert os.path.realpath(f.name).startswith(os.path.realpath(path)), (
+                    "file should be created in root_dir if specified."
+                )
 
     def test_temporary_dir_no_args(self) -> None:
         with temporary_dir() as path:
@@ -149,17 +149,17 @@ class TestContextutilTest:
     def test_temporary_dir_without_cleanup(self) -> None:
         with temporary_dir(cleanup=False) as path:
             assert os.path.exists(path), "Temporary dir should exist within the context."
-        assert os.path.exists(
-            path
-        ), "Temporary dir should exist outside of context if cleanup=False."
+        assert os.path.exists(path), (
+            "Temporary dir should exist outside of context if cleanup=False."
+        )
         shutil.rmtree(path)
 
     def test_temporary_dir_with_root_dir(self) -> None:
         with temporary_dir() as path1:
             with temporary_dir(root_dir=path1) as path2:
-                assert os.path.realpath(path2).startswith(
-                    os.path.realpath(path1)
-                ), "Nested temporary dir should be created within outer dir."
+                assert os.path.realpath(path2).startswith(os.path.realpath(path1)), (
+                    "Nested temporary dir should be created within outer dir."
+                )
 
     def test_open_zipDefault(self) -> None:
         with temporary_dir() as tempdir:
@@ -189,8 +189,9 @@ class TestContextutilTest:
                 file_symlink = os.path.join(tempdir, "foo")
                 os.symlink(not_zip.name, file_symlink)
                 assert os.path.realpath(file_symlink) == os.path.realpath(not_zip.name)
-                with pytest.raises(zipfile.BadZipfile, match=f"{not_zip.name}"), open_zip(
-                    file_symlink
+                with (
+                    pytest.raises(zipfile.BadZipfile, match=f"{not_zip.name}"),
+                    open_zip(file_symlink),
                 ):
                     pass
 

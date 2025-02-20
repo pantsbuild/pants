@@ -173,9 +173,9 @@ class TestDirutilTest:
         path: str
 
     def assert_tree(self, root: str, *expected: Dir | File | Symlink):
-        def collect_tree() -> (
-            Iterator[TestDirutilTest.Dir | TestDirutilTest.File | TestDirutilTest.Symlink]
-        ):
+        def collect_tree() -> Iterator[
+            TestDirutilTest.Dir | TestDirutilTest.File | TestDirutilTest.Symlink
+        ]:
             for path, dirnames, filenames in os.walk(root, followlinks=False):
                 relpath = os.path.relpath(path, root)
                 if relpath == os.curdir:
@@ -284,17 +284,22 @@ class TestDirutilTest:
             rm_rf(file_name)
 
     def test_rm_rf_permission_error_raises(self, file_name="./perm_guarded_file") -> None:
-        with temporary_dir() as td, pushd(td), unittest.mock.patch(
-            "pants.util.dirutil.shutil.rmtree"
-        ) as mock_rmtree, pytest.raises(OSError):
+        with (
+            temporary_dir() as td,
+            pushd(td),
+            unittest.mock.patch("pants.util.dirutil.shutil.rmtree") as mock_rmtree,
+            pytest.raises(OSError),
+        ):
             mock_rmtree.side_effect = OSError(errno.EACCES, os.strerror(errno.EACCES))
             touch(file_name)
             rm_rf(file_name)
 
     def test_rm_rf_no_such_file_not_an_error(self, file_name="./vanishing_file") -> None:
-        with temporary_dir() as td, pushd(td), unittest.mock.patch(
-            "pants.util.dirutil.shutil.rmtree"
-        ) as mock_rmtree:
+        with (
+            temporary_dir() as td,
+            pushd(td),
+            unittest.mock.patch("pants.util.dirutil.shutil.rmtree") as mock_rmtree,
+        ):
             mock_rmtree.side_effect = OSError(errno.ENOENT, os.strerror(errno.ENOENT))
             touch(file_name)
             rm_rf(file_name)

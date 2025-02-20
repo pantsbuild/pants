@@ -123,12 +123,12 @@ def test_fix_implicitly_keeps_required(source: str, target: str, expected: str):
     new_call = fix_implicitly_usage(call, target_func)
 
     dummy_module = cst.parse_module("")
-    assert new_call.deep_equals(
-        call
-    ), f"Expected {dummy_module.code_for_node(new_call)} to equal {dummy_module.code_for_node(call)}"
-    assert new_call.deep_equals(
-        _parse_call(expected)
-    ), f"Expected {dummy_module.code_for_node(new_call)} to equal {expected}"
+    assert new_call.deep_equals(call), (
+        f"Expected {dummy_module.code_for_node(new_call)} to equal {dummy_module.code_for_node(call)}"
+    )
+    assert new_call.deep_equals(_parse_call(expected)), (
+        f"Expected {dummy_module.code_for_node(new_call)} to equal {expected}"
+    )
 
 
 @pytest.mark.parametrize(
@@ -157,12 +157,12 @@ def test_fix_implicitly_usage_removes_unneeded(source: str, target: str, expecte
     new_call = fix_implicitly_usage(call, target_func)
 
     dummy_module = cst.parse_module("")
-    assert not new_call.deep_equals(
-        call
-    ), f"Expected {dummy_module.code_for_node(new_call)} to not equal {dummy_module.code_for_node(call)}"
-    assert new_call.deep_equals(
-        _parse_call(expected)
-    ), f"Expected {dummy_module.code_for_node(new_call)} to equal {expected}"
+    assert not new_call.deep_equals(call), (
+        f"Expected {dummy_module.code_for_node(new_call)} to not equal {dummy_module.code_for_node(call)}"
+    )
+    assert new_call.deep_equals(_parse_call(expected)), (
+        f"Expected {dummy_module.code_for_node(new_call)} to equal {expected}"
+    )
 
 
 @pytest.mark.parametrize(
@@ -191,9 +191,9 @@ def test_fix_implicitly_usage_modification(source: str, target: str, expected: s
     new_call = fix_implicitly_usage(call, target_func)
 
     dummy_module = cst.parse_module("")
-    assert new_call.deep_equals(
-        _parse_call(expected)
-    ), f"Expected {dummy_module.code_for_node(new_call)} to equal {expected}"
+    assert new_call.deep_equals(_parse_call(expected)), (
+        f"Expected {dummy_module.code_for_node(new_call)} to equal {expected}"
+    )
 
 
 def _parse_call(source: str) -> cst.Call:

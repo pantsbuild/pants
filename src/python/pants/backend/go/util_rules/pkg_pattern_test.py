@@ -130,8 +130,8 @@ def _run_test(name: str, tests: str, fn: Callable[[str, str], bool]) -> None:
             for pattern in patterns:
                 for test_example in f[1:]:
                     result = fn(pattern, test_example)
-                    assert (
-                        result == want
-                    ), f"{name}({pattern})({test_example}): result={result}, want={want}"
+                    assert result == want, (
+                        f"{name}({pattern})({test_example}): result={result}, want={want}"
+                    )
         else:
             raise ValueError(f"Unknown directive {f[0]}")

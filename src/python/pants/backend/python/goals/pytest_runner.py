@@ -444,7 +444,9 @@ async def setup_pytest_for_target(
 
     run_description = request.field_sets[0].address.spec
     if len(request.field_sets) > 1:
-        run_description = f"batch of {run_description} and {len(request.field_sets)-1} other files"
+        run_description = (
+            f"batch of {run_description} and {len(request.field_sets) - 1} other files"
+        )
     process = await Get(
         Process,
         VenvPexProcess(
@@ -534,7 +536,9 @@ async def run_python_tests(
     def warning_description() -> str:
         description = batch.elements[0].address.spec
         if len(batch.elements) > 1:
-            description = f"batch containing {description} and {len(batch.elements)-1} other files"
+            description = (
+                f"batch containing {description} and {len(batch.elements) - 1} other files"
+            )
         if batch.partition_metadata.description:
             description = f"{description} ({batch.partition_metadata.description})"
         return description

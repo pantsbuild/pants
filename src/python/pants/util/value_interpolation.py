@@ -103,9 +103,9 @@ class InterpolationContext(FrozenDict[str, Union[str, InterpolationValue]]):
             if self.options_scope is None:
                 assert not any(field_infos_is_none), f"Missing target field details in {self!r}."
             else:
-                assert all(
-                    field_infos_is_none
-                ), f"Must not refer to both configuration option and target field in {self!r}."
+                assert all(field_infos_is_none), (
+                    f"Must not refer to both configuration option and target field in {self!r}."
+                )
 
         def __str__(self) -> str:
             if self.options_scope:

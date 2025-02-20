@@ -417,7 +417,9 @@ class Snapshot:
     @property
     def files(self) -> tuple[str, ...]: ...
     # Don't call this, call pants.engine.fs.SnapshotDiff instead
-    def _diff(self, other: Snapshot) -> tuple[
+    def _diff(
+        self, other: Snapshot
+    ) -> tuple[
         tuple[str, ...],
         tuple[str, ...],
         tuple[str, ...],

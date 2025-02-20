@@ -420,9 +420,9 @@ class PBSPythonProviderSubsystem(Subsystem):
 
             pbs_python_info = PBSPythonInfo(url=info.url, sha256=info.sha256, size=info.size)
 
-            user_supplied_pythons[py_version][pbs_release_tag][
-                info.platform.value
-            ] = pbs_python_info
+            user_supplied_pythons[py_version][pbs_release_tag][info.platform.value] = (
+                pbs_python_info
+            )
 
         return user_supplied_pythons
 

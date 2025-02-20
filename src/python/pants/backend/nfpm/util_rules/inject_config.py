@@ -135,7 +135,9 @@ async def determine_injected_nfpm_package_fields(
             )
         )
     inject_nfpm_config_request_type = applicable_inject_nfpm_config_requests[0]
-    inject_nfpm_config_request: InjectNfpmPackageFieldsRequest = inject_nfpm_config_request_type(target)  # type: ignore[abstract]
+    inject_nfpm_config_request: InjectNfpmPackageFieldsRequest = inject_nfpm_config_request_type(
+        target
+    )  # type: ignore[abstract]
     return await Get(
         InjectedNfpmPackageFields, InjectNfpmPackageFieldsRequest, inject_nfpm_config_request
     )
