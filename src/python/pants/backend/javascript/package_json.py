@@ -831,7 +831,7 @@ def _script_missing_error(entry_point: str, scripts: Iterable[str], address: Add
             {entry_point} was not found in package.json#scripts section
             of the `{PackageJsonTarget.alias}` target with address {address}.
 
-            Available scripts are: {', '.join(scripts)}.
+            Available scripts are: {", ".join(scripts)}.
             """
         )
     )

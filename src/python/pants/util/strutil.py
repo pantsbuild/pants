@@ -157,7 +157,9 @@ class Simplifier:
         chroot = (
             strip_v2_chroot_path(v)
             if self.strip_chroot_path
-            else v.decode() if isinstance(v, bytes) else v
+            else v.decode()
+            if isinstance(v, bytes)
+            else v
         )
         formatting = colors.strip_color(chroot) if self.strip_formatting else chroot
         assert isinstance(formatting, str)
@@ -197,7 +199,7 @@ def bullet_list(elements: Iterable[str], max_elements: int = -1) -> str:
         elements = tuple(elements)
         if len(elements) > max_elements:
             elements = elements[: max_elements - 1] + (
-                f"... and {len(elements)-max_elements+1} more",
+                f"... and {len(elements) - max_elements + 1} more",
             )
 
     sep = "\n  * "

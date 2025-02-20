@@ -109,7 +109,7 @@ async def partition_pylint(
         for (
             resolve,
             interpreter_constraints,
-        ), field_sets, in resolve_and_interpreter_constraints_to_field_sets.items()
+        ), field_sets in resolve_and_interpreter_constraints_to_field_sets.items()
     )
 
 

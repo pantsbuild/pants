@@ -185,9 +185,9 @@ def assert_results_are_the_same(
     sets: tuple[OrderedSetInstance, OrderedSetInstance],
 ) -> None:
     """Check that all results have the same value, but are different items."""
-    assert all(
-        result == results[0] for result in results
-    ), f"Not all results are the same.\nResults: {results}\nTest data: {sets}"
+    assert all(result == results[0] for result in results), (
+        f"Not all results are the same.\nResults: {results}\nTest data: {sets}"
+    )
     for a, b in itertools.combinations(results, r=2):
         if isinstance(a, bool):
             continue

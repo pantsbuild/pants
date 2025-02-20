@@ -72,7 +72,7 @@ class ThriftSourceTarget(Target):
         A single Thrift file used to generate various languages.
 
         See language-specific docs:
-            Python: {doc_url('docs/python/integrations/thrift')}
+            Python: {doc_url("docs/python/integrations/thrift")}
         """
     )
 

@@ -383,7 +383,7 @@ def goal_rule(*args, **kwargs):
 
 @overload
 def _uncacheable_rule(
-    func: Callable[P, Coroutine[Any, Any, R]]
+    func: Callable[P, Coroutine[Any, Any, R]],
 ) -> Callable[P, Coroutine[Any, Any, R]]: ...
 
 

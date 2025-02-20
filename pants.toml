@@ -5,11 +5,10 @@ print_stacktrace = true
 pythonpath = ["%(buildroot)s/pants-plugins"]
 backend_packages.add = [
   "pants.backend.build_files.fix.deprecations",
-  "pants.backend.build_files.fmt.black",
+  "pants.backend.build_files.fmt.ruff",
   "pants.backend.python",
   "pants.backend.experimental.python.packaging.pyoxidizer",
   "pants.backend.python.lint.autoflake",
-  "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.flake8",
   "pants.backend.python.lint.isort",
@@ -29,6 +28,7 @@ backend_packages.add = [
   "pants.backend.experimental.javascript",
   "pants.backend.experimental.javascript.lint.prettier",
   "pants.backend.experimental.python",
+  "pants.backend.experimental.python.lint.ruff.format",
   "pants.backend.experimental.python.packaging.pyoxidizer",
   "pants.backend.experimental.scala",
   "pants.backend.experimental.scala.lint.scalafmt",
@@ -135,7 +135,7 @@ ignore_adding_targets = [
 ]
 
 [update-build-files]
-# We use `pants.backend.build_files.fmt.black`
+# We use `pants.backend.build_files.fmt.ruff`
 fmt = false
 
 [pex]

@@ -71,6 +71,7 @@ Example demonstrating how to register synthetic targets:
             ...
         )
 """
+
 from __future__ import annotations
 
 import itertools
@@ -209,7 +210,8 @@ class AllSyntheticAddressMaps:
                 {
                     path: tuple(type(request) for request in requests_group)  # type: ignore[misc]
                     for path, requests_group in itertools.groupby(
-                        sorted(requests, key=requests_key), key=requests_key  # type: ignore[arg-type]
+                        sorted(requests, key=requests_key),  # type: ignore[arg-type]
+                        key=requests_key,  # type: ignore[arg-type]
                     )
                     if path != SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS
                 }

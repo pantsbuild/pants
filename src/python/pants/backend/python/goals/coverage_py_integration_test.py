@@ -63,7 +63,7 @@ def sources(batched: bool) -> dict[str, str]:
         python_tests(
             name="tests",
             dependencies=[":project"],
-            {'batch_compatibility_tag="default",' if batched else ''}
+            {'batch_compatibility_tag="default",' if batched else ""}
         )
         """
         ),
@@ -114,7 +114,7 @@ def sources(batched: bool) -> dict[str, str]:
            assert True is True
         """
         ),
-        "tests/python/project_test/no_src/BUILD.py": f"""python_tests({'batch_compatibility_tag="default"' if batched else ''})""",
+        "tests/python/project_test/no_src/BUILD.py": f"""python_tests({'batch_compatibility_tag="default"' if batched else ""})""",
     }
 
 

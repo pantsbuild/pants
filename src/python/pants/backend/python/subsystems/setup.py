@@ -155,7 +155,7 @@ class PythonSetup(Subsystem):
             interpreter constraints, update `[python].interpreter_constraints`, the
             `interpreter_constraints` field, and relevant tool options like
             `[isort].interpreter_constraints` to tell Pants which interpreters your code
-            actually uses. See {doc_url('docs/python/overview/interpreter-compatibility')}.
+            actually uses. See {doc_url("docs/python/overview/interpreter-compatibility")}.
 
             All elements must be the minor and major Python version, e.g. `'2.7'` or `'3.10'`. Do
             not include the patch version.

@@ -144,7 +144,7 @@ class ExternalToolOptionsMixin:
         `version|platform|sha256|length|url_override`, where:
 
           - `version` is the version string
-          - `platform` is one of `[{','.join(Platform.__members__.keys())}]`
+          - `platform` is one of `[{",".join(Platform.__members__.keys())}]`
           - `sha256` is the 64-character hex representation of the expected sha256
             digest of the download file, as emitted by `shasum -a 256`
           - `length` is the expected length of the download file in bytes, as emitted by
@@ -343,7 +343,7 @@ class TemplatedExternalToolOptionsMixin(ExternalToolOptionsMixin):
             (e.g. zip file). You can change this to point to your own hosted file, e.g. to
             work with proxies or for access via the filesystem through a `file:$abspath` URL (e.g.
             `file:/this/is/absolute`, possibly by
-            [templating the buildroot in a config file]({doc_url('docs/using-pants/key-concepts/options#config-file-entries')})).
+            [templating the buildroot in a config file]({doc_url("docs/using-pants/key-concepts/options#config-file-entries")})).
 
             Use `{{version}}` to have the value from `--version` substituted, and `{{platform}}` to
             have a value from `--url-platform-mapping` substituted in, depending on the

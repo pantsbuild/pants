@@ -52,13 +52,13 @@ from pants.util.frozendict import FrozenDict
 
 def test_default_module_mapping_is_normalized() -> None:
     for k in DEFAULT_MODULE_MAPPING:
-        assert k == canonicalize_project_name(
-            k
-        ), "Please update `DEFAULT_MODULE_MAPPING` to use canonical project names"
+        assert k == canonicalize_project_name(k), (
+            "Please update `DEFAULT_MODULE_MAPPING` to use canonical project names"
+        )
     for k in DEFAULT_TYPE_STUB_MODULE_MAPPING:
-        assert k == canonicalize_project_name(
-            k
-        ), "Please update `DEFAULT_TYPE_STUB_MODULE_MAPPING` to use canonical project names"
+        assert k == canonicalize_project_name(k), (
+            "Please update `DEFAULT_TYPE_STUB_MODULE_MAPPING` to use canonical project names"
+        )
 
 
 def test_default_module_mapping_uses_tuples() -> None:

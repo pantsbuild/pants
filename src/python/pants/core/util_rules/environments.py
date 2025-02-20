@@ -472,8 +472,9 @@ async def _warn_on_non_local_environments(specified_targets: Iterable[Target], s
             EnvironmentNameRequest(
                 name,
                 description_of_origin=(
-                    "the `environment` field of targets including "
-                    ", ".join(tgt.address.spec for tgt in tgts[:3])
+                    "the `environment` field of targets including , ".join(
+                        tgt.address.spec for tgt in tgts[:3]
+                    )
                 ),
             ),
         )

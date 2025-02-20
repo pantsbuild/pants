@@ -129,7 +129,7 @@ class _HelmDeploymentProcessWrapper(EngineAwareParameter, EngineAwareReturnType)
         msg = softwrap(
             f"""
             Built deployment process for {self.address} using chart {self.chart.address}
-            with{'out' if not self.output_directory else ''} a post-renderer stage
+            with{"out" if not self.output_directory else ""} a post-renderer stage
             """
         )
         if self.output_directory:
@@ -173,7 +173,7 @@ class RenderedHelmFiles(EngineAwareReturnType):
     def message(self) -> str | None:
         return softwrap(
             f"""
-            Generated {pluralize(len(self.snapshot.files), 'file')} from deployment {self.address}
+            Generated {pluralize(len(self.snapshot.files), "file")} from deployment {self.address}
             using chart {self.chart.address}.
             """
         )
@@ -244,7 +244,7 @@ async def _sort_value_file_names_for_evaluation(
         softwrap(
             f"""Value files for {address} would be evaluated using the following order:
 
-            {', '.join(result)}
+            {", ".join(result)}
             """
         )
     )

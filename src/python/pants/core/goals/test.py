@@ -203,14 +203,14 @@ class TestResult(EngineAwareReturnType):
         if len(self.addresses) == 1:
             return self.addresses[0].spec
 
-        return f"{self.addresses[0].spec} and {len(self.addresses)-1} other files"
+        return f"{self.addresses[0].spec} and {len(self.addresses) - 1} other files"
 
     @property
     def path_safe_description(self) -> str:
         if len(self.addresses) == 1:
             return self.addresses[0].path_safe_spec
 
-        return f"{self.addresses[0].path_safe_spec}+{len(self.addresses)-1}"
+        return f"{self.addresses[0].path_safe_spec}+{len(self.addresses) - 1}"
 
     def __lt__(self, other: Any) -> bool:
         """We sort first by exit code, then alphanumerically within each group."""
@@ -382,7 +382,7 @@ class TestRequest:
             if len(self.elements) == 1:
                 return self.elements[0].address.spec
 
-            return f"{self.elements[0].address.spec} and {len(self.elements)-1} other files"
+            return f"{self.elements[0].address.spec} and {len(self.elements) - 1} other files"
 
         def metadata(self) -> dict[str, Any]:
             return {
@@ -1071,9 +1071,9 @@ _SOURCE_MAP = {
 
 def _format_test_summary(result: TestResult, run_id: RunId, console: Console) -> str:
     """Format the test summary printed to the console."""
-    assert (
-        result.result_metadata is not None
-    ), "Skipped test results should not be outputted in the test summary"
+    assert result.result_metadata is not None, (
+        "Skipped test results should not be outputted in the test summary"
+    )
     succeeded = result.exit_code == 0
     retried = len(result.process_results) > 1
 

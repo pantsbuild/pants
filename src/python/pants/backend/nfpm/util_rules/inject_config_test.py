@@ -80,7 +80,7 @@ def test_determine_injected_nfpm_package_fields(rule_runner: RuleRunner, package
                     description="A {packager} package",
                     package_name="{_PKG_NAME}",
                     version="",  # the plugin should provide this
-                    {'' if packager != 'deb' else 'maintainer="Foo Bar <deb@example.com>",'}
+                    {"" if packager != "deb" else 'maintainer="Foo Bar <deb@example.com>",'}
                     dependencies=[],
                 )
                 """

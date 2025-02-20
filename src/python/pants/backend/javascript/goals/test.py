@@ -111,7 +111,7 @@ class TestMetadata:
 
     @property
     def description(self) -> str:
-        return f'{self.owning_target[NodePackageNameField].value} {self.compatibility_tag or ""}'
+        return f"{self.owning_target[NodePackageNameField].value} {self.compatibility_tag or ''}"
 
 
 @rule(desc="Partition NodeJS tests", level=LogLevel.DEBUG)
@@ -201,7 +201,7 @@ async def run_javascript_tests(
                 timeout_seconds = timeout
     file_description = field_sets[0].address.spec
     if len(field_sets) > 1:
-        file_description += f"+ {pluralize(len(field_sets)  - 1, 'other file')}"
+        file_description += f"+ {pluralize(len(field_sets) - 1, 'other file')}"
     process = await Get(
         Process,
         NodeJsProjectEnvironmentProcess(

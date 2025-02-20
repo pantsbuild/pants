@@ -53,7 +53,7 @@ class AvroSourceTarget(Target):
         f"""
         A single Avro file used to generate various languages.
 
-        See {doc_url('avro')}.
+        See {doc_url("avro")}.
         """
     )
 

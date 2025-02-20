@@ -181,7 +181,7 @@ _Out9 = TypeVar("_Out9")
 
 @overload
 async def MultiGet(
-    __gets: Iterable[Get[_Output] | Coroutine[Any, Any, _Output]]
+    __gets: Iterable[Get[_Output] | Coroutine[Any, Any, _Output]],
 ) -> tuple[_Output, ...]: ...
 
 
@@ -542,9 +542,9 @@ async def MultiGet(
         raise ValueError(
             softwrap(
                 f"""
-                Unexpected MultiGet None arguments: {', '.join(
-                    map(str, likely_args_explicitly_passed)
-                )}
+                Unexpected MultiGet None arguments: {
+                    ", ".join(map(str, likely_args_explicitly_passed))
+                }
 
                 When constructing a MultiGet from individual Gets, all leading arguments must be
                 Gets.
@@ -555,7 +555,7 @@ async def MultiGet(
     raise TypeError(
         softwrap(
             f"""
-            Unexpected MultiGet argument types: {', '.join(map(str, likely_args_explicitly_passed))}
+            Unexpected MultiGet argument types: {", ".join(map(str, likely_args_explicitly_passed))}
 
             A MultiGet can be constructed in two ways:
               1. MultiGet(Iterable[Get[T]]) -> Tuple[T]

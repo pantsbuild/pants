@@ -194,7 +194,7 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
 
             If you would like to generate a lockfile for {resolve_name},
             follow the instructions for setting up lockfiles for tools
-            {doc_url('docs/python/overview/lockfiles#lockfiles-for-tools')}
+            {doc_url("docs/python/overview/lockfiles#lockfiles-for-tools")}
         """
         )
 

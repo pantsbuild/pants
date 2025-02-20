@@ -128,7 +128,7 @@ class HelpPrinter(MaybeColor):
             print(
                 self.maybe_cyan(f"{key:{longest_key}}:"),
                 self.maybe_magenta(
-                    f"\n{' ':{longest_key+2}}".join(
+                    f"\n{' ':{longest_key + 2}}".join(
                         hard_wrap(value, width=self._width - longest_key - 2)
                     )
                 ),
@@ -306,8 +306,7 @@ class HelpPrinter(MaybeColor):
 
         specific_help_cmd = f"{bin_name()} help $subsystem"
         print(
-            f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a "
-            f"specific subsystem.\n"
+            f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a specific subsystem.\n"
         )
 
     def _print_all_targets(self) -> None:
@@ -329,8 +328,7 @@ class HelpPrinter(MaybeColor):
             print(f"{alias_str}{summary}\n")
         specific_help_cmd = f"{bin_name()} help $target_type"
         print(
-            f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a specific "
-            f"target type.\n"
+            f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a specific target type.\n"
         )
 
     def _print_all_tools(self) -> None:

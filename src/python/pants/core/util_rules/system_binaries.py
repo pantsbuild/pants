@@ -724,7 +724,7 @@ async def _find_candidate_paths_via_subprocess_helper(
 
         set -euox pipefail
 
-        CHECK_FILE_ENTRIES={'1' if request.check_file_entries else ''}
+        CHECK_FILE_ENTRIES={"1" if request.check_file_entries else ""}
         """
     )
     script_body = dedent(

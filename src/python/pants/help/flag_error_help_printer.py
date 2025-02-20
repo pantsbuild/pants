@@ -55,7 +55,6 @@ class FlagErrorHelpPrinter(MaybeColor):
                 formatted_matches = self._format_did_you_mean_matches(did_you_mean)
                 print(f"Did you mean {formatted_matches}?")
             help_cmd = (
-                f"{bin_name()} help"
-                f"{'' if err.arg_scope == GLOBAL_SCOPE else (' ' + err.arg_scope)}"
+                f"{bin_name()} help{'' if err.arg_scope == GLOBAL_SCOPE else (' ' + err.arg_scope)}"
             )
             print(f"Use `{self.maybe_green(help_cmd)}` to get help.")

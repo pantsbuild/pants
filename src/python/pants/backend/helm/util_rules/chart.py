@@ -196,7 +196,7 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
         logger.debug(
             softwrap(
                 f"""
-                Found {pluralize(len(subcharts), 'subchart')} as direct dependencies
+                Found {pluralize(len(subcharts), "subchart")} as direct dependencies
                 on Helm chart at: {request.field_set.address}.
                 """
             )

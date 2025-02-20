@@ -202,8 +202,9 @@ class MultiMatcher:
         )
         if unknown_path_patterns:
             raise ValueError(
-                "required_matches uses unknown path pattern names: "
-                "{}".format(", ".join(sorted(unknown_path_patterns)))
+                "required_matches uses unknown path pattern names: {}".format(
+                    ", ".join(sorted(unknown_path_patterns))
+                )
             )
 
         unknown_content_patterns = content_patterns_used.difference(
@@ -211,8 +212,9 @@ class MultiMatcher:
         )
         if unknown_content_patterns:
             raise ValueError(
-                "required_matches uses unknown content pattern names: "
-                "{}".format(", ".join(sorted(unknown_content_patterns)))
+                "required_matches uses unknown content pattern names: {}".format(
+                    ", ".join(sorted(unknown_content_patterns))
+                )
             )
 
         self._path_matchers = {pp.name: PathMatcher(pp) for pp in config.path_patterns}

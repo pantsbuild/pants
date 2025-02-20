@@ -153,7 +153,7 @@ async def _resolve_post_renderers(
     logger.debug(
         softwrap(
             f"""
-            Resolving {pluralize(len(address_inputs.values), 'post-renderer')} from {address_inputs.description_of_origin}:
+            Resolving {pluralize(len(address_inputs.values), "post-renderer")} from {address_inputs.description_of_origin}:
 
             {bullet_list(address_inputs.values, 5)}
             """

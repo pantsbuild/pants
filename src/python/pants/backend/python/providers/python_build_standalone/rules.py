@@ -343,7 +343,7 @@ class PBSPythonProviderSubsystem(Subsystem):
 
             - `py_version` is the Python version string
             - `pbs_release_tag` is the PBS release tag (i.e., the PBS-specific version)
-            - `platform` is one of `[{','.join(Platform.__members__.keys())}]`
+            - `platform` is one of `[{",".join(Platform.__members__.keys())}]`
             - `sha256` is the 64-character hex representation of the expected sha256
                 digest of the download file, as emitted by `shasum -a 256`
             - `length` is the expected length of the download file in bytes, as emitted by
@@ -420,9 +420,9 @@ class PBSPythonProviderSubsystem(Subsystem):
 
             pbs_python_info = PBSPythonInfo(url=info.url, sha256=info.sha256, size=info.size)
 
-            user_supplied_pythons[py_version][pbs_release_tag][
-                info.platform.value
-            ] = pbs_python_info
+            user_supplied_pythons[py_version][pbs_release_tag][info.platform.value] = (
+                pbs_python_info
+            )
 
         return user_supplied_pythons
 

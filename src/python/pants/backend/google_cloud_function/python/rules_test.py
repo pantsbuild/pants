@@ -212,9 +212,9 @@ def test_create_hello_world_gcf(
     complete_platform: bytes,
 ) -> None:
     if runtime:
-        assert (
-            complete_platforms_target_type is None
-        ), "Cannot set both runtime and complete platforms!"
+        assert complete_platforms_target_type is None, (
+            "Cannot set both runtime and complete platforms!"
+        )
 
     complete_platforms_target_name = (
         f"complete_platforms_{complete_platforms_target_type}"

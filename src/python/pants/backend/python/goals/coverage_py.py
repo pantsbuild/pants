@@ -385,7 +385,7 @@ async def merge_coverage_data(
     for data in data_collection:
         path_prefix = data.addresses[0].path_safe_spec
         if len(data.addresses) > 1:
-            path_prefix = f"{path_prefix}+{len(data.addresses)-1}-others"
+            path_prefix = f"{path_prefix}+{len(data.addresses) - 1}-others"
 
         # We prefix each .coverage file with its corresponding address to avoid collisions.
         coverage_digest_gets.append(Get(Digest, AddPrefix(data.digest, prefix=path_prefix)))

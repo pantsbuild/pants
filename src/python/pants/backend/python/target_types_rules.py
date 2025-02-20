@@ -430,7 +430,7 @@ async def resolve_python_distribution_entry_points(
                     target type {target.alias}.
 
                     Alternatively, you can use a module like "project.app:main".
-                    See {doc_url('docs/python/overview/building-distributions')}.
+                    See {doc_url("docs/python/overview/building-distributions")}.
                     """
                 )
             )

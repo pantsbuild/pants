@@ -54,8 +54,7 @@ async def _jvm_bsp_resources(
     return BSPResourcesResult(
         resources=(
             # NB: IntelliJ requires that directory URIs end in slashes.
-            build_root.pathlib_path.joinpath(".pants.d/bsp", rel_resources_dir).as_uri()
-            + "/",
+            build_root.pathlib_path.joinpath(".pants.d/bsp", rel_resources_dir).as_uri() + "/",
         ),
         output_digest=output_digest,
     )

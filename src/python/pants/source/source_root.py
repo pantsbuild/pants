@@ -126,7 +126,7 @@ class SourceRootConfig(Subsystem):
 
             Use `/` to signify that the buildroot itself is a source root.
 
-            See {doc_url('docs/using-pants/key-concepts/source-roots')}.
+            See {doc_url("docs/using-pants/key-concepts/source-roots")}.
             """
         ),
         advanced=True,

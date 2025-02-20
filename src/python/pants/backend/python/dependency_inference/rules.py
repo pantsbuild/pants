@@ -184,7 +184,7 @@ def _get_imports_info(
 
 
 def _collect_imports_info(
-    resolve_result: dict[str, ImportResolveResult]
+    resolve_result: dict[str, ImportResolveResult],
 ) -> tuple[frozenset[Address], frozenset[str]]:
     """Collect import resolution results into:
 
@@ -345,7 +345,7 @@ async def _handle_unowned_imports(
 
         If you do not expect an import to be inferable, add `# pants: no-infer-dep` to the
         import line. Otherwise, see
-        {doc_url('docs/using-pants/troubleshooting-common-issues#import-errors-and-missing-dependencies')} for common problems.
+        {doc_url("docs/using-pants/troubleshooting-common-issues#import-errors-and-missing-dependencies")} for common problems.
         """
     )
     if unowned_dependency_behavior is UnownedDependencyUsage.LogWarning:

@@ -101,9 +101,9 @@ def test_init_terraform_uses_lockfiles(
     # Assert lockfile is not regenerated
     result_lockfile = find_file(initialised_files, ".terraform.lock.hcl")
     assert result_lockfile, "Did not find lockfile"
-    assert (
-        f'version     = "{requested_version}"' in result_lockfile.content.decode()
-    ), "version in lockfile has changed, we should not have regenerated the lockfile"
+    assert f'version     = "{requested_version}"' in result_lockfile.content.decode(), (
+        "version in lockfile has changed, we should not have regenerated the lockfile"
+    )
 
     # Assert dependencies are initialised to the older version
     result_provider = find_link(
@@ -111,9 +111,9 @@ def test_init_terraform_uses_lockfiles(
         ".terraform/providers/registry.terraform.io/hashicorp/null/*/*",
     )
     assert result_provider, "Did not find any providers, did we initialise them successfully?"
-    assert (
-        requested_version in result_provider.path
-    ), "initialised provider did not have our requested version, did the lockfile show up and did we regenerate it?"
+    assert requested_version in result_provider.path, (
+        "initialised provider did not have our requested version, did the lockfile show up and did we regenerate it?"
+    )
 
 
 def test_init_terraform_without_backends(
@@ -124,9 +124,9 @@ def test_init_terraform_without_backends(
     )
 
     # Not initialising the backend means that ./.terraform/.terraform.tfstate will not be present
-    assert not find_file(
-        initialised_files, "**/*.tfstate"
-    ), "Terraform state file should not be present if the request was to not initialise the backend"
+    assert not find_file(initialised_files, "**/*.tfstate"), (
+        "Terraform state file should not be present if the request was to not initialise the backend"
+    )
 
     # The dependencies should still be present
     assert find_link(
@@ -136,9 +136,9 @@ def test_init_terraform_without_backends(
 
 
 def assert_init_module(modules, target_module_id: str, message: str) -> None:
-    assert (
-        target_module_id in modules
-    ), f"{message}: Did not find {target_module_id} in modules.json. Found modules are {list(modules.items())}"
+    assert target_module_id in modules, (
+        f"{message}: Did not find {target_module_id} in modules.json. Found modules are {list(modules.items())}"
+    )
 
 
 def test_init_terraform_with_transitive_module(rule_runner: RuleRunner, tmpdir) -> None:
@@ -194,4 +194,6 @@ def test_init_terraform_with_transitive_module(rule_runner: RuleRunner, tmpdir) 
     assert find_link(
         initialised_entries,
         ".terraform/providers/registry.terraform.io/hashicorp/null/*/*",
-    ), "Did not find expected provider contained in module, did we successfully include it in the files passed to `init`?"
+    ), (
+        "Did not find expected provider contained in module, did we successfully include it in the files passed to `init`?"
+    )

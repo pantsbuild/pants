@@ -316,7 +316,7 @@ class JvmArtifactExclusion:
 
 
 def _jvm_artifact_exclusions_field_help(
-    supported_exclusions: Callable[[], Iterable[type[JvmArtifactExclusion]]]
+    supported_exclusions: Callable[[], Iterable[type[JvmArtifactExclusion]]],
 ) -> str | Callable[[], str]:
     return help_text(
         lambda: f"""
@@ -328,7 +328,7 @@ def _jvm_artifact_exclusions_field_help(
         version conflicts in complex resolves.
 
         Supported exclusions are:
-        {bullet_list(f'`{exclusion.alias}`: {exclusion.help}' for exclusion in supported_exclusions())}
+        {bullet_list(f"`{exclusion.alias}`: {exclusion.help}" for exclusion in supported_exclusions())}
         """
     )
 
@@ -738,7 +738,7 @@ def _shading_rules_field_help(intro: str) -> str:
 
         There are {pluralize(len(JVM_SHADING_RULE_TYPES), "possible shading rule")} available,
         which are as follows:
-        {bullet_list([f'`{rule.alias}`: {rule.help}' for rule in JVM_SHADING_RULE_TYPES])}
+        {bullet_list([f"`{rule.alias}`: {rule.help}" for rule in JVM_SHADING_RULE_TYPES])}
 
         When defining shading rules, just add them in this field using the previously listed rule
         alias and passing along the required parameters.

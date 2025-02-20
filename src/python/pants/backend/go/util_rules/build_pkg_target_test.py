@@ -201,9 +201,9 @@ def assert_built(
     actual = dict(built_package.import_paths_to_pkg_a_files)
     for import_path, pkg_archive_path in expected.items():
         assert import_path in actual, f"expected {import_path} to be in build output"
-        assert (
-            actual[import_path] == expected[import_path]
-        ), "expected package archive paths to match"
+        assert actual[import_path] == expected[import_path], (
+            "expected package archive paths to match"
+        )
     assert set(expected.values()).issubset(set(result_files))
 
 

@@ -460,8 +460,7 @@ class TestRuleGraph:
         with pytest.raises(Exception) as cm:
             create_scheduler(rules)
         assert (
-            "No installed rules return the type B, and it was not provided by potential "
-            "callers of "
+            "No installed rules return the type B, and it was not provided by potential callers of "
         ) in str(cm.value)
         assert (
             "If that type should be computed by a rule, ensure that that rule is installed."
@@ -1015,11 +1014,23 @@ class TestRuleGraph:
                   */
                   // root entries
                 {fmt_non_param_edge(A, ())}
-                {fmt_non_param_edge(RuleFormatRequest(a, gets=[("B", "D")]), (), rule_type=GraphVertexType.singleton)}
+                {
+                    fmt_non_param_edge(
+                        RuleFormatRequest(a, gets=[("B", "D")]),
+                        (),
+                        rule_type=GraphVertexType.singleton,
+                    )
+                }
                 {fmt_non_param_edge(A, (), RuleFormatRequest(a, gets=[("B", "D")]))}
                   // internal entries
-                {fmt_non_param_edge(RuleFormatRequest(a, (), gets=[("B", "D")]), D, RuleFormatRequest(b_from_d),
-                                    append_for_product=False)}
+                {
+                    fmt_non_param_edge(
+                        RuleFormatRequest(a, (), gets=[("B", "D")]),
+                        D,
+                        RuleFormatRequest(b_from_d),
+                        append_for_product=False,
+                    )
+                }
                 {fmt_param_edge(D, D, RuleFormatRequest(b_from_d))}
                 }}"""
             ).strip(),

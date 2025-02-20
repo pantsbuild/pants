@@ -48,7 +48,7 @@ class WorkunitsLogger(WorkunitsCallback):
         completed_workunits: tuple[Workunit, ...],
         finished: bool,
         context: StreamingWorkunitContext,
-        **kwargs
+        **kwargs,
     ) -> None:
         with open(self.dest, "a") as dest:
             print(str(completed_workunits), file=dest)

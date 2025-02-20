@@ -553,9 +553,13 @@ async def _setup_pex_requirements(
         argv = (
             ["--lock", loaded_lockfile.lockfile_path, *pex_lock_resolver_args]
             if loaded_lockfile.is_pex_native
-            else
             # We use pip to resolve a requirements.txt pseudo-lockfile, possibly with hashes.
-            ["--requirement", loaded_lockfile.lockfile_path, "--no-transitive", *pip_resolver_args]
+            else [
+                "--requirement",
+                loaded_lockfile.lockfile_path,
+                "--no-transitive",
+                *pip_resolver_args,
+            ]
         )
         if loaded_lockfile.metadata and complete_req_strings:
             validate_metadata(
@@ -813,9 +817,9 @@ def _build_pex_description(
             repo_pex = request.requirements.from_superset.name
             return softwrap(
                 f"""
-                Extracting {pluralize(len(req_strings), 'requirement')}
+                Extracting {pluralize(len(req_strings), "requirement")}
                 to build {request.output_filename} from {repo_pex}:
-                {', '.join(req_strings)}
+                {", ".join(req_strings)}
                 """
             )
         elif isinstance(request.requirements.from_superset, Resolve):
@@ -825,16 +829,16 @@ def _build_pex_description(
             lockfile_path = resolve_to_lockfile.get(request.requirements.from_superset.name, "")
             return softwrap(
                 f"""
-                Building {pluralize(len(req_strings), 'requirement')}
+                Building {pluralize(len(req_strings), "requirement")}
                 for {request.output_filename} from the {lockfile_path} resolve:
-                {', '.join(req_strings)}
+                {", ".join(req_strings)}
                 """
             )
         else:
             desc_suffix = softwrap(
                 f"""
-                with {pluralize(len(req_strings), 'requirement')}:
-                {', '.join(req_strings)}
+                with {pluralize(len(req_strings), "requirement")}:
+                {", ".join(req_strings)}
                 """
             )
     return f"Building {request.output_filename} {desc_suffix}"

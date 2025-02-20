@@ -417,7 +417,9 @@ class Snapshot:
     @property
     def files(self) -> tuple[str, ...]: ...
     # Don't call this, call pants.engine.fs.SnapshotDiff instead
-    def _diff(self, other: Snapshot) -> tuple[
+    def _diff(
+        self, other: Snapshot
+    ) -> tuple[
         tuple[str, ...],
         tuple[str, ...],
         tuple[str, ...],
@@ -905,7 +907,7 @@ def rule_subgraph_visualize(
 def garbage_collect_store(scheduler: PyScheduler, target_size_bytes: int) -> None: ...
 def lease_files_in_graph(scheduler: PyScheduler, session: PySession) -> None: ...
 def strongly_connected_components(
-    adjacency_lists: Sequence[tuple[Any, Sequence[Any]]]
+    adjacency_lists: Sequence[tuple[Any, Sequence[Any]]],
 ) -> Sequence[Sequence[Any]]: ...
 def hash_prefix_zero_bits(item: str) -> int: ...
 

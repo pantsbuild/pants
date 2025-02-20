@@ -169,7 +169,7 @@ class BSPGoal(AuxiliaryGoal):
                 f"""\
                 #!/bin/sh
                 {run_script_env_lines_str}
-                exec 2>>{shlex.quote(str(bsp_logs_dir / 'stderr.log'))}
+                exec 2>>{shlex.quote(str(bsp_logs_dir / "stderr.log"))}
                 env 1>&2
                 exec {shlex.quote(bin_name())} --no-pantsd {self.name} --server
                 """

@@ -68,9 +68,7 @@ process title: ([^\n]+)
 sys\\.argv: ([^\n]+)
 pid: {pid}
 Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
-""".format(
-        pid=pid, signum=signum, signame=signame
-    )
+""".format(pid=pid, signum=signum, signame=signame)
     assert re.search(regex_str, contents)
 
 

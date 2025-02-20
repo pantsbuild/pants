@@ -357,7 +357,7 @@ async def determine_requirement_strings_in_closure(
     elif len(addrs) == 1:
         description_of_origin = addrs[0].spec
     else:
-        description_of_origin = f"{addrs[0].spec} and {len(addrs)-1} other targets"
+        description_of_origin = f"{addrs[0].spec} and {len(addrs) - 1} other targets"
 
     return PexRequirements(
         request.addresses,
@@ -477,7 +477,7 @@ async def _determine_requirements_for_pex_from_targets(
                     f"""
                     [python].run_against_entire_lockfile was set, but could not find a
                     lockfile or constraints file for this target set. See
-                    {doc_url('docs/python/overview/third-party-dependencies')} for details.
+                    {doc_url("docs/python/overview/third-party-dependencies")} for details.
                     """
                 )
             )
@@ -714,7 +714,7 @@ async def _setup_constraints_repository_pex(
             softwrap(
                 f"""
                 The constraints file {constraints_path} does not contain
-                entries for the following requirements: {', '.join(unconstrained_projects)}.
+                entries for the following requirements: {", ".join(unconstrained_projects)}.
 
                 Ignoring `[python].resolve_all_constraints` option.
                 """
