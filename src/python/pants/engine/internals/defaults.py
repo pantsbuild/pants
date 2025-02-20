@@ -10,6 +10,7 @@ resulting after the BUILD file have been parsed is returned in the `AddressFamil
 These defaults are then applied when creating the `TargetAdaptor` targets by the `Registrar` in the
 parser.
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping

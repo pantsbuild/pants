@@ -7,7 +7,6 @@ projects that use only javascript, and is then named jsconfig.json.
 See https://code.visualstudio.com/docs/languages/jsconfig
 """
 
-
 from __future__ import annotations
 
 import json

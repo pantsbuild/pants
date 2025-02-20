@@ -10,6 +10,7 @@ Live run:
     $ pants help-all > all-help.json
     $ pants run build-support/bin/generate_json_schema.py -- --all-help-file=all-help.json
 """
+
 import argparse
 import itertools
 import json

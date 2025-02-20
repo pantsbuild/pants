@@ -71,6 +71,7 @@ Example demonstrating how to register synthetic targets:
             ...
         )
 """
+
 from __future__ import annotations
 
 import itertools
