@@ -6,6 +6,7 @@ pythonpath = ["%(buildroot)s/pants-plugins"]
 backend_packages.add = [
   "pants.backend.build_files.fix.deprecations",
   "pants.backend.build_files.fmt.black",
+  "pants.backend.build_files.fmt.ruff",
   "pants.backend.python",
   "pants.backend.experimental.python.packaging.pyoxidizer",
   "pants.backend.python.lint.autoflake",
@@ -29,6 +30,7 @@ backend_packages.add = [
   "pants.backend.experimental.javascript",
   "pants.backend.experimental.javascript.lint.prettier",
   "pants.backend.experimental.python",
+  "pants.backend.experimental.python.lint.ruff.format",
   "pants.backend.experimental.python.packaging.pyoxidizer",
   "pants.backend.experimental.scala",
   "pants.backend.experimental.scala.lint.scalafmt",

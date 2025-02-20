@@ -70,3 +70,17 @@ module = [
   "psutil",
 ]
 ignore_missing_imports = true
+
+[tool.ruff]
+# Exclusions were copied from [tool.black]
+exclude = [
+  ".git",
+  ".mypy_cache",
+  ".pants.d",
+  "dist/",
+  # "virtualenvs",
+  # This file intentionally contains invalid syntax, it trips black up.
+  # "compilation_failure"
+]
+line-length = 100
+target-version = "py311"
