@@ -14,8 +14,16 @@ from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import Collection
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.internals.mapper import SpecsFilter
-from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import UnexpandedTargets
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import (
+    AllTargets,
+    AlwaysTraverseDeps,
+    RegisteredTargetTypes,
+    Targets,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+    UnexpandedTargets,
+)
 from pants.option.option_types import EnumOption, StrOption
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
@@ -48,6 +56,8 @@ class ChangedAddresses(Collection[Address]):
 async def find_changed_owners(
     request: ChangedRequest,
     specs_filter: SpecsFilter,
+    registered_target_types: RegisteredTargetTypes,
+    all_targets: AllTargets,
 ) -> ChangedAddresses:
     no_dependents = request.dependents == DependentsOption.NONE
     owners = await Get(
@@ -75,28 +85,51 @@ async def find_changed_owners(
     # However, we also must be careful to preserve if target generators are direct owners, which
     # happens when a generated file is deleted.
     owner_target_generators = FrozenOrderedSet(
-        addr.maybe_convert_to_target_generator() for addr in owners if addr.is_generated_target
+        addr.maybe_convert_to_target_generator()
+        for addr in owners
+        if addr.is_generated_target
     )
-    dependents = await Get(
-        Dependents,
-        DependentsRequest(
-            owners,
-            transitive=request.dependents == DependentsOption.TRANSITIVE,
-            include_roots=False,
-        ),
-    )
+
+    if specs_filter.is_specified:
+        all_matched_targets = [tgt for tgt in all_targets if specs_filter.matches(tgt)]
+        #      print(all_matched_targets)
+        transitive_targets = [
+            set((t.address for t in tt.closure))
+            for tt in await MultiGet(
+                (
+                    Get(
+                        TransitiveTargets,
+                        TransitiveTargetsRequest(
+                            [tgt.address],
+                            should_traverse_deps_predicate=AlwaysTraverseDeps(),
+                        ),
+                    )
+                    for tgt in all_matched_targets
+                ),
+            )
+        ]
+
+        dependents = [
+            tgt.address
+            for tgt, deps in zip(all_matched_targets, transitive_targets)
+            if not deps.isdisjoint(owner_target_generators)
+        ]
+    else:
+        dependents = await Get(
+            Dependents,
+            DependentsRequest(
+                owners,
+                transitive=request.dependents == DependentsOption.TRANSITIVE,
+                include_roots=False,
+            ),
+        )
+
     result = FrozenOrderedSet(owners) | (dependents - owner_target_generators)
     if specs_filter.is_specified:
-        # Finally, we must now filter out the result to only include what matches our tags, as the
-        # last step of https://github.com/pantsbuild/pants/issues/15544.
-        #
-        # Note that we use `UnexpandedTargets` rather than `Targets` or `FilteredTargets` so that
-        # we preserve target generators.
         result_as_tgts = await Get(UnexpandedTargets, Addresses(result))
         result = FrozenOrderedSet(
             tgt.address for tgt in result_as_tgts if specs_filter.matches(tgt)
         )
-
     return ChangedAddresses(result)
 
 
