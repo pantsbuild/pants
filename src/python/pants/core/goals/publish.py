@@ -25,10 +25,7 @@ from abc import ABCMeta
 from dataclasses import asdict, dataclass, field, is_dataclass, replace
 from enum import Enum
 from itertools import chain
-from typing import ClassVar, Generic, Type, TypeVar, cast
-
-from typing_extensions import final
-from typing import ClassVar, Generic, TypeVar, final
+from typing import ClassVar, Generic, TypeVar, cast, final
 
 from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
 from pants.engine.addresses import Address
