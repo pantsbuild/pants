@@ -1645,8 +1645,9 @@ async def resolve_dependencies(
             ValidatedDependencies,
             {
                 vd_request_type(
-                    vd_request_type.field_set_type.create(tgt), result
-                ): ValidateDependenciesRequest,  # type: ignore[misc]
+                    vd_request_type.field_set_type.create(tgt),  # type: ignore[misc]
+                    result,
+                ): ValidateDependenciesRequest,
                 environment_name: EnvironmentName,
             },
         )

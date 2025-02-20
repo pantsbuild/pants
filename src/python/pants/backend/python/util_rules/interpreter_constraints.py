@@ -303,13 +303,13 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
 
         def valid_constraint(constraint: Requirement) -> bool:
             if any(
-                constraint.specifier.contains(prior)
-                for prior in prior_versions  # type: ignore[attr-defined]
+                constraint.specifier.contains(prior)  # type: ignore[attr-defined]
+                for prior in prior_versions
             ):
                 return False
             if not any(
-                constraint.specifier.contains(allowed)
-                for allowed in allowed_versions  # type: ignore[attr-defined]
+                constraint.specifier.contains(allowed)  # type: ignore[attr-defined]
+                for allowed in allowed_versions
             ):
                 return False
             return True

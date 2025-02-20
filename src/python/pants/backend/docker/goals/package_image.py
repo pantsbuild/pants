@@ -352,9 +352,9 @@ def get_build_options(
                 source=source,
                 error_cls=DockerImageOptionValueError,
             )
-            yield from target[field_type].options(
+            yield from target[field_type].options(  # type: ignore[attr-defined]
                 format, global_build_hosts_options=global_build_hosts_options
-            )  # type: ignore[attr-defined]
+            )
 
     # Target stage
     target_stage = None
