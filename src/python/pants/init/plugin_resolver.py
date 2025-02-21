@@ -238,7 +238,8 @@ async def resolve_plugins(
         # analysis).
         "--no-pre-install-wheels",
         "--sources-directory=source_files",
-        "--no-pypi",  # TODO: Get index and find-links from original config option.
+        *req_strings,
+        "--no-pypi",
         *(f"--index={index}" for index in python_repos.indexes),
         *(f"--find-links={repo}" for repo in python_repos.find_links),
         *(
@@ -264,8 +265,6 @@ async def resolve_plugins(
             )
         )
         args.extend(["--constraints", constraints_file])
-
-    args.extend(["--", *req_strings])
 
     merged_input_digest = await Get(Digest, MergeDigests(input_digests))
 
