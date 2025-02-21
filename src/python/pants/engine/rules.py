@@ -400,14 +400,22 @@ def rule(**kwargs: Unpack[RuleDecoratorKwargs]) -> Callable[[F], F]:
 
 @overload
 def rule(_func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Coroutine[Any, Any, R]]:
-    """Handles bare @rule decorators on async functions."""
+    """Handles bare @rule decorators on async functions.
+
+    Usage of Coroutine[...] (vs Awaitable[...]) is intentional, as `MultiGet`/`concurrently` use
+    coroutines directly.
+    """
     ...
 
 
 @overload
 def rule(_func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]:
     """Handles bare @rule decorators on non-async functions It's debatable whether we should even
-    have non-async @rule functions, but keeping this to not break the world for plugin authors."""
+    have non-async @rule functions, but keeping this to not break the world for plugin authors.
+
+    Usage of Coroutine[...] (vs Awaitable[...]) is intentional, as `MultiGet`/`concurrently` use
+    coroutines directly.
+    """
     ...
 
 
