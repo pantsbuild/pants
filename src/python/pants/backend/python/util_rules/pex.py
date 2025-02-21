@@ -29,7 +29,8 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules import pex_cli, pex_requirements
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX, maybe_log_pex_stderr
+from pants.backend.python.util_rules.pex_cli import PexCliProcess, maybe_log_pex_stderr
+from pants.backend.python.util_rules.pex_cli_tool import PexPEX
 from pants.backend.python.util_rules.pex_environment import (
     CompletePexEnvironment,
     PexEnvironment,
