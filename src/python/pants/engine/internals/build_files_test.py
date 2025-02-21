@@ -238,7 +238,7 @@ def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
             ),
         ],
     )
-    return cast(BuildFilePreludeSymbols, symbols)
+    return symbols
 
 
 def test_prelude_parsing_good() -> None:
