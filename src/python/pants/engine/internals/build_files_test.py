@@ -7,7 +7,7 @@ import logging
 import re
 from collections.abc import Mapping
 from textwrap import dedent
-from typing import Any, cast
+from typing import Any
 
 import pytest
 

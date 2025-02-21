@@ -336,7 +336,7 @@ class TestRuleArgumentAnnotation:
     def test_bogus_rules(self) -> None:
         with pytest.raises(UnrecognizedRuleArgument):
 
-            @rule(bogus_kwarg="TOTALLY BOGUS!!!!!!") # type: ignore
+            @rule(bogus_kwarg="TOTALLY BOGUS!!!!!!")  # type: ignore
             def a_named_rule(a: int, b: str) -> bool:
                 return False
 
@@ -1081,6 +1081,6 @@ def test_param_type_overrides() -> None:
 
     with pytest.raises(MissingParameterTypeAnnotation, match="must be a type"):
 
-        @rule(_param_type_overrides={"param1": "A string"}) # type: ignore
+        @rule(_param_type_overrides={"param1": "A string"})  # type: ignore
         async def protect_existence(param1) -> A:
             return A()

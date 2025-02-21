@@ -10,7 +10,17 @@ from collections.abc import Callable, Coroutine, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
 from types import FrameType, ModuleType
-from typing import Any, Awaitable, Concatenate, NotRequired, Protocol, TypeVar, TypedDict, Union, Unpack, cast, get_type_hints, overload
+from typing import (
+    Any,
+    NotRequired,
+    Protocol,
+    TypedDict,
+    TypeVar,
+    Unpack,
+    cast,
+    get_type_hints,
+    overload,
+)
 
 from typing_extensions import ParamSpec
 
@@ -44,11 +54,12 @@ class RuleType(Enum):
     goal_rule = "goal_rule"
     uncacheable_rule = "_uncacheable_rule"
 
+
 P = ParamSpec("P")
 R = TypeVar("R")
 SyncRuleT = Callable[P, R]
 AsyncRuleT = Callable[P, Coroutine[Any, Any, R]]
-RuleDecorator = Callable[[SyncRuleT[P,R] | AsyncRuleT[P,R]], AsyncRuleT[P,R]]
+RuleDecorator = Callable[[SyncRuleT | AsyncRuleT], AsyncRuleT]
 
 
 def _rule_call_trampoline(
@@ -186,16 +197,17 @@ PRIVATE_RULE_DECORATOR_ARGUMENTS = {
 # So we leave it out of PUBLIC_RULE_DECORATOR_ARGUMENTS.
 IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS = {"rule_type", "cacheable"}
 
+
 class RuleDecoratorKwargs(TypedDict):
-    """Public-facing @rule kwargs used in the codebase"""
+    """Public-facing @rule kwargs used in the codebase."""
 
     canonical_name: NotRequired[str]
 
     canonical_name_suffix: NotRequired[str]
-    
+
     desc: NotRequired[str]
     """The rule's description as it appears in stacktraces/debugging. For goal rules, defaults to the goal name."""
-    
+
     level: NotRequired[LogLevel]
     """The logging level applied to this rule. Defaults to TRACE."""
 
@@ -205,19 +217,20 @@ class RuleDecoratorKwargs(TypedDict):
     _param_type_overrides: NotRequired[dict[str, type[Any]]]
     """Unstable. Internal Pants usage only."""
 
+
 class _RuleDecoratorKwargs(RuleDecoratorKwargs):
     """Internal/Implicit @rule kwargs (not for use outside rules.py)"""
-    
+
     rule_type: RuleType
     """The decorator used to declare the rule (see rules.py:_make_rule(...))"""
-    
+
     cacheable: bool
     """Whether the results of this rule should be cached. Typically true for rules, false for goal_rules (see rules.py:_make_rule(...))"""
 
-    
 
-
-def rule_decorator(func: SyncRuleT | AsyncRuleT, **kwargs: Unpack[_RuleDecoratorKwargs]) -> AsyncRuleT:
+def rule_decorator(
+    func: SyncRuleT | AsyncRuleT, **kwargs: Unpack[_RuleDecoratorKwargs]
+) -> AsyncRuleT:
     if not inspect.isfunction(func):
         raise ValueError("The @rule decorator expects to be placed on a function.")
 
@@ -286,7 +299,7 @@ def rule_decorator(func: SyncRuleT | AsyncRuleT, **kwargs: Unpack[_RuleDecorator
         effective_desc = f"`{return_type.name}` goal"
 
     effective_level = kwargs.get("level", LogLevel.TRACE)
-    if not isinstance(effective_level, LogLevel): # type: ignore[unused-ignore]
+    if not isinstance(effective_level, LogLevel):  # type: ignore[unused-ignore]
         raise ValueError(
             "Expected to receive a value of type LogLevel for the level "
             f"argument, but got: {effective_level}"
@@ -373,29 +386,30 @@ def inner_rule(*args, **kwargs) -> AsyncRuleT | RuleDecorator:
 
 
 F = TypeVar("F", bound=Callable[..., Any | Coroutine[Any, Any, Any]])
+
+
 @overload
 def rule(**kwargs: Unpack[RuleDecoratorKwargs]) -> Callable[[F], F]:
-    """
-    Handles decorator factories of the form `@rule(foo=..., bar=...)`
-    https://mypy.readthedocs.io/en/stable/generics.html#decorator-factories
-    
+    """Handles decorator factories of the form `@rule(foo=..., bar=...)`
+    https://mypy.readthedocs.io/en/stable/generics.html#decorator-factories.
+
     Note: This needs to be the first rule, otherwise MyPy goes nuts
     """
     ...
 
+
 @overload
 def rule(_func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Coroutine[Any, Any, R]]:
-    """Handles bare @rule decorators on async functions"""
+    """Handles bare @rule decorators on async functions."""
     ...
+
 
 @overload
 def rule(_func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]:
-    """
-    Handles bare @rule decorators on non-async functions
-    It's debatable whether we should even have non-async @rule functions, but keeping this to not
-    break the world for plugin authors.
-    """
+    """Handles bare @rule decorators on non-async functions It's debatable whether we should even
+    have non-async @rule functions, but keeping this to not break the world for plugin authors."""
     ...
+
 
 def rule(*args, **kwargs):
     return inner_rule(*args, **kwargs, rule_type=RuleType.rule, cacheable=True)
@@ -410,9 +424,7 @@ def goal_rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]: ...
 
 
 @overload
-def goal_rule(
-    *args, func: None = None, **kwargs: Any
-) -> AsyncRuleT: ...
+def goal_rule(*args, func: None = None, **kwargs: Any) -> AsyncRuleT: ...
 
 
 def goal_rule(*args, **kwargs):
