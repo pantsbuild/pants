@@ -103,7 +103,6 @@ async def push_docker_images(
             PublishPackages(
                 names=(ref,),
                 process=process,
-                background_process_output=options.background_process_output,
             )
         )
 
@@ -113,7 +112,6 @@ async def push_docker_images(
                 PublishPackages(
                     names=tuple(skip_tags),
                     description=f"(by `{reason}` on registry @{name})",
-                    background_process_output=options.background_process_output,
                 ),
             )
 

@@ -7,12 +7,10 @@ import sys
 from typing import Any
 
 from pants.backend.docker.registries import DockerRegistries
-from pants.core.goals.publish import ShowOutput
 from pants.core.util_rules.search_paths import ExecutableSearchPathsOptionMixin
 from pants.option.option_types import (
     BoolOption,
     DictOption,
-    EnumOption,
     ShellStrListOption,
     StrListOption,
     StrOption,
@@ -241,15 +239,6 @@ class DockerOptions(Subsystem):
             docker to be pre-authenticated to the registries to which it is pushing.
             """
         ),
-    )
-    background_process_output = EnumOption(
-        default=ShowOutput.ALL,
-        help="Show stdout/stderr for publishing with publish_noninteractively=true.",
-    )
-
-    publish_noninteractively_verbose = BoolOption(
-        default=False,
-        help="If true, output logs to console when running with `publish_noninteractively=True`.",
     )
     _tools = StrListOption(
         default=[],

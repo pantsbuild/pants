@@ -50,8 +50,9 @@ from pants.engine.target import (
     TargetRootsToFieldSetsRequest,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
-from pants.option.option_types import StrOption
+from pants.option.option_types import EnumOption, StrOption
 from pants.util.frozendict import FrozenDict
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -144,15 +145,12 @@ class PublishPackages:
     However, some tools have non-interactive publishing modes and can leverage parallelism. See
     https://github.com/pantsbuild/pants/issues/17613#issuecomment-1323913381 for more context.
 
-    If running a background process, output is controlled by `background_process_output`.
-
     The `description` may be a reason explaining why the publish was skipped, or identifying which
     repository the artifacts are published to.
     """
 
     names: tuple[str, ...]
     process: InteractiveProcess | Process | None = None
-    background_process_output: ShowOutput = ShowOutput.ALL
     description: str | None = None
     data: PublishOutputData = field(default_factory=PublishOutputData)
 
@@ -196,6 +194,17 @@ class PublishSubsystem(GoalSubsystem):
     output = StrOption(
         default=None,
         help="Filename for JSON structured publish information.",
+    )
+
+    noninteractive_process_output = EnumOption(
+        default=ShowOutput.ALL,
+        help=softwrap(
+            """
+            Show stdout/stderr when publishing with
+            noninteractively.  This only has an effect for those
+            publish subsystems that support a noninteractive mode.
+            """
+        ),
     )
 
 
@@ -320,8 +329,9 @@ async def run_publish(
         if background_res.stderr:
             output_msg += f"\n{background_res.stderr.decode()}"
 
-        if pub.background_process_output == ShowOutput.ALL or (
-            pub.background_process_output == ShowOutput.FAILED and background_res.exit_code == 0
+        if publish.noninteractive_process_output == ShowOutput.ALL or (
+            publish.noninteractive_process_output == ShowOutput.FAILED
+            and background_res.exit_code == 0
         ):
             console.print_stdout(output_msg)
 
