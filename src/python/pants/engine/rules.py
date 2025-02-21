@@ -10,7 +10,7 @@ from collections.abc import Callable, Coroutine, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
 from types import FrameType, ModuleType
-from typing import Any, Protocol, TypeVar, Union, cast, get_type_hints, overload
+from typing import Any, Awaitable, Concatenate, NotRequired, Protocol, TypeVar, TypedDict, Union, Unpack, cast, get_type_hints, overload
 
 from typing_extensions import ParamSpec
 
@@ -44,12 +44,11 @@ class RuleType(Enum):
     goal_rule = "goal_rule"
     uncacheable_rule = "_uncacheable_rule"
 
-
 P = ParamSpec("P")
 R = TypeVar("R")
 SyncRuleT = Callable[P, R]
 AsyncRuleT = Callable[P, Coroutine[Any, Any, R]]
-RuleDecorator = Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]
+RuleDecorator = Callable[[SyncRuleT[P,R] | AsyncRuleT[P,R]], AsyncRuleT[P,R]]
 
 
 def _rule_call_trampoline(
@@ -187,8 +186,33 @@ PRIVATE_RULE_DECORATOR_ARGUMENTS = {
 # So we leave it out of PUBLIC_RULE_DECORATOR_ARGUMENTS.
 IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS = {"rule_type", "cacheable"}
 
+class RuleDecoratorKwargs(TypedDict):
+    """Public-facing @rule kwargs"""
 
-def rule_decorator(func: SyncRuleT | AsyncRuleT, **kwargs) -> AsyncRuleT:
+    canonical_name: NotRequired[str]
+
+    canonical_name_suffix: NotRequired[str]
+    
+    desc: NotRequired[str]
+    """The rule's description as it appears in stacktraces/debugging. For goal rules, defaults to the goal name."""
+    
+    level: NotRequired[LogLevel]
+    """The logging level applied to this rule. Defaults to TRACE."""
+
+class _RuleDecoratorKwargs(RuleDecoratorKwargs):
+    """Internal/Implicit @rule kwargs (not for use outside rules.py)"""
+    
+    rule_type: RuleType
+    """The decorator used to declare the rule (see rules.py:_make_rule(...))"""
+    
+    cacheable: bool
+    """Whether the results of this rule should be cached. Typically true for rules, false for goal_rules (see rules.py:_make_rule(...))"""
+
+    _masked_types: tuple[type, ...]
+    _param_type_overrides: dict[str, type]
+
+
+def rule_decorator(func: SyncRuleT | AsyncRuleT, **kwargs: Unpack[_RuleDecoratorKwargs]) -> AsyncRuleT:
     if not inspect.isfunction(func):
         raise ValueError("The @rule decorator expects to be placed on a function.")
 
@@ -205,8 +229,8 @@ def rule_decorator(func: SyncRuleT | AsyncRuleT, **kwargs) -> AsyncRuleT:
             f"`@rule`s and `@goal_rule`s only accept the following keyword arguments: {PUBLIC_RULE_DECORATOR_ARGUMENTS}"
         )
 
-    rule_type: RuleType = kwargs["rule_type"]
-    cacheable: bool = kwargs["cacheable"]
+    rule_type = kwargs["rule_type"]
+    cacheable = kwargs["cacheable"]
     masked_types: tuple[type, ...] = tuple(kwargs.get("_masked_types", ()))
     param_type_overrides: dict[str, type] = kwargs.get("_param_type_overrides", {})
 
@@ -257,7 +281,7 @@ def rule_decorator(func: SyncRuleT | AsyncRuleT, **kwargs) -> AsyncRuleT:
         effective_desc = f"`{return_type.name}` goal"
 
     effective_level = kwargs.get("level", LogLevel.TRACE)
-    if not isinstance(effective_level, LogLevel):
+    if not isinstance(effective_level, LogLevel): # type: ignore
         raise ValueError(
             "Expected to receive a value of type LogLevel for the level "
             f"argument, but got: {effective_level}"
@@ -343,21 +367,109 @@ def inner_rule(*args, **kwargs) -> AsyncRuleT | RuleDecorator:
         return wrapper
 
 
+
+# @overload
+# def rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]: ...
+
+
+# @overload
+# def rule(*, func: Callable[P, R] | None = None) -> Callable[P, Coroutine[Any, Any, R]]: ...
+
+# F = TypeVar('F', bound=Callable[..., Any])
+# # FA = TypeVar('FA', bound=Callable[..., Awaitable[Any]])
+# @overload
+# def rule(func: F) -> F: ...
+
+# @overload
+# def rule[**P, R](_func: Callable[P, R]) -> Callable[P, R]:
+#     ...
+
+# @overload
+# def rule[**P, R](_func: Callable[P, Awaitable[R]] | Callable[P, R]) -> Callable[P, Awaitable[R]] | Callable[P, R]:
+#     ...
+
+# @overload
+# def rule[**P, R](*, _func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]: 
+#     ...
+
+# P = ParamSpec("P")
+# R = TypeVar("R")
+# SyncRuleT = Callable[P, R]
+# AsyncRuleT = Callable[P, Coroutine[Any, Any, R]]
+# RuleDecorator = Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]
+
+# @overload
+# def rule(
+#     func: Callable[P, R] | None = None, /, **kwargs: Any
+# ) -> Callable: ...
+
+# Shout out to the Traut: https://github.com/python/typing/discussions/1847#discussioncomment-10433941
+class SyncOrAsync(Protocol):
+    @overload
+    def __call__(self, _func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Coroutine[Any, Any, R]]: ...
+
+    @overload
+    def __call__(self, _func: Callable[P, R]) -> Callable[P, R]: ...
+
+    def __call__(self, _func: Callable[P, Coroutine[Any, Any, R]] | Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]] | Callable[P, R]: ...
+
+# @overload
+# def rule(**kwargs: Unpack[RuleDecoratorKwargs]) -> Callable[[F], F]:
+#     ...
+
+# https://mypy.readthedocs.io/en/stable/generics.html#decorator-factories
+F = TypeVar("F", bound=Callable[..., Any])
+FC = TypeVar("FC", bound=Callable[..., Coroutine[Any, Any, Any]])
+FCC = TypeVar("FCC", bound=Callable[..., Any | Coroutine[Any, Any, Any]])
 @overload
-def rule(func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Coroutine[Any, Any, R]]: ...
+def rule(**kwargs: Unpack[RuleDecoratorKwargs]) -> Callable[[FCC], FCC]:
+    ...
 
+# @overload
+# def rule(
+#     *, 
+#     canonical_name: str | None = None, 
+#     canonical_name_suffix: str | None = None, 
+#     desc: str | None = None, 
+#     level: LogLevel | None = None
+# ) -> Callable[[F], F]:
+#     ...
 
 @overload
-def rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]: ...
-
+def rule(_func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Coroutine[Any, Any, R]]:
+    ...
 
 @overload
-def rule(
-    *args, func: None = None, **kwargs: Any
-) -> Callable[[SyncRuleT | AsyncRuleT], AsyncRuleT]: ...
+def rule(_func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]:
+    ...
+
+# @overload
+# def rule(func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Coroutine[Any, Any, R]]: 
+#     ...
+
+# @overload
+# def rule(**kwargs: Any) -> SyncOrAsync:
+#     ...
+
+# ???
+# @overload
+# def rule(_func: Callable[P, Awaitable[R]], /, **kwargs: Any) -> Callable[P, Awaitable[R]]:
+#     ...
 
 
-def rule(*args, **kwargs):
+
+    #     canonical_name: NotRequired[str]
+
+    # canonical_name_suffix: NotRequired[str]
+    
+    # desc: NotRequired[str]
+    # """The rule's description as it appears in stacktraces/debugging. For goal rules, defaults to the goal name."""
+    
+    # level: NotRequired[LogLevel]
+    # """The logging level applied to this rule. Defaults to TRACE."""
+
+
+def rule(*args, **kwargs): # -> SyncOrAsync:
     return inner_rule(*args, **kwargs, rule_type=RuleType.rule, cacheable=True)
 
 
@@ -372,7 +484,7 @@ def goal_rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]: ...
 @overload
 def goal_rule(
     *args, func: None = None, **kwargs: Any
-) -> Callable[[SyncRuleT | AsyncRuleT], AsyncRuleT]: ...
+) -> AsyncRuleT: ...
 
 
 def goal_rule(*args, **kwargs):
