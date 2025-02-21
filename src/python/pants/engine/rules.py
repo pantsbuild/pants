@@ -424,7 +424,9 @@ def goal_rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]: ...
 
 
 @overload
-def goal_rule(*args, func: None = None, **kwargs: Any) -> AsyncRuleT: ...
+def goal_rule(
+    *args, func: None = None, **kwargs: Any
+) -> Callable[[SyncRuleT | AsyncRuleT], AsyncRuleT]: ...
 
 
 def goal_rule(*args, **kwargs):
