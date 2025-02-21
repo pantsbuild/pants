@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from textwrap import dedent
-from typing import Iterable, Mapping
 
 import pytest
 

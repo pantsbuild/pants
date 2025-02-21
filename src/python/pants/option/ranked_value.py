@@ -3,10 +3,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from enum import Enum
 from functools import total_ordering
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Any, Optional, Union
 
 
 # NB: Must mirror the Rank enum in src/rust/engine/options/src/lib.rs.
@@ -33,7 +34,7 @@ class Rank(Enum):
             return NotImplemented
         return self._rank < other._rank
 
-    def description(self) -> Optional[str]:
+    def description(self) -> str | None:
         """The source descriptions used to display option value derivation to users."""
         # These specific strings are for compatibility with the legacy parser's tests.
         # We may revisit them once that is gone.
@@ -46,8 +47,8 @@ class Rank(Enum):
         return None
 
 
-Value = Union[str, int, float, None, Dict, Enum, List]
-ValueAndDetails = Tuple[Optional[Value], Optional[str]]
+Value = Union[str, int, float, None, dict, Enum, list]
+ValueAndDetails = tuple[Optional[Value], Optional[str]]
 
 
 @dataclass(frozen=True)

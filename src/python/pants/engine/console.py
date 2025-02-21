@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import sys
-from typing import Callable, TextIO
+from collections.abc import Callable
+from typing import TextIO
 
 from colors import blue, cyan, green, magenta, red, yellow
 

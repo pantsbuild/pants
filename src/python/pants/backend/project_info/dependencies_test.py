@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from functools import partial
 from textwrap import dedent
-from typing import Any, List, Optional, Union
+from typing import Any
 
 import pytest
 
@@ -39,7 +39,7 @@ def rule_runner() -> PythonRuleRunner:
 
 
 def create_python_sources(
-    rule_runner: PythonRuleRunner, directory: str, *, dependencies: Optional[List[str]] = None
+    rule_runner: PythonRuleRunner, directory: str, *, dependencies: list[str] | None = None
 ) -> None:
     rule_runner.write_files(
         {
@@ -85,9 +85,9 @@ def assert_dependencies(
     rule_runner: PythonRuleRunner,
     *,
     specs: list[str],
-    expected: Union[list[str], dict[str, Any]],
+    expected: list[str] | dict[str, Any],
     transitive: bool = False,
-    output_file: Optional[str] = None,
+    output_file: str | None = None,
     closed: bool = False,
     output_format: DependenciesOutputFormat = DependenciesOutputFormat.text,
 ) -> None:

@@ -7,16 +7,16 @@ projects that use only javascript, and is then named jsconfig.json.
 See https://code.visualstudio.com/docs/languages/jsconfig
 """
 
-
 from __future__ import annotations
 
 import json
 import logging
 import os
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Literal
+from typing import Literal
 
 from pants.engine.collection import Collection
 from pants.engine.fs import DigestContents, FileContent, PathGlobs

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import io
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Sequence
 
 import chevron
 

@@ -459,7 +459,7 @@ def test_generate_nfpm_yaml(
                     description="{description}",
                     package_name="{_PKG_NAME}",
                     version="{_PKG_VERSION}",
-                    {'' if packager != 'deb' else 'maintainer="Foo Bar <deb@example.com>",'}
+                    {"" if packager != "deb" else 'maintainer="Foo Bar <deb@example.com>",'}
                     dependencies={repr(dependencies)},
                     scripts={repr(scripts)},
                     **{extra_metadata},

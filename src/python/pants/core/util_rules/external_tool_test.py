@@ -208,17 +208,17 @@ def test_export(rule_runner) -> None:
     assert result.result is not None, "failed to export anything at all"
 
     exported = result.result
-    assert exported.exported_binaries == (
-        ExportedBinary("foobar", "foobar-3.4.7/bin/foobar"),
-    ), "didn't request exporting correct bin"
+    assert exported.exported_binaries == (ExportedBinary("foobar", "foobar-3.4.7/bin/foobar"),), (
+        "didn't request exporting correct bin"
+    )
 
     exported_digest: DigestContents = rule_runner.request(DigestContents, (exported.digest,))
     assert len(exported_digest) == 2, "digest didn't contain all files"
 
     exported_files = {e.path: e.content for e in exported_digest}
-    assert (
-        exported_files["foobar-3.4.7/bin/foobar"] == b"exe"
-    ), "digest didn't export our executable"
+    assert exported_files["foobar-3.4.7/bin/foobar"] == b"exe", (
+        "digest didn't export our executable"
+    )
 
 
 class ConstrainedTool(TemplatedExternalTool):

@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import ancestor_files

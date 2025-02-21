@@ -155,7 +155,7 @@ async def gather_coordinates_for_jvm_lockfile(
                 f"""
                 The following values could not be parsed as an address nor as a JVM coordinate string.
                 The problematic inputs supplied to the `{request.option_name}` option were:
-                {', '.join(bad_artifact_inputs)}.
+                {", ".join(bad_artifact_inputs)}.
                 """
             )
         )
@@ -176,7 +176,7 @@ async def gather_coordinates_for_jvm_lockfile(
                 f"""
                 The following addresses reference targets that are not `jvm_artifact` targets.
                 Please only supply the addresses of `jvm_artifact` for the `{request.option_name}`
-                option. The problematic addresses are: {', '.join(str(tgt.address) for tgt in other_targets)}.
+                option. The problematic addresses are: {", ".join(str(tgt.address) for tgt in other_targets)}.
                 """
             )
         )

@@ -70,8 +70,9 @@ class TestProcessManager(unittest.TestCase):
         )
 
     def test_readwrite_metadata_by_name(self):
-        with temporary_dir() as tmpdir, unittest.mock.patch(
-            "pants.pantsd.process_manager.get_buildroot", return_value=tmpdir
+        with (
+            temporary_dir() as tmpdir,
+            unittest.mock.patch("pants.pantsd.process_manager.get_buildroot", return_value=tmpdir),
         ):
             self.pmm.write_metadata_by_name(self.TEST_KEY, self.TEST_VALUE)
             self.assertEqual(self.pmm.read_metadata_by_name(self.TEST_KEY), self.TEST_VALUE)
@@ -98,8 +99,9 @@ class TestProcessManager(unittest.TestCase):
                 )
 
     def test_await_metadata_by_name(self):
-        with temporary_dir() as tmpdir, unittest.mock.patch(
-            "pants.pantsd.process_manager.get_buildroot", return_value=tmpdir
+        with (
+            temporary_dir() as tmpdir,
+            unittest.mock.patch("pants.pantsd.process_manager.get_buildroot", return_value=tmpdir),
         ):
             self.pmm.write_metadata_by_name(self.TEST_KEY, self.TEST_VALUE)
 
@@ -235,9 +237,10 @@ class TestProcessManager(unittest.TestCase):
                 self.pm.purge_metadata()
 
     def test_purge_metadata_alive_but_forced(self):
-        with unittest.mock.patch.object(
-            ProcessManager, "is_alive", return_value=True
-        ), unittest.mock.patch("pants.pantsd.process_manager.rm_rf") as mock_rm_rf:
+        with (
+            unittest.mock.patch.object(ProcessManager, "is_alive", return_value=True),
+            unittest.mock.patch("pants.pantsd.process_manager.rm_rf") as mock_rm_rf,
+        ):
             self.pm.purge_metadata(force=True)
             self.assertGreater(mock_rm_rf.call_count, 0)
 
@@ -254,13 +257,13 @@ class TestProcessManager(unittest.TestCase):
 
     @contextmanager
     def setup_terminate(self):
-        with unittest.mock.patch.object(
-            ProcessManager, "_kill", **PATCH_OPTS
-        ) as mock_kill, unittest.mock.patch.object(
-            ProcessManager, "is_alive", **PATCH_OPTS
-        ) as mock_alive, unittest.mock.patch.object(
-            ProcessManager, "purge_metadata", **PATCH_OPTS
-        ) as mock_purge:
+        with (
+            unittest.mock.patch.object(ProcessManager, "_kill", **PATCH_OPTS) as mock_kill,
+            unittest.mock.patch.object(ProcessManager, "is_alive", **PATCH_OPTS) as mock_alive,
+            unittest.mock.patch.object(
+                ProcessManager, "purge_metadata", **PATCH_OPTS
+            ) as mock_purge,
+        ):
             yield mock_kill, mock_alive, mock_purge
             self.assertGreater(mock_alive.call_count, 0)
 
@@ -297,25 +300,23 @@ class TestProcessManager(unittest.TestCase):
 
     @contextmanager
     def mock_daemonize_context(self, chk_pre=True, chk_post_child=False, chk_post_parent=False):
-        with unittest.mock.patch.object(
-            ProcessManager, "post_fork_parent", **PATCH_OPTS
-        ) as mock_post_parent, unittest.mock.patch.object(
-            ProcessManager, "post_fork_child", **PATCH_OPTS
-        ) as mock_post_child, unittest.mock.patch.object(
-            ProcessManager, "pre_fork", **PATCH_OPTS
-        ) as mock_pre, unittest.mock.patch.object(
-            ProcessManager, "purge_metadata", **PATCH_OPTS
-        ) as mock_purge, unittest.mock.patch(
-            "os._exit", **PATCH_OPTS
-        ), unittest.mock.patch(
-            "os.chdir", **PATCH_OPTS
-        ), unittest.mock.patch(
-            "os.setsid", **PATCH_OPTS
-        ), unittest.mock.patch(
-            "os.waitpid", **PATCH_OPTS
-        ), unittest.mock.patch(
-            "os.fork", **PATCH_OPTS
-        ) as mock_fork:
+        with (
+            unittest.mock.patch.object(
+                ProcessManager, "post_fork_parent", **PATCH_OPTS
+            ) as mock_post_parent,
+            unittest.mock.patch.object(
+                ProcessManager, "post_fork_child", **PATCH_OPTS
+            ) as mock_post_child,
+            unittest.mock.patch.object(ProcessManager, "pre_fork", **PATCH_OPTS) as mock_pre,
+            unittest.mock.patch.object(
+                ProcessManager, "purge_metadata", **PATCH_OPTS
+            ) as mock_purge,
+            unittest.mock.patch("os._exit", **PATCH_OPTS),
+            unittest.mock.patch("os.chdir", **PATCH_OPTS),
+            unittest.mock.patch("os.setsid", **PATCH_OPTS),
+            unittest.mock.patch("os.waitpid", **PATCH_OPTS),
+            unittest.mock.patch("os.fork", **PATCH_OPTS) as mock_fork,
+        ):
             yield mock_fork
 
             mock_purge.assert_called_once_with(self.pm)

@@ -11,9 +11,10 @@ import os.path
 import sys
 import typing
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Sequence, cast
+from typing import Any, cast
 
 import typing_extensions
 
@@ -585,9 +586,12 @@ async def get_dependencies_rule_application(
         return DependenciesRuleApplication.allow_all()
 
     (
-        origin_rules_family,
-        origin_target,
-    ), *dependencies_family_adaptor = await _get_target_family_and_adaptor_for_dep_rules(
+        (
+            origin_rules_family,
+            origin_target,
+        ),
+        *dependencies_family_adaptor,
+    ) = await _get_target_family_and_adaptor_for_dep_rules(
         request.address,
         *request.dependencies,
         description_of_origin=request.description_of_origin,

@@ -343,7 +343,7 @@ def test_url_assets(use_per_platform: bool) -> None:
                 f"""\
                 resource(
                     name='antigravity',
-                    source={source_field_value(f'http_source({http_source_info})')}
+                    source={source_field_value(f"http_source({http_source_info})")}
                 )
                 resource(
                     name='antigravity_renamed',

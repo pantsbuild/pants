@@ -3,8 +3,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Iterable, Mapping, Sequence
+from typing import TYPE_CHECKING
 
 from pants.base.build_environment import pants_version
 from pants.base.exceptions import BuildConfigurationError

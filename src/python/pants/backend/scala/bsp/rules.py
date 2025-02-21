@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import logging
 import textwrap
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
 from pants.backend.scala.bsp.spec import (
     ScalaBuildTarget,

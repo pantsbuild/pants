@@ -6,7 +6,6 @@ import re
 import signal
 import time
 from pathlib import Path
-from typing import List, Tuple
 
 import pytest
 
@@ -19,7 +18,7 @@ from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegratio
 pytestmark = pytest.mark.platform_specific_behavior
 
 
-def lifecycle_stub_cmdline() -> List[str]:
+def lifecycle_stub_cmdline() -> list[str]:
     # Load the testprojects pants-plugins to get some testing tasks and subsystems.
     testproject_backend_src_dir = os.path.join(
         get_buildroot(), "testprojects/pants-plugins/src/python"
@@ -36,7 +35,7 @@ def lifecycle_stub_cmdline() -> List[str]:
     return lifecycle_stub_cmdline
 
 
-def get_log_file_paths(workdir: str, pid: int) -> Tuple[str, str]:
+def get_log_file_paths(workdir: str, pid: int) -> tuple[str, str]:
     pid_specific_log_file = ExceptionSink.exceptions_log_path(for_pid=pid, in_dir=workdir)
     assert os.path.isfile(pid_specific_log_file)
 
@@ -69,9 +68,7 @@ process title: ([^\n]+)
 sys\\.argv: ([^\n]+)
 pid: {pid}
 Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
-""".format(
-        pid=pid, signum=signum, signame=signame
-    )
+""".format(pid=pid, signum=signum, signame=signame)
     assert re.search(regex_str, contents)
 
 

@@ -9,13 +9,12 @@ import os
 import re
 import sys
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path, PurePath
-from typing import Any, Callable, Type, TypeVar, cast
-
-from typing_extensions import assert_never
+from typing import Any, Type, TypeVar, assert_never, cast
 
 from pants.base.build_environment import (
     get_buildroot,
@@ -174,7 +173,7 @@ class RemoteProvider(Enum):
             return softwrap(
                 f"""
                 The type of provider to use, if using a remote cache and/or remote execution, See
-                {doc_url('docs/using-pants/remote-caching-and-execution')} for details.
+                {doc_url("docs/using-pants/remote-caching-and-execution")} for details.
 
                 Each provider supports different `remote_store_address` and (optional)
                 `remote_execution_address` URIs.
@@ -913,7 +912,7 @@ class BootstrapOptions:
             using the requested version, as Pants cannot dynamically change the version it
             is using once the program is already running.
 
-            If you use the `{bin_name()}` script from {doc_url('docs/getting-started/installing-pants')}, however, changing
+            If you use the `{bin_name()}` script from {doc_url("docs/getting-started/installing-pants")}, however, changing
             the value in your `pants.toml` will cause the new version to be installed and run automatically.
 
             Run `{bin_name()} --version` to check what is being used.
@@ -1405,7 +1404,7 @@ class BootstrapOptions:
 
             This option cannot be overridden via environment targets, so if you need a different
             value than what the rest of your organization is using, override the value via an
-            environment variable, CLI argument, or `.pants.rc` file. See {doc_url('docs/using-pants/key-concepts/options')}.
+            environment variable, CLI argument, or `.pants.rc` file. See {doc_url("docs/using-pants/key-concepts/options")}.
             """
         ),
     )
@@ -1616,7 +1615,7 @@ class BootstrapOptions:
             the token via the environment variable (`PANTS_REMOTE_OAUTH_BEARER_TOKEN`), CLI option
             (`--remote-oauth-bearer-token`), or store the token in a file and set the option to
             `"@/path/to/token.txt"` to [read the value from that
-            file]({doc_url('docs/using-pants/key-concepts/options#reading-individual-option-values-from-files')}).
+            file]({doc_url("docs/using-pants/key-concepts/options#reading-individual-option-values-from-files")}).
             """
         ),
     )
@@ -1864,7 +1863,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         help=softwrap(
             f"""
             Include only targets with these tags (optional '+' prefix) or without these
-            tags ('-' prefix). See {doc_url('docs/using-pants/advanced-target-selection')}.
+            tags ('-' prefix). See {doc_url("docs/using-pants/advanced-target-selection")}.
             """
         ),
         metavar="[+-]tag1,tag2,...",
@@ -1930,7 +1929,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         help=softwrap(
             f"""
             Python files to evaluate and whose symbols should be exposed to all BUILD files.
-            See {doc_url('docs/writing-plugins/macros')}.
+            See {doc_url("docs/writing-plugins/macros")}.
             """
         ),
         advanced=True,

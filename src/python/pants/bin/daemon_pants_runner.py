@@ -7,7 +7,6 @@ import sys
 import time
 from contextlib import contextmanager
 from threading import Lock
-from typing import Dict, Tuple
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, ExitCode
 from pants.bin.local_pants_runner import LocalPantsRunner
@@ -97,8 +96,8 @@ class DaemonPantsRunner:
 
     def single_daemonized_run(
         self,
-        args: Tuple[str, ...],
-        env: Dict[str, str],
+        args: tuple[str, ...],
+        env: dict[str, str],
         working_dir: str,
         cancellation_latch: PySessionCancellationLatch,
     ) -> ExitCode:
@@ -150,8 +149,8 @@ class DaemonPantsRunner:
     def __call__(
         self,
         command: str,
-        args: Tuple[str, ...],
-        env: Dict[str, str],
+        args: tuple[str, ...],
+        env: dict[str, str],
         working_dir: str,
         cancellation_latch: PySessionCancellationLatch,
         stdin_fileno: int,

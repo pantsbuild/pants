@@ -7,11 +7,12 @@ import argparse
 import difflib
 import os
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import Enum, ReprEnum
 from pathlib import Path
 from textwrap import dedent  # noqa: PNT20
-from typing import Any, Dict, Sequence, cast
+from typing import Any, cast
 
 import toml
 import yaml
@@ -53,9 +54,9 @@ HEADER = dedent(
 )
 
 
-Step = Dict[str, Any]
-Jobs = Dict[str, Any]
-Env = Dict[str, str]
+Step = dict[str, Any]
+Jobs = dict[str, Any]
+Env = dict[str, str]
 
 
 class Platform(Enum):
@@ -949,8 +950,6 @@ def build_wheels_job(
                             "with": {
                                 "subject-path": "dist/src.python.pants/*.pex",
                             },
-                            # Temporary: Allow errors in this step while we test the release workflow.
-                            "continue-on-error": True,
                         },
                         {
                             "name": "Upload Wheel and Pex",
@@ -987,8 +986,6 @@ def build_wheels_job(
                                     "with": {
                                         "subject-path": "dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants.testutil*.whl",
                                     },
-                                    # Temporary: Allow errors in this step while we test the release workflow.
-                                    "continue-on-error": True,
                                 },
                                 {
                                     "name": "Upload testutil Wheel",
@@ -1325,7 +1322,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     },
                     "run": dedent(
                         f"""\
-                        gh release edit {gha_expr("needs.release_info.outputs.build-ref") } --draft=false --notes-file notes.txt
+                        gh release edit {gha_expr("needs.release_info.outputs.build-ref")} --draft=false --notes-file notes.txt
                         """
                     ),
                 },
@@ -1744,7 +1741,7 @@ def merge_ok(pr_jobs: list[str]) -> Jobs:
                 {
                     "run": dedent(
                         f"""\
-                merge_ok="{gha_expr('needs.set_merge_ok.outputs.merge_ok')}"
+                merge_ok="{gha_expr("needs.set_merge_ok.outputs.merge_ok")}"
                 if [[ "${{merge_ok}}" == "true" ]]; then
                     echo "Merge OK"
                     exit 0

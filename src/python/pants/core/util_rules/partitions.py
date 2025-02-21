@@ -6,9 +6,10 @@
 from __future__ import annotations
 
 import itertools
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Generic, Iterable, Protocol, TypeVar, overload
+from typing import Generic, Protocol, TypeVar, overload
 
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.engine.collection import Collection

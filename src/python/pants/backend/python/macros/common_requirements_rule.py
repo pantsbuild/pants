@@ -6,7 +6,8 @@ from __future__ import annotations
 import itertools
 import logging
 import os
-from typing import Callable, Iterable, cast
+from collections.abc import Callable, Iterable
+from typing import cast
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
