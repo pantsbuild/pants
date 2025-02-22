@@ -166,6 +166,7 @@ def _write_pyproject_toml():
             ]
 
             [tool.uv]
+            package = false
             environments = ["sys_platform == '{sys.platform}'"]
 
             [tool.pants_internal]
