@@ -181,7 +181,7 @@ def _check_pyproject_up_to_date():
 # If the plugin requirements have changed, then update pyproject.toml and re-lock.
 if not _check_pyproject_up_to_date():
     _write_pyproject_toml()
-    subprocess.run([uv_path, "sync"])
+    subprocess.run([uv_path, "sync", f"--python={sys.executable}"])
 
 subprocess.run(["./.venv/bin/python", "-c", "import os, site; print(os.linesep.join(site.getsitepackages()))"])
 """
