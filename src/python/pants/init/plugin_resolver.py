@@ -163,6 +163,9 @@ def _write_pyproject_toml():
             dependencies = [
             {requirements_formatted}
             ]
+
+            [tool.uv]
+            environments = ["sys_platform == '{sys.platform}'"]
             '''
         ))
 
