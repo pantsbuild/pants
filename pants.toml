@@ -43,6 +43,7 @@ backend_packages.add = [
   "internal_plugins.releases",
   "internal_plugins.test_lockfile_fixtures",
 ]
+experimental_use_uv_for_plugin_resolution = true
 plugins = [
   "hdrhistogram", # For use with `--stats-log`.
 ]

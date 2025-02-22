@@ -1,6 +1,7 @@
 # Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalToolRequest,
@@ -32,6 +33,10 @@ class UvSubsystem(TemplatedExternalTool):
         "macos_x86_64": "x86_64-apple-darwin",
     }
 
+    def generate_exe(self, plat: Platform) -> str:
+        platform = self.url_platform_mapping.get(plat.value, "")
+        return f"./uv-{platform}/uv"
+
 
 class UvTool(DownloadedExternalTool):
     """The UV tool, downloaded."""
@@ -46,4 +51,7 @@ async def download_uv_tool(uv_subsystem: UvSubsystem, platform: Platform) -> UvT
 
 
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        *external_tool.rules(),
+    )

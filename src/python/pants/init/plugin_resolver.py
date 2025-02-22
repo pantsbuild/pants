@@ -19,14 +19,24 @@ from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.core.subsystems.uv import UvTool
 from pants.core.subsystems.uv import rules as uv_rules
+from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
+from pants.core.util_rules.adhoc_binaries import rules as adhoc_binaries_rules
 from pants.core.util_rules.environments import determine_bootstrap_environment
 from pants.engine.collection import DeduplicatedCollection
-from pants.engine.env_vars import CompleteEnvironmentVars
+from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.environment import EnvironmentName
+from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import SessionValues
-from pants.engine.process import ProcessCacheScope, ProcessResult
-from pants.engine.rules import Get, QueryRule, collect_rules, rule
+from pants.engine.intrinsics import execute_process
+from pants.engine.platform import Platform
+from pants.engine.process import (
+    Process,
+    ProcessCacheScope,
+    ProcessExecutionEnvironment,
+    ProcessResult,
+)
+from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
 from pants.init.bootstrap_scheduler import BootstrapScheduler
 from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -60,6 +70,8 @@ async def resolve_plugins_via_pex(
     `named_caches` directory), but consequently needs to disable the process cache: see the
     ProcessCacheScope reference in the body.
     """
+    logger.info("resolve_plugins_via_pex")
+
     req_strings = sorted(global_options.plugins + request.requirements)
 
     requirements = PexRequirements(
@@ -109,18 +121,144 @@ async def resolve_plugins_via_pex(
     return ResolvedPluginDistributions(plugins_process_result.stdout.decode().strip().split("\n"))
 
 
+@dataclass(frozen=True)
+class _UvPluginResolveScript:
+    digest: Digest
+    path: str
+
+
+# Script which invokes `uv` to resolve plugin distributions. It builds a mini-uv project in a subdirectory
+# of the repository and uses `uv` to manage the venv in that project.
+_UV_PLUGIN_RESOLVE_SCRIPT = r"""\
+import os
+from pathlib import Path
+import subprocess
+import sys
+import textwrap
+import tomllib
+
+
+# `uv` path is passed as the first argument.
+uv_path = sys.argv[1]
+
+# Requirements are the remaining arguments.
+requirements = sys.argv[2:]
+
+# Ensure directory exists for plugin resolution project.
+plugins_path = Path(".pants.d/plugins")
+plugins_path.mkdir(parents=True, exist_ok=True)
+os.chdir(plugins_path)
+
+
+def _write_pyproject_toml():
+    requirements_formatted = "\n".join([f'  "{x}"' for x in requirements])
+    with open("pyproject.toml", "w") as f:
+        f.write(textwrap.dedent(
+            f'''\
+            [project]
+            name = "pants-plugins"
+            version = "0.0.1"
+            description = "Plugins for your Pants"
+            requires-python = "==3.11.*"
+            dependencies = [
+            {requirements_formatted}
+            ]
+            '''
+        ))
+
+
+def _check_pyproject_up_to_date():
+    if not os.path.exists("pyproject.toml"):
+        return False
+
+    with open("pyproject.toml", "rb") as f:
+        pyproject = tomllib.load(f)
+        return pyproject["project"]["dependencies"] == requirements
+
+# If the plugin requirements have changed, then update pyproject.toml and re-lock.
+if not _check_pyproject_up_to_date():
+    _write_pyproject_toml()
+    subprocess.run([uv_path, "sync"])
+
+subprocess.run(["./.venv/bin/python", "-c", "import os, site; print(os.linesep.join(site.getsitepackages()))"])
+"""
+
+
+@rule
+async def _setup_uv_plugin_resolve_script() -> _UvPluginResolveScript:
+    digest = await Get(
+        Digest,
+        CreateDigest(
+            [FileContent(content=_UV_PLUGIN_RESOLVE_SCRIPT.encode(), path="uv_plugin_resolve.py")]
+        ),
+    )
+    return _UvPluginResolveScript(digest=digest, path="uv_plugin_resolve.py")
+
+
 async def resolve_plugins_via_uv(
-    request: PluginsRequest, uv_tool: UvTool
+    request: PluginsRequest, global_options: GlobalOptions
 ) -> ResolvedPluginDistributions:
-    return ResolvedPluginDistributions()
+    uv_tool, uv_plugin_resolve_script, platform, python_binary = await MultiGet(
+        Get(UvTool),
+        Get(_UvPluginResolveScript),
+        Get(Platform),
+        Get(PythonBuildStandaloneBinary),
+    )
+
+    req_strings = sorted(global_options.plugins + request.requirements)
+
+    # NB: We run this Process per-restart because it (intentionally) leaks named cache
+    # paths in a way that invalidates the Process-cache. See the method doc.
+    cache_scope = (
+        ProcessCacheScope.PER_SESSION
+        if global_options.plugins_force_resolve
+        else ProcessCacheScope.PER_RESTART_SUCCESSFUL
+    )
+
+    input_digest = await Get(
+        Digest, MergeDigests([uv_plugin_resolve_script.digest, uv_tool.digest])
+    )
+
+    env = await Get(
+        EnvironmentVars, EnvironmentVarsRequest(["PATH", "HOME"], allowed=["PATH", "HOME"])
+    )
+
+    process = Process(
+        argv=(
+            python_binary.path,
+            f"{{chroot}}/{uv_plugin_resolve_script.path}",
+            f"{{chroot}}/{uv_tool.exe}",
+            *req_strings,
+        ),
+        env=env,
+        input_digest=input_digest,
+        append_only_caches=python_binary.APPEND_ONLY_CACHES,
+        description=f"Resolving plugins: {', '.join(req_strings)}",
+        cache_scope=cache_scope,
+    )
+
+    workspace_process_execution_environment = ProcessExecutionEnvironment(
+        environment_name=None,
+        platform=platform.value,
+        docker_image=None,
+        remote_execution=False,
+        remote_execution_extra_platform_properties=(),
+        execute_in_workspace=True,
+    )
+
+    result = await execute_process(process, workspace_process_execution_environment)
+    if result.exit_code != 0:
+        raise ValueError(f"Plugin resolution failed: stderr={result.stderr.decode()}")
+
+    return ResolvedPluginDistributions(result.stdout.decode().strip().split("\n"))
 
 
 @rule
 async def resolve_plugins(
-    request: PluginsRequest, global_options: GlobalOptions, uv_tool: UvTool
+    request: PluginsRequest, global_options: GlobalOptions
 ) -> ResolvedPluginDistributions:
     if global_options.experimental_use_uv_for_plugin_resolution:
-        return await resolve_plugins_via_uv(request=request, uv_tool=uv_tool)
+        return await resolve_plugins_via_uv(request=request, global_options=global_options)
     else:
         return await resolve_plugins_via_pex(request=request, global_options=global_options)
 
@@ -189,5 +327,6 @@ def rules():
     return [
         QueryRule(ResolvedPluginDistributions, [PluginsRequest, EnvironmentName]),
         *collect_rules(),
+        *adhoc_binaries_rules(),
         *uv_rules(),
     ]
