@@ -208,18 +208,26 @@ async def resolve_plugins_via_uv(
     request: PluginsRequest, global_options: GlobalOptions
 ) -> ResolvedPluginDistributions:
     req_strings = sorted(global_options.plugins + request.requirements)
+    if not req_strings:
+        return ResolvedPluginDistributions()
+
     reqs_content = "\n".join(str(r) for r in req_strings)
     constraints_content = "\n".join(str(c) for c in request.constraints)
-    
+
     uv_tool, uv_plugin_resolve_script, platform, python_binary, data_digest = await MultiGet(
         Get(UvTool),
         Get(_UvPluginResolveScript),
         Get(Platform),
         Get(PythonBuildStandaloneBinary),
-        Get(Digest, CreateDigest([
-            FileContent(content=reqs_content.encode(), path="requirements.txt"),
-            FileContent(content=constraints_content.encode(), path="constraints.txt"),
-        ]))
+        Get(
+            Digest,
+            CreateDigest(
+                [
+                    FileContent(content=reqs_content.encode(), path="requirements.txt"),
+                    FileContent(content=constraints_content.encode(), path="constraints.txt"),
+                ]
+            ),
+        ),
     )
 
     # NB: We run this Process per-restart because it (intentionally) leaks named cache
