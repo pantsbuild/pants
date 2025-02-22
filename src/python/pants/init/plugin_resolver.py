@@ -139,11 +139,10 @@ import tomllib
 
 VERSION = 0
 
-# `uv` path is passed as the first argument.
-uv_path = sys.argv[1]
-
-# Requirements are the remaining arguments.
-requirements = sys.argv[2:]
+inputs_dir = Path(sys.argv[1])
+uv_path = inputs_dir / sys.argv[2]
+requirements = (inputs_dir / sys.argv[3]).read_text().splitlines()
+constraints = (inputs_dir / sys.argv[4]).read_text().splitlines()
 
 # Ensure directory exists for plugin resolution project.
 plugins_path = Path(".pants.d/plugins")
@@ -152,7 +151,8 @@ os.chdir(plugins_path)
 
 
 def _write_pyproject_toml():
-    requirements_formatted = ",\n".join([f'  "{x}"' for x in requirements])
+    requirements_formatted = ", ".join([f'"{x}"' for x in requirements])
+    constraints_formatted = ", ".join([f'"{x}"' for x in constraints])
     with open("pyproject.toml", "w") as f:
         f.write(textwrap.dedent(
             f'''\
@@ -161,14 +161,11 @@ def _write_pyproject_toml():
             version = "0.0.1"
             description = "Plugins for your Pants"
             requires-python = "==3.11.*"
-            dependencies = [
-            {requirements_formatted}
-            ]
-
+            dependencies = [{requirements_formatted}]
             [tool.uv]
             package = false
             environments = ["sys_platform == '{sys.platform}'"]
-
+            constraint-dependencies = [{constraints_formatted}]
             [tool.pants_internal]
             version = {VERSION}
             '''
@@ -181,9 +178,11 @@ def _check_pyproject_up_to_date():
 
     with open("pyproject.toml", "rb") as f:
         pyproject = tomllib.load(f)
-        if pyproject["tool"]["pants_internal"]["version"] != VERSION:
-            return False
-        return pyproject["project"]["dependencies"] == requirements
+
+    if pyproject["tool"]["pants_internal"]["version"] != VERSION:
+        return False
+
+    return pyproject["project"]["dependencies"] == requirements
 
 # If the plugin requirements have changed, then update pyproject.toml and re-lock.
 if not _check_pyproject_up_to_date():
@@ -208,14 +207,20 @@ async def _setup_uv_plugin_resolve_script() -> _UvPluginResolveScript:
 async def resolve_plugins_via_uv(
     request: PluginsRequest, global_options: GlobalOptions
 ) -> ResolvedPluginDistributions:
-    uv_tool, uv_plugin_resolve_script, platform, python_binary = await MultiGet(
+    req_strings = sorted(global_options.plugins + request.requirements)
+    reqs_content = "\n".join(str(r) for r in req_strings)
+    constraints_content = "\n".join(str(c) for c in request.constraints)
+    
+    uv_tool, uv_plugin_resolve_script, platform, python_binary, data_digest = await MultiGet(
         Get(UvTool),
         Get(_UvPluginResolveScript),
         Get(Platform),
         Get(PythonBuildStandaloneBinary),
+        Get(Digest, CreateDigest([
+            FileContent(content=reqs_content.encode(), path="requirements.txt"),
+            FileContent(content=constraints_content.encode(), path="constraints.txt"),
+        ]))
     )
-
-    req_strings = sorted(global_options.plugins + request.requirements)
 
     # NB: We run this Process per-restart because it (intentionally) leaks named cache
     # paths in a way that invalidates the Process-cache. See the method doc.
@@ -226,7 +231,7 @@ async def resolve_plugins_via_uv(
     )
 
     input_digest = await Get(
-        Digest, MergeDigests([uv_plugin_resolve_script.digest, uv_tool.digest])
+        Digest, MergeDigests([uv_plugin_resolve_script.digest, uv_tool.digest, data_digest])
     )
 
     env = await Get(
@@ -237,8 +242,10 @@ async def resolve_plugins_via_uv(
         argv=(
             python_binary.path,
             f"{{chroot}}/{uv_plugin_resolve_script.path}",
-            f"{{chroot}}/{uv_tool.exe}",
-            *req_strings,
+            "{chroot}",
+            f"{uv_tool.exe}",
+            "requirements.txt",
+            "constraints.txt",
         ),
         env=env,
         input_digest=input_digest,
