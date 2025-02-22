@@ -17,6 +17,8 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
+from pants.core.subsystems.uv import UvTool
+from pants.core.subsystems.uv import rules as uv_rules
 from pants.core.util_rules.environments import determine_bootstrap_environment
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.env_vars import CompleteEnvironmentVars
@@ -49,8 +51,7 @@ class ResolvedPluginDistributions(DeduplicatedCollection[str]):
     sort_input = True
 
 
-@rule
-async def resolve_plugins(
+async def resolve_plugins_via_pex(
     request: PluginsRequest, global_options: GlobalOptions
 ) -> ResolvedPluginDistributions:
     """This rule resolves plugins using a VenvPex, and exposes the absolute paths of their dists.
@@ -106,6 +107,22 @@ async def resolve_plugins(
         ),
     )
     return ResolvedPluginDistributions(plugins_process_result.stdout.decode().strip().split("\n"))
+
+
+async def resolve_plugins_via_uv(
+    request: PluginsRequest, uv_tool: UvTool
+) -> ResolvedPluginDistributions:
+    return ResolvedPluginDistributions()
+
+
+@rule
+async def resolve_plugins(
+    request: PluginsRequest, global_options: GlobalOptions, uv_tool: UvTool
+) -> ResolvedPluginDistributions:
+    if global_options.experimental_use_uv_for_plugin_resolution:
+        return await resolve_plugins_via_uv(request=request, uv_tool=uv_tool)
+    else:
+        return await resolve_plugins_via_pex(request=request, global_options=global_options)
 
 
 class PluginResolver:
@@ -172,4 +189,5 @@ def rules():
     return [
         QueryRule(ResolvedPluginDistributions, [PluginsRequest, EnvironmentName]),
         *collect_rules(),
+        *uv_rules(),
     ]

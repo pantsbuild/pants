@@ -2017,6 +2017,18 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         default=[],
     )
 
+    experimental_use_uv_for_plugin_resolution = BoolOption(
+        default=False,
+        advanced=True,
+        help=softwrap(
+            """
+            If true, use `uv` for resolving Pants plugins instead of `pex`.
+
+            This is an experimental option and no stability is guaranteed.
+            """
+        ),
+    )
+
     @classmethod
     def validate_instance(cls, opts):
         """Validates an instance of global options for cases that are not prohibited via
