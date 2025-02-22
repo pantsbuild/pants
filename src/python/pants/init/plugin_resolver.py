@@ -152,7 +152,7 @@ os.chdir(plugins_path)
 
 
 def _write_pyproject_toml():
-    requirements_formatted = "\n".join([f'  "{x}"' for x in requirements])
+    requirements_formatted = ",\n".join([f'  "{x}"' for x in requirements])
     with open("pyproject.toml", "w") as f:
         f.write(textwrap.dedent(
             f'''\
