@@ -137,6 +137,7 @@ import sys
 import textwrap
 import tomllib
 
+VERSION = 0
 
 # `uv` path is passed as the first argument.
 uv_path = sys.argv[1]
@@ -166,6 +167,9 @@ def _write_pyproject_toml():
 
             [tool.uv]
             environments = ["sys_platform == '{sys.platform}'"]
+
+            [tool.pants_internal]
+            version = {VERSION}
             '''
         ))
 
@@ -176,6 +180,8 @@ def _check_pyproject_up_to_date():
 
     with open("pyproject.toml", "rb") as f:
         pyproject = tomllib.load(f)
+        if pyproject["tool"]["pants_internal"]["version"] != VERSION:
+            return False
         return pyproject["project"]["dependencies"] == requirements
 
 # If the plugin requirements have changed, then update pyproject.toml and re-lock.
