@@ -8,11 +8,13 @@ import site
 import sys
 from collections.abc import Iterable
 from dataclasses import dataclass
+from io import StringIO
 from typing import cast
 
 from pkg_resources import Requirement, WorkingSet
 from pkg_resources import working_set as global_working_set
 
+from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
@@ -132,62 +134,61 @@ class _UvPluginResolveScript:
 _UV_PLUGIN_RESOLVE_SCRIPT = r"""\
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
-import textwrap
 import tomllib
 
-VERSION = 0
+
+def dig(d, keys, *, default=None):
+    for key in keys[:-1]:
+        d = d.get(key, {})
+    return d.get(keys[-1], default)
+
+
+def pyproject_changed(current_path: Path, previous_path: Path) -> bool:
+    with open(current_path, "rb") as f:
+        current_pyproject = tomllib.load(f)
+
+    with open(previous_path, "rb") as f:
+        previous_pyproject = tomllib.load(f)
+
+    keys_to_check = [
+        ["tool", "__pants_internal__", "version"],
+        ["project", "dependencies"],
+        ["tool", "uv", "constraint-dependencies"],
+        ["tool", "uv", "environments"],
+        ["tool", "uv", "index"],
+        ["tool", "uv", "find-links"],
+    ]
+
+    for keys in keys_to_check:
+        if dig(current_pyproject, keys) != dig(previous_pyproject, keys):
+            return True
+
+    return False
+
 
 inputs_dir = Path(sys.argv[1])
 uv_path = inputs_dir / sys.argv[2]
-requirements = (inputs_dir / sys.argv[3]).read_text().splitlines()
-constraints = (inputs_dir / sys.argv[4]).read_text().splitlines()
+pyproject_path = inputs_dir / sys.argv[3]
 
 # Ensure directory exists for plugin resolution project.
 plugins_path = Path(".pants.d/plugins")
 plugins_path.mkdir(parents=True, exist_ok=True)
 os.chdir(plugins_path)
 
+reinstall = (
+    not os.path.exists("pyproject.toml")
+    or not os.path.exists("uv.lock")
+    or pyproject_changed(pyproject_path, "./pyproject.toml")
+)
 
-def _write_pyproject_toml():
-    requirements_formatted = ", ".join([f'"{x}"' for x in requirements])
-    constraints_formatted = ", ".join([f'"{x}"' for x in constraints])
-    with open("pyproject.toml", "w") as f:
-        f.write(textwrap.dedent(
-            f'''\
-            [project]
-            name = "pants-plugins"
-            version = "0.0.1"
-            description = "Plugins for your Pants"
-            requires-python = "==3.11.*"
-            dependencies = [{requirements_formatted}]
-            [tool.uv]
-            package = false
-            environments = ["sys_platform == '{sys.platform}'"]
-            constraint-dependencies = [{constraints_formatted}]
-            [tool.pants_internal]
-            version = {VERSION}
-            '''
-        ))
-
-
-def _check_pyproject_up_to_date():
-    if not os.path.exists("pyproject.toml"):
-        return False
-
-    with open("pyproject.toml", "rb") as f:
-        pyproject = tomllib.load(f)
-
-    if pyproject["tool"]["pants_internal"]["version"] != VERSION:
-        return False
-
-    return pyproject["project"]["dependencies"] == requirements
-
-# If the plugin requirements have changed, then update pyproject.toml and re-lock.
-if not _check_pyproject_up_to_date():
-    _write_pyproject_toml()
-    subprocess.run([uv_path, "sync", f"--python={sys.executable}"])
+if reinstall:
+    shutil.copy(pyproject_path, ".")
+    subprocess.run([uv_path, "sync", "--no-config", f"--python={sys.executable}"])
+else:
+    subprocess.run([uv_path, "sync", "--no-config", "--frozen", f"--python={sys.executable}"])
 
 subprocess.run(["./.venv/bin/python", "-c", "import os, site; print(os.linesep.join(site.getsitepackages()))"])
 """
@@ -204,6 +205,50 @@ async def _setup_uv_plugin_resolve_script() -> _UvPluginResolveScript:
     return _UvPluginResolveScript(digest=digest, path="uv_plugin_resolve.py")
 
 
+_PYPROJECT_TEMPLATE = """\
+[project]
+name = "pants-plugins"
+version = "0.0.1"
+description = "Plugins for your Pants"
+requires-python = "==3.11.*"
+dependencies = [{requirements_formatted}]
+[tool.uv]
+package = false
+environments = ["sys_platform == '{platform}'"]
+constraint-dependencies = [{constraints_formatted}]
+find-links = [{find_links_formatted}]
+{indexes_formatted}
+[tool.__pants_internal__]
+version = {version}
+"""
+
+
+def _generate_pyproject_toml(
+    requirements: Iterable[str],
+    constraints: Iterable[str],
+    python_indexes: Iterable[str],
+    python_find_links: Iterable[str],
+) -> str:
+    requirements_formatted = ", ".join([f'"{x}"' for x in requirements])
+    constraints_formatted = ", ".join([f'"{x}"' for x in constraints])
+    find_links_formatted = ", ".join([f'"{x}"' for x in python_find_links])
+
+    indexes_formatted = StringIO()
+    for python_index in python_indexes:
+        indexes_formatted.write(f"""[[tool.uv.index]]\nurl = "{python_index}"\n""")
+    if python_indexes:
+        indexes_formatted.write("default = true\n")
+
+    return _PYPROJECT_TEMPLATE.format(
+        constraints_formatted=constraints_formatted,
+        find_links_formatted=find_links_formatted,
+        indexes_formatted=indexes_formatted.getvalue(),
+        platform=sys.platform,
+        requirements_formatted=requirements_formatted,
+        version=0,
+    )
+
+
 async def resolve_plugins_via_uv(
     request: PluginsRequest, global_options: GlobalOptions
 ) -> ResolvedPluginDistributions:
@@ -211,8 +256,14 @@ async def resolve_plugins_via_uv(
     if not req_strings:
         return ResolvedPluginDistributions()
 
-    reqs_content = "\n".join(str(r) for r in req_strings)
-    constraints_content = "\n".join(str(c) for c in request.constraints)
+    python_repos = await Get(PythonRepos)
+
+    pyproject_content = _generate_pyproject_toml(
+        requirements=req_strings,
+        constraints=(str(c) for c in request.constraints),
+        python_indexes=python_repos.indexes,
+        python_find_links=python_repos.find_links,
+    )
 
     uv_tool, uv_plugin_resolve_script, platform, python_binary, data_digest = await MultiGet(
         Get(UvTool),
@@ -223,8 +274,7 @@ async def resolve_plugins_via_uv(
             Digest,
             CreateDigest(
                 [
-                    FileContent(content=reqs_content.encode(), path="requirements.txt"),
-                    FileContent(content=constraints_content.encode(), path="constraints.txt"),
+                    FileContent(content=pyproject_content.encode(), path="pyproject.toml"),
                 ]
             ),
         ),
@@ -252,8 +302,7 @@ async def resolve_plugins_via_uv(
             f"{{chroot}}/{uv_plugin_resolve_script.path}",
             "{chroot}",
             f"{uv_tool.exe}",
-            "requirements.txt",
-            "constraints.txt",
+            "pyproject.toml",
         ),
         env=env,
         input_digest=input_digest,

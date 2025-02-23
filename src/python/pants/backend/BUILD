@@ -53,6 +53,7 @@ __dependents_rules__(
     ),
     (
         (
+            "[/python/subsystems/repos.py]",
             "[/python/util_rules/interpreter_constraints.py]",
             "[/python/util_rules/pex_environment.py]",
             "[/python/util_rules/pex_requirements.py]",
