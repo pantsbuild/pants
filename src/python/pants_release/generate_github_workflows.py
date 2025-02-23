@@ -1811,7 +1811,7 @@ def generate() -> dict[Path, str]:
                         *checkout(),
                         {
                             "name": "Cargo audit (for security vulnerabilities)",
-                            "run": f"./cargo install --version 0.17.5 cargo-audit\n./cargo audit {ignore_advisories}\n",
+                            "run": f"./cargo install cargo-audit --locked\n./cargo audit {ignore_advisories}\n",
                         },
                     ],
                 }
