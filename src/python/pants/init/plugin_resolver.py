@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import site
 import sys
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from io import StringIO
 from typing import cast
@@ -226,7 +226,7 @@ version = {version}
 def _generate_pyproject_toml(
     requirements: Iterable[str],
     constraints: Iterable[str],
-    python_indexes: Iterable[str],
+    python_indexes: Sequence[str],
     python_find_links: Iterable[str],
 ) -> str:
     requirements_formatted = ", ".join([f'"{x}"' for x in requirements])
@@ -234,10 +234,12 @@ def _generate_pyproject_toml(
     find_links_formatted = ", ".join([f'"{x}"' for x in python_find_links])
 
     indexes_formatted = StringIO()
-    for python_index in python_indexes:
-        indexes_formatted.write(f"""[[tool.uv.index]]\nurl = "{python_index}"\n""")
     if python_indexes:
-        indexes_formatted.write("default = true\n")
+        for python_index in python_indexes:
+            indexes_formatted.write(f"""[[tool.uv.index]]\nurl = "{python_index}"\n""")
+        indexes_formatted.write("default = true")
+    else:
+        indexes_formatted.write("no-index = true")
 
     return _PYPROJECT_TEMPLATE.format(
         constraints_formatted=constraints_formatted,
