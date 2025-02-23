@@ -123,6 +123,7 @@ async def generate_lockfile(
                 "--resolver-version",
                 "pip-2020-resolver",
                 "--preserve-pip-download-log",
+                "pex-pip-download.log",
                 # PEX files currently only run on Linux and Mac machines; so we hard code this
                 # limit on lock universality to avoid issues locking due to irrelevant
                 # Windows-only dependency issues. See this Pex issue that originated from a
