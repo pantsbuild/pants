@@ -282,8 +282,6 @@ async def resolve_plugins_via_uv(
         ),
     )
 
-    # NB: We run this Process per-restart because it (intentionally) leaks named cache
-    # paths in a way that invalidates the Process-cache. See the method doc.
     cache_scope = (
         ProcessCacheScope.PER_SESSION
         if global_options.plugins_force_resolve
