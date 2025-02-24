@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from textwrap import dedent
 
@@ -17,13 +18,11 @@ from pants.backend.python.target_types import PythonSourceTarget
 from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget
 from pants.core.target_types import rules as core_target_type_rules
 from pants.core.util_rules import archive, source_files
-from pants.core.util_rules.adhoc_process_support import AdhocProcessRequest
 from pants.core.util_rules.environments import LocalWorkspaceEnvironmentTarget
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.process import Process
 from pants.engine.target import (
     GeneratedSources,
     GenerateSourcesRequest,
@@ -45,7 +44,6 @@ def rule_runner() -> PythonRuleRunner:
             *run_python_source_rules(),
             *run_system_binary_rules(),
             QueryRule(GeneratedSources, [GenerateFilesFromAdhocToolRequest]),
-            QueryRule(Process, [AdhocProcessRequest]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
         ],
@@ -373,6 +371,7 @@ def test_adhoc_tool_workspace_invalidation_sources(rule_runner: PythonRuleRunner
 
     # Update the hash-only source file's content. The adhoc_tool should be re-executed now.
     (Path(rule_runner.build_root) / "src" / "a-file").write_text("xyzzy")
+    time.sleep(0.1)  # wait for invalidation to occur in engine
     result3 = execute_adhoc_tool(rule_runner, address)
     assert result1.snapshot != result3.snapshot
 

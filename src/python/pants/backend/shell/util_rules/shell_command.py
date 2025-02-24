@@ -77,12 +77,15 @@ class ShellCommandProcessFromTargetRequest:
     target: Target
 
 
-async def _prepare_process_request_from_target(
-    shell_command: Target,
+@rule
+async def prepare_process_request_from_target(
+    request: ShellCommandProcessFromTargetRequest,
     shell_setup: ShellSetup.EnvironmentAware,
     bash: BashBinary,
     env_target: EnvironmentTarget,
 ) -> AdhocProcessRequest:
+    shell_command = request.target
+
     description = f"the `{shell_command.alias}` at `{shell_command.address}`"
 
     working_directory = shell_command[ShellCommandWorkdirField].value
@@ -201,29 +204,6 @@ async def _prepare_process_request_from_target(
         outputs_match_error_behavior=outputs_match_mode.glob_match_error_behavior,
         outputs_match_conjunction=outputs_match_mode.glob_expansion_conjunction,
     )
-
-
-@rule
-async def run_adhoc_result_from_target(
-    request: ShellCommandProcessFromTargetRequest,
-    shell_setup: ShellSetup.EnvironmentAware,
-    bash: BashBinary,
-    env_target: EnvironmentTarget,
-) -> AdhocProcessResult:
-    scpr = await _prepare_process_request_from_target(request.target, shell_setup, bash, env_target)
-    return await Get(AdhocProcessResult, AdhocProcessRequest, scpr)
-
-
-@rule
-async def prepare_process_request_from_target(
-    request: ShellCommandProcessFromTargetRequest,
-    shell_setup: ShellSetup.EnvironmentAware,
-    bash: BashBinary,
-    env_target: EnvironmentTarget,
-) -> Process:
-    # Needed to support `experimental_test_shell_command`
-    scpr = await _prepare_process_request_from_target(request.target, shell_setup, bash, env_target)
-    return await Get(Process, AdhocProcessRequest, scpr)
 
 
 class RunShellCommand(RunFieldSet):
