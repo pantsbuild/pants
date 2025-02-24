@@ -158,7 +158,7 @@ class PylintFirstPartyPlugins:
         return self.sources_digest != EMPTY_DIGEST
 
 
-@rule("Prepare [pylint].source_plugins", level=LogLevel.DEBUG)
+@rule(desc="Prepare [pylint].source_plugins", level=LogLevel.DEBUG)
 async def pylint_first_party_plugins(pylint: Pylint) -> PylintFirstPartyPlugins:
     if not pylint.source_plugins:
         return PylintFirstPartyPlugins(FrozenOrderedSet(), FrozenOrderedSet(), EMPTY_DIGEST)

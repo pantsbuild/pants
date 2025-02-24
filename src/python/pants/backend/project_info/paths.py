@@ -139,7 +139,7 @@ async def get_paths_between_root_and_destination(pair: RootDestinationPair) -> S
     return SpecsPaths(paths=spec_paths)
 
 
-@rule("Get paths between root and multiple destinations.")
+@rule(desc="Get paths between root and multiple destinations.")
 async def get_paths_between_root_and_destinations(
     pair: RootDestinationsPair,
 ) -> SpecsPathsCollection:
