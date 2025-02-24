@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Tuple
 
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.rules import Get, collect_rules, rule
@@ -30,7 +29,7 @@ class SubprocessEnvironment(Subsystem):
                 Entries are either strings in the form `ENV_VAR=value` to set an explicit value;
                 or just `ENV_VAR` to copy the value from Pants's own environment.
 
-                See {doc_url('docs/using-pants/key-concepts/options#addremove-semantics')} for how to add and remove Pants's
+                See {doc_url("docs/using-pants/key-concepts/options#addremove-semantics")} for how to add and remove Pants's
                 default for this option.
                 """
             ),
@@ -38,7 +37,7 @@ class SubprocessEnvironment(Subsystem):
         )
 
         @property
-        def env_vars_to_pass_to_subprocesses(self) -> Tuple[str, ...]:
+        def env_vars_to_pass_to_subprocesses(self) -> tuple[str, ...]:
             return tuple(sorted(set(self._env_vars)))
 
 

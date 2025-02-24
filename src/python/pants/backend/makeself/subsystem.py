@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable, Optional
 
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import external_tool
@@ -75,8 +75,8 @@ class RunMakeselfArchive:
     input_digest: Digest
     description: str
     level: LogLevel = LogLevel.INFO
-    output_directory: Optional[str] = None
-    extra_args: Optional[tuple[str, ...]] = None
+    output_directory: str | None = None
+    extra_args: tuple[str, ...] | None = None
     extra_tools: tuple[str, ...] = ()
 
 

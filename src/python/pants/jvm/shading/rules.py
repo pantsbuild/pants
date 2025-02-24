@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable
 
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (

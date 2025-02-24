@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping
 
 from pants.backend.codegen.thrift.target_types import ThriftSourceField
 from pants.engine.engine_aware import EngineAwareParameter

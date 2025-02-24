@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os
 import signal
-from typing import Mapping
+from collections.abc import Mapping
 
 import pytest
 from workunit_logger.register import FINISHED_SUCCESSFULLY

@@ -6,10 +6,11 @@ from __future__ import annotations
 import itertools
 import logging
 import urllib.parse
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path, PurePath
-from typing import Any, Iterator, Mapping, Sequence, cast
+from typing import Any, cast
 
 import toml
 from packaging.version import InvalidVersion, Version

@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Collection
 from dataclasses import dataclass
-from typing import Collection
 
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.core.util_rules import asdf, search_paths

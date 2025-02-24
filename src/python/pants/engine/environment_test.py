@@ -1,7 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Dict, List
 
 import pytest
 
@@ -21,7 +20,7 @@ from pants.engine.env_vars import CompleteEnvironmentVars
         (['A=has a " in it'], {"A": 'has a " in it'}),
     ],
 )
-def test_complete_environment(input_strs: List[str], expected: Dict[str, str]) -> None:
+def test_complete_environment(input_strs: list[str], expected: dict[str, str]) -> None:
     pants_env = CompleteEnvironmentVars({"A": "a", "B": "b", "C": "c"})
 
     subset = pants_env.get_subset(input_strs)

@@ -1,6 +1,6 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from typing import Iterable, Union
+from collections.abc import Iterable
 
 from pants.backend.tsx.goals import tailor as tsx_tailor
 from pants.backend.tsx.target_types import (
@@ -35,7 +35,7 @@ def target_types() -> Iterable[type[Target]]:
     )
 
 
-def rules() -> Iterable[Union[Rule, UnionRule]]:
+def rules() -> Iterable[Rule | UnionRule]:
     return (
         *dependency_inference_rules.rules(),
         *tailor.rules(),

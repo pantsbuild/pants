@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from typing import Mapping
+from collections.abc import Mapping
 
 from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
 from pants.backend.java.target_types import JavaSourceField

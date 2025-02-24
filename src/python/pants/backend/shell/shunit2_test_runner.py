@@ -264,7 +264,7 @@ async def run_tests_with_shunit2(
 
 @rule(desc="Setup Shunit2 to run interactively", level=LogLevel.DEBUG)
 async def setup_shunit2_debug_test(
-    batch: Shunit2TestRequest.Batch[Shunit2FieldSet, Any]
+    batch: Shunit2TestRequest.Batch[Shunit2FieldSet, Any],
 ) -> TestDebugRequest:
     setup = await Get(TestSetup, TestSetupRequest(batch.single_element))
     return TestDebugRequest(

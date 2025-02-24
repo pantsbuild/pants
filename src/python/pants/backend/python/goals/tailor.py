@@ -6,9 +6,9 @@ from __future__ import annotations
 import logging
 import os
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable
 
 from pants.backend.python.dependency_inference.module_mapper import module_from_stripped_path
 from pants.backend.python.macros.pipenv_requirements import parse_pipenv_requirements

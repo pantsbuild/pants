@@ -11,11 +11,12 @@ import threading
 import tokenize
 import traceback
 import typing
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import InitVar, dataclass, field
 from difflib import get_close_matches
 from io import StringIO
 from pathlib import PurePath
-from typing import Annotated, Any, Callable, Iterable, Mapping, TypeVar
+from typing import Annotated, Any, TypeVar
 
 import typing_extensions
 
@@ -487,7 +488,7 @@ class Parser:
             help_str = softwrap(
                 f"""
                 If you expect to see more symbols activated in the below list, refer to
-                {doc_url('docs/using-pants/key-concepts/backends')} for all available backends to activate.
+                {doc_url("docs/using-pants/key-concepts/backends")} for all available backends to activate.
                 """
             )
             valid_symbols = sorted(s for s in global_symbols.keys() if s != "__builtins__")

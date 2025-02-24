@@ -5,11 +5,10 @@ from __future__ import annotations
 
 import logging
 from abc import ABCMeta
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, ClassVar, Iterable, Mapping, Optional, Tuple, TypeVar, Union
-
-from typing_extensions import final
+from typing import Any, ClassVar, TypeVar, final
 
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.environments import _warn_on_non_local_environments
@@ -80,7 +79,7 @@ class RunFieldSet(FieldSet, metaclass=ABCMeta):
 
     @final
     @classmethod
-    def rules(cls) -> Iterable[Union[Rule, UnionRule]]:
+    def rules(cls) -> Iterable[Rule | UnionRule]:
         yield UnionRule(RunFieldSet, cls)
         if not cls.supports_debug_adapter:
             yield from _unsupported_debug_adapter_rules(cls)
@@ -103,7 +102,7 @@ class RunRequest:
     digest: Digest
     # Values in args and in env can contain the format specifier "{chroot}", which will
     # be substituted with the (absolute) chroot path.
-    args: Tuple[str, ...]
+    args: tuple[str, ...]
     extra_env: FrozenDict[str, str]
     immutable_input_digests: Mapping[str, Digest] | None = None
     append_only_caches: Mapping[str, str] | None = None
@@ -113,7 +112,7 @@ class RunRequest:
         *,
         digest: Digest,
         args: Iterable[str],
-        extra_env: Optional[Mapping[str, str]] = None,
+        extra_env: Mapping[str, str] | None = None,
         immutable_input_digests: Mapping[str, Digest] | None = None,
         append_only_caches: Mapping[str, str] | None = None,
     ) -> None:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import FrozenSet
 
 from pants.backend.codegen.protobuf.target_types import (
     ProtobufDependenciesField,
@@ -51,7 +50,7 @@ class ProtobufJavaRuntimeForResolveRequest:
 
 @dataclass(frozen=True)
 class ProtobufJavaRuntimeForResolve:
-    addresses: FrozenSet[Address]
+    addresses: frozenset[Address]
 
 
 @rule
@@ -83,7 +82,7 @@ class ProtobufJavaGrpcRuntimeForResolveRequest:
 
 @dataclass(frozen=True)
 class ProtobufJavaGrpcRuntimeForResolve:
-    addresses: FrozenSet[Address]
+    addresses: frozenset[Address]
 
 
 @rule

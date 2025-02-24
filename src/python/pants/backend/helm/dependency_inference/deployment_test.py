@@ -298,9 +298,9 @@ def test_resolving_docker_image() -> None:
         },
     )
 
-    assert (
-        do_resolve(resolver, "busybox:latest") is None
-    ), "image in known 3rd party should have no resolution"
+    assert do_resolve(resolver, "busybox:latest") is None, (
+        "image in known 3rd party should have no resolution"
+    )
 
     with pytest.raises(UnownedDependencyError):
         # image not in known 3rd party should have no resolution
@@ -323,9 +323,9 @@ def test_resolving_docker_image() -> None:
         # a target which is not a docker_image should not resolve
         do_resolve(resolver, target_wrong_type)
 
-    assert (
-        do_resolve(resolver, docker_with_registry) is None
-    ), "image with registry in known 3rd party should have no resolution"
+    assert do_resolve(resolver, docker_with_registry) is None, (
+        "image with registry in known 3rd party should have no resolution"
+    )
 
 
 def test_resolving_docker_image_globs() -> None:
@@ -355,9 +355,9 @@ def test_resolving_docker_image_globs() -> None:
         },
     )
 
-    assert (
-        do_resolve(resolver, "busybox:latest") is None
-    ), "image in known 3rd party should have no resolution"
+    assert do_resolve(resolver, "busybox:latest") is None, (
+        "image in known 3rd party should have no resolution"
+    )
 
     with pytest.raises(UnownedDependencyError):
         # image not in known 3rd party should have no resolution
@@ -383,12 +383,12 @@ def test_resolving_docker_image_no_thirdparty() -> None:
         set(),
     )
     resolver._handle_missing_docker_image = MagicMock(return_value=None)  # type: ignore[method-assign]
-    assert (
-        resolver.image_ref_to_actual_address("busybox:latest") is None
-    ), "with 3rdparty permitting everything, anything 3rdparty should not resolve"
-    assert (
-        not resolver._handle_missing_docker_image.call_args_list
-    ), "with 3rdparty permitting everything, we should not warn"
+    assert resolver.image_ref_to_actual_address("busybox:latest") is None, (
+        "with 3rdparty permitting everything, anything 3rdparty should not resolve"
+    )
+    assert not resolver._handle_missing_docker_image.call_args_list, (
+        "with 3rdparty permitting everything, we should not warn"
+    )
 
 
 def test_inject_deployment_dependencies(rule_runner: RuleRunner) -> None:

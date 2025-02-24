@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import FrozenSet
 
 from pants.backend.codegen.soap.java.jaxws import JaxWsTools
 from pants.backend.codegen.soap.target_types import WsdlDependenciesField
@@ -41,7 +40,7 @@ class JaxWSJavaRuntimeForResolveRequest:
 
 @dataclass(frozen=True)
 class JaxWSJavaRuntimeForResolve:
-    addresses: FrozenSet[Address]
+    addresses: frozenset[Address]
 
 
 @rule

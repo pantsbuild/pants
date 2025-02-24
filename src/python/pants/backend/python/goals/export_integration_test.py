@@ -7,8 +7,8 @@ import os
 import platform
 import re
 import shutil
+from collections.abc import Mapping, MutableMapping
 from textwrap import dedent
-from typing import Mapping, MutableMapping
 
 import pytest
 
@@ -84,31 +84,31 @@ def test_export(py_resolve_format: PythonResolveExportFormat, py_hermetic_script
         ).assert_success()
 
     export_prefix = os.path.join("dist", "export", "python", "virtualenvs")
-    assert os.path.isdir(
-        export_prefix
-    ), f"expected export prefix dir '{export_prefix}' does not exist"
+    assert os.path.isdir(export_prefix), (
+        f"expected export prefix dir '{export_prefix}' does not exist"
+    )
     py_minor_version = f"{platform.python_version_tuple()[0]}.{platform.python_version_tuple()[1]}"
     for resolve, ansicolors_version in [("a", "1.1.8"), ("b", "1.0.2")]:
         export_resolve_dir = os.path.join(export_prefix, resolve)
-        assert os.path.isdir(
-            export_resolve_dir
-        ), f"expected export resolve dir '{export_resolve_dir}' does not exist"
+        assert os.path.isdir(export_resolve_dir), (
+            f"expected export resolve dir '{export_resolve_dir}' does not exist"
+        )
 
         export_dir = os.path.join(export_resolve_dir, platform.python_version())
         assert os.path.isdir(export_dir), f"expected export dir '{export_dir}' does not exist"
         if py_resolve_format == PythonResolveExportFormat.symlinked_immutable_virtualenv:
-            assert os.path.islink(
-                export_dir
-            ), f"expected export dir '{export_dir}' is not a symlink"
+            assert os.path.islink(export_dir), (
+                f"expected export dir '{export_dir}' is not a symlink"
+            )
 
         lib_dir = os.path.join(export_dir, "lib", f"python{py_minor_version}", "site-packages")
         assert os.path.isdir(lib_dir), f"expected export lib dir '{lib_dir}' does not exist"
         expected_ansicolors_dir = os.path.join(
             lib_dir, f"ansicolors-{ansicolors_version}.dist-info"
         )
-        assert os.path.isdir(
-            expected_ansicolors_dir
-        ), f"expected dist-info for ansicolors '{expected_ansicolors_dir}' does not exist"
+        assert os.path.isdir(expected_ansicolors_dir), (
+            f"expected dist-info for ansicolors '{expected_ansicolors_dir}' does not exist"
+        )
 
         if py_resolve_format == PythonResolveExportFormat.mutable_virtualenv:
             activate_path = os.path.join(export_dir, "bin", "activate")
@@ -117,14 +117,14 @@ def test_export(py_resolve_format: PythonResolveExportFormat, py_hermetic_script
                 activate_content = activate_file.read()
 
             prompt_re = re.compile(rf"""PS1=('|")\({resolve}/{platform.python_version()}\) """)
-            assert (
-                prompt_re.search(activate_content) is not None
-            ), "Expected PS1 prompt not defined in bin/activate."
+            assert prompt_re.search(activate_content) is not None, (
+                "Expected PS1 prompt not defined in bin/activate."
+            )
 
             script_path = os.path.join(export_dir, "bin", "wheel")
-            assert os.path.isfile(
-                script_path
-            ), "expected wheel to be installed, but bin/wheel is missing"
+            assert os.path.isfile(script_path), (
+                "expected wheel to be installed, but bin/wheel is missing"
+            )
             with open(script_path) as script_file:
                 shebang = script_file.readline().strip()
             if py_hermetic_scripts:
@@ -134,25 +134,25 @@ def test_export(py_resolve_format: PythonResolveExportFormat, py_hermetic_script
 
             expected_foo_dir = os.path.join(lib_dir, "foo_dist-1.2.3.dist-info")
             if resolve == "b":
-                assert not os.path.isdir(
-                    expected_foo_dir
-                ), f"unexpected dist-info for foo-dist '{expected_foo_dir}' exists"
+                assert not os.path.isdir(expected_foo_dir), (
+                    f"unexpected dist-info for foo-dist '{expected_foo_dir}' exists"
+                )
             elif resolve == "a":
                 # make sure the editable wheel for the python_distribution is installed
-                assert os.path.isdir(
-                    expected_foo_dir
-                ), f"expected dist-info for foo-dist '{expected_foo_dir}' does not exist"
+                assert os.path.isdir(expected_foo_dir), (
+                    f"expected dist-info for foo-dist '{expected_foo_dir}' does not exist"
+                )
                 # direct_url__pants__.json should be moved to direct_url.json
                 expected_foo_direct_url_pants = os.path.join(
                     expected_foo_dir, "direct_url__pants__.json"
                 )
-                assert not os.path.isfile(
-                    expected_foo_direct_url_pants
-                ), f"expected direct_url__pants__.json for foo-dist '{expected_foo_direct_url_pants}' was not removed"
+                assert not os.path.isfile(expected_foo_direct_url_pants), (
+                    f"expected direct_url__pants__.json for foo-dist '{expected_foo_direct_url_pants}' was not removed"
+                )
                 expected_foo_direct_url = os.path.join(expected_foo_dir, "direct_url.json")
-                assert os.path.isfile(
-                    expected_foo_direct_url
-                ), f"expected direct_url.json for foo-dist '{expected_foo_direct_url}' does not exist"
+                assert os.path.isfile(expected_foo_direct_url), (
+                    f"expected direct_url.json for foo-dist '{expected_foo_direct_url}' does not exist"
+                )
 
 
 def test_symlinked_venv_resilience() -> None:

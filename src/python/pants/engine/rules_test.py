@@ -2,11 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from textwrap import dedent
-from typing import Callable, List, Optional, Tuple, Type, Union, get_type_hints
+from typing import Any, get_type_hints
 
 import pytest
 
@@ -52,7 +53,7 @@ def create_scheduler(rules, validate=True):
 
 
 def fmt_rule(
-    rule: Callable, *, gets: Optional[List[Tuple[str, str]]] = None, multiline: bool = False
+    rule: Callable, *, gets: list[tuple[str, str]] | None = None, multiline: bool = False
 ) -> str:
     """Generate the str that the engine will use for the rule.
 
@@ -86,8 +87,8 @@ def fmt_rule(
 @dataclass(frozen=True)
 class RuleFormatRequest:
     rule: Callable
-    for_param: Optional[Union[Type, Tuple[Type, ...]]] = None
-    gets: Optional[List[Tuple[str, str]]] = None
+    for_param: type | tuple[type, ...] | None = None
+    gets: list[tuple[str, str]] | None = None
 
     def format(self) -> str:
         msg = fmt_rule(self.rule, gets=self.gets, multiline=True)
@@ -111,10 +112,10 @@ class RuleFormatRequest:
 
 
 def fmt_param_edge(
-    param: Type,
-    product: Union[Type, Tuple[Type, ...]],
-    via_func: Union[Type, RuleFormatRequest],
-    return_func: Optional[RuleFormatRequest] = None,
+    param: type[Any],
+    product: type[Any] | tuple[type[Any], ...],
+    via_func: type[Any] | RuleFormatRequest,
+    return_func: RuleFormatRequest | None = None,
 ) -> str:
     if isinstance(via_func, type):
         via_func_str = f"Select({via_func.__name__})"
@@ -150,7 +151,7 @@ class GraphVertexType(Enum):
     intrinsic = "intrinsic"
     param = "param"
 
-    def graph_vertex_color_fmt_str(self) -> Optional[str]:
+    def graph_vertex_color_fmt_str(self) -> str | None:
         olive = "0.2214,0.7179,0.8528"
         gray = "0.576,0,0.6242"
         orange = "0.08,0.5,0.976"
@@ -172,9 +173,9 @@ class GraphVertexType(Enum):
 
 
 def fmt_non_param_edge(
-    subject: Union[Type, Callable, RuleFormatRequest],
-    product: Union[Type, Tuple[Type, ...]],
-    return_func: Optional[RuleFormatRequest] = None,
+    subject: type | Callable | RuleFormatRequest,
+    product: type | tuple[type, ...],
+    return_func: RuleFormatRequest | None = None,
     rule_type: GraphVertexType = GraphVertexType.task,
     append_for_product: bool = True,
 ) -> str:
@@ -459,8 +460,7 @@ class TestRuleGraph:
         with pytest.raises(Exception) as cm:
             create_scheduler(rules)
         assert (
-            "No installed rules return the type B, and it was not provided by potential "
-            "callers of "
+            "No installed rules return the type B, and it was not provided by potential callers of "
         ) in str(cm.value)
         assert (
             "If that type should be computed by a rule, ensure that that rule is installed."
@@ -1014,11 +1014,23 @@ class TestRuleGraph:
                   */
                   // root entries
                 {fmt_non_param_edge(A, ())}
-                {fmt_non_param_edge(RuleFormatRequest(a, gets=[("B", "D")]), (), rule_type=GraphVertexType.singleton)}
+                {
+                    fmt_non_param_edge(
+                        RuleFormatRequest(a, gets=[("B", "D")]),
+                        (),
+                        rule_type=GraphVertexType.singleton,
+                    )
+                }
                 {fmt_non_param_edge(A, (), RuleFormatRequest(a, gets=[("B", "D")]))}
                   // internal entries
-                {fmt_non_param_edge(RuleFormatRequest(a, (), gets=[("B", "D")]), D, RuleFormatRequest(b_from_d),
-                                    append_for_product=False)}
+                {
+                    fmt_non_param_edge(
+                        RuleFormatRequest(a, (), gets=[("B", "D")]),
+                        D,
+                        RuleFormatRequest(b_from_d),
+                        append_for_product=False,
+                    )
+                }
                 {fmt_param_edge(D, D, RuleFormatRequest(b_from_d))}
                 }}"""
             ).strip(),

@@ -7,8 +7,9 @@ import json
 import logging
 import os.path
 from collections import namedtuple
+from collections.abc import Callable
 from textwrap import dedent
-from typing import Callable, ContextManager, cast
+from typing import ContextManager, cast
 
 import pytest
 

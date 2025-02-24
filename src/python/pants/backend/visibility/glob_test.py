@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 import pytest
 

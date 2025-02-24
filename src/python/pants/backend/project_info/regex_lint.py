@@ -5,9 +5,10 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Iterable
+from typing import Any
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.core.goals.lint import LintFilesRequest, LintResult, Partitions
@@ -201,8 +202,9 @@ class MultiMatcher:
         )
         if unknown_path_patterns:
             raise ValueError(
-                "required_matches uses unknown path pattern names: "
-                "{}".format(", ".join(sorted(unknown_path_patterns)))
+                "required_matches uses unknown path pattern names: {}".format(
+                    ", ".join(sorted(unknown_path_patterns))
+                )
             )
 
         unknown_content_patterns = content_patterns_used.difference(
@@ -210,8 +212,9 @@ class MultiMatcher:
         )
         if unknown_content_patterns:
             raise ValueError(
-                "required_matches uses unknown content pattern names: "
-                "{}".format(", ".join(sorted(unknown_content_patterns)))
+                "required_matches uses unknown content pattern names: {}".format(
+                    ", ".join(sorted(unknown_content_patterns))
+                )
             )
 
         self._path_matchers = {pp.name: PathMatcher(pp) for pp in config.path_patterns}

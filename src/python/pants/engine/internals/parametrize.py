@@ -7,12 +7,11 @@ import dataclasses
 import itertools
 import operator
 from collections import abc, defaultdict
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from enum import Enum
 from functools import reduce
-from typing import Any, Iterator, Mapping, cast
-
-from typing_extensions import Self
+from typing import Any, Self, cast
 
 from pants.build_graph.address import BANNED_CHARS_IN_PARAMETERS
 from pants.engine.addresses import Address
@@ -248,9 +247,10 @@ class Parametrize:
                             if isinstance(fields.get(name), Parametrize)
                         }
                     )
-                    yield expanded_address.parametrize(
-                        grouped_address.parameters
-                    ), expanded_fields | dict(grouped_fields)
+                    yield (
+                        expanded_address.parametrize(grouped_address.parameters),
+                        expanded_fields | dict(grouped_fields),
+                    )
             else:
                 if parametrize_group is not None:
                     expanded_fields |= dict(parametrize_group.kwargs)
@@ -258,7 +258,7 @@ class Parametrize:
 
     @staticmethod
     def _collect_parametrizations(
-        fields: Mapping[str, Any | Parametrize]
+        fields: Mapping[str, Any | Parametrize],
     ) -> Mapping[str | None, list[tuple[str, Parametrize]]]:
         parametrizations = defaultdict(list)
         for field_name, v in fields.items():
@@ -270,7 +270,7 @@ class Parametrize:
 
     @staticmethod
     def _check_parametrizations(
-        parametrizations: Mapping[str | None, list[tuple[str, Parametrize]]]
+        parametrizations: Mapping[str | None, list[tuple[str, Parametrize]]],
     ) -> None:
         for group_name, groups in parametrizations.items():
             if group_name is not None and len(groups) > 1:
@@ -296,7 +296,7 @@ class Parametrize:
                 softwrap(
                     f"""
                     Conflicting parametrizations for {pluralize(len(conflicting), "field", include_count=False)}:
-                    {', '.join(map(repr, sorted(conflicting)))}
+                    {", ".join(map(repr, sorted(conflicting)))}
                     """
                 )
             )

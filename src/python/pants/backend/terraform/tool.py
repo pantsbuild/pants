@@ -18,9 +18,9 @@ from __future__ import annotations
 
 import os
 import shlex
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Tuple
 
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import external_tool
@@ -456,7 +456,7 @@ async def setup_terraform_process(
         "__terraform": downloaded_terraform.digest,
     }
 
-    def prepend_paths(paths: Tuple[str, ...]) -> Tuple[str, ...]:
+    def prepend_paths(paths: tuple[str, ...]) -> tuple[str, ...]:
         return tuple((Path(request.chdir) / path).as_posix() for path in paths)
 
     # Initialise the Terraform provider cache, since Terraform expects the directory to already exist.

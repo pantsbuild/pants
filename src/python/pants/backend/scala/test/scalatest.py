@@ -195,7 +195,7 @@ async def run_scalatest_test(
 
 @rule(level=LogLevel.DEBUG)
 async def setup_scalatest_debug_request(
-    batch: ScalatestTestRequest.Batch[ScalatestTestFieldSet, Any]
+    batch: ScalatestTestRequest.Batch[ScalatestTestFieldSet, Any],
 ) -> TestDebugRequest:
     setup = await Get(TestSetup, TestSetupRequest(batch.single_element, is_debug=True))
     process = await Get(Process, JvmProcess, setup.process)

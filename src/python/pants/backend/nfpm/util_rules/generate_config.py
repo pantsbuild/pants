@@ -121,10 +121,10 @@ async def generate_nfpm_yaml(
             softwrap(
                 f"""
                 The '{NfpmContentFile.alias}' target type requires a value for the '{NfpmContentSrcField.alias}' field,
-                But {'these targets are' if plural else 'this target is'} missing a '{NfpmContentSrcField.alias}' value.
+                But {"these targets are" if plural else "this target is"} missing a '{NfpmContentSrcField.alias}' value.
                 If the '{NfpmContentFileSourceField.alias}' field is provided, then the '{NfpmContentSrcField.alias}'
                 defaults to the file referenced in the '{NfpmContentFileSourceField.alias}' field.
-                Please fix the {'targets at these addresses' if plural else 'target at this address'}:
+                Please fix the {"targets at these addresses" if plural else "target at this address"}:
                 """
             )
             + "\n".join(str(address) for address in invalid_content_file_addresses)
@@ -134,11 +134,11 @@ async def generate_nfpm_yaml(
         raise NfpmSrcMissingFromSandboxException(
             softwrap(
                 f"""
-                The '{NfpmContentSrcField.alias}' {'files are' if plural else 'file is'} missing
+                The '{NfpmContentSrcField.alias}' {"files are" if plural else "file is"} missing
                 from the nfpm sandbox. This sandbox contains packages, generated code, and sources
                 from the '{NfpmDependencies.alias}' field. It also contains any file from the
                 '{NfpmContentFileSourceField.alias}' field. Please fix the '{NfpmContentFile.alias}'
-                {'targets at these addresses' if plural else 'target at this address'}:
+                {"targets at these addresses" if plural else "target at this address"}:
                 """
             )
             + "\n".join(str(address) for address in src_missing_from_sandbox_addresses)
@@ -158,11 +158,11 @@ async def generate_nfpm_yaml(
         raise NfpmSrcMissingFromSandboxException(
             softwrap(
                 f"""
-                {request.field_set.address}: {'Some' if plural else 'One'} of the files in the
-                '{request.field_set.scripts.alias}' field {'are' if plural else 'is'} missing
+                {request.field_set.address}: {"Some" if plural else "One"} of the files in the
+                '{request.field_set.scripts.alias}' field {"are" if plural else "is"} missing
                 from the nfpm sandbox. The sandbox gets populated from the '{NfpmDependencies.alias}'
-                field. Are you missing {'any dependencies' if plural else 'a dependency'}?
-                Here {'are' if plural else 'is'} the missing {'scripts' if plural else 'script'}:
+                field. Are you missing {"any dependencies" if plural else "a dependency"}?
+                Here {"are" if plural else "is"} the missing {"scripts" if plural else "script"}:
                 {repr(script_src_missing_from_sandbox)}
                 """
             )

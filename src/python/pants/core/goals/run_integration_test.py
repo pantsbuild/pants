@@ -21,16 +21,14 @@ def test_restartable(use_pantsd: bool) -> None:
     dirname.mkdir(parents=True)
 
     files = {
-        dirname
-        / "slow.py": dedent(
+        dirname / "slow.py": dedent(
             """\
             import time
             time.sleep(30)
             raise Exception("Should have been restarted by now!")
             """
         ),
-        dirname
-        / "BUILD": dedent(
+        dirname / "BUILD": dedent(
             """\
             python_sources(name='lib')
             pex_binary(name='bin', entry_point='slow.py', restartable=True)
@@ -73,8 +71,7 @@ def test_non_restartable(use_pantsd: bool) -> None:
     dirname.mkdir(parents=True)
 
     files = {
-        dirname
-        / "script.py": dedent(
+        dirname / "script.py": dedent(
             """\
             import os
             import time
@@ -85,12 +82,9 @@ def test_non_restartable(use_pantsd: bool) -> None:
                 fp.write("")
             time.sleep(5)
             print("Not restarted")
-            """.format(
-                dirname=dirname
-            )
+            """.format(dirname=dirname)
         ),
-        dirname
-        / "BUILD": dedent(
+        dirname / "BUILD": dedent(
             """\
             python_sources(name="src", restartable=False)
             """

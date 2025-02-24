@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import os
 import subprocess
+from collections.abc import Iterable
 from functools import lru_cache
-from typing import Iterable
 from unittest import skipIf
 
 import _pytest.mark.structures

@@ -4,9 +4,10 @@
 from __future__ import annotations
 
 import itertools
+from collections.abc import Iterable
 from functools import partial
 from pathlib import PurePath
-from typing import Iterable, NamedTuple
+from typing import NamedTuple
 
 import pytest
 

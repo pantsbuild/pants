@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import venv
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from configparser import ConfigParser
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -20,7 +21,7 @@ from enum import Enum
 from functools import total_ordering
 from math import ceil
 from pathlib import Path
-from typing import Any, Callable, Iterable, Iterator, Sequence, cast
+from typing import Any, cast
 
 import requests
 from packaging.version import Version

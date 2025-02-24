@@ -8,7 +8,6 @@ import re
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
@@ -200,18 +199,18 @@ class TestMetadata:
 
 @dataclass(frozen=True)
 class TestSetupRequest:
-    field_sets: Tuple[PythonTestFieldSet, ...]
+    field_sets: tuple[PythonTestFieldSet, ...]
     metadata: TestMetadata
     is_debug: bool
     extra_env: FrozenDict[str, str] = FrozenDict()
-    prepend_argv: Tuple[str, ...] = ()
-    additional_pexes: Tuple[Pex, ...] = ()
+    prepend_argv: tuple[str, ...] = ()
+    additional_pexes: tuple[Pex, ...] = ()
 
 
 @dataclass(frozen=True)
 class TestSetup:
     process: Process
-    results_file_name: Optional[str]
+    results_file_name: str | None
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -376,7 +375,7 @@ async def setup_pytest_for_target(
         results_file_prefix = request.field_sets[0].address.path_safe_spec
         if len(request.field_sets) > 1:
             results_file_prefix = (
-                f"batch-of-{results_file_prefix}+{len(request.field_sets)-1}-files"
+                f"batch-of-{results_file_prefix}+{len(request.field_sets) - 1}-files"
             )
         results_file_name = f"{results_file_prefix}.xml"
         pytest_args.extend(
@@ -445,7 +444,9 @@ async def setup_pytest_for_target(
 
     run_description = request.field_sets[0].address.spec
     if len(request.field_sets) > 1:
-        run_description = f"batch of {run_description} and {len(request.field_sets)-1} other files"
+        run_description = (
+            f"batch of {run_description} and {len(request.field_sets) - 1} other files"
+        )
     process = await Get(
         Process,
         VenvPexProcess(
@@ -535,7 +536,9 @@ async def run_python_tests(
     def warning_description() -> str:
         description = batch.elements[0].address.spec
         if len(batch.elements) > 1:
-            description = f"batch containing {description} and {len(batch.elements)-1} other files"
+            description = (
+                f"batch containing {description} and {len(batch.elements) - 1} other files"
+            )
         if batch.partition_metadata.description:
             description = f"{description} ({batch.partition_metadata.description})"
         return description
@@ -579,7 +582,7 @@ async def run_python_tests(
 
 @rule(desc="Set up Pytest to run interactively", level=LogLevel.DEBUG)
 async def debug_python_test(
-    batch: PyTestRequest.Batch[PythonTestFieldSet, TestMetadata]
+    batch: PyTestRequest.Batch[PythonTestFieldSet, TestMetadata],
 ) -> TestDebugRequest:
     setup = await Get(
         TestSetup, TestSetupRequest(batch.elements, batch.partition_metadata, is_debug=True)
