@@ -40,12 +40,9 @@ async-trait = { workspace = true }
 protos = { path = "protos" }
 bytes = { workspace = true }
 cache = { path = "cache" }
-concrete_time = { path = "concrete_time" }
-crossbeam-channel = { workspace = true }
 deepsize = { workspace = true, features = ["internment", "smallvec"] }
 dep_inference = { path = "dep_inference" }
 derivative = { workspace = true }
-async-oncecell = { workspace = true }
 docker = { path = "process_execution/docker" }
 fnv = { workspace = true }
 fs = { path = "fs" }
@@ -86,7 +83,6 @@ time = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
 tokio-retry2 = { workspace = true }
 tokio-util = { workspace = true, features = ["io"] }
-tryfuture = { path = "tryfuture" }
 ui = { path = "ui" }
 url = { workspace = true }
 watch = { path = "watch" }

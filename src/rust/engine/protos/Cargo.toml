@@ -6,13 +6,14 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-bytes = { workspace = true }
 hashing = { path = "../hashing" }
 prost = { workspace = true }
-prost-build = { workspace = true }
 prost-types = { workspace = true }
 tonic = { workspace = true, features = ["transport", "codegen", "tls", "tls-roots"] }
 
 [build-dependencies]
 prost-build = { workspace = true }
 tonic-build = { workspace = true, features = ["prost"] }
+
+[package.metadata.cargo-machete]
+ignored = ["prost-types"]
