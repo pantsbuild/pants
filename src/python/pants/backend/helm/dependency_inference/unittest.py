@@ -3,9 +3,9 @@
 
 import logging
 import os
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Sequence
 
 from pants.backend.helm.goals.tailor import _SNAPSHOT_FOLDER_NAME, _TESTS_FOLDER_NAME
 from pants.backend.helm.target_types import AllHelmChartTargets, HelmUnitTestDependenciesField

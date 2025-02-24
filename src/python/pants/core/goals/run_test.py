@@ -5,7 +5,8 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import Iterable, Mapping, cast
+from collections.abc import Iterable, Mapping
+from typing import cast
 
 import pytest
 from _pytest.monkeypatch import MonkeyPatch

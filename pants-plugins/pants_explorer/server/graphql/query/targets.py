@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable, Iterator
 from dataclasses import asdict
-from typing import Iterable, Iterator, List, Optional
 
 import strawberry
 from pants_explorer.server.graphql.context import GraphQLContext
@@ -37,7 +37,7 @@ class TargetTypeField:
     description: str = strawberry.field(description="Field documentation.")
     type_hint: str = strawberry.field(description="Field type hint.")
     required: bool = strawberry.field(description="Field required flag.")
-    default: Optional[str] = strawberry.field(description="Field default value.")
+    default: str | None = strawberry.field(description="Field default value.")
 
 
 @strawberry.type(description="Describes a target type.")
@@ -48,7 +48,7 @@ class TargetType:
     provider: str = strawberry.field(description="Backend that registered the target type.")
     summary: str = strawberry.field(description="Target type documentation summary.")
     description: str = strawberry.field(description="Target type documentation.")
-    fields: List[TargetTypeField] = strawberry.field(description="All valid fields for the target.")
+    fields: list[TargetTypeField] = strawberry.field(description="All valid fields for the target.")
 
     @classmethod
     def from_help(cls, info: TargetTypeHelpInfo) -> TargetType:
@@ -85,10 +85,10 @@ class Target:
     description="Filter target types based on type (alias) and/or limit the number of entries to return."
 )
 class TargetTypesQuery:
-    alias_re: Optional[str] = strawberry.field(
+    alias_re: str | None = strawberry.field(
         default=None, description="Select targets types matching a regexp."
     )
-    limit: Optional[int] = strawberry.field(
+    limit: int | None = strawberry.field(
         default=None, description="Limit the number of entries returned."
     )
 
@@ -116,16 +116,16 @@ class TargetTypesQuery:
 
 @strawberry.input(description="Filter targets based on the supplied query.")
 class TargetsQuery:
-    specs: Optional[List[str]] = strawberry.field(
+    specs: list[str] | None = strawberry.field(
         default=None,
         description=(
             "Select targets matching the address specs. (Same syntax as supported on the command line.)"
         ),
     )
-    target_type: Optional[str] = strawberry.field(
+    target_type: str | None = strawberry.field(
         default=None, description="Select targets of a certain type only."
     )
-    limit: Optional[int] = strawberry.field(
+    limit: int | None = strawberry.field(
         default=None, description="Limit the number of entries returned."
     )
 
@@ -154,9 +154,7 @@ class QueryTargetsMixin:
     @strawberry.field(
         description="Get all registered target types that may be used in BUILD files."
     )
-    def target_types(
-        self, info: Info, query: Optional[TargetTypesQuery] = None
-    ) -> List[TargetType]:
+    def target_types(self, info: Info, query: TargetTypesQuery | None = None) -> list[TargetType]:
         request_state = GraphQLContext.request_state_from_info(info)
         return list(
             TargetTypesQuery.filter(
@@ -169,7 +167,7 @@ class QueryTargetsMixin:
         )
 
     @strawberry.field(description="Get all targets defined in BUILD files.")
-    async def targets(self, info: Info, query: Optional[TargetsQuery] = None) -> List[Target]:
+    async def targets(self, info: Info, query: TargetsQuery | None = None) -> list[Target]:
         req = GraphQLContext.request_state_from_info(info).product_request
         specs = (
             _get_specs_parser().parse_specs(

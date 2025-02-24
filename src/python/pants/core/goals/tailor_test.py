@@ -623,9 +623,9 @@ def test_resolve_specs_targetting_build_files(build_file_name) -> None:
         DirLiteralSpec("bad/dir"),
     )
 
-    assert resolved.includes.dir_globs == (
-        DirGlobSpec("src/other/"),
-    ), "did not passthrough other spec type"
-    assert resolved.ignores.dir_globs == (
-        DirGlobSpec("bad/other/"),
-    ), "did not passthrough other spec type"
+    assert resolved.includes.dir_globs == (DirGlobSpec("src/other/"),), (
+        "did not passthrough other spec type"
+    )
+    assert resolved.ignores.dir_globs == (DirGlobSpec("bad/other/"),), (
+        "did not passthrough other spec type"
+    )

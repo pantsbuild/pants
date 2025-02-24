@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import os.path
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.python.lint.black.skip_field import SkipBlackField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase

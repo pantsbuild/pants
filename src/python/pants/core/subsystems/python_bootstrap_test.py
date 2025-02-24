@@ -4,8 +4,9 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterable, Sequence
 from contextlib import contextmanager
-from typing import Iterable, List, Sequence, TypeVar
+from typing import TypeVar
 
 import pytest
 
@@ -86,7 +87,7 @@ def fake_pyenv_root(fake_versions, fake_local_version):
         yield pyenv_root, fake_version_dirs, fake_local_version_dirs
 
 
-def materialize_indices(sequence: Sequence[_T], indices: Iterable[int]) -> List[_T]:
+def materialize_indices(sequence: Sequence[_T], indices: Iterable[int]) -> list[_T]:
     return [sequence[i] for i in indices]
 
 
@@ -135,20 +136,21 @@ def test_expand_interpreter_search_paths(rule_runner: RuleRunner) -> None:
     )
     env_name = "name"
     with setup_pexrc_with_pex_python_path(["/pexrc/path1:/pexrc/path2"]):
-        with fake_asdf_root(
-            all_python_versions, asdf_home_versions, asdf_local_versions, tool_name="python"
-        ) as (
-            home_dir,
-            asdf_dir,
-            expected_asdf_paths,
-            expected_asdf_home_paths,
-            expected_asdf_local_paths,
-        ), fake_pyenv_root(
-            all_python_versions, local_pyenv_version
-        ) as (
-            pyenv_root,
-            expected_pyenv_paths,
-            expected_pyenv_local_paths,
+        with (
+            fake_asdf_root(
+                all_python_versions, asdf_home_versions, asdf_local_versions, tool_name="python"
+            ) as (
+                home_dir,
+                asdf_dir,
+                expected_asdf_paths,
+                expected_asdf_home_paths,
+                expected_asdf_local_paths,
+            ),
+            fake_pyenv_root(all_python_versions, local_pyenv_version) as (
+                pyenv_root,
+                expected_pyenv_paths,
+                expected_pyenv_local_paths,
+            ),
         ):
             rule_runner.set_session_values(
                 {

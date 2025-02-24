@@ -3,26 +3,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import datetime
 from io import RawIOBase
-from typing import (
-    Any,
-    Callable,
-    ClassVar,
-    FrozenSet,
-    Generic,
-    Iterable,
-    Mapping,
-    Optional,
-    Protocol,
-    Sequence,
-    TextIO,
-    Tuple,
-    TypeVar,
-    overload,
-)
-
-from typing_extensions import Self
+from typing import Any, ClassVar, Generic, Optional, Protocol, Self, TextIO, TypeVar, overload
 
 from pants.engine.fs import (
     CreateDigest,
@@ -65,9 +49,9 @@ class PyFailure:
 # Address
 # ------------------------------------------------------------------------------
 
-BANNED_CHARS_IN_TARGET_NAME: FrozenSet
-BANNED_CHARS_IN_GENERATED_NAME: FrozenSet
-BANNED_CHARS_IN_PARAMETERS: FrozenSet
+BANNED_CHARS_IN_TARGET_NAME: frozenset
+BANNED_CHARS_IN_GENERATED_NAME: frozenset
+BANNED_CHARS_IN_PARAMETERS: frozenset
 
 def address_spec_parse(
     spec: str,
@@ -433,7 +417,9 @@ class Snapshot:
     @property
     def files(self) -> tuple[str, ...]: ...
     # Don't call this, call pants.engine.fs.SnapshotDiff instead
-    def _diff(self, other: Snapshot) -> tuple[
+    def _diff(
+        self, other: Snapshot
+    ) -> tuple[
         tuple[str, ...],
         tuple[str, ...],
         tuple[str, ...],
@@ -668,7 +654,7 @@ class PyOptionId:
     ) -> None: ...
 
 class PyPantsCommand:
-    def builtin_or_auxiliary_goal(self) -> Optional[str]: ...
+    def builtin_or_auxiliary_goal(self) -> str | None: ...
     def goals(self) -> list[str]: ...
     def unknown_goals(self) -> list[str]: ...
     def specs(self) -> list[str]: ...
@@ -681,28 +667,28 @@ class PyConfigSource:
 T = TypeVar("T")
 
 # List of tuples of (value, rank, details string).
-OptionValueDerivation = list[Tuple[T, int, str]]
+OptionValueDerivation = list[tuple[T, int, str]]
 
 # A tuple (value, rank of value, optional derivation of value).
-OptionValue = Tuple[Optional[T], int, Optional[OptionValueDerivation]]
+OptionValue = tuple[Optional[T], int, Optional[OptionValueDerivation]]
 
 def py_bin_name() -> str: ...
 
 class PyOptionParser:
     def __init__(
         self,
-        args: Optional[Sequence[str]],
+        args: Sequence[str] | None,
         env: dict[str, str],
-        configs: Optional[Sequence[PyConfigSource]],
+        configs: Sequence[PyConfigSource] | None,
         allow_pantsrc: bool,
         include_derivation: bool,
-        known_scopes_to_flags: Optional[dict[str, frozenset[str]]],
-        known_goals: Optional[Sequence[PyGoalInfo]],
+        known_scopes_to_flags: dict[str, frozenset[str]] | None,
+        known_goals: Sequence[PyGoalInfo] | None,
     ) -> None: ...
-    def get_bool(self, option_id: PyOptionId, default: Optional[bool]) -> OptionValue[bool]: ...
-    def get_int(self, option_id: PyOptionId, default: Optional[int]) -> OptionValue[int]: ...
-    def get_float(self, option_id: PyOptionId, default: Optional[float]) -> OptionValue[float]: ...
-    def get_string(self, option_id: PyOptionId, default: Optional[str]) -> OptionValue[str]: ...
+    def get_bool(self, option_id: PyOptionId, default: bool | None) -> OptionValue[bool]: ...
+    def get_int(self, option_id: PyOptionId, default: int | None) -> OptionValue[int]: ...
+    def get_float(self, option_id: PyOptionId, default: float | None) -> OptionValue[float]: ...
+    def get_string(self, option_id: PyOptionId, default: str | None) -> OptionValue[str]: ...
     def get_bool_list(
         self, option_id: PyOptionId, default: list[bool]
     ) -> OptionValue[list[bool]]: ...
@@ -921,7 +907,7 @@ def rule_subgraph_visualize(
 def garbage_collect_store(scheduler: PyScheduler, target_size_bytes: int) -> None: ...
 def lease_files_in_graph(scheduler: PyScheduler, session: PySession) -> None: ...
 def strongly_connected_components(
-    adjacency_lists: Sequence[Tuple[Any, Sequence[Any]]]
+    adjacency_lists: Sequence[tuple[Any, Sequence[Any]]],
 ) -> Sequence[Sequence[Any]]: ...
 def hash_prefix_zero_bits(item: str) -> int: ...
 

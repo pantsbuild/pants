@@ -83,21 +83,19 @@ def test_no_config() -> None:
 
 
 def test_no_run_section() -> None:
-    assert (
-        resolve_config(
-            "pyproject.toml",
-            dedent(
-                """\
+    assert resolve_config(
+        "pyproject.toml",
+        dedent(
+            """\
                 [tool.coverage.report]
                 ignore_errors = true
 
                 [tool.isort]
                 foo = "bar"
                 """
-            ),
-        )
-        == dedent(
-            """\
+        ),
+    ) == dedent(
+        """\
             [tool.isort]
             foo = "bar"
 
@@ -108,20 +106,17 @@ def test_no_run_section() -> None:
             relative_files = true
             omit = [ "pytest.pex/*",]
             """
-        )
     )
-    assert (
-        resolve_config(
-            ".coveragerc",
-            dedent(
-                """\
+    assert resolve_config(
+        ".coveragerc",
+        dedent(
+            """\
                 [report]
                 ignore_errors: True
                 """
-            ),
-        )
-        == dedent(
-            """\
+        ),
+    ) == dedent(
+        """\
             [report]
             ignore_errors = True
 
@@ -131,20 +126,17 @@ def test_no_run_section() -> None:
             \tpytest.pex/*
 
             """  # noqa: W291
-        )
     )
-    assert (
-        resolve_config(
-            "setup.cfg",
-            dedent(
-                """\
+    assert resolve_config(
+        "setup.cfg",
+        dedent(
+            """\
                 [coverage:report]
                 ignore_errors: True
                 """
-            ),
-        )
-        == dedent(
-            """\
+        ),
+    ) == dedent(
+        """\
             [coverage:report]
             ignore_errors = True
 
@@ -154,47 +146,41 @@ def test_no_run_section() -> None:
             \tpytest.pex/*
 
             """  # noqa: W291
-        )
     )
 
 
 def test_update_run_section() -> None:
-    assert (
-        resolve_config(
-            "pyproject.toml",
-            dedent(
-                """\
+    assert resolve_config(
+        "pyproject.toml",
+        dedent(
+            """\
                 [tool.coverage.run]
                 relative_files = false
                 omit = ["e1"]
                 foo = "bar"
                 """
-            ),
-        )
-        == dedent(
-            """\
+        ),
+    ) == dedent(
+        """\
             [tool.coverage.run]
             relative_files = true
             omit = [ "e1", "pytest.pex/*",]
             foo = "bar"
             """
-        )
     )
-    assert (
-        resolve_config(
-            ".coveragerc",
-            dedent(
-                """\
+    assert resolve_config(
+        ".coveragerc",
+        dedent(
+            """\
                 [run]
                 relative_files: False
                 omit:
                   e1
                 foo: bar
                 """
-            ),
-        )
-        == dedent(
-            """\
+        ),
+    ) == dedent(
+        """\
             [run]
             relative_files = True
             omit = 
@@ -203,23 +189,20 @@ def test_update_run_section() -> None:
             foo = bar
 
             """  # noqa: W291
-        )
     )
-    assert (
-        resolve_config(
-            "setup.cfg",
-            dedent(
-                """\
+    assert resolve_config(
+        "setup.cfg",
+        dedent(
+            """\
                 [coverage:run]
                 relative_files: False
                 omit:
                   e1
                 foo: bar
                 """
-            ),
-        )
-        == dedent(
-            """\
+        ),
+    ) == dedent(
+        """\
             [coverage:run]
             relative_files = True
             omit = 
@@ -228,7 +211,6 @@ def test_update_run_section() -> None:
             foo = bar
 
             """  # noqa: W291
-        )
     )
 
 

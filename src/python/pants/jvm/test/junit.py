@@ -194,7 +194,7 @@ async def run_junit_test(
 
 @rule(level=LogLevel.DEBUG)
 async def setup_junit_debug_request(
-    batch: JunitTestRequest.Batch[JunitTestFieldSet, Any]
+    batch: JunitTestRequest.Batch[JunitTestFieldSet, Any],
 ) -> TestDebugRequest:
     setup = await Get(TestSetup, TestSetupRequest(batch.single_element, is_debug=True))
     process = await Get(Process, JvmProcess, setup.process)

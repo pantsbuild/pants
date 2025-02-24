@@ -5,9 +5,9 @@ from __future__ import annotations
 import itertools
 import logging
 import os.path
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable
 
 from pants.backend.javascript import package_json
 from pants.backend.javascript.package_json import (
@@ -225,7 +225,7 @@ def _handle_unowned_imports(
 
         {bullet_list(sorted(unowned_imports))}
 
-        If you do not expect an import to be inferrable, add `// pants: no-infer-dep` to the
+        If you do not expect an import to be inferable, add `// pants: no-infer-dep` to the
         import line. Otherwise, see {url} for common problems.
         """
     )

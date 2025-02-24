@@ -9,29 +9,14 @@ import functools
 import os
 import re
 import sys
+from collections.abc import Callable, Coroutine, Generator, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path, PurePath
 from pprint import pformat
 from tempfile import mkdtemp
-from typing import (
-    Any,
-    Callable,
-    Coroutine,
-    Generator,
-    Generic,
-    Iterable,
-    Iterator,
-    Literal,
-    Mapping,
-    Sequence,
-    Type,
-    TypeVar,
-    Union,
-    cast,
-    overload,
-)
+from typing import Any, Generic, Literal, TypeVar, cast, overload
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
@@ -99,10 +84,11 @@ def logging(original_function=None, *, level: LogLevel = LogLevel.INFO):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             stdout_fileno, stderr_fileno = sys.stdout.fileno(), sys.stderr.fileno()
-            with temporary_dir() as tempdir, initialize_stdio_raw(
-                level, False, False, {}, True, [], tempdir
-            ), stdin_context() as stdin, stdio_destination(
-                stdin.fileno(), stdout_fileno, stderr_fileno
+            with (
+                temporary_dir() as tempdir,
+                initialize_stdio_raw(level, False, False, {}, True, [], tempdir),
+                stdin_context() as stdin,
+                stdio_destination(stdin.fileno(), stdout_fileno, stderr_fileno),
             ):
                 return func(*args, **kwargs)
 
@@ -638,7 +624,7 @@ class RuleRunner:
                 ),
             )
 
-    def do_not_use_mock(self, output_type: Type, input_types: Iterable[type]) -> MockGet:
+    def do_not_use_mock(self, output_type: type[Any], input_types: Iterable[type[Any]]) -> MockGet:
         """Returns a `MockGet` whose behavior is to run the actual rule using this `RuleRunner`"""
         return MockGet(
             output_type=output_type,
@@ -668,7 +654,7 @@ class MockGet(Generic[_O]):
 
 @dataclass(frozen=True)
 class MockRequestExceptionComparable:
-    category: Union[Literal["Get"], Literal["Effect"], str]
+    category: Literal["Get"] | Literal["Effect"] | str
     output_type: str | None
     input_types: tuple[str, ...]
 
@@ -678,13 +664,13 @@ class MockRequestExceptionComparable:
 
 
 def _compare_expected_mocks(
-    expected: Sequence[Union[Get, Effect, AwaitableConstraints]],
-    actual: Sequence[Union[MockGet, MockEffect]],
+    expected: Sequence[Get | Effect | AwaitableConstraints],
+    actual: Sequence[MockGet | MockEffect],
 ) -> str:
     """Try to be helpful with identifying the problem with supplied mocks."""
 
     def as_comparable(
-        o: Union[Get, Effect, MockGet, MockEffect, AwaitableConstraints, type]
+        o: Get | Effect | MockGet | MockEffect | AwaitableConstraints | type,
     ) -> MockRequestExceptionComparable:
         if isinstance(o, MockGet) or isinstance(o, Get):
             category = "Get"
@@ -872,20 +858,23 @@ def mock_console(
             .colors
         )
 
-    with initialize_stdio(global_bootstrap_options), stdin_context(
-        stdin_content
-    ) as stdin, temporary_file(binary_mode=False) as stdout, temporary_file(
-        binary_mode=False
-    ) as stderr, stdio_destination(
-        stdin_fileno=stdin.fileno(),
-        stdout_fileno=stdout.fileno(),
-        stderr_fileno=stderr.fileno(),
+    with (
+        initialize_stdio(global_bootstrap_options),
+        stdin_context(stdin_content) as stdin,
+        temporary_file(binary_mode=False) as stdout,
+        temporary_file(binary_mode=False) as stderr,
+        stdio_destination(
+            stdin_fileno=stdin.fileno(),
+            stdout_fileno=stdout.fileno(),
+            stderr_fileno=stderr.fileno(),
+        ),
     ):
         # NB: We yield a Console without overriding the destination argument, because we have
         # already done a sys.std* level replacement. The replacement is necessary in order for
         # InteractiveProcess to have native file handles to interact with.
-        yield Console(use_colors=colors), StdioReader(
-            _stdout=Path(stdout.name), _stderr=Path(stderr.name)
+        yield (
+            Console(use_colors=colors),
+            StdioReader(_stdout=Path(stdout.name), _stderr=Path(stderr.name)),
         )
 
 

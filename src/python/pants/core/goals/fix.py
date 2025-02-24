@@ -6,20 +6,9 @@ from __future__ import annotations
 import itertools
 import logging
 from collections import defaultdict
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
-from typing import (
-    Any,
-    Callable,
-    ClassVar,
-    Iterable,
-    Iterator,
-    NamedTuple,
-    Protocol,
-    Sequence,
-    Tuple,
-    Type,
-    TypeVar,
-)
+from typing import Any, ClassVar, NamedTuple, Protocol, TypeVar
 
 from pants.base.specs import Specs
 from pants.core.goals.lint import (
@@ -224,16 +213,16 @@ class FixSubsystem(GoalSubsystem):
 
         See also:
 
-        - [The `fmt` goal]({doc_url('reference/goals/fix')} will run code-editing tools that may make only
+        - [The `fmt` goal]({doc_url("reference/goals/fix")} will run code-editing tools that may make only
           syntactic changes, not semantic ones. The `fix` includes running these `fmt` tools by
           default (see [the `skip_formatters` option](#skip_formatters) to control this).
 
-        - [The `lint` goal]({doc_url('reference/goals/lint')}) will validate code is formatted, by running these
+        - [The `lint` goal]({doc_url("reference/goals/lint")}) will validate code is formatted, by running these
           fixers and checking there's no change.
 
         - Documentation about formatters for various ecosystems, such as:
-          [Python]({doc_url('docs/python/overview/linters-and-formatters')}), [JVM]({doc_url('jvm/java-and-scala#lint-and-format')}),
-          [SQL]({doc_url('docs/sql#enable-sqlfluff-linter')})
+          [Python]({doc_url("docs/python/overview/linters-and-formatters")}), [JVM]({doc_url("jvm/java-and-scala#lint-and-format")}),
+          [SQL]({doc_url("docs/sql#enable-sqlfluff-linter")})
         """
     )
 
@@ -346,7 +335,7 @@ async def _do_fix(
             yield tuple(batch)
 
     def _make_disjoint_batch_requests() -> Iterable[_FixBatchRequest]:
-        partition_infos: Iterable[Tuple[Type[AbstractFixRequest], Any]]
+        partition_infos: Iterable[tuple[type[AbstractFixRequest], Any]]
         files: Sequence[str]
 
         partition_infos_by_files = defaultdict(list)
@@ -439,9 +428,9 @@ async def fix_batch(
         )
         results.append(result)
 
-        assert set(result.output.files) == set(
-            batch.files
-        ), f"Expected {result.output.files} to match {batch.files}"
+        assert set(result.output.files) == set(batch.files), (
+            f"Expected {result.output.files} to match {batch.files}"
+        )
         current_snapshot = result.output
     return _FixBatchResult(tuple(results))
 

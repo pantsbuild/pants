@@ -4,9 +4,9 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Mapping
 
 from pants.core.subsystems.python_bootstrap import PythonBootstrap
 from pants.core.util_rules import subprocess_environment, system_binaries

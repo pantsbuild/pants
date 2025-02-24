@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Iterable
+from collections.abc import Iterable
 
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.external_tool import TemplatedExternalTool

@@ -7,10 +7,9 @@ import logging
 import os
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Tuple
+from typing import TypeAlias
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
-from typing_extensions import TypeAlias
 
 from pants.backend.python.dependency_inference.module_mapper import (
     ResolveName,
@@ -41,7 +40,7 @@ from pants.util.memo import memoized
 
 logger = logging.getLogger(__name__)
 
-InvertedModuleMapping: TypeAlias = FrozenDict[Address, Tuple[str, ...]]
+InvertedModuleMapping: TypeAlias = FrozenDict[Address, tuple[str, ...]]
 
 
 def _in_chroot(relpath: str) -> str:

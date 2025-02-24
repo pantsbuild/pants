@@ -4,9 +4,9 @@
 from __future__ import annotations
 
 import os.path
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable
 
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, GoSdkToolIDResult

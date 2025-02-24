@@ -5,10 +5,9 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
-from typing import Any, Callable, ClassVar, Iterable, Iterator, Protocol, Sequence, TypeVar, cast
-
-from typing_extensions import final
+from typing import Any, ClassVar, Protocol, TypeVar, cast, final
 
 from pants.base.specs import Specs
 from pants.core.goals.multi_tool_goal_helper import (
@@ -243,16 +242,16 @@ class LintSubsystem(GoalSubsystem):
 
         See also:
 
-        - [The `fmt` goal]({doc_url('reference/goals/fix')} will save the the result of formatters
+        - [The `fmt` goal]({doc_url("reference/goals/fix")} will save the the result of formatters
           (code-editing tools that make only "syntactic" changes) back to the workspace.
 
-        - [The `fmt` goal]({doc_url('reference/goals/fix')} will save the the result of fixers
+        - [The `fmt` goal]({doc_url("reference/goals/fix")} will save the the result of fixers
           (code-editing tools that may make "semantic" changes too) back to the workspace.
 
         - Documentation about linters for various ecosystems, such as:
-          [Python]({doc_url('docs/python/overview/linters-and-formatters')}), [Go]({doc_url('docs/go')}),
-          [JVM]({doc_url('jvm/java-and-scala#lint-and-format')}), [Shell]({doc_url('docs/shell')}),
-          [Docker]({doc_url('docs/docker#linting-dockerfiles-with-hadolint')}).
+          [Python]({doc_url("docs/python/overview/linters-and-formatters")}), [Go]({doc_url("docs/go")}),
+          [JVM]({doc_url("jvm/java-and-scala#lint-and-format")}), [Shell]({doc_url("docs/shell")}),
+          [Docker]({doc_url("docs/docker#linting-dockerfiles-with-hadolint")}).
 
         """
     )

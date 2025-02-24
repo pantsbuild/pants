@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+from collections.abc import Iterator
 from functools import partial
 from pathlib import PurePath
-from typing import Iterator
 
 from pants.backend.python.macros.common_fields import (
     ModuleMappingField,

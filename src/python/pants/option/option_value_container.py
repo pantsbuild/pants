@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import copy
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Iterator
 
 from pants.option.ranked_value import Rank, RankedValue, Value
 

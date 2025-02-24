@@ -100,8 +100,7 @@ jobs:
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
 
         '
-    - continue-on-error: true
-      if: needs.release_info.outputs.is-release == 'true'
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v2
       with:
@@ -214,8 +213,7 @@ jobs:
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
 
         '
-    - continue-on-error: true
-      if: needs.release_info.outputs.is-release == 'true'
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v2
       with:
@@ -231,8 +229,7 @@ jobs:
         \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
         \ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)\"\
         \ \\\n    --data-binary \"@$WHL\";\n"
-    - continue-on-error: true
-      if: needs.release_info.outputs.is-release == 'true'
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the pantsbuild.pants.testutil wheel
       uses: actions/attest-build-provenance@v2
       with:
@@ -294,7 +291,7 @@ jobs:
       with:
         key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain')
           }}-v2
-        path: '~/.rustup/toolchains/1.84.1-*
+        path: '~/.rustup/toolchains/1.85.0-*
 
           ~/.rustup/update-hashes
 
@@ -357,8 +354,7 @@ jobs:
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
 
         '
-    - continue-on-error: true
-      if: needs.release_info.outputs.is-release == 'true'
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v2
       with:
@@ -420,7 +416,7 @@ jobs:
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain')
           }}-v2
-        path: '~/.rustup/toolchains/1.84.1-*
+        path: '~/.rustup/toolchains/1.85.0-*
 
           ~/.rustup/update-hashes
 
@@ -483,8 +479,7 @@ jobs:
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
 
         '
-    - continue-on-error: true
-      if: needs.release_info.outputs.is-release == 'true'
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v2
       with:
@@ -547,7 +542,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.84.1-*
+        path: '~/.rustup/toolchains/1.85.0-*
 
           ~/.rustup/update-hashes
 

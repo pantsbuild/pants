@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
-from typing import Iterable, Iterator
 
 from pants.backend.kotlin.subsystems.kotlinc import KotlincSubsystem
 from pants.backend.kotlin.target_types import (

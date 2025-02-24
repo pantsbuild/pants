@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import DefaultDict, Mapping
+from typing import DefaultDict
 
 from pants.backend.codegen.thrift.target_types import AllThriftTargets, ThriftSourceField
 from pants.backend.codegen.thrift.thrift_parser import ParsedThrift, ParsedThriftRequest

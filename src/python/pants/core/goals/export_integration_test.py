@@ -144,13 +144,13 @@ def assert_export(rule_runner: RuleRunner, cls, was_linked: bool = True) -> None
         linked_path = os.path.join("dist", "export", "bin", bin.name)
         linked_content = rule_runner.read_file(linked_path)
         if was_linked:
-            assert (
-                linked_content == resolve
-            ), f"bin {bin.name} was not linked to the `bin` directory, instead {linked_content!r} was"
+            assert linked_content == resolve, (
+                f"bin {bin.name} was not linked to the `bin` directory, instead {linked_content!r} was"
+            )
         else:
-            assert (
-                linked_content != resolve
-            ), f"bin {bin.name} was linked to `bin` directory but we expected it to not be"
+            assert linked_content != resolve, (
+                f"bin {bin.name} was linked to `bin` directory but we expected it to not be"
+            )
 
 
 def test_export_binary(rule_runner):

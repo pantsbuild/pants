@@ -1,0 +1,113 @@
+---
+    title: Kubernetes Overview
+    sidebar_position: 999
+---
+
+---
+
+:::caution Kubernetes support is in alpha stage
+Pants is currently building support for Kubernetes. Simple use cases might be
+supported, but many options are missing.
+
+Please share feedback for what you need to use Pants with your Kubernetes queries by
+either [opening a GitHub
+issue](https://github.com/pantsbuild/pants/issues/new/choose) or [joining our
+Slack](/community/getting-help)!
+:::
+
+## Initial setup
+
+First, activate the relevant backend in `pants.toml`:
+
+```toml title="pants.toml"
+[GLOBAL]
+backend_packages = [
+  ...
+  "pants.backend.experimental.k8s",
+  ...
+]
+```
+
+The Kubernetes backend adds [`k8s_source`](../../reference/targets/k8s_source.mdx) and
+[`k8s_sources`](../../reference/targets/k8s_sources.mdx) target types for Kubernetes object
+files.
+
+For example, create a file `src/k8s/webpages.yaml`:
+
+```yaml title="src/k8s/webpages.yaml"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: webpages
+data:
+  index.html: |
+    <html>
+      <head>Hello pants!</head>
+      <body>Hello pants!</body>
+    </html>
+```
+
+Now add a `k8s_sources` target in `src/k8s/BUILD`:
+
+```python title="src/k8s/BUILD"
+k8s_sources()
+```
+
+## Deploying objects to a cluster
+
+We'll be using a local [kind](https://kind.sigs.k8s.io/) cluster throughout the
+tutorial. First, spin up a cluster:
+
+```bash
+kind create cluster
+```
+```
+Creating cluster "kind" ...
+ ✓ Ensuring node image (kindest/node:v1.25.3) 🖼 
+ ✓ Preparing nodes 📦  
+ ✓ Writing configuration 📜 
+ ✓ Starting control-plane 🕹️ 
+ ✓ Installing CNI 🔌 
+ ✓ Installing StorageClass 💾 
+Set kubectl context to "kind-kind"
+```
+
+Second, configure the list of available contexts in `pants.toml`:
+
+```toml title="pants.toml"
+...
+
+[k8s]
+available_contexts = [
+  "kind-kind",
+]
+```
+
+Third, create a deployable target `k8s_bundle` in `src/k8s/BUILD`:
+
+```python title="src/k8s/BUILD"
+k8s_sources()
+k8s_bundle(
+    name="webpages",
+    sources=("src/k8s/webpages.yaml",),
+    context="kind-kind",
+)
+```
+
+Now you can deploy the target:
+
+```bash
+pants experimental-deploy src/k8s:webpages
+```
+```
+✓ src/k8s:webpages deployed to context kind-kind
+```
+
+note::: To prevent accidentally deploying kubernetes manifests to the wrong
+cluster, the context field is required on `k8s_bundle` for deployment. For
+deploying the same `k8s_bundle` to multiple contexts, consider using
+`parametrize` like `k8s_bundle(..., context=parametrize("stage", "prod"))`. For
+CI agents which will only have access to a single context, set the
+`[kubectl].pass_context` to false in `pants.toml` to have them use their
+default context.

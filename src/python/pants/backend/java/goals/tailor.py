@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.java.subsystems.javac import JavacSubsystem
 from pants.backend.java.target_types import (

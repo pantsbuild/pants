@@ -152,7 +152,7 @@ async def py_constraints(
             softwrap(
                 f"""
                 No Python files/targets matched for the `py-constraints` goal. All target types with
-                Python interpreter constraints: {', '.join(target_types_with_constraints)}
+                Python interpreter constraints: {", ".join(target_types_with_constraints)}
                 """
             )
         )

@@ -2,8 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from collections.abc import Callable
 from textwrap import dedent
-from typing import Any, Callable, TypeVar, overload
+from typing import Any, TypeVar, overload
 
 import pytest
 
