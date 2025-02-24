@@ -8,13 +8,14 @@ from pants.backend.shell.lint.shfmt.subsystem import Shfmt
 from pants.backend.shell.target_types import ShellSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.goals.resolves import ExportableTool
-from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
-from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
+from pants.core.util_rules.config_files import find_config_file
+from pants.core.util_rules.external_tool import download_external_tool
 from pants.core.util_rules.partitions import PartitionerType
-from pants.engine.fs import Digest, MergeDigests
+from pants.engine.fs import MergeDigests
+from pants.engine.intrinsics import merge_digests
 from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.process import Process, execute_process_or_raise
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -40,38 +41,31 @@ class ShfmtRequest(FmtTargetsRequest):
 
 @rule(desc="Format with shfmt", level=LogLevel.DEBUG)
 async def shfmt_fmt(request: ShfmtRequest.Batch, shfmt: Shfmt, platform: Platform) -> FmtResult:
-    download_shfmt_get = Get(
-        DownloadedExternalTool, ExternalToolRequest, shfmt.get_request(platform)
-    )
-    config_files_get = Get(
-        ConfigFiles, ConfigFilesRequest, shfmt.config_request(request.snapshot.dirs)
-    )
-    downloaded_shfmt, config_files = await MultiGet(download_shfmt_get, config_files_get)
-
-    input_digest = await Get(
-        Digest,
+    download_shfmt_get = download_external_tool(shfmt.get_request(platform))
+    config_files_get = find_config_file(shfmt.config_request(request.snapshot.dirs))
+    downloaded_shfmt, config_files = await concurrently(download_shfmt_get, config_files_get)
+    input_digest = await merge_digests(
         MergeDigests(
             (request.snapshot.digest, downloaded_shfmt.digest, config_files.snapshot.digest)
-        ),
+        )
     )
 
-    argv = [
-        downloaded_shfmt.exe,
-        "-l",
-        "-w",
-        *shfmt.args,
-        *request.files,
-    ]
-
-    result = await Get(
-        ProcessResult,
-        Process(
-            argv=argv,
-            input_digest=input_digest,
-            output_files=request.files,
-            description=f"Run shfmt on {pluralize(len(request.files), 'file')}.",
-            level=LogLevel.DEBUG,
-        ),
+    result = await execute_process_or_raise(
+        **implicitly(
+            Process(
+                argv=(
+                    downloaded_shfmt.exe,
+                    "-l",
+                    "-w",
+                    *shfmt.args,
+                    *request.files,
+                ),
+                input_digest=input_digest,
+                output_files=request.files,
+                description=f"Run shfmt on {pluralize(len(request.files), 'file')}.",
+                level=LogLevel.DEBUG,
+            )
+        )
     )
     return await FmtResult.create(request, result)
 

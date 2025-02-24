@@ -13,7 +13,10 @@ from pants.backend.shell.target_types import (
     SkipShellCommandTestsField,
 )
 from pants.backend.shell.util_rules import shell_command
-from pants.backend.shell.util_rules.shell_command import ShellCommandProcessFromTargetRequest
+from pants.backend.shell.util_rules.shell_command import (
+    ShellCommandProcessFromTargetRequest,
+    prepare_process_request_from_target,
+)
 from pants.core.goals.test import (
     TestDebugRequest,
     TestExtraEnv,
@@ -23,16 +26,15 @@ from pants.core.goals.test import (
     TestSubsystem,
 )
 from pants.core.util_rules.environments import EnvironmentField
-from pants.engine.internals.selectors import Get
+from pants.engine.internals.graph import resolve_target
 from pants.engine.process import (
     InteractiveProcess,
-    Process,
     ProcessCacheScope,
-    ProcessResultWithRetries,
     ProcessWithRetries,
+    execute_process_with_retry,
 )
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import Target, WrappedTarget, WrappedTargetRequest
+from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.target import Target, WrappedTargetRequest
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
@@ -64,14 +66,13 @@ async def test_shell_command(
     test_extra_env: TestExtraEnv,
 ) -> TestResult:
     field_set = batch.single_element
-    wrapped_tgt = await Get(
-        WrappedTarget,
+    wrapped_tgt = await resolve_target(
         WrappedTargetRequest(field_set.address, description_of_origin="<infallible>"),
+        **implicitly(),
     )
 
-    shell_process = await Get(
-        Process,
-        ShellCommandProcessFromTargetRequest(wrapped_tgt.target),
+    shell_process = await prepare_process_request_from_target(
+        ShellCommandProcessFromTargetRequest(wrapped_tgt.target), **implicitly()
     )
 
     shell_process = dataclasses.replace(
@@ -87,8 +88,8 @@ async def test_shell_command(
         ),
     )
 
-    shell_result = await Get(
-        ProcessResultWithRetries, ProcessWithRetries(shell_process, test_subsystem.attempts_default)
+    shell_result = await execute_process_with_retry(
+        ProcessWithRetries(shell_process, test_subsystem.attempts_default)
     )
     return TestResult.from_fallible_process_result(
         process_results=shell_result.results,
@@ -102,14 +103,13 @@ async def test_shell_command_interactively(
     batch: ShellTestRequest.Batch[TestShellCommandFieldSet, Any],
 ) -> TestDebugRequest:
     field_set = batch.single_element
-    wrapped_tgt = await Get(
-        WrappedTarget,
+    wrapped_tgt = await resolve_target(
         WrappedTargetRequest(field_set.address, description_of_origin="<infallible>"),
+        **implicitly(),
     )
 
-    shell_process = await Get(
-        Process,
-        ShellCommandProcessFromTargetRequest(wrapped_tgt.target),
+    shell_process = await prepare_process_request_from_target(
+        ShellCommandProcessFromTargetRequest(wrapped_tgt.target), **implicitly()
     )
 
     # This is probably not strictly necessary given the use of `InteractiveProcess` but good to be correct in any event.
