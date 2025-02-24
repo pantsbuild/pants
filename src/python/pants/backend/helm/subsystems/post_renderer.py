@@ -7,10 +7,11 @@ import logging
 import os
 import pkgutil
 import shlex
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent  # noqa: PNT20
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 import yaml
 
@@ -152,7 +153,7 @@ async def _resolve_post_renderers(
     logger.debug(
         softwrap(
             f"""
-            Resolving {pluralize(len(address_inputs.values), 'post-renderer')} from {address_inputs.description_of_origin}:
+            Resolving {pluralize(len(address_inputs.values), "post-renderer")} from {address_inputs.description_of_origin}:
 
             {bullet_list(address_inputs.values, 5)}
             """

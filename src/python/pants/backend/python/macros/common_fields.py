@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-from typing import ClassVar, Dict, Iterable, Tuple
+from collections.abc import Iterable
+from typing import ClassVar
 
 from pants.backend.python.target_types import (
     PythonRequirementModulesField,
@@ -35,8 +36,8 @@ class ModuleMappingField(DictStringToStringSequenceField):
 
     @classmethod
     def compute_value(  # type: ignore[override]
-        cls, raw_value: Dict[str, Iterable[str]], address: Address
-    ) -> FrozenDict[str, Tuple[str, ...]]:
+        cls, raw_value: dict[str, Iterable[str]], address: Address
+    ) -> FrozenDict[str, tuple[str, ...]]:
         value_or_default = super().compute_value(raw_value, address)
         return normalize_module_mapping(value_or_default)
 
@@ -59,8 +60,8 @@ class TypeStubsModuleMappingField(DictStringToStringSequenceField):
 
     @classmethod
     def compute_value(  # type: ignore[override]
-        cls, raw_value: Dict[str, Iterable[str]], address: Address
-    ) -> FrozenDict[str, Tuple[str, ...]]:
+        cls, raw_value: dict[str, Iterable[str]], address: Address
+    ) -> FrozenDict[str, tuple[str, ...]]:
         value_or_default = super().compute_value(raw_value, address)
         return normalize_module_mapping(value_or_default)
 

@@ -4,9 +4,9 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import Enum, unique
-from typing import Iterable, Mapping
 
 import pkg_resources
 
@@ -110,7 +110,7 @@ class JarToolRequest:
 
     @staticmethod
     def __parse_policies(
-        policies: Iterable[tuple[str, str | JarDuplicateAction]]
+        policies: Iterable[tuple[str, str | JarDuplicateAction]],
     ) -> Iterable[tuple[str, JarDuplicateAction]]:
         return [
             (

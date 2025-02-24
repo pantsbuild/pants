@@ -7,9 +7,10 @@ import importlib.resources
 import json
 import logging
 import os
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from functools import cache
-from typing import Callable, ClassVar, Iterable, Optional, Sequence
+from typing import ClassVar
 from urllib.parse import urlparse
 
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
@@ -193,7 +194,7 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
 
             If you would like to generate a lockfile for {resolve_name},
             follow the instructions for setting up lockfiles for tools
-            {doc_url('docs/python/overview/lockfiles#lockfiles-for-tools')}
+            {doc_url("docs/python/overview/lockfiles#lockfiles-for-tools")}
         """
         )
 
@@ -212,7 +213,7 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
 
     @classmethod
     @cache
-    def _default_package_name_and_version(cls) -> Optional[_PackageNameAndVersion]:
+    def _default_package_name_and_version(cls) -> _PackageNameAndVersion | None:
         if cls.default_lockfile_resource is None:
             return None
 

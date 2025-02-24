@@ -4,7 +4,6 @@
 import logging
 import time
 from dataclasses import dataclass
-from typing import Tuple
 
 from pants.engine.internals.scheduler import Workunit
 from pants.engine.rules import collect_rules, rule
@@ -46,10 +45,10 @@ class WorkunitsLogger(WorkunitsCallback):
     def __call__(
         self,
         *,
-        completed_workunits: Tuple[Workunit, ...],
+        completed_workunits: tuple[Workunit, ...],
         finished: bool,
         context: StreamingWorkunitContext,
-        **kwargs
+        **kwargs,
     ) -> None:
         with open(self.dest, "a") as dest:
             print(str(completed_workunits), file=dest)

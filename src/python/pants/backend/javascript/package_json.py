@@ -7,8 +7,9 @@ import json
 import logging
 import os.path
 from abc import ABC
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, Iterable, Literal, Mapping, Optional, Tuple
+from typing import Any, ClassVar, Literal
 
 import yaml
 
@@ -209,8 +210,8 @@ class NodePackageScriptsField(SequenceField[NodeScript]):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Iterable[Any]], address: Address
-    ) -> Optional[Tuple[NodeScript, ...]]:
+        cls, raw_value: Iterable[Any] | None, address: Address
+    ) -> tuple[NodeScript, ...] | None:
         values = super().compute_value(raw_value, address)
         test_scripts = [value for value in values or () if isinstance(value, NodeTestScript)]
         if len(test_scripts) > 1:
@@ -830,7 +831,7 @@ def _script_missing_error(entry_point: str, scripts: Iterable[str], address: Add
             {entry_point} was not found in package.json#scripts section
             of the `{PackageJsonTarget.alias}` target with address {address}.
 
-            Available scripts are: {', '.join(scripts)}.
+            Available scripts are: {", ".join(scripts)}.
             """
         )
     )

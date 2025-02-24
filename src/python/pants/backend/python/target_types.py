@@ -7,20 +7,10 @@ import collections.abc
 import logging
 import os.path
 from abc import ABC, abstractmethod
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
-from typing import (
-    TYPE_CHECKING,
-    ClassVar,
-    Iterable,
-    Iterator,
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
-    Union,
-    cast,
-)
+from typing import TYPE_CHECKING, ClassVar, cast
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
@@ -113,12 +103,12 @@ class InterpreterConstraintsField(StringSequenceField, AsyncFieldMixin):
 
         If the field is not set, it will default to the option `[python].interpreter_constraints`.
 
-        See {doc_url('docs/python/overview/interpreter-compatibility')} for how these interpreter
+        See {doc_url("docs/python/overview/interpreter-compatibility")} for how these interpreter
         constraints are merged with the constraints of dependencies.
         """
     )
 
-    def value_or_global_default(self, python_setup: PythonSetup) -> Tuple[str, ...]:
+    def value_or_global_default(self, python_setup: PythonSetup) -> tuple[str, ...]:
         """Return either the given `compatibility` field or the global interpreter constraints.
 
         If interpreter constraints are supplied by the CLI flag, return those only.
@@ -351,7 +341,7 @@ class EntryPointField(AsyncFieldMixin, Field):
     value: EntryPoint | None
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[EntryPoint]:
+    def compute_value(cls, raw_value: str | None, address: Address) -> EntryPoint | None:
         value = super().compute_value(raw_value, address)
         if value is None:
             return None
@@ -397,7 +387,7 @@ class PexScriptField(Field):
     value: ConsoleScript | None
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[ConsoleScript]:
+    def compute_value(cls, raw_value: str | None, address: Address) -> ConsoleScript | None:
         value = super().compute_value(raw_value, address)
         if value is None:
             return None
@@ -422,7 +412,7 @@ class PexExecutableField(Field):
     value: Executable | None
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[Executable]:
+    def compute_value(cls, raw_value: str | None, address: Address) -> Executable | None:
         value = super().compute_value(raw_value, address)
         if value is None:
             return None
@@ -505,7 +495,7 @@ class PexCompletePlatformsField(SpecialCasedDependencies):
         complete platform JSON as described by Pex
         (https://pex.readthedocs.io/en/latest/buildingpex.html#complete-platform).
 
-        See {doc_url('docs/python/overview/pex#generating-the-complete_platforms-file')} for details on how to create this file.
+        See {doc_url("docs/python/overview/pex#generating-the-complete_platforms-file")} for details on how to create this file.
         """
     )
 
@@ -524,9 +514,7 @@ class PexInheritPathField(StringField):
 
     # TODO(#9388): deprecate allowing this to be a `bool`.
     @classmethod
-    def compute_value(
-        cls, raw_value: Optional[Union[str, bool]], address: Address
-    ) -> Optional[str]:
+    def compute_value(cls, raw_value: str | bool | None, address: Address) -> str | None:
         if isinstance(raw_value, bool):
             return "prefer" if raw_value else "false"
         return super().compute_value(raw_value, address)
@@ -773,7 +761,7 @@ class PexBinary(Target):
         A Python target that can be converted into an executable PEX file.
 
         PEX files are self-contained executable files that contain a complete Python environment
-        capable of running the target. For more information, see {doc_url('docs/python/overview/pex')}.
+        capable of running the target. For more information, see {doc_url("docs/python/overview/pex")}.
         """
     )
 
@@ -972,7 +960,7 @@ class PythonTestsTimeoutField(IntField):
     )
     valid_numbers = ValidNumbers.positive_only
 
-    def calculate_from_global_options(self, test: TestSubsystem, pytest: PyTest) -> Optional[int]:
+    def calculate_from_global_options(self, test: TestSubsystem, pytest: PyTest) -> int | None:
         """Determine the timeout (in seconds) after resolving conflicting global options in the
         `pytest` and `test` scopes.
 
@@ -1063,7 +1051,7 @@ class PythonTestTarget(Target):
         target and then be included in the `dependencies` field. (You can use the
         `python_test_utils` target to generate these `python_source` targets.)
 
-        See {doc_url('docs/python/goals/test')}
+        See {doc_url("docs/python/goals/test")}
         """
     )
 
@@ -1244,8 +1232,8 @@ class _PipRequirementSequenceField(Field):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Iterable[str]], address: Address
-    ) -> Tuple[PipRequirement, ...]:
+        cls, raw_value: Iterable[str] | None, address: Address
+    ) -> tuple[PipRequirement, ...]:
         value = super().compute_value(raw_value, address)
         if value is None:
             return ()
@@ -1402,7 +1390,7 @@ class PythonRequirementTarget(Target):
         requirement into a `python_requirement` target automatically. For Poetry, use
         `poetry_requirements`.
 
-        See {doc_url('docs/python/overview/third-party-dependencies')}.
+        See {doc_url("docs/python/overview/third-party-dependencies")}.
         """
     )
 
@@ -1447,12 +1435,12 @@ class PythonProvidesField(ScalarField, AsyncFieldMixin):
         in the `setup()` function:
         (https://packaging.python.org/guides/distributing-packages-using-setuptools/#setup-args).
 
-        See {doc_url('docs/writing-plugins/common-plugin-tasks/custom-python-artifact-kwargs')} for how to write a plugin to dynamically generate kwargs.
+        See {doc_url("docs/writing-plugins/common-plugin-tasks/custom-python-artifact-kwargs")} for how to write a plugin to dynamically generate kwargs.
         """
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[PythonArtifact], address: Address) -> PythonArtifact:
+    def compute_value(cls, raw_value: PythonArtifact | None, address: Address) -> PythonArtifact:
         return cast(PythonArtifact, super().compute_value(raw_value, address))
 
 
@@ -1508,7 +1496,7 @@ class PythonDistributionEntryPoint:
     """Note that this stores if the entry point comes from an address to a `pex_binary` target."""
 
     entry_point: EntryPoint
-    pex_binary_address: Optional[Address]
+    pex_binary_address: Address | None
 
 
 # See `target_type_rules.py` for the `Resolve..Request -> Resolved..` rule
@@ -1556,8 +1544,8 @@ class ResolvePythonDistributionEntryPointsRequest:
     logic for resolving pex_binary addresses etc.
     """
 
-    entry_points_field: Optional[PythonDistributionEntryPointsField] = None
-    provides_field: Optional[PythonProvidesField] = None
+    entry_points_field: PythonDistributionEntryPointsField | None = None
+    provides_field: PythonProvidesField | None = None
 
     def __post_init__(self):
         # Must provide at least one of these fields.
@@ -1681,7 +1669,7 @@ class PythonDistribution(Target):
         f"""
         A publishable Python setuptools distribution (e.g. an sdist or wheel).
 
-        See {doc_url('docs/python/overview/building-distributions')}.
+        See {doc_url("docs/python/overview/building-distributions")}.
         """
     )
 

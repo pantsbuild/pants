@@ -6,8 +6,9 @@ from __future__ import annotations
 import logging
 import site
 import sys
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable, Optional, cast
+from typing import cast
 
 from pkg_resources import Requirement, WorkingSet
 from pkg_resources import working_set as global_working_set
@@ -118,8 +119,8 @@ class PluginResolver:
     def __init__(
         self,
         scheduler: BootstrapScheduler,
-        interpreter_constraints: Optional[InterpreterConstraints] = None,
-        working_set: Optional[WorkingSet] = None,
+        interpreter_constraints: InterpreterConstraints | None = None,
+        working_set: WorkingSet | None = None,
     ) -> None:
         self._scheduler = scheduler
         self._working_set = working_set or global_working_set

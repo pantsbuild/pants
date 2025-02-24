@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import textwrap
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Iterable, Mapping
 
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.util_rules import goroot

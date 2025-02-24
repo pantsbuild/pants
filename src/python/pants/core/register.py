@@ -5,6 +5,7 @@
 
 These are always activated and cannot be disabled.
 """
+
 from pants.backend.codegen import export_codegen_goal
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals import (

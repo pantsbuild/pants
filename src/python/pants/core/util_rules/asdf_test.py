@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import PurePath
-from typing import Mapping
 
 import pytest
 

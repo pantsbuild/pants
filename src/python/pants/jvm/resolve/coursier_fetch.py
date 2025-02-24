@@ -10,9 +10,10 @@ import json
 import logging
 import os
 from collections import defaultdict
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Iterable, Iterator, List, Tuple
+from typing import TYPE_CHECKING, Any
 
 import toml
 
@@ -329,9 +330,9 @@ async def prepare_coursier_resolve_info(
 ) -> CoursierResolveInfo:
     # Transform requirements that correspond to local JAR files into coordinates with `file:/`
     # URLs, and put the files in the place specified by the URLs.
-    no_jars: List[ArtifactRequirement] = []
-    jars: List[Tuple[ArtifactRequirement, JvmArtifactJarSourceField]] = []
-    extra_args: List[str] = []
+    no_jars: list[ArtifactRequirement] = []
+    jars: list[tuple[ArtifactRequirement, JvmArtifactJarSourceField]] = []
+    extra_args: list[str] = []
 
     LOCAL_EXCLUDE_FILE = "PANTS_RESOLVE_EXCLUDES"
 

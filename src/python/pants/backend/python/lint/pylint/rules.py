@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple
 
 import packaging
 
@@ -62,7 +61,7 @@ class PylintRequest(LintTargetsRequest):
     tool_subsystem = Pylint
 
 
-def generate_argv(field_sets: tuple[PylintFieldSet, ...], pylint: Pylint) -> Tuple[str, ...]:
+def generate_argv(field_sets: tuple[PylintFieldSet, ...], pylint: Pylint) -> tuple[str, ...]:
     args = []
     if pylint.config is not None:
         args.append(f"--rcfile={pylint.config}")
@@ -110,7 +109,7 @@ async def partition_pylint(
         for (
             resolve,
             interpreter_constraints,
-        ), field_sets, in resolve_and_interpreter_constraints_to_field_sets.items()
+        ), field_sets in resolve_and_interpreter_constraints_to_field_sets.items()
     )
 
 

@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Optional, Union
+from typing import Any
 
 from pants.backend.project_info.peek import _PeekJsonEncoder
 from pants.backend.python.dependency_inference.module_mapper import ResolveName
@@ -110,9 +110,9 @@ class ImportAnalysis:
     """Information on the inferred imports for a Python file."""
 
     name: str
-    reference: Union[ParsedPythonImportInfo, str]
+    reference: ParsedPythonImportInfo | str
     resolved: ImportResolveResult
-    possible_resolve: Optional[list[tuple[Address, ResolveName]]]
+    possible_resolve: list[tuple[Address, ResolveName]] | None
 
 
 @dataclass(frozen=True)

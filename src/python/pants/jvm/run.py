@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Iterable, Optional, Tuple
+from collections.abc import Iterable
 
 from pants.core.goals.run import RunRequest
 from pants.core.util_rules.system_binaries import UnzipBinary
@@ -50,7 +50,7 @@ async def _find_main(
 
 async def _find_main_by_manifest(
     unzip: UnzipBinary, input_digest: Digest, jarfile: str
-) -> Optional[str]:
+) -> str | None:
     # jvm only allows `-cp` or `-jar` to be specified, and `-jar` takes precedence. So, even for a
     # JAR with a valid `Main-Class` in the manifest, we need to peek inside the manifest and
     # extract `main` ourself.
@@ -84,7 +84,7 @@ async def _find_main_by_manifest(
 
 async def _find_main_by_javap(
     unzip: UnzipBinary, jdk: JdkEnvironment, input_digest: Digest, jarfile: str
-) -> Tuple[str, ...]:
+) -> tuple[str, ...]:
     # Finds the `main` class by inspecting all of the classes inside the specified JAR
     # to find one with a JVM main method.
 

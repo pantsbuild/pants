@@ -5,10 +5,10 @@ from __future__ import annotations
 
 import itertools
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Dict, Iterable, Optional
 
 from pants.backend.python.dependency_inference import module_mapper, parse_python_dependencies
 from pants.backend.python.dependency_inference.default_unowned_dependencies import (
@@ -184,7 +184,7 @@ def _get_imports_info(
 
 
 def _collect_imports_info(
-    resolve_result: dict[str, ImportResolveResult]
+    resolve_result: dict[str, ImportResolveResult],
 ) -> tuple[frozenset[Address], frozenset[str]]:
     """Collect import resolution results into:
 
@@ -248,7 +248,7 @@ class UnownedImportPossibleOwnerRequest:
 
 @dataclass(frozen=True)
 class UnownedImportsPossibleOwners:
-    value: Dict[str, list[tuple[Address, ResolveName]]]
+    value: dict[str, list[tuple[Address, ResolveName]]]
 
 
 @dataclass(frozen=True)
@@ -343,9 +343,9 @@ async def _handle_unowned_imports(
 
         {bullet_list(unowned_imports_with_lines)}{other_resolves_snippet}
 
-        If you do not expect an import to be inferrable, add `# pants: no-infer-dep` to the
+        If you do not expect an import to be inferable, add `# pants: no-infer-dep` to the
         import line. Otherwise, see
-        {doc_url('docs/using-pants/troubleshooting-common-issues#import-errors-and-missing-dependencies')} for common problems.
+        {doc_url("docs/using-pants/troubleshooting-common-issues#import-errors-and-missing-dependencies")} for common problems.
         """
     )
     if unowned_dependency_behavior is UnownedDependencyUsage.LogWarning:
@@ -375,7 +375,7 @@ async def _exec_parse_deps(
 class ResolvedParsedPythonDependenciesRequest:
     field_set: PythonImportDependenciesInferenceFieldSet
     parsed_dependencies: ParsedPythonDependencies
-    resolve: Optional[str]
+    resolve: str | None
 
 
 @dataclass(frozen=True)

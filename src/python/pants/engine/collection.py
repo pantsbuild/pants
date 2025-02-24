@@ -3,14 +3,15 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar, Iterable, Tuple, TypeVar, cast, overload
+from collections.abc import Iterable
+from typing import Any, ClassVar, TypeVar, cast, overload
 
 from pants.util.ordered_set import FrozenOrderedSet
 
 T = TypeVar("T")
 
 
-class Collection(Tuple[T, ...]):
+class Collection(tuple[T, ...]):
     """A light newtype around immutable sequences for use with the V2 engine.
 
     This should be subclassed when you want to create a distinct collection type, such as:
@@ -35,7 +36,7 @@ class Collection(Tuple[T, ...]):
         result = super().__getitem__(index)
         if isinstance(index, int):
             return cast(T, result)
-        return self.__class__(cast(Tuple[T, ...], result))
+        return self.__class__(cast(tuple[T, ...], result))
 
     def __eq__(self, other: Any) -> bool:
         if self is other:

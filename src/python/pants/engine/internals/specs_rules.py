@@ -8,7 +8,7 @@ import itertools
 import logging
 import os
 from collections import defaultdict
-from typing import Iterable
+from collections.abc import Iterable
 
 from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.base.specs import (

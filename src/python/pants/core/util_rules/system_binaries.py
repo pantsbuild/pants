@@ -9,13 +9,12 @@ import logging
 import os
 import shlex
 import subprocess
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
 from itertools import groupby
 from textwrap import dedent  # noqa: PNT20
-from typing import Iterable, Mapping, Sequence
-
-from typing_extensions import Self
+from typing import Self
 
 from pants.core.subsystems import python_bootstrap
 from pants.core.util_rules.environments import EnvironmentTarget
@@ -725,7 +724,7 @@ async def _find_candidate_paths_via_subprocess_helper(
 
         set -euox pipefail
 
-        CHECK_FILE_ENTRIES={'1' if request.check_file_entries else ''}
+        CHECK_FILE_ENTRIES={"1" if request.check_file_entries else ""}
         """
     )
     script_body = dedent(
