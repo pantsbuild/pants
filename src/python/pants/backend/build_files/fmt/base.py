@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from pants.backend.build_files.utils import _get_build_file_partitioner_rules
 from pants.core.goals.fmt import FmtFilesRequest

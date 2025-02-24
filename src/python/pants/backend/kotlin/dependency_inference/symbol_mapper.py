@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from collections import defaultdict
-from typing import Mapping
+from collections.abc import Mapping
 
 from pants.backend.kotlin.dependency_inference.kotlin_parser import KotlinSourceDependencyAnalysis
 from pants.backend.kotlin.target_types import KotlinSourceField

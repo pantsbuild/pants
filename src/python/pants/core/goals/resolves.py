@@ -61,6 +61,8 @@ class ExportableTool:
         """
         exportable_tools = union_membership.get(ExportableTool)
         relevant_tools: dict[str, type[T]] = {
-            e.options_scope: e for e in exportable_tools if issubclass(e, parent_class)  # type: ignore # mypy isn't narrowing with `issubclass`
+            e.options_scope: e  # type: ignore # mypy isn't narrowing with `issubclass`
+            for e in exportable_tools
+            if issubclass(e, parent_class)
         }
         return relevant_tools

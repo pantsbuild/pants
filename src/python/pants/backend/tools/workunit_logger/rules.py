@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import json
 import logging
-from typing import Any, Dict, Tuple
+from typing import Any
 
 from pants.engine.internals.scheduler import Workunit
 from pants.engine.rules import collect_rules, rule
@@ -48,7 +48,7 @@ class WorkunitLoggerCallback(WorkunitsCallback):
 
     def __init__(self, wulogger: "WorkunitLogger"):
         self.wulogger = wulogger
-        self._completed_workunits: Dict[str, object] = {}
+        self._completed_workunits: dict[str, object] = {}
 
     @property
     def can_finish_async(self) -> bool:
@@ -57,8 +57,8 @@ class WorkunitLoggerCallback(WorkunitsCallback):
     def __call__(
         self,
         *,
-        completed_workunits: Tuple[Workunit, ...],
-        started_workunits: Tuple[Workunit, ...],
+        completed_workunits: tuple[Workunit, ...],
+        started_workunits: tuple[Workunit, ...],
         context: StreamingWorkunitContext,
         finished: bool = False,
         **kwargs: Any,

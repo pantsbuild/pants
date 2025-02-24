@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-from typing import Tuple
-
 from pants.backend.python.lint.bandit.subsystem import Bandit, BanditFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules import pex
@@ -26,7 +24,7 @@ class BanditRequest(LintTargetsRequest):
     tool_subsystem = Bandit
 
 
-def generate_argv(source_files: SourceFiles, bandit: Bandit) -> Tuple[str, ...]:
+def generate_argv(source_files: SourceFiles, bandit: Bandit) -> tuple[str, ...]:
     args = []
     if bandit.config is not None:
         args.append(f"--config={bandit.config}")

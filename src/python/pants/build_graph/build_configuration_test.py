@@ -1,7 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Type
 
 import pytest
 
@@ -79,13 +78,13 @@ def test_register_union_rules(bc_builder: BuildConfiguration.Builder) -> None:
 
 
 def test_validation(caplog, bc_builder: BuildConfiguration.Builder) -> None:
-    def mk_dummy_subsys(_options_scope: str, goal: bool = False) -> Type[Subsystem]:
+    def mk_dummy_subsys(_options_scope: str, goal: bool = False) -> type[Subsystem]:
         class DummySubsystem(GoalSubsystem if goal else Subsystem):  # type: ignore[misc]
             options_scope = _options_scope
 
         return DummySubsystem
 
-    def mk_dummy_tgt(_alias: str) -> Type[Target]:
+    def mk_dummy_tgt(_alias: str) -> type[Target]:
         class DummyTarget(Target):
             alias = _alias
             core_fields = tuple()
@@ -120,7 +119,7 @@ def test_validation(caplog, bc_builder: BuildConfiguration.Builder) -> None:
 
 
 def test_register_subsystems(bc_builder: BuildConfiguration.Builder) -> None:
-    def mk_dummy_subsys(_options_scope: str) -> Type[Subsystem]:
+    def mk_dummy_subsys(_options_scope: str) -> type[Subsystem]:
         class DummySubsystem(Subsystem):
             options_scope = _options_scope
 
@@ -147,7 +146,7 @@ def test_register_subsystems(bc_builder: BuildConfiguration.Builder) -> None:
 
 
 def test_register_target_types(bc_builder: BuildConfiguration.Builder) -> None:
-    def mk_dummy_tgt(_alias: str) -> Type[Target]:
+    def mk_dummy_tgt(_alias: str) -> type[Target]:
         class DummyTarget(Target):
             alias = _alias
             core_fields = tuple()

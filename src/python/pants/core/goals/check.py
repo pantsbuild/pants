@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, ClassVar, Generic, Iterable, TypeVar, cast
+from typing import Any, ClassVar, Generic, TypeVar, cast
 
 from pants.core.goals.lint import REPORT_DIR as REPORT_DIR  # noqa: F401
 from pants.core.goals.multi_tool_goal_helper import (

@@ -6,10 +6,11 @@ import json
 import logging
 import os
 import re
+from collections.abc import Iterator
 from dataclasses import asdict, dataclass
 from functools import partial
 from itertools import chain
-from typing import Iterator, Literal, cast
+from typing import Literal, cast
 
 # Re-exporting BuiltDockerImage here, as it has its natural home here, but has moved out to resolve
 # a dependency cycle from docker_build_context.
@@ -351,7 +352,9 @@ def get_build_options(
                 source=source,
                 error_cls=DockerImageOptionValueError,
             )
-            yield from target[field_type].options(format, global_build_hosts_options=global_build_hosts_options)  # type: ignore[attr-defined]
+            yield from target[field_type].options(  # type: ignore[attr-defined]
+                format, global_build_hosts_options=global_build_hosts_options
+            )
 
     # Target stage
     target_stage = None

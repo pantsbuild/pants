@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import dataclasses
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.rust.subsystems.rust import RustSubsystem
 from pants.core.util_rules.system_binaries import (

@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Iterable, cast
+from typing import Any, cast
 
 from pants.core.util_rules.lockfile_metadata import (
     LockfileMetadata,

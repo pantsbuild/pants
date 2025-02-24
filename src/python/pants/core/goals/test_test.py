@@ -4,11 +4,12 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Iterable
+from typing import Any
 
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
@@ -839,8 +840,8 @@ def test_non_utf8_output() -> None:
     test_result = make_test_result(
         [],
         exit_code=1,  # "test error" so stdout/stderr are output in message
-        stdout_bytes=b"\x80\xBF",  # invalid UTF-8 as required by the test
-        stderr_bytes=b"\x80\xBF",  # invalid UTF-8 as required by the test
+        stdout_bytes=b"\x80\xbf",  # invalid UTF-8 as required by the test
+        stderr_bytes=b"\x80\xbf",  # invalid UTF-8 as required by the test
         output_setting=ShowOutput.ALL,
     )
     assert test_result.message() == "failed (exit code 1).\n��\n��\n\n"

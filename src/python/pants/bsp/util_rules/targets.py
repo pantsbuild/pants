@@ -5,9 +5,10 @@ from __future__ import annotations
 import itertools
 import logging
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import ClassVar, Generic, Sequence, Type, TypeVar
+from typing import ClassVar, Generic, TypeVar
 
 import toml
 
@@ -74,7 +75,7 @@ class BSPBuildTargetsMetadataRequest(Generic[_FS]):
 
     language_id: ClassVar[str]
     can_merge_metadata_from: ClassVar[tuple[str, ...]]
-    field_set_type: ClassVar[Type[_FS]]  # type: ignore[misc]
+    field_set_type: ClassVar[type[_FS]]  # type: ignore[misc]
 
     resolve_prefix: ClassVar[str]
     resolve_field: ClassVar[type[Field]]
@@ -358,7 +359,7 @@ async def generate_one_bsp_build_target_request(
     field_sets_by_request_type: dict[type[BSPBuildTargetsMetadataRequest], OrderedSet[FieldSet]] = (
         defaultdict(OrderedSet)
     )
-    metadata_request_types: FrozenOrderedSet[Type[BSPBuildTargetsMetadataRequest]] = (
+    metadata_request_types: FrozenOrderedSet[type[BSPBuildTargetsMetadataRequest]] = (
         union_membership.get(BSPBuildTargetsMetadataRequest)
     )
     metadata_request_types_by_lang_id: dict[str, type[BSPBuildTargetsMetadataRequest]] = {}
@@ -375,7 +376,7 @@ async def generate_one_bsp_build_target_request(
 
     for tgt in targets:
         for metadata_request_type in metadata_request_types:
-            field_set_type: Type[FieldSet] = metadata_request_type.field_set_type
+            field_set_type: type[FieldSet] = metadata_request_type.field_set_type
             if field_set_type.is_applicable(tgt):
                 field_sets_by_request_type[metadata_request_type].add(field_set_type.create(tgt))
 
@@ -541,7 +542,7 @@ async def bsp_dependency_sources(request: DependencySourcesParams) -> Dependency
 class BSPDependencyModulesRequest(Generic[_FS]):
     """Hook to allow language backends to provide dependency modules."""
 
-    field_set_type: ClassVar[Type[_FS]]  # type: ignore[misc]
+    field_set_type: ClassVar[type[_FS]]  # type: ignore[misc]
 
     field_sets: tuple[_FS, ...]
 
@@ -577,10 +578,10 @@ async def resolve_one_dependency_module(
 ) -> ResolveOneDependencyModuleResult:
     targets = await Get(Targets, BuildTargetIdentifier, request.bsp_target_id)
 
-    field_sets_by_request_type: dict[Type[BSPDependencyModulesRequest], list[FieldSet]] = (
+    field_sets_by_request_type: dict[type[BSPDependencyModulesRequest], list[FieldSet]] = (
         defaultdict(list)
     )
-    dep_module_request_types: FrozenOrderedSet[Type[BSPDependencyModulesRequest]] = (
+    dep_module_request_types: FrozenOrderedSet[type[BSPDependencyModulesRequest]] = (
         union_membership.get(BSPDependencyModulesRequest)
     )
     for tgt in targets:
@@ -639,7 +640,7 @@ async def bsp_dependency_modules(
 class BSPCompileRequest(Generic[_FS]):
     """Hook to allow language backends to compile targets."""
 
-    field_set_type: ClassVar[Type[_FS]]  # type: ignore[misc]
+    field_set_type: ClassVar[type[_FS]]  # type: ignore[misc]
 
     bsp_target: BSPBuildTargetInternal
     field_sets: tuple[_FS, ...]
@@ -669,7 +670,7 @@ class BSPCompileResult:
 class BSPResourcesRequest(Generic[_FS]):
     """Hook to allow language backends to provide resources for targets."""
 
-    field_set_type: ClassVar[Type[_FS]]  # type: ignore[misc]
+    field_set_type: ClassVar[type[_FS]]  # type: ignore[misc]
 
     bsp_target: BSPBuildTargetInternal
     field_sets: tuple[_FS, ...]

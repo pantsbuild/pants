@@ -5,9 +5,10 @@
 #  https://www.python.org/dev/peps/pep-0503/#normalized-names.
 
 import re
+from collections.abc import Callable
 from enum import Enum
 from functools import partial
-from typing import Callable, Dict, List, Match, Tuple
+from re import Match
 
 
 class PackageSeparator(Enum):
@@ -83,7 +84,7 @@ the replacement. see re.sub for more information
 then if an import in the python code is google.cloud.foo, then the package of
 google-cloud-foo will be used.
 """
-DEFAULT_MODULE_PATTERN_MAPPING: Dict[re.Pattern, List[Callable[[Match[str]], str]]] = {
+DEFAULT_MODULE_PATTERN_MAPPING: dict[re.Pattern, list[Callable[[Match[str]], str]]] = {
     re.compile(r"""^azure-.+"""): [all_hyphen_to_dot],
     re.compile(r"""^django-((.+(-.+)?))"""): [first_group_hyphen_to_underscore],
     # See https://github.com/googleapis/google-cloud-python#libraries for all Google cloud
@@ -103,7 +104,7 @@ DEFAULT_MODULE_PATTERN_MAPPING: Dict[re.Pattern, List[Callable[[Match[str]], str
     re.compile(r"""^apache-(airflow-providers-.+)"""): [first_group_hyphen_to_dot],
 }
 
-DEFAULT_MODULE_MAPPING: Dict[str, Tuple[str, ...]] = {
+DEFAULT_MODULE_MAPPING: dict[str, tuple[str, ...]] = {
     "absl-py": ("absl",),
     "acryl-datahub": ("datahub",),
     "ansicolors": ("colors",),
@@ -250,14 +251,14 @@ DEFAULT_MODULE_MAPPING: Dict[str, Tuple[str, ...]] = {
     "websocket-client": ("websocket",),
 }
 
-DEFAULT_TYPE_STUB_MODULE_PATTERN_MAPPING: Dict[re.Pattern, List[Callable[[Match[str]], str]]] = {
+DEFAULT_TYPE_STUB_MODULE_PATTERN_MAPPING: dict[re.Pattern, list[Callable[[Match[str]], str]]] = {
     re.compile(r"""^stubs[_-](.+)"""): [first_group_hyphen_to_underscore],
     re.compile(r"""^types[_-](.+)"""): [first_group_hyphen_to_underscore],
     re.compile(r"""^(.+)[_-]stubs"""): [first_group_hyphen_to_underscore],
     re.compile(r"""^(.+)[_-]types"""): [first_group_hyphen_to_underscore],
 }
 
-DEFAULT_TYPE_STUB_MODULE_MAPPING: Dict[str, Tuple[str, ...]] = {
+DEFAULT_TYPE_STUB_MODULE_MAPPING: dict[str, tuple[str, ...]] = {
     "djangorestframework-types": ("rest_framework",),
     "lark-stubs": ("lark",),
     "types-beautifulsoup4": ("bs4",),

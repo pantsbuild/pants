@@ -6,11 +6,12 @@ from __future__ import annotations
 import importlib.resources
 import subprocess
 import sys
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import Iterable, List, cast
+from typing import cast
 from unittest.mock import Mock
 
 import pytest
@@ -561,7 +562,7 @@ def create_dists(workdir: Path, project: Project, *projects: Project) -> PurePat
 
 
 def requirements(rule_runner: PythonRuleRunner, pex: Pex) -> list[str]:
-    return cast(List[str], get_all_data(rule_runner, pex).info["requirements"])
+    return cast(list[str], get_all_data(rule_runner, pex).info["requirements"])
 
 
 def test_constraints_validation(tmp_path: Path, rule_runner: PythonRuleRunner) -> None:

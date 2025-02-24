@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import importlib.util
 import logging
-from typing import Union
 
 import libcst as cst
 import libcst.matchers as m
@@ -30,7 +29,7 @@ def make_importfrom_attr(module: str) -> cst.Attribute | cst.Name:
     return cst.Attribute(value=make_importfrom_attr(partial_module), attr=cst.Name(parts[-1]))
 
 
-def make_importfrom_attr_matcher(module: str) -> Union[m.Attribute, m.Name]:
+def make_importfrom_attr_matcher(module: str) -> m.Attribute | m.Name:
     """Generates a cst matcher.Attribute or matcher.Name from a module string."""
     parts = module.split(".")
     if len(parts) == 1:

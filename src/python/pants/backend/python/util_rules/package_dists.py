@@ -9,10 +9,11 @@ import os
 import pickle
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import partial
 from pathlib import PurePath
-from typing import Any, DefaultDict, Dict, List, Mapping, Tuple, cast
+from typing import Any, DefaultDict, cast
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -121,7 +122,7 @@ class OwnershipError(SetupPyError):
         super().__init__(
             softwrap(
                 f"""
-                {msg} See {doc_url('docs/python/overview/building-distributions')} for
+                {msg} See {doc_url("docs/python/overview/building-distributions")} for
                 how python_sources targets are mapped to distributions.
                 """
             )
@@ -217,7 +218,7 @@ class SetupKwargs:
     """The keyword arguments to the `setup()` function in the generated `setup.py`."""
 
     _pickled_bytes: bytes
-    _overwrite_banned_keys: Tuple[str, ...]
+    _overwrite_banned_keys: tuple[str, ...]
 
     def __init__(
         self,
@@ -225,7 +226,7 @@ class SetupKwargs:
         *,
         address: Address,
         _allow_banned_keys: bool = False,
-        _overwrite_banned_keys: Tuple[str, ...] = (),
+        _overwrite_banned_keys: tuple[str, ...] = (),
     ) -> None:
         super().__init__()
         if "name" not in kwargs:
@@ -270,7 +271,7 @@ class SetupKwargs:
 
     @memoized_property
     def kwargs(self) -> dict[str, Any]:
-        return cast(Dict[str, Any], pickle.loads(self._pickled_bytes))
+        return cast(dict[str, Any], pickle.loads(self._pickled_bytes))
 
     @property
     def name(self) -> str:
@@ -303,7 +304,7 @@ class SetupKwargsRequest(ABC):
         """Whether the kwargs implementation should be used for this target or not."""
 
     @property
-    def explicit_kwargs(self) -> Dict[str, Any]:
+    def explicit_kwargs(self) -> dict[str, Any]:
         # We return a dict copy of the underlying FrozenDict, because the caller expects a
         # dict (and we have documented as much).
         return dict(self.target[PythonProvidesField].value.kwargs)
@@ -478,9 +479,9 @@ async def create_dist_build_request(
     prefixed_input = await Get(Digest, AddPrefix(input_digest, chroot_prefix))
     build_system = await Get(BuildSystem, BuildSystemRequest(prefixed_input, working_directory))
     output_path = dist_tgt.get(PythonDistributionOutputPathField).value
-    assert (
-        output_path is not None
-    ), "output_path should take a default string value if the user has not provided it."
+    assert output_path is not None, (
+        "output_path should take a default string value if the user has not provided it."
+    )
 
     return DistBuildRequest(
         build_system=build_system,
@@ -980,7 +981,7 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
                         f"""
                         Found multiple sibling python_distribution targets that are the closest
                         ancestor dependents of {target.address} and are therefore candidates to
-                        own it: {', '.join(o.address.spec for o in all_owners)}. Only a
+                        own it: {", ".join(o.address.spec for o in all_owners)}. Only a
                         single such owner is allowed, to avoid ambiguity.
                         """
                     )
@@ -1017,7 +1018,7 @@ def is_ownable_target(tgt: Target, union_membership: UnionMembership) -> bool:
 
 
 # Convenient type alias for the pair (package name, data files in the package).
-PackageDatum = Tuple[str, Tuple[str, ...]]
+PackageDatum = tuple[str, tuple[str, ...]]
 
 
 def find_packages(
@@ -1131,12 +1132,12 @@ def declares_pkg_resources_namespace_package(python_src: str) -> bool:
 
 
 def merge_entry_points(
-    *all_entry_points_with_descriptions_of_source: tuple[str, dict[str, dict[str, str]]]
+    *all_entry_points_with_descriptions_of_source: tuple[str, dict[str, dict[str, str]]],
 ) -> dict[str, dict[str, str]]:
     """Merge all entry points, throwing ValueError if there are any conflicts."""
     merged = cast(
         # this gives us a two level deep defaultdict with the inner values being of list type
-        DefaultDict[str, DefaultDict[str, List[Tuple[str, str]]]],
+        DefaultDict[str, DefaultDict[str, list[tuple[str, str]]]],
         defaultdict(partial(defaultdict, list)),
     )
 
@@ -1153,7 +1154,7 @@ def merge_entry_points(
                 softwrap(
                     f"""
                     Multiple entry_points registered for {category} {name} in:
-                    {', '.join(ep_source for ep_source, _ in entry_points_with_source)}
+                    {", ".join(ep_source for ep_source, _ in entry_points_with_source)}
                     """
                 )
             )

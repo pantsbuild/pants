@@ -11,7 +11,7 @@ from collections import Counter
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Optional, TypedDict
+from typing import TypedDict
 
 from pants.engine.internals.scheduler import Workunit
 from pants.engine.rules import collect_rules, rule
@@ -114,7 +114,7 @@ class StatsAggregatorSubsystem(Subsystem):
     )
 
 
-def _log_or_write_to_file_plain(output_file: Optional[str], lines: list[str]) -> None:
+def _log_or_write_to_file_plain(output_file: str | None, lines: list[str]) -> None:
     """Send text to the stdout or write to the output file (plain text)."""
     if lines:
         text = "\n".join(lines)
@@ -126,7 +126,7 @@ def _log_or_write_to_file_plain(output_file: Optional[str], lines: list[str]) ->
             logger.info(text)
 
 
-def _log_or_write_to_file_json(output_file: Optional[str], stats_object: StatsObject) -> None:
+def _log_or_write_to_file_json(output_file: str | None, stats_object: StatsObject) -> None:
     """Send JSON Lines single line object to the stdout or write to the file."""
     if not stats_object:
         return
@@ -147,7 +147,7 @@ class StatsAggregatorCallback(WorkunitsCallback):
         *,
         log: bool,
         memory: bool,
-        output_file: Optional[str],
+        output_file: str | None,
         has_histogram_module: bool,
         format: StatsOutputFormat,
     ) -> None:

@@ -10,8 +10,9 @@ import sys
 import time
 import traceback
 from abc import ABCMeta
+from collections.abc import Callable
 from hashlib import sha256
-from typing import Callable, cast
+from typing import cast
 
 import psutil
 

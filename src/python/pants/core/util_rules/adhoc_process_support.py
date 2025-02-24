@@ -8,11 +8,12 @@ import json
 import logging
 import os
 import shlex
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from textwrap import dedent  # noqa: PNT20
-from typing import Iterable, Mapping, TypeVar, Union
+from typing import TypeVar
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.build_graph.address import Address
@@ -531,17 +532,17 @@ async def check_outputs(
             message += f"\n\nDirectories in output ({len(snapshot.dirs)} total):"
             dirs = sorted(snapshot.dirs, key=lambda x: x.count(os.pathsep))
             if len(dirs) > 15:
-                message += f" {', ' .join(dirs[0:15])}, ... (trimmed for brevity)"
+                message += f" {', '.join(dirs[0:15])}, ... (trimmed for brevity)"
             else:
-                message += f" {', ' .join(dirs)}"
+                message += f" {', '.join(dirs)}"
 
         if snapshot.files:
             message += f"\n\nFiles in output ({len(snapshot.files)} total):"
             files = sorted(snapshot.files, key=lambda x: x.count(os.pathsep))
             if len(files) > 15:
-                message += f" {', ' .join(files[0:15])}, ... (trimmed for brevity)"
+                message += f" {', '.join(files[0:15])}, ... (trimmed for brevity)"
             else:
-                message += f" {', ' .join(files)}"
+                message += f" {', '.join(files)}"
 
         if outputs_match_error_behavior == GlobMatchErrorBehavior.error:
             raise ValueError(message)
@@ -858,7 +859,7 @@ def _output_at_build_root(process: Process, bash: BashBinary) -> Process:
     )
 
 
-def parse_relative_directory(workdir_in: str, relative_to: Union[Address, str]) -> str:
+def parse_relative_directory(workdir_in: str, relative_to: Address | str) -> str:
     """Convert the `workdir` field into something that can be understood by `Process`."""
 
     if isinstance(relative_to, Address):

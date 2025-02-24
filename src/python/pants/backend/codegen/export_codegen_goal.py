@@ -71,7 +71,7 @@ async def export_codegen(
             softwrap(
                 f"""
                 No codegen files/targets matched. All codegen target types:
-                {', '.join(codegen_targets)}
+                {", ".join(codegen_targets)}
                 """
             )
         )

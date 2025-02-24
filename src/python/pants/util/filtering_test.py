@@ -1,7 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Callable
+from collections.abc import Callable
 
 from pants.util.filtering import and_filters, create_filter, create_filters
 

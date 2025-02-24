@@ -1,7 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from dataclasses import dataclass
-from typing import Union
 
 from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
 from pants.backend.terraform.target_types import (
@@ -50,7 +49,7 @@ class TerraformCheckRequest(CheckRequest):
 
 
 def terraform_fieldset_to_init_request(
-    terraform_fieldset: Union[TerraformDeploymentFieldSet, TerraformFieldSet]
+    terraform_fieldset: TerraformDeploymentFieldSet | TerraformFieldSet,
 ) -> TerraformInitRequest:
     if isinstance(terraform_fieldset, TerraformDeploymentFieldSet):
         deployment = terraform_fieldset

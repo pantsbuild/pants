@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Iterable, List, Mapping, Tuple
 
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.fs import EMPTY_DIGEST, Digest, FileDigest
@@ -201,7 +201,7 @@ class FallibleProcessResult:
 
 @dataclass(frozen=True)
 class ProcessResultWithRetries:
-    results: Tuple[FallibleProcessResult, ...]
+    results: tuple[FallibleProcessResult, ...]
 
     @property
     def last(self):
@@ -354,13 +354,11 @@ execute_process_or_raise = fallible_to_exec_result_or_raise
 
 @rule
 async def execute_process_with_retry(req: ProcessWithRetries) -> ProcessResultWithRetries:
-    results: List[FallibleProcessResult] = []
+    results: list[FallibleProcessResult] = []
     for attempt in range(0, req.attempts):
         proc = dataclasses.replace(req.proc, attempt=attempt)
-        result = (
-            await Get(  # noqa: PNT30: We only know that we need to rerun the test after we run it
-                FallibleProcessResult, Process, proc
-            )
+        result = await Get(  # noqa: PNT30: We only know that we need to rerun the test after we run it
+            FallibleProcessResult, Process, proc
         )
         results.append(result)
         if result.exit_code == 0:

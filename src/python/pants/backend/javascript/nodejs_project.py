@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import itertools
 import os.path
+from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from pathlib import PurePath
-from typing import Iterable
 
 from pants.backend.javascript import package_json
 from pants.backend.javascript.package_json import (
@@ -273,14 +273,14 @@ def _merge_workspaces(node_js_projects: set[_TentativeProject]) -> Iterable[_Ten
 
 
 def _ensure_one_parent(
-    project_to_parents: dict[_TentativeProject, list[_TentativeProject]]
+    project_to_parents: dict[_TentativeProject, list[_TentativeProject]],
 ) -> None:
     for project, parents in project_to_parents.items():
         if len(parents) > 1:
             raise ValueError(
                 softwrap(
                     f"""
-                    Nodejs projects {', '.join(parent.root_dir for parent in parents)}
+                    Nodejs projects {", ".join(parent.root_dir for parent in parents)}
                     are specifying {project.root_dir} to be part of their workspaces.
 
                     A package can only be part of one project.
