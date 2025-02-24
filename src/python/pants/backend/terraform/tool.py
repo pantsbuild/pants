@@ -1,24 +1,42 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+"""# Terraform
+
+## Caching: Pants uses the [provider cache](https://developer.hashicorp.com/terraform/cli/config/config-file#provider-plugin-cache) for caching providers.
+These are the things that need to be downloaded, so this provides the most speedup.
+We use the providers cache instead of identifying and caching the providers individually for a few reasons:
+1. This leverages Terraform's existing caching mechanism
+2. This is much simpler
+3. This incurs almost no overhead, since it is done as part of `terraform init`. We don't need to run more analysers or separately download providers
+
+We didn't use `terraform providers lock` for a few reasons:
+1. `terraform providers lock` isn't designed for this usecase, it's designed to create mirrors of providers. It does more work (to set up manifests) and would require us to set more config settings
+2. `terraform providers lock` doesn't use itself as a cache. So every time we would want to refresh the cache, we need to download _everything_ again. Even if nothing has changed.
+"""
+
 from __future__ import annotations
 
+import os
 import shlex
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Tuple
 
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalToolRequest,
     TemplatedExternalTool,
 )
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.core.util_rules.system_binaries import BashBinary, MkdirBinary
+from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_DIGEST, Digest
 from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import collect_rules, rule
+from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, StrListOption
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
@@ -342,8 +360,10 @@ class TerraformTool(TemplatedExternalTool):
 
     extra_env_vars = StrListOption(
         help=softwrap(
-            """
+            f"""
             Additional environment variables that would be made available to all Terraform processes.
+
+            {EXTRA_ENV_VARS_USAGE_HELP}
             """
         ),
         advanced=True,
@@ -358,11 +378,32 @@ class TerraformTool(TemplatedExternalTool):
         ),
     )
 
+    platforms = StrListOption(
+        help=softwrap(
+            """
+            Platforms to generate lockfiles for. See the [documentation for the providers lock command](https://developer.hashicorp.com/terraform/cli/commands/providers/lock#platform-os_arch).
+            For example, `["windows_amd64", "darwin_amd64", "linux_amd64"]`
+            """
+        ),
+        advanced=True,
+    )
+
     tailor = BoolOption(
         default=True,
         help="If true, add `terraform_module` targets with the `tailor` goal.",
         advanced=True,
     )
+
+    def generate_exe(self, plat: Platform) -> str:
+        return "./terraform"
+
+    @property
+    def plugin_cache_dir(self) -> str:
+        return "__terraform_filesystem_mirror"
+
+    @property
+    def append_only_caches(self) -> dict[str, str]:
+        return {"terraform_plugins": self.plugin_cache_dir}
 
 
 @dataclass(frozen=True)
@@ -377,9 +418,19 @@ class TerraformProcess:
     chdir: str = "."  # directory for terraform's `-chdir` argument
 
 
+def _make_launcher_script(bash: BashBinary, commands: Iterable[Iterable[str]]) -> tuple[str, ...]:
+    """Assemble several command invocations into an inline launcher script, suitable for passing as
+    `Process(argv=(bash.path, "-c", script), ...)`"""
+    return (bash.path, "-c", " && ".join([shlex.join(command) for command in commands]))
+
+
 @rule
 async def setup_terraform_process(
-    request: TerraformProcess, terraform: TerraformTool, platform: Platform
+    request: TerraformProcess,
+    terraform: TerraformTool,
+    bash: BashBinary,
+    mkdir: MkdirBinary,
+    platform: Platform,
 ) -> Process:
     downloaded_terraform = await Get(
         DownloadedExternalTool,
@@ -388,17 +439,46 @@ async def setup_terraform_process(
     )
     env = await Get(EnvironmentVars, EnvironmentVarsRequest(terraform.extra_env_vars))
 
-    immutable_input_digests = {"__terraform": downloaded_terraform.digest}
+    extra_env_vars = {}
 
-    def prepend_paths(paths: Tuple[str, ...]) -> Tuple[str, ...]:
+    path = []
+    user_path = env.get("PATH")
+    if user_path:
+        path.append(user_path)
+    extra_env_vars["PATH"] = os.pathsep.join(path)
+
+    tf_plugin_cache_dir = os.path.join(terraform.plugin_cache_dir, request.chdir)
+    extra_env_vars["TF_PLUGIN_CACHE_DIR"] = os.path.join("{chroot}", tf_plugin_cache_dir)
+
+    env = EnvironmentVars({**env, **extra_env_vars})
+
+    immutable_input_digests = {
+        "__terraform": downloaded_terraform.digest,
+    }
+
+    def prepend_paths(paths: tuple[str, ...]) -> tuple[str, ...]:
         return tuple((Path(request.chdir) / path).as_posix() for path in paths)
 
+    # Initialise the Terraform provider cache, since Terraform expects the directory to already exist.
+    initialize_provider_cache_cmd = (mkdir.path, "-p", tf_plugin_cache_dir)
+    run_terraform_cmd = (
+        "__terraform/terraform",
+        f"-chdir={shlex.quote(request.chdir)}",
+    ) + request.args
+
     return Process(
-        argv=("__terraform/terraform", f"-chdir={shlex.quote(request.chdir)}") + request.args,
+        argv=_make_launcher_script(
+            bash,
+            (
+                initialize_provider_cache_cmd,
+                run_terraform_cmd,
+            ),
+        ),
         input_digest=request.input_digest,
         immutable_input_digests=immutable_input_digests,
         output_files=prepend_paths(request.output_files),
         output_directories=prepend_paths(request.output_directories),
+        append_only_caches=terraform.append_only_caches,
         env=env,
         description=request.description,
         level=LogLevel.DEBUG,
@@ -406,4 +486,8 @@ async def setup_terraform_process(
 
 
 def rules():
-    return [*collect_rules(), *external_tool.rules()]
+    return [
+        *collect_rules(),
+        *external_tool.rules(),
+        UnionRule(ExportableTool, TerraformTool),
+    ]

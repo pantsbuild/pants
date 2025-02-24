@@ -5,10 +5,9 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
-from typing import Any, Callable, ClassVar, Iterable, Iterator, Protocol, Sequence, TypeVar, cast
-
-from typing_extensions import final
+from typing import Any, ClassVar, Protocol, TypeVar, cast, final
 
 from pants.base.specs import Specs
 from pants.core.goals.multi_tool_goal_helper import (
@@ -39,7 +38,7 @@ from pants.engine.target import FieldSet, FilteredTargets
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.option_types import BoolOption
 from pants.util.collections import partition_sequentially
-from pants.util.docutil import bin_name
+from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 from pants.util.strutil import Simplifier, softwrap
@@ -233,7 +232,29 @@ REPORT_DIR = "reports"
 
 class LintSubsystem(GoalSubsystem):
     name = "lint"
-    help = "Run linters/formatters/fixers in check mode."
+    help = softwrap(
+        f"""
+        Run linters/formatters/fixers in check mode.
+
+        This goal runs tools that check code quality/styling etc, without changing that code. This
+        includes running formatters and fixers, but instead of writing changes back to the
+        workspace, Pants treats any changes they would make as a linting failure.
+
+        See also:
+
+        - [The `fmt` goal]({doc_url("reference/goals/fix")} will save the the result of formatters
+          (code-editing tools that make only "syntactic" changes) back to the workspace.
+
+        - [The `fmt` goal]({doc_url("reference/goals/fix")} will save the the result of fixers
+          (code-editing tools that may make "semantic" changes too) back to the workspace.
+
+        - Documentation about linters for various ecosystems, such as:
+          [Python]({doc_url("docs/python/overview/linters-and-formatters")}), [Go]({doc_url("docs/go")}),
+          [JVM]({doc_url("jvm/java-and-scala#lint-and-format")}), [Shell]({doc_url("docs/shell")}),
+          [Docker]({doc_url("docs/docker#linting-dockerfiles-with-hadolint")}).
+
+        """
+    )
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:

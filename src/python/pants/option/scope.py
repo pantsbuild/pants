@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Optional, Tuple, Type, cast
+from typing import Any, Optional, cast
 
 from pants.option.option_value_container import OptionValueContainer
 
@@ -26,12 +26,12 @@ class ScopeInfo:
     """Information about a scope."""
 
     scope: str
-    subsystem_cls: Optional[Type] = None
+    subsystem_cls: type[Any] | None = None
     # A ScopeInfo may have a deprecated_scope (from its associated subsystem_cls), which represents
     # a previous/deprecated name for a current/non-deprecated ScopeInfo. It may also be directly
     # deprecated via this `removal_version`, which allows for the deprecation of an entire scope.
-    removal_version: Optional[str] = None
-    removal_hint: Optional[str] = None
+    removal_version: str | None = None
+    removal_hint: str | None = None
 
     # Command line goal scope flag.
     is_goal: bool = False
@@ -39,25 +39,28 @@ class ScopeInfo:
     # Builtin goals, such as `help` and `version` etc.
     is_builtin: bool = False
 
+    # Auxiliary goals, such as the `experimental-bsp` goal.
+    is_auxiliary: bool = False
+
     @property
     def description(self) -> str:
         return cast(str, self._subsystem_cls_attr("help"))
 
     @property
-    def deprecated_scope(self) -> Optional[str]:
+    def deprecated_scope(self) -> str | None:
         return cast(Optional[str], self._subsystem_cls_attr("deprecated_options_scope"))
 
     @property
-    def deprecated_scope_removal_version(self) -> Optional[str]:
+    def deprecated_scope_removal_version(self) -> str | None:
         return cast(
             Optional[str],
             self._subsystem_cls_attr("deprecated_options_scope_removal_version"),
         )
 
     @property
-    def scope_aliases(self) -> Tuple[str, ...]:
+    def scope_aliases(self) -> tuple[str, ...]:
         """BuiltinGoal subsystems may define aliases."""
-        return cast(Tuple[str, ...], self._subsystem_cls_attr("aliases", ()))
+        return cast(tuple[str, ...], self._subsystem_cls_attr("aliases", ()))
 
     def _subsystem_cls_attr(self, name: str, default=None):
         return getattr(self.subsystem_cls, name, default) if self.subsystem_cls else default

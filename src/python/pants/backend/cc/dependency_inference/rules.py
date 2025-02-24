@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import DefaultDict, Iterable
+from typing import DefaultDict
 
 from pants.backend.cc.subsystems.cc_infer import CCInferSubsystem
 from pants.backend.cc.target_types import CCDependenciesField, CCSourceField
@@ -14,7 +15,7 @@ from pants.build_graph.address import Address
 from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.stripped_source_files import StrippedFileNameRequest, strip_file_name
 from pants.engine.internals.graph import determine_explicitly_provided_dependencies, hydrate_sources
-from pants.engine.intrinsics import directory_digest_to_digest_contents
+from pants.engine.intrinsics import get_digest_contents
 from pants.engine.rules import Rule, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     AllTargets,
@@ -130,7 +131,7 @@ async def infer_cc_source_dependencies(
         hydrate_sources(HydrateSourcesRequest(request.field_set.sources), **implicitly()),
     )
 
-    digest_contents = await directory_digest_to_digest_contents(hydrated_sources.snapshot.digest)
+    digest_contents = await get_digest_contents(hydrated_sources.snapshot.digest)
     assert len(digest_contents) == 1
     file_content = digest_contents[0]
     file_path = PurePath(file_content.path)

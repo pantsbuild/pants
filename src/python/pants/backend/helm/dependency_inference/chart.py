@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.helm.resolve import artifacts
 from pants.backend.helm.resolve.artifacts import ThirdPartyHelmArtifactMapping

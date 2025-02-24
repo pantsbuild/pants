@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import venv
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from configparser import ConfigParser
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -20,7 +21,7 @@ from enum import Enum
 from functools import total_ordering
 from math import ceil
 from pathlib import Path
-from typing import Any, Callable, Iterable, Iterator, Sequence, cast
+from typing import Any, cast
 
 import requests
 from packaging.version import Version
@@ -532,19 +533,35 @@ def build_pants_wheels() -> None:
 
     for package in PACKAGES:
         found_wheels = sorted(Path("dist").glob(f"{package}-{version}-*.whl"))
-        # NB: For any platform-specific wheels, like pantsbuild.pants, we assume that the
-        # top-level `dist` will only have wheels built for the current platform. This
-        # should be safe because it is not possible to build native wheels for another
-        # platform.
-        if not is_cross_platform(found_wheels) and len(found_wheels) > 1:
-            die(
-                softwrap(
-                    f"""
-                    Found multiple wheels for {package} in the `dist/` folder, but was
-                    expecting only one wheel: {sorted(wheel.name for wheel in found_wheels)}.
-                    """
+        if not is_cross_platform(found_wheels):
+            # NB: For any platform-specific wheels, like pantsbuild.pants, we assume that the
+            # top-level `dist` will only have wheels built for the current platform. This
+            # should be safe because it is not possible to build native wheels for another
+            # platform.
+            if len(found_wheels) > 1:
+                die(
+                    softwrap(
+                        f"""
+                        Found multiple wheels for {package} in the `dist/` folder, but was
+                        expecting only one wheel: {sorted(wheel.name for wheel in found_wheels)}.
+                        """
+                    )
                 )
-            )
+
+            # We also only build for a single architecture at a time, so lets confirm that the wheel
+            # isn't potentially reporting itself as applicable to arm64 and x86-64 ('universal2', in
+            # macOS parlance) (see #21938):
+            wheel = found_wheels[0]
+            if "universal2" in str(wheel):
+                die(
+                    softwrap(
+                        f"""
+                        Found universal wheel for {package} in the `dist/` folder, but was
+                        expecting a specific architecture: {wheel}.
+                        """
+                    )
+                )
+
         for wheel in found_wheels:
             wheel_dest = dest / wheel.name
             if not wheel_dest.exists():
@@ -809,7 +826,7 @@ def smoke_test_install_and_version(version: str) -> None:
             ]
 
             [python]
-            interpreter_constraints = ["==3.9.*"]
+            interpreter_constraints = ["==3.11.*"]
             enable_resolves = true
             """
         )

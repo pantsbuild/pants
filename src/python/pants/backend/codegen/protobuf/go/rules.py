@@ -9,6 +9,7 @@ import textwrap
 from collections import defaultdict
 from dataclasses import dataclass
 
+from pants.backend.codegen.protobuf import protoc
 from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.target_types import (
     AllProtobufTargets,
@@ -316,7 +317,7 @@ async def setup_full_package_build_request(
                 f"""
                 Expected Go files generated from Protobuf sources to be output to a single directory.
                 - import path: {request.import_path}
-                - protobuf files: {', '.join(pkg_files)}
+                - protobuf files: {", ".join(pkg_files)}
                 """
             ).strip(),
         )
@@ -372,7 +373,7 @@ async def setup_full_package_build_request(
                             f"""
                             Multiple addresses match import of `{dep_import_path}`.
 
-                            addresses: {', '.join(str(a) for a in candidate_addresses.addresses)}
+                            addresses: {", ".join(str(a) for a in candidate_addresses.addresses)}
                             """
                         ).strip(),
                     )
@@ -598,6 +599,8 @@ async def setup_go_protoc_plugin() -> _SetupGoProtocPlugin:
                 input_digest=download_sources_result.output_digest,
                 output_files=["gopath/bin/protoc-gen-go"],
                 description="Build Go protobuf plugin for `protoc`.",
+                # Allow `go` to contact the Go module proxy since it will run its own build.
+                allow_downloads=True,
             ),
         ),
         Get(
@@ -610,6 +613,8 @@ async def setup_go_protoc_plugin() -> _SetupGoProtocPlugin:
                 input_digest=download_sources_result.output_digest,
                 output_files=["gopath/bin/protoc-gen-go-grpc"],
                 description="Build Go gRPC protobuf plugin for `protoc`.",
+                # Allow `go` to contact the Go module proxy since it will run its own build.
+                allow_downloads=True,
             ),
         ),
     )
@@ -644,6 +649,7 @@ def rules():
         UnionRule(GoModuleImportPathsMappingsHook, ProtobufGoModuleImportPathsMappingsHook),
         ProtobufSourcesGeneratorTarget.register_plugin_field(GoOwningGoModAddressField),
         ProtobufSourceTarget.register_plugin_field(GoOwningGoModAddressField),
+        *protoc.rules(),
         # Rules needed for this to pass src/python/pants/init/load_backends_integration_test.py:
         *assembly.rules(),
         *build_pkg.rules(),

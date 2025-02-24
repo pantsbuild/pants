@@ -6,10 +6,11 @@ from __future__ import annotations
 import logging
 import os
 import time
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import PurePath
 from types import CoroutineType
-from typing import Any, Callable, Dict, Iterable, NoReturn, Sequence, cast
+from typing import Any, NoReturn, cast
 
 from typing_extensions import TypedDict
 
@@ -41,6 +42,7 @@ from pants.engine.internals.native_dep_inference import (
     NativeParsedDockerfileInfo,
     NativeParsedJavascriptDependencies,
     NativeParsedPythonDependencies,
+    ParsedJavascriptDependencyCandidate,
 )
 from pants.engine.internals.native_engine import (
     PyExecutionRequest,
@@ -79,7 +81,7 @@ from pants.util.strutil import pluralize
 logger = logging.getLogger(__name__)
 
 
-Workunit = Dict[str, Any]
+Workunit = dict[str, Any]
 
 
 class PolledWorkunits(TypedDict):
@@ -182,6 +184,7 @@ class Scheduler:
             parsed_python_deps_result=NativeParsedPythonDependencies,
             parsed_javascript_deps_result=NativeParsedJavascriptDependencies,
             parsed_dockerfile_info_result=NativeParsedDockerfileInfo,
+            parsed_javascript_deps_candidate_result=ParsedJavascriptDependencyCandidate,
         )
         remoting_options = PyRemotingOptions(
             provider=execution_options.remote_provider.value,
@@ -486,13 +489,15 @@ class SchedulerSession:
             raise ExecutionTimeoutError("Timed out")
 
         states = [
-            Throw(
-                raw_root.result,
-                python_traceback=raw_root.python_traceback,
-                engine_traceback=raw_root.engine_traceback,
+            (
+                Throw(
+                    raw_root.result,
+                    python_traceback=raw_root.python_traceback,
+                    engine_traceback=raw_root.engine_traceback,
+                )
+                if raw_root.is_throw
+                else Return(raw_root.result)
             )
-            if raw_root.is_throw
-            else Return(raw_root.result)
             for raw_root in raw_roots
         ]
 

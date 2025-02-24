@@ -36,6 +36,8 @@ message JavascriptInferenceMetadata {
   }
   string package_root = 1;
   repeated ImportPattern import_patterns = 2;
+  optional string config_root = 3;
+  repeated ImportPattern paths = 4;
 }
 
 // A URL and Digest tuple, which is itself digested and used as a CacheKey. ObservedURLs

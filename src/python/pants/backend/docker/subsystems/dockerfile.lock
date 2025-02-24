@@ -6,7 +6,7 @@
 // {
 //   "version": 3,
 //   "valid_for_interpreter_constraints": [
-//     "CPython<4,>=3.7"
+//     "CPython<4,>=3.8"
 //   ],
 //   "generated_with_requirements": [
 //     "dockerfile<4,>=3.2.0"
@@ -24,6 +24,7 @@
   "allow_wheels": true,
   "build_isolation": true,
   "constraints": [],
+  "excluded": [],
   "locked_resolves": [
     {
       "locked_requirements": [
@@ -31,29 +32,29 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "a3ff90c92f05b5bceee4742d15899b3967cda025eec14a852811d089caf3478e",
-              "url": "https://files.pythonhosted.org/packages/a7/53/19d0ce2471a22fa469a7748e8d45f0eaa99b38dfbfecfe24cd1ca19db41f/dockerfile-3.2.0-cp38-abi3-macosx_12_0_arm64.whl"
+              "hash": "16a0c353e8d41dfedcbbb39d2c3e911ed5379269ee9fddd7f2fd7dc8d43c957e",
+              "url": "https://files.pythonhosted.org/packages/ad/60/29cac20ce5d96022d0976cf562f4f28f18a224cd95e7a4558b9fd56ee08c/dockerfile-3.3.1-cp38-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e6bd64408386b7ba2259d85820e0fe90de1b6b8269f560f18aba100c6aa40b7d",
-              "url": "https://files.pythonhosted.org/packages/0e/de/00149a416148c609c71c8a94e5e4df14a9f62bf2fa41aeda021b76388623/dockerfile-3.2.0-cp36-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.whl"
+              "hash": "c222ee8b26017df0d9c5dcb9c4e02452f508137fc89e214758f68d57c50f5d2a",
+              "url": "https://files.pythonhosted.org/packages/46/c8/bbc9cbfba6943a422b3c72a6e862665d7d811aed882fe2f0698cf6b2f008/dockerfile-3.3.1-cp38-abi3-macosx_12_0_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e13fd3768216a788189e0667521e1435a273a4129119a8453085d897fc34aac8",
-              "url": "https://files.pythonhosted.org/packages/6e/75/1395fac29bd2dcccb51ffae11ba9a19fe159eabf9596bca4cf49c1a2b191/dockerfile-3.2.0.tar.gz"
+              "hash": "4790b3d96d1018302b27661f9624d851a4b7113bce1dbb2d7509991e81a387a9",
+              "url": "https://files.pythonhosted.org/packages/54/94/754d7d016f4fbbadcd280b2f99fb9b86567ef9094b241affa40c75083fe4/dockerfile-3.3.1.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "e6e00b82b82042fb4df569ae00bd2648ac6c8823f51c406da31ab01c728926c2",
-              "url": "https://files.pythonhosted.org/packages/9e/19/0f56ebd6d535832bfbe7c4f16c983c08ab8e01927fe9ae15e1afcfa88996/dockerfile-3.2.0-cp36-abi3-macosx_10_14_x86_64.whl"
+              "hash": "93bc503ed34dbbb52214753c560942f59686b3f26d0ed392d6b48fa3c238c0b1",
+              "url": "https://files.pythonhosted.org/packages/97/f5/ae500b918d6cf4229f26ab40bfec06cad0af5425dd471e747c4fea26d0c9/dockerfile-3.3.1-cp38-abi3-macosx_13_0_arm64.whl"
             }
           ],
           "project_name": "dockerfile",
           "requires_dists": [],
-          "requires_python": ">=3.6.1",
-          "version": "3.2.0"
+          "requires_python": ">=3.8",
+          "version": "3.3.1"
         }
       ],
       "platform_tag": null
@@ -61,15 +62,16 @@
   ],
   "only_builds": [],
   "only_wheels": [],
+  "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.2.1",
-  "pip_version": "24.0",
+  "pex_version": "2.16.2",
+  "pip_version": "24.2",
   "prefer_older_binary": false,
   "requirements": [
     "dockerfile<4,>=3.2.0"
   ],
   "requires_python": [
-    "<4,>=3.7"
+    "<4,>=3.8"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",

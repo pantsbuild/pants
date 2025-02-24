@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Iterable, List, Mapping, Tuple
 
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.fs import EMPTY_DIGEST, Digest, FileDigest
@@ -35,6 +35,10 @@ class ProcessCacheScope(Enum):
     ALWAYS = "always"
     # Cached in all locations, but only if the process exits successfully.
     SUCCESSFUL = "successful"
+    # Cached only locally, regardless of success or failure.
+    LOCAL_ALWAYS = "local_always"
+
+    LOCAL_SUCCESSFUL = "local_successful"
     # Cached only in memory (i.e. memoized in pantsd), but never persistently, regardless of
     # success vs. failure.
     PER_RESTART_ALWAYS = "per_restart_always"
@@ -197,7 +201,7 @@ class FallibleProcessResult:
 
 @dataclass(frozen=True)
 class ProcessResultWithRetries:
-    results: Tuple[FallibleProcessResult, ...]
+    results: tuple[FallibleProcessResult, ...]
 
     @property
     def last(self):
@@ -287,6 +291,18 @@ class ProcessExecutionFailure(Exception):
             )
         super().__init__("\n".join(err_strings))
 
+    @classmethod
+    def from_result(
+        cls, result: FallibleProcessResult, description: str, keep_sandboxes: KeepSandboxes
+    ) -> ProcessExecutionFailure:
+        return cls(
+            result.exit_code,
+            result.stdout,
+            result.stderr,
+            description,
+            keep_sandboxes=keep_sandboxes,
+        )
+
 
 @rule
 def get_multi_platform_request_description(req: Process) -> ProductDescription:
@@ -319,15 +335,30 @@ def fallible_to_exec_result_or_raise(
     )
 
 
+# fallible_to_exec_result_or_raise directly converts a FallibleProcessResult
+# to a ProcessResult, or raises an exception if the process failed.
+# Its name makes sense when you already have a FallibleProcessResult in hand.
+#
+# But, it is common to want to execute a process and automatically raise an exception
+# on process error. The execute_process_or_raise() alias below facilitates this idiom:
+#
+# result = await execute_process_or_raise(
+#         **implicitly(
+#             Process(...) # Or something that some other rule can convert to a Process.
+#         )
+#     )
+# Where the execute_process() intrinsic is invoked implicitly to create a FallibleProcessResult.
+# This is simply a better name for the same rule, when invoked in this use case.
+execute_process_or_raise = fallible_to_exec_result_or_raise
+
+
 @rule
-async def run_proc_with_retry(req: ProcessWithRetries) -> ProcessResultWithRetries:
-    results: List[FallibleProcessResult] = []
+async def execute_process_with_retry(req: ProcessWithRetries) -> ProcessResultWithRetries:
+    results: list[FallibleProcessResult] = []
     for attempt in range(0, req.attempts):
         proc = dataclasses.replace(req.proc, attempt=attempt)
-        result = (
-            await Get(  # noqa: PNT30: We only know that we need to rerun the test after we run it
-                FallibleProcessResult, Process, proc
-            )
+        result = await Get(  # noqa: PNT30: We only know that we need to rerun the test after we run it
+            FallibleProcessResult, Process, proc
         )
         results.append(result)
         if result.exit_code == 0:

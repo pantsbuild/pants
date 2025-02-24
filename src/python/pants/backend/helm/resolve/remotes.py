@@ -3,10 +3,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any, Iterator, cast
+from typing import Any, cast
 
-from pants.option.parser import Parser
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_method
 
@@ -39,7 +39,7 @@ class HelmRegistry:
         return cls(
             alias=alias,
             address=cast(str, d["address"]).rstrip("/"),
-            default=Parser.ensure_bool(d.get("default", alias == "default")),
+            default=d.get("default", alias == "default"),
         )
 
     def __post_init__(self) -> None:

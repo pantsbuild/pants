@@ -8,8 +8,9 @@ import collections.abc
 import json
 import logging
 from abc import ABCMeta
-from dataclasses import dataclass, fields, is_dataclass
-from typing import Any, Iterable, Mapping, Protocol, runtime_checkable
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, fields, is_dataclass, replace
+from typing import Any, Protocol, runtime_checkable
 
 from pants.core.goals.deploy import Deploy, DeployFieldSet
 from pants.core.goals.package import Package, PackageFieldSet
@@ -56,8 +57,7 @@ logger = logging.getLogger(__name__)
 class Dictable(Protocol):
     """Make possible to avoid adding concrete types to serialize objects."""
 
-    def asdict(self) -> Mapping[str, Any]:
-        ...
+    def asdict(self) -> Mapping[str, Any]: ...
 
 
 class PeekSubsystem(Outputting, GoalSubsystem):
@@ -243,9 +243,9 @@ async def _create_target_alias_to_goals_map() -> dict[str, tuple[str, ...]]:
         TestFieldSet: Test.name,
     }
 
-    assert len(peekable_field_sets) == len(
-        field_set_to_goal_map
-    ), "Must have a goal string for each field set"
+    assert len(peekable_field_sets) == len(field_set_to_goal_map), (
+        "Must have a goal string for each field set"
+    )
     peekable_goals = [field_set_to_goal_map[fs] for fs in peekable_field_sets]
 
     target_roots_to_field_sets_get = [
@@ -432,14 +432,9 @@ async def peek(
         # TargetData is frozen so we need to create a new collection
         tds = TargetDatas(
             [
-                TargetData(
-                    td.target,
-                    td.expanded_sources,
-                    td.expanded_dependencies,
-                    td.dependencies_rules,
-                    td.dependents_rules,
-                    td.applicable_dep_rules,
-                    target_alias_to_goals_map.get(td.target.alias),
+                replace(
+                    td,
+                    goals=target_alias_to_goals_map.get(td.target.alias),
                 )
                 for td in tds
             ]

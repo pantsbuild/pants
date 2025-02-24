@@ -122,7 +122,7 @@ def test_bad_group_name(exception_str: str, args: list[Any], kwargs: dict[str, A
             dict(
                 # Field overridden by some parametrize groups.
                 f="x",
-                **Parametrize("A", f=1),  # type: ignore[arg-type]
+                **Parametrize("A", f=1),
                 **Parametrize("B", f=2),
                 **Parametrize("C", g=[]),
             ),
@@ -134,9 +134,9 @@ def test_bad_group_name(exception_str: str, args: list[Any], kwargs: dict[str, A
                 ("a@c=val2,parametrize=root-sub2", {"a": 2, "b": 0, "c": "val2"}),
                 ("a@parametrize=root-sub1", {"a": 1, "b": 1}),
             ],
-            dict(  # type: ignore[arg-type]
+            dict(
                 b=0,
-                **Parametrize(  # type: ignore[arg-type]
+                **Parametrize(
                     "root",
                     a=1,
                     **Parametrize("sub1", b=1),
@@ -176,7 +176,7 @@ def test_expand(
             dict(
                 g="1",
                 i="1",
-                **Parametrize("A", f="1", g="2"),  # type: ignore[arg-type]
+                **Parametrize("A", f="1", g="2"),
                 **Parametrize("B"),
             ),
         ),
@@ -219,7 +219,7 @@ def test_expand_existing_parameters(
                 h=Parametrize("x", "y"),
                 x=5,
                 z=6,
-                **Parametrize("A", f=1),  # type: ignore[arg-type]
+                **Parametrize("A", f=1),
                 **Parametrize("B", g=2, x=3),
             ),
             "Failed to parametrize `a:a`:\n  Conflicting parametrizations for fields: 'f', 'g'",
@@ -233,7 +233,7 @@ def test_expand_existing_parameters(
                 z=6,
                 **Parametrize(
                     "root",
-                    **Parametrize("A", f=1, h=4),  # type: ignore[arg-type]
+                    **Parametrize("A", f=1, h=4),
                     **Parametrize("B", g=2, x=3),
                 ),
             ),
@@ -243,7 +243,7 @@ def test_expand_existing_parameters(
         (
             dict(
                 f="x",
-                **Parametrize("A", a=1, b=3),  # type: ignore[arg-type]
+                **Parametrize("A", a=1, b=3),
                 **Parametrize("A", a=2, c=4),
             ),
             "Failed to parametrize `a:a`:\n  Parametrization group name is not unique: 'A'",

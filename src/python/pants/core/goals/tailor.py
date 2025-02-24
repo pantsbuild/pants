@@ -9,9 +9,10 @@ import logging
 import os
 from abc import ABCMeta
 from collections import defaultdict
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Iterator, Mapping, cast
+from typing import cast
 
 from pants.base.specs import AncestorGlobSpec, DirLiteralSpec, RawSpecs, Specs
 from pants.build_graph.address import Address
@@ -165,7 +166,7 @@ class PutativeTarget:
                 softwrap(
                     f"""
                     A target of type {target_type.__name__} was proposed at
-                    address {path}:{name} with explicit sources {', '.join(explicit_sources or triggering_sources)},
+                    address {path}:{name} with explicit sources {", ".join(explicit_sources or triggering_sources)},
                     but this target type does not have a `source` or `sources` field.
                     """
                 )
@@ -226,7 +227,7 @@ class PutativeTarget:
         return dataclasses.replace(
             self,
             owned_sources=owned_sources,
-            kwargs={**self.kwargs, "sources": owned_sources},
+            kwargs=FrozenDict({**self.kwargs, "sources": owned_sources}),
         )
 
     def add_comments(self, comments: Iterable[str]) -> PutativeTarget:
@@ -237,7 +238,7 @@ class PutativeTarget:
             if isinstance(v, str):
                 return f'"{v}"'
             if isinstance(v, tuple):
-                val_parts = [f"\n{indent*2}{fmt_val(x)}" for x in v]
+                val_parts = [f"\n{indent * 2}{fmt_val(x)}" for x in v]
                 val_str = ",".join(val_parts) + ("," if v else "")
                 return f"[{val_str}\n{indent}]"
             return repr(v)
@@ -246,7 +247,7 @@ class PutativeTarget:
         if self.kwargs or has_name:
             _kwargs = {
                 **({"name": self.name} if has_name else {}),
-                **self.kwargs,  # type: ignore[arg-type]
+                **self.kwargs,
             }
             _kwargs_str_parts = [f"\n{indent}{k}={fmt_val(v)}" for k, v in _kwargs.items()]
             kwargs_str = ",".join(_kwargs_str_parts) + ",\n"
@@ -318,7 +319,7 @@ class TailorSubsystem(GoalSubsystem):
             f"""
             A mapping from standard target type to custom type to use instead. The custom
             type can be a custom target type or a macro that offers compatible functionality
-            to the one it replaces (see {doc_url('docs/writing-plugins/macros')}).
+            to the one it replaces (see {doc_url("docs/writing-plugins/macros")}).
             """
         ),
         advanced=True,

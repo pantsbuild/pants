@@ -3,8 +3,9 @@
 
 import functools
 import inspect
+from collections.abc import Callable
 from contextlib import contextmanager
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, TypeVar
 
 from pants.util.meta import T, classproperty
 
@@ -61,7 +62,7 @@ def per_instance(*args, **kwargs):
     return equal_args(*instance_and_rest, **kwargs)
 
 
-def memoized(func: Optional[F] = None, key_factory=equal_args, cache_factory=dict) -> F:
+def memoized(func: F | None = None, key_factory=equal_args, cache_factory=dict) -> F:
     """Memoizes the results of a function call.
 
     By default, exactly one result is memoized for each unique combination of function arguments.
@@ -146,7 +147,7 @@ def memoized(func: Optional[F] = None, key_factory=equal_args, cache_factory=dic
     return memoize  # type: ignore[return-value]
 
 
-def memoized_method(func: Optional[F] = None, key_factory=per_instance, cache_factory=dict) -> F:
+def memoized_method(func: F | None = None, key_factory=per_instance, cache_factory=dict) -> F:
     """A convenience wrapper for memoizing instance methods.
 
     Typically you'd expect a memoized instance method to hold a cached value per class instance;
@@ -183,7 +184,7 @@ def memoized_method(func: Optional[F] = None, key_factory=per_instance, cache_fa
 
 
 def memoized_property(
-    func: Optional[Callable[..., T]] = None, key_factory=per_instance, cache_factory=dict
+    func: Callable[..., T] | None = None, key_factory=per_instance, cache_factory=dict
 ) -> T:
     """A convenience wrapper for memoizing properties.
 
@@ -249,21 +250,19 @@ def memoized_property(
     getter = memoized_method(func=func, key_factory=key_factory, cache_factory=cache_factory)
     return property(  # type: ignore[return-value]
         fget=getter,
-        fdel=lambda self: getter.forget(self),  # type: ignore[attr-defined, no-any-return]
+        fdel=lambda self: getter.forget(self),  # type: ignore[attr-defined]
     )
 
 
 # TODO[13244]: fix type hint issue when using @memoized_classmethod and friends
-def memoized_classmethod(
-    func: Optional[F] = None, key_factory=per_instance, cache_factory=dict
-) -> F:
+def memoized_classmethod(func: F | None = None, key_factory=per_instance, cache_factory=dict) -> F:
     return classmethod(  # type: ignore[return-value]
         memoized_method(func, key_factory=key_factory, cache_factory=cache_factory)
     )
 
 
 def memoized_classproperty(
-    func: Optional[Callable[..., T]] = None, key_factory=per_instance, cache_factory=dict
+    func: Callable[..., T] | None = None, key_factory=per_instance, cache_factory=dict
 ) -> T:
     return classproperty(
         memoized_classmethod(func, key_factory=key_factory, cache_factory=cache_factory)
@@ -271,7 +270,7 @@ def memoized_classproperty(
 
 
 def testable_memoized_property(
-    func: Optional[Callable[..., T]] = None, key_factory=per_instance, cache_factory=dict
+    func: Callable[..., T] | None = None, key_factory=per_instance, cache_factory=dict
 ) -> T:
     """A variant of `memoized_property` that allows for setting of properties (for tests, etc)."""
     getter = memoized_method(func=func, key_factory=key_factory, cache_factory=cache_factory)
@@ -283,5 +282,5 @@ def testable_memoized_property(
     return property(  # type: ignore[return-value]
         fget=getter,
         fset=setter,
-        fdel=lambda self: getter.forget(self),  # type: ignore[attr-defined, no-any-return]
+        fdel=lambda self: getter.forget(self),  # type: ignore[attr-defined]
     )

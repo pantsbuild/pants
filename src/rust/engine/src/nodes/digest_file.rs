@@ -6,7 +6,7 @@ use fs::File;
 use futures::TryFutureExt;
 use graph::CompoundNode;
 
-use super::{NodeKey, NodeOutput, NodeResult};
+use super::{NodeKey, NodeOutput, NodeResult, SubjectPath};
 use crate::context::Context;
 use crate::python::throw;
 
@@ -14,11 +14,14 @@ use crate::python::throw;
 /// A Node that represents reading a file and fingerprinting its contents.
 ///
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
-pub struct DigestFile(pub File);
+pub struct DigestFile {
+    pub file: File,
+    pub subject_path: SubjectPath,
+}
 
 impl DigestFile {
     pub(super) async fn run_node(self, context: Context) -> NodeResult<hashing::Digest> {
-        let path = context.core.vfs.file_path(&self.0);
+        let path = context.core.vfs.file_path(&self.file);
         context
             .core
             .store()

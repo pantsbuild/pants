@@ -4,8 +4,9 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable, Iterator
 from dataclasses import asdict
-from typing import Iterable, Iterator, List, Optional, cast
+from typing import cast
 
 import strawberry
 from pants_explorer.server.graphql.context import GraphQLContext
@@ -17,12 +18,12 @@ from pants.help import help_info_extracter
 @strawberry.type(description=cast(str, help_info_extracter.RuleInfo.__doc__))
 class RuleInfo:
     name: str
-    description: Optional[str]
-    documentation: Optional[str]
+    description: str | None
+    documentation: str | None
     provider: str
     output_type: str
-    input_types: List[str]
-    awaitables: List[str]
+    input_types: list[str]
+    awaitables: list[str]
 
     @classmethod
     def from_help(cls, info: help_info_extracter.RuleInfo) -> RuleInfo:
@@ -34,10 +35,10 @@ class RuleInfo:
     description="Filter rules based on name and/or limit the number of entries to return."
 )
 class RulesQuery:
-    name_re: Optional[str] = strawberry.field(
+    name_re: str | None = strawberry.field(
         default=None, description="Select rules matching a regexp."
     )
-    limit: Optional[int] = strawberry.field(
+    limit: int | None = strawberry.field(
         default=None, description="Limit the number of entries returned."
     )
 
@@ -66,7 +67,7 @@ class QueryRulesMixin:
     """Get rules related info."""
 
     @strawberry.field
-    def rules(self, info: Info, query: Optional[RulesQuery] = None) -> List[RuleInfo]:
+    def rules(self, info: Info, query: RulesQuery | None = None) -> list[RuleInfo]:
         request_state = GraphQLContext.request_state_from_info(info)
         return list(
             RulesQuery.filter(

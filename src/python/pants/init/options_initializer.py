@@ -7,9 +7,9 @@ import dataclasses
 import importlib
 import logging
 import sys
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, List
 
 import pkg_resources
 
@@ -47,7 +47,7 @@ def _initialize_build_configuration(
       2. is expensive to call, because it might resolve plugins from the network
     """
 
-    bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
+    bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
 
     # Add any extra paths to python path (e.g., for loading extra source backends).
     for path in bootstrap_options.pythonpath:
@@ -66,7 +66,7 @@ def _initialize_build_configuration(
     )
 
 
-def _collect_backends_requirements(backends: List[str]) -> List[str]:
+def _collect_backends_requirements(backends: list[str]) -> list[str]:
     """Collects backend package dependencies, in case those are declared in an adjacent
     requirements.txt. Ignores any loading errors, assuming those will be later on handled by the
     backends loader.
@@ -135,7 +135,7 @@ class OptionsInitializer:
     TODO: We would eventually like to use the bootstrap Scheduler to construct the
     OptionsBootstrapper as well, but for now we do the opposite thing, and the Scheduler is
     used only to resolve plugins.
-      see: https://github.com/pantsbuild/pants/issues/10360
+      see https://github.com/pantsbuild/pants/pull/11568
     """
 
     def __init__(

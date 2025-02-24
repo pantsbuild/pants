@@ -5,13 +5,17 @@ from __future__ import annotations
 
 import functools
 import os
+from collections.abc import Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from threading import Thread
-from typing import Any, BinaryIO, Dict, Iterable, Tuple
+from typing import Any, BinaryIO
 
-from pylsp_jsonrpc.endpoint import Endpoint  # type: ignore[import]
-from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # type: ignore[import]
+from pylsp_jsonrpc.endpoint import Endpoint  # type: ignore[import-untyped]
+from pylsp_jsonrpc.streams import (  # type: ignore[import-untyped]
+    JsonRpcStreamReader,
+    JsonRpcStreamWriter,
+)
 
 from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPConnection
@@ -55,7 +59,7 @@ def setup_pipes():
 
 
 # A notification method name, and a subset of its fields.
-NotificationSubset = Tuple[str, Dict[str, Any]]
+NotificationSubset = tuple[str, dict[str, Any]]
 
 
 @dataclass

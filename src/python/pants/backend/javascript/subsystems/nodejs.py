@@ -6,9 +6,10 @@ from __future__ import annotations
 import itertools
 import logging
 import os.path
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from itertools import groupby
-from typing import ClassVar, Collection, Iterable, Mapping, Sequence
+from typing import ClassVar
 
 from nodesemver import min_satisfying
 
@@ -41,10 +42,11 @@ from pants.core.util_rules.system_binaries import (
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest, PathEnvironmentVariable
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, DownloadFile
 from pants.engine.internals.native_engine import FileDigest, MergeDigests
+from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, Rule, collect_rules, rule
+from pants.engine.rules import Get, Rule, collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import DictOption, ShellStrListOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
@@ -61,12 +63,12 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
     options_scope = "nodejs"
     help = "The Node.js Javascript runtime (including Corepack)."
 
-    default_version = "v20.15.1"
+    default_version = "v22.6.0"
     default_known_versions = [
-        "v20.15.1|macos_arm64|4743bc042f90ba5d9edf09403207290a9cdd2f6061bdccf7caaa0bbfd49f343e|41888895",
-        "v20.15.1|macos_x86_64|f5379772ffae1404cfd1fcc8cf0c6c5971306b8fb2090d348019047306de39dc|43531593",
-        "v20.15.1|linux_arm64|10d47a46ef208b3e4b226e4d595a82659123b22397ed77b7975d989114ec317e|24781292",
-        "v20.15.1|linux_x86_64|26700f8d3e78112ad4a2618a9c8e2816e38a49ecf0213ece80e54c38cb02563f|25627852",
+        "v22.6.0|macos_arm64|9ea60766807cd3c3a3ad6ad419f98918d634a60fe8dea5b9c07507ed0f176d4c|47583427",
+        "v22.6.0|macos_x86_64|8766c5968ca22d20fc6237c54c7c5d12ef12e15940d6119a79144ccb163ea737|49688634",
+        "v22.6.0|linux_arm64|0053ee0426c4daaa65c44f2cef87be45135001c3145cfb840aa1d0e6f2619610|28097296",
+        "v22.6.0|linux_x86_64|acbbe539edc33209bb3e1b25f7545b5ca5d70e6256ed8318e1ec1e41e7b35703|29240984",
     ]
 
     default_url_template = "https://nodejs.org/dist/{version}/node-{version}-{platform}.tar"
@@ -137,7 +139,7 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
     )
 
     package_managers = DictOption[str](
-        default={"npm": "10.8.1", "yarn": "1.22.22", "pnpm": "9.5.0"},
+        default={"npm": "10.8.2", "yarn": "1.22.22", "pnpm": "9.5.0"},
         help=help_text(
             """
             A mapping of package manager versions to semver releases.
@@ -157,6 +159,38 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
         if self.package_manager in self.package_managers:
             return f"{self.package_manager}@{self.package_managers[self.package_manager]}"
         return self.package_manager
+
+    _tools = StrListOption(
+        default=[],
+        help=softwrap(
+            """
+            List any additional executable tools required for node processes to work. The paths to
+            these tools will be included in the PATH used in the execution sandbox, so that
+            they may be used by nodejs processes execution.
+            """
+        ),
+        advanced=True,
+    )
+
+    _optional_tools = StrListOption(
+        default=[],
+        help=softwrap(
+            """
+            List any additional executable which are not mandatory for node processes to work, but
+            which should be included if available. The paths to these tools will be included in the
+            PATH used in the execution sandbox, so that they may be used by nodejs processes execution.
+            """
+        ),
+        advanced=True,
+    )
+
+    @property
+    def tools(self) -> tuple[str, ...]:
+        return tuple(sorted(set(self._tools)))
+
+    @property
+    def optional_tools(self) -> tuple[str, ...]:
+        return tuple(sorted(set(self._optional_tools)))
 
     class EnvironmentAware(ExecutableSearchPathsOptionMixin, Subsystem.EnvironmentAware):
         search_path = StrListOption(
@@ -347,24 +381,66 @@ async def add_corepack_shims_to_digest(
     return await Get(Digest, MergeDigests((binary_digest, enable_corepack_result.output_digest)))
 
 
+async def get_nodejs_process_tools_shims(
+    *,
+    tools: Sequence[str],
+    optional_tools: Sequence[str],
+    search_path: Sequence[str],
+    rationale: str,
+) -> BinaryShims:
+    requests = [
+        BinaryPathRequest(binary_name=binary_name, search_path=search_path)
+        for binary_name in (*tools, *optional_tools)
+    ]
+    paths = await MultiGet(Get(BinaryPaths, BinaryPathRequest, request) for request in requests)
+    required_tools_paths = [
+        path.first_path_or_raise(request, rationale=rationale)
+        for request, path in zip(requests, paths)
+        if request.binary_name in tools
+    ]
+    optional_tools_paths = [
+        path.first_path
+        for request, path in zip(requests, paths)
+        if request.binary_name in optional_tools and path.first_path
+    ]
+
+    tools_shims = await Get(
+        BinaryShims,
+        BinaryShimsRequest,
+        BinaryShimsRequest.for_paths(
+            *required_tools_paths,
+            *optional_tools_paths,
+            rationale=rationale,
+        ),
+    )
+
+    return tools_shims
+
+
 @rule(level=LogLevel.DEBUG)
 async def node_process_environment(
-    binaries: NodeJSBinaries, nodejs: NodeJS.EnvironmentAware
+    binaries: NodeJSBinaries,
+    nodejs: NodeJS,
+    nodejs_environment: NodeJS.EnvironmentAware,
 ) -> NodeJSProcessEnvironment:
     default_required_tools = ["sh", "bash"]
     tools_used_by_setup_scripts = ["mkdir", "rm", "touch", "which"]
     pnpm_shim_tools = ["sed", "dirname"]
-    binary_shims = await Get(
-        BinaryShims,
-        BinaryShimsRequest.for_binaries(
+
+    binary_shims = await get_nodejs_process_tools_shims(
+        tools=[
             *default_required_tools,
             *tools_used_by_setup_scripts,
             *pnpm_shim_tools,
-            rationale="execute a nodejs process",
-            search_path=nodejs.executable_search_path,
-        ),
+            *nodejs.tools,
+        ],
+        optional_tools=nodejs.optional_tools,
+        search_path=nodejs_environment.executable_search_path,
+        rationale="execute a nodejs process",
     )
-    corepack_env_vars = await Get(EnvironmentVars, EnvironmentVarsRequest(nodejs.corepack_env_vars))
+    corepack_env_vars = await Get(
+        EnvironmentVars, EnvironmentVarsRequest(nodejs_environment.corepack_env_vars)
+    )
     binary_digest_with_shims = await add_corepack_shims_to_digest(
         binaries, binary_shims, corepack_env_vars
     )
@@ -390,7 +466,11 @@ class NodeJSBootstrap:
 async def _get_nvm_root() -> str | None:
     """See https://github.com/nvm-sh/nvm#installing-and-updating."""
 
-    env = await Get(EnvironmentVars, EnvironmentVarsRequest(("NVM_DIR", "XDG_CONFIG_HOME", "HOME")))
+    env = await environment_vars_subset(
+        **implicitly(
+            {EnvironmentVarsRequest(("NVM_DIR", "XDG_CONFIG_HOME", "HOME")): EnvironmentVarsRequest}
+        )
+    )
     nvm_dir = env.get("NVM_DIR")
     default_dir = env.get("XDG_CONFIG_HOME", env.get("HOME"))
     if nvm_dir:

@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import itertools
+import logging
 import re
 from collections import defaultdict
-from typing import Iterable, Iterator, Protocol, Sequence, Tuple, TypeVar
+from collections.abc import Iterable, Iterator, Sequence
+from typing import Protocol, TypeVar
 
 from packaging.requirements import InvalidRequirement
 from pkg_resources import Requirement
@@ -22,23 +24,23 @@ from pants.util.memo import memoized
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
 
+logger = logging.getLogger(__name__)
+
 
 # This protocol allows us to work with any arbitrary FieldSet. See
 # https://mypy.readthedocs.io/en/stable/protocols.html.
 class FieldSetWithInterpreterConstraints(Protocol):
     @property
-    def address(self) -> Address:
-        ...
+    def address(self) -> Address: ...
 
     @property
-    def interpreter_constraints(self) -> InterpreterConstraintsField:
-        ...
+    def interpreter_constraints(self) -> InterpreterConstraintsField: ...
 
 
 _FS = TypeVar("_FS", bound=FieldSetWithInterpreterConstraints)
 
 
-RawConstraints = Tuple[str, ...]
+RawConstraints = tuple[str, ...]
 
 
 # The current maxes are 2.7.18 and 3.6.15.  We go much higher, for safety.
@@ -301,11 +303,13 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
 
         def valid_constraint(constraint: Requirement) -> bool:
             if any(
-                constraint.specifier.contains(prior) for prior in prior_versions  # type: ignore[attr-defined]
+                constraint.specifier.contains(prior)  # type: ignore[attr-defined]
+                for prior in prior_versions
             ):
                 return False
             if not any(
-                constraint.specifier.contains(allowed) for allowed in allowed_versions  # type: ignore[attr-defined]
+                constraint.specifier.contains(allowed)  # type: ignore[attr-defined]
+                for allowed in allowed_versions
             ):
                 return False
             return True
@@ -513,3 +517,24 @@ def _major_minor_version_when_single_and_entire(ics: InterpreterConstraints) -> 
 
     # anything else we don't understand
     raise _NonSimpleMajorMinor()
+
+
+@memoized
+def _warn_on_python2_usage_in_interpreter_constraints(
+    interpreter_constraints: tuple[str, ...], *, description_of_origin: str
+) -> None:
+    ics = InterpreterConstraints(interpreter_constraints)
+    if ics.includes_python2():
+        logger.warning(
+            f"The Python interpreter constraints from {description_of_origin} includes Python 2.x as a selected Python version. "
+            "Please note that Pants will no longer be proactively tested with Python 2.x starting with Pants v2.24.x because "
+            "Python 2 support ended on 1 January 2020. Please consider upgrading to Python 3.x for your code."
+        )
+
+
+def warn_on_python2_usage_in_interpreter_constraints(
+    interpreter_constraints: Iterable[str], *, description_of_origin: str
+) -> None:
+    _warn_on_python2_usage_in_interpreter_constraints(
+        tuple(interpreter_constraints), description_of_origin=description_of_origin
+    )

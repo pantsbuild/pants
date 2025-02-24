@@ -3,4 +3,12 @@
 
 python_sources()
 
-python_tests(name="tests")
+python_tests(
+    name="tests",
+    overrides={
+        "integration_test.py": {
+            "tags": ["platform_specific_behavior"],
+            "timeout": 120,
+        }
+    },
+)

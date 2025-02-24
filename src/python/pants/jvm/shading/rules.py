@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable
 
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
@@ -25,7 +25,7 @@ from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.shading import jarjar
-from pants.jvm.shading.jarjar import JarJar, JarJarGeneratorLockfileSentinel, MisplacedClassStrategy
+from pants.jvm.shading.jarjar import JarJar, MisplacedClassStrategy
 from pants.jvm.target_types import JvmShadingRule, _shading_validate_rules
 from pants.util.logging import LogLevel
 
@@ -89,8 +89,7 @@ async def shade_jar(request: ShadeJarRequest, jdk: InternalJdk, jarjar: JarJar) 
     rule_config_content = "\n".join([rule.encode() for rule in request.rules]) + "\n"
     logger.debug(f"Using JarJar rule file with following contents:\n{rule_config_content}")
 
-    lockfile_request, conf_digest, output_digest = await MultiGet(
-        Get(GenerateJvmLockfileFromTool, JarJarGeneratorLockfileSentinel()),
+    conf_digest, output_digest = await MultiGet(
         Get(
             Digest,
             CreateDigest(
@@ -106,7 +105,9 @@ async def shade_jar(request: ShadeJarRequest, jdk: InternalJdk, jarjar: JarJar) 
     )
 
     tool_classpath, input_digest = await MultiGet(
-        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
+        Get(
+            ToolClasspath, ToolClasspathRequest(lockfile=GenerateJvmLockfileFromTool.create(jarjar))
+        ),
         Get(Digest, MergeDigests([request.digest, output_digest])),
     )
 

@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from copy import deepcopy
 from pathlib import PurePath
-from typing import Final, Iterable
+from typing import Final
 
 import libcst as cst
 import pytest
@@ -122,12 +123,12 @@ def test_fix_implicitly_keeps_required(source: str, target: str, expected: str):
     new_call = fix_implicitly_usage(call, target_func)
 
     dummy_module = cst.parse_module("")
-    assert new_call.deep_equals(
-        call
-    ), f"Expected {dummy_module.code_for_node(new_call)} to equal {dummy_module.code_for_node(call)}"
-    assert new_call.deep_equals(
-        _parse_call(expected)
-    ), f"Expected {dummy_module.code_for_node(new_call)} to equal {expected}"
+    assert new_call.deep_equals(call), (
+        f"Expected {dummy_module.code_for_node(new_call)} to equal {dummy_module.code_for_node(call)}"
+    )
+    assert new_call.deep_equals(_parse_call(expected)), (
+        f"Expected {dummy_module.code_for_node(new_call)} to equal {expected}"
+    )
 
 
 @pytest.mark.parametrize(
@@ -156,12 +157,12 @@ def test_fix_implicitly_usage_removes_unneeded(source: str, target: str, expecte
     new_call = fix_implicitly_usage(call, target_func)
 
     dummy_module = cst.parse_module("")
-    assert not new_call.deep_equals(
-        call
-    ), f"Expected {dummy_module.code_for_node(new_call)} to not equal {dummy_module.code_for_node(call)}"
-    assert new_call.deep_equals(
-        _parse_call(expected)
-    ), f"Expected {dummy_module.code_for_node(new_call)} to equal {expected}"
+    assert not new_call.deep_equals(call), (
+        f"Expected {dummy_module.code_for_node(new_call)} to not equal {dummy_module.code_for_node(call)}"
+    )
+    assert new_call.deep_equals(_parse_call(expected)), (
+        f"Expected {dummy_module.code_for_node(new_call)} to equal {expected}"
+    )
 
 
 @pytest.mark.parametrize(
@@ -178,9 +179,9 @@ def test_fix_implicitly_usage_removes_unneeded(source: str, target: str, expecte
             "digest_to_snapshot(**implicitly(DigestSubset(config_files.snapshot.digest, PathGlobs([config_file]))))",
         ),
         (
-            "process_request_to_process_result(VenvPexProcess(arg1, arg2, arg3), **implicitly())",
-            "async def process_request_to_process_result(process: Process, process_execution_environment: ProcessExecutionEnvironment) -> FallibleProcessResult: ...",
-            "process_request_to_process_result(**implicitly(VenvPexProcess(arg1, arg2, arg3)))",
+            "execute_process(VenvPexProcess(arg1, arg2, arg3), **implicitly())",
+            "async def execute_process(process: Process, process_execution_environment: ProcessExecutionEnvironment) -> FallibleProcessResult: ...",
+            "execute_process(**implicitly(VenvPexProcess(arg1, arg2, arg3)))",
         ),
     ],
 )
@@ -190,9 +191,9 @@ def test_fix_implicitly_usage_modification(source: str, target: str, expected: s
     new_call = fix_implicitly_usage(call, target_func)
 
     dummy_module = cst.parse_module("")
-    assert new_call.deep_equals(
-        _parse_call(expected)
-    ), f"Expected {dummy_module.code_for_node(new_call)} to equal {expected}"
+    assert new_call.deep_equals(_parse_call(expected)), (
+        f"Expected {dummy_module.code_for_node(new_call)} to equal {expected}"
+    )
 
 
 def _parse_call(source: str) -> cst.Call:

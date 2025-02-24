@@ -4,13 +4,15 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Iterable
+from typing import Any
 
 import pytest
+from _pytest.monkeypatch import MonkeyPatch
 
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.target_types import PexBinary, PythonSourcesGeneratorTarget
@@ -205,7 +207,7 @@ class MockTestRequest(TestRequest):
 
     @classmethod
     def test_result(cls, field_sets: Iterable[MockTestFieldSet]) -> TestResult:
-        addresses = [field_set.address for field_set in field_sets]
+        addresses = tuple(field_set.address for field_set in field_sets)
         return make_test_result(
             addresses,
             exit_code=cls.exit_code(addresses),
@@ -602,7 +604,11 @@ def test_format_rerun_command(results: list[TestResult], expected: None | str) -
     assert expected == _format_test_rerun_command(results)
 
 
-def test_debug_target(rule_runner: PythonRuleRunner) -> None:
+def test_debug_target(rule_runner: PythonRuleRunner, monkeypatch: MonkeyPatch) -> None:
+    def noop():
+        pass
+
+    monkeypatch.setattr("pants.engine.intrinsics.task_side_effected", noop)
     exit_code, _ = run_test_rule(
         rule_runner,
         request_type=SuccessfulRequest,
@@ -654,14 +660,18 @@ def test_coverage(rule_runner: PythonRuleRunner) -> None:
 
 
 def sort_results() -> None:
-    create_test_result = partial(
-        TestResult,
-        stdout="",
-        stdout_digest=EMPTY_FILE_DIGEST,
-        stderr="",
-        stderr_digest=EMPTY_FILE_DIGEST,
-        output_setting=ShowOutput.ALL,
-    )
+    def create_test_result(exit_code: int | None, addresses: Iterable[Address]) -> TestResult:
+        return TestResult(
+            exit_code=exit_code,
+            addresses=tuple(addresses),
+            stdout_bytes=b"",
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr_bytes=b"",
+            stderr_digest=EMPTY_FILE_DIGEST,
+            output_setting=ShowOutput.ALL,
+            result_metadata=None,
+        )
+
     skip1 = create_test_result(
         exit_code=None,
         addresses=(Address("t1"),),
@@ -830,8 +840,8 @@ def test_non_utf8_output() -> None:
     test_result = make_test_result(
         [],
         exit_code=1,  # "test error" so stdout/stderr are output in message
-        stdout_bytes=b"\x80\xBF",  # invalid UTF-8 as required by the test
-        stderr_bytes=b"\x80\xBF",  # invalid UTF-8 as required by the test
+        stdout_bytes=b"\x80\xbf",  # invalid UTF-8 as required by the test
+        stderr_bytes=b"\x80\xbf",  # invalid UTF-8 as required by the test
         output_setting=ShowOutput.ALL,
     )
     assert test_result.message() == "failed (exit code 1).\n��\n��\n\n"

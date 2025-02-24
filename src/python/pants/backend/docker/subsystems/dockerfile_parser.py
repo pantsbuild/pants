@@ -13,6 +13,7 @@ from pants.backend.python.subsystems.python_tool_base import PythonToolRequireme
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.base.deprecated import warn_or_error
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.native_engine import NativeDependenciesRequest
@@ -27,7 +28,7 @@ from pants.engine.target import (
     WrappedTargetRequest,
 )
 from pants.option.option_types import BoolOption
-from pants.util.docutil import bin_name
+from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
 from pants.util.resources import read_resource
 from pants.util.strutil import softwrap
@@ -51,6 +52,10 @@ class DockerfileParser(PythonToolRequirementsBase):
         help=softwrap(
             f"""
             Use the new experimental Rust-based, multithreaded, in-process dependency parser.
+
+            This new parser does not require the `dockerfile` dependency and thus, for instance,
+            doesn't require Go to be installed to run on platforms for which that package doesn't
+            provide pre-built wheels.
 
             If you think the new behaviour is causing problems, it is recommended that you run
             `{bin_name()} --dockerfile-parser-use-rust-parser=True peek :: > new-parser.json` and then
@@ -212,6 +217,41 @@ async def parse_dockerfile(
         f"Internal error: Expected a single source file to Dockerfile parse request {request}, "
         f"got: {dockerfiles}."
     )
+
+    if dockerfile_parser.options.is_default("use_rust_parser"):
+        warn_or_error(
+            # In 2.27, consider changing:
+            #
+            # - the default value of use_rust_parser to True
+            # - this deprecation to check for `use_rust_parser == False` instead
+            #
+            # This means switching to the Rust parser by default and deprecate the old one, in one
+            # step. This may not be appropriate if we don't feel the Rust parser is reliable
+            # enough, yet. Please make an assessment!
+            removal_version="2.27.0.dev0",
+            entity="Implicitly relying on the old Dockerfile parser",
+            hint=softwrap(
+                f"""
+                Future versions of Pants will use a Rust-based parser for Dockerfiles. The new
+                parser is faster and does not require installing extra dependencies.
+
+                To aid in this migration, please set the `[dockerfile-parser].use_rust_parser`
+                option, to either:
+
+                - `true`, to opt-in to the new parser now
+
+                - `false`, to continue using the old parser if you find issues with the new parser
+                  (please let us know: <https://github.com/pantsbuild/pants/issues/new/choose>)
+
+                If this option is not set, the default parser will change when upgrading to a future
+                version of Pants, outside of your control.
+
+                See {doc_url("reference/subsystems/dockerfile-parser#use_rust_parser")} for
+                additional information.
+                """
+            ),
+        )
+
     try:
         if dockerfile_parser.use_rust_parser:
             return await _natively_parse_dockerfile(target.address, sources.snapshot.digest)

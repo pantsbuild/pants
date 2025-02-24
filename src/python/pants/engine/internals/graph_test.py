@@ -6,10 +6,10 @@ from __future__ import annotations
 import dataclasses
 import itertools
 import os.path
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Iterable, List, Set, Tuple, Type
 
 import pytest
 
@@ -484,7 +484,7 @@ def test_coarsened_targets(transitive_targets_rule_runner: RuleRunner) -> None:
     )
 
     def assert_coarsened(
-        a: Address, expected_members: List[Address], expected_dependencies: List[Address]
+        a: Address, expected_members: list[Address], expected_dependencies: list[Address]
     ) -> None:
         coarsened_targets = transitive_targets_rule_runner.request(
             CoarsenedTargets,
@@ -551,7 +551,7 @@ def assert_failed_cycle(
     *,
     root_target_name: str,
     subject_target_name: str,
-    path_target_names: Tuple[str, ...],
+    path_target_names: tuple[str, ...],
 ) -> None:
     with pytest.raises(ExecutionError) as e:
         rule_runner.request(
@@ -845,7 +845,7 @@ def assert_owners(
     rule_runner: RuleRunner,
     requested: Iterable[str],
     *,
-    expected: Set[Address],
+    expected: set[Address],
     match_if_owning_build_file_included_in_sources: bool = False,
 ) -> None:
     result = rule_runner.request(
@@ -1586,8 +1586,12 @@ def test_parametrize_16190(generated_targets_rule_runner: RuleRunner) -> None:
 @pytest.mark.parametrize(
     "field_content",
     [
-        "tagz=['tag']",
-        "tagz=parametrize(['tag1'], ['tag2'])",
+        "tagz=('tag',)",
+        # TODO: The documentation of `parametrize()`, and the type annotations in its
+        #  implementation in parametrize.py, imply that a positional arg must be
+        #  a string, and other arg types should be applied as kwargs, so it's unclear
+        #  why we expect this to work, and should revisit.
+        "tagz=parametrize(('tag1',), ('tag2',))",
     ],
 )
 def test_parametrize_16910(generated_targets_rule_runner: RuleRunner, field_content: str) -> None:
@@ -1772,7 +1776,7 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
         pass
 
     addr = Address("", target_name="lib")
-    sources_rule_runner.write_files({f: "" for f in ["f1.f95"]})
+    sources_rule_runner.write_files({"f1.f95": ""})
 
     valid_sources = SourcesSubclass(["*"], addr)
     hydrated_valid_sources = sources_rule_runner.request(
@@ -1809,7 +1813,7 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
 
 def test_sources_unmatched_globs(sources_rule_runner: RuleRunner) -> None:
     sources_rule_runner.set_options(["--unmatched-build-file-globs=error"])
-    sources_rule_runner.write_files({f: "" for f in ["f1.f95"]})
+    sources_rule_runner.write_files({"f1.f95": ""})
     sources = MultipleSourcesField(["non_existent.f95"], Address("", target_name="lib"))
     with engine_error(contains="non_existent.f95"):
         sources_rule_runner.request(HydratedSources, [HydrateSourcesRequest(sources)])
@@ -1878,9 +1882,9 @@ def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
         # We allow for 1 or 3 files
         expected_num_files = range(1, 4, 2)
 
-    sources_rule_runner.write_files({f: "" for f in ["f1.txt", "f2.txt", "f3.txt", "f4.txt"]})
+    sources_rule_runner.write_files(dict.fromkeys(["f1.txt", "f2.txt", "f3.txt", "f4.txt"], ""))
 
-    def hydrate(sources_cls: Type[MultipleSourcesField], sources: Iterable[str]) -> HydratedSources:
+    def hydrate(sources_cls: type[MultipleSourcesField], sources: Iterable[str]) -> HydratedSources:
         return sources_rule_runner.request(
             HydratedSources,
             [

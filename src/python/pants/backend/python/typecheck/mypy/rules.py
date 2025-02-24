@@ -5,10 +5,10 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
+from collections.abc import Iterable
 from dataclasses import dataclass
 from hashlib import sha256
 from textwrap import dedent  # noqa: PNT20
-from typing import Iterable, Optional, Tuple
 
 import packaging
 
@@ -86,8 +86,8 @@ async def _generate_argv(
     cache_dir: str,
     venv_python: str,
     file_list_path: str,
-    python_version: Optional[str],
-) -> Tuple[str, ...]:
+    python_version: str | None,
+) -> tuple[str, ...]:
     args = [pex.pex.argv0, f"--python-executable={venv_python}", *mypy.args]
     if mypy.config:
         args.append(f"--config-file={mypy.config}")
@@ -111,7 +111,7 @@ async def _generate_argv(
     return tuple(args)
 
 
-def determine_python_files(files: Iterable[str]) -> Tuple[str, ...]:
+def determine_python_files(files: Iterable[str]) -> tuple[str, ...]:
     """We run over all .py and .pyi files, but .pyi files take precedence.
 
     MyPy will error if we say to run over the same module with both its .py and .pyi files, so we
@@ -127,6 +127,9 @@ def determine_python_files(files: Iterable[str]) -> Tuple[str, ...]:
             pyi_file = f + "i"
             if pyi_file not in result:
                 result.add(f)
+        else:
+            result.add(f)
+
     return tuple(result)
 
 
@@ -298,7 +301,7 @@ async def mypy_typecheck_partition(
                             {mkdir.path} -p "$SANDBOX_CACHE_DIR" > /dev/null 2>&1
                             {cp.path} "$NAMED_CACHE_DB" "$SANDBOX_CACHE_DB" > /dev/null 2>&1
 
-                            {' '.join((shell_quote(arg) for arg in argv))}
+                            {" ".join((shell_quote(arg) for arg in argv))}
                             EXIT_CODE=$?
 
                             if ! {ln.path} "$SANDBOX_CACHE_DB" "$NAMED_CACHE_DB" > /dev/null 2>&1; then

@@ -8,7 +8,6 @@ import re
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
@@ -92,6 +91,7 @@ from pants.option.global_options import GlobalOptions
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import OrderedSet
 from pants.util.pip_requirement import PipRequirement
 from pants.util.strutil import softwrap
 
@@ -112,6 +112,7 @@ class PytestPluginSetup:
     """
 
     digest: Digest = EMPTY_DIGEST
+    extra_sys_path: tuple[str, ...] = ()
 
 
 @union(in_scope_types=[EnvironmentName])
@@ -198,18 +199,18 @@ class TestMetadata:
 
 @dataclass(frozen=True)
 class TestSetupRequest:
-    field_sets: Tuple[PythonTestFieldSet, ...]
+    field_sets: tuple[PythonTestFieldSet, ...]
     metadata: TestMetadata
     is_debug: bool
     extra_env: FrozenDict[str, str] = FrozenDict()
-    prepend_argv: Tuple[str, ...] = ()
-    additional_pexes: Tuple[Pex, ...] = ()
+    prepend_argv: tuple[str, ...] = ()
+    additional_pexes: tuple[Pex, ...] = ()
 
 
 @dataclass(frozen=True)
 class TestSetup:
     process: Process
-    results_file_name: Optional[str]
+    results_file_name: str | None
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -374,7 +375,7 @@ async def setup_pytest_for_target(
         results_file_prefix = request.field_sets[0].address.path_safe_spec
         if len(request.field_sets) > 1:
             results_file_prefix = (
-                f"batch-of-{results_file_prefix}+{len(request.field_sets)-1}-files"
+                f"batch-of-{results_file_prefix}+{len(request.field_sets) - 1}-files"
             )
         results_file_name = f"{results_file_prefix}.xml"
         pytest_args.extend(
@@ -404,8 +405,14 @@ async def setup_pytest_for_target(
             )
         )
 
+    extra_sys_path = OrderedSet(
+        (
+            *prepared_sources.source_roots,
+            *(entry for plugin_setup in plugin_setups for entry in plugin_setup.extra_sys_path),
+        )
+    )
     extra_env = {
-        "PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots),
+        "PEX_EXTRA_SYS_PATH": ":".join(extra_sys_path),
         **request.extra_env,
         **test_extra_env.env,
         # NOTE: field_set_extra_env intentionally after `test_extra_env` to allow overriding within
@@ -437,7 +444,9 @@ async def setup_pytest_for_target(
 
     run_description = request.field_sets[0].address.spec
     if len(request.field_sets) > 1:
-        run_description = f"batch of {run_description} and {len(request.field_sets)-1} other files"
+        run_description = (
+            f"batch of {run_description} and {len(request.field_sets) - 1} other files"
+        )
     process = await Get(
         Process,
         VenvPexProcess(
@@ -527,7 +536,9 @@ async def run_python_tests(
     def warning_description() -> str:
         description = batch.elements[0].address.spec
         if len(batch.elements) > 1:
-            description = f"batch containing {description} and {len(batch.elements)-1} other files"
+            description = (
+                f"batch containing {description} and {len(batch.elements) - 1} other files"
+            )
         if batch.partition_metadata.description:
             description = f"{description} ({batch.partition_metadata.description})"
         return description
@@ -571,7 +582,7 @@ async def run_python_tests(
 
 @rule(desc="Set up Pytest to run interactively", level=LogLevel.DEBUG)
 async def debug_python_test(
-    batch: PyTestRequest.Batch[PythonTestFieldSet, TestMetadata]
+    batch: PyTestRequest.Batch[PythonTestFieldSet, TestMetadata],
 ) -> TestDebugRequest:
     setup = await Get(
         TestSetup, TestSetupRequest(batch.elements, batch.partition_metadata, is_debug=True)

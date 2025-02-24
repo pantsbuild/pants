@@ -5,9 +5,10 @@ from __future__ import annotations
 
 from abc import ABCMeta
 from collections import defaultdict
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Callable, Generic, Iterable, Iterator, Mapping, Optional, Type, TypeVar
+from typing import Any, Generic, TypeVar
 
 from pants.engine.collection import Collection
 from pants.util.frozendict import FrozenDict
@@ -159,7 +160,7 @@ class MutableYamlIndex(Generic[T]):
     def frozen(self) -> FrozenYamlIndex[T]:
         """Transforms this collection into a frozen (immutable) one."""
 
-        return FrozenYamlIndex(self)
+        return FrozenYamlIndex.create(self)
 
 
 @dataclass(frozen=True)
@@ -169,7 +170,7 @@ class _YamlDocumentIndexNode(Generic[T]):
     paths: FrozenDict[YamlPath, T]
 
     @classmethod
-    def empty(cls: Type[_YamlDocumentIndexNode[T]]) -> _YamlDocumentIndexNode[T]:
+    def empty(cls: type[_YamlDocumentIndexNode[T]]) -> _YamlDocumentIndexNode[T]:
         return cls(paths=FrozenDict())
 
     def to_json_dict(self) -> dict[str, dict[str, str]]:
@@ -190,7 +191,8 @@ class FrozenYamlIndex(Generic[T]):
 
     _data: FrozenDict[PurePath, Collection[_YamlDocumentIndexNode[T]]]
 
-    def __init__(self, other: MutableYamlIndex[T]) -> None:
+    @classmethod
+    def create(cls, other: MutableYamlIndex[T]) -> FrozenYamlIndex[T]:
         data: dict[PurePath, Collection[_YamlDocumentIndexNode[T]]] = {}
         for file_path, doc_index in other._data.items():
             max_index = max(doc_index.keys())
@@ -202,9 +204,13 @@ class FrozenYamlIndex(Generic[T]):
                 doc_list[idx] = _YamlDocumentIndexNode(paths=FrozenDict(item_map))
 
             data[file_path] = Collection(doc_list)
-        object.__setattr__(self, "_data", FrozenDict(data))
+        return FrozenYamlIndex(_data=FrozenDict(data))
 
-    def transform_values(self, func: Callable[[T], Optional[R]]) -> FrozenYamlIndex[R]:
+    @classmethod
+    def empty(cls: type[FrozenYamlIndex[T]]) -> FrozenYamlIndex[T]:
+        return FrozenYamlIndex[T](_data=FrozenDict())
+
+    def transform_values(self, func: Callable[[T], R | None]) -> FrozenYamlIndex[R]:
         """Transforms the values of the given indexed collection into those that are returned from
         the received function.
 

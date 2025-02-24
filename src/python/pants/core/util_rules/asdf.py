@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Collection
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path, PurePath
-from typing import Collection
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
-from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
+from pants.core.util_rules.environments import EnvironmentTarget
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import _uncacheable_rule, collect_rules
@@ -97,7 +97,7 @@ async def _resolve_asdf_tool_paths(
     env: EnvironmentVars,
     local: bool,
 ) -> tuple[str, ...]:
-    if not (isinstance(env_tgt.val, LocalEnvironmentTarget) or env_tgt.val is None):
+    if not env_tgt.can_access_local_system_paths:
         return ()
 
     asdf_dir = get_asdf_data_dir(env)

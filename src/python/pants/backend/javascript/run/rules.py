@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.javascript import install_node_package
 from pants.backend.javascript.install_node_package import (
@@ -45,16 +45,18 @@ async def run_node_build_script(
     target_env_vars = await Get(
         EnvironmentVars, EnvironmentVarsRequest(field_set.extra_env_vars.value or ())
     )
-
-    prefix_arg = "--prefix"
-    if installation.project_env.project.package_manager == "yarn":
-        prefix_arg = "--cwd"
+    package_dir = "{chroot}" + "/" + installation.project_env.package_dir()
 
     process = await Get(
         Process,
         NodeJsProjectEnvironmentProcess(
             installation.project_env,
-            args=(prefix_arg, "{chroot}", "run", str(field_set.entry_point.value)),
+            args=(
+                *installation.package_manager.current_directory_args,
+                package_dir,
+                "run",
+                str(field_set.entry_point.value),
+            ),
             description=f"Running {str(field_set.entry_point.value)}.",
             input_digest=installation.digest,
             extra_env=target_env_vars,

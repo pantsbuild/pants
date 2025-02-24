@@ -89,7 +89,7 @@ def test_build_pkg(rule_runner: RuleRunner) -> None:
         ).digest,
         s_files=(),
         direct_dependencies=(),
-        minimum_go_version=None,
+        minimum_go_version="1.21.2",
     )
     direct_dep = BuildGoPackageRequest(
         import_path="example.com/foo/dep",

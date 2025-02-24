@@ -70,27 +70,24 @@ def test_strip_prefix() -> None:
 
 
 def test_strip_chroot_path() -> None:
-    assert (
-        strip_v2_chroot_path(
-            dedent(
-                """\
+    assert strip_v2_chroot_path(
+        dedent(
+            """\
             Would reformat /private/var/folders/sx/pdpbqz4x5cscn9hhfpbsbqvm0000gn/T/pants-sandbox-3zt5Ph/src/python/example.py
             Would reformat /var/folders/sx/pdpbqz4x5cscn9hhfpbsbqvm0000gn/T/pants-sandbox-OCnquv/test.py
             Would reformat /custom-tmpdir/pants-sandbox-7zt4pH/custom_tmpdir.py
 
             Some other output.
             """
-            )
         )
-        == dedent(
-            """\
+    ) == dedent(
+        """\
         Would reformat src/python/example.py
         Would reformat test.py
         Would reformat custom_tmpdir.py
 
         Some other output.
         """
-        )
     )
 
     # A subdir must be prefixed with `pants-sandbox-`, then some characters after it.
@@ -113,6 +110,18 @@ def test_strip_chroot_path() -> None:
     # Confirm we can handle values with no chroot path.
     assert strip_v2_chroot_path("") == ""
     assert strip_v2_chroot_path("hello world") == "hello world"
+
+    # Confirm other data (e.g. URLS) is unaffected
+    assert (
+        strip_v2_chroot_path("https://pantsbuild.org and /private/tmp/pants-sandbox-uPH7bl/sandbox")
+        == "https://pantsbuild.org and sandbox"
+    )
+    assert (
+        strip_v2_chroot_path(
+            "{'URL': 'https://pantsbuild.org', 'VENV': '/tmp/q_dt/pants-sandbox-K3/.cache/pex'}"
+        )
+        == "{'URL': 'https://pantsbuild.org', 'VENV': '.cache/pex'}"
+    )
 
 
 @pytest.mark.parametrize(
@@ -205,9 +214,8 @@ def test_softwrap_multiline() -> None:
         == "The version of the prior release, e.g. `2.0.0.dev0` or `2.0.0rc1`."
     )
     # Test with leading backslash
-    assert (
-        softwrap(
-            """\
+    assert softwrap(
+        """\
                 Do you believe in UFOs, astral projections, mental telepathy, ESP, clairvoyance,
                 spirit photography, telekinetic movement, full trance mediums, the Loch Ness monster
                 and the theory of Atlantis?
@@ -218,21 +226,18 @@ def test_softwrap_multiline() -> None:
                 [From
                 Ghostbusters (1984)]
             """
-        )
-        == (
-            "Do you believe in UFOs, astral projections, mental telepathy, ESP, clairvoyance,"
-            + " spirit photography, telekinetic movement, full trance mediums, the Loch Ness monster"
-            + " and the theory of Atlantis?"
-            + "\n\n"
-            + "Ah, if there's a steady paycheck in it, I'll believe anything you say."
-            + "\n\n"
-            + "[From Ghostbusters (1984)]"
-        )
+    ) == (
+        "Do you believe in UFOs, astral projections, mental telepathy, ESP, clairvoyance,"
+        + " spirit photography, telekinetic movement, full trance mediums, the Loch Ness monster"
+        + " and the theory of Atlantis?"
+        + "\n\n"
+        + "Ah, if there's a steady paycheck in it, I'll believe anything you say."
+        + "\n\n"
+        + "[From Ghostbusters (1984)]"
     )
     # Test without leading backslash
-    assert (
-        softwrap(
-            """
+    assert softwrap(
+        """
                 Do you believe in UFOs, astral projections, mental telepathy, ESP, clairvoyance,
                 spirit photography, telekinetic movement, full trance mediums, the Loch Ness monster
                 and the theory of Atlantis?
@@ -243,20 +248,17 @@ def test_softwrap_multiline() -> None:
                 [From
                 Ghostbusters (1984)]
             """
-        )
-        == (
-            "Do you believe in UFOs, astral projections, mental telepathy, ESP, clairvoyance,"
-            + " spirit photography, telekinetic movement, full trance mediums, the Loch Ness monster"
-            + " and the theory of Atlantis?"
-            + "\n\n"
-            + "Ah, if there's a steady paycheck in it, I'll believe anything you say."
-            + "\n\n"
-            + "[From Ghostbusters (1984)]"
-        )
+    ) == (
+        "Do you believe in UFOs, astral projections, mental telepathy, ESP, clairvoyance,"
+        + " spirit photography, telekinetic movement, full trance mediums, the Loch Ness monster"
+        + " and the theory of Atlantis?"
+        + "\n\n"
+        + "Ah, if there's a steady paycheck in it, I'll believe anything you say."
+        + "\n\n"
+        + "[From Ghostbusters (1984)]"
     )
-    assert (
-        softwrap(
-            """
+    assert softwrap(
+        """
                 Do you
                 believe in:
 
@@ -268,40 +270,34 @@ def test_softwrap_multiline() -> None:
                 Ah, if there's a steady paycheck in it,
                 I'll believe anything you say.
             """
-        )
-        == (
-            "Do you believe in:"
-            + "\n\n"
-            + "    UFOs\n"
-            + "    astral projections\n"
-            + "    mental telepathy\n"
-            + "    ...\n"
-            + "\n"
-            + "Ah, if there's a steady paycheck in it, I'll believe anything you say."
-        )
+    ) == (
+        "Do you believe in:"
+        + "\n\n"
+        + "    UFOs\n"
+        + "    astral projections\n"
+        + "    mental telepathy\n"
+        + "    ...\n"
+        + "\n"
+        + "Ah, if there's a steady paycheck in it, I'll believe anything you say."
     )
-    assert (
-        softwrap(
-            """
+    assert softwrap(
+        """
                 Do you believe in:
                     UFOs
                     astral projections
                     mental telepathy
                     ...
             """
-        )
-        == (
-            "Do you believe in:"
-            + "\n"
-            + "    UFOs\n"
-            + "    astral projections\n"
-            + "    mental telepathy\n"
-            + "    ..."
-        )
+    ) == (
+        "Do you believe in:"
+        + "\n"
+        + "    UFOs\n"
+        + "    astral projections\n"
+        + "    mental telepathy\n"
+        + "    ..."
     )
-    assert (
-        softwrap(
-            """
+    assert softwrap(
+        """
                 Roll Call:
 
                     ```
@@ -318,76 +314,65 @@ def test_softwrap_multiline() -> None:
 
                 All here.
             """
-        )
-        == (
-            "Roll Call:\n\n"
-            + "    ```\n"
-            + "        - Dr. Peter Venkman\n"
-            + "        - Dr. Egon Spengler\n"
-            + "        - Dr. Raymond Stantz\n"
-            + "        - Winston Zeddemore\n"
-            + "\n"
-            + "        And not really a ghostbuster, but we need to test wrapped indentation\n"
-            # No \n at the end of this one
-            + "        - Louis (Vinz, Vinz Clortho, Keymaster of Gozer. Volguus Zildrohar, Lord of"
-            + " the Sebouillia)\n"
-            + "    ```\n"
-            + "\nAll here."
-        )
+    ) == (
+        "Roll Call:\n\n"
+        + "    ```\n"
+        + "        - Dr. Peter Venkman\n"
+        + "        - Dr. Egon Spengler\n"
+        + "        - Dr. Raymond Stantz\n"
+        + "        - Winston Zeddemore\n"
+        + "\n"
+        + "        And not really a ghostbuster, but we need to test wrapped indentation\n"
+        # No \n at the end of this one
+        + "        - Louis (Vinz, Vinz Clortho, Keymaster of Gozer. Volguus Zildrohar, Lord of"
+        + " the Sebouillia)\n"
+        + "    ```\n"
+        + "\nAll here."
     )
-    assert (
-        softwrap(
-            f"""
+    assert softwrap(
+        f"""
                 Roll Call:
 
                 {bullet_list(["Dr. Peter Venkman", "Dr. Egon Spengler", "Dr. Raymond Stantz"])}
 
                 All here.
             """
-        )
-        == (
-            "Roll Call:\n\n"
-            + "  * Dr. Peter Venkman\n"
-            + "  * Dr. Egon Spengler\n"
-            + "  * Dr. Raymond Stantz\n"
-            + "\nAll here."
-        )
+    ) == (
+        "Roll Call:\n\n"
+        + "  * Dr. Peter Venkman\n"
+        + "  * Dr. Egon Spengler\n"
+        + "  * Dr. Raymond Stantz\n"
+        + "\nAll here."
     )
     assert softwrap("A\n\n\nB") == "A\n\nB"
-    assert (
-        softwrap(
-            f"""
+    assert softwrap(
+        f"""
                 Roll Call:
                 {bullet_list(["Dr. Peter Venkman", "Dr. Egon Spengler", "Dr. Raymond Stantz"])}
                 All here.
             """
-        )
-        == (
-            "Roll Call:\n"
-            + "  * Dr. Peter Venkman\n"
-            + "  * Dr. Egon Spengler\n"
-            + "  * Dr. Raymond Stantz\n"
-            + "All here."
-        )
+    ) == (
+        "Roll Call:\n"
+        + "  * Dr. Peter Venkman\n"
+        + "  * Dr. Egon Spengler\n"
+        + "  * Dr. Raymond Stantz\n"
+        + "All here."
     )
     # This models when we output stdout/stderr. The canonical way to do that is to indent every line
     #   so that softwrap preserves common indentation and the output "looks right"
     stdout = "* Dr. Peter Venkman\n* Dr. Egon Spengler\n* Dr. Raymond Stantz"
-    assert (
-        softwrap(
-            f"""
+    assert softwrap(
+        f"""
                 Roll Call:
-                {textwrap.indent(stdout, " "*2)}
+                {textwrap.indent(stdout, " " * 2)}
                 All here.
             """
-        )
-        == (
-            "Roll Call:\n"
-            + "  * Dr. Peter Venkman\n"
-            + "  * Dr. Egon Spengler\n"
-            + "  * Dr. Raymond Stantz\n"
-            + "All here."
-        )
+    ) == (
+        "Roll Call:\n"
+        + "  * Dr. Peter Venkman\n"
+        + "  * Dr. Egon Spengler\n"
+        + "  * Dr. Raymond Stantz\n"
+        + "All here."
     )
 
 

@@ -29,10 +29,7 @@ from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.build_graph.address import Address
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent
 from pants.engine.internals.parametrize import Parametrize
-from pants.testutil.python_interpreter_selection import (
-    skip_unless_python27_present,
-    skip_unless_python39_present,
-)
+from pants.testutil.python_interpreter_selection import skip_unless_python39_present
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import QueryRule
 from pants.util.frozendict import FrozenDict
@@ -86,16 +83,7 @@ def do_test_backend_wrapper(rule_runner: PythonRuleRunner, constraints: str) -> 
     )
     res = rule_runner.request(PEP660BuildResult, [req])
 
-    is_py2 = "2.7" in constraints
-    assert (
-        res.editable_wheel_path
-        == f"dist/foobar-1.2.3-0.editable-{'py2.' if is_py2 else ''}py3-none-any.whl"
-    )
-
-
-@skip_unless_python27_present
-def test_works_with_python2(rule_runner: PythonRuleRunner) -> None:
-    do_test_backend_wrapper(rule_runner, constraints="CPython==2.7.*")
+    assert res.editable_wheel_path == "dist/foobar-1.2.3-0.editable-py3-none-any.whl"
 
 
 @skip_unless_python39_present
@@ -160,8 +148,7 @@ def test_build_editable_local_dists(rule_runner: PythonRuleRunner) -> None:
     foo = PurePath("foo")
     rule_runner.write_files(
         {
-            foo
-            / "BUILD": dedent(
+            foo / "BUILD": dedent(
                 """
             python_sources()
 
@@ -175,8 +162,7 @@ def test_build_editable_local_dists(rule_runner: PythonRuleRunner) -> None:
             """
             ),
             foo / "bar.py": "BAR = 42",
-            foo
-            / "setup.py": dedent(
+            foo / "setup.py": dedent(
                 """
                 from setuptools import setup
 
@@ -228,8 +214,7 @@ def test_build_editable_local_dists_special_files(rule_runner: PythonRuleRunner)
                 root / pkg / "BUILD": "python_sources()\n",
                 root / pkg / "__init__.py": "",
                 root / pkg / "bar.py": "BAR = 42" if pkg == "a" else "from a.bar import BAR",
-                root
-                / "BUILD": dedent(
+                root / "BUILD": dedent(
                     f"""
                     python_sources()
 
@@ -242,8 +227,7 @@ def test_build_editable_local_dists_special_files(rule_runner: PythonRuleRunner)
                     )
                     """
                 ),
-                root
-                / "setup.py": dedent(
+                root / "setup.py": dedent(
                     f"""
                     from setuptools import setup
 

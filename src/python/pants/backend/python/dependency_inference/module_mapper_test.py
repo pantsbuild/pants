@@ -4,10 +4,10 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from pathlib import PurePath
 from textwrap import dedent
 from types import FunctionType
-from typing import Iterable, Tuple
 
 import pytest
 from packaging.utils import canonicalize_name as canonicalize_project_name
@@ -52,13 +52,13 @@ from pants.util.frozendict import FrozenDict
 
 def test_default_module_mapping_is_normalized() -> None:
     for k in DEFAULT_MODULE_MAPPING:
-        assert k == canonicalize_project_name(
-            k
-        ), "Please update `DEFAULT_MODULE_MAPPING` to use canonical project names"
+        assert k == canonicalize_project_name(k), (
+            "Please update `DEFAULT_MODULE_MAPPING` to use canonical project names"
+        )
     for k in DEFAULT_TYPE_STUB_MODULE_MAPPING:
-        assert k == canonicalize_project_name(
-            k
-        ), "Please update `DEFAULT_TYPE_STUB_MODULE_MAPPING` to use canonical project names"
+        assert k == canonicalize_project_name(k), (
+            "Please update `DEFAULT_TYPE_STUB_MODULE_MAPPING` to use canonical project names"
+        )
 
 
 def test_default_module_mapping_uses_tuples() -> None:
@@ -456,6 +456,8 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
                 "opentelemetry-instrumentation-botocore",
                 "opentelemetry-instrumentation-botocore",
             ),
+            req("apache-airflow", "apache-airflow"),
+            req("apache-airflow-providers-apache-beam", "apache-airflow-providers-apache-beam"),
         ]
     )
     rule_runner.write_files({"BUILD": build_file})
@@ -482,6 +484,17 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
                 ),
                 "default": FrozenDict(
                     {
+                        "airflow": (
+                            ModuleProvider(
+                                Address("", target_name="apache-airflow"), ModuleProviderType.IMPL
+                            ),
+                        ),
+                        "airflow.providers.apache.beam": (
+                            ModuleProvider(
+                                Address("", target_name="apache-airflow-providers-apache-beam"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
                         "azure.keyvault.secrets": (
                             ModuleProvider(
                                 Address("", target_name="azure-keyvault-secrets"),
@@ -975,12 +988,13 @@ def test_issue_15111(rule_runner: RuleRunner) -> None:
             ("dotenv",),
         ),
         ("oslo-service", ("oslo_service",)),
+        ("apache-airflow-providers-apache-beam", ("airflow.providers.apache.beam",)),
         ("pyopenssl", tuple()),
         ("", tuple()),
     ],
 )
 def test_generate_mappings_from_pattern_matches_para(
-    proj_name: str, expected_modules: Tuple[str]
+    proj_name: str, expected_modules: tuple[str]
 ) -> None:
     assert generate_mappings_from_pattern(proj_name, is_type_stub=False) == expected_modules
 
@@ -1016,7 +1030,7 @@ def test_generate_mappings_from_pattern_matches_para(
     ],
 )
 def test_generate_type_stub_mappings_from_pattern_matches_para(
-    proj_name: str, expected_modules: Tuple[str]
+    proj_name: str, expected_modules: tuple[str]
 ) -> None:
     assert generate_mappings_from_pattern(proj_name, is_type_stub=True) == expected_modules
 

@@ -16,7 +16,6 @@ Example rule:
       return PublishProcesses(...)
 """
 
-
 from __future__ import annotations
 
 import collections
@@ -25,9 +24,7 @@ import logging
 from abc import ABCMeta
 from dataclasses import asdict, dataclass, field, is_dataclass, replace
 from itertools import chain
-from typing import ClassVar, Generic, Type, TypeVar
-
-from typing_extensions import final
+from typing import ClassVar, Generic, TypeVar, final
 
 from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
 from pants.engine.addresses import Address
@@ -35,8 +32,9 @@ from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult
-from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.intrinsics import run_interactive_process_in_environment
+from pants.engine.process import InteractiveProcess
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
     ImmutableValue,
@@ -97,7 +95,7 @@ class PublishFieldSet(Generic[_T], FieldSet, metaclass=ABCMeta):
     """
 
     # Subclasses must provide this, to a union member (subclass) of `PublishRequest`.
-    publish_request_type: ClassVar[Type[_T]]  # type: ignore[misc]
+    publish_request_type: ClassVar[type[_T]]  # type: ignore[misc]
 
     @final
     def _request(self, packages: tuple[BuiltPackage, ...]) -> _T:
@@ -244,10 +242,7 @@ async def run_publish(
             continue
 
         logger.debug(f"Execute {pub.process}")
-        res = await Effect(
-            InteractiveProcessResult,
-            {pub.process: InteractiveProcess, local_environment.val: EnvironmentName},
-        )
+        res = await run_interactive_process_in_environment(pub.process, local_environment.val)
         if res.exit_code == 0:
             sigil = console.sigil_succeeded()
             status = "published"

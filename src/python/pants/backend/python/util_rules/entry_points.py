@@ -1,8 +1,8 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from collections import defaultdict
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import Callable, Iterable
 
 from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
@@ -287,9 +287,9 @@ async def generate_entry_points_txt(request: GenerateEntryPointsTxtRequest) -> E
         Get(Paths, PathGlobs(module_candidate_paths)) for module_candidate_paths in possible_paths
     )
 
-    entry_points_by_path: dict[
-        str, list[tuple[Target, ResolvedPythonDistributionEntryPoints]]
-    ] = defaultdict(list)
+    entry_points_by_path: dict[str, list[tuple[Target, ResolvedPythonDistributionEntryPoints]]] = (
+        defaultdict(list)
+    )
 
     target: Target
     resolved_ep: ResolvedPythonDistributionEntryPoints

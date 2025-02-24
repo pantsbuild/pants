@@ -7,9 +7,10 @@ import inspect
 import itertools
 import logging
 import sys
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from functools import partial
-from typing import Any, Callable, Iterator, List, Sequence, get_type_hints
+from typing import Any, get_type_hints
 
 import typing_extensions
 
@@ -59,6 +60,12 @@ class _TypeStack:
         self.root = sys.modules[func.__module__]
         self.push(self.root)
         self._push_function_closures(func)
+        # To support recursive rules.
+        # TODO: This will not allow mutually recursive rules defined in the same module.
+        #  Doing so will require changes to the @rule decorator implementation so that we
+        #  gather all rules in a module and assign them ids, and only then run
+        #  collect_awaitables() on those rules.
+        self.push({func.__name__: func})
 
     def __getitem__(self, name: str) -> Any:
         for ns in reversed(self._stack):
@@ -135,14 +142,16 @@ class _AwaitableCollector(ast.NodeVisitor):
         if beginning_indent:
             source = "\n".join(line[beginning_indent:] for line in source.split("\n"))
 
-        self.source_file = inspect.getsourcefile(func)
+        self.source_file = inspect.getsourcefile(func) or "<unknown>"
 
         self.types = _TypeStack(func)
-        self.awaitables: List[AwaitableConstraints] = []
+        self.awaitables: list[AwaitableConstraints] = []
         self.visit(ast.parse(source))
 
     def _format(self, node: ast.AST, msg: str) -> str:
-        lineno = node.lineno + self.func.__code__.co_firstlineno - 1
+        lineno: str = "<unknown>"
+        if isinstance(node, (ast.expr, ast.stmt)):
+            lineno = str(node.lineno + self.func.__code__.co_firstlineno - 1)
         return f"{self.source_file}:{lineno}: {msg}"
 
     def _lookup(self, attr: ast.expr) -> Any:
@@ -193,7 +202,7 @@ class _AwaitableCollector(ast.NodeVisitor):
             )
         return resolved
 
-    def _get_inputs(self, input_nodes: Sequence[Any]) -> tuple[Sequence[Any], List[Any]]:
+    def _get_inputs(self, input_nodes: Sequence[Any]) -> tuple[Sequence[Any], list[Any]]:
         if not input_nodes:
             return input_nodes, []
         if len(input_nodes) != 1:
@@ -299,9 +308,10 @@ class _AwaitableCollector(ast.NodeVisitor):
                 self.awaitables.append(
                     self._get_legacy_awaitable(call_node, is_effect=issubclass(func, Effect))
                 )
-            elif inspect.isfunction(func) and (rule := getattr(func, "rule", None)) is not None:
+            elif (
+                inspect.isfunction(func) and (rule_id := getattr(func, "rule_id", None)) is not None
+            ):
                 # Is a direct `@rule` call.
-                rule_id = rule.canonical_name
                 self.awaitables.append(self._get_byname_awaitable(rule_id, func, call_node))
             elif inspect.iscoroutinefunction(func) or _returns_awaitable(func):
                 # Is a call to a "rule helper".
@@ -381,5 +391,5 @@ class _AwaitableCollector(ast.NodeVisitor):
 
 
 @memoized
-def collect_awaitables(func: Callable) -> List[AwaitableConstraints]:
+def collect_awaitables(func: Callable) -> list[AwaitableConstraints]:
     return _AwaitableCollector(func).awaitables

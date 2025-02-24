@@ -6,7 +6,7 @@ from __future__ import annotations
 import dataclasses
 import json
 from dataclasses import dataclass
-from typing import ClassVar, Type, cast
+from typing import ClassVar, cast
 
 from pants.backend.go.dependency_inference import GoModuleImportPathsMapping
 from pants.backend.go.go_sources.load_go_binary import LoadedGoBinary, LoadedGoBinaryRequest
@@ -140,7 +140,7 @@ def maybe_get_codegen_request_type(
     if not tgt.has_field(SourcesField):
         return None
     generate_request_types = cast(
-        FrozenOrderedSet[Type[GoCodegenBuildRequest]], union_membership.get(GoCodegenBuildRequest)
+        FrozenOrderedSet[type[GoCodegenBuildRequest]], union_membership.get(GoCodegenBuildRequest)
     )
     sources_field = tgt[SourcesField]
     relevant_requests = [
@@ -458,7 +458,10 @@ async def setup_build_go_package_target_request(
         maybe_base_pkg_dep = await Get(
             FallibleBuildGoPackageRequest,
             BuildGoPackageTargetRequest(
-                request.address, for_tests=True, build_opts=request.build_opts
+                request.address,
+                for_tests=True,
+                with_coverage=request.with_coverage,
+                build_opts=request.build_opts,
             ),
         )
         if maybe_base_pkg_dep.request is None:

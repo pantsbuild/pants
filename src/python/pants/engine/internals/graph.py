@@ -10,21 +10,10 @@ import json
 import logging
 import os.path
 from collections import defaultdict
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import (
-    Any,
-    DefaultDict,
-    FrozenSet,
-    Iterable,
-    Iterator,
-    Mapping,
-    NamedTuple,
-    Sequence,
-    Type,
-    TypeVar,
-    cast,
-)
+from typing import Any, DefaultDict, NamedTuple, Type, TypeVar, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
@@ -1042,7 +1031,7 @@ def calc_source_block_mapping(
     )
 
 
-class FilesWithSourceBlocks(FrozenSet[str]):
+class FilesWithSourceBlocks(frozenset[str]):
     pass
 
 
@@ -1109,7 +1098,10 @@ async def find_owners(
 
     def create_live_and_deleted_gets(
         *, filter_by_global_options: bool
-    ) -> tuple[Get[FilteredTargets | Targets], Get[UnexpandedTargets],]:
+    ) -> tuple[
+        Get[FilteredTargets | Targets],
+        Get[UnexpandedTargets],
+    ]:
         """Walk up the buildroot looking for targets that would conceivably claim changed sources.
 
         For live files, we use Targets, which causes generated targets to be used rather than their
@@ -1652,7 +1644,10 @@ async def resolve_dependencies(
         Get(
             ValidatedDependencies,
             {
-                vd_request_type(vd_request_type.field_set_type.create(tgt), result): ValidateDependenciesRequest,  # type: ignore[misc]
+                vd_request_type(
+                    vd_request_type.field_set_type.create(tgt),  # type: ignore[misc]
+                    result,
+                ): ValidateDependenciesRequest,
                 environment_name: EnvironmentName,
             },
         )

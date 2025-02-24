@@ -1,10 +1,10 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-""""Generates trufflehog rules."""
+"""Generates trufflehog rules."""
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from pants.backend.tools.trufflehog.subsystem import Trufflehog
 from pants.core.goals.lint import LintFilesRequest, LintResult
@@ -13,11 +13,11 @@ from pants.core.util_rules.external_tool import download_external_tool
 from pants.core.util_rules.partitions import Partitions
 from pants.engine.fs import CreateDigest, FileEntry, MergeDigests, PathGlobs
 from pants.engine.intrinsics import (
-    create_digest_to_digest,
+    create_digest,
     digest_to_snapshot,
-    directory_digest_to_digest_entries,
-    merge_digests_request_to_digest,
-    process_request_to_process_result,
+    execute_process,
+    get_digest_entries,
+    merge_digests,
 )
 from pants.engine.platform import Platform
 from pants.engine.process import Process
@@ -63,13 +63,13 @@ async def run_trufflehog(
     # The downloaded files are going to contain the `exe`, readme and license. We only want the `exe`
     entry = next(
         e
-        for e in await directory_digest_to_digest_entries(downloaded_trufflehog.digest)
+        for e in await get_digest_entries(downloaded_trufflehog.digest)
         if isinstance(e, FileEntry) and e.path == "trufflehog" and e.is_executable
     )
 
-    trufflehog_digest = await create_digest_to_digest(CreateDigest([entry]))
+    trufflehog_digest = await create_digest(CreateDigest([entry]))
     snapshot = await digest_to_snapshot(**implicitly(PathGlobs(request.elements)))
-    input_digest = await merge_digests_request_to_digest(
+    input_digest = await merge_digests(
         MergeDigests(
             (
                 snapshot.digest,
@@ -79,7 +79,7 @@ async def run_trufflehog(
         )
     )
 
-    process_result = await process_request_to_process_result(
+    process_result = await execute_process(
         Process(
             argv=(
                 downloaded_trufflehog.exe,

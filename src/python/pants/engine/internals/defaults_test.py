@@ -4,7 +4,8 @@
 from __future__ import annotations
 
 from collections import namedtuple
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 import pytest
 
@@ -279,9 +280,7 @@ Scenario = namedtuple(
                 kwargs=dict(ignore_unknown_fields=True),
                 expected_defaults={
                     "test_type_1": _determenistic_parametrize_group_keys(
-                        {
-                            **ParametrizeDefault("splat", description="splat-desc")  # type: ignore[list-item]
-                        }
+                        {**ParametrizeDefault("splat", description="splat-desc")}
                     )
                 },
             ),

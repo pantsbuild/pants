@@ -6,13 +6,14 @@ from __future__ import annotations
 import dataclasses
 import logging
 import os.path
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Iterable, List, Mapping, Optional, Tuple
 
 from pants.backend.python.subsystems.python_native_code import PythonNativeCodeSubsystem
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules import pex_environment
 from pants.backend.python.util_rules.pex_environment import PexEnvironment, PexSubsystem
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import adhoc_binaries, external_tool
 from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.external_tool import (
@@ -25,10 +26,13 @@ from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions, ca_certs_path_to_file_content
+from pants.option.option_types import ArgsListOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +42,21 @@ class PexCli(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pex-tool/pex)."
 
-    default_version = "v2.11.0"
+    default_version = "v2.33.1"
     default_url_template = "https://github.com/pex-tool/pex/releases/download/{version}/pex"
-    version_constraints = ">=2.3.0,<3.0"
+    version_constraints = ">=2.13.0,<3.0"
+
+    # extra args to be passed to the pex tool; note that they
+    # are going to apply to all invocations of the pex tool.
+    global_args = ArgsListOption(
+        example="--check=error --no-compile",
+        extra_help=softwrap(
+            """
+            Note that these apply to all invocations of the pex tool, including building `pex_binary`
+            targets, preparing `python_test` targets to run, and generating lockfiles.
+            """
+        ),
+    )
 
     @classproperty
     def default_known_versions(cls):
@@ -49,8 +65,8 @@ class PexCli(TemplatedExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "554a3ad5d1662d93d06a7e65bf5444589d1956752df39e2665a4d54e1e05c949",
-                    "4181790",
+                    "5ebed0e2ba875983a72b4715ee3b2ca6ae5fedbf28d738634e02e30e3bb5ed28",
+                    "4559974",
                 )
             )
             for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
@@ -62,10 +78,10 @@ class PexCliProcess:
     subcommand: tuple[str, ...]
     extra_args: tuple[str, ...]
     description: str = dataclasses.field(compare=False)
-    additional_input_digest: Optional[Digest]
-    extra_env: Optional[FrozenDict[str, str]]
-    output_files: Optional[Tuple[str, ...]]
-    output_directories: Optional[Tuple[str, ...]]
+    additional_input_digest: Digest | None
+    extra_env: FrozenDict[str, str] | None
+    output_files: tuple[str, ...] | None
+    output_directories: tuple[str, ...] | None
     level: LogLevel
     concurrency_available: int
     cache_scope: ProcessCacheScope
@@ -76,10 +92,10 @@ class PexCliProcess:
         subcommand: Iterable[str],
         extra_args: Iterable[str],
         description: str,
-        additional_input_digest: Optional[Digest] = None,
-        extra_env: Optional[Mapping[str, str]] = None,
-        output_files: Optional[Iterable[str]] = None,
-        output_directories: Optional[Iterable[str]] = None,
+        additional_input_digest: Digest | None = None,
+        extra_env: Mapping[str, str] | None = None,
+        output_files: Iterable[str] | None = None,
+        output_directories: Iterable[str] | None = None,
         level: LogLevel = LogLevel.INFO,
         concurrency_available: int = 0,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
@@ -123,10 +139,11 @@ async def setup_pex_cli_process(
     python_native_code: PythonNativeCodeSubsystem.EnvironmentAware,
     global_options: GlobalOptions,
     pex_subsystem: PexSubsystem,
+    pex_cli_subsystem: PexCli,
     python_setup: PythonSetup,
 ) -> Process:
     tmpdir = ".tmp"
-    gets: List[Get] = [Get(Digest, CreateDigest([Directory(tmpdir)]))]
+    gets: list[Get] = [Get(Digest, CreateDigest([Directory(tmpdir)]))]
 
     cert_args = []
     if global_options.ca_certs_path:
@@ -179,6 +196,7 @@ async def setup_pex_cli_process(
         *warnings_args,
         *pip_version_args,
         *resolve_args,
+        *pex_cli_subsystem.global_args,
         # NB: This comes at the end because it may use `--` passthrough args, # which must come at
         # the end.
         *request.extra_args,
@@ -189,7 +207,7 @@ async def setup_pex_cli_process(
     env = {
         **complete_pex_env.environment_dict(python=bootstrap_python),
         **python_native_code.subprocess_env_vars,
-        **(request.extra_env or {}),
+        **(request.extra_env or {}),  # type: ignore[dict-item]
         # If a subcommand is used, we need to use the `pex3` console script.
         **({"PEX_SCRIPT": "pex3"} if request.subcommand else {}),
     }
@@ -223,4 +241,5 @@ def rules():
         *external_tool.rules(),
         *pex_environment.rules(),
         *adhoc_binaries.rules(),
+        UnionRule(ExportableTool, PexCli),
     ]

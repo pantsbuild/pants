@@ -8,9 +8,10 @@ import logging
 import os
 import shutil
 import subprocess
+from collections.abc import Sequence
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Generic, Sequence, Type, TypeVar, cast
+from typing import Generic, TypeVar, cast
 
 from pants.backend.cc.lint.clangformat.subsystem import ClangFormat
 from pants.backend.codegen.avro.java.subsystem import AvroSubsystem
@@ -38,7 +39,6 @@ from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.lint.pydocstyle.subsystem import Pydocstyle
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.lint.pyupgrade.subsystem import PyUpgrade
-from pants.backend.python.lint.ruff.subsystem import Ruff
 from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.packaging.pyoxidizer.subsystem import PyOxidizer
 from pants.backend.python.subsystems.debugpy import DebugPy
@@ -65,7 +65,7 @@ from pants.util.dirutil import touch
 logger = logging.getLogger(__name__)
 
 
-default_python_interpreter_constraints = "CPython>=3.7,<4"
+default_python_interpreter_constraints = "CPython>=3.8,<4"
 
 
 ToolBaseT = TypeVar("ToolBaseT")
@@ -73,7 +73,7 @@ ToolBaseT = TypeVar("ToolBaseT")
 
 @dataclass
 class Tool(Generic[ToolBaseT]):
-    cls: Type[ToolBaseT]
+    cls: type[ToolBaseT]
     backend: str
 
     @property
@@ -90,13 +90,11 @@ class Tool(Generic[ToolBaseT]):
 
 
 @dataclass
-class PythonTool(Tool[PythonToolRequirementsBase]):
-    ...
+class PythonTool(Tool[PythonToolRequirementsBase]): ...
 
 
 @dataclass
-class JvmTool(Tool[JvmToolBase]):
-    ...
+class JvmTool(Tool[JvmToolBase]): ...
 
 
 all_python_tools = tuple(
@@ -127,9 +125,6 @@ all_python_tools = tuple(
             PythonTool(PythonProtobufGrpclibPlugin, "pants.backend.codegen.protobuf.python"),
             PythonTool(Pytype, "pants.backend.experimental.python.typecheck.pytype"),
             PythonTool(PyOxidizer, "pants.backend.experimental.python.packaging.pyoxidizer"),
-            # Note - Ruff has two backends (<package>.check and <package>.format).
-            # Both of these rely on the same resolve underneath so we just pick one here.
-            PythonTool(Ruff, "pants.backend.experimental.python.lint.ruff.check"),
             PythonTool(SemgrepSubsystem, "pants.backend.experimental.tools.semgrep"),
             PythonTool(Setuptools, "pants.backend.python"),
             PythonTool(SetuptoolsSCM, "pants.backend.python"),
@@ -268,6 +263,17 @@ def generate_jvm_tool_lockfiles(tools: Sequence[JvmTool], dry_run: bool) -> None
 
 
 def generate(buildroot: str, tools: Sequence[Tool], args: Sequence[str], dry_run: bool) -> None:
+    def lockfile_inrepo_dest(lockfile_pkg, lockfile_filename):
+        return os.path.join(
+            "src",
+            "python",
+            lockfile_pkg.replace(".", os.path.sep),
+            lockfile_filename,
+        )
+
+    def lockfile_buildroot_filename(lockfile_name):
+        return os.path.join(buildroot, lockfile_name)
+
     pants_repo_root = get_buildroot()
     touch(os.path.join(buildroot, "pants.toml"))
     backends = sorted({tool.backend for tool in tools})
@@ -287,19 +293,24 @@ def generate(buildroot: str, tools: Sequence[Tool], args: Sequence[str], dry_run
         logger.info("Would run: " + " ".join(args))
         return
 
+    # If there is a pre-existing lockfile, seed it so we get the pretty lockfile diff
+    for tool in tools:
+        lockfile_pkg, lockfile_filename = tool.cls.default_lockfile_resource
+        lockfile_dest = lockfile_inrepo_dest(lockfile_pkg, lockfile_filename)
+        if os.path.isfile(lockfile_dest):
+            logger.debug(f"copying existing lockfile from {lockfile_dest}")
+            shutil.copy(lockfile_dest, lockfile_buildroot_filename(tool.lockfile_name))
+
     logger.debug("Running: " + " ".join(args))
     subprocess.run(args, cwd=buildroot, check=True)
 
     # Copy the generated lockfiles from the tmp repo to the Pants repo.
     for tool in tools:
         lockfile_pkg, lockfile_filename = tool.cls.default_lockfile_resource
-        lockfile_dest = os.path.join(
-            "src",
-            "python",
-            lockfile_pkg.replace(".", os.path.sep),
-            lockfile_filename,
+        shutil.copy(
+            lockfile_buildroot_filename(tool.lockfile_name),
+            lockfile_inrepo_dest(lockfile_pkg, lockfile_filename),
         )
-        shutil.copy(os.path.join(buildroot, tool.lockfile_name), lockfile_dest)
 
 
 def main() -> None:

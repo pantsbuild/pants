@@ -4,9 +4,10 @@
 import re
 import string
 from collections import namedtuple
+from collections.abc import Iterable, Sequence
 from dataclasses import FrozenInstanceError, dataclass
 from enum import Enum
-from typing import Any, ClassVar, Dict, Iterable, List, Optional, Sequence, Set, Tuple, cast
+from typing import Any, ClassVar, cast
 
 import pytest
 
@@ -30,6 +31,7 @@ from pants.engine.target import (
     IntField,
     InvalidFieldChoiceException,
     InvalidFieldException,
+    InvalidFieldMemberTypeException,
     InvalidFieldTypeException,
     InvalidGeneratedTargetException,
     InvalidTargetException,
@@ -44,6 +46,7 @@ from pants.engine.target import (
     StringField,
     StringSequenceField,
     Target,
+    TupleSequenceField,
     ValidNumbers,
     _validate_origin_sources_blocks,
     generate_file_based_overrides_field_help_message,
@@ -64,11 +67,11 @@ from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 class FortranExtensions(Field):
     alias = "fortran_extensions"
-    value: Tuple[str, ...]
+    value: tuple[str, ...]
     default = ()
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[Iterable[str]], address: Address) -> Tuple[str, ...]:
+    def compute_value(cls, raw_value: Iterable[str] | None, address: Address) -> tuple[str, ...]:
         value_or_default = super().compute_value(raw_value, address)
         # Add some arbitrary validation to test that hydration/validation works properly.
         bad_extensions = [
@@ -338,8 +341,8 @@ def test_override_preexisting_field_via_new_target() -> None:
 
         @classmethod
         def compute_value(
-            cls, raw_value: Optional[Iterable[str]], address: Address
-        ) -> Tuple[str, ...]:
+            cls, raw_value: Iterable[str] | None, address: Address
+        ) -> tuple[str, ...]:
             # Ensure that we avoid certain problematic extensions and always use some defaults.
             specified_extensions = super().compute_value(raw_value, address)
             banned = [
@@ -482,7 +485,7 @@ def test_target_residence_dir() -> None:
 def test_coarsened_target_equality() -> None:
     a, b = (FortranTarget({}, Address(name)) for name in string.ascii_lowercase[:2])
 
-    def ct(members: List[Target], dependencies: List[CoarsenedTarget] = []):
+    def ct(members: list[Target], dependencies: list[CoarsenedTarget] = []):
         return CoarsenedTarget(members, dependencies)
 
     assert ct([]) == ct([])
@@ -507,7 +510,7 @@ def test_coarsened_target_closure() -> None:
     all_targets = [FortranTarget({}, Address(name)) for name in string.ascii_lowercase[:5]]
     a, b, c, d, e = all_targets
 
-    def ct(members: List[Target], dependencies: List[CoarsenedTarget] = []) -> CoarsenedTarget:
+    def ct(members: list[Target], dependencies: list[CoarsenedTarget] = []) -> CoarsenedTarget:
         return CoarsenedTarget(members, dependencies)
 
     def assert_closure(cts: Sequence[CoarsenedTarget], expected: Sequence[Target]) -> None:
@@ -696,8 +699,8 @@ def test_scalar_field() -> None:
 
         @classmethod
         def compute_value(
-            cls, raw_value: Optional[CustomObject], address: Address
-        ) -> Optional[CustomObject]:
+            cls, raw_value: CustomObject | None, address: Address
+        ) -> CustomObject | None:
             return super().compute_value(raw_value, address)
 
     addr = Address("", target_name="example")
@@ -784,8 +787,8 @@ def test_sequence_field() -> None:
 
         @classmethod
         def compute_value(
-            cls, raw_value: Optional[Iterable[CustomObject]], address: Address
-        ) -> Optional[Tuple[CustomObject, ...]]:
+            cls, raw_value: Iterable[CustomObject] | None, address: Address
+        ) -> tuple[CustomObject, ...] | None:
             return super().compute_value(raw_value, address)
 
     addr = Address("", target_name="example")
@@ -805,6 +808,25 @@ def test_sequence_field() -> None:
     # All elements must be the expected type.
     with pytest.raises(InvalidFieldTypeException):
         Example([CustomObject(), 1, CustomObject()], addr)
+
+
+def test_tuple_sequence_field() -> None:
+    class Example(TupleSequenceField):
+        alias = "example"
+        expected_element_type = str
+        expected_element_count = -1
+        expected_type_description = "an iterable of n-tuples of strings"
+        expected_element_type_description = "n-tuple of strings"
+
+    addr = Address("", target_name="example")
+    assert Example([("hello", "world")], addr).value == (("hello", "world"),)
+    assert Example(None, addr).value is None
+    with pytest.raises(InvalidFieldTypeException):
+        Example("strings are technically iterable...", addr)
+    with pytest.raises(InvalidFieldMemberTypeException):
+        Example(["strings are technically iterable..."], addr)
+    with pytest.raises(InvalidFieldMemberTypeException):
+        Example([("hello", 0, "world")], addr)
 
 
 def test_string_sequence_field() -> None:
@@ -947,7 +969,7 @@ def test_dict_string_to_string_sequence_field() -> None:
 
     addr = Address("", target_name="example")
 
-    def assert_flexible_constructor(raw_value: Dict[str, Iterable[str]]) -> None:
+    def assert_flexible_constructor(raw_value: dict[str, Iterable[str]]) -> None:
         assert Example(raw_value, addr).value == FrozenDict(
             {k: tuple(v) for k, v in raw_value.items()}
         )
@@ -1235,7 +1257,7 @@ def test_explicitly_provided_dependencies_remaining_after_disambiguation() -> No
         ignores=FrozenOrderedSet([addr, generated_addr]),
     )
 
-    def assert_disambiguated_via_ignores(ambiguous: List[Address], expected: Set[Address]) -> None:
+    def assert_disambiguated_via_ignores(ambiguous: list[Address], expected: set[Address]) -> None:
         assert (
             epd.remaining_after_disambiguation(tuple(ambiguous), owners_must_be_ancestors=False)
             == expected
@@ -1280,12 +1302,12 @@ def test_explicitly_provided_dependencies_remaining_after_disambiguation() -> No
 
 def test_explicitly_provided_dependencies_disambiguated() -> None:
     def get_disambiguated(
-        ambiguous: List[Address],
+        ambiguous: list[Address],
         *,
-        ignores: Optional[List[Address]] = None,
-        includes: Optional[List[Address]] = None,
+        ignores: list[Address] | None = None,
+        includes: list[Address] | None = None,
         owners_must_be_ancestors: bool = False,
-    ) -> Optional[Address]:
+    ) -> Address | None:
         epd = ExplicitlyProvidedDependencies(
             address=Address("dir", target_name="input_tgt"),
             includes=FrozenOrderedSet(includes or []),
@@ -1340,10 +1362,10 @@ def test_explicitly_provided_dependencies_maybe_warn_of_ambiguous_dependency_inf
     caplog,
 ) -> None:
     def maybe_warn(
-        ambiguous: List[Address],
+        ambiguous: list[Address],
         *,
-        ignores: Optional[List[Address]] = None,
-        includes: Optional[List[Address]] = None,
+        ignores: list[Address] | None = None,
+        includes: list[Address] | None = None,
         owners_must_be_ancestors: bool = False,
     ) -> None:
         caplog.clear()
@@ -1470,7 +1492,7 @@ def test_overrides_field_normalization() -> None:
     assert OverridesField.flatten_paths(
         addr,
         [
-            (paths, globs, cast(Dict[str, Any], overrides))
+            (paths, globs, cast(dict[str, Any], overrides))
             for (paths, overrides), globs in zip(
                 [
                     (Paths(("dir/foo.ext",), ()), tgt1_override),

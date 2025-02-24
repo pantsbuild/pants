@@ -17,11 +17,18 @@ from pants.backend.javascript.dependency_inference.rules import (
 from pants.backend.javascript.dependency_inference.rules import rules as dependency_inference_rules
 from pants.backend.javascript.package_json import AllPackageJson
 from pants.backend.javascript.target_types import JSSourcesGeneratorTarget, JSSourceTarget
+from pants.backend.jsx.target_types import JSXSourcesGeneratorTarget, JSXSourceTarget
+from pants.backend.tsx.target_types import TSXSourcesGeneratorTarget, TSXSourceTarget
+from pants.backend.typescript.target_types import (
+    TypeScriptSourcesGeneratorTarget,
+    TypeScriptSourceTarget,
+)
 from pants.build_graph.address import Address
+from pants.core.util_rules.unowned_dependency_behavior import UnownedDependencyError
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import QueryRule
 from pants.engine.target import InferredDependencies, Target
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import RuleRunner, engine_error
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -29,16 +36,24 @@ from pants.util.ordered_set import FrozenOrderedSet
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *package_json.rules(),
             *dependency_inference_rules(),
             QueryRule(AllPackageJson, ()),
             QueryRule(Owners, (OwnersRequest,)),
             QueryRule(InferredDependencies, (InferNodePackageDependenciesRequest,)),
             QueryRule(InferredDependencies, (InferJSDependenciesRequest,)),
         ],
-        target_types=[*package_json.target_types(), JSSourceTarget, JSSourcesGeneratorTarget],
+        target_types=[
+            *package_json.target_types(),
+            JSSourceTarget,
+            JSSourcesGeneratorTarget,
+            JSXSourceTarget,
+            JSXSourcesGeneratorTarget,
+            TSXSourceTarget,
+            TSXSourcesGeneratorTarget,
+            TypeScriptSourceTarget,
+            TypeScriptSourcesGeneratorTarget,
+        ],
     )
-    rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
 
 
@@ -62,14 +77,27 @@ def get_inferred_package_jsons_address(
 def test_infers_esmodule_js_dependencies(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "src/js/BUILD": "javascript_sources()",
+            "src/js/BUILD": dedent(
+                """\
+                javascript_sources()
+                jsx_sources(name='jsx')
+                typescript_sources(name='ts')
+                tsx_sources(name='tsx')
+                """
+            ),
             "src/js/index.mjs": dedent(
                 """\
                 import fs from "fs";
-                import { x } from "./xes.mjs";
+                import { x } from "./moduleA";
+                import { y } from "./moduleB";
+                import { z } from "./moduleC";
+                import { w } from "./moduleD";
                 """
             ),
-            "src/js/xes.mjs": "",
+            "src/js/moduleA.mjs": "",
+            "src/js/moduleB.jsx": "",
+            "src/js/moduleC.ts": "",
+            "src/js/moduleD.tsx": "",
         }
     )
 
@@ -79,21 +107,39 @@ def test_infers_esmodule_js_dependencies(rule_runner: RuleRunner) -> None:
         [InferJSDependenciesRequest(JSSourceInferenceFieldSet.create(index_tgt))],
     ).include
 
-    assert set(addresses) == {Address("src/js", relative_file_path="xes.mjs")}
+    assert set(addresses) == {
+        Address("src/js", relative_file_path="moduleA.mjs"),
+        Address("src/js", relative_file_path="moduleB.jsx", target_name="jsx"),
+        Address("src/js", relative_file_path="moduleC.ts", target_name="ts"),
+        Address("src/js", relative_file_path="moduleD.tsx", target_name="tsx"),
+    }
 
 
 def test_infers_esmodule_js_dependencies_from_ancestor_files(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "src/js/BUILD": "javascript_sources()",
+            "src/js/BUILD": dedent(
+                """\
+                javascript_sources()
+                jsx_sources(name='jsx')
+                typescript_sources(name='ts')
+                tsx_sources(name='tsx')
+                """
+            ),
             "src/js/a/BUILD": "javascript_sources()",
             "src/js/a/index.mjs": dedent(
                 """\
                 import fs from "fs";
-                import { x } from "../xes.mjs";
+                import { x } from "../moduleA";
+                import { y } from "../moduleB";
+                import { z } from "../moduleC";
+                import { w } from "../moduleD";
                 """
             ),
-            "src/js/xes.mjs": "",
+            "src/js/moduleA.mjs": "",
+            "src/js/moduleB.jsx": "",
+            "src/js/moduleC.ts": "",
+            "src/js/moduleD.tsx": "",
         }
     )
 
@@ -103,21 +149,39 @@ def test_infers_esmodule_js_dependencies_from_ancestor_files(rule_runner: RuleRu
         [InferJSDependenciesRequest(JSSourceInferenceFieldSet.create(index_tgt))],
     ).include
 
-    assert set(addresses) == {Address("src/js", relative_file_path="xes.mjs")}
+    assert set(addresses) == {
+        Address("src/js", relative_file_path="moduleA.mjs"),
+        Address("src/js", relative_file_path="moduleB.jsx", target_name="jsx"),
+        Address("src/js", relative_file_path="moduleC.ts", target_name="ts"),
+        Address("src/js", relative_file_path="moduleD.tsx", target_name="tsx"),
+    }
 
 
 def test_infers_commonjs_js_dependencies_from_ancestor_files(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "src/js/BUILD": "javascript_sources()",
+            "src/js/BUILD": dedent(
+                """\
+                javascript_sources()
+                jsx_sources(name='jsx')
+                typescript_sources(name='ts')
+                tsx_sources(name='tsx')
+                """
+            ),
             "src/js/a/BUILD": "javascript_sources()",
             "src/js/a/index.cjs": dedent(
                 """\
                 const fs = require("fs");
-                const { x } = require("../xes.cjs");
+                const { x } = require("../moduleA.cjs");
+                const { y } = require("../moduleB.jsx");
+                const { z } = require("../moduleC.ts");
+                const { w } = require("../moduleD.tsx");
                 """
             ),
-            "src/js/xes.cjs": "",
+            "src/js/moduleA.cjs": "",
+            "src/js/moduleB.jsx": "",
+            "src/js/moduleC.ts": "",
+            "src/js/moduleD.tsx": "",
         }
     )
 
@@ -127,7 +191,172 @@ def test_infers_commonjs_js_dependencies_from_ancestor_files(rule_runner: RuleRu
         [InferJSDependenciesRequest(JSSourceInferenceFieldSet.create(index_tgt))],
     ).include
 
-    assert set(addresses) == {Address("src/js", relative_file_path="xes.cjs")}
+    assert set(addresses) == {
+        Address("src/js", relative_file_path="moduleA.cjs"),
+        Address("src/js", relative_file_path="moduleB.jsx", target_name="jsx"),
+        Address("src/js", relative_file_path="moduleC.ts", target_name="ts"),
+        Address("src/js", relative_file_path="moduleD.tsx", target_name="tsx"),
+    }
+
+
+def test_infers_js_dependencies_via_config(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "root/project/BUILD": "package_json()",
+            "root/project/package.json": given_package("ham", "0.0.1", main="./src/index.js"),
+            "root/project/jsconfig.json": json.dumps(
+                {"compilerOptions": {"paths": {"*": ["./src/*"]}}}
+            ),
+            "root/project/src/BUILD": "javascript_sources()",
+            "root/project/src/index.js": dedent(
+                """\
+                import button from "components/button.js";
+                """
+            ),
+            "root/project/src/components/BUILD": "javascript_sources()",
+            "root/project/src/components/button.js": "",
+        }
+    )
+
+    index_tgt = rule_runner.get_target(Address("root/project/src", relative_file_path="index.js"))
+    addresses = rule_runner.request(
+        InferredDependencies,
+        [InferJSDependenciesRequest(JSSourceInferenceFieldSet.create(index_tgt))],
+    ).include
+
+    assert set(addresses) == {
+        Address("root/project/src/components", relative_file_path="button.js")
+    }
+
+
+def test_infers_js_dependencies_via_config_and_extension_less_imports(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "root/project/BUILD": "package_json()",
+            "root/project/package.json": given_package("ham", "0.0.1", main="./src/index.js"),
+            "root/project/jsconfig.json": json.dumps(
+                {"compilerOptions": {"paths": {"*": ["./src/*"]}}}
+            ),
+            "root/project/src/BUILD": "javascript_sources()",
+            "root/project/src/index.js": dedent(
+                """\
+                import { Button } from "components";
+                """
+            ),
+            "root/project/src/components/BUILD": "javascript_sources()",
+            "root/project/src/components/index.js": "export { Button } from 'components/button'",
+            "root/project/src/components/button.js": "",
+        }
+    )
+
+    root_index_tgt = rule_runner.get_target(
+        Address("root/project/src", relative_file_path="index.js")
+    )
+
+    addresses = rule_runner.request(
+        InferredDependencies,
+        [InferJSDependenciesRequest(JSSourceInferenceFieldSet.create(root_index_tgt))],
+    ).include
+
+    assert set(addresses) == {Address("root/project/src/components", relative_file_path="index.js")}
+
+
+def test_infers_js_dependencies_with_compiled_typescript_modules(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": dedent(
+                """\
+                javascript_sources()
+                typescript_sources(name="ts")
+                """
+            ),
+            "src/js/index.js": dedent(
+                """\
+                import { x } from "./moduleA";
+                """
+            ),
+            "src/js/moduleA.ts": "",
+            "src/js/moduleA.js": "",  # Compiled output from tsc
+        }
+    )
+
+    index_tgt = rule_runner.get_target(Address("src/js", relative_file_path="index.js"))
+    addresses = rule_runner.request(
+        InferredDependencies,
+        [InferJSDependenciesRequest(JSSourceInferenceFieldSet.create(index_tgt))],
+    ).include
+
+    assert set(addresses) == {
+        Address("src/js", relative_file_path="moduleA.js"),
+        Address("src/js", target_name="ts", relative_file_path="moduleA.ts"),
+    }
+
+
+def test_unmatched_js_dependencies_and_error_unowned_behaviour(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(["--nodejs-infer-unowned-dependency-behavior=error"])
+    rule_runner.write_files(
+        {
+            "root/project/BUILD": "package_json()",
+            "root/project/package.json": given_package("ham", "0.0.1", main="./src/index.js"),
+            "root/project/jsconfig.json": json.dumps(
+                {"compilerOptions": {"paths": {"*": ["./src/*"]}}}
+            ),
+            "root/project/src/BUILD": "javascript_sources()",
+            "root/project/src/index.js": dedent(
+                """\
+                import { Button } from "components";
+                """
+            ),
+            "root/project/src/components/BUILD": "javascript_sources()",
+            "root/project/src/components/button.js": "",
+        }
+    )
+
+    root_index_tgt = rule_runner.get_target(
+        Address("root/project/src", relative_file_path="index.js")
+    )
+
+    with engine_error(UnownedDependencyError, contains="components"):
+        rule_runner.request(
+            InferredDependencies,
+            [InferJSDependenciesRequest(JSSourceInferenceFieldSet.create(root_index_tgt))],
+        )
+
+
+def test_unmatched_local_js_dependencies_fulfilled_with_third_party_package(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.set_options(["--nodejs-infer-unowned-dependency-behavior=error"])
+    rule_runner.write_files(
+        {
+            "root/project/BUILD": "package_json()",
+            "root/project/package.json": given_package(
+                "ham", "0.0.1", main="./src/index.js", dependencies={"components": "*"}
+            ),
+            "root/project/jsconfig.json": json.dumps(
+                {"compilerOptions": {"paths": {"*": ["./src/*"]}}}
+            ),
+            "root/project/src/BUILD": "javascript_sources()",
+            "root/project/src/index.js": dedent(
+                """\
+                import { Button } from "components";
+                """
+            ),
+        }
+    )
+
+    root_index_tgt = rule_runner.get_target(
+        Address("root/project/src", relative_file_path="index.js")
+    )
+
+    addresses = rule_runner.request(
+        InferredDependencies,
+        [InferJSDependenciesRequest(JSSourceInferenceFieldSet.create(root_index_tgt))],
+    ).include
+
+    assert set(addresses) == {Address("root/project", generated_name="components")}
 
 
 def test_infers_main_package_json_field_js_source_dependency(rule_runner: RuleRunner) -> None:
@@ -285,6 +514,60 @@ def test_infers_third_party_package_json_field_js_source_dependency(
     ).include
 
     assert set(addresses) == {Address("src/js", generated_name="chalk")}
+
+
+def test_infers_scoped_third_party_package_json_field_js_source_dependency(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": "package_json()",
+            "src/js/package.json": given_package(
+                "ham", "0.0.1", main="lib/index.js", dependencies={"@angular/core": "14.0.0"}
+            ),
+            "src/js/lib/BUILD": "javascript_sources()",
+            "src/js/lib/index.js": dedent(
+                """\
+                import { Component } from "@angular/core";
+                """
+            ),
+        }
+    )
+
+    pkg_tgt = rule_runner.get_target(Address("src/js/lib", relative_file_path="index.js"))
+    addresses = rule_runner.request(
+        InferredDependencies,
+        [InferJSDependenciesRequest(JSSourceInferenceFieldSet.create(pkg_tgt))],
+    ).include
+
+    assert set(addresses) == {Address("src/js", generated_name="__angular/core")}
+
+
+def test_infers_third_party_package_json_field_js_source_dependency_with_subpath(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": "package_json()",
+            "src/js/package.json": given_package(
+                "ham", "0.0.1", main="lib/index.js", dependencies={"@mui/material": "5.0.0"}
+            ),
+            "src/js/lib/BUILD": "javascript_sources()",
+            "src/js/lib/index.js": dedent(
+                """\
+                import Button from '@mui/material/Button';
+                """
+            ),
+        }
+    )
+
+    pkg_tgt = rule_runner.get_target(Address("src/js/lib", relative_file_path="index.js"))
+    addresses = rule_runner.request(
+        InferredDependencies,
+        [InferJSDependenciesRequest(JSSourceInferenceFieldSet.create(pkg_tgt))],
+    ).include
+
+    assert set(addresses) == {Address("src/js", generated_name="__mui/material")}
 
 
 def test_infers_third_party_package_json_field_js_source_dependency_with_import_subpaths(

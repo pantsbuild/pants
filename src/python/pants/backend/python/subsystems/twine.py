@@ -33,6 +33,10 @@ class TwineSubsystem(PythonToolBase):
         # requirements.
         # See: https://github.com/pantsbuild/pants/pull/13594#issuecomment-968154931
         "colorama>=0.4.3",
+        # Remove this constraint once on twine > 5. See:
+        # https://github.com/pypa/twine/issues/977
+        # https://github.com/pypa/twine/issues/1125
+        "importlib-metadata<8",
     ]
 
     register_interpreter_constraints = True
@@ -82,7 +86,7 @@ class TwineSubsystem(PythonToolBase):
 
             This option cannot be overridden via environment targets, so if you need a different
             value than what the rest of your organization is using, override the value via an
-            environment variable, CLI argument, or `.pants.rc` file. See {doc_url('docs/using-pants/key-concepts/options')}.
+            environment variable, CLI argument, or `.pants.rc` file. See {doc_url("docs/using-pants/key-concepts/options")}.
             """
         ),
     )

@@ -7,9 +7,10 @@ import importlib.resources
 import json
 import logging
 import os
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from functools import cache
-from typing import Callable, ClassVar, Iterable, Optional, Sequence
+from typing import ClassVar
 from urllib.parse import urlparse
 
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
@@ -62,7 +63,7 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
     #  requirements that reflect any minimum capabilities Pants assumes about the tool.
     default_requirements: Sequence[str] = []
 
-    default_interpreter_constraints: ClassVar[Sequence[str]] = ["CPython>=3.7,<4"]
+    default_interpreter_constraints: ClassVar[Sequence[str]] = ["CPython>=3.8,<4"]
     register_interpreter_constraints: ClassVar[bool] = False
 
     default_lockfile_resource: ClassVar[tuple[str, str] | None] = None
@@ -124,7 +125,9 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
 
             Values can be pip-style requirements (e.g., `tool` or `tool==1.2.3` or `tool>=1.2.3`),
             or addresses of `python_requirement` targets (or targets that generate or depend on
-            `python_requirement` targets).
+            `python_requirement` targets). Make sure to use the `//` prefix to refer to targets
+            using their full address from the root (e.g. `//3rdparty/python:tool`). This is necessary
+            to distinguish address specs from local or VCS requirements.
 
             The lockfile will be validated against the requirements - if a lockfile doesn't
             provide the requirement (at a suitable version, if the requirement specifies version
@@ -191,7 +194,7 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
 
             If you would like to generate a lockfile for {resolve_name},
             follow the instructions for setting up lockfiles for tools
-            {doc_url('docs/python/overview/lockfiles#lockfiles-for-tools')}
+            {doc_url("docs/python/overview/lockfiles#lockfiles-for-tools")}
         """
         )
 
@@ -210,7 +213,7 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
 
     @classmethod
     @cache
-    def _default_package_name_and_version(cls) -> Optional[_PackageNameAndVersion]:
+    def _default_package_name_and_version(cls) -> _PackageNameAndVersion | None:
         if cls.default_lockfile_resource is None:
             return None
 
@@ -223,7 +226,9 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
                 lock_bytes = fp.read()
         elif parts.scheme == "resource":
             # The "netloc" in our made-up "resource://" scheme is the package.
-            lock_bytes = importlib.resources.read_binary(parts.netloc, lockfile_path)
+            lock_bytes = (
+                importlib.resources.files(parts.netloc).joinpath(lockfile_path).read_bytes()
+            )
         else:
             raise ValueError(
                 f"Unsupported scheme {parts.scheme} for lockfile URL: {lockfile.url} "

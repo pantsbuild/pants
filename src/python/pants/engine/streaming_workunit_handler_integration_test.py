@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os
 import signal
-from typing import Mapping
+from collections.abc import Mapping
 
 import pytest
 from workunit_logger.register import FINISHED_SUCCESSFULLY
@@ -27,7 +27,7 @@ def workunit_logger_config(log_dest: str, *, pantsd: bool = True) -> Mapping:
             "backend_packages.add": ["workunit_logger", "pants.backend.python"],
         },
         "workunit-logger": {"dest": log_dest},
-        "python": {"interpreter_constraints": "['>=3.7,<3.10']"},
+        "python": {"interpreter_constraints": "['>=3.8,<3.10']"},
     }
 
 

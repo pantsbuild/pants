@@ -5,7 +5,8 @@ from __future__ import annotations
 
 import itertools
 from collections import defaultdict
-from typing import Iterable, Mapping, Protocol, Sequence, TypeVar
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Protocol, TypeVar
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField, PythonResolveField
@@ -19,12 +20,10 @@ ResolveName = str
 
 class _FieldSetWithResolveAndICs(Protocol):
     @property
-    def resolve(self) -> PythonResolveField:
-        ...
+    def resolve(self) -> PythonResolveField: ...
 
     @property
-    def interpreter_constraints(self) -> InterpreterConstraintsField:
-        ...
+    def interpreter_constraints(self) -> InterpreterConstraintsField: ...
 
 
 _FS = TypeVar("_FS", bound=_FieldSetWithResolveAndICs)

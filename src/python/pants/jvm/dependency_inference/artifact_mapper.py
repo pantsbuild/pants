@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
-from typing import Any, DefaultDict, Iterable, Iterator, Tuple
+from typing import Any, DefaultDict
 
 from pants.backend.java.subsystems.java_infer import JavaInferSubsystem
 from pants.build_graph.address import Address
@@ -44,7 +45,7 @@ class UnversionedCoordinate:
 
 class AvailableThirdPartyArtifacts(
     FrozenDict[
-        Tuple[_ResolveName, UnversionedCoordinate], Tuple[Tuple[Address, ...], Tuple[str, ...]]
+        tuple[_ResolveName, UnversionedCoordinate], tuple[tuple[Address, ...], tuple[str, ...]]
     ]
 ):
     """Maps coordinates and resolve names to target `Address`es and declared packages."""
@@ -104,7 +105,7 @@ class MutableTrieNode:
         return FrozenTrieNode(self)
 
 
-FrozenTrieNodeItem = Tuple[str, bool, FrozenDict[SymbolNamespace, FrozenOrderedSet[Address]], bool]
+FrozenTrieNodeItem = tuple[str, bool, FrozenDict[SymbolNamespace, FrozenOrderedSet[Address]], bool]
 
 
 @dataclass(frozen=True)
@@ -280,9 +281,9 @@ async def find_available_third_party_artifacts(
     address_mapping: DefaultDict[
         tuple[_ResolveName, UnversionedCoordinate], OrderedSet[Address]
     ] = defaultdict(OrderedSet)
-    package_mapping: DefaultDict[
-        tuple[_ResolveName, UnversionedCoordinate], OrderedSet[str]
-    ] = defaultdict(OrderedSet)
+    package_mapping: DefaultDict[tuple[_ResolveName, UnversionedCoordinate], OrderedSet[str]] = (
+        defaultdict(OrderedSet)
+    )
     for tgt in all_jvm_artifact_tgts:
         coord = UnversionedCoordinate(
             group=tgt[JvmArtifactGroupField].value, artifact=tgt[JvmArtifactArtifactField].value

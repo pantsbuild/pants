@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import importlib.resources
 import logging
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Iterable, Iterator
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from pants.backend.python.subsystems.repos import PythonRepos
@@ -210,7 +211,7 @@ async def load_lockfile(
         _fc = FileContent(
             lockfile_path,
             # The "netloc" in our made-up "resource://" scheme is the package.
-            importlib.resources.read_binary(parts.netloc, lockfile_path),
+            importlib.resources.files(parts.netloc).joinpath(lockfile_path).read_bytes(),
         )
         lockfile_path, lock_bytes = (_fc.path, _fc.content)
         lockfile_digest = await Get(Digest, CreateDigest([_fc]))
@@ -604,12 +605,15 @@ def _invalid_lockfile_error(
         )
         for i in validation.failure_reasons
     ):
-        yield softwrap(
-            """
+        yield (
+            softwrap(
+                """
             - The lockfile does not provide all the necessary requirements. You must
             modify the input requirements and/or regenerate the lockfile (see below).
             """
-        ) + "\n\n"
+            )
+            + "\n\n"
+        )
         if is_default_user_lockfile:
             yield softwrap(
                 f"""

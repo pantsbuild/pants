@@ -4,9 +4,9 @@
 from __future__ import annotations
 
 import os.path
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterable
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
@@ -50,7 +50,7 @@ class Sqlfluff(PythonToolBase):
     default_requirements = ["sqlfluff>=2.3.5,<3"]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
+    default_interpreter_constraints = ["CPython>=3.8,<4"]
 
     default_lockfile_resource = ("pants.backend.sql.lint.sqlfluff", "sqlfluff.lock")
 

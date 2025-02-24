@@ -1,10 +1,12 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable, Optional
 
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
@@ -12,10 +14,11 @@ from pants.core.util_rules.external_tool import (
     download_external_tool,
 )
 from pants.engine.fs import Digest, RemovePrefix
-from pants.engine.intrinsics import remove_prefix_request_to_digest
+from pants.engine.intrinsics import remove_prefix
 from pants.engine.platform import Platform
-from pants.engine.process import fallible_to_exec_result_or_raise
+from pants.engine.process import execute_process_or_raise
 from pants.engine.rules import Rule, collect_rules, implicitly, rule
+from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 
@@ -72,8 +75,8 @@ class RunMakeselfArchive:
     input_digest: Digest
     description: str
     level: LogLevel = LogLevel.INFO
-    output_directory: Optional[str] = None
-    extra_args: Optional[tuple[str, ...]] = None
+    output_directory: str | None = None
+    extra_args: tuple[str, ...] | None = None
     extra_tools: tuple[str, ...] = ()
 
 
@@ -82,7 +85,7 @@ async def extract_makeself_distribution(
     dist: MakeselfDistribution,
 ) -> MakeselfTool:
     out = "__makeself"
-    result = await fallible_to_exec_result_or_raise(
+    result = await execute_process_or_raise(
         **implicitly(
             RunMakeselfArchive(
                 exe=dist.exe,
@@ -102,12 +105,13 @@ async def extract_makeself_distribution(
             )
         )
     )
-    digest = await remove_prefix_request_to_digest(RemovePrefix(result.output_digest, out))
+    digest = await remove_prefix(RemovePrefix(result.output_digest, out))
     return MakeselfTool(digest=digest, exe="makeself.sh")
 
 
-def rules() -> Iterable[Rule]:
+def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
         *external_tool.rules(),
+        UnionRule(ExportableTool, MakeselfSubsystem),
     )

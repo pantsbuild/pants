@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from textwrap import dedent
-from typing import Callable, Optional
 
 import pytest
 
@@ -15,9 +15,9 @@ from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_
 def run_generic_test(
     *,
     entry_point: str = "app.py",
-    execution_mode: Optional[PexExecutionMode] = None,
+    execution_mode: PexExecutionMode | None = None,
     include_tools: bool = False,
-    layout: Optional[PexLayout] = None,
+    layout: PexLayout | None = None,
     venv_site_packages_copies: bool = False,
 ) -> Callable[..., PantsResult]:
     sources = {
@@ -105,7 +105,7 @@ def test_entry_point(
 @pytest.mark.parametrize("execution_mode", [None, PexExecutionMode.VENV])
 @pytest.mark.parametrize("include_tools", [True, False])
 def test_execution_mode_and_include_tools(
-    execution_mode: Optional[PexExecutionMode],
+    execution_mode: PexExecutionMode | None,
     include_tools: bool,
 ):
     run = run_generic_test(
@@ -126,7 +126,7 @@ def test_execution_mode_and_include_tools(
 
 @pytest.mark.parametrize("layout", PexLayout)
 def test_layout(
-    layout: Optional[PexLayout],
+    layout: PexLayout | None,
 ):
     run_generic_test(layout=layout)
 
@@ -281,3 +281,31 @@ def test_run_script_from_3rdparty_dist_issue_13747() -> None:
         result = run_pants(args)
         result.assert_success()
         assert SAY in result.stdout.strip()
+
+
+def test_pass_extra_pex_cli_subsystem_global_args() -> None:
+    """Test that extra global args passed to the pex-cli subsystem propagate to the actual pex
+    invocation."""
+    sources = {
+        "src/BUILD": dedent(
+            """\
+            python_requirement(name="cowsay", requirements=["cowsay==4.0"])
+            pex_binary(name="test", script="cowsay", dependencies=[":cowsay"])
+            """
+        ),
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        args = [
+            "--backend-packages=pants.backend.python",
+            "--pex-cli-global-args='--non-existing-flag-name=some-value'",
+            f"--source-root-patterns=['/{tmpdir}/src']",
+            "run",
+            f"{tmpdir}/src:test",
+            "--",
+            "moooo",
+        ]
+        result = run_pants(args)
+        result.assert_failure()
+        stderr = result.stderr.strip()
+        assert "unrecognized arguments" in stderr
+        assert "non-existing-flag-name" in stderr

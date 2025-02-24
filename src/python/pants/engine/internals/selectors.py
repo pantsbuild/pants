@@ -5,20 +5,9 @@ from __future__ import annotations
 
 import ast
 import itertools
+from collections.abc import Coroutine, Generator, Iterable, Sequence
 from dataclasses import dataclass
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Coroutine,
-    Generator,
-    Generic,
-    Iterable,
-    Sequence,
-    Tuple,
-    TypeVar,
-    cast,
-    overload,
-)
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast, overload
 
 from pants.engine.internals.native_engine import PyGeneratorResponseCall, PyGeneratorResponseGet
 from pants.util.strutil import softwrap
@@ -172,7 +161,7 @@ class _MultiGet:
 
     def __await__(self) -> Generator[tuple[Get | Coroutine, ...], None, tuple]:
         result = yield self.gets
-        return cast(Tuple, result)
+        return cast(tuple, result)
 
 
 # These type variables are used to parametrize from 1 to 10 Gets when used in a tuple-style
@@ -192,9 +181,8 @@ _Out9 = TypeVar("_Out9")
 
 @overload
 async def MultiGet(
-    __gets: Iterable[Get[_Output] | Coroutine[Any, Any, _Output]]
-) -> tuple[_Output, ...]:
-    ...
+    __gets: Iterable[Get[_Output] | Coroutine[Any, Any, _Output]],
+) -> tuple[_Output, ...]: ...
 
 
 @overload
@@ -211,8 +199,7 @@ async def MultiGet(
     __get9: Get[_Output] | Coroutine[Any, Any, _Output],
     __get10: Get[_Output] | Coroutine[Any, Any, _Output],
     *__gets: Get[_Output] | Coroutine[Any, Any, _Output],
-) -> tuple[_Output, ...]:
-    ...
+) -> tuple[_Output, ...]: ...
 
 
 @overload
@@ -227,8 +214,7 @@ async def MultiGet(
     __get7: Get[_Out7] | Coroutine[Any, Any, _Out7],
     __get8: Get[_Out8] | Coroutine[Any, Any, _Out8],
     __get9: Get[_Out9] | Coroutine[Any, Any, _Out9],
-) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8, _Out9]:
-    ...
+) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8, _Out9]: ...
 
 
 @overload
@@ -242,8 +228,7 @@ async def MultiGet(
     __get6: Get[_Out6] | Coroutine[Any, Any, _Out6],
     __get7: Get[_Out7] | Coroutine[Any, Any, _Out7],
     __get8: Get[_Out8] | Coroutine[Any, Any, _Out8],
-) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8]:
-    ...
+) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8]: ...
 
 
 @overload
@@ -256,8 +241,7 @@ async def MultiGet(
     __get5: Get[_Out5] | Coroutine[Any, Any, _Out5],
     __get6: Get[_Out6] | Coroutine[Any, Any, _Out6],
     __get7: Get[_Out7] | Coroutine[Any, Any, _Out7],
-) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7]:
-    ...
+) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7]: ...
 
 
 @overload
@@ -269,8 +253,7 @@ async def MultiGet(
     __get4: Get[_Out4] | Coroutine[Any, Any, _Out4],
     __get5: Get[_Out5] | Coroutine[Any, Any, _Out5],
     __get6: Get[_Out6] | Coroutine[Any, Any, _Out6],
-) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6]:
-    ...
+) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6]: ...
 
 
 @overload
@@ -281,8 +264,7 @@ async def MultiGet(
     __get3: Get[_Out3] | Coroutine[Any, Any, _Out3],
     __get4: Get[_Out4] | Coroutine[Any, Any, _Out4],
     __get5: Get[_Out5] | Coroutine[Any, Any, _Out5],
-) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5]:
-    ...
+) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5]: ...
 
 
 @overload
@@ -292,8 +274,7 @@ async def MultiGet(
     __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
     __get3: Get[_Out3] | Coroutine[Any, Any, _Out3],
     __get4: Get[_Out4] | Coroutine[Any, Any, _Out4],
-) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4]:
-    ...
+) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4]: ...
 
 
 @overload
@@ -302,8 +283,7 @@ async def MultiGet(
     __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
     __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
     __get3: Get[_Out3] | Coroutine[Any, Any, _Out3],
-) -> tuple[_Out0, _Out1, _Out2, _Out3]:
-    ...
+) -> tuple[_Out0, _Out1, _Out2, _Out3]: ...
 
 
 @overload
@@ -311,22 +291,22 @@ async def MultiGet(
     __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
     __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
     __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
-) -> tuple[_Out0, _Out1, _Out2]:
-    ...
+) -> tuple[_Out0, _Out1, _Out2]: ...
 
 
 @overload
 async def MultiGet(
     __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
     __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
-) -> tuple[_Out0, _Out1]:
-    ...
+) -> tuple[_Out0, _Out1]: ...
 
 
 async def MultiGet(
-    __arg0: Iterable[Get[_Output] | Coroutine[Any, Any, _Output]]
-    | Get[_Out0]
-    | Coroutine[Any, Any, _Out0],
+    __arg0: (
+        Iterable[Get[_Output] | Coroutine[Any, Any, _Output]]
+        | Get[_Out0]
+        | Coroutine[Any, Any, _Out0]
+    ),
     __arg1: Get[_Out1] | Coroutine[Any, Any, _Out1] | None = None,
     __arg2: Get[_Out2] | Coroutine[Any, Any, _Out2] | None = None,
     __arg3: Get[_Out3] | Coroutine[Any, Any, _Out3] | None = None,
@@ -562,9 +542,9 @@ async def MultiGet(
         raise ValueError(
             softwrap(
                 f"""
-                Unexpected MultiGet None arguments: {', '.join(
-                    map(str, likely_args_explicitly_passed)
-                )}
+                Unexpected MultiGet None arguments: {
+                    ", ".join(map(str, likely_args_explicitly_passed))
+                }
 
                 When constructing a MultiGet from individual Gets, all leading arguments must be
                 Gets.
@@ -575,7 +555,7 @@ async def MultiGet(
     raise TypeError(
         softwrap(
             f"""
-            Unexpected MultiGet argument types: {', '.join(map(str, likely_args_explicitly_passed))}
+            Unexpected MultiGet argument types: {", ".join(map(str, likely_args_explicitly_passed))}
 
             A MultiGet can be constructed in two ways:
               1. MultiGet(Iterable[Get[T]]) -> Tuple[T]

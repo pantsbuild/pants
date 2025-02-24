@@ -15,17 +15,19 @@ use hashing::Digest;
 use protos::gen::pants::cache::{
     dependency_inference_request, CacheKey, CacheKeyType, DependencyInferenceRequest,
 };
-use pyo3::prelude::{pyfunction, wrap_pyfunction, PyModule, PyResult, Python, ToPyObject};
+use pyo3::prelude::{pyfunction, wrap_pyfunction, PyModule, PyResult, Python};
+use pyo3::types::{PyAnyMethods, PyModuleMethods};
+use pyo3::{Bound, IntoPyObject, PyErr};
 use store::Store;
 use workunit_store::{in_workunit, Level};
 
 use crate::externs::dep_inference::PyNativeDependenciesRequest;
-use crate::externs::PyGeneratorResponseNativeCall;
+use crate::externs::{store_dict, PyGeneratorResponseNativeCall};
 use crate::nodes::{task_get_context, NodeResult};
 use crate::python::{Failure, Value};
 use crate::{externs, Core};
 
-pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn register(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_dockerfile_info, m)?)?;
     m.add_function(wrap_pyfunction!(parse_python_deps, m)?)?;
     m.add_function(wrap_pyfunction!(parse_javascript_deps, m)?)?;
@@ -52,7 +54,7 @@ impl PreparedInferenceRequest {
         let PyNativeDependenciesRequest {
             directory_digest,
             metadata,
-        } = Python::with_gil(|py| deps_request.extract(py))?;
+        } = Python::with_gil(|py| deps_request.bind(py).extract())?;
 
         let (path, digest) = Self::find_one_file(directory_digest, store, backend).await?;
         let str_path = path.display().to_string();
@@ -143,26 +145,38 @@ fn parse_dockerfile_info(deps_request: Value) -> PyGeneratorResponseNativeCall {
                 )
                 .await?;
 
-                let result = Python::with_gil(|py| {
-                    externs::unsafe_call(
+                let result = Python::with_gil(|py| -> Result<_, PyErr> {
+                    Ok(externs::unsafe_call(
                         py,
                         core.types.parsed_dockerfile_info_result,
                         &[
-                            result.path.to_object(py).into(),
-                            result.build_args.to_object(py).into(),
-                            result.copy_source_paths.to_object(py).into(),
-                            result.copy_build_args.to_object(py).into(),
-                            result.from_image_build_args.to_object(py).into(),
+                            result.path.into_pyobject(py)?.into_any().into(),
+                            result.build_args.into_pyobject(py)?.into_any().into(),
+                            result
+                                .copy_source_paths
+                                .into_pyobject(py)?
+                                .into_any()
+                                .into(),
+                            result.copy_build_args.into_pyobject(py)?.into_any().into(),
+                            result
+                                .from_image_build_args
+                                .into_pyobject(py)?
+                                .into_any()
+                                .into(),
                             result
                                 .version_tags
                                 .into_iter()
-                                .map(|(stage, tag)| format!("{stage} {tag}"))
+                                .map(|(stage, tag)| match tag {
+                                    Some(tag) => format!("{stage} {tag}"),
+                                    None => stage.to_string(),
+                                })
                                 .collect::<Vec<_>>()
-                                .to_object(py)
+                                .into_pyobject(py)?
+                                .into_any()
                                 .into(),
                         ],
-                    )
-                });
+                    ))
+                })?;
 
                 Ok::<_, Failure>(result)
             }
@@ -199,16 +213,20 @@ fn parse_python_deps(deps_request: Value) -> PyGeneratorResponseNativeCall {
                 )
                 .await?;
 
-                let result = Python::with_gil(|py| {
-                    externs::unsafe_call(
+                let result = Python::with_gil(|py| -> Result<_, PyErr> {
+                    Ok(externs::unsafe_call(
                         py,
                         core.types.parsed_python_deps_result,
                         &[
-                            result.imports.to_object(py).into(),
-                            result.string_candidates.to_object(py).into(),
+                            result.imports.into_pyobject(py)?.into_any().into(),
+                            result
+                                .string_candidates
+                                .into_pyobject(py)?
+                                .into_any()
+                                .into(),
                         ],
-                    )
-                });
+                    ))
+                })?;
 
                 Ok::<_, Failure>(result)
             }
@@ -263,18 +281,33 @@ fn parse_javascript_deps(deps_request: Value) -> PyGeneratorResponseNativeCall {
                 )
                 .await?;
 
-                let result = Python::with_gil(|py| {
-                    externs::unsafe_call(
+                Python::with_gil(|py| -> Result<_, Failure> {
+                    let import_items = result
+                        .imports
+                        .into_iter()
+                        .map(|(string, info)| -> Result<_, PyErr> {
+                            Ok((
+                                string.into_pyobject(py)?.into_any().into(),
+                                externs::unsafe_call(
+                                    py,
+                                    core.types.parsed_javascript_deps_candidate_result,
+                                    &[
+                                        info.file_imports.into_pyobject(py)?.into_any().into(),
+                                        info.package_imports.into_pyobject(py)?.into_any().into(),
+                                    ],
+                                ),
+                            ))
+                        })
+                        .collect::<Result<Vec<_>, PyErr>>()
+                        .map_err(|e| Failure::from_py_err_with_gil(py, e))?;
+
+                    Ok(externs::unsafe_call(
                         py,
                         core.types.parsed_javascript_deps_result,
-                        &[
-                            result.file_imports.to_object(py).into(),
-                            result.package_imports.to_object(py).into(),
-                        ],
-                    )
-                });
-
-                Ok::<_, Failure>(result)
+                        &[store_dict(py, import_items)
+                            .map_err(|e| Failure::from_py_err_with_gil(py, e))?],
+                    ))
+                })
             }
         )
         .await

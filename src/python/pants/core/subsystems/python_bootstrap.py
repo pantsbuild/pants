@@ -6,10 +6,9 @@ from __future__ import annotations
 import itertools
 import logging
 import os
+import sys
+from collections.abc import Collection
 from dataclasses import dataclass
-from typing import Collection
-
-from pex.variables import Variables
 
 from pants.core.util_rules import asdf, search_paths
 from pants.core.util_rules.asdf import AsdfPathString, AsdfToolPathsResult
@@ -30,7 +29,7 @@ from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
-_PBS_URL_TEMPLATE = "https://github.com/indygreg/python-build-standalone/releases/download/20230116/cpython-3.9.16+20230116-{}-install_only.tar.gz"
+_PBS_URL_TEMPLATE = "https://github.com/astral-sh/python-build-standalone/releases/download/20241008/cpython-3.11.10+20241008-{}-install_only.tar.gz"
 
 
 class PythonBootstrapSubsystem(Subsystem):
@@ -49,23 +48,23 @@ class PythonBootstrapSubsystem(Subsystem):
         default={
             "linux_arm64": (
                 _PBS_URL_TEMPLATE.format("aarch64-unknown-linux-gnu"),
-                "1ba520c0db431c84305677f56eb9a4254f5097430ed443e92fc8617f8fba973d",
-                23873387,
+                "320635e957e13d2e10d70a3031563d032fae9e40e60e5ec32bc353643fae1335",
+                25925875,
             ),
             "linux_x86_64": (
                 _PBS_URL_TEMPLATE.format("x86_64-unknown-linux-gnu"),
-                "7ba397787932393e65fc2fb9fcfabf54f2bb6751d5da2b45913cb25b2d493758",
-                26129729,
+                "ff121f14ed113c9da83a45f76c3cf41976fb4419fe406d5cc7066765761c6a4e",
+                29716764,
             ),
             "macos_arm64": (
                 _PBS_URL_TEMPLATE.format("aarch64-apple-darwin"),
-                "d732d212d42315ac27c6da3e0b69636737a8d72086c980daf844344c010cab80",
-                17084463,
+                "ecdc9c042b8f97bff211fcf9425bc51c96acd4037df1565964e89816f2c9564d",
+                17795541,
             ),
             "macos_x86_64": (
                 _PBS_URL_TEMPLATE.format("x86_64-apple-darwin"),
-                "3948384af5e8d4ee7e5ccc648322b99c1c5cf4979954ed5e6b3382c69d6db71e",
-                17059474,
+                "a618c086e0514f681523947e2b66a4dc0c6560f91c36faa072fa6787455df9ea",
+                18165701,
             ),
         },
         help=softwrap(
@@ -226,13 +225,49 @@ async def _expand_interpreter_search_paths(
     return _SearchPaths(tuple(expanded))
 
 
+# This method is copied from the pex package, located at pex.variables.Variables._get_kv().
+# It is copied here to avoid a hard dependency on pex.
+def _get_kv(variable: str) -> list[str] | None:
+    kv = variable.strip().split("=")
+    if len(list(filter(None, kv))) == 2:
+        return kv
+    else:
+        return None
+
+
+# This method is copied from the pex package, located at pex.variables.Variables.from_rc().
+# It is copied here to avoid a hard dependency on pex.
+def _read_pex_rc(rc: str | None = None) -> dict[str, str]:
+    """Read pex runtime configuration variables from a pexrc file.
+
+    :param rc: an absolute path to a pexrc file.
+    :return: A dict of key value pairs found in processed pexrc files.
+    """
+    ret_vars = {}
+    rc_locations = [
+        os.path.join(os.sep, "etc", "pexrc"),
+        os.path.join("~", ".pexrc"),
+        os.path.join(os.path.dirname(sys.argv[0]), ".pexrc"),
+    ]
+    if rc:
+        rc_locations.append(rc)
+    for filename in rc_locations:
+        try:
+            with open(os.path.expanduser(filename)) as fh:
+                rc_items = map(_get_kv, fh)
+                ret_vars.update(dict(filter(None, rc_items)))
+        except OSError:
+            continue
+    return ret_vars
+
+
 def _get_pex_python_paths():
     """Returns a list of paths to Python interpreters as defined in a pexrc file.
 
     These are provided by a PEX_PYTHON_PATH in either of '/etc/pexrc', '~/.pexrc'. PEX_PYTHON_PATH
     defines a colon-separated list of paths to interpreters that a pex can be built and run against.
     """
-    ppp = Variables.from_rc().get("PEX_PYTHON_PATH")
+    ppp = _read_pex_rc().get("PEX_PYTHON_PATH")
     if ppp:
         return ppp.split(os.pathsep)
     else:

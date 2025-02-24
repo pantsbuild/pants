@@ -6,10 +6,9 @@ from __future__ import annotations
 import os
 import re
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from typing import Callable, ClassVar, Iterator, Optional, cast
-
-from typing_extensions import final
+from typing import ClassVar, cast, final
 
 from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
 from pants.backend.docker.subsystems.docker_options import DockerOptions
@@ -81,7 +80,7 @@ class DockerImageContextRootField(StringField):
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
+    def compute_value(cls, raw_value: str | None, address: Address) -> str | None:
         value_or_default = super().compute_value(raw_value, address=address)
         if isinstance(value_or_default, str) and value_or_default.startswith("/"):
             val = value_or_default.strip("/")
@@ -90,7 +89,7 @@ class DockerImageContextRootField(StringField):
                     f"""
                     The `{cls.alias}` field in target {address} must be a relative path, but was
                     {value_or_default!r}. Use {val!r} for a path relative to the build root, or
-                    {'./' + val!r} for a path relative to the BUILD file
+                    {"./" + val!r} for a path relative to the BUILD file
                     (i.e. {os.path.join(address.spec_path, val)!r}).
                     """
                 )
@@ -151,7 +150,7 @@ class DockerImageTagsField(StringSequenceField):
 
         {_interpolation_help.format(kind="tag")}
 
-        See {doc_url('docs/docker/tagging-docker-images')}.
+        See {doc_url("docs/docker/tagging-docker-images")}.
         """
     )
 
@@ -335,8 +334,7 @@ class DockerBuildKitOptionField:
     """Mixin to indicate a BuildKit-specific option."""
 
     @abstractmethod
-    def options(self, value_formatter: OptionValueFormatter) -> Iterator[str]:
-        ...
+    def options(self, value_formatter: OptionValueFormatter) -> Iterator[str]: ...
 
     required_help = "This option requires BuildKit to be enabled via the Docker subsystem options."
 

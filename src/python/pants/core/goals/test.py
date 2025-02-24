@@ -9,11 +9,12 @@ import logging
 import os
 import shlex
 from abc import ABC, ABCMeta
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, ClassVar, Iterable, Optional, Sequence, Tuple, TypeVar, cast
+from typing import Any, ClassVar, TypeVar, cast
 
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
@@ -36,17 +37,13 @@ from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_FILE_DIGEST, Digest, FileDigest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.session import RunId
-from pants.engine.process import (
-    FallibleProcessResult,
-    InteractiveProcess,
-    InteractiveProcessResult,
-    ProcessResultMetadata,
-)
-from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.intrinsics import run_interactive_process_in_environment
+from pants.engine.process import FallibleProcessResult, InteractiveProcess, ProcessResultMetadata
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
     FieldSetsPerTarget,
@@ -102,7 +99,7 @@ class TestResult(EngineAwareReturnType):
     # True if the core test rules should log that extra output was written.
     log_extra_output: bool = False
     # All results including failed attempts
-    process_results: Tuple[FallibleProcessResult, ...] = field(default_factory=tuple)
+    process_results: tuple[FallibleProcessResult, ...] = field(default_factory=tuple)
 
     output_simplifier: Simplifier = Simplifier()
 
@@ -142,7 +139,7 @@ class TestResult(EngineAwareReturnType):
 
     @staticmethod
     def from_fallible_process_result(
-        process_results: Tuple[FallibleProcessResult, ...],
+        process_results: tuple[FallibleProcessResult, ...],
         address: Address,
         output_setting: ShowOutput,
         *,
@@ -172,7 +169,7 @@ class TestResult(EngineAwareReturnType):
 
     @staticmethod
     def from_batched_fallible_process_result(
-        process_results: Tuple[FallibleProcessResult, ...],
+        process_results: tuple[FallibleProcessResult, ...],
         batch: TestRequest.Batch[_TestFieldSetT, Any],
         output_setting: ShowOutput,
         *,
@@ -206,14 +203,14 @@ class TestResult(EngineAwareReturnType):
         if len(self.addresses) == 1:
             return self.addresses[0].spec
 
-        return f"{self.addresses[0].spec} and {len(self.addresses)-1} other files"
+        return f"{self.addresses[0].spec} and {len(self.addresses) - 1} other files"
 
     @property
     def path_safe_description(self) -> str:
         if len(self.addresses) == 1:
             return self.addresses[0].path_safe_spec
 
-        return f"{self.addresses[0].path_safe_spec}+{len(self.addresses)-1}"
+        return f"{self.addresses[0].path_safe_spec}+{len(self.addresses) - 1}"
 
     def __lt__(self, other: Any) -> bool:
         """We sort first by exit code, then alphanumerically within each group."""
@@ -385,7 +382,7 @@ class TestRequest:
             if len(self.elements) == 1:
                 return self.elements[0].address.spec
 
-            return f"{self.elements[0].address.spec} and {len(self.elements)-1} other files"
+            return f"{self.elements[0].address.spec} and {len(self.elements) - 1} other files"
 
         def metadata(self) -> dict[str, Any]:
             return {
@@ -521,10 +518,10 @@ class TestSubsystem(GoalSubsystem):
     class EnvironmentAware:
         extra_env_vars = StrListOption(
             help=softwrap(
-                """
+                f"""
                 Additional environment variables to include in test processes.
-                Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
-                `ENV_VAR` to copy the value of a variable in Pants's own environment.
+
+                {EXTRA_ENV_VARS_USAGE_HELP}
                 """
             ),
         )
@@ -732,7 +729,7 @@ class TestTimeoutField(IntField, metaclass=ABCMeta):
         """
     )
 
-    def calculate_from_global_options(self, test: TestSubsystem) -> Optional[int]:
+    def calculate_from_global_options(self, test: TestSubsystem) -> int | None:
         if not test.timeouts:
             return None
         if self.value is None:
@@ -749,13 +746,12 @@ class TestTimeoutField(IntField, metaclass=ABCMeta):
 class TestExtraEnvVarsField(StringSequenceField, metaclass=ABCMeta):
     alias = "extra_env_vars"
     help = help_text(
-        """
-         Additional environment variables to include in test processes.
+        f"""
+        Additional environment variables to include in test processes.
 
-         Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
-         `ENV_VAR` to copy the value of a variable in Pants's own environment.
+        {EXTRA_ENV_VARS_USAGE_HELP}
 
-         This will be merged with and override values from `[test].extra_env_vars`.
+        This will be merged with and override values from `[test].extra_env_vars`.
         """
     )
 
@@ -875,12 +871,8 @@ async def _run_debug_tests(
                 )
             )
 
-        debug_result = await Effect(
-            InteractiveProcessResult,
-            {
-                debug_request.process: InteractiveProcess,
-                environment_name: EnvironmentName,
-            },
+        debug_result = await run_interactive_process_in_environment(
+            debug_request.process, environment_name
         )
         if debug_result.exit_code != 0:
             exit_code = debug_result.exit_code
@@ -1021,7 +1013,7 @@ async def run_tests(
         }
         coverage_collections = []
         for data_cls, data in itertools.groupby(all_coverage_data, lambda data: type(data)):
-            collection_cls = coverage_types_to_collection_types[data_cls]
+            collection_cls = coverage_types_to_collection_types[data_cls]  # type: ignore[index]
             coverage_collections.append(collection_cls(data))
         # We can create multiple reports for each coverage data (e.g., console, xml, html)
         coverage_reports_collections = await MultiGet(
@@ -1045,9 +1037,8 @@ async def run_tests(
                 OpenFiles, OpenFilesRequest(coverage_report_files, error_if_open_not_found=False)
             )
             for process in open_files.processes:
-                _ = await Effect(
-                    InteractiveProcessResult,
-                    {process: InteractiveProcess, local_environment_name.val: EnvironmentName},
+                _ = await run_interactive_process_in_environment(
+                    process, local_environment_name.val
                 )
 
         for coverage_reports in coverage_reports_collections:
@@ -1080,9 +1071,9 @@ _SOURCE_MAP = {
 
 def _format_test_summary(result: TestResult, run_id: RunId, console: Console) -> str:
     """Format the test summary printed to the console."""
-    assert (
-        result.result_metadata is not None
-    ), "Skipped test results should not be outputted in the test summary"
+    assert result.result_metadata is not None, (
+        "Skipped test results should not be outputted in the test summary"
+    )
     succeeded = result.exit_code == 0
     retried = len(result.process_results) > 1
 

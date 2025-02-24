@@ -4,13 +4,14 @@
 from __future__ import annotations
 
 import textwrap
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Iterable, Mapping
 
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.util_rules import goroot
+from pants.backend.go.util_rules.go_bootstrap import GoBootstrap
 from pants.backend.go.util_rules.goroot import GoRoot
-from pants.core.util_rules.system_binaries import BashBinary
+from pants.core.util_rules.system_binaries import BashBinary, BinaryShims, BinaryShimsRequest
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
@@ -105,11 +106,15 @@ async def go_sdk_invoke_setup(goroot: GoRoot) -> GoSdkRunSetup:
 @rule
 async def setup_go_sdk_process(
     request: GoSdkProcess,
+    go_bootstrap: GoBootstrap,
     go_sdk_run: GoSdkRunSetup,
     bash: BashBinary,
     golang_env_aware: GolangSubsystem.EnvironmentAware,
     goroot: GoRoot,
 ) -> Process:
+    # Use go search path to find extra tools
+    search_path = go_bootstrap.go_search_paths
+
     input_digest, env_vars = await MultiGet(
         Get(Digest, MergeDigests([go_sdk_run.digest, request.input_digest])),
         Get(
@@ -124,6 +129,26 @@ async def setup_go_sdk_process(
         GoSdkRunSetup.CHDIR_ENV: request.working_dir or "",
         "__PANTS_GO_SDK_CACHE_KEY": f"{goroot.full_version}/{goroot.goos}/{goroot.goarch}",
     }
+
+    immutable_input_digests: dict[str, Digest] = {}
+
+    # Add path to additional tools, such as git, that may be needed by the go tool
+    if golang_env_aware.extra_tools:
+        extra_tools = await Get(
+            BinaryShims,
+            BinaryShimsRequest,
+            BinaryShimsRequest.for_binaries(
+                *golang_env_aware.extra_tools,
+                rationale="allow additional tools for go tools",
+                search_path=search_path,
+            ),
+        )
+        # Prepend path to additional tools
+        if "PATH" in env:
+            env["PATH"] = f"{extra_tools.path_component}:{env['PATH']}"
+        else:
+            env["PATH"] = extra_tools.path_component
+        immutable_input_digests.update(extra_tools.immutable_input_digests)
 
     if request.replace_sandbox_root_in_args:
         env[GoSdkRunSetup.SANDBOX_ROOT_ENV] = "1"
@@ -140,6 +165,7 @@ async def setup_go_sdk_process(
     return Process(
         argv=[bash.path, go_sdk_run.script.path, *request.command],
         env=env,
+        immutable_input_digests=immutable_input_digests,
         input_digest=input_digest,
         description=request.description,
         output_files=request.output_files,

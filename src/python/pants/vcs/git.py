@@ -8,12 +8,13 @@ import logging
 import os
 import re
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
 from io import StringIO
 from os import PathLike
 from pathlib import Path, PurePath
-from typing import Any, DefaultDict, Iterable
+from typing import Any, DefaultDict
 
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException, MaybeGitBinary
 from pants.engine.engine_aware import EngineAwareReturnType
@@ -255,6 +256,7 @@ class DiffParser:
 @dataclass(frozen=True)
 class MaybeGitWorktree(EngineAwareReturnType):
     git_worktree: GitWorktree | None = None
+    failure_reason: str | None = None  # If git_worktree is None, the reason why.
 
     def cacheable(self) -> bool:
         return False
@@ -272,7 +274,7 @@ async def get_git_worktree(
     maybe_git_binary: MaybeGitBinary,
 ) -> MaybeGitWorktree:
     if not maybe_git_binary.git_binary:
-        return MaybeGitWorktree()
+        return MaybeGitWorktree(failure_reason="couldn't find `git` binary")
 
     git_binary = maybe_git_binary.git_binary
     cmd = ["rev-parse", "--show-toplevel"]
@@ -284,8 +286,9 @@ async def get_git_worktree(
         else:
             output = git_binary._invoke_unsandboxed(cmd)
     except GitBinaryException as e:
-        logger.info(f"No git repository at {os.getcwd()}: {e!r}")
-        return MaybeGitWorktree()
+        failure_msg = f"no git repository at {os.getcwd()}: {e!r}"
+        logger.info(failure_msg)
+        return MaybeGitWorktree(failure_reason=failure_msg)
 
     git_worktree = GitWorktree(
         binary=git_binary,

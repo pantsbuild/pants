@@ -6,9 +6,9 @@ import dataclasses
 import hashlib
 import os.path
 from collections import deque
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Mapping
 
 from pants.backend.go.util_rules import cgo, coverage
 from pants.backend.go.util_rules.assembly import (
@@ -715,7 +715,7 @@ async def build_go_package(
 
     # See https://github.com/golang/go/blob/f229e7031a6efb2f23241b5da000c3b3203081d6/src/cmd/go/internal/work/gc.go#L79-L100
     # for where this logic comes from.
-    go_version = request.minimum_go_version or "1.16"
+    go_version = go_root.major_version(request.minimum_go_version or "1.16")
     if go_root.is_compatible_version(go_version):
         compile_args.extend(["-lang", f"go{go_version}"])
 

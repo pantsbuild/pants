@@ -6,9 +6,9 @@ from __future__ import annotations
 import dataclasses
 import logging
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Optional, Tuple
 
 from pants.backend.makeself.subsystem import MakeselfTool
 from pants.backend.makeself.system_binaries import MakeselfBinaryShimsRequest
@@ -38,12 +38,8 @@ from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.graph import find_valid_field_sets, hydrate_sources, resolve_targets
 from pants.engine.internals.native_engine import AddPrefix
-from pants.engine.intrinsics import (
-    add_prefix_request_to_digest,
-    digest_to_snapshot,
-    merge_digests_request_to_digest,
-)
-from pants.engine.process import Process, ProcessCacheScope, fallible_to_exec_result_or_raise
+from pants.engine.intrinsics import add_prefix, digest_to_snapshot, merge_digests
+from pants.engine.process import Process, ProcessCacheScope, execute_process_or_raise
 from pants.engine.rules import Rule, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import FieldSetsPerTargetRequest, HydrateSourcesRequest, SourcesField
 from pants.engine.unions import UnionRule
@@ -81,10 +77,10 @@ class CreateMakeselfArchive:
     input_digest: Digest
     description: str = dataclasses.field(compare=False)
     output_filename: str
-    extra_tools: Optional[Tuple[str, ...]] = None
+    extra_tools: tuple[str, ...] | None = None
     level: LogLevel = LogLevel.INFO
-    cache_scope: Optional[ProcessCacheScope] = None
-    timeout_seconds: Optional[int] = None
+    cache_scope: ProcessCacheScope | None = None
+    timeout_seconds: int | None = None
 
 
 @rule
@@ -172,7 +168,7 @@ async def package_makeself_binary(field_set: MakeselfArchiveFieldSet) -> BuiltPa
         for tgt in file_targets
     )
 
-    input_digest = await merge_digests_request_to_digest(
+    input_digest = await merge_digests(
         MergeDigests(
             (
                 *(package.digest for package in packages),
@@ -180,11 +176,11 @@ async def package_makeself_binary(field_set: MakeselfArchiveFieldSet) -> BuiltPa
             )
         )
     )
-    input_digest = await add_prefix_request_to_digest(AddPrefix(input_digest, archive_dir))
+    input_digest = await add_prefix(AddPrefix(input_digest, archive_dir))
 
     output_path = PurePath(field_set.output_path.value_or_default(file_ending="run"))
     output_filename = output_path.name
-    result = await fallible_to_exec_result_or_raise(
+    result = await execute_process_or_raise(
         **implicitly(
             CreateMakeselfArchive(
                 archive_dir=archive_dir,
@@ -200,9 +196,7 @@ async def package_makeself_binary(field_set: MakeselfArchiveFieldSet) -> BuiltPa
             )
         )
     )
-    digest = await add_prefix_request_to_digest(
-        AddPrefix(result.output_digest, str(output_path.parent))
-    )
+    digest = await add_prefix(AddPrefix(result.output_digest, str(output_path.parent)))
     snapshot = await digest_to_snapshot(digest)
     assert len(snapshot.files) == 1, snapshot
 

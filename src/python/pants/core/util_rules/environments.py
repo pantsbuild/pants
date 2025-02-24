@@ -6,9 +6,10 @@ from __future__ import annotations
 import dataclasses
 import logging
 import shlex
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from itertools import groupby
-from typing import Any, Callable, ClassVar, Iterable, Optional, Sequence, Tuple, Type, Union, cast
+from typing import Any, ClassVar, cast
 
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.engine_aware import EngineAwareParameter
@@ -41,7 +42,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.option import custom_types
 from pants.option.global_options import GlobalOptions
-from pants.option.option_types import DictOption, OptionsInfo, collect_options_info
+from pants.option.option_types import DictOption, OptionInfo, collect_options_info
 from pants.option.subsystem import Subsystem
 from pants.util.enums import match
 from pants.util.frozendict import FrozenDict
@@ -471,8 +472,9 @@ async def _warn_on_non_local_environments(specified_targets: Iterable[Target], s
             EnvironmentNameRequest(
                 name,
                 description_of_origin=(
-                    "the `environment` field of targets including "
-                    ", ".join(tgt.address.spec for tgt in tgts[:3])
+                    "the `environment` field of targets including , ".join(
+                        tgt.address.spec for tgt in tgts[:3]
+                    )
                 ),
             ),
         )
@@ -482,7 +484,7 @@ async def _warn_on_non_local_environments(specified_targets: Iterable[Target], s
     error_cases = [
         (env_name, tgts, env_tgt.val)
         for ((env_name, tgts), env_tgt) in zip(env_names_and_targets, env_tgts)
-        if env_tgt.val is not None and not isinstance(env_tgt.val, LocalEnvironmentTarget)
+        if env_tgt.val is not None and not env_tgt.can_access_local_system_paths
     ]
 
     for env_name, tgts, env_tgt in error_cases:
@@ -584,6 +586,22 @@ class EnvironmentTarget:
             return ProcessCacheScope.PER_SESSION
         else:
             return ProcessCacheScope.SUCCESSFUL
+
+    @property
+    def use_working_directory_as_base_for_output_captures(self) -> bool:
+        if self.val and self.val.has_field(LocalWorkspaceCompatiblePlatformsField):
+            return False
+        return True
+
+    @property
+    def can_access_local_system_paths(self) -> bool:
+        tgt = self.val
+        if not tgt:
+            return True
+
+        return tgt.has_field(LocalCompatiblePlatformsField) or tgt.has_field(
+            LocalWorkspaceCompatiblePlatformsField
+        )
 
 
 def _compute_env_field(field_set: FieldSet) -> EnvironmentField:
@@ -1098,8 +1116,8 @@ class _EnvironmentSensitiveOptionFieldMixin:
 class ShellStringSequenceField(StringSequenceField):
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Iterable[str]], address: Address
-    ) -> Optional[Tuple[str, ...]]:
+        cls, raw_value: Iterable[str] | None, address: Address
+    ) -> tuple[str, ...] | None:
         """Computes a flattened shlexed arg list from an iterable of strings."""
         if not raw_value:
             return ()
@@ -1108,13 +1126,13 @@ class ShellStringSequenceField(StringSequenceField):
 
 
 # Maps between non-list option value types and corresponding fields
-_SIMPLE_OPTIONS: dict[Union[Type, Callable[[str], Any]], Type[Field]] = {
+_SIMPLE_OPTIONS: dict[type | Callable[[str], Any], type[Field]] = {
     str: StringField,
 }
 
 # Maps between the member types for list options. Each element is the
 # field type, and the `value` type for the field.
-_LIST_OPTIONS: dict[Union[Type, Callable[[str], Any]], Type[Field]] = {
+_LIST_OPTIONS: dict[type | Callable[[str], Any], type[Field]] = {
     str: StringSequenceField,
     custom_types.shell_str: ShellStringSequenceField,
 }
@@ -1144,12 +1162,12 @@ def option_field_name_for(flag_names: Sequence[str]) -> str:
 
 def _add_option_field_for(
     env_aware_t: type[Subsystem.EnvironmentAware],
-    option: OptionsInfo,
+    option: OptionInfo,
 ) -> Iterable[UnionRule]:
-    option_type: type = option.flag_options["type"]
+    option_type: type = option.kwargs["type"]
     scope = env_aware_t.subsystem.options_scope
 
-    snake_name = option_field_name_for(option.flag_names)
+    snake_name = option_field_name_for(option.args)
 
     # Note that there is not presently good support for enum options. `str`-backed enums should
     # be easy enough to add though...
@@ -1164,7 +1182,7 @@ def _add_option_field_for(
                 "to a `Field` subtype that supports your option's value type."
             )
     else:
-        member_type = option.flag_options["member_type"]
+        member_type = option.kwargs["member_type"]
         try:
             field_type = _LIST_OPTIONS[member_type]
         except KeyError:
@@ -1187,7 +1205,7 @@ def _add_option_field_for(
             "environment target is active."
         )
         subsystem = env_aware_t
-        option_name = option.flag_names[0]
+        option_name = option.args[0]
 
     setattr(OptionField, "__qualname__", f"{option_type.__qualname__}.{OptionField.__name__}")
 

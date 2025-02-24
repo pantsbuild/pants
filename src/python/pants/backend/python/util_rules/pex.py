@@ -8,10 +8,11 @@ import json
 import logging
 import os
 import shlex
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent  # noqa: PNT20
-from typing import Iterable, Iterator, Mapping, Sequence, TypeVar
+from typing import TypeVar
 
 import packaging.specifiers
 import packaging.version
@@ -51,7 +52,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     validate_metadata,
 )
 from pants.build_graph.address import Address
-from pants.core.target_types import FileSourceField
+from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
 from pants.core.util_rules.stripped_source_files import rules as stripped_source_rules
@@ -63,7 +64,7 @@ from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import MultiGet
-from pants.engine.intrinsics import add_prefix_request_to_digest
+from pants.engine.intrinsics import add_prefix
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
@@ -136,7 +137,13 @@ async def digest_complete_platform_addresses(
     original_files_sources = await MultiGet(
         Get(
             HydratedSources,
-            HydrateSourcesRequest(tgt.get(SourcesField), for_sources_types=(FileSourceField,)),
+            HydrateSourcesRequest(
+                tgt.get(SourcesField),
+                for_sources_types=(
+                    FileSourceField,
+                    ResourceSourceField,
+                ),
+            ),
         )
         for tgt in original_file_targets
     )
@@ -546,9 +553,13 @@ async def _setup_pex_requirements(
         argv = (
             ["--lock", loaded_lockfile.lockfile_path, *pex_lock_resolver_args]
             if loaded_lockfile.is_pex_native
-            else
             # We use pip to resolve a requirements.txt pseudo-lockfile, possibly with hashes.
-            ["--requirement", loaded_lockfile.lockfile_path, "--no-transitive", *pip_resolver_args]
+            else [
+                "--requirement",
+                loaded_lockfile.lockfile_path,
+                "--no-transitive",
+                *pip_resolver_args,
+            ]
         )
         if loaded_lockfile.metadata and complete_req_strings:
             validate_metadata(
@@ -672,7 +683,7 @@ async def build_pex(
 
     pex_python_setup_req = _determine_pex_python_and_platforms(request)
     requirements_setup_req = _setup_pex_requirements(**implicitly({request: PexRequest}))
-    sources_digest_as_subdir_req = add_prefix_request_to_digest(
+    sources_digest_as_subdir_req = add_prefix(
         AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
     )
     if isinstance(request.requirements, PexRequirements):
@@ -806,9 +817,9 @@ def _build_pex_description(
             repo_pex = request.requirements.from_superset.name
             return softwrap(
                 f"""
-                Extracting {pluralize(len(req_strings), 'requirement')}
+                Extracting {pluralize(len(req_strings), "requirement")}
                 to build {request.output_filename} from {repo_pex}:
-                {', '.join(req_strings)}
+                {", ".join(req_strings)}
                 """
             )
         elif isinstance(request.requirements.from_superset, Resolve):
@@ -818,16 +829,16 @@ def _build_pex_description(
             lockfile_path = resolve_to_lockfile.get(request.requirements.from_superset.name, "")
             return softwrap(
                 f"""
-                Building {pluralize(len(req_strings), 'requirement')}
+                Building {pluralize(len(req_strings), "requirement")}
                 for {request.output_filename} from the {lockfile_path} resolve:
-                {', '.join(req_strings)}
+                {", ".join(req_strings)}
                 """
             )
         else:
             desc_suffix = softwrap(
                 f"""
-                with {pluralize(len(req_strings), 'requirement')}:
-                {', '.join(req_strings)}
+                with {pluralize(len(req_strings), "requirement")}:
+                {", ".join(req_strings)}
                 """
             )
     return f"Building {request.output_filename} {desc_suffix}"

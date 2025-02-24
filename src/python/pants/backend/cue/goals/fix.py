@@ -3,8 +3,9 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
+from pants.backend.cue import subsystem
 from pants.backend.cue.rules import _run_cue
 from pants.backend.cue.subsystem import Cue
 from pants.backend.cue.target_types import CueFieldSet
@@ -37,4 +38,5 @@ def rules() -> Iterable[Rule]:
     return (
         *collect_rules(),
         *CueFmtRequest.rules(),
+        *subsystem.rules(),
     )

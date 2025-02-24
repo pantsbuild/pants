@@ -3,8 +3,9 @@
 
 import itertools
 import random
+from collections.abc import Iterator, Sequence
 from copy import copy
-from typing import AbstractSet, Iterator, Sequence, Tuple, Type, Union
+from typing import AbstractSet, Union
 
 import pytest
 
@@ -12,7 +13,7 @@ from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
 
 OrderedSetInstance = Union[OrderedSet, FrozenOrderedSet]
-OrderedSetCls = Union[Type[OrderedSet], Type[FrozenOrderedSet]]
+OrderedSetCls = Union[type[OrderedSet], type[FrozenOrderedSet]]
 
 
 @pytest.mark.parametrize("cls", [OrderedSet, FrozenOrderedSet])
@@ -179,14 +180,14 @@ def test_clear() -> None:
 
 
 def assert_results_are_the_same(
-    results: Union[Sequence[AbstractSet], Sequence[bool]],
+    results: Sequence[AbstractSet] | Sequence[bool],
     *,
-    sets: Tuple[OrderedSetInstance, OrderedSetInstance],
+    sets: tuple[OrderedSetInstance, OrderedSetInstance],
 ) -> None:
     """Check that all results have the same value, but are different items."""
-    assert all(
-        result == results[0] for result in results
-    ), f"Not all results are the same.\nResults: {results}\nTest data: {sets}"
+    assert all(result == results[0] for result in results), (
+        f"Not all results are the same.\nResults: {results}\nTest data: {sets}"
+    )
     for a, b in itertools.combinations(results, r=2):
         if isinstance(a, bool):
             continue
@@ -200,7 +201,7 @@ def assert_results_are_the_same(
 
 def generate_testdata(
     cls: OrderedSetCls,
-) -> Iterator[Tuple[OrderedSetInstance, OrderedSetInstance]]:
+) -> Iterator[tuple[OrderedSetInstance, OrderedSetInstance]]:
     data1 = cls([5, 3, 1, 4])
     data2 = cls([1, 4])
     yield data1, data2

@@ -9,9 +9,9 @@ use deepsize::DeepSizeOf;
 use futures::future::{self, BoxFuture, FutureExt};
 use graph::CompoundNode;
 use internment::Intern;
-use pyo3::prelude::{PyErr, Python};
-use pyo3::types::{PyDict, PyTuple};
-use pyo3::{IntoPy, ToPyObject};
+use pyo3::prelude::{PyAnyMethods, PyErr, Python};
+use pyo3::types::{PyDict, PyDictMethods, PyTuple};
+use pyo3::{Bound, IntoPyObject};
 use rule_graph::DependencyKey;
 use workunit_store::{in_workunit, Level, RunningWorkunit};
 
@@ -218,9 +218,12 @@ impl Task {
                         .collect::<Vec<_>>();
                     match future::try_join_all(get_futures).await {
                         Ok(values) => {
-                            input = GeneratorInput::Arg(Python::with_gil(|py| {
-                                externs::store_tuple(py, values)
-                            }));
+                            let values_tuple_result =
+                                Python::with_gil(|py| externs::store_tuple(py, values));
+                            input = match values_tuple_result {
+                                Ok(t) => GeneratorInput::Arg(t),
+                                Err(err) => GeneratorInput::Err(err),
+                            }
                         }
                         Err(throw @ Failure::Throw { .. }) => {
                             input = GeneratorInput::Err(PyErr::from(throw));
@@ -276,12 +279,12 @@ impl Task {
             &self.side_effected,
             async move {
                 Python::with_gil(|py| {
-                    let func = (*self.task.func.0.value).as_ref(py);
+                    let func = self.task.func.0.value.bind(py);
 
                     // If there are explicit positional arguments, apply any computed arguments as
                     // keywords. Otherwise, apply computed arguments as positional.
                     let res = if let Some(args) = args {
-                        let args = args.value.extract::<&PyTuple>(py)?;
+                        let args = args.value.bind(py).extract::<Bound<'_, PyTuple>>()?;
                         let kwargs = PyDict::new(py);
                         for ((name, _), value) in self
                             .task
@@ -292,15 +295,20 @@ impl Task {
                         {
                             kwargs.set_item(name, &value)?;
                         }
-                        func.call(args, Some(kwargs))
+                        func.call(args, Some(&kwargs))
                     } else {
-                        let args_tuple = PyTuple::new(py, deps.iter().map(|v| v.to_object(py)));
+                        let deps = deps
+                            .iter()
+                            .map(|v| v.into_pyobject(py))
+                            .collect::<Result<Vec<_>, _>>()
+                            .map_err(|e| format!("Conversion error: {e:?}"))?;
+                        let args_tuple = PyTuple::new(py, deps)?;
                         func.call1(args_tuple)
                     };
 
                     res.map(|res| {
-                        let type_id = TypeId::new(res.get_type());
-                        let val = Value::new(res.into_py(py));
+                        let type_id = TypeId::new(&res.get_type().as_borrowed());
+                        let val = Value::from(&res);
                         (val, type_id)
                     })
                     .map_err(Failure::from)
@@ -331,7 +339,7 @@ impl Task {
 
         if self.task.engine_aware_return_type {
             Python::with_gil(|py| {
-                EngineAwareReturnType::update_workunit(workunit, (*result_val).as_ref(py))
+                EngineAwareReturnType::update_workunit(workunit, result_val.bind(py))
             })
         };
 

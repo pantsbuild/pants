@@ -4,7 +4,6 @@
 import importlib
 import logging
 import traceback
-from typing import Dict, List, Optional
 
 from pkg_resources import Requirement, WorkingSet
 
@@ -29,10 +28,10 @@ class PluginLoadOrderError(PluginLoadingError):
 
 
 def load_backends_and_plugins(
-    plugins: List[str],
+    plugins: list[str],
     working_set: WorkingSet,
-    backends: List[str],
-    bc_builder: Optional[BuildConfiguration.Builder] = None,
+    backends: list[str],
+    bc_builder: BuildConfiguration.Builder | None = None,
 ) -> BuildConfiguration:
     """Load named plugins and source backends.
 
@@ -50,7 +49,7 @@ def load_backends_and_plugins(
 
 def load_plugins(
     build_configuration: BuildConfiguration.Builder,
-    plugins: List[str],
+    plugins: list[str],
     working_set: WorkingSet,
 ) -> None:
     """Load named plugins from the current working_set into the supplied build_configuration.
@@ -76,7 +75,7 @@ def load_plugins(
                               eg ['widgetpublish', 'widgetgen==1.2'].
     :param working_set: A pkg_resources.WorkingSet to load plugins from.
     """
-    loaded: Dict = {}
+    loaded: dict = {}
     for plugin in plugins or []:
         req = Requirement.parse(plugin)
         dist = working_set.find(req)
@@ -107,12 +106,15 @@ def load_plugins(
                 f"register remote auth function {remote_auth_func.__module__}.{remote_auth_func.__name__} from plugin: {plugin}"
             )
             build_configuration.register_remote_auth_plugin(remote_auth_func)
+        if "auxiliary_goals" in entries:
+            auxiliary_goals = entries["auxiliary_goals"].load()()
+            build_configuration.register_auxiliary_goals(req.key, auxiliary_goals)
 
         loaded[dist.as_requirement().key] = dist
 
 
 def load_build_configuration_from_source(
-    build_configuration: BuildConfiguration.Builder, backends: List[str]
+    build_configuration: BuildConfiguration.Builder, backends: list[str]
 ) -> None:
     """Installs pants backend packages to provide BUILD file symbols and cli goals.
 
@@ -168,3 +170,6 @@ def load_backend(build_configuration: BuildConfiguration.Builder, backend_packag
             f"register remote auth function {remote_auth_func.__module__}.{remote_auth_func.__name__} from backend: {backend_package}"
         )
         build_configuration.register_remote_auth_plugin(remote_auth_func)
+    auxiliary_goals = invoke_entrypoint("auxiliary_goals")
+    if auxiliary_goals:
+        build_configuration.register_auxiliary_goals(backend_package, auxiliary_goals)

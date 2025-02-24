@@ -29,7 +29,10 @@ def test_integration_generate_lockfile(
     result = rule_runner.run_goal_rule(
         GenerateLockfilesGoal,
         global_args=[*rule_runner.options_bootstrapper.args],
-        args=["--generate-lockfiles-resolve=src/tf:mod"],
+        args=[
+            "--generate-lockfiles-resolve=src/tf:mod",
+            "--download-terraform-platforms=['linux_amd64','linux_arm64']",  # the 'linux_arm64' platform is not in the original lockfile
+        ],
     )
 
     # assert Pants things we succeeded

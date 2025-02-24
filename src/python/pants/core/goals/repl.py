@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import os
 from abc import ABC
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Mapping, Optional, Sequence, Tuple, Type, cast
+from typing import ClassVar, Optional, cast
 
 from pants.core.util_rules.environments import _warn_on_non_local_environments
 from pants.engine.addresses import Addresses
@@ -14,8 +15,9 @@ from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult
-from pants.engine.rules import Effect, Get, collect_rules, goal_rule
+from pants.engine.intrinsics import run_interactive_process
+from pants.engine.process import InteractiveProcess
+from pants.engine.rules import Get, collect_rules, goal_rule
 from pants.engine.target import FilteredTargets, Target
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import ArgsListOption, BoolOption, StrOption
@@ -77,7 +79,7 @@ class Repl(Goal):
 @dataclass(frozen=True)
 class ReplRequest:
     digest: Digest
-    args: Tuple[str, ...]
+    args: tuple[str, ...]
     extra_env: FrozenDict[str, str]
     immutable_input_digests: FrozenDict[str, Digest]
     append_only_caches: FrozenDict[str, str]
@@ -88,7 +90,7 @@ class ReplRequest:
         *,
         digest: Digest,
         args: Iterable[str],
-        extra_env: Optional[Mapping[str, str]] = None,
+        extra_env: Mapping[str, str] | None = None,
         immutable_input_digests: Mapping[str, Digest] | None = None,
         append_only_caches: Mapping[str, str] | None = None,
         run_in_workspace: bool = True,
@@ -118,7 +120,7 @@ async def run_repl(
     repl_shell_name = repl_subsystem.shell or "python"
     implementations = {impl.name: impl for impl in union_membership[ReplImplementation]}
     repl_implementation_cls = cast(
-        Optional[Type[ReplImplementation]], implementations.get(repl_shell_name)
+        Optional[type[ReplImplementation]], implementations.get(repl_shell_name)
     )
     if repl_implementation_cls is None:
         available = sorted(implementations.keys())
@@ -147,8 +149,7 @@ async def run_repl(
 
     env = {**complete_env, **request.extra_env}
 
-    result = await Effect(
-        InteractiveProcessResult,
+    result = await run_interactive_process(
         InteractiveProcess(
             argv=(*request.args, *repl_subsystem.args),
             env=env,

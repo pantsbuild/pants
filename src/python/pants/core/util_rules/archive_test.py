@@ -6,8 +6,9 @@ import gzip
 import subprocess
 import tarfile
 import zipfile
+from collections.abc import Callable
 from io import BytesIO
-from typing import Callable, cast
+from typing import cast
 
 import pytest
 
@@ -120,8 +121,8 @@ def test_extract_non_archive(rule_runner: RuleRunner) -> None:
     assert DigestContents([FileContent("test.sh", b"# A shell script")]) == digest_contents
 
 
-def test_create_zip_archive(rule_runner: RuleRunner) -> None:
-    output_filename = "demo/a.zip"
+@pytest.mark.parametrize("output_filename", ["demo/a.zip", "demo/a.whl", "demo/a"])
+def test_create_zip_archive(rule_runner: RuleRunner, output_filename: str) -> None:
     input_snapshot = rule_runner.make_snapshot(FILES)
     created_digest = rule_runner.request(
         Digest,
@@ -136,7 +137,9 @@ def test_create_zip_archive(rule_runner: RuleRunner) -> None:
         assert set(zf.namelist()) == set(FILES.keys())
 
     # We also use Pants to extract the created archive, which checks for idempotency.
-    extracted_archive = rule_runner.request(ExtractedArchive, [created_digest])
+    extracted_archive = rule_runner.request(
+        ExtractedArchive, [MaybeExtractArchiveRequest(digest=created_digest, use_suffix=".zip")]
+    )
     digest_contents = rule_runner.request(DigestContents, [extracted_archive.digest])
     assert digest_contents == EXPECTED_DIGEST_CONTENTS
 

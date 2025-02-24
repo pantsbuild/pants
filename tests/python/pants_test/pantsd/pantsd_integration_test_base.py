@@ -7,9 +7,10 @@ import functools
 import os
 import time
 import unittest
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Callable, Iterator, Mapping
+from typing import Any
 
 from colors import bold, cyan, magenta
 
@@ -110,9 +111,9 @@ class PantsDaemonMonitor(ProcessManager):
 
     def _check_pantsd_is_alive(self):
         self._log()
-        assert (
-            self._started
-        ), "cannot assert that pantsd is running. Try calling assert_started before calling this method."
+        assert self._started, (
+            "cannot assert that pantsd is running. Try calling assert_started before calling this method."
+        )
         assert self.is_alive(), "pantsd was not alive."
         return self.pid
 
@@ -132,9 +133,9 @@ class PantsDaemonMonitor(ProcessManager):
 
     def assert_stopped(self):
         self._log()
-        assert (
-            self._started
-        ), "cannot assert pantsd stoppage. Try calling assert_started before calling this method."
+        assert self._started, (
+            "cannot assert pantsd stoppage. Try calling assert_started before calling this method."
+        )
         for _ in attempts("pantsd should be stopped!"):
             if self.is_dead():
                 break
@@ -184,7 +185,7 @@ class PantsDaemonIntegrationTestBase(unittest.TestCase):
                     ],
                 },
                 "python": {
-                    "interpreter_constraints": "['>=3.7,<3.10']",
+                    "interpreter_constraints": "['>=3.11,<3.12']",
                 },
             }
 

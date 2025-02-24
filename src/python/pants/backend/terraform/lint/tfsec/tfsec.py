@@ -4,14 +4,20 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.terraform.target_types import TerraformFieldSet
-from pants.base.deprecated import deprecated_conditional
 from pants.core.goals.lint import LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import ExternalTool
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.platform import Platform
 from pants.engine.target import BoolField, Target
-from pants.option.option_types import ArgsListOption, BoolOption, DirOption, FileOption, SkipOption
+from pants.option.option_types import (
+    ArgsListOption,
+    BoolOption,
+    DirOption,
+    FileOption,
+    SkipOption,
+    StrOption,
+)
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -37,6 +43,10 @@ class TFSec(ExternalTool):
 
     skip = SkipOption("lint")
     args = ArgsListOption(example="--minimum-severity=MEDIUM")
+    report_name = StrOption(
+        default=None,
+        help="If specified, will redirect the output to a file(s) under dist/lint/terraform-tfsec/ with the given name",
+    )
     config = FileOption(
         default=None,
         advanced=True,
@@ -89,13 +99,6 @@ class TFSec(ExternalTool):
         )
 
     def generate_url(self, plat: Platform) -> str:
-        deprecated_conditional(
-            lambda: self.version.startswith("v"),
-            removal_version="2.26.0.dev0",
-            entity="using a version beginning with 'v'",
-            hint=f"Remove the leading 'v' from `[{self.options_scope}].version` and from versions in `[{self.options_scope}].known_versions`",
-        )
-
         plat_str = {
             "macos_arm64": "darwin_arm64",
             "macos_x86_64": "darwin_amd64",
@@ -103,12 +106,7 @@ class TFSec(ExternalTool):
             "linux_x86_64": "linux_amd64",
         }[plat.value]
 
-        # backwards compatibility with version strings beginning with 'v'
-        version = self.version
-        if version.startswith("v"):
-            version = version[1:]
-
-        return f"https://github.com/aquasecurity/tfsec/releases/download/v{version}/tfsec_{version}_{plat_str}.tar.gz"
+        return f"https://github.com/aquasecurity/tfsec/releases/download/v{self.version}/tfsec_{self.version}_{plat_str}.tar.gz"
 
     def generate_exe(self, _: Platform) -> str:
         return "./tfsec"

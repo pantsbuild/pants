@@ -6,7 +6,8 @@ from __future__ import annotations
 import itertools
 import logging
 import os
-from typing import Callable, Iterable, cast
+from collections.abc import Callable, Iterable
+from typing import cast
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
@@ -128,7 +129,7 @@ async def _generate_requirements(
         normalized_proj_name = canonicalize_project_name(project_name)
         tgt_overrides = overrides.pop(normalized_proj_name, {})
         if Dependencies.alias in tgt_overrides:
-            tgt_overrides = tgt_overrides | {
+            tgt_overrides = tgt_overrides | {  # type: ignore[operator]
                 Dependencies.alias: list(tgt_overrides[Dependencies.alias]) + req_deps
             }
 

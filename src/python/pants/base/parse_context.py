@@ -2,12 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from typing import Any, Mapping, Protocol
+from collections.abc import Mapping
+from typing import Any, Protocol
 
 
 class FilePathOracle(Protocol):
-    def filepath(self) -> str:
-        ...
+    def filepath(self) -> str: ...
 
 
 class ParseContext:

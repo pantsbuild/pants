@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator, Protocol
+from typing import Protocol
 
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.env_vars import CompleteEnvironmentVars
@@ -29,8 +30,7 @@ class PantsServicesConstructor(Protocol):
         self,
         bootstrap_options: OptionValueContainer,
         graph_scheduler: GraphScheduler,
-    ) -> PantsServices:
-        ...
+    ) -> PantsServices: ...
 
 
 class PantsDaemonCore:
@@ -168,7 +168,7 @@ class PantsDaemonCore:
                 # The fingerprint mismatches, either because this is the first run (and there is no
                 # fingerprint) or because relevant options have changed. Create a new scheduler
                 # and services.
-                bootstrap_options = options.bootstrap_option_values()
+                bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
                 assert bootstrap_options is not None
                 with self._handle_exceptions():
                     self._initialize(

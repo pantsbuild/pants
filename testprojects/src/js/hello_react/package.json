@@ -1,0 +1,29 @@
+{
+  "name": "@pants/hello-react",
+  "version": "0.0.1",
+  "description": "Testing jsx interop",
+  "main": "./src/index.jsx",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "NODE_OPTIONS=--experimental-vm-modules $NODE_OPTIONS jest",
+    "build": "esbuild src/index.jsx --bundle --outfile=dist/main.js"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@babel/preset-react": "7.24.7",
+    "esbuild": "0.23.0",
+    "jest": "^29.5.0"
+  },
+  "jest": {
+    "extensionsToTreatAsEsm": [
+      ".jsx"
+    ],
+    "moduleNameMapper": {
+      "^@app/(.*)$": "<rootDir>/src/$1"
+    }
+  }
+}

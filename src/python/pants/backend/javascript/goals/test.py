@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import dataclasses
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable
 
 from pants.backend.javascript import install_node_package, nodejs_project_environment
 from pants.backend.javascript.install_node_package import (
@@ -22,13 +22,7 @@ from pants.backend.javascript.package_json import (
     OwningNodePackageRequest,
 )
 from pants.backend.javascript.subsystems.nodejstest import NodeJSTest
-from pants.backend.javascript.target_types import (
-    JSSourceField,
-    JSTestBatchCompatibilityTagField,
-    JSTestExtraEnvVarsField,
-    JSTestSourceField,
-    JSTestTimeoutField,
-)
+from pants.backend.javascript.target_types import JSRuntimeSourceField, JSTestRuntimeSourceField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.build_graph.address import Address
 from pants.core.goals.test import (
@@ -37,10 +31,13 @@ from pants.core.goals.test import (
     CoverageReports,
     FilesystemCoverageReport,
     TestExtraEnv,
+    TestExtraEnvVarsField,
     TestFieldSet,
     TestRequest,
     TestResult,
+    TestsBatchCompatibilityTagField,
     TestSubsystem,
+    TestTimeoutField,
 )
 from pants.core.target_types import AssetSourceField
 from pants.core.util_rules import source_files
@@ -88,13 +85,13 @@ class JSCoverageDataCollection(CoverageDataCollection[JSCoverageData]):
 
 @dataclass(frozen=True)
 class JSTestFieldSet(TestFieldSet):
-    required_fields = (JSTestSourceField,)
+    required_fields = (JSTestRuntimeSourceField,)
 
-    batch_compatibility_tag: JSTestBatchCompatibilityTagField
-    source: JSTestSourceField
+    batch_compatibility_tag: TestsBatchCompatibilityTagField
+    source: JSTestRuntimeSourceField
     dependencies: Dependencies
-    timeout: JSTestTimeoutField
-    extra_env_vars: JSTestExtraEnvVarsField
+    timeout: TestTimeoutField
+    extra_env_vars: TestExtraEnvVarsField
 
 
 class JSTestRequest(TestRequest):
@@ -114,7 +111,7 @@ class TestMetadata:
 
     @property
     def description(self) -> str:
-        return f'{self.owning_target[NodePackageNameField].value} {self.compatibility_tag or ""}'
+        return f"{self.owning_target[NodePackageNameField].value} {self.compatibility_tag or ''}"
 
 
 @rule(desc="Partition NodeJS tests", level=LogLevel.DEBUG)
@@ -174,7 +171,7 @@ async def run_javascript_tests(
         SourceFilesRequest(
             (tgt.get(SourcesField) for tgt in transitive_tgts.closure),
             enable_codegen=True,
-            for_sources_types=[JSSourceField, AssetSourceField],
+            for_sources_types=[JSRuntimeSourceField, AssetSourceField],
         ),
     )
     merged_digest = await Get(Digest, MergeDigests([sources.snapshot.digest, installation.digest]))
@@ -204,7 +201,7 @@ async def run_javascript_tests(
                 timeout_seconds = timeout
     file_description = field_sets[0].address.spec
     if len(field_sets) > 1:
-        file_description += f"+ {pluralize(len(field_sets)  - 1, 'other file')}"
+        file_description += f"+ {pluralize(len(field_sets) - 1, 'other file')}"
     process = await Get(
         Process,
         NodeJsProjectEnvironmentProcess(

@@ -4,15 +4,15 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, ClassVar, Iterable, Mapping, cast
+from typing import Any, ClassVar, cast
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
-from pants.bsp.protocol import BSPHandlerMapping
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.core.util_rules import environments, system_binaries
 from pants.core.util_rules.environments import determine_bootstrap_environment
@@ -318,18 +318,13 @@ class EngineInitializer:
                 *(
                     QueryRule(
                         goal_type,
-                        environment_selecting_goal_param_types
-                        if goal_type._selects_environments()
-                        else GraphSession.goal_param_types,
+                        (
+                            environment_selecting_goal_param_types
+                            if goal_type._selects_environments()
+                            else GraphSession.goal_param_types
+                        ),
                     )
                     for goal_type in goal_map.values()
-                ),
-                # Install queries for each request/response pair used by the BSP support.
-                # Note: These are necessary because the BSP support is a built-in goal that makes
-                # synchronous requests into the engine.
-                *(
-                    QueryRule(impl.response_type, (impl.request_type, Workspace, EnvironmentName))
-                    for impl in union_membership.get(BSPHandlerMapping)
                 ),
                 QueryRule(Snapshot, [PathGlobs]),  # Used by the SchedulerService.
             )

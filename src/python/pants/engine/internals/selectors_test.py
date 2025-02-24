@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 import pytest
 
@@ -53,7 +53,7 @@ def assert_invalid_get(create_get: Callable[[], Get], *, expected: str) -> None:
 def test_invalid_get() -> None:
     # Bad output type.
     assert_invalid_get(
-        lambda: Get(1, str, "bob"),  # type: ignore[call-overload, no-any-return]
+        lambda: Get(1, str, "bob"),  # type: ignore[call-overload]
         expected=(
             "Invalid Get. The first argument (the output type) must be a type, but given "
             f"`1` with type {int}."

@@ -6,9 +6,10 @@
 from __future__ import annotations
 
 import itertools
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Generic, Iterable, Protocol, TypeVar, overload
+from typing import Generic, Protocol, TypeVar, overload
 
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.engine.collection import Collection
@@ -69,8 +70,7 @@ class PartitionerType(Enum):
 
 class PartitionMetadata(Protocol):
     @property
-    def description(self) -> str | None:
-        ...
+    def description(self) -> str | None: ...
 
 
 class _EmptyMetadata:
@@ -125,15 +125,13 @@ class Partitions(Collection[Partition[PartitionElementT, PartitionMetadataT]]):
     @classmethod
     def single_partition(
         cls, elements: Iterable[PartitionElementT]
-    ) -> Partitions[PartitionElementT, _EmptyMetadata]:
-        ...
+    ) -> Partitions[PartitionElementT, _EmptyMetadata]: ...
 
     @overload
     @classmethod
     def single_partition(
         cls, elements: Iterable[PartitionElementT], *, metadata: PartitionMetadataT
-    ) -> Partitions[PartitionElementT, PartitionMetadataT]:
-        ...
+    ) -> Partitions[PartitionElementT, PartitionMetadataT]: ...
 
     @classmethod
     def single_partition(

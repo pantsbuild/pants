@@ -6,10 +6,10 @@
 // {
 //   "version": 3,
 //   "valid_for_interpreter_constraints": [
-//     "CPython<4,>=3.7"
+//     "CPython<4,>=3.8"
 //   ],
 //   "generated_with_requirements": [
-//     "python-hcl2<5,>=3.0.5"
+//     "python-hcl2<=4.3.0,>=3.0.5"
 //   ],
 //   "manylinux": "manylinux2014",
 //   "requirement_constraints": [],
@@ -24,6 +24,7 @@
   "allow_wheels": true,
   "build_isolation": true,
   "constraints": [],
+  "excluded": [],
   "locked_resolves": [
     {
       "locked_requirements": [
@@ -31,13 +32,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "a0dd3a87289f8ccbb325901e4222e723e7d745dbfc1803eaf5f3d2ace19cf2db",
-              "url": "https://files.pythonhosted.org/packages/e7/9c/eef7c591e6dc952f3636cfe0df712c0f9916cedf317810a3bb53ccb65cdd/lark-1.1.9-py3-none-any.whl"
+              "hash": "c2276486b02f0f1b90be155f2c8ba4a8e194d42775786db622faccd652d8e80c",
+              "url": "https://files.pythonhosted.org/packages/2d/00/d90b10b962b4277f5e64a78b6609968859ff86889f5b898c1a778c06ec00/lark-1.2.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "15fa5236490824c2c4aba0e22d2d6d823575dcaf4cdd1848e34b6ad836240fba",
-              "url": "https://files.pythonhosted.org/packages/2c/e1/804b6196b3fbdd0f8ba785fc62837b034782a891d6f663eea2f30ca23cfa/lark-1.1.9.tar.gz"
+              "hash": "ca807d0162cd16cef15a8feecb862d7319e7a09bdb13aef927968e45040fed80",
+              "url": "https://files.pythonhosted.org/packages/af/60/bc7622aefb2aee1c0b4ba23c1446d3e30225c8770b38d7aedbfb65ca9d5a/lark-1.2.2.tar.gz"
             }
           ],
           "project_name": "lark",
@@ -47,20 +48,20 @@
             "js2py; extra == \"nearley\"",
             "regex; extra == \"regex\""
           ],
-          "requires_python": ">=3.6",
-          "version": "1.1.9"
+          "requires_python": ">=3.8",
+          "version": "1.2.2"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "e958fe52ca0519e3500eb621caa16be6be9c27870cbcd1879d8c538fb85067ea",
-              "url": "https://files.pythonhosted.org/packages/34/0a/39813c22334a22b43ffd16acb06aa4541ea1d34bfeab2aa2bcece83a471f/python_hcl2-4.3.2-py3-none-any.whl"
+              "hash": "6c76d1d523b6fb8ca6d1f70308459f310853e124c4bbfe9fcc018bcacdc78a40",
+              "url": "https://files.pythonhosted.org/packages/0d/58/32f70aa0d776a467472ee0077929e03d4febb681f6b564cec1d58c09d95b/python_hcl2-4.3.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "7122661438be27ccd8b8f3db71969d8ef2cce3b3cf183e88f8172575e7405a65",
-              "url": "https://files.pythonhosted.org/packages/ef/94/cc6f7100a857a5a4a676c2c71322ca476051278fad4ec956f0116c1d3834/python-hcl2-4.3.2.tar.gz"
+              "hash": "41e37e2a9b3d223da5e8ebc99e72b40d2315087e966f458f7eac13c7831d9b9e",
+              "url": "https://files.pythonhosted.org/packages/0b/8c/9c7858604212b25e040652fba3eb06514b363b857544f7321ca97185f001/python-hcl2-4.3.0.tar.gz"
             }
           ],
           "project_name": "python-hcl2",
@@ -68,7 +69,7 @@
             "lark<2,>=1"
           ],
           "requires_python": ">=3.7.0",
-          "version": "4.3.2"
+          "version": "4.3.0"
         }
       ],
       "platform_tag": null
@@ -76,15 +77,16 @@
   ],
   "only_builds": [],
   "only_wheels": [],
+  "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.2.1",
-  "pip_version": "24.0",
+  "pex_version": "2.16.2",
+  "pip_version": "24.2",
   "prefer_older_binary": false,
   "requirements": [
-    "python-hcl2<5,>=3.0.5"
+    "python-hcl2<=4.3.0,>=3.0.5"
   ],
   "requires_python": [
-    "<4,>=3.7"
+    "<4,>=3.8"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",

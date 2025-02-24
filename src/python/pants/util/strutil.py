@@ -10,8 +10,9 @@ import re
 import shlex
 import textwrap
 from collections import abc
+from collections.abc import Callable, Iterable, Mapping
 from logging import Logger
-from typing import Any, Callable, Iterable, Mapping, TypeVar
+from typing import Any, TypeVar
 
 import colors
 from typing_extensions import ParamSpec
@@ -139,7 +140,7 @@ def strip_v2_chroot_path(v: bytes | str) -> str:
     """
     if isinstance(v, bytes):
         v = v.decode()
-    return re.sub(r"/.*/pants-sandbox-[a-zA-Z0-9]+/", "", v)
+    return re.sub(r"/[a-zA-Z0-9-_\/]*/pants-sandbox-[a-zA-Z0-9]+/", "", v)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -198,7 +199,7 @@ def bullet_list(elements: Iterable[str], max_elements: int = -1) -> str:
         elements = tuple(elements)
         if len(elements) > max_elements:
             elements = elements[: max_elements - 1] + (
-                f"... and {len(elements)-max_elements+1} more",
+                f"... and {len(elements) - max_elements + 1} more",
             )
 
     sep = "\n  * "
@@ -329,7 +330,7 @@ def help_text(val: str | Callable[[], str]) -> str | Callable[[], str]:
     if isinstance(val, str):
         return softwrap(val)
     else:
-        return lambda: softwrap(val())  # type: ignore[operator]
+        return lambda: softwrap(val())
 
 
 P = ParamSpec("P")

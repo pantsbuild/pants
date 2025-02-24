@@ -16,6 +16,8 @@ use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ActionResult;
 use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
+use tokio_util::compat::{FuturesAsyncReadCompatExt, FuturesAsyncWriteCompatExt};
 use workunit_store::{Metric, ObservationMetric};
 
 use remote_provider_traits::{
@@ -58,8 +60,7 @@ impl Provider {
                 // TODO: record Metric::RemoteStoreRequestTimeouts for timeouts
                 TimeoutLayer::new()
                     .with_timeout(options.timeout)
-                    // TimeoutLayer requires specifying a non-zero minimum transfer speed too.
-                    .with_speed(1),
+                    .with_io_timeout(options.timeout),
             )
             // TODO: RetryLayer doesn't seem to retry stores, but we should
             .layer(RetryLayer::new().with_max_times(options.retries + 1))
@@ -77,8 +78,7 @@ impl Provider {
     }
 
     pub fn fs(path: &str, scope: String, options: RemoteStoreOptions) -> Result<Provider, String> {
-        let mut builder = opendal::services::Fs::default();
-        builder.root(path).enable_path_check();
+        let builder = opendal::services::Fs::default().root(path);
         Provider::new(builder, scope, options)
     }
 
@@ -87,10 +87,9 @@ impl Provider {
         scope: String,
         options: RemoteStoreOptions,
     ) -> Result<Provider, String> {
-        let mut builder = opendal::services::Ghac::default();
-
-        builder.version(GITHUB_ACTIONS_CACHE_VERSION);
-        builder.endpoint(url);
+        let mut builder = opendal::services::Ghac::default()
+            .version(GITHUB_ACTIONS_CACHE_VERSION)
+            .endpoint(url);
 
         // extract the token from the `authorization: Bearer ...` header because OpenDAL's Ghac service
         // reasons about it separately (although does just stick it in its own `authorization: Bearer
@@ -115,7 +114,7 @@ impl Provider {
             ));
         };
 
-        builder.runtime_token(token);
+        builder = builder.runtime_token(token);
 
         Provider::new(builder, scope, options)
     }
@@ -143,7 +142,7 @@ impl Provider {
 
         let path = self.path(digest.hash);
         let start = Instant::now();
-        let mut reader = match self.operator.reader(&path).await {
+        let reader = match self.operator.reader(&path).await {
             Ok(reader) => reader,
             Err(e) if e.kind() == opendal::ErrorKind::NotFound => return Ok(false),
             Err(e) => return Err(format!("failed to read {}: {}", path, e)),
@@ -158,6 +157,12 @@ impl Provider {
                 obs,
             );
         }
+
+        let mut reader = match reader.into_futures_async_read(..).await {
+            Ok(reader) => reader.compat(),
+            Err(e) if e.kind() == opendal::ErrorKind::NotFound => return Ok(false),
+            Err(e) => return Err(format!("failed to convert reader for {}: {}", path, e)),
+        };
 
         match mode {
             LoadMode::Validate => {
@@ -225,7 +230,7 @@ impl ByteStoreProvider for Provider {
 
         let path = self.path(digest.hash);
 
-        let mut writer = match self.operator.writer(&path).await {
+        let writer = match self.operator.writer(&path).await {
             Ok(writer) => writer,
             // The item already exists, i.e. these bytes have already been stored. For example,
             // concurrent executions that are caching the same bytes. This makes the assumption that
@@ -236,18 +241,14 @@ impl ByteStoreProvider for Provider {
         };
 
         // TODO: it would be good to pass through options.chunk_size_bytes here
+        let mut writer = writer.into_futures_async_write().compat_write();
         match tokio::io::copy(&mut file, &mut writer).await {
-            Ok(_) => writer.close().await.map_err(|e| {
+            Ok(_) => writer.shutdown().await.map_err(|e| {
                 format!("Uploading file with digest {digest:?} to {path}: failed to commit: {e}")
             }),
-            Err(e) => {
-                let abort_err = writer.abort().await.err().map_or("".to_owned(), |e| {
-                    format!(" (additional error while aborting = {e})")
-                });
-                Err(format!(
-          "Uploading file with digest {digest:?} to {path}: failed to copy: {e}{abort_err}"
-        ))
-            }
+            Err(e) => Err(format!(
+                "Uploading file with digest {digest:?} to {path}: failed to copy: {e}"
+            )),
         }
     }
 
@@ -275,7 +276,7 @@ impl ByteStoreProvider for Provider {
 
             workunit_store::increment_counter_if_in_workunit(Metric::RemoteStoreExistsAttempts, 1);
 
-            let result = self.operator.is_exist(&path).await;
+            let result = self.operator.exists(&path).await;
 
             let metric = match result {
                 Ok(_) => Metric::RemoteStoreExistsSuccesses,

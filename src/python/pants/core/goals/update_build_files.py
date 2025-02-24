@@ -18,6 +18,8 @@ from colors import green, red
 from pants.backend.build_files.fix.deprecations import renamed_fields_rules, renamed_targets_rules
 from pants.backend.build_files.fix.deprecations.base import FixedBUILDFile
 from pants.backend.build_files.fmt.black.register import BlackRequest
+from pants.backend.build_files.fmt.buildifier.rules import BuildifierRequest, _run_buildifier_fmt
+from pants.backend.build_files.fmt.buildifier.subsystem import Buildifier
 from pants.backend.build_files.fmt.ruff.register import RuffRequest
 from pants.backend.build_files.fmt.yapf.register import YapfRequest
 from pants.backend.python.goals import lockfile
@@ -47,6 +49,7 @@ from pants.engine.fs import (
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.build_files import BuildFileOptions
 from pants.engine.internals.parser import ParseError
+from pants.engine.platform import Platform
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.option_types import BoolOption, EnumOption
@@ -73,6 +76,7 @@ class Formatter(Enum):
     YAPF = "yapf"
     BLACK = "black"
     RUFF = "ruff"
+    BUILDIFIER = "buildifier"
 
 
 @union(in_scope_types=[EnvironmentName])
@@ -119,7 +123,7 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
 
         This does not handle the full Pants upgrade. You must still manually change
         `pants_version` in `pants.toml` and you may need to manually address some deprecations.
-        See {doc_url('docs/releases/upgrade-tips')} for upgrade tips.
+        See {doc_url("docs/releases/upgrade-tips")} for upgrade tips.
         """
     )
 
@@ -223,6 +227,7 @@ async def update_build_files(
         Formatter.BLACK: FormatWithBlackRequest,
         Formatter.YAPF: FormatWithYapfRequest,
         Formatter.RUFF: FormatWithRuffRequest,
+        Formatter.BUILDIFIER: FormatWithBuildifierRequest,
     }
     chosen_formatter_request_class = formatter_to_request_class.get(
         update_build_files_subsystem.formatter
@@ -280,7 +285,7 @@ async def update_build_files(
                 softwrap(
                     f"""
                     However, there may still be deprecations that `update-build-files` doesn't know
-                    how to fix. See {doc_url('docs/releases/upgrade-tips')} for upgrade tips.
+                    how to fix. See {doc_url("docs/releases/upgrade-tips")} for upgrade tips.
                     """
                 )
             )
@@ -395,10 +400,9 @@ class FormatWithRuffRequest(RewrittenBuildFileRequest):
 
 @rule
 async def format_build_file_with_ruff(
-    request: FormatWithRuffRequest, ruff: Ruff
+    request: FormatWithRuffRequest, ruff: Ruff, platform: Platform
 ) -> RewrittenBuildFile:
     input_snapshot = await Get(Snapshot, CreateDigest([request.to_file_content()]))
-    ruff_ics = await get_lockfile_interpreter_constraints(ruff)
     result = await _run_ruff_fmt(
         RuffRequest.Batch(
             Ruff.options_scope,
@@ -407,7 +411,7 @@ async def format_build_file_with_ruff(
             snapshot=input_snapshot,
         ),
         ruff,
-        ruff_ics,
+        platform,
     )
     output_content = await Get(DigestContents, Digest, result.output.digest)
 
@@ -415,6 +419,37 @@ async def format_build_file_with_ruff(
     build_lines = tuple(formatted_build_file_content.content.decode("utf-8").splitlines())
     change_descriptions = ("Format with Ruff",) if result.did_change else ()
 
+    return RewrittenBuildFile(request.path, build_lines, change_descriptions=change_descriptions)
+
+
+# ------------------------------------------------------------------------------------------
+# Buildifier formatter fixer
+# ------------------------------------------------------------------------------------------
+
+
+class FormatWithBuildifierRequest(RewrittenBuildFileRequest):
+    pass
+
+
+@rule
+async def format_build_file_with_buildifier(
+    request: FormatWithBuildifierRequest, buildifier: Buildifier, platform: Platform
+) -> RewrittenBuildFile:
+    input_snapshot = await Get(Snapshot, CreateDigest([request.to_file_content()]))
+    result = await _run_buildifier_fmt(
+        request=BuildifierRequest.Batch(
+            tool_name=Buildifier.options_scope,
+            elements=input_snapshot.files,
+            partition_metadata=None,
+            snapshot=input_snapshot,
+        ),
+        buildifier=buildifier,
+        platform=platform,
+    )
+    output_content = await Get(DigestContents, Digest, result.output.digest)
+    formatted_build_file_content = next(fc for fc in output_content if fc.path == request.path)
+    build_lines = tuple(formatted_build_file_content.content.decode("utf-8").splitlines())
+    change_descriptions = (f"Format with {Buildifier.name}",) if result.did_change else ()
     return RewrittenBuildFile(request.path, build_lines, change_descriptions=change_descriptions)
 
 
@@ -440,9 +475,9 @@ async def maybe_rename_deprecated_targets(
     return RewrittenBuildFile(
         request.path,
         tuple(new_content.content.decode("utf-8").splitlines()),
-        change_descriptions=("Renamed deprecated targets",)
-        if old_bytes != new_content.content
-        else (),
+        change_descriptions=(
+            ("Renamed deprecated targets",) if old_bytes != new_content.content else ()
+        ),
     )
 
 
@@ -468,9 +503,9 @@ async def maybe_rename_deprecated_fields(
     return RewrittenBuildFile(
         request.path,
         tuple(new_content.content.decode("utf-8").splitlines()),
-        change_descriptions=("Renamed deprecated fields",)
-        if old_bytes != new_content.content
-        else (),
+        change_descriptions=(
+            ("Renamed deprecated fields",) if old_bytes != new_content.content else ()
+        ),
     )
 
 
@@ -488,4 +523,5 @@ def rules():
         UnionRule(RewrittenBuildFileRequest, FormatWithBlackRequest),
         UnionRule(RewrittenBuildFileRequest, FormatWithYapfRequest),
         UnionRule(RewrittenBuildFileRequest, FormatWithRuffRequest),
+        UnionRule(RewrittenBuildFileRequest, FormatWithBuildifierRequest),
     )

@@ -9,10 +9,11 @@ import os
 import pickle
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import partial
 from pathlib import PurePath
-from typing import Any, DefaultDict, Dict, List, Mapping, Tuple, cast
+from typing import Any, DefaultDict, cast
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -121,7 +122,7 @@ class OwnershipError(SetupPyError):
         super().__init__(
             softwrap(
                 f"""
-                {msg} See {doc_url('docs/python/overview/building-distributions')} for
+                {msg} See {doc_url("docs/python/overview/building-distributions")} for
                 how python_sources targets are mapped to distributions.
                 """
             )
@@ -217,9 +218,15 @@ class SetupKwargs:
     """The keyword arguments to the `setup()` function in the generated `setup.py`."""
 
     _pickled_bytes: bytes
+    _overwrite_banned_keys: tuple[str, ...]
 
     def __init__(
-        self, kwargs: Mapping[str, Any], *, address: Address, _allow_banned_keys: bool = False
+        self,
+        kwargs: Mapping[str, Any],
+        *,
+        address: Address,
+        _allow_banned_keys: bool = False,
+        _overwrite_banned_keys: tuple[str, ...] = (),
     ) -> None:
         super().__init__()
         if "name" not in kwargs:
@@ -249,7 +256,9 @@ class SetupKwargs:
                             """
                         )
                     )
-
+        object.__setattr__(
+            self, "_overwrite_banned_keys", _overwrite_banned_keys if _overwrite_banned_keys else ()
+        )
         # We serialize with `pickle` so that is hashable. We don't use `FrozenDict` because it
         # would require that all values are immutable, and we may have lists and dictionaries as
         # values. It's too difficult/clunky to convert those all, then to convert them back out of
@@ -262,7 +271,7 @@ class SetupKwargs:
 
     @memoized_property
     def kwargs(self) -> dict[str, Any]:
-        return cast(Dict[str, Any], pickle.loads(self._pickled_bytes))
+        return cast(dict[str, Any], pickle.loads(self._pickled_bytes))
 
     @property
     def name(self) -> str:
@@ -295,7 +304,7 @@ class SetupKwargsRequest(ABC):
         """Whether the kwargs implementation should be used for this target or not."""
 
     @property
-    def explicit_kwargs(self) -> Dict[str, Any]:
+    def explicit_kwargs(self) -> dict[str, Any]:
         # We return a dict copy of the underlying FrozenDict, because the caller expects a
         # dict (and we have documented as much).
         return dict(self.target[PythonProvidesField].value.kwargs)
@@ -470,9 +479,9 @@ async def create_dist_build_request(
     prefixed_input = await Get(Digest, AddPrefix(input_digest, chroot_prefix))
     build_system = await Get(BuildSystem, BuildSystemRequest(prefixed_input, working_directory))
     output_path = dist_tgt.get(PythonDistributionOutputPathField).value
-    assert (
-        output_path is not None
-    ), "output_path should take a default string value if the user has not provided it."
+    assert output_path is not None, (
+        "output_path should take a default string value if the user has not provided it."
+    )
 
     return DistBuildRequest(
         build_system=build_system,
@@ -645,18 +654,35 @@ async def determine_finalized_setup_kwargs(request: GenerateSetupPyRequest) -> F
             next(str(ic.specifier) for ic in request.interpreter_constraints),  # type: ignore[attr-defined]
         )
 
-    # NB: We are careful to not overwrite these values, but we also don't expect them to have been
-    # set. The user must have gone out of their way to use a `SetupKwargs` plugin, and to have
-    # specified `SetupKwargs(_allow_banned_keys=True)`.
+    # The cascading defaults here are for two levels of "I know what I'm
+    # doing. Normally the plugin will calculate the appropriate values.  If
+    # the user Really Knows what they are doing and has gone out of their way
+    # to use a `SetupKwargs` plugin, and to have also specified
+    # `SetupKwargs(_allow_banned_keys=True)`, then instead the values are
+    # merged.  If the user REALLY REALLY knows what they are doing, they can
+    # use `_overwrite_banned_keys=("the-key",)` in their plugin to use only
+    # their value for that key.
+    def _overwrite_value(key: str) -> bool:
+        return key in resolved_setup_kwargs._overwrite_banned_keys
+
     setup_kwargs.update(
         {
-            "packages": (*sources.packages, *(setup_kwargs.get("packages", []))),
+            "packages": (
+                *(sources.packages if not _overwrite_value("packages") else []),
+                *(setup_kwargs.get("packages", [])),
+            ),
             "namespace_packages": (
-                *sources.namespace_packages,
+                *(sources.namespace_packages if not _overwrite_value("namespace_packages") else []),
                 *setup_kwargs.get("namespace_packages", []),
             ),
-            "package_data": {**dict(sources.package_data), **setup_kwargs.get("package_data", {})},
-            "install_requires": (*requirements, *setup_kwargs.get("install_requires", [])),
+            "package_data": {
+                **dict(sources.package_data if not _overwrite_value("package_data") else {}),
+                **setup_kwargs.get("package_data", {}),
+            },
+            "install_requires": (
+                *(requirements if not _overwrite_value("install_requires") else []),
+                *setup_kwargs.get("install_requires", []),
+            ),
         }
     )
 
@@ -955,7 +981,7 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
                         f"""
                         Found multiple sibling python_distribution targets that are the closest
                         ancestor dependents of {target.address} and are therefore candidates to
-                        own it: {', '.join(o.address.spec for o in all_owners)}. Only a
+                        own it: {", ".join(o.address.spec for o in all_owners)}. Only a
                         single such owner is allowed, to avoid ambiguity.
                         """
                     )
@@ -992,7 +1018,7 @@ def is_ownable_target(tgt: Target, union_membership: UnionMembership) -> bool:
 
 
 # Convenient type alias for the pair (package name, data files in the package).
-PackageDatum = Tuple[str, Tuple[str, ...]]
+PackageDatum = tuple[str, tuple[str, ...]]
 
 
 def find_packages(
@@ -1106,12 +1132,12 @@ def declares_pkg_resources_namespace_package(python_src: str) -> bool:
 
 
 def merge_entry_points(
-    *all_entry_points_with_descriptions_of_source: tuple[str, dict[str, dict[str, str]]]
+    *all_entry_points_with_descriptions_of_source: tuple[str, dict[str, dict[str, str]]],
 ) -> dict[str, dict[str, str]]:
     """Merge all entry points, throwing ValueError if there are any conflicts."""
     merged = cast(
         # this gives us a two level deep defaultdict with the inner values being of list type
-        DefaultDict[str, DefaultDict[str, List[Tuple[str, str]]]],
+        DefaultDict[str, DefaultDict[str, list[tuple[str, str]]]],
         defaultdict(partial(defaultdict, list)),
     )
 
@@ -1128,7 +1154,7 @@ def merge_entry_points(
                 softwrap(
                     f"""
                     Multiple entry_points registered for {category} {name} in:
-                    {', '.join(ep_source for ep_source, _ in entry_points_with_source)}
+                    {", ".join(ep_source for ep_source, _ in entry_points_with_source)}
                     """
                 )
             )

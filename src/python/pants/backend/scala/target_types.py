@@ -448,7 +448,7 @@ class ScalaArtifactExclusion(JvmArtifactExclusion):
                     f"""
                     Invalid `crossversion` value '{self.crossversion}' in in list of
                     exclusions at target: {address}. Valid values are:
-                    {', '.join(valid_crossversions)}
+                    {", ".join(valid_crossversions)}
                     """
                 )
             )

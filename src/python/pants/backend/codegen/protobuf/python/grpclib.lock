@@ -6,7 +6,7 @@
 // {
 //   "version": 3,
 //   "valid_for_interpreter_constraints": [
-//     "CPython<4,>=3.7"
+//     "CPython<4,>=3.8"
 //   ],
 //   "generated_with_requirements": [
 //     "grpclib[protobuf]<1,>=0.4"
@@ -24,6 +24,7 @@
   "allow_wheels": true,
   "build_isolation": true,
   "constraints": [],
+  "excluded": [],
   "locked_resolves": [
     {
       "locked_requirements": [
@@ -120,11 +121,6 @@
             },
             {
               "algorithm": "sha256",
-              "hash": "aeaf541ddbad8311a87dd695ed9642401131ea39ad7bc8cf3ef3967fd093b626",
-              "url": "https://files.pythonhosted.org/packages/0a/f0/b256648385dfda067688570b10e7b90eacd3711c26635763560cbad0a447/multidict-6.0.5-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
               "hash": "79660376075cfd4b2c80f295528aa6beb2058fd289f4c9252f986751a4cd0496",
               "url": "https://files.pythonhosted.org/packages/0c/08/bb47f886457e2259aefc10044e45c8a1b62f0c27228557e17775869d0341/multidict-6.0.5-cp312-cp312-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl"
             },
@@ -155,11 +151,6 @@
             },
             {
               "algorithm": "sha256",
-              "hash": "19fe01cea168585ba0f678cad6f58133db2aa14eccaf22f88e4a6dccadfad8b3",
-              "url": "https://files.pythonhosted.org/packages/21/d2/8faec69b04237385c760d0c481ba032e46cdecb6bf47bdbf672a60f19d75/multidict-6.0.5-cp37-cp37m-macosx_10_9_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
               "hash": "53689bb4e102200a4fafa9de9c7c3c212ab40a7ab2c8e474491914d2305f187e",
               "url": "https://files.pythonhosted.org/packages/21/db/3403263f158b0bc7b0d4653766d71cb39498973f2042eead27b2e9758782/multidict-6.0.5-cp311-cp311-macosx_10_9_x86_64.whl"
             },
@@ -177,11 +168,6 @@
               "algorithm": "sha256",
               "hash": "04bde7a7b3de05732a4eb39c94574db1ec99abb56162d6c520ad26f83267de29",
               "url": "https://files.pythonhosted.org/packages/28/32/d7799a208701d537b92705f46c777ded812a6dc139c18d8ed599908f6b1c/multidict-6.0.5-cp311-cp311-manylinux_2_17_s390x.manylinux2014_s390x.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "b55358304d7a73d7bdf5de62494aaf70bd33015831ffd98bc498b433dfe5b10c",
-              "url": "https://files.pythonhosted.org/packages/33/2e/b37eaa5541d29847dfdfb6dbe3ac514d31dab186c78b0156cdb585616b13/multidict-6.0.5-cp37-cp37m-musllinux_1_1_i686.whl"
             },
             {
               "algorithm": "sha256",
@@ -220,11 +206,6 @@
             },
             {
               "algorithm": "sha256",
-              "hash": "e4972624066095e52b569e02b5ca97dbd7a7ddd4294bf4e7247d52635630dd83",
-              "url": "https://files.pythonhosted.org/packages/41/34/16237d404dc204a90c94d5974ae8aaaa6dd4604b6ff808883262a5759c0d/multidict-6.0.5-cp37-cp37m-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl"
-            },
-            {
-              "algorithm": "sha256",
               "hash": "fb616be3538599e797a2017cccca78e354c767165e8858ab5116813146041a24",
               "url": "https://files.pythonhosted.org/packages/45/7c/06926bb91752c52abca3edbfefac1ea90d9d1bc00c84d0658c137589b920/multidict-6.0.5-cp312-cp312-musllinux_1_1_ppc64le.whl"
             },
@@ -260,18 +241,8 @@
             },
             {
               "algorithm": "sha256",
-              "hash": "d946b0a9eb8aaa590df1fe082cee553ceab173e6cb5b03239716338629c50c7a",
-              "url": "https://files.pythonhosted.org/packages/62/34/829b3a0857ae46e502cb9c6699541107aa2d077501004c1148909465b6c7/multidict-6.0.5-cp37-cp37m-musllinux_1_1_aarch64.whl"
-            },
-            {
-              "algorithm": "sha256",
               "hash": "09a892e4a9fb47331da06948690ae38eaa2426de97b4ccbfafbdcbe5c8f37ff8",
               "url": "https://files.pythonhosted.org/packages/6a/43/d753dbaa498d42e8e292889cc9a9def30b32631573ae86c9911889977049/multidict-6.0.5-cp38-cp38-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "a3145cb08d8625b2d3fee1b2d596a8766352979c9bffe5d7833e0503d0f0b5e5",
-              "url": "https://files.pythonhosted.org/packages/6b/97/08c6a79ef52b2764ae9f7abb7463e7e1e6ddcb17125494654f00cb343380/multidict-6.0.5-cp37-cp37m-musllinux_1_1_ppc64le.whl"
             },
             {
               "algorithm": "sha256",
@@ -325,11 +296,6 @@
             },
             {
               "algorithm": "sha256",
-              "hash": "107c0cdefe028703fb5dafe640a409cb146d44a6ae201e55b35a4af8e95457dd",
-              "url": "https://files.pythonhosted.org/packages/93/4b/fc9f393fbae0e9ebd7728b06a79f60325f6307ee4fc433cfa39995f307ee/multidict-6.0.5-cp37-cp37m-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl"
-            },
-            {
-              "algorithm": "sha256",
               "hash": "2ffc42c922dbfddb4a4c3b438eb056828719f07608af27d163191cb3e3aa6cc5",
               "url": "https://files.pythonhosted.org/packages/9c/18/9565f32c19d186168731e859692dfbc0e98f66a1dcf9e14d69c02a78b75a/multidict-6.0.5-cp312-cp312-macosx_11_0_arm64.whl"
             },
@@ -347,11 +313,6 @@
               "algorithm": "sha256",
               "hash": "7901c05ead4b3fb75113fb1dd33eb1253c6d3ee37ce93305acd9d38e0b5f21a4",
               "url": "https://files.pythonhosted.org/packages/aa/a9/46cdb4cb40bbd4b732169413f56b04a6553460b22bd914f9729c9ba63761/multidict-6.0.5-cp311-cp311-musllinux_1_1_i686.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "403c0911cd5d5791605808b942c88a8155c2592e05332d2bf78f18697a5fa15e",
-              "url": "https://files.pythonhosted.org/packages/ab/f7/6d5f45c0cc8bcb2e510a8c17c51c74b42c2dcd6636bd048217d4336c342f/multidict-6.0.5-cp37-cp37m-manylinux_2_17_s390x.manylinux2014_s390x.whl"
             },
             {
               "algorithm": "sha256",
@@ -430,11 +391,6 @@
             },
             {
               "algorithm": "sha256",
-              "hash": "6bf7a982604375a8d49b6cc1b781c1747f243d91b81035a9b43a2126c04766f5",
-              "url": "https://files.pythonhosted.org/packages/e0/fa/517294e7f7a1d070a03a16bd28f10997d4b90846ca52f390833365d15048/multidict-6.0.5-cp37-cp37m-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
-            },
-            {
-              "algorithm": "sha256",
               "hash": "55205d03e8a598cfc688c71ca8ea5f66447164efff8869517f175ea632c7cb7b",
               "url": "https://files.pythonhosted.org/packages/e8/4e/51130700c255597ac8e15ceac2e492117ffad44c75610381652b7d2e96a1/multidict-6.0.5-cp38-cp38-manylinux_2_17_s390x.manylinux2014_s390x.whl"
             },
@@ -442,11 +398,6 @@
               "algorithm": "sha256",
               "hash": "e0e79d91e71b9867c73323a3444724d496c037e578a0e1755ae159ba14f4f3d1",
               "url": "https://files.pythonhosted.org/packages/e9/32/35668bb3e6ab2f12f4e4f7f4000f72f714882a94f904d4c3633fbd036753/multidict-6.0.5-cp311-cp311-musllinux_1_1_ppc64le.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "c9bf56195c6bbd293340ea82eafd0071cb3d450c703d2c93afb89f93b8386ccc",
-              "url": "https://files.pythonhosted.org/packages/eb/1c/bc0d59aeb216f3fce21333632f72843bf2dfd5d045e32a13615477cd7d7c/multidict-6.0.5-cp37-cp37m-musllinux_1_1_x86_64.whl"
             },
             {
               "algorithm": "sha256",
@@ -480,11 +431,6 @@
             },
             {
               "algorithm": "sha256",
-              "hash": "d65f25da8e248202bd47445cec78e0025c0fe7582b23ec69c3b27a640dd7a8e3",
-              "url": "https://files.pythonhosted.org/packages/fc/3a/308c8bcdffe345cf4e2682543311a67aabb3c85492ce896d0a07d5105443/multidict-6.0.5-cp37-cp37m-musllinux_1_1_s390x.whl"
-            },
-            {
-              "algorithm": "sha256",
               "hash": "76c0de87358b192de7ea9649beb392f107dcad9ad27276324c24c91774ca5271",
               "url": "https://files.pythonhosted.org/packages/fc/b1/b0a7744be00b0f5045c7ed4e4a6b8ee6bde4672b2c620474712299df5979/multidict-6.0.5-cp312-cp312-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl"
             },
@@ -503,34 +449,34 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "80797ce7424f8c8d2f2547e2d42bfbb6c08230ce5832d6c099a37335c9c90a92",
-              "url": "https://files.pythonhosted.org/packages/e5/a7/bb962b8b981dd890a44a34d0e922b76c32e5db443ff9f9b9ce6149069070/protobuf-4.24.4-py3-none-any.whl"
+              "hash": "510ed78cd0980f6d3218099e874714cdf0d8a95582e7b059b06cabad855ed0a0",
+              "url": "https://files.pythonhosted.org/packages/e3/b2/4df9958122a0377e571972c71692420bafd623d1df3ce506d88c2aba7e12/protobuf-5.28.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "5a70731910cd9104762161719c3d883c960151eea077134458503723b60e3667",
-              "url": "https://files.pythonhosted.org/packages/52/5c/f2c0778278259089952f94b0884ca27a001a17ffbd992ebe30c841085f4c/protobuf-4.24.4.tar.gz"
+              "hash": "6206afcb2d90181ae8722798dcb56dc76675ab67458ac24c0dd7d75d632ac9bd",
+              "url": "https://files.pythonhosted.org/packages/19/15/da43113361db20f2d521bc38d92549edbe06856aeec085c420b2b8af5751/protobuf-5.28.0-cp38-abi3-manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "8e61a27f362369c2f33248a0ff6896c20dcd47b5d48239cb9720134bef6082e4",
-              "url": "https://files.pythonhosted.org/packages/88/12/efb5896c901382548ecb58d0449885a8f9aa62bb559d65e5a8a47f122629/protobuf-4.24.4-cp37-abi3-macosx_10_9_universal2.whl"
+              "hash": "dde74af0fa774fa98892209992295adbfb91da3fa98c8f67a88afe8f5a349add",
+              "url": "https://files.pythonhosted.org/packages/5f/d7/331ee1f3b798c34d2257c79d5426ecbe95d46d2b40ba808a29da6947f6d8/protobuf-5.28.0.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "b493cb590960ff863743b9ff1452c413c2ee12b782f48beca77c8da3e2ffe9d9",
-              "url": "https://files.pythonhosted.org/packages/c8/2c/03046cac73f46bfe98fc846ef629cf4f84c2f59258216aa2cc0d22bfca8f/protobuf-4.24.4-cp37-abi3-manylinux2014_x86_64.whl"
+              "hash": "532627e8fdd825cf8767a2d2b94d77e874d5ddb0adefb04b237f7cc296748681",
+              "url": "https://files.pythonhosted.org/packages/ce/ec/34f67d6a3398aa360524d90f75a8c648c99c807b2f1001f5ab16355c1d12/protobuf-5.28.0-cp38-abi3-macosx_10_9_universal2.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "bffa46ad9612e6779d0e51ae586fde768339b791a50610d85eb162daeb23661e",
-              "url": "https://files.pythonhosted.org/packages/db/61/9c7b481771fe4702fb3be1152812fecec9b06f9c36d523ad52b98cb46800/protobuf-4.24.4-cp37-abi3-manylinux2014_aarch64.whl"
+              "hash": "018db9056b9d75eb93d12a9d35120f97a84d9a919bcab11ed56ad2d399d6e8dd",
+              "url": "https://files.pythonhosted.org/packages/fe/79/636415c84eed9835fed83183db73fd6ea7ba76a85cae321ff2eaad722e85/protobuf-5.28.0-cp38-abi3-manylinux2014_aarch64.whl"
             }
           ],
           "project_name": "protobuf",
           "requires_dists": [],
-          "requires_python": ">=3.7",
-          "version": "4.24.4"
+          "requires_python": ">=3.8",
+          "version": "5.28.0"
         }
       ],
       "platform_tag": null
@@ -538,15 +484,16 @@
   ],
   "only_builds": [],
   "only_wheels": [],
+  "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.2.1",
-  "pip_version": "24.0",
+  "pex_version": "2.16.2",
+  "pip_version": "24.2",
   "prefer_older_binary": false,
   "requirements": [
     "grpclib[protobuf]<1,>=0.4"
   ],
   "requires_python": [
-    "<4,>=3.7"
+    "<4,>=3.8"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",

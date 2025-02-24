@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 from fnmatch import fnmatch
-from typing import ClassVar, Optional
+from typing import ClassVar
 from urllib.parse import urlparse
 
 from pants.engine.fs import Digest, DownloadFile, NativeDownloadFile
@@ -11,6 +11,7 @@ from pants.engine.internals.native_engine import FileDigest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionMembership, union
+from pants.option.global_options import GlobalOptions
 from pants.util.strutil import bullet_list, softwrap
 
 
@@ -42,14 +43,14 @@ class URLDownloadHandler:
             ]
     """
 
-    match_scheme: ClassVar[Optional[str]] = None
+    match_scheme: ClassVar[str | None] = None
     """The scheme to match (e.g. 'ftp' or 's3') or `None` to match all schemes.
 
     The scheme is matched using `fnmatch`, see https://docs.python.org/3/library/fnmatch.html for more
     information.
     """
 
-    match_authority: ClassVar[Optional[str]] = None
+    match_authority: ClassVar[str | None] = None
     """The authority to match (e.g. 'pantsbuild.org' or 's3.amazonaws.com') or `None` to match all authorities.
 
     The authority is matched using `fnmatch`, see https://docs.python.org/3/library/fnmatch.html for more
@@ -67,8 +68,10 @@ class URLDownloadHandler:
 async def download_file(
     request: DownloadFile,
     union_membership: UnionMembership,
+    global_options: GlobalOptions,
 ) -> Digest:
     parsed_url = urlparse(request.url)
+
     handlers = union_membership.get(URLDownloadHandler)
     matched_handlers = []
     for handler in handlers:
@@ -96,7 +99,15 @@ async def download_file(
         handler = matched_handlers[0]
         return await Get(Digest, URLDownloadHandler, handler(request.url, request.expected_digest))
 
-    return await Get(Digest, NativeDownloadFile(request.url, request.expected_digest))
+    return await Get(
+        Digest,
+        NativeDownloadFile(
+            request.url,
+            request.expected_digest,
+            retry_delay_duration=global_options.file_downloads_retry_delay,
+            max_attempts=global_options.file_downloads_max_attempts,
+        ),
+    )
 
 
 def rules():

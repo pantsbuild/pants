@@ -1,10 +1,11 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
 import dataclasses
 import json
 import textwrap
 from pathlib import Path
-from typing import Optional
 
 from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
 from pants.backend.terraform.goals.deploy import DeployTerraformFieldSet
@@ -14,7 +15,7 @@ from pants.backend.terraform.testutil import (
     standard_deployment,
     terraform_lockfile,
 )
-from pants.engine.fs import DigestContents, FileContent
+from pants.engine.fs import DigestContents, DigestEntries, FileContent, SymlinkEntry
 from pants.engine.internals.native_engine import Address
 from pants.testutil.rule_runner import RuleRunner
 
@@ -24,7 +25,7 @@ standard_deployment = standard_deployment
 
 def _do_init_terraform(
     rule_runner: RuleRunner, standard_deployment: StandardDeployment, initialise_backend: bool
-) -> DigestContents:
+) -> tuple[DigestContents, DigestEntries]:
     rule_runner.write_files(standard_deployment.files)
     target = rule_runner.get_target(standard_deployment.target)
     field_set = DeployTerraformFieldSet.create(target)
@@ -39,17 +40,30 @@ def _do_init_terraform(
         ],
     )
     initialised_files = rule_runner.request(DigestContents, [result.sources_and_deps])
+    initialised_entries = rule_runner.request(DigestEntries, [result.sources_and_deps])
     assert isinstance(initialised_files, DigestContents)
-    return initialised_files
+    return initialised_files, initialised_entries
 
 
-def find_file(files: DigestContents, pattern: str) -> Optional[FileContent]:
+def find_file(files: DigestContents, pattern: str) -> FileContent | None:
     return next((file for file in files if Path(file.path).match(pattern)), None)
+
+
+def find_link(entries: DigestEntries, pattern: str) -> SymlinkEntry | None:
+    for entry in entries:
+        if not isinstance(entry, SymlinkEntry):
+            continue
+
+        if Path(entry.path).match(pattern):
+            # allow any prefix to account for absolute targets
+            return entry
+
+    return None
 
 
 def test_init_terraform(rule_runner: RuleRunner, standard_deployment: StandardDeployment) -> None:
     """Test for the happy path of initialising Terraform with a backend config."""
-    initialised_files = _do_init_terraform(
+    initialised_files, initialised_links = _do_init_terraform(
         rule_runner, standard_deployment, initialise_backend=True
     )
 
@@ -60,9 +74,9 @@ def test_init_terraform(rule_runner: RuleRunner, standard_deployment: StandardDe
     assert stub_tfstate["backend"]["config"]["path"] == str(standard_deployment.state_file)
 
     # Assert dependencies are initialised by checking for the dependency itself
-    assert find_file(
-        initialised_files,
-        ".terraform/providers/registry.terraform.io/hashicorp/null/*/*/terraform-provider-null*",
+    assert find_link(
+        initialised_links,
+        ".terraform/providers/registry.terraform.io/hashicorp/null/*/*",
     ), "Did not find expected provider"
 
     # Assert lockfile is included
@@ -80,51 +94,51 @@ def test_init_terraform_uses_lockfiles(
         files={**standard_deployment.files, **{"src/tf/.terraform.lock.hcl": terraform_lockfile}},
     )
 
-    initialised_files = _do_init_terraform(
+    initialised_files, initialised_entries = _do_init_terraform(
         rule_runner, deployment_with_lockfile, initialise_backend=True
     )
 
     # Assert lockfile is not regenerated
     result_lockfile = find_file(initialised_files, ".terraform.lock.hcl")
     assert result_lockfile, "Did not find lockfile"
-    assert (
-        f'version     = "{requested_version}"' in result_lockfile.content.decode()
-    ), "version in lockfile has changed, we should not have regenerated the lockfile"
+    assert f'version     = "{requested_version}"' in result_lockfile.content.decode(), (
+        "version in lockfile has changed, we should not have regenerated the lockfile"
+    )
 
     # Assert dependencies are initialised to the older version
-    result_provider = find_file(
-        initialised_files,
-        ".terraform/providers/registry.terraform.io/hashicorp/null/*/*/terraform-provider-null*",
+    result_provider = find_link(
+        initialised_entries,
+        ".terraform/providers/registry.terraform.io/hashicorp/null/*/*",
     )
     assert result_provider, "Did not find any providers, did we initialise them successfully?"
-    assert (
-        requested_version in result_provider.path
-    ), "initialised provider did not have our requested version, did the lockfile show up and did we regenerate it?"
+    assert requested_version in result_provider.path, (
+        "initialised provider did not have our requested version, did the lockfile show up and did we regenerate it?"
+    )
 
 
 def test_init_terraform_without_backends(
     rule_runner: RuleRunner, standard_deployment: StandardDeployment
 ) -> None:
-    initialised_files = _do_init_terraform(
+    initialised_files, initialised_entries = _do_init_terraform(
         rule_runner, standard_deployment, initialise_backend=False
     )
 
     # Not initialising the backend means that ./.terraform/.terraform.tfstate will not be present
-    assert not find_file(
-        initialised_files, "**/*.tfstate"
-    ), "Terraform state file should not be present if the request was to not initialise the backend"
+    assert not find_file(initialised_files, "**/*.tfstate"), (
+        "Terraform state file should not be present if the request was to not initialise the backend"
+    )
 
     # The dependencies should still be present
-    assert find_file(
-        initialised_files,
-        ".terraform/providers/registry.terraform.io/hashicorp/null/*/*/terraform-provider-null*",
+    assert find_link(
+        initialised_entries,
+        ".terraform/providers/registry.terraform.io/hashicorp/null/*/*",
     ), "Did not find expected provider"
 
 
 def assert_init_module(modules, target_module_id: str, message: str) -> None:
-    assert (
-        target_module_id in modules
-    ), f"{message}: Did not find {target_module_id} in modules.json. Found modules are {list(modules.items())}"
+    assert target_module_id in modules, (
+        f"{message}: Did not find {target_module_id} in modules.json. Found modules are {list(modules.items())}"
+    )
 
 
 def test_init_terraform_with_transitive_module(rule_runner: RuleRunner, tmpdir) -> None:
@@ -157,7 +171,9 @@ def test_init_terraform_with_transitive_module(rule_runner: RuleRunner, tmpdir) 
         Path(str(tmpdir.mkdir(".terraform").join("state.json"))),
         Address("src/tf/deployment", target_name="root"),
     )
-    initialised_files = _do_init_terraform(rule_runner, deployment, initialise_backend=True)
+    initialised_files, initialised_entries = _do_init_terraform(
+        rule_runner, deployment, initialise_backend=True
+    )
 
     assert initialised_files
     # Assert that init succeeded and created the modules mapping
@@ -175,7 +191,9 @@ def test_init_terraform_with_transitive_module(rule_runner: RuleRunner, tmpdir) 
     )
 
     # Assert that the provider dependency was initialised
-    assert find_file(
-        initialised_files,
-        ".terraform/providers/registry.terraform.io/hashicorp/null/*/*/terraform-provider-null*",
-    ), "Did not find expected provider contained in module, did we successfully include it in the files passed to `init`?"
+    assert find_link(
+        initialised_entries,
+        ".terraform/providers/registry.terraform.io/hashicorp/null/*/*",
+    ), (
+        "Did not find expected provider contained in module, did we successfully include it in the files passed to `init`?"
+    )

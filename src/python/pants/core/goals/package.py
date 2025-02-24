@@ -6,9 +6,9 @@ from __future__ import annotations
 import logging
 import os
 from abc import ABCMeta
+from collections.abc import Iterable
 from dataclasses import dataclass
 from string import Template
-from typing import Iterable
 
 from pants.core.util_rules import distdir
 from pants.core.util_rules.distdir import DistDir

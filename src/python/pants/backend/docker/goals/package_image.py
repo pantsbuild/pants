@@ -6,10 +6,11 @@ import json
 import logging
 import os
 import re
+from collections.abc import Iterator
 from dataclasses import asdict, dataclass
 from functools import partial
 from itertools import chain
-from typing import Iterator, Literal, cast
+from typing import Literal, cast
 
 # Re-exporting BuiltDockerImage here, as it has its natural home here, but has moved out to resolve
 # a dependency cycle from docker_build_context.
@@ -65,7 +66,7 @@ class DockerBuildTargetStageError(ValueError):
     pass
 
 
-class DockerImageOptionValueError(ValueError):
+class DockerImageOptionValueError(InterpolationError):
     pass
 
 
@@ -351,7 +352,9 @@ def get_build_options(
                 source=source,
                 error_cls=DockerImageOptionValueError,
             )
-            yield from target[field_type].options(format, global_build_hosts_options=global_build_hosts_options)  # type: ignore[attr-defined]
+            yield from target[field_type].options(  # type: ignore[attr-defined]
+                format, global_build_hosts_options=global_build_hosts_options
+            )
 
     # Target stage
     target_stage = None
@@ -526,6 +529,8 @@ def parse_image_id_from_docker_build_output(docker: DockerBinary, *outputs: byte
                     r"(writing image (?P<digest>sha256:\S+))",
                     # BuildKit with containerd-snapshotter output.
                     r"(exporting manifest list (?P<manifest_list>sha256:\S+))",
+                    # BuildKit with containerd-snapshotter output and no attestation.
+                    r"(exporting manifest (?P<manifest>sha256:\S+))",
                     # Docker output.
                     r"(Successfully built (?P<short_id>\S+))",
                 ),
@@ -548,6 +553,7 @@ def parse_image_id_from_docker_build_output(docker: DockerBinary, *outputs: byte
                     image_id_match.group("digest")
                     or image_id_match.group("short_id")
                     or image_id_match.group("manifest_list")
+                    or image_id_match.group("manifest")
                 )
                 return image_id
 

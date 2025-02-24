@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping
 
 from pants.core.goals.generate_lockfiles import (
     DEFAULT_TOOL_LOCKFILE,
@@ -219,9 +219,7 @@ async def setup_lockfile_request_from_tool(
         artifacts=artifacts,
         resolve_name=request.resolve_name,
         lockfile_dest=(
-            request.write_lockfile_dest
-            if request.read_lockfile_dest != DEFAULT_TOOL_LOCKFILE
-            else DEFAULT_TOOL_LOCKFILE
+            request.lockfile if request.lockfile != DEFAULT_TOOL_LOCKFILE else DEFAULT_TOOL_LOCKFILE
         ),
         diff=False,
     )

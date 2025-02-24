@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Iterable, Mapping
+from collections.abc import Iterable, Mapping
 
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.rule_runner import RuleRunner
@@ -22,5 +22,5 @@ class PythonRuleRunner(RuleRunner):
         ):
             # We inject the test ICs via env and not args, because in a handful of cases
             # we have different behavior when the option is set via flag.
-            env["PANTS_PYTHON_INTERPRETER_CONSTRAINTS"] = "['>=3.7,<3.10',]"
+            env["PANTS_PYTHON_INTERPRETER_CONSTRAINTS"] = "['>=3.8,<3.10',]"
         return super().create_options_bootstrapper(args=args, env=env)

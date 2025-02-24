@@ -20,7 +20,7 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.lockfile_diff import _generate_python_lockfile_diff
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
 from pants.backend.python.util_rules.pex_cli import PexCliProcess, maybe_log_pex_stderr
-from pants.backend.python.util_rules.pex_environment import PexSubsystem
+from pants.backend.python.util_rules.pex_environment import PexSubsystem, PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements,
     ResolvePexConfig,
@@ -105,6 +105,9 @@ async def generate_lockfile(
 
     pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
     header_delimiter = "//"
+
+    python = await Get(PythonExecutable, InterpreterConstraints, req.interpreter_constraints)
+
     result = await Get(
         ProcessResult,
         PexCliProcess(
@@ -133,6 +136,7 @@ async def generate_lockfile(
                 "mac",
                 # This makes diffs more readable when lockfiles change.
                 "--indent=2",
+                f"--python-path={python.path}",
                 *(f"--find-links={link}" for link in req.find_links),
                 *pip_args_setup.args,
                 *req.interpreter_constraints.generate_pex_arg_list(),
@@ -206,24 +210,26 @@ class KnownPythonUserResolveNamesRequest(KnownUserResolveNamesRequest):
     pass
 
 
-def python_exportable_tools(union_membership: UnionMembership) -> dict[str, type[PythonToolBase]]:
-    exportable_tools = union_membership.get(ExportableTool)
-    names_of_python_tools: dict[str, type[PythonToolBase]] = {
-        e.options_scope: e for e in exportable_tools if issubclass(e, PythonToolBase)  # type: ignore  # mypy isn't narrowing with `issubclass`
-    }
-    return names_of_python_tools
-
-
 @rule
-def determine_python_user_resolves(
+async def determine_python_user_resolves(
     _: KnownPythonUserResolveNamesRequest,
     python_setup: PythonSetup,
     union_membership: UnionMembership,
 ) -> KnownUserResolveNames:
+    """Find all know Python resolves, from both user-created resolves and internal tools."""
     python_tool_resolves = ExportableTool.filter_for_subclasses(union_membership, PythonToolBase)
 
+    tools_using_default_resolve = [
+        resolve_name
+        for resolve_name, subsystem_cls in python_tool_resolves.items()
+        if (await _construct_subsystem(subsystem_cls)).install_from_resolve is None
+    ]
+
     return KnownUserResolveNames(
-        names=(*python_setup.resolves.keys(), *python_tool_resolves.keys()),
+        names=(
+            *python_setup.resolves.keys(),
+            *tools_using_default_resolve,
+        ),  # the order of the keys doesn't matter since shadowing is done in `setup_user_lockfile_requests`
         option_name="[python].resolves",
         requested_resolve_names_cls=RequestedPythonUserResolveNames,
     )
@@ -236,6 +242,11 @@ async def setup_user_lockfile_requests(
     python_setup: PythonSetup,
     union_membership: UnionMembership,
 ) -> UserGenerateLockfiles:
+    """Transform the names of resolves requested into the `GeneratePythonLockfile` request object.
+
+    Shadowing is done here by only checking internal resolves if the resolve is not a user-created
+    resolve.
+    """
     if not (python_setup.enable_resolves and python_setup.resolves_generate_lockfiles):
         return UserGenerateLockfiles()
 
@@ -250,10 +261,10 @@ async def setup_user_lockfile_requests(
 
     tools = ExportableTool.filter_for_subclasses(union_membership, PythonToolBase)
 
-    out = []
+    out = set()
     for resolve in requested:
         if resolve in python_setup.resolves:
-            out.append(
+            out.add(
                 GeneratePythonLockfile(
                     requirements=PexRequirements.req_strings_from_requirement_fields(
                         resolve_to_requirements_fields[resolve]
@@ -280,7 +291,7 @@ async def setup_user_lockfile_requests(
             else:
                 ic = InterpreterConstraints(tool.default_interpreter_constraints)
 
-            out.append(
+            out.add(
                 GeneratePythonLockfile(
                     requirements=FrozenOrderedSet(sorted(tool.requirements)),
                     find_links=FrozenOrderedSet(find_links),
@@ -332,7 +343,7 @@ async def python_lockfile_synthetic_targets(
                     TargetAdaptor(
                         "_lockfiles",
                         name=synthetic_lockfile_target_name(name),
-                        sources=[lockfile],
+                        sources=(lockfile,),
                         __description_of_origin__=f"the [python].resolves option {name!r}",
                     )
                     for _, lockfile, name in lockfiles

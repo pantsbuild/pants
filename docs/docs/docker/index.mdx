@@ -145,7 +145,7 @@ ARG VAR3=default
 
 ### Target build stage
 
-When your `Dockerfile` is a multi-stage build file, you may specify which stage to build with the [`--docker-build-target-stage`](../../reference/subsystems/docker.mdx#section-build-target-stage) for all images, or provide a per image setting with the `docker_image` field [`target_stage`](../../reference/targets/docker_image.mdx#target_stage).
+When your `Dockerfile` is a multi-stage build file, you may specify which stage to build with the [`--docker-build-target-stage`](../../reference/subsystems/docker.mdx#build_target_stage) for all images, or provide a per image setting with the `docker_image` field [`target_stage`](../../reference/targets/docker_image.mdx#target_stage).
 
 ```dockerfile
 FROM python:3.8 AS base

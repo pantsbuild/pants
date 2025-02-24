@@ -1,5 +1,5 @@
 ---
-    title: GitHub Actions macOS ARM64 runners
+    title: GitHub Actions macOS runners
     sidebar_position: 2
 ---
 
@@ -203,3 +203,9 @@ should be able to pick up any job with this setting:
       - macOS11
       - ARM64
 ```
+
+## Self-hosted macOS X86_64 Runners
+
+As of August 2024 we are also running a self-hosted macOS 10.15 x86_64 runner on MacStadium,
+as GitHub Actions does not offer hosted runners for this old OS version. It is set up similarly
+to the instructions above, with appropriate changes to the `runs-on` labels and env vars.

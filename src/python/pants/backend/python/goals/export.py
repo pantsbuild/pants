@@ -50,7 +50,7 @@ from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import AllTargets, HydratedSources, HydrateSourcesRequest, SourcesField
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.option.option_types import BoolOption, EnumOption, StrListOption
+from pants.option.option_types import EnumOption, StrListOption
 from pants.util.strutil import path_safe, softwrap
 
 logger = logging.getLogger(__name__)
@@ -110,38 +110,6 @@ class ExportPluginOptions:
         advanced=True,
     )
 
-    py_hermetic_scripts = BoolOption(
-        default=True,
-        help=softwrap(
-            """
-            When exporting a mutable virtualenv for a resolve, by default
-            modify console script shebang lines to make them "hermetic".
-            The shebang of hermetic console scripts uses the python args: `-sE`:
-
-              - `-s` skips inclusion of the user site-packages directory,
-              - `-E` ignores all `PYTHON*` env vars like `PYTHONPATH`.
-
-            Set this to false if you need non-hermetic scripts with
-            simple python shebangs that respect vars like `PYTHONPATH`,
-            to, for example, allow IDEs like PyCharm to inject its debugger,
-            coverage, or other IDE-specific libs when running a script.
-
-            This only applies when when exporting a `mutable_virtualenv`
-            (`symlinked_immutable_virtualenv` exports are not "full"
-            virtualenvs because they are used internally by pants itself.
-            Pants requires hermetic scripts to provide its reproduciblity
-            guarantee, fine-grained caching, and other features).
-            """
-        ),
-        advanced=True,
-        removal_version="2.24.0.dev0",
-        removal_hint=softwrap(
-            """
-            Use `--export-py-non-hermetic-scripts-in-resolve` instead.
-            """
-        ),
-    )
-
     py_non_hermetic_scripts_in_resolve = StrListOption(
         help=softwrap(
             """
@@ -175,7 +143,8 @@ class ExportPluginOptions:
             virtualenv exported for that resolve. Generated sources will be placed in the appropriate location within
             the site-packages directory of the mutable virtualenv.
             """
-        )
+        ),
+        advanced=True,
     )
 
 
@@ -283,10 +252,7 @@ async def do_export(
             f"--prompt={venv_prompt}",
             output_path,
         ]
-        if (
-            req.resolve_name in export_subsys.options.py_non_hermetic_scripts_in_resolve
-            or not export_subsys.options.py_hermetic_scripts
-        ):
+        if req.resolve_name in export_subsys.options.py_non_hermetic_scripts_in_resolve:
             pex_args.insert(-1, "--non-hermetic-scripts")
 
         post_processing_cmds = [
@@ -410,6 +376,7 @@ async def python_codegen_export_setup() -> _ExportPythonCodegenSetup:
                     content=textwrap.dedent(
                         f"""\
                         import os
+                        import shutil
                         import site
                         import sys
 
@@ -423,7 +390,10 @@ async def python_codegen_export_setup() -> _ExportPythonCodegenSetup:
                         for item in os.listdir(codegen_dir):
                             if item == "{_ExportPythonCodegenSetup.SCRIPT_NAME}":
                                 continue
-                            os.rename(os.path.join(codegen_dir, item), os.path.join(site_packages_dir, item))
+                            src = os.path.join(codegen_dir, item)
+                            dest = os.path.join(site_packages_dir, item)
+                            shutil.copytree(src, dest, dirs_exist_ok=True)
+                            shutil.rmtree(src)
                         """
                     ).encode(),
                 )

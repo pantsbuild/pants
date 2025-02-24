@@ -5,7 +5,7 @@ from __future__ import annotations
 import dataclasses
 import os
 import textwrap
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
 from pants.backend.python.subsystems.debugpy import DebugPy
 from pants.backend.python.target_types import (
@@ -43,8 +43,8 @@ async def _create_python_source_run_request(
     pex_env: PexEnvironment,
     run_in_sandbox: bool,
     pex_path: Iterable[Pex] = (),
-    console_script: Optional[ConsoleScript] = None,
-    executable: Optional[Executable] = None,
+    console_script: ConsoleScript | None = None,
+    executable: Executable | None = None,
 ) -> RunRequest:
     addresses = [address]
     entry_point, transitive_targets = await MultiGet(

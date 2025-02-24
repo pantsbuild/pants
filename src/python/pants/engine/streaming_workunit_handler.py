@@ -6,8 +6,9 @@ from __future__ import annotations
 import logging
 import threading
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Sequence, Tuple
+from typing import Any
 
 from pants.base.specs import Specs
 from pants.core.util_rules.environments import determine_bootstrap_environment
@@ -195,7 +196,7 @@ class WorkunitsCallbackFactory:
     callback_factory: Callable[[], WorkunitsCallback | None]
 
 
-class WorkunitsCallbackFactories(Tuple[WorkunitsCallbackFactory, ...]):
+class WorkunitsCallbackFactories(tuple[WorkunitsCallbackFactory, ...]):
     """A list of registered factories for WorkunitsCallback instances."""
 
 

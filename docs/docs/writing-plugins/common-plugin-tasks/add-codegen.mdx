@@ -19,9 +19,7 @@ This guide assumes that you are running a code generator that already exists out
 
 If you are instead writing your own code generation logic inline, you can skip Step 2. In Step 4, rather than running a `Process`, use [`CreateDigest`](../the-rules-api/file-system.mdx).
 
-1. Create a target type for the protocol
-
----
+## 1. Create a target type for the protocol
 
 You will need to define a new target type to allow users to provide metadata for their protocol files, e.g. their `.proto` files. See [Creating new targets](../the-target-api/creating-new-targets.mdx) for a guide on how to do this.
 
@@ -91,9 +89,7 @@ def rules():
 
 This example hardcodes the injected address. You can instead add logic to your rule to make this dynamic. For example, in Pants's Protobuf implementation, Pants looks for a `python_requirement` target with `protobuf`. See [protobuf/python/python_protobuf_subsystem.py](https://github.com/pantsbuild/pants/blob/main/src/python/pants/backend/codegen/protobuf/python/python_protobuf_subsystem.py).
 
-2. Install your code generator
-
----
+## 2. Install your code generator
 
 There are several ways for Pants to install your tool. See [Installing tools](../the-rules-api/installing-tools.mdx). This example will use `ExternalTool` because there is already a pre-compiled binary for Protoc.
 
@@ -130,9 +126,7 @@ class Protoc(ExternalTool):
         return "./bin/protoc"
 ```
 
-3. Create a `GenerateSourcesRequest`
-
----
+## 3. Create a `GenerateSourcesRequest`
 
 `GenerateSourcesRequest` tells Pants the `input` and the `output` of your code generator, such as going from `ProtobufSourceField -> PythonSourceField`. Pants will use this to determine when to use your code generation implementation.
 
@@ -165,9 +159,7 @@ def rules():
     ]
 ```
 
-4. Create a rule for your codegen logic
-
----
+## 4. Create a rule for your codegen logic
 
 Your rule should take as a parameter the `GenerateSourcesRequest` from Step 3 and the `Subsystem` (or `ExternalTool`) from Step 2. It should return `GeneratedSources`.
 
@@ -286,9 +278,7 @@ def rules():
 Run `pants export-codegen path/to/file.ext` to ensure Pants is correctly generating the file. This will write the generated file(s) under the `dist/` directory, using the same path that will be used during Pants runs.
 :::
 
-5. Audit call sites to ensure they've enabled codegen
-
----
+## 5. Audit call sites to ensure they've enabled codegen
 
 Call sites must opt into using codegen, and they must also specify what types of sources they're expecting. See [Rules and the Target API](../the-rules-api/rules-and-the-target-api.mdx) about `SourcesField`.
 
@@ -296,8 +286,10 @@ For example, if you added a code generator that goes from `ProtobufSourceField -
 
 You should check that everywhere you're expecting is using your new codegen implementation by manually testing it out. Create a new protocol target, add it to the `dependencies` field of a target, and then run goals like `pants package` and `pants test` to make sure that the generated file works correctly.
 
-6. Add tests (optional)
-
----
+## 6. Add tests (optional)
 
 Refer to [Testing rules](../the-rules-api/testing-plugins.mdx).
+
+## 7. Make the tool exportable (optional)
+
+Refer to [Allowing tool export](allowing-tool-export.mdx) to allow users to export the tool for use in external programs.

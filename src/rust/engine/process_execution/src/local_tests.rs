@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use maplit::hashset;
-use shell_quote::bash;
+use shell_quote::Bash;
 use tempfile::TempDir;
 
 use fs::EMPTY_DIRECTORY_DIGEST;
@@ -464,7 +464,7 @@ async fn test_directory_preservation() {
     assert!(rolands_path.exists());
 
     // Ensure the bash command line is provided.
-    let bytes_quoted_command_line = bash::escape(&bash_contents);
+    let bytes_quoted_command_line = Bash::quote_vec(&bash_contents);
     let quoted_command_line = str::from_utf8(&bytes_quoted_command_line).unwrap();
     assert!(std::fs::read_to_string(&run_script_path)
         .unwrap()

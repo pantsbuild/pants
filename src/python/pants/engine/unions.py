@@ -4,8 +4,9 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any, Callable, DefaultDict, Generic, Iterable, Mapping, TypeVar, cast, overload
+from typing import Any, DefaultDict, Generic, TypeVar, cast, overload
 
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_method
@@ -15,13 +16,11 @@ _T = TypeVar("_T", bound=type)
 
 
 @overload
-def union(cls: _T, *, in_scope_types: None = None) -> _T:
-    ...
+def union(cls: _T, *, in_scope_types: None = None) -> _T: ...
 
 
 @overload
-def union(cls: None = None, *, in_scope_types: list[type]) -> Callable[[_T], _T]:
-    ...
+def union(cls: None = None, *, in_scope_types: list[type]) -> Callable[[_T], _T]: ...
 
 
 def union(
@@ -183,15 +182,13 @@ class _DistinctUnionTypePerSubclassGetter(Generic[_T]):
 
 
 @overload
-def distinct_union_type_per_subclass(cls: _T, *, in_scope_types: None = None) -> _T:
-    ...
+def distinct_union_type_per_subclass(cls: _T, *, in_scope_types: None = None) -> _T: ...
 
 
 @overload
 def distinct_union_type_per_subclass(
     cls: None = None, *, in_scope_types: list[type]
-) -> Callable[[_T], _T]:
-    ...
+) -> Callable[[_T], _T]: ...
 
 
 def distinct_union_type_per_subclass(
