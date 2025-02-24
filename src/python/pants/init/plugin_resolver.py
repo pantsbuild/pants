@@ -137,43 +137,26 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
-import tomllib
-
-
-def dig(d, keys, *, default=None):
-    for key in keys[:-1]:
-        d = d.get(key, {})
-    return d.get(keys[-1], default)
 
 
 def pyproject_changed(current_path: Path, previous_path: Path) -> bool:
     with open(current_path, "rb") as f:
-        current_pyproject = tomllib.load(f)
+        current_pyproject = f.read()
 
     with open(previous_path, "rb") as f:
-        previous_pyproject = tomllib.load(f)
+        previous_pyproject = f.read()
 
-    keys_to_check = [
-        ["tool", "__pants_internal__", "version"],
-        ["project", "dependencies"],
-        ["tool", "uv", "constraint-dependencies"],
-        ["tool", "uv", "environments"],
-        ["tool", "uv", "index"],
-        ["tool", "uv", "find-links"],
-    ]
+    return current_pyproject != previous_pyproject
 
-    for keys in keys_to_check:
-        if dig(current_pyproject, keys) != dig(previous_pyproject, keys):
-            return True
 
-    return False
+def run(args):
+    return subprocess.run(args, check=True)
 
 
 inputs_dir = Path(sys.argv[1])
 uv_path = inputs_dir / sys.argv[2]
 pyproject_path = inputs_dir / sys.argv[3]
 
-# Ensure directory exists for plugin resolution project.
 plugins_path = Path(".pants.d/plugins")
 plugins_path.mkdir(parents=True, exist_ok=True)
 os.chdir(plugins_path)
@@ -186,11 +169,11 @@ reinstall = (
 
 if reinstall:
     shutil.copy(pyproject_path, ".")
-    subprocess.run([uv_path, "sync", "--no-config", f"--python={sys.executable}"])
+    run([uv_path, "sync", "--no-config", f"--python={sys.executable}"])
 else:
-    subprocess.run([uv_path, "sync", "--no-config", "--frozen", f"--python={sys.executable}"])
+    run([uv_path, "sync", "--no-config", "--frozen", f"--python={sys.executable}"])
 
-subprocess.run(["./.venv/bin/python", "-c", "import os, site; print(os.linesep.join(site.getsitepackages()))"])
+run(["./.venv/bin/python", "-c", "import os, site; print(os.linesep.join(site.getsitepackages()))"])
 """
 
 
