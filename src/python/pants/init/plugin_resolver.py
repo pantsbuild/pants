@@ -169,9 +169,9 @@ reinstall = (
 
 if reinstall:
     shutil.copy(pyproject_path, ".")
-    run([uv_path, "sync", "--no-config", f"--python={sys.executable}"])
+    run([uv_path, "sync", f"--python={sys.executable}"])
 else:
-    run([uv_path, "sync", "--no-config", "--frozen", f"--python={sys.executable}"])
+    run([uv_path, "sync", "--frozen", f"--python={sys.executable}"])
 
 run(["./.venv/bin/python", "-c", "import os, site; print(os.linesep.join(site.getsitepackages()))"])
 """
