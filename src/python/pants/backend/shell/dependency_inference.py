@@ -7,25 +7,26 @@ import json
 import logging
 import re
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import DefaultDict
 
 from pants.backend.shell.lint.shellcheck.subsystem import Shellcheck
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.target_types import ShellDependenciesField, ShellSourceField
-from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
+from pants.core.util_rules.external_tool import download_external_tool
 from pants.engine.addresses import Address
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import Digest, MergeDigests
+from pants.engine.internals.graph import determine_explicitly_provided_dependencies, hydrate_sources
+from pants.engine.intrinsics import execute_process, merge_digests
 from pants.engine.platform import Platform
-from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.process import Process, ProcessCacheScope
+from pants.engine.rules import Rule, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     AllTargets,
     DependenciesRequest,
-    ExplicitlyProvidedDependencies,
     FieldSet,
-    HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
@@ -99,12 +100,9 @@ async def parse_shell_imports(
     # We use Shellcheck to parse for us by running it against each file in isolation, which means
     # that all `source` statements will error. Then, we can extract the problematic paths from the
     # JSON output.
-    downloaded_shellcheck = await Get(
-        DownloadedExternalTool, ExternalToolRequest, shellcheck.get_request(platform)
-    )
-    input_digest = await Get(Digest, MergeDigests([request.digest, downloaded_shellcheck.digest]))
-    process_result = await Get(
-        FallibleProcessResult,
+    downloaded_shellcheck = await download_external_tool(shellcheck.get_request(platform))
+    input_digest = await merge_digests(MergeDigests([request.digest, downloaded_shellcheck.digest]))
+    process_result = await execute_process(
         Process(
             # NB: We do not load up `[shellcheck].{args,config}` because it would risk breaking
             # determinism of dependency inference in an unexpected way.
@@ -116,6 +114,7 @@ async def parse_shell_imports(
             # deterministic.
             cache_scope=ProcessCacheScope.ALWAYS,
         ),
+        **implicitly(),
     )
 
     try:
@@ -169,17 +168,19 @@ async def infer_shell_dependencies(
         return InferredDependencies([])
 
     address = request.field_set.address
-    explicitly_provided_deps, hydrated_sources = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
-        Get(HydratedSources, HydrateSourcesRequest(request.field_set.source)),
+    explicitly_provided_deps, hydrated_sources = await concurrently(
+        determine_explicitly_provided_dependencies(
+            **implicitly(DependenciesRequest(request.field_set.dependencies))
+        ),
+        hydrate_sources(HydrateSourcesRequest(request.field_set.source), **implicitly()),
     )
     assert len(hydrated_sources.snapshot.files) == 1
 
-    detected_imports = await Get(
-        ParsedShellImports,
+    detected_imports = await parse_shell_imports(
         ParseShellImportsRequest(
             hydrated_sources.snapshot.digest, hydrated_sources.snapshot.files[0]
         ),
+        **implicitly(),
     )
     result: OrderedSet[Address] = OrderedSet()
     for import_path in detected_imports:
@@ -200,5 +201,5 @@ async def infer_shell_dependencies(
     return InferredDependencies(sorted(result))
 
 
-def rules():
+def rules() -> Iterable[Rule | UnionRule]:
     return (*collect_rules(), UnionRule(InferDependenciesRequest, InferShellDependencies))
