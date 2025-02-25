@@ -734,7 +734,7 @@ def test_jobs(
             + pants_args
             + ["--", "-m", "platform_specific_behavior"]
         )
-    pants_args = ["./pants"] + pants_args
+    pants_args = ["./pants", "--changed-since=origin/main", "--changed-dependents=transitive"] + pants_args
     pants_args_str = " ".join(pants_args) + "\n"
 
     return {
