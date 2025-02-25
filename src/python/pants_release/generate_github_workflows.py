@@ -727,14 +727,18 @@ def test_jobs(
         human_readable_step_name = f"Run Python test shard {shard}"
         log_name += f"-{shard}"
         pants_args.append(f"--shard={shard}")
-    pants_args.append("::")
+    # pants_args.append("::")
     if platform_specific:
         pants_args = (
             ["--tag=+platform_specific_behavior"]
             + pants_args
             + ["--", "-m", "platform_specific_behavior"]
         )
-    pants_args = ["./pants", "--changed-since=origin/main", "--changed-dependents=transitive"] + pants_args
+    pants_args = [
+        "./pants",
+        "--changed-since=origin/main",
+        "--changed-dependents=transitive",
+    ] + pants_args
     pants_args_str = " ".join(pants_args) + "\n"
 
     return {

@@ -842,8 +842,8 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - name: Run Python tests
-      run: './pants --changed-since=origin/main --changed-dependents=transitive --tag=+platform_specific_behavior test ::
-        -- -m platform_specific_behavior
+      run: './pants --changed-since=origin/main --changed-dependents=transitive --tag=+platform_specific_behavior test --
+        -m platform_specific_behavior
 
         '
     - continue-on-error: true
@@ -945,7 +945,7 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - name: Run Python test shard 0/10
-      run: './pants --changed-since=origin/main --changed-dependents=transitive test --shard=0/10 ::
+      run: './pants --changed-since=origin/main --changed-dependents=transitive test --shard=0/10
 
         '
     - continue-on-error: true
@@ -1047,7 +1047,7 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - name: Run Python test shard 1/10
-      run: './pants --changed-since=origin/main --changed-dependents=transitive test --shard=1/10 ::
+      run: './pants --changed-since=origin/main --changed-dependents=transitive test --shard=1/10
 
         '
     - continue-on-error: true
@@ -1149,7 +1149,7 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - name: Run Python test shard 2/10
-      run: './pants --changed-since=origin/main --changed-dependents=transitive test --shard=2/10 ::
+      run: './pants --changed-since=origin/main --changed-dependents=transitive test --shard=2/10
 
         '
     - continue-on-error: true
@@ -1251,7 +1251,7 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - name: Run Python test shard 3/10
-      run: './pants --changed-since=origin/main --changed-dependents=transitive test --shard=3/10 ::
+      run: './pants --changed-since=origin/main --changed-dependents=transitive test --shard=3/10
 
         '
     - continue-on-error: true
@@ -1353,7 +1353,7 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - name: Run Python test shard 4/10
-      run: './pants --changed-since=origin/main --changed-dependents=transitive test --shard=4/10 ::
+      run: './pants --changed-since=origin/main --changed-dependents=transitive test --shard=4/10
 
         '
     - continue-on-error: true
@@ -1455,7 +1455,7 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - name: Run Python test shard 5/10
-      run: './pants --changed-since=origin/main --changed-dependents=transitive test --shard=5/10 ::
+      run: './pants --changed-since=origin/main --changed-dependents=transitive test --shard=5/10
 
         '
     - continue-on-error: true
@@ -1557,7 +1557,7 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - name: Run Python test shard 6/10
-      run: './pants --changed-since=origin/main --changed-dependents=transitive test --shard=6/10 ::
+      run: './pants --changed-since=origin/main --changed-dependents=transitive test --shard=6/10
 
         '
     - continue-on-error: true
@@ -1659,7 +1659,7 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - name: Run Python test shard 7/10
-      run: './pants --changed-since=origin/main --changed-dependents=transitive test --shard=7/10 ::
+      run: './pants --changed-since=origin/main --changed-dependents=transitive test --shard=7/10
 
         '
     - continue-on-error: true
@@ -1761,7 +1761,7 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - name: Run Python test shard 8/10
-      run: './pants --changed-since=origin/main --changed-dependents=transitive test --shard=8/10 ::
+      run: './pants --changed-since=origin/main --changed-dependents=transitive test --shard=8/10
 
         '
     - continue-on-error: true
@@ -1863,7 +1863,7 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - name: Run Python test shard 9/10
-      run: './pants --changed-since=origin/main --changed-dependents=transitive test --shard=9/10 ::
+      run: './pants --changed-since=origin/main --changed-dependents=transitive test --shard=9/10
 
         '
     - continue-on-error: true
@@ -1937,8 +1937,8 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - name: Run Python tests
-      run: './pants --changed-since=origin/main --changed-dependents=transitive --tag=+platform_specific_behavior test ::
-        -- -m platform_specific_behavior
+      run: './pants --changed-since=origin/main --changed-dependents=transitive --tag=+platform_specific_behavior test --
+        -m platform_specific_behavior
 
         '
     - continue-on-error: true
