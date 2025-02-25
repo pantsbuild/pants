@@ -21,7 +21,7 @@ from pants.backend.python.util_rules.pex import (
     VenvPex,
     VenvPexProcess,
 )
-from pants.backend.python.util_rules.pex_cli import PexPEX
+from pants.backend.python.util_rules.pex_cli_tool import PexPEX
 from pants.backend.python.util_rules.pex_requirements import EntireLockfile, PexRequirements
 from pants.engine.fs import Digest
 from pants.engine.process import Process, ProcessResult

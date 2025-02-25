@@ -54,8 +54,12 @@ __dependents_rules__(
     (
         (
             "[/python/util_rules/interpreter_constraints.py]",
+            "[/python/util_rules/pex_cli_tool.py]",
             "[/python/util_rules/pex_environment.py]",
             "[/python/util_rules/pex_requirements.py]",
+            "[/python/subsystems/python_native_code.py]",
+            "[/python/subsystems/repos.py]",
+            "[/python/subsystems/setup.py]",
         ),
         "src/python/pants/init/plugin_resolver.py",
         DEFAULT_DEPENDENTS_RULES,
