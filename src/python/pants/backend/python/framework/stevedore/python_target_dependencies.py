@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 from pants.backend.python.framework.stevedore.target_types import (
@@ -22,10 +22,10 @@ from pants.backend.python.target_types import (
     PythonTestTarget,
 )
 from pants.backend.python.util_rules.entry_points import (
-    EntryPointDependencies,
     GetEntryPointDependenciesRequest,
+    get_filtered_entry_point_dependencies,
 )
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.target import (
     AllTargets,
     FieldSet,
@@ -97,7 +97,7 @@ async def map_stevedore_extensions(
     desc=f"Find `{PythonDistribution.alias}` targets with entry_points in selected `{StevedoreNamespace.alias}`s",
     level=LogLevel.DEBUG,
 )
-def find_python_distributions_with_entry_points_in_stevedore_namespaces(
+async def find_python_distributions_with_entry_points_in_stevedore_namespaces(
     request: StevedoreNamespacesProviderTargetsRequest,
     stevedore_extensions: StevedoreExtensions,
 ) -> StevedoreExtensionTargets:
@@ -141,28 +141,26 @@ async def infer_stevedore_namespaces_dependencies(
     if requested_namespaces.value is None:
         return InferredDependencies(())
 
-    targets = await Get(
-        StevedoreExtensionTargets,
-        StevedoreNamespacesProviderTargetsRequest(requested_namespaces),
+    targets = await find_python_distributions_with_entry_points_in_stevedore_namespaces(
+        StevedoreNamespacesProviderTargetsRequest(requested_namespaces), **implicitly()
     )
 
     requested_namespaces_value = requested_namespaces.value
-    entry_point_dependencies = await Get(
-        EntryPointDependencies,
+    entry_point_dependencies = await get_filtered_entry_point_dependencies(
         GetEntryPointDependenciesRequest(
             targets,
             lambda tgt, ns: ns in requested_namespaces_value,
             lambda tgt, ns, ep_name: True,
-        ),
+        )
     )
 
     return InferredDependencies(entry_point_dependencies.addresses)
 
 
-def rules():
-    return [
+def rules() -> Iterable[Rule | UnionRule]:
+    return (
         *collect_rules(),
         PythonTestsGeneratorTarget.register_plugin_field(StevedoreNamespacesField),
         PythonTestTarget.register_plugin_field(StevedoreNamespacesField),
         UnionRule(InferDependenciesRequest, InferStevedoreNamespacesDependencies),
-    ]
+    )
