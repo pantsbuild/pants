@@ -86,8 +86,8 @@ def test_shell_command_as_test(rule_runner: RuleRunner) -> None:
 
                 # Check whether `runnable_dependencies` works.
                 system_binary(
-                    name="sed",
-                    binary_name="sed",
+                    name="cat",
+                    binary_name="cat",
                 )
                 system_binary(
                     name="test",
@@ -98,8 +98,8 @@ def test_shell_command_as_test(rule_runner: RuleRunner) -> None:
                   name="pass_with_runnable_dependency",
                   execution_dependencies=[":msg-gen", ":src"],
                   tools=["echo"],
-                  runnable_dependencies=[":sed", ":test"],
-                  command="value=$(sed -e 's/ss/SS/;' < msg.txt) && test $value = meSSage",
+                  runnable_dependencies=[":cat", ":test"],
+                  command="value=$(cat msg.txt) && test $value = message",
                 )
                 """
             ),
