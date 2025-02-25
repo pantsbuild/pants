@@ -22,7 +22,7 @@ from pants.core.goals.package import BuiltPackage
 from pants.core.goals.publish import PublishPackages, PublishProcesses
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST
-from pants.engine.process import Process
+from pants.engine.process import InteractiveProcess, Process
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.process_util import process_assertion
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -101,6 +101,7 @@ def assert_publish(
     assert publish.description == expect_description
     if expect_process:
         assert publish.process
+        assert isinstance(publish.process, InteractiveProcess)
         expect_process(publish.process.process)
     else:
         assert publish.process is None
