@@ -561,7 +561,7 @@ def test_run_shell_command_request(
 @pytest.mark.parametrize(
     ("tool_name", "should_succeed"),
     (
-        ("python3.8", True),
+        ("python3.11", True),
         ("cd", False),
         ("floop", False),
     ),
@@ -597,7 +597,7 @@ def test_path_populated_with_tools(
             raise exerr
 
     if should_succeed:
-        assert caplog.records[0].msg.strip().endswith("python3.8")
+        assert caplog.records[0].msg.strip().endswith("python3.11")
     else:
         # `which` is silent in `bash` when nothing is found
         assert not caplog.records
@@ -611,7 +611,7 @@ def test_shell_command_boot_script(rule_runner: RuleRunner) -> None:
                 shell_command(
                   name="boot-script-test",
                   tools=[
-                    "python3.8",
+                    "python3.11",
                   ],
                   command="./command.script",
                   workdir=".",
@@ -643,7 +643,7 @@ def test_shell_command_boot_script_in_build_root(rule_runner: RuleRunner) -> Non
                 shell_command(
                   name="boot-script-test",
                   tools=[
-                    "python3.8",
+                    "python3.11",
                   ],
                   command="./command.script",
                 )

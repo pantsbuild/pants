@@ -38,11 +38,11 @@ from pants.core.util_rules.adhoc_process_support import (
     AdhocProcessRequest,
     ExtraSandboxContents,
     MergeExtraSandboxContents,
-    ResolvedExecutionDependencies,
     ResolveExecutionDependenciesRequest,
     convert_fallible_adhoc_process_result,
     merge_extra_sandbox_contents,
     parse_relative_directory,
+    prepare_adhoc_process,
     prepare_env_vars,
     resolve_execution_environment,
 )
@@ -53,6 +53,11 @@ from pants.core.util_rules.environments import (
     resolve_environment_name,
 )
 from pants.core.util_rules.system_binaries import BashBinary, BinaryShims, BinaryShimsRequest
+from pants.core.util_rules.system_binaries import (
+    BashBinary,
+    BinaryShimsRequest,
+    create_binary_shims,
+)
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import PathGlobs
 from pants.engine.internals.graph import resolve_target
@@ -60,6 +65,7 @@ from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.intrinsics import digest_to_snapshot
 from pants.engine.process import Process
 from pants.engine.rules import Get, collect_rules, implicitly, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
     GeneratedSources,
     GenerateSourcesRequest,
@@ -110,6 +116,7 @@ async def prepare_process_request_from_target(
         ),
         **implicitly(),
     )
+
     dependencies_digest = execution_environment.digest
 
     output_files = shell_command.get(ShellCommandOutputFilesField).value or ()
@@ -118,19 +125,17 @@ async def prepare_process_request_from_target(
     # Resolve the `tools` field into a digest
     tools = shell_command.get(ShellCommandToolsField, default_raw_value=()).value or ()
     tools = tuple(tool for tool in tools if tool not in BASH_BUILTIN_COMMANDS)
-
-    resolved_tools = await Get(
-        BinaryShims,
+    resolved_tools = await create_binary_shims(
         BinaryShimsRequest.for_binaries(
             *tools,
             rationale=f"execute {description}",
             search_path=shell_setup.executable_search_path,
         ),
+        bash,
     )
 
     runnable_dependencies = execution_environment.runnable_dependencies
-    extra_sandbox_contents = []
-
+    extra_sandbox_contents: list[ExtraSandboxContents] = []
     extra_sandbox_contents.append(
         ExtraSandboxContents(
             digest=EMPTY_DIGEST,
@@ -264,13 +269,13 @@ async def _interactive_shell_command(
         "CHROOT": "{chroot}",
     }
 
-    execution_environment = await Get(
-        ResolvedExecutionDependencies,
+    execution_environment = await resolve_execution_environment(
         ResolveExecutionDependenciesRequest(
             shell_command.address,
             shell_command.get(ShellCommandExecutionDependenciesField).value,
             shell_command.get(ShellCommandRunnableDependenciesField).value,
         ),
+        bash,
     )
     dependencies_digest = execution_environment.digest
 

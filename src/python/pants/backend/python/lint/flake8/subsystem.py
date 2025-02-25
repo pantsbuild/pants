@@ -167,7 +167,7 @@ class Flake8FirstPartyPlugins:
         return self.sources_digest != EMPTY_DIGEST
 
 
-@rule("Prepare [flake8].source_plugins", level=LogLevel.DEBUG)
+@rule(desc="Prepare [flake8].source_plugins", level=LogLevel.DEBUG)
 async def flake8_first_party_plugins(flake8: Flake8) -> Flake8FirstPartyPlugins:
     if not flake8.source_plugins:
         return Flake8FirstPartyPlugins(FrozenOrderedSet(), FrozenOrderedSet(), EMPTY_DIGEST)

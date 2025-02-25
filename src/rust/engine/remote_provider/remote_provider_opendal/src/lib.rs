@@ -211,7 +211,7 @@ impl ByteStoreProvider for Provider {
         let path = self.path(digest.hash);
 
         match self.operator.write(&path, bytes).await {
-            Ok(()) => Ok(()),
+            Ok(_) => Ok(()),
             // The item already exists, i.e. these bytes have already been stored. For example,
             // concurrent executions that are caching the same bytes. This makes the assumption that
             // which ever execution won the race to create the item successfully finishes the write, and
