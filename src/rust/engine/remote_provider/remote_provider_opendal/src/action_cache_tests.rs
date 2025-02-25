@@ -51,7 +51,7 @@ async fn write_test_data(provider: &Provider, digest: Digest, data: remexec::Act
         .operator
         .write(&test_path(digest), data.to_bytes())
         .await
-        .unwrap()
+        .unwrap();
 }
 
 #[tokio::test]
