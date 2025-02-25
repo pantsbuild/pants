@@ -113,7 +113,8 @@ def test_failing(rule_runner: PythonRuleRunner) -> None:
     assert len(result) == 1
     assert result[0].exit_code == 1
     assert "FAILED:" in result[0].stdout
-    assert f'{PACKAGE}/f.py", line 4' in result[0].stdout
+    assert f"{PACKAGE}/f.py:4:1" in result[0].stdout
+    assert f"[wrong-arg-types]" in result[0].stdout
     assert result[0].report == EMPTY_DIGEST
 
 
@@ -134,7 +135,8 @@ def test_multiple_targets(rule_runner: PythonRuleRunner) -> None:
     assert len(result) == 1
     assert result[0].exit_code == 1
     assert f"{PACKAGE}/good.py" not in result[0].stdout
-    assert f'{PACKAGE}/bad.py", line 4' in result[0].stdout
+    assert f"{PACKAGE}/bad.py:4:1" in result[0].stdout
+    assert f"[wrong-arg-types]" in result[0].stdout
     assert "Analyzing 2 sources" in result[0].stdout
     assert result[0].report == EMPTY_DIGEST
 
