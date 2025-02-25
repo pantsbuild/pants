@@ -8,6 +8,8 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.adhoc import run_system_binary
+from pants.backend.adhoc.target_types import SystemBinaryTarget
 from pants.backend.shell.goals import test
 from pants.backend.shell.goals.test import ShellTestRequest, TestShellCommandFieldSet
 from pants.backend.shell.target_types import (
@@ -18,7 +20,7 @@ from pants.backend.shell.target_types import (
 from pants.build_graph.address import Address
 from pants.core.goals import package
 from pants.core.goals.test import TestDebugRequest, TestResult, get_filtered_environment
-from pants.core.util_rules import archive, source_files
+from pants.core.util_rules import archive, source_files, system_binaries
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.testutil.rule_runner import RuleRunner, mock_console
@@ -34,6 +36,8 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *archive.rules(),
             *package.rules(),
+            *system_binaries.rules(),
+            *run_system_binary.rules(),
             get_filtered_environment,
             QueryRule(TestResult, (ShellTestRequest.Batch,)),
             QueryRule(TestDebugRequest, [ShellTestRequest.Batch]),
@@ -42,6 +46,7 @@ def rule_runner() -> RuleRunner:
             ShellSourcesGeneratorTarget,
             ShellCommandTarget,
             ShellCommandTestTarget,
+            SystemBinaryTarget,
         ],
     )
     rule_runner.set_options(
@@ -77,6 +82,24 @@ def test_shell_command_as_test(rule_runner: RuleRunner) -> None:
                   execution_dependencies=[":msg-gen", ":src"],
                   tools=["echo"],
                   command="./test.sh msg.txt xyzzy",
+                )
+
+                # Check whether `runnable_dependencies` works.
+                system_binary(
+                    name="sed",
+                    binary_name="sed",
+                )
+                system_binary(
+                    name="test",
+                    binary_name="test",
+                    fingerprint_args=["1", "=", "1"]
+                )
+                experimental_test_shell_command(
+                  name="pass_with_runnable_dependency",
+                  execution_dependencies=[":msg-gen", ":src"],
+                  tools=["echo"],
+                  runnable_dependencies=[":sed", ":test"],
+                  command="value=$(sed -e 's/ss/SS/;' < msg.txt) && test $value = meSSage",
                 )
                 """
             ),
@@ -123,3 +146,9 @@ def test_shell_command_as_test(rule_runner: RuleRunner) -> None:
     with mock_console(rule_runner.options_bootstrapper):
         fail_debug_result = rule_runner.run_interactive_process(fail_debug_request.process)
         assert fail_debug_result.exit_code == 1
+
+    pass_for_runnable_dependency_target = rule_runner.get_target(
+        Address("", target_name="pass_with_runnable_dependency")
+    )
+    pass_for_runnable_dependency_result = run_test(pass_for_runnable_dependency_target)
+    assert pass_for_runnable_dependency_result.exit_code == 0
