@@ -42,7 +42,6 @@ from pants.core.util_rules.adhoc_process_support import (
     convert_fallible_adhoc_process_result,
     merge_extra_sandbox_contents,
     parse_relative_directory,
-    prepare_adhoc_process,
     prepare_env_vars,
     resolve_execution_environment,
 )
@@ -52,7 +51,6 @@ from pants.core.util_rules.environments import (
     EnvironmentTarget,
     resolve_environment_name,
 )
-from pants.core.util_rules.system_binaries import BashBinary, BinaryShims, BinaryShimsRequest
 from pants.core.util_rules.system_binaries import (
     BashBinary,
     BinaryShimsRequest,
@@ -64,7 +62,6 @@ from pants.engine.internals.graph import resolve_target
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.intrinsics import digest_to_snapshot
 from pants.engine.process import Process
-from pants.engine.rules import Get, collect_rules, implicitly, rule
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
     GeneratedSources,
