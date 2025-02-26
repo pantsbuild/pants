@@ -25,14 +25,16 @@ from pants.core.goals.test import (
     TestResult,
     TestSubsystem,
 )
+from pants.core.util_rules.adhoc_process_support import (
+    AdhocProcessRequest,
+    FallibleAdhocProcessResult,
+    prepare_adhoc_process,
+)
+from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
+from pants.core.util_rules.adhoc_process_support import run_prepared_adhoc_process
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.internals.graph import resolve_target
-from pants.engine.process import (
-    InteractiveProcess,
-    ProcessCacheScope,
-    ProcessWithRetries,
-    execute_process_with_retry,
-)
+from pants.engine.process import InteractiveProcess, ProcessCacheScope
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import Target, WrappedTargetRequest
 from pants.util.frozendict import FrozenDict
@@ -80,19 +82,25 @@ async def test_shell_command(
         cache_scope=(
             ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
         ),
-        env=FrozenDict(
+        env_vars=FrozenDict(
             {
                 **test_extra_env.env,
-                **shell_process.env,
+                **shell_process.env_vars,
             }
         ),
     )
 
-    shell_result = await execute_process_with_retry(
-        ProcessWithRetries(shell_process, test_subsystem.attempts_default)
-    )
+    results: list[FallibleAdhocProcessResult] = []
+    for _ in range(test_subsystem.attempts_default):
+        result = await run_prepared_adhoc_process(
+            **implicitly({shell_process: AdhocProcessRequest})
+        )  # noqa: PNT30: retry loop
+        results.append(result)
+        if result.process_result.exit_code == 0:
+            break
+
     return TestResult.from_fallible_process_result(
-        process_results=shell_result.results,
+        process_results=tuple(r.process_result for r in results),
         address=field_set.address,
         output_setting=test_subsystem.output,
     )
@@ -108,12 +116,14 @@ async def test_shell_command_interactively(
         **implicitly(),
     )
 
-    shell_process = await prepare_process_request_from_target(
-        ShellCommandProcessFromTargetRequest(wrapped_tgt.target), **implicitly()
+    prepared_request = await prepare_adhoc_process(
+        **implicitly(ShellCommandProcessFromTargetRequest(wrapped_tgt.target))
     )
 
     # This is probably not strictly necessary given the use of `InteractiveProcess` but good to be correct in any event.
-    shell_process = dataclasses.replace(shell_process, cache_scope=ProcessCacheScope.PER_SESSION)
+    shell_process = dataclasses.replace(
+        prepared_request.process, cache_scope=ProcessCacheScope.PER_SESSION
+    )
 
     return TestDebugRequest(
         InteractiveProcess.from_process(
@@ -127,4 +137,5 @@ def rules():
         *collect_rules(),
         *shell_command.rules(),
         *ShellTestRequest.rules(),
+        *adhoc_process_support_rules(),
     )

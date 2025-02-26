@@ -36,18 +36,16 @@ from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.adhoc_process_support import (
     AdhocProcessRequest,
-    AdhocProcessResult,
     ExtraSandboxContents,
     MergeExtraSandboxContents,
     ResolveExecutionDependenciesRequest,
+    convert_fallible_adhoc_process_result,
     merge_extra_sandbox_contents,
     parse_relative_directory,
-    prepare_adhoc_process,
     prepare_env_vars,
     resolve_execution_environment,
 )
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
-from pants.core.util_rules.adhoc_process_support import run_adhoc_process
 from pants.core.util_rules.environments import (
     EnvironmentNameRequest,
     EnvironmentTarget,
@@ -89,12 +87,15 @@ class ShellCommandProcessFromTargetRequest:
     target: Target
 
 
-async def _prepare_process_request_from_target(
-    shell_command: Target,
+@rule
+async def prepare_process_request_from_target(
+    request: ShellCommandProcessFromTargetRequest,
     shell_setup: ShellSetup.EnvironmentAware,
     bash: BashBinary,
     env_target: EnvironmentTarget,
 ) -> AdhocProcessRequest:
+    shell_command = request.target
+
     description = f"the `{shell_command.alias}` at `{shell_command.address}`"
 
     working_directory = shell_command[ShellCommandWorkdirField].value
@@ -110,7 +111,7 @@ async def _prepare_process_request_from_target(
             shell_command.get(ShellCommandExecutionDependenciesField).value,
             shell_command.get(ShellCommandRunnableDependenciesField).value,
         ),
-        bash,
+        **implicitly(),
     )
 
     dependencies_digest = execution_environment.digest
@@ -214,29 +215,6 @@ async def _prepare_process_request_from_target(
     )
 
 
-@rule
-async def run_adhoc_result_from_target(
-    request: ShellCommandProcessFromTargetRequest,
-    shell_setup: ShellSetup.EnvironmentAware,
-    bash: BashBinary,
-    env_target: EnvironmentTarget,
-) -> AdhocProcessResult:
-    scpr = await _prepare_process_request_from_target(request.target, shell_setup, bash, env_target)
-    return await run_adhoc_process(scpr)
-
-
-@rule
-async def prepare_process_request_from_target(
-    request: ShellCommandProcessFromTargetRequest,
-    shell_setup: ShellSetup.EnvironmentAware,
-    bash: BashBinary,
-    env_target: EnvironmentTarget,
-) -> Process:
-    # Needed to support `experimental_test_shell_command`
-    scpr = await _prepare_process_request_from_target(request.target, shell_setup, bash, env_target)
-    return await prepare_adhoc_process(scpr, **implicitly())
-
-
 class RunShellCommand(RunFieldSet):
     required_fields = (
         ShellCommandCommandField,
@@ -255,7 +233,7 @@ async def shell_command_in_sandbox(
         **implicitly(),
     )
 
-    adhoc_result = await run_adhoc_result_from_target(
+    adhoc_result = await convert_fallible_adhoc_process_result(
         **implicitly(
             {
                 environment_name: EnvironmentName,
