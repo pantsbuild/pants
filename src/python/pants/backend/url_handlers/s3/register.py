@@ -9,6 +9,8 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from pants.engine.download_file import URLDownloadHandler
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import Digest, NativeDownloadFile
 from pants.engine.internals.native_engine import FileDigest
 from pants.engine.internals.selectors import Get
@@ -29,7 +31,9 @@ class AWSCredentials:
 
 
 @rule
-async def access_aws_credentials() -> AWSCredentials:
+async def access_aws_credentials(
+    local_environment_name: ChosenLocalEnvironmentName,
+) -> AWSCredentials:
     try:
         from botocore import credentials, session
     except ImportError:
@@ -48,7 +52,44 @@ async def access_aws_credentials() -> AWSCredentials:
         )
         raise
 
-    session = session.get_session()
+    env_vars = await Get(
+        EnvironmentVars,
+        {
+            EnvironmentVarsRequest(
+                [
+                    "AWS_PROFILE",
+                    "AWS_REGION",
+                    "AWS_ACCESS_KEY_ID",
+                    "AWS_SECRET_ACCESS_KEY",
+                    "AWS_SESSION_TOKEN",
+                ]
+            ): EnvironmentVarsRequest,
+            local_environment_name.val: EnvironmentName,
+        },
+    )
+
+    session = session.Session()
+
+    aws_profile = env_vars.get("AWS_PROFILE")
+    if aws_profile:
+        session.set_config_variable("profile", aws_profile)
+
+    aws_region = env_vars.get("AWS_REGION")
+    if aws_region:
+        session.set_config_variable("region", aws_region)
+
+    aws_access_key = env_vars.get("AWS_ACCESS_KEY_ID")
+    aws_secret_key = env_vars.get("AWS_SECRET_ACCESS_KEY")
+    aws_session_token = env_vars.get("AWS_SESSION_TOKEN")
+    if aws_access_key and aws_secret_key:
+        session.set_credentials(
+            credentials.Credentials(
+                access_key=aws_access_key,
+                secret_key=aws_secret_key,
+                token=aws_session_token,
+            )
+        )
+
     creds = credentials.create_credential_resolver(session).load_credentials()
 
     return AWSCredentials(creds)
@@ -136,7 +177,7 @@ class DownloadS3AuthorityVirtualHostedStyleURL(URLDownloadHandler):
 
 @rule
 async def download_file_from_virtual_hosted_s3_authority(
-    request: DownloadS3AuthorityVirtualHostedStyleURL, aws_credentials: AWSCredentials
+    request: DownloadS3AuthorityVirtualHostedStyleURL,
 ) -> Digest:
     split = urlsplit(request.url)
     bucket, aws_netloc = split.netloc.split(".", 1)
@@ -157,9 +198,7 @@ class DownloadS3AuthorityPathStyleURL(URLDownloadHandler):
 
 
 @rule
-async def download_file_from_path_s3_authority(
-    request: DownloadS3AuthorityPathStyleURL, aws_credentials: AWSCredentials
-) -> Digest:
+async def download_file_from_path_s3_authority(request: DownloadS3AuthorityPathStyleURL) -> Digest:
     split = urlsplit(request.url)
     _, bucket, key = split.path.split("/", 2)
     return await Get(
