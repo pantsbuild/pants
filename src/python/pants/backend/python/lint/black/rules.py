@@ -9,12 +9,13 @@ from pants.backend.python.lint.black.subsystem import Black, BlackFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import VenvPexProcess, create_venv_pex
 from pants.core.goals.fmt import AbstractFmtRequest, FmtResult, FmtTargetsRequest, Partitions
-from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
-from pants.engine.fs import Digest, MergeDigests
-from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.core.util_rules.config_files import find_config_file
+from pants.engine.fs import MergeDigests
+from pants.engine.intrinsics import merge_digests
+from pants.engine.process import execute_process_or_raise
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize, softwrap
 
@@ -29,42 +30,37 @@ async def _run_black(
     black: Black,
     interpreter_constraints: InterpreterConstraints,
 ) -> FmtResult:
-    black_pex_get = Get(
-        VenvPex,
-        PexRequest,
-        black.to_pex_request(interpreter_constraints=interpreter_constraints),
+    black_pex_get = create_venv_pex(
+        **implicitly(black.to_pex_request(interpreter_constraints=interpreter_constraints))
     )
-    config_files_get = Get(
-        ConfigFiles, ConfigFilesRequest, black.config_request(request.snapshot.dirs)
+    config_files_get = find_config_file(black.config_request(request.snapshot.dirs))
+    black_pex, config_files = await concurrently(black_pex_get, config_files_get)
+
+    input_digest = await merge_digests(
+        MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
     )
-
-    black_pex, config_files = await MultiGet(black_pex_get, config_files_get)
-
-    input_digest = await Get(
-        Digest, MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
-    )
-
-    result = await Get(
-        ProcessResult,
-        VenvPexProcess(
-            black_pex,
-            argv=(
-                *(("--config", black.config) if black.config else ()),
-                "-W",
-                "{pants_concurrency}",
-                *black.args,
-                *request.files,
-            ),
-            input_digest=input_digest,
-            output_files=request.files,
-            # Note - the cache directory is not used by Pants,
-            # and we pass through a temporary directory to neutralize
-            # Black's caching behavior in favor of Pants' caching.
-            extra_env={"BLACK_CACHE_DIR": "__pants_black_cache"},
-            concurrency_available=len(request.files),
-            description=f"Run Black on {pluralize(len(request.files), 'file')}.",
-            level=LogLevel.DEBUG,
-        ),
+    result = await execute_process_or_raise(
+        **implicitly(
+            VenvPexProcess(
+                black_pex,
+                argv=(
+                    *(("--config", black.config) if black.config else ()),
+                    "-W",
+                    "{pants_concurrency}",
+                    *black.args,
+                    *request.files,
+                ),
+                input_digest=input_digest,
+                output_files=request.files,
+                # Note - the cache directory is not used by Pants,
+                # and we pass through a temporary directory to neutralize
+                # Black's caching behavior in favor of Pants' caching.
+                extra_env={"BLACK_CACHE_DIR": "__pants_black_cache"},
+                concurrency_available=len(request.files),
+                description=f"Run Black on {pluralize(len(request.files), 'file')}.",
+                level=LogLevel.DEBUG,
+            )
+        )
     )
     return await FmtResult.create(request, result)
 
@@ -120,8 +116,8 @@ async def black_fmt(request: BlackRequest.Batch, black: Black) -> FmtResult:
 
 
 def rules():
-    return [
+    return (
         *collect_rules(),
         *BlackRequest.rules(),
         *pex.rules(),
-    ]
+    )
