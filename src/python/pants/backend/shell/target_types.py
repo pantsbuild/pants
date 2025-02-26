@@ -501,6 +501,10 @@ class ShellCommandTestTarget(Target):
         EnvironmentField,
         SkipShellCommandTestsField,
         ShellCommandWorkdirField,
+        ShellCommandOutputFilesField,
+        ShellCommandOutputDirectoriesField,
+        ShellCommandOutputRootDirField,
+        ShellCommandOutputsMatchMode,
     )
     help = help_text(
         """

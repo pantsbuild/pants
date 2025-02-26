@@ -33,7 +33,9 @@ from pants.core.util_rules.adhoc_process_support import (
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
 from pants.core.util_rules.adhoc_process_support import run_prepared_adhoc_process
 from pants.core.util_rules.environments import EnvironmentField
+from pants.engine.fs import EMPTY_DIGEST, Snapshot
 from pants.engine.internals.graph import resolve_target
+from pants.engine.intrinsics import digest_to_snapshot
 from pants.engine.process import InteractiveProcess, ProcessCacheScope
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import Target, WrappedTargetRequest
@@ -99,10 +101,16 @@ async def test_shell_command(
         if result.process_result.exit_code == 0:
             break
 
+    extra_output: Snapshot | None = None
+    if results[-1].adjusted_digest != EMPTY_DIGEST:
+        extra_output = await digest_to_snapshot(results[-1].adjusted_digest)
+
     return TestResult.from_fallible_process_result(
         process_results=tuple(r.process_result for r in results),
         address=field_set.address,
         output_setting=test_subsystem.output,
+        extra_output=extra_output,
+        log_extra_output=extra_output is not None,
     )
 
 
