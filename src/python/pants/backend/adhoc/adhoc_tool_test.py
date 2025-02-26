@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import time
 from pathlib import Path
 from textwrap import dedent
 
@@ -371,7 +370,6 @@ def test_adhoc_tool_workspace_invalidation_sources(rule_runner: PythonRuleRunner
 
     # Update the hash-only source file's content. The adhoc_tool should be re-executed now.
     (Path(rule_runner.build_root) / "src" / "a-file").write_text("xyzzy")
-    time.sleep(0.1)  # wait for invalidation to occur in engine
     result3 = execute_adhoc_tool(rule_runner, address)
     assert result1.snapshot != result3.snapshot
 
