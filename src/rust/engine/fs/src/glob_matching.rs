@@ -28,11 +28,11 @@ pub static DOUBLE_STAR_GLOB: LazyLock<Pattern> =
     LazyLock::new(|| Pattern::new(DOUBLE_STAR).unwrap());
 static MISSING_GLOB_SOURCE: LazyLock<GlobParsedSource> =
     LazyLock::new(|| GlobParsedSource(String::from("")));
-static PATTERN_MATCH_OPTIONS: LazyLock<MatchOptions> = LazyLock::new(|| MatchOptions {
+const PATTERN_MATCH_OPTIONS: MatchOptions = MatchOptions {
     case_sensitive: true,
     require_literal_separator: true,
     require_literal_leading_dot: false,
-});
+};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum PathGlob {
@@ -353,7 +353,7 @@ impl FilespecMatcher {
         let matches_includes = self
             .includes
             .iter()
-            .any(|pattern| pattern.matches_path_with(path, *PATTERN_MATCH_OPTIONS));
+            .any(|pattern| pattern.matches_path_with(path, PATTERN_MATCH_OPTIONS));
         matches_includes && !self.excludes.is_ignored_path(path, false)
     }
 
