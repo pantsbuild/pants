@@ -7,11 +7,12 @@ use std::fmt::Display;
 use std::iter::Iterator;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
+use std::sync::LazyLock;
 
 use async_trait::async_trait;
 use futures::future::{self, TryFutureExt};
 use glob::{MatchOptions, Pattern};
-use lazy_static::lazy_static;
+
 use log::warn;
 use parking_lot::Mutex;
 
@@ -22,16 +23,16 @@ use crate::{
 
 static DOUBLE_STAR: &str = "**";
 
-lazy_static! {
-    pub static ref SINGLE_STAR_GLOB: Pattern = Pattern::new("*").unwrap();
-    pub static ref DOUBLE_STAR_GLOB: Pattern = Pattern::new(DOUBLE_STAR).unwrap();
-    static ref MISSING_GLOB_SOURCE: GlobParsedSource = GlobParsedSource(String::from(""));
-    static ref PATTERN_MATCH_OPTIONS: MatchOptions = MatchOptions {
-        case_sensitive: true,
-        require_literal_separator: true,
-        require_literal_leading_dot: false,
-    };
-}
+pub static SINGLE_STAR_GLOB: LazyLock<Pattern> = LazyLock::new(|| Pattern::new("*").unwrap());
+pub static DOUBLE_STAR_GLOB: LazyLock<Pattern> =
+    LazyLock::new(|| Pattern::new(DOUBLE_STAR).unwrap());
+static MISSING_GLOB_SOURCE: LazyLock<GlobParsedSource> =
+    LazyLock::new(|| GlobParsedSource(String::from("")));
+const PATTERN_MATCH_OPTIONS: MatchOptions = MatchOptions {
+    case_sensitive: true,
+    require_literal_separator: true,
+    require_literal_leading_dot: false,
+};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum PathGlob {
@@ -352,7 +353,7 @@ impl FilespecMatcher {
         let matches_includes = self
             .includes
             .iter()
-            .any(|pattern| pattern.matches_path_with(path, *PATTERN_MATCH_OPTIONS));
+            .any(|pattern| pattern.matches_path_with(path, PATTERN_MATCH_OPTIONS));
         matches_includes && !self.excludes.is_ignored_path(path, false)
     }
 

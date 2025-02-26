@@ -8,11 +8,11 @@ use std::hash::{self, Hash};
 use std::ops::Deref;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
+use std::sync::LazyLock;
 
 use deepsize::{known_deep_size, DeepSizeOf};
 use internment::Intern;
 use itertools::Itertools;
-use lazy_static::lazy_static;
 use log::warn;
 use serde::Serialize;
 
@@ -24,13 +24,11 @@ use protos::require_digest;
 
 use crate::{LinkDepth, PathStat, RelativePath, MAX_LINK_DEPTH};
 
-lazy_static! {
-    pub static ref EMPTY_DIGEST_TREE: DigestTrie = DigestTrie(vec![].into());
-    pub static ref EMPTY_DIRECTORY_DIGEST: DirectoryDigest = DirectoryDigest {
-        digest: EMPTY_DIGEST,
-        tree: Some(EMPTY_DIGEST_TREE.clone()),
-    };
-}
+pub static EMPTY_DIGEST_TREE: LazyLock<DigestTrie> = LazyLock::new(|| DigestTrie(vec![].into()));
+pub static EMPTY_DIRECTORY_DIGEST: LazyLock<DirectoryDigest> = LazyLock::new(|| DirectoryDigest {
+    digest: EMPTY_DIGEST,
+    tree: Some(EMPTY_DIGEST_TREE.clone()),
+});
 
 #[derive(Clone, Copy)]
 pub enum SymlinkBehavior {

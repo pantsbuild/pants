@@ -4,7 +4,7 @@
 use std::collections::{BTreeMap, HashMap};
 use std::iter::FromIterator;
 use std::str::FromStr;
-use std::sync::{Arc, Once};
+use std::sync::{Arc, LazyLock, Once};
 use std::task::{Context, Poll};
 use std::time::Duration;
 
@@ -15,7 +15,6 @@ use http::header::HeaderName;
 use http::{HeaderMap, HeaderValue};
 use hyper::Uri;
 use itertools::Itertools;
-use lazy_static::lazy_static;
 use tokio_rustls::rustls::ClientConfig;
 use tower::limit::ConcurrencyLimit;
 use tower::timeout::{Timeout, TimeoutLayer};
@@ -72,16 +71,15 @@ pub fn layered_service(
         .service(channel)
 }
 
-lazy_static! {
-    static ref METRIC_FOR_REAPI_PATH: Arc<HashMap<String, ObservationMetric>> = {
+static METRIC_FOR_REAPI_PATH: LazyLock<Arc<HashMap<String, ObservationMetric>>> =
+    LazyLock::new(|| {
         let mut m = HashMap::new();
         m.insert(
             "/build.bazel.remote.execution.v2.ActionCache/GetActionResult".to_string(),
             ObservationMetric::RemoteCacheGetActionResultNetworkTimeMicros,
         );
         Arc::new(m)
-    };
-}
+    });
 
 pub async fn create_channel(
     addr: &str,

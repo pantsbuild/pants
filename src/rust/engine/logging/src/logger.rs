@@ -8,21 +8,18 @@ use std::fmt::Write as FmtWrite;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use arc_swap::ArcSwap;
 use chrono::Timelike;
 use colored::*;
-use lazy_static::lazy_static;
 use log::{debug, log, set_logger, set_max_level, Level, LevelFilter, Log, Metadata, Record};
 use parking_lot::Mutex;
 use regex::Regex;
 
 const TIME_FORMAT_STR: &str = "%H:%M:%S";
 
-lazy_static! {
-    pub static ref PANTS_LOGGER: PantsLogger = PantsLogger::new();
-}
+pub static PANTS_LOGGER: LazyLock<PantsLogger> = LazyLock::new(PantsLogger::new);
 
 struct Inner {
     per_run_logs: Mutex<Option<File>>,

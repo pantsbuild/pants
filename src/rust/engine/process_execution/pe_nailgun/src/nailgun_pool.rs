@@ -9,11 +9,11 @@ use std::os::unix::process::ExitStatusExt;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
+use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 
 use async_lock::{Mutex, MutexGuardArc};
 use futures::future;
-use lazy_static::lazy_static;
 use log::debug;
 use regex::Regex;
 use tempfile::TempDir;
@@ -27,9 +27,8 @@ use workunit_store::{in_workunit, Level};
 use process_execution::local::prepare_workdir;
 use process_execution::{NamedCaches, Process, ProcessError};
 
-lazy_static! {
-    static ref NAILGUN_PORT_REGEX: Regex = Regex::new(r".*\s+port\s+(\d+)\.$").unwrap();
-}
+static NAILGUN_PORT_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r".*\s+port\s+(\d+)\.$").unwrap());
 
 struct PoolEntry {
     fingerprint: NailgunProcessFingerprint,
