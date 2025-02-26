@@ -6,7 +6,6 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-futures = { workspace = true }
 tokio = { workspace = true, features = ["macros", "sync"] }
 
 [dev-dependencies]

@@ -8,7 +8,6 @@ publish = false
 [dependencies]
 protos = { path = "../protos" }
 clap = { workspace = true, features = ["derive"] }
-dirs-next = { workspace = true }
 env_logger = { workspace = true }
 fs = { path = "../fs" }
 futures = { workspace = true }
@@ -26,3 +25,6 @@ remote = { path = "../process_execution/remote" }
 
 [lints]
 workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["futures"]

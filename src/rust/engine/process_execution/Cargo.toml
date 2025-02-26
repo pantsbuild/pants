@@ -6,11 +6,8 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-async-stream = { workspace = true }
 async-trait = { workspace = true }
-async-lock = { workspace = true }
 async-oncecell = { workspace = true }
-walkdir = { workspace = true }
 protos = { path = "../protos" }
 bytes = { workspace = true }
 cache = { path = "../cache" }
@@ -24,14 +21,12 @@ libc = { workspace = true }
 log = { workspace = true }
 nails = { workspace = true }
 nix = { workspace = true }
-sha2 = { workspace = true }
 shell-quote = { workspace = true }
 store = { path = "../fs/store" }
 task_executor = { path = "../task_executor" }
 tempfile = { workspace = true }
 concrete_time = { path = "../concrete_time" }
 tokio = { workspace = true, features = ["net", "process", "rt-multi-thread", "sync", "time"] }
-tokio-rustls = { workspace = true }
 tokio-util = { workspace = true, features = ["codec"] }
 uname = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
@@ -42,14 +37,11 @@ parking_lot = { workspace = true }
 itertools = { workspace = true }
 serde = { workspace = true }
 bincode = { workspace = true }
-once_cell = { workspace = true }
-rand = { workspace = true }
 prost = { workspace = true }
 prost-types = { workspace = true }
 shlex = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
-tonic = { workspace = true, features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
 tryfuture = { path = "../tryfuture" }
 
 [dev-dependencies]
@@ -64,3 +56,6 @@ tokio = { workspace = true, features = ["macros"] }
 
 [lints]
 workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["strum"]
