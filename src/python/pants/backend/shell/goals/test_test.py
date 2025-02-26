@@ -72,14 +72,14 @@ def test_basic_usage_of_test_shell_command(rule_runner: RuleRunner) -> None:
                   output_files=["msg.txt"],
                 )
 
-                experimental_test_shell_command(
+                test_shell_command(
                   name="pass",
                   execution_dependencies=[":msg-gen", ":src"],
                   tools=["echo"],
                   command="./test.sh msg.txt message",
                 )
 
-                experimental_test_shell_command(
+                test_shell_command(
                   name="fail",
                   execution_dependencies=[":msg-gen", ":src"],
                   tools=["echo"],
@@ -96,7 +96,7 @@ def test_basic_usage_of_test_shell_command(rule_runner: RuleRunner) -> None:
                     binary_name="test",
                     fingerprint_args=["1", "=", "1"]
                 )
-                experimental_test_shell_command(
+                test_shell_command(
                   name="pass_with_runnable_dependency",
                   execution_dependencies=[":msg-gen", ":src"],
                   tools=["echo"],
@@ -164,7 +164,7 @@ def test_extra_outputs_support(rule_runner: RuleRunner) -> None:
                 """\
                 shell_sources(name="src")
 
-                experimental_test_shell_command(
+                test_shell_command(
                   name="test",
                   execution_dependencies=[":src"],
                   tools=["echo", "mkdir"],
@@ -205,14 +205,14 @@ def test_outputs_match_mode_support(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-            experimental_test_shell_command(
+            test_shell_command(
                 name="allow_empty",
                 command="true",
                 output_files=["non-existent-file"],
                 output_directories=["non-existent-dir"],
                 outputs_match_mode="allow_empty",
             )
-            experimental_test_shell_command(
+            test_shell_command(
                 name="all_with_present_file",
                 command="touch some-file",
                 tools=["touch"],
@@ -220,7 +220,7 @@ def test_outputs_match_mode_support(rule_runner: RuleRunner) -> None:
                 output_directories=["some-directory"],
                 outputs_match_mode="all",
             )
-            experimental_test_shell_command(
+            test_shell_command(
                 name="all_with_present_directory",
                 command="mkdir some-directory",
                 tools=["mkdir"],
@@ -228,7 +228,7 @@ def test_outputs_match_mode_support(rule_runner: RuleRunner) -> None:
                 output_directories=["some-directory"],
                 outputs_match_mode="all",
             )
-            experimental_test_shell_command(
+            test_shell_command(
                 name="at_least_one_with_present_file",
                 command="touch some-file",
                 tools=["touch"],
@@ -236,7 +236,7 @@ def test_outputs_match_mode_support(rule_runner: RuleRunner) -> None:
                 output_directories=["some-directory"],
                 outputs_match_mode="at_least_one",
             )
-            experimental_test_shell_command(
+            test_shell_command(
                 name="at_least_one_with_present_directory",
                 command="mkdir some-directory && touch some-directory/foo.txt",
                 tools=["mkdir", "touch"],
