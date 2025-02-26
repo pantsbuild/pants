@@ -2,17 +2,19 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from pants.backend.visibility.rule_types import BuildFileVisibilityRules
 from pants.backend.visibility.subsystem import VisibilitySubsystem
 from pants.engine.goal import CurrentExecutingGoals
+from pants.engine.internals.build_files import get_dependencies_rule_application
 from pants.engine.internals.dep_rules import (
     BuildFileDependencyRulesImplementation,
     BuildFileDependencyRulesImplementationRequest,
 )
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.target import (
     Dependencies,
-    DependenciesRuleApplication,
     DependenciesRuleApplicationRequest,
     FieldSet,
     ValidatedDependencies,
@@ -50,19 +52,19 @@ async def visibility_validate_dependencies(
         return ValidatedDependencies()
 
     address = request.field_set.address
-    dependencies_rule_action = await Get(
-        DependenciesRuleApplication,
+    dependencies_rule_action = await get_dependencies_rule_application(
         DependenciesRuleApplicationRequest(
             address=address,
             dependencies=request.dependencies,
             description_of_origin=f"get dependency rules for {address}",
         ),
+        **implicitly(),
     )
     dependencies_rule_action.execute_actions()
     return ValidatedDependencies()
 
 
-def rules():
+def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
         UnionRule(
