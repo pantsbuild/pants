@@ -5,25 +5,22 @@ from __future__ import annotations
 import json
 import os
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex_environment import PythonExecutable
+from pants.backend.python.util_rules.pex import find_interpreter
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import FileGlobSpec, RawSpecs
-from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import (
-    HydratedSources,
-    HydrateSourcesRequest,
-    SourcesField,
-    Target,
-    Targets,
-)
+from pants.engine.fs import AddPrefix, CreateDigest, FileContent, MergeDigests
+from pants.engine.internals.graph import hydrate_sources, resolve_targets
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import add_prefix, create_digest, merge_digests
+from pants.engine.process import Process, execute_process_or_raise
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
+from pants.engine.target import HydrateSourcesRequest, SourcesField, Target
 from pants.util.frozendict import FrozenDict
 from pants.util.resources import read_resource
 
@@ -43,7 +40,7 @@ class DjangoApps(FrozenDict[str, DjangoApp]):
     def label_to_file(self) -> FrozenDict[str, str]:
         return FrozenDict((label, app.config_file) for label, app in self.items())
 
-    def add_from_json(self, json_bytes: bytes, strip_prefix="") -> DjangoApps:
+    def add_from_json(self, json_bytes: bytes, strip_prefix: str = "") -> DjangoApps:
         json_dict: dict[str, dict[str, str]] = json.loads(json_bytes.decode())
         apps = {
             label: DjangoApp(
@@ -85,14 +82,14 @@ async def detect_django_apps(python_setup: PythonSetup) -> DjangoApps:
     #  be dep-inferred as a whole via the full package path in settings.py anyway.
     #  In the future we may find a way to map third-party apps here as well.
     django_apps = DjangoApps(FrozenDict())
-    targets = await Get(
-        Targets,
-        RawSpecs,
-        RawSpecs.create(
-            specs=[FileGlobSpec("**/apps.py")],
-            description_of_origin="Django app detection",
-            unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
-        ),
+    targets = await resolve_targets(
+        **implicitly(
+            RawSpecs.create(
+                specs=[FileGlobSpec("**/apps.py")],
+                description_of_origin="Django app detection",
+                unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
+            )
+        )
     )
     if not targets:
         return django_apps
@@ -100,7 +97,7 @@ async def detect_django_apps(python_setup: PythonSetup) -> DjangoApps:
     script_file_content = FileContent(
         "script/__visitor.py", read_resource(__name__, _script_resource)
     )
-    script_digest = await Get(Digest, CreateDigest([script_file_content]))
+    script_digest = await create_digest(CreateDigest([script_file_content]))
     apps_sandbox_prefix = "_apps_to_detect"
 
     # Partition by ICs, so we can run the detector on the appropriate interpreter.
@@ -112,34 +109,30 @@ async def detect_django_apps(python_setup: PythonSetup) -> DjangoApps:
         ics_to_tgts[ics].append(tgt)
 
     for ics, tgts in ics_to_tgts.items():
-        sources = await MultiGet(  # noqa: PNT30: requires triage
-            [Get(HydratedSources, HydrateSourcesRequest(tgt[SourcesField])) for tgt in tgts]
+        sources = await concurrently(  # noqa: PNT30: requires triage
+            [
+                hydrate_sources(HydrateSourcesRequest(tgt[SourcesField]), **implicitly())
+                for tgt in tgts
+            ]
         )
-        apps_digest = await Get(  # noqa: PNT30: requires triage
-            Digest, MergeDigests([src.snapshot.digest for src in sources])
-        )
-        prefixed_apps_digest = await Get(  # noqa: PNT30: requires triage
-            Digest, AddPrefix(apps_digest, apps_sandbox_prefix)
-        )
+        apps_digest = await merge_digests(MergeDigests([src.snapshot.digest for src in sources]))
+        prefixed_apps_digest = await add_prefix(AddPrefix(apps_digest, apps_sandbox_prefix))
 
-        input_digest = await Get(  # noqa: PNT30: requires triage
-            Digest, MergeDigests([prefixed_apps_digest, script_digest])
-        )
-        python_interpreter = await Get(  # noqa: PNT30: requires triage
-            PythonExecutable, InterpreterConstraints, ics
-        )
+        input_digest = await merge_digests(MergeDigests([prefixed_apps_digest, script_digest]))
+        python_interpreter = await find_interpreter(ics, **implicitly())
 
-        process_result = await Get(  # noqa: PNT30: requires triage
-            ProcessResult,
-            Process(
-                argv=[
-                    python_interpreter.path,
-                    script_file_content.path,
-                    apps_sandbox_prefix,
-                ],
-                input_digest=input_digest,
-                description="Detect Django apps",
-            ),
+        process_result = await execute_process_or_raise(
+            **implicitly(
+                Process(
+                    argv=[
+                        python_interpreter.path,
+                        script_file_content.path,
+                        apps_sandbox_prefix,
+                    ],
+                    input_digest=input_digest,
+                    description="Detect Django apps",
+                )
+            )
         )
         django_apps = django_apps.add_from_json(
             process_result.stdout or b"{}", strip_prefix=apps_sandbox_prefix
@@ -148,7 +141,5 @@ async def detect_django_apps(python_setup: PythonSetup) -> DjangoApps:
     return django_apps
 
 
-def rules():
-    return [
-        *collect_rules(),
-    ]
+def rules() -> Iterable[Rule]:
+    return collect_rules()
