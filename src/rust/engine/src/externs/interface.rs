@@ -17,10 +17,8 @@ use std::panic;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
+use std::sync::LazyLock;
 use std::time::Duration;
-use tokio::sync::Mutex;
-
-use lazy_static::lazy_static;
 
 use async_latch::AsyncLatch;
 use fnv::FnvHasher;
@@ -49,6 +47,7 @@ use remote::remote_cache::RemoteCacheWarningsBehavior;
 use rule_graph::{self, RuleGraph};
 use store::RemoteProvider;
 use task_executor::Executor;
+use tokio::sync::Mutex;
 use workunit_store::{
     ArtifactOutput, ObservationMetric, UserMetadataItem, Workunit, WorkunitState, WorkunitStore,
     WorkunitStoreHandle,
@@ -1862,9 +1861,7 @@ fn ensure_path_doesnt_exist(path: &Path) -> io::Result<()> {
     }
 }
 
-lazy_static! {
-    static ref GLOBAL_WORKSPACE_WRITE_LOCK: Mutex<()> = Mutex::new(());
-}
+static GLOBAL_WORKSPACE_WRITE_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 #[pyfunction]
 fn write_digest(

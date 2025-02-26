@@ -6,7 +6,6 @@
 
 use futures::future::{BoxFuture, Future};
 use futures::FutureExt;
-use lazy_static::lazy_static;
 use pyo3::exceptions::{PyAssertionError, PyException, PyStopIteration, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::sync::GILProtected;
@@ -18,6 +17,7 @@ use std::cell::{Ref, RefCell};
 use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::fmt;
+use std::sync::LazyLock;
 
 use logging::PythonLogLevel;
 use rule_graph::RuleId;
@@ -400,9 +400,7 @@ pub fn unsafe_call(py: Python, type_id: TypeId, args: &[Value]) -> Value {
     Value::from(&res)
 }
 
-lazy_static! {
-    pub static ref INTERNS: Interns = Interns::new();
-}
+pub static INTERNS: LazyLock<Interns> = LazyLock::new(Interns::new);
 
 /// Interprets the `Get` and `implicitly(..)` syntax, which reduces to two optional positional
 /// arguments, and results in input types and inputs.

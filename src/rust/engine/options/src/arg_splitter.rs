@@ -3,11 +3,12 @@
 
 use crate::flags::Flag;
 use crate::{GoalInfo, Scope};
-use lazy_static::lazy_static;
+
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
 // These are the names for the built in goals to print help message when there is no goal, or any
 // unknown goals respectively. They begin with underlines to exclude them from the list of goals in
@@ -15,13 +16,13 @@ use std::path::{Path, PathBuf};
 pub const NO_GOAL_NAME: &str = "__no_goal";
 pub const UNKNOWN_GOAL_NAME: &str = "__unknown_goal";
 
-lazy_static! {
-    static ref SPEC_RE: Regex = Regex::new(r"[/\\.:*#]").unwrap();
-    static ref SINGLE_DASH_FLAGS: HashSet<&'static str> = HashSet::from([
+static SPEC_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[/\\.:*#]").unwrap());
+static SINGLE_DASH_FLAGS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+    HashSet::from([
         "-h", "-v", "-V", "-ltrace", "-ldebug", "-linfo", "-lwarn", "-lerror", "-l=trace",
         "-l=debug", "-l=info", "-l=warn", "-l=error",
-    ]);
-}
+    ])
+});
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Args {

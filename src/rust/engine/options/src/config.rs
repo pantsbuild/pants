@@ -5,8 +5,8 @@ use std::any::Any;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
-use lazy_static::lazy_static;
 use regex::Regex;
 use toml::value::Table;
 use toml::Value;
@@ -20,9 +20,8 @@ type InterpolationMap = HashMap<String, String>;
 
 static DEFAULT_SECTION: &str = "DEFAULT";
 
-lazy_static! {
-    static ref PLACEHOLDER_RE: Regex = Regex::new(r"%\(([a-zA-Z0-9_.]+)\)s").unwrap();
-}
+static PLACEHOLDER_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"%\(([a-zA-Z0-9_.]+)\)s").unwrap());
 
 pub(crate) fn interpolate_string(
     value: String,
