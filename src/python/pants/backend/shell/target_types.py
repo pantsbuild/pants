@@ -486,7 +486,11 @@ class ShellCommandRunTarget(Target):
 
 
 class ShellCommandTestTarget(Target):
-    alias = "experimental_test_shell_command"
+    alias = "test_shell_command"
+
+    deprecated_alias = "experimental_test_shell_command"
+    deprecated_alias_removal_version = "2.27.0.dev0"
+
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ShellCommandTestDependenciesField,
@@ -512,15 +516,15 @@ class ShellCommandTestTarget(Target):
 
         Example BUILD file:
 
-            experimental_test_shell_command(
+            test_shell_command(
                 name="test",
                 tools=["test"],
                 command="test -r $CHROOT/some-data-file.txt",
                 execution_dependencies=["src/project/files:data"],
             )
 
-        The `command` may use either `{chroot}` on the command line, or the `$CHROOT`
-        environment variable to get the root directory for where any dependencies are located.
+        The `command` may use the `{chroot}` marked on the command line to get the root directory
+        for where any dependencies are located.
 
         In contrast to the `run_shell_command`, this target is intended to run shell commands as tests
         and will only run them via the `test` goal.
