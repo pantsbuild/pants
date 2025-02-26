@@ -11,6 +11,7 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import FileGlobSpec, RawSpecs
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
@@ -88,7 +89,9 @@ async def detect_django_apps(python_setup: PythonSetup) -> DjangoApps:
         Targets,
         RawSpecs,
         RawSpecs.create(
-            specs=[FileGlobSpec("**/apps.py")], description_of_origin="Django app detection"
+            specs=[FileGlobSpec("**/apps.py")],
+            description_of_origin="Django app detection",
+            unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
         ),
     )
     if not targets:
