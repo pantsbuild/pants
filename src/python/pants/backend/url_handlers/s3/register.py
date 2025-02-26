@@ -35,7 +35,8 @@ async def access_aws_credentials(
     local_environment_name: ChosenLocalEnvironmentName,
 ) -> AWSCredentials:
     try:
-        from botocore import credentials, session
+        from botocore import credentials
+        from botocore import session as boto_session
     except ImportError:
         logger.warning(
             softwrap(
@@ -68,7 +69,7 @@ async def access_aws_credentials(
         },
     )
 
-    session = session.Session()
+    session = boto_session.Session()
 
     aws_profile = env_vars.get("AWS_PROFILE")
     if aws_profile:
