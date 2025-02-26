@@ -490,6 +490,7 @@ class ShellCommandTestTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ShellCommandTestDependenciesField,
+        ShellCommandRunnableDependenciesField,
         ShellCommandCommandField,
         ShellCommandLogOutputField,
         ShellCommandSourcesField,
