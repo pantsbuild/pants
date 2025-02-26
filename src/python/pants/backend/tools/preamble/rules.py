@@ -11,8 +11,9 @@ from typing import Any
 
 from pants.backend.tools.preamble.subsystem import PreambleSubsystem
 from pants.core.goals.fmt import FmtFilesRequest, FmtResult, Partitions
-from pants.engine.fs import CreateDigest, Digest, DigestContents, Snapshot
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.fs import CreateDigest
+from pants.engine.intrinsics import digest_to_snapshot, get_digest_contents
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 
@@ -61,7 +62,7 @@ async def preamble_fmt(
     request: PreambleRequest.Batch, preamble_subsystem: PreambleSubsystem
 ) -> FmtResult:
     template_by_path = preamble_subsystem.get_template_by_path(request.snapshot.files)
-    digest_contents = await Get(DigestContents, Digest, request.snapshot.digest)
+    digest_contents = await get_digest_contents(request.snapshot.digest)
     contents_by_path = {file_content.path: file_content for file_content in digest_contents}
 
     for path, template in template_by_path.items():
@@ -78,7 +79,9 @@ async def preamble_fmt(
                 contents_by_path[path], content=new_content.encode("utf-8")
             )
 
-    output_snapshot = await Get(Snapshot, CreateDigest(contents_by_path.values()))
+    output_snapshot = await digest_to_snapshot(
+        **implicitly(CreateDigest(contents_by_path.values()))
+    )
 
     return FmtResult(
         input=request.snapshot,
@@ -90,7 +93,7 @@ async def preamble_fmt(
 
 
 def rules():
-    return [
+    return (
         *collect_rules(),
         *PreambleRequest.rules(),
-    ]
+    )
