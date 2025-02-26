@@ -17,15 +17,18 @@ from pants.backend.python.util_rules import python_sources
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
-    StrippedPythonSourceFiles,
+    strip_python_sources,
 )
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.engine.addresses import Addresses, UnparsedAddressInputs
+from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.fs import AddPrefix, Digest
+from pants.engine.internals.graph import resolve_unparsed_address_inputs
+from pants.engine.internals.graph import transitive_targets as transitive_targets_get
 from pants.engine.internals.native_engine import EMPTY_DIGEST
-from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import FieldSet, Target, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.intrinsics import add_prefix
+from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.target import FieldSet, Target, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.option_types import (
     ArgsListOption,
@@ -172,9 +175,11 @@ async def flake8_first_party_plugins(flake8: Flake8) -> Flake8FirstPartyPlugins:
     if not flake8.source_plugins:
         return Flake8FirstPartyPlugins(FrozenOrderedSet(), FrozenOrderedSet(), EMPTY_DIGEST)
 
-    plugin_target_addresses = await Get(Addresses, UnparsedAddressInputs, flake8.source_plugins)
-    transitive_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequest(plugin_target_addresses)
+    plugin_target_addresses = await resolve_unparsed_address_inputs(
+        flake8.source_plugins, **implicitly()
+    )
+    transitive_targets = await transitive_targets_get(
+        TransitiveTargetsRequest(plugin_target_addresses), **implicitly()
     )
 
     requirements_fields: OrderedSet[PythonRequirementsField] = OrderedSet()
@@ -190,14 +195,13 @@ async def flake8_first_party_plugins(flake8: Flake8) -> Flake8FirstPartyPlugins:
     # `flake8:local-plugins` values take a module name rather than a path to the module;
     # i.e. `plugin`, but not `path/to/plugin`.
     # (This means users must have specified the parent directory as a source root.)
-    stripped_sources = await Get(
-        StrippedPythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure)
+    stripped_sources = await strip_python_sources(
+        **implicitly(PythonSourceFilesRequest(transitive_targets.closure))
     )
-    prefixed_sources = await Get(
-        Digest,
+    prefixed_sources = await add_prefix(
         AddPrefix(
             stripped_sources.stripped_source_files.snapshot.digest, Flake8FirstPartyPlugins.PREFIX
-        ),
+        )
     )
 
     return Flake8FirstPartyPlugins(
