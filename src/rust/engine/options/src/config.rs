@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
 use regex::Regex;
-use toml::value::Table;
 use toml::Value;
+use toml::value::Table;
 
 use super::{DictEdit, DictEditAction, ListEdit, ListEditAction, OptionsSource, Val};
 use crate::fromfile::FromfileExpander;

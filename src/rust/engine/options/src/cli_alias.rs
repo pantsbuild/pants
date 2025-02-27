@@ -34,7 +34,8 @@ fn validate_alias(
             if args.contains(alias) {
                 return Err(format!(
                     "Invalid alias in `[cli].alias` option: {}. This is already a registered flag in the {} scope.",
-                    alias, Scope::named(scope).name()
+                    alias,
+                    Scope::named(scope).name()
                 ));
             }
         }

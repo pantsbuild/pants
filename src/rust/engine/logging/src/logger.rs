@@ -13,7 +13,7 @@ use std::sync::{Arc, LazyLock};
 use arc_swap::ArcSwap;
 use chrono::Timelike;
 use colored::*;
-use log::{debug, log, set_logger, set_max_level, Level, LevelFilter, Log, Metadata, Record};
+use log::{Level, LevelFilter, Log, Metadata, Record, debug, log, set_logger, set_max_level};
 use parking_lot::Mutex;
 use regex::Regex;
 

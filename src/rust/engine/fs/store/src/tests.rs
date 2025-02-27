@@ -10,8 +10,8 @@ use testutil::data::{TestData, TestDirectory};
 
 use bytes::Bytes;
 use fs::{
-    DigestEntry, DirectoryDigest, FileEntry, Link, PathStat, Permissions, RelativePath,
-    EMPTY_DIRECTORY_DIGEST,
+    DigestEntry, DirectoryDigest, EMPTY_DIRECTORY_DIGEST, FileEntry, Link, PathStat, Permissions,
+    RelativePath,
 };
 use grpc_util::prost::MessageExt;
 use grpc_util::tls;
@@ -22,8 +22,8 @@ use workunit_store::WorkunitStore;
 
 use crate::local::ByteStore;
 use crate::{
-    EntryType, FileContent, RemoteProvider, RemoteStoreOptions, Snapshot, Store, StoreError,
-    StoreFileByDigest, UploadSummary, MEGABYTES,
+    EntryType, FileContent, MEGABYTES, RemoteProvider, RemoteStoreOptions, Snapshot, Store,
+    StoreError, StoreFileByDigest, UploadSummary,
 };
 
 pub(crate) const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
@@ -1450,8 +1450,8 @@ fn assert_same_digest_entries(left: Vec<DigestEntry>, right: Vec<DigestEntry>) {
                 if path_left != path_right {
                     success = false;
                     eprintln!(
-            "Paths did not match for empty directory at index {index}: {path_left:?}, {path_right:?}"
-          );
+                        "Paths did not match for empty directory at index {index}: {path_left:?}, {path_right:?}"
+                    );
                 }
             }
             (l, r) => {

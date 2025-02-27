@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::future;
 use grpc_util::prost::MessageExt;
-use hashing::{async_verified_copy, Digest, Fingerprint, EMPTY_DIGEST};
+use hashing::{Digest, EMPTY_DIGEST, Fingerprint, async_verified_copy};
 use http::header::AUTHORIZATION;
 use opendal::layers::{ConcurrentLimitLayer, RetryLayer, TimeoutLayer};
 use opendal::{Builder, Operator};

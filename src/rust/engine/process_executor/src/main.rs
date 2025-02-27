@@ -14,8 +14,8 @@ use clap::StructOpt;
 use fs::{DirectoryDigest, Permissions, RelativePath};
 use hashing::{Digest, Fingerprint};
 use process_execution::{
-    local::KeepSandboxes, CacheContentBehavior, Context, InputDigests, NamedCaches, Platform,
-    ProcessCacheScope, ProcessExecutionEnvironment, ProcessExecutionStrategy,
+    CacheContentBehavior, Context, InputDigests, NamedCaches, Platform, ProcessCacheScope,
+    ProcessExecutionEnvironment, ProcessExecutionStrategy, local::KeepSandboxes,
 };
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
@@ -24,7 +24,7 @@ use protos::require_digest;
 use remote::remote_cache::RemoteCacheRunnerOptions;
 use store::{ImmutableInputs, RemoteProvider, RemoteStoreOptions, Store};
 use tokio::sync::RwLock;
-use workunit_store::{in_workunit, Level, WorkunitStore};
+use workunit_store::{Level, WorkunitStore, in_workunit};
 
 #[derive(Clone, Debug, Default)]
 struct ProcessMetadata {
@@ -314,7 +314,9 @@ async fn main() {
                 (Some(certs), Some(key)) => Some((certs, key)),
                 (None, None) => None,
                 _ => {
-                    panic!("Must specify both --cas-client-certs-file and --cas-client-key-file or neither")
+                    panic!(
+                        "Must specify both --cas-client-certs-file and --cas-client-key-file or neither"
+                    )
                 }
             };
 

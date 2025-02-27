@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::mem;
 use std::pin::pin;
-use std::sync::{atomic, Arc};
+use std::sync::{Arc, atomic};
 
 use crate::context::{Context, DepState};
 use crate::node::{EntryId, Node, NodeError};

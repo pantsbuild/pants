@@ -8,14 +8,14 @@ use std::fmt::Debug;
 use std::fs::File;
 use std::io::Write;
 
-use crate::config::{interpolate_string, ConfigSource};
+use crate::config::{ConfigSource, interpolate_string};
 use crate::{
-    option_id, DictEdit, DictEditAction, ListEdit, ListEditAction, OptionId, OptionsSource, Val,
+    DictEdit, DictEditAction, ListEdit, ListEditAction, OptionId, OptionsSource, Val, option_id,
 };
 
 use crate::config::{Config, ConfigReader};
-use crate::fromfile::test_util::write_fromfile;
 use crate::fromfile::FromfileExpander;
+use crate::fromfile::test_util::write_fromfile;
 use tempfile::TempDir;
 
 fn maybe_config(file_content: &str) -> Result<ConfigReader, String> {

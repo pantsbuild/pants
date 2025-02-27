@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 use libc::pid_t;
 use log::debug;
-use options::{option_id, BuildRoot, OptionId, OptionParser, OptionType};
+use options::{BuildRoot, OptionId, OptionParser, OptionType, option_id};
 use sha2::digest::Update;
 use sha2::{Digest, Sha256};
 use sysinfo::{ProcessExt, ProcessStatus, System, SystemExt};

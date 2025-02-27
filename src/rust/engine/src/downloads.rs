@@ -10,17 +10,17 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use bytes::{BufMut, Bytes};
-use futures::stream::StreamExt;
 use futures::TryFutureExt;
+use futures::stream::StreamExt;
 use hashing::Digest;
-use humansize::{file_size_opts, FileSize};
-use reqwest::header::{HeaderMap, HeaderName};
+use humansize::{FileSize, file_size_opts};
 use reqwest::Error;
+use reqwest::header::{HeaderMap, HeaderName};
 use store::Store;
-use tokio_retry2::{strategy::ExponentialFactorBackoff, Retry, RetryError};
+use tokio_retry2::{Retry, RetryError, strategy::ExponentialFactorBackoff};
 use url::Url;
 
-use workunit_store::{in_workunit, Level};
+use workunit_store::{Level, in_workunit};
 
 #[derive(Debug)]
 enum StreamingError {
@@ -287,13 +287,13 @@ mod tests {
         net::SocketAddr,
         num::NonZeroUsize,
         sync::{
-            atomic::{AtomicU32, Ordering},
             Arc,
+            atomic::{AtomicU32, Ordering},
         },
         time::Duration,
     };
 
-    use axum::{extract::State, response::IntoResponse, routing::get, Router};
+    use axum::{Router, extract::State, response::IntoResponse, routing::get};
     use hashing::Digest;
     use maplit::hashset;
     use reqwest::StatusCode;

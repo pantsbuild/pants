@@ -22,7 +22,7 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use hashing::Fingerprint;
 use store::{ImmutableInputs, Store};
 use task_executor::Executor;
-use workunit_store::{in_workunit, Level};
+use workunit_store::{Level, in_workunit};
 
 use process_execution::local::prepare_workdir;
 use process_execution::{NamedCaches, Process, ProcessError};

@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use deepsize::DeepSizeOf;
-use futures::{future, FutureExt};
+use futures::{FutureExt, future};
 use log::debug;
 use tokio::time;
 

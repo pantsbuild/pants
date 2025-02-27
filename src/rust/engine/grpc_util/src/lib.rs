@@ -16,11 +16,11 @@ use http::{HeaderMap, HeaderValue};
 use hyper::Uri;
 use itertools::Itertools;
 use tokio_rustls::rustls::ClientConfig;
+use tower::ServiceBuilder;
 use tower::limit::ConcurrencyLimit;
 use tower::timeout::{Timeout, TimeoutLayer};
-use tower::ServiceBuilder;
 use tower_service::Service;
-use workunit_store::{increment_counter_if_in_workunit, Metric, ObservationMetric};
+use workunit_store::{Metric, ObservationMetric, increment_counter_if_in_workunit};
 
 use crate::channel::Channel;
 use crate::headers::{SetRequestHeaders, SetRequestHeadersLayer};
@@ -199,8 +199,8 @@ mod tests {
                             Ok(Response::new(gen::Output {}))
                         } else {
                             Err(Status::invalid_argument(format!(
-                "user-agent header did not contain expected value: actual={user_agent}"
-              )))
+                                "user-agent header did not contain expected value: actual={user_agent}"
+                            )))
                         }
                     }
                     None => Err(Status::invalid_argument("user-agent header was not set")),

@@ -10,7 +10,7 @@ use futures::{FutureExt, TryFutureExt};
 use parking_lot::Mutex;
 use serde::Serialize;
 
-use fs::{default_cache_path, RelativePath};
+use fs::{RelativePath, default_cache_path};
 use store::WorkdirSymlink;
 
 #[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize)]
@@ -25,8 +25,8 @@ impl CacheName {
             Ok(CacheName(name))
         } else {
             Err(format!(
-        "Cache names may only contain lowercase alphanumeric characters or underscores: got {name:?}"
-      ))
+                "Cache names may only contain lowercase alphanumeric characters or underscores: got {name:?}"
+            ))
         }
     }
 
@@ -61,9 +61,9 @@ impl NamedCaches {
     pub fn new(
         base_path: PathBuf,
         initializer: impl Fn(&Path) -> futures::future::BoxFuture<Result<(), String>>
-            + Send
-            + Sync
-            + 'static,
+        + Send
+        + Sync
+        + 'static,
     ) -> Self {
         Self(Arc::new(Inner {
             base_path,

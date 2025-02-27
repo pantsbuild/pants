@@ -13,7 +13,7 @@ use mock::execution_server::{ExpectedAPICall, MockOperation};
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::gen::google::longrunning::Operation;
-use remexec::{execution_stage::Value as ExecutionStageValue, ExecutedActionMetadata};
+use remexec::{ExecutedActionMetadata, execution_stage::Value as ExecutionStageValue};
 use store::{RemoteProvider, RemoteStoreOptions, SnapshotOps, Store, StoreError};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
@@ -22,7 +22,7 @@ use tokio::time::{sleep, timeout};
 use workunit_store::{Level, RunId, RunningWorkunit, WorkunitStore};
 
 use crate::remote::{CommandRunner, ExecutionError, OperationOrStatus};
-use fs::{DirectoryDigest, RelativePath, SymlinkBehavior, EMPTY_DIRECTORY_DIGEST};
+use fs::{DirectoryDigest, EMPTY_DIRECTORY_DIGEST, RelativePath, SymlinkBehavior};
 use process_execution::{
     CacheName, CommandRunner as CommandRunnerTrait, Context, EntireExecuteRequest,
     FallibleProcessResultWithPlatform, InputDigests, Platform, Process, ProcessCacheScope,
@@ -1677,9 +1677,11 @@ async fn initial_response_missing_response_and_error() {
         .await
         .expect_err("Want Err");
 
-    assert!(result
-        .to_string()
-        .ends_with("Operation finished but no response supplied"));
+    assert!(
+        result
+            .to_string()
+            .ends_with("Operation finished but no response supplied")
+    );
 }
 
 #[tokio::test]

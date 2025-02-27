@@ -3,12 +3,12 @@
 
 use pyo3::exceptions::PyException;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
-use pyo3::{prelude::*, BoundObject};
+use pyo3::{BoundObject, prelude::*};
 
 use options::{
-    apply_dict_edits, apply_list_edits, bin_name, Args, ConfigSource, DictEdit, DictEditAction,
-    Env, GoalInfo, ListEdit, ListEditAction, ListOptionValue, OptionId, OptionParser,
-    OptionalOptionValue, PantsCommand, Scope, Source, Val,
+    Args, ConfigSource, DictEdit, DictEditAction, Env, GoalInfo, ListEdit, ListEditAction,
+    ListOptionValue, OptionId, OptionParser, OptionalOptionValue, PantsCommand, Scope, Source, Val,
+    apply_dict_edits, apply_list_edits, bin_name,
 };
 
 use itertools::Itertools;
@@ -166,7 +166,7 @@ impl PyOptionId {
                 return Err(ParseError::new_err(format!(
                     "Switch value should contain a single character, but was: {}",
                     s
-                )))
+                )));
             }
         };
         let option_id =

@@ -2,15 +2,15 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::ops::Deref;
-use std::sync::atomic::{self, AtomicU32, AtomicUsize};
 use std::sync::Arc;
+use std::sync::atomic::{self, AtomicU32, AtomicUsize};
 
 use parking_lot::Mutex;
 use workunit_store::RunId;
 
+use crate::Graph;
 use crate::entry::Generation;
 use crate::node::{CompoundNode, EntryId, Node, NodeError};
-use crate::Graph;
 
 struct InnerContext<N: Node + Send> {
     context: N::Context,

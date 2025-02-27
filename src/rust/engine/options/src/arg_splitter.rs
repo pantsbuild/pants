@@ -41,11 +41,11 @@ impl Args {
     pub fn argv() -> Self {
         let mut args = env::args().collect::<Vec<_>>().into_iter();
         args.next(); // Consume the process name (argv[0]).
-                     // TODO: In Pants's own integration tests we may invoke Pants in a subprocess via
-                     //  `python -m pants` or `python path/to/__main__.py` or similar. So
-                     //  skipping argv[0] may not be sufficient to get just the set of args to split.
-                     //  In practice our tests pass despite these extra args being interpreted as specs
-                     //  or goals, but that is skating on thin ice.
+        // TODO: In Pants's own integration tests we may invoke Pants in a subprocess via
+        //  `python -m pants` or `python path/to/__main__.py` or similar. So
+        //  skipping argv[0] may not be sufficient to get just the set of args to split.
+        //  In practice our tests pass despite these extra args being interpreted as specs
+        //  or goals, but that is skating on thin ice.
         Self::new(args.collect::<Vec<_>>())
     }
 }
