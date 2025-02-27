@@ -523,8 +523,8 @@ class ShellCommandTestTarget(Target):
                 execution_dependencies=["src/project/files:data"],
             )
 
-        The `command` may use the `{chroot}` marked on the command line to get the root directory
-        for where any dependencies are located.
+        The `command` may use the `{chroot}` marker on the command line or in environment variables
+        to get the root directory where any dependencies are materialized during execution.
 
         In contrast to the `run_shell_command`, this target is intended to run shell commands as tests
         and will only run them via the `test` goal.
