@@ -264,7 +264,7 @@ internment = "0.6"
 itertools = "0.10"
 libc = "0.2.137"
 lmdb-rkv = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "6ae7a552aa2c932c3ddf652a68cdde2fed547cbc" }
-log = "0.4.20"
+log = "0.4.26"
 madvise = "0.1"
 maplit = "1.0.1"
 nails = "0.13"
