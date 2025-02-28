@@ -10,13 +10,13 @@ use async_trait::async_trait;
 use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt};
 use log::{debug, trace};
-use nails::execution::{self, child_channel, ChildInput, Command};
+use nails::execution::{self, ChildInput, Command, child_channel};
 use store::{ImmutableInputs, Store};
 use task_executor::Executor;
 use tokio::net::TcpStream;
-use workunit_store::{in_workunit, Metric, RunningWorkunit};
+use workunit_store::{Metric, RunningWorkunit, in_workunit};
 
-use process_execution::local::{prepare_workdir, CapturedWorkdir, ChildOutput};
+use process_execution::local::{CapturedWorkdir, ChildOutput, prepare_workdir};
 use process_execution::{
     Context, FallibleProcessResultWithPlatform, InputDigests, NamedCaches, Process, ProcessError,
 };

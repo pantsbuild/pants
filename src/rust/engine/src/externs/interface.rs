@@ -23,25 +23,25 @@ use std::time::Duration;
 use async_latch::AsyncLatch;
 use fnv::FnvHasher;
 use fs::DirectoryDigest;
-use futures::future::{self, FutureExt};
 use futures::Future;
+use futures::future::{self, FutureExt};
 use hashing::Digest;
-use log::{self, debug, error, warn, Log};
+use log::{self, Log, debug, error, warn};
 use logging::logger::PANTS_LOGGER;
 use logging::{Logger, PythonLogLevel};
 use petgraph::graph::{DiGraph, Graph};
 use process_execution::CacheContentBehavior;
 use pyo3::exceptions::{PyException, PyIOError, PyKeyboardInterrupt, PyValueError};
 use pyo3::prelude::{
-    pyclass, pyfunction, pymethods, pymodule, wrap_pyfunction, PyModule, PyObject,
-    PyResult as PyO3Result, Python,
+    PyModule, PyObject, PyResult as PyO3Result, Python, pyclass, pyfunction, pymethods, pymodule,
+    wrap_pyfunction,
 };
 use pyo3::sync::GILProtected;
 use pyo3::types::{
     PyAnyMethods, PyBytes, PyDict, PyDictMethods, PyList, PyListMethods, PyModuleMethods, PyTuple,
     PyType,
 };
-use pyo3::{create_exception, Bound, IntoPyObject, PyAny, PyRef};
+use pyo3::{Bound, IntoPyObject, PyAny, PyRef, create_exception};
 use regex::Regex;
 use remote::remote_cache::RemoteCacheWarningsBehavior;
 use rule_graph::{self, RuleGraph};
@@ -53,13 +53,13 @@ use workunit_store::{
     WorkunitStoreHandle,
 };
 
-use crate::externs::fs::{possible_store_missing_digest, PyFileDigest};
+use crate::externs::fs::{PyFileDigest, possible_store_missing_digest};
 use crate::externs::process::PyProcessExecutionEnvironment;
 use crate::intrinsics;
 use crate::{
-    externs, nodes, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination,
-    Failure, Function, Key, LocalStoreOptions, Params, RemotingOptions, Rule, Scheduler, Session,
-    SessionCore, Tasks, TypeId, Types, Value,
+    Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination, Failure, Function, Key,
+    LocalStoreOptions, Params, RemotingOptions, Rule, Scheduler, Session, SessionCore, Tasks,
+    TypeId, Types, Value, externs, nodes,
 };
 
 #[pymodule]

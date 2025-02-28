@@ -10,7 +10,7 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::sync::LazyLock;
 
-use deepsize::{known_deep_size, DeepSizeOf};
+use deepsize::{DeepSizeOf, known_deep_size};
 use internment::Intern;
 use itertools::Itertools;
 use log::warn;
@@ -22,7 +22,7 @@ use hashing::{Digest, EMPTY_DIGEST};
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 
-use crate::{LinkDepth, PathStat, RelativePath, MAX_LINK_DEPTH};
+use crate::{LinkDepth, MAX_LINK_DEPTH, PathStat, RelativePath};
 
 pub static EMPTY_DIGEST_TREE: LazyLock<DigestTrie> = LazyLock::new(|| DigestTrie(vec![].into()));
 pub static EMPTY_DIRECTORY_DIGEST: LazyLock<DirectoryDigest> = LazyLock::new(|| DirectoryDigest {
@@ -656,7 +656,10 @@ impl DigestTrie {
                                     break;
                                 }
                             }
-                            warn!("Exceeded the maximum link depth while traversing link {:#?} to path {:#?}. Stopping traversal.", logical_path, s.target);
+                            warn!(
+                                "Exceeded the maximum link depth while traversing link {:#?} to path {:#?}. Stopping traversal.",
+                                logical_path, s.target
+                            );
                             return;
                         }
                         self.walk_helper(root, path.clone(), symlink_behavior, link_depth, f);
@@ -885,7 +888,7 @@ impl DigestTrie {
                             String::new()
                         },
                         format_entries(&extra_directories, &files, &symlinks),
-                    ))
+                    ));
                 }
                 (Some(d), true) => {
                     already_stripped = already_stripped.join(component_to_strip);
@@ -964,7 +967,10 @@ impl DigestTrie {
 
             if let Some(Entry::Symlink(s)) = maybe_matching_entry {
                 if link_depth >= MAX_LINK_DEPTH {
-                    warn!("Exceeded the maximum link depth while traversing link {:#?} to path {:#?}. Stopping traversal.", logical_path, s.target);
+                    warn!(
+                        "Exceeded the maximum link depth while traversing link {:#?} to path {:#?}. Stopping traversal.",
+                        logical_path, s.target
+                    );
                     return Ok(None);
                 }
 

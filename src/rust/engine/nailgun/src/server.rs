@@ -13,14 +13,14 @@ use std::sync::Arc;
 use async_latch::AsyncLatch;
 use bytes::Bytes;
 use futures::channel::oneshot;
-use futures::{future, sink, stream, FutureExt, SinkExt, StreamExt, TryStreamExt};
+use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt, future, sink, stream};
 use log::{debug, info};
-use nails::execution::{self, child_channel, sink_for, ChildInput, ChildOutput, ExitCode};
 use nails::Nail;
+use nails::execution::{self, ChildInput, ChildOutput, ExitCode, child_channel, sink_for};
 use task_executor::Executor;
 use tokio::fs::File;
 use tokio::net::TcpListener;
-use tokio::sync::{mpsc, Notify, RwLock};
+use tokio::sync::{Notify, RwLock, mpsc};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 pub struct Server {

@@ -8,10 +8,10 @@ use std::ffi::OsString;
 
 use super::id::{NameTransform, OptionId};
 use super::{DictEdit, OptionsSource};
+use crate::ListEdit;
 use crate::fromfile::FromfileExpander;
 use crate::parse::Parseable;
 use crate::scope::Scope;
-use crate::ListEdit;
 
 #[derive(Debug)]
 pub struct Env {

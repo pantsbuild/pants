@@ -4,25 +4,25 @@
 use std::any::Any;
 use std::cell::RefCell;
 use std::cmp::Reverse;
-use std::collections::{hash_map, BinaryHeap, HashMap, HashSet};
+use std::collections::{BinaryHeap, HashMap, HashSet, hash_map};
 use std::fmt::Debug;
 use std::future::Future;
-use std::sync::atomic::{self, AtomicBool};
 use std::sync::Arc;
+use std::sync::atomic::{self, AtomicBool};
 use std::time::{Duration, SystemTime};
 
 use bytes::{BufMut, Bytes, BytesMut};
 use concrete_time::TimeSpan;
 use deepsize::DeepSizeOf;
 use hdrhistogram::serialization::Serializer;
-use log::log;
 pub use log::Level;
+use log::log;
 pub use metrics::{Metric, ObservationMetric};
 use parking_lot::Mutex;
 use petgraph::stable_graph::{NodeIndex, StableDiGraph};
 use petgraph::visit::{VisitMap, Visitable};
-use rand::thread_rng;
 use rand::Rng;
+use rand::thread_rng;
 use smallvec::SmallVec;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::task_local;
@@ -769,9 +769,7 @@ impl WorkunitStore {
 
 #[macro_export]
 macro_rules! format_workunit_duration_ms {
-    ($workunit_duration_ms:expr) => {{
-        format_args!("{:.2}s", ($workunit_duration_ms as f64) / 1000.0)
-    }};
+    ($workunit_duration_ms:expr) => {{ format_args!("{:.2}s", ($workunit_duration_ms as f64) / 1000.0) }};
 }
 
 ///

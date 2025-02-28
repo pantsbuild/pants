@@ -2,8 +2,8 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::fmt;
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 use deepsize::DeepSizeOf;
 use futures::future::{self, BoxFuture, FutureExt};
@@ -13,13 +13,13 @@ use pyo3::prelude::{PyAnyMethods, PyErr, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use pyo3::{Bound, IntoPyObject};
 use rule_graph::DependencyKey;
-use workunit_store::{in_workunit, Level, RunningWorkunit};
+use workunit_store::{Level, RunningWorkunit, in_workunit};
 
-use super::{select, task_context, NodeKey, NodeResult, Params};
+use super::{NodeKey, NodeResult, Params, select, task_context};
 use crate::context::Context;
 use crate::externs::engine_aware::EngineAwareReturnType;
 use crate::externs::{self, GeneratorInput, GeneratorResponse};
-use crate::python::{throw, Failure, Key, TypeId, Value};
+use crate::python::{Failure, Key, TypeId, Value, throw};
 use crate::tasks::{self, Rule};
 
 #[derive(DeepSizeOf, Derivative, Clone)]

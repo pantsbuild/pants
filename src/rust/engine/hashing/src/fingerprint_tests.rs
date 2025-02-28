@@ -1,7 +1,7 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use crate::Fingerprint;
-use serde_test::{assert_ser_tokens, Token};
+use serde_test::{Token, assert_ser_tokens};
 
 #[test]
 fn from_bytes_unsafe() {

@@ -4,8 +4,8 @@
 use crate::config::ConfigSource;
 use crate::flags::Flag;
 use crate::{
-    munge_bin_name, option_id, Args, BuildRoot, DictEdit, DictEditAction, Env, GoalInfo, ListEdit,
-    ListEditAction, OptionParser, Scope, Source, Val,
+    Args, BuildRoot, DictEdit, DictEditAction, Env, GoalInfo, ListEdit, ListEditAction,
+    OptionParser, Scope, Source, Val, munge_bin_name, option_id,
 };
 use itertools::Itertools;
 use maplit::{hashmap, hashset};

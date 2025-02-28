@@ -297,13 +297,13 @@ impl AddressInput {
                     // AddressSpec constructor because we weren't sure if the path_spec referred to a file
                     // vs. a directory.
                     return Err(InvalidTargetNameError::new_err(format!(
-            "Addresses for generated first-party targets in the build root must include \
+                        "Addresses for generated first-party targets in the build root must include \
              which target generator they come from, such as `{}:original_target`. However, \
              `{}` from {} did not have a target name.",
-            self.path_component.display(),
-            self.original_spec,
-            self.description_of_origin,
-          )));
+                        self.path_component.display(),
+                        self.original_spec,
+                        self.description_of_origin,
+                    )));
                 }
             }
         };
@@ -472,12 +472,12 @@ impl Address {
                 .collect::<Vec<_>>();
             if !banned.is_empty() {
                 return Err(InvalidTargetNameError::new_err(format!(
-          "The generated name `{generated_name}` (defined in directory {}, the part after \
+                    "The generated name `{generated_name}` (defined in directory {}, the part after \
           `#`) contains banned characters (`{}`). Please replace \
            these characters with another separator character like `_`, `-`, or `/`.",
-          spec_path.display(),
-          banned.join(","),
-        )));
+                    spec_path.display(),
+                    banned.join(","),
+                )));
             }
         }
 

@@ -180,11 +180,13 @@ async fn store_bytes_empty() {
         .unwrap();
 
     // We don't actually store an empty file.
-    assert!(!provider
-        .operator
-        .exists(&test_path(&testdata))
-        .await
-        .unwrap());
+    assert!(
+        !provider
+            .operator
+            .exists(&test_path(&testdata))
+            .await
+            .unwrap()
+    );
 }
 
 #[tokio::test]
@@ -235,11 +237,13 @@ async fn store_file_empty_file() {
         .unwrap();
 
     // We don't actually store an empty file.
-    assert!(!provider
-        .operator
-        .exists(&test_path(&testdata))
-        .await
-        .unwrap());
+    assert!(
+        !provider
+            .operator
+            .exists(&test_path(&testdata))
+            .await
+            .unwrap()
+    );
 }
 
 #[tokio::test]

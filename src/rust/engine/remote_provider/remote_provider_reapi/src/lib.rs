@@ -2,8 +2,8 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use tonic::metadata::BinaryMetadataValue;
 use tonic::Request;
+use tonic::metadata::BinaryMetadataValue;
 
 use grpc_util::prost::MessageExt;
 

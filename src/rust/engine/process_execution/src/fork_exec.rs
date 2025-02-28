@@ -56,11 +56,11 @@ pub async fn spawn_process(
                         continue;
                     } else if retries > 0 {
                         break Err(format!(
-            "Error launching process after {} {} for ETXTBSY. Final error was: {:?}",
-            retries,
-            if retries == 1 { "retry" } else { "retries" },
-            e
-        ));
+                            "Error launching process after {} {} for ETXTBSY. Final error was: {:?}",
+                            retries,
+                            if retries == 1 { "retry" } else { "retries" },
+                            e
+                        ));
                     } else {
                         break Err(format!("Error launching process: {e:?}"));
                     }

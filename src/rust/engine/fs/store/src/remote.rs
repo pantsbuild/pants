@@ -10,10 +10,10 @@ use futures::Future;
 use hashing::Digest;
 use log::Level;
 use remote_provider::{
-    choose_byte_store_provider, ByteStoreProvider, LoadDestination, RemoteStoreOptions,
+    ByteStoreProvider, LoadDestination, RemoteStoreOptions, choose_byte_store_provider,
 };
 use tokio::fs::File;
-use workunit_store::{in_workunit, Metric, ObservationMetric};
+use workunit_store::{Metric, ObservationMetric, in_workunit};
 
 #[derive(Clone)]
 pub struct ByteStore {

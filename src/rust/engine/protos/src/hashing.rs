@@ -2,8 +2,8 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::hash::{Hash, Hasher};
 
-use crate::gen::pants::cache::dependency_inference_request::Metadata;
 use crate::gen::pants::cache::JavascriptInferenceMetadata;
+use crate::gen::pants::cache::dependency_inference_request::Metadata;
 
 impl Hash for JavascriptInferenceMetadata {
     fn hash<H: Hasher>(&self, state: &mut H) {

@@ -3,7 +3,7 @@
 
 use crate::rules::{CallSignature, DependencyKey, ParamTypes, Query, Rule, RuleId};
 use crate::{
-    params_str, Entry, EntryWithDeps, Reentry, RootEntry, RuleEdges, RuleEntry, RuleGraph,
+    Entry, EntryWithDeps, Reentry, RootEntry, RuleEdges, RuleEntry, RuleGraph, params_str,
 };
 
 use std::borrow::Cow;
@@ -13,9 +13,9 @@ use fnv::{FnvHashMap as HashMap, FnvHashSet as HashSet};
 use indexmap::IndexSet;
 use internment::Intern;
 use itertools::Itertools;
+use petgraph::Direction;
 use petgraph::graph::{DiGraph, EdgeReference, NodeIndex};
 use petgraph::visit::{DfsPostOrder, EdgeRef, IntoNodeReferences, NodeRef, VisitMap, Visitable};
-use petgraph::Direction;
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 enum Node<R: Rule> {
@@ -720,13 +720,13 @@ impl<R: Rule> Builder<R> {
                     })
                     .count();
                 log::trace!(
-          "rule_graph monomorphize: iteration {}: live: {}, minimal: {}, to_visit: {}, total: {}",
-          iteration,
-          live_count,
-          minimal_count,
-          to_visit.len(),
-          graph.node_count(),
-        );
+                    "rule_graph monomorphize: iteration {}: live: {}, minimal: {}, to_visit: {}, total: {}",
+                    iteration,
+                    live_count,
+                    minimal_count,
+                    to_visit.len(),
+                    graph.node_count(),
+                );
             }
 
             // Group dependencies by DependencyKey.
@@ -782,27 +782,27 @@ impl<R: Rule> Builder<R> {
 
             let trace_str = if looping {
                 format!(
-          "creating monomorphizations (from {} dependent sets and {:?} dependencies) for {:?}: {} with {:#?} and {:#?}",
-          dependents_by_out_set.len(),
-          dependencies_by_key
-        .iter()
-        .map(|edges| edges.len())
-        .collect::<Vec<_>>(),
-          node_id,
-          graph[node_id],
-          dependencies_by_key
-            .iter()
-            .flat_map(|choices| {
-              choices
-                .iter()
-                .map(|(dk, di)| (dk.to_string(), graph[*di].to_string()))
-            })
-            .collect::<Vec<_>>(),
-          dependents_by_out_set
-        .keys()
-        .map(params_str)
-        .collect::<Vec<_>>(),
-        )
+                    "creating monomorphizations (from {} dependent sets and {:?} dependencies) for {:?}: {} with {:#?} and {:#?}",
+                    dependents_by_out_set.len(),
+                    dependencies_by_key
+                        .iter()
+                        .map(|edges| edges.len())
+                        .collect::<Vec<_>>(),
+                    node_id,
+                    graph[node_id],
+                    dependencies_by_key
+                        .iter()
+                        .flat_map(|choices| {
+                            choices
+                                .iter()
+                                .map(|(dk, di)| (dk.to_string(), graph[*di].to_string()))
+                        })
+                        .collect::<Vec<_>>(),
+                    dependents_by_out_set
+                        .keys()
+                        .map(params_str)
+                        .collect::<Vec<_>>(),
+                )
             } else {
                 "".to_owned()
             };
@@ -930,16 +930,19 @@ impl<R: Rule> Builder<R> {
 
                 if looping {
                     log::trace!(
-            "   generating {:#?}, with {} dependents and {} dependencies ({} minimal) which consumes: {:#?}",
-            new_node,
-            dependents.len(),
-            dependencies.len(),
-            dependencies.iter().filter(|(_, dependency_id)| minimal_in_set.contains(dependency_id)).count(),
-            dependencies
-              .iter()
-              .map(|(dk, di)| (dk.to_string(), graph[*di].to_string(),))
-              .collect::<Vec<_>>()
-          );
+                        "   generating {:#?}, with {} dependents and {} dependencies ({} minimal) which consumes: {:#?}",
+                        new_node,
+                        dependents.len(),
+                        dependencies.len(),
+                        dependencies
+                            .iter()
+                            .filter(|(_, dependency_id)| minimal_in_set.contains(dependency_id))
+                            .count(),
+                        dependencies
+                            .iter()
+                            .map(|(dk, di)| (dk.to_string(), graph[*di].to_string(),))
+                            .collect::<Vec<_>>()
+                    );
                 }
 
                 let replacement_id = graph.add_node(MaybeDeleted::new(new_node));
@@ -1323,12 +1326,12 @@ impl<R: Rule> Builder<R> {
             )
         } else {
             format!(
-        "No installed rules return the type {} to satisfy {} for {}.\nEnsure that the rule you are \
+                "No installed rules return the type {} to satisfy {} for {}.\nEnsure that the rule you are \
         expecting to use is installed.",
-        dependency_key.product(),
-        dependency_key,
-        node,
-      )
+                dependency_key.product(),
+                dependency_key,
+                node,
+            )
         }
     }
 
@@ -1439,8 +1442,8 @@ impl<R: Rule> Builder<R> {
                 Entry::Param(p) => {
                     if !dependencies.is_empty() {
                         return Err(format!(
-              "Param {p} should not have had dependencies, but had: {dependencies:#?}",
-            ));
+                            "Param {p} should not have had dependencies, but had: {dependencies:#?}",
+                        ));
                     }
                 }
             }

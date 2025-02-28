@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::time::{self, Duration};
 
 use bytes::{BufMut, Bytes};
-use hashing::{sync_verified_copy, AgedFingerprint, Digest, Fingerprint, FINGERPRINT_SIZE};
+use hashing::{AgedFingerprint, Digest, FINGERPRINT_SIZE, Fingerprint, sync_verified_copy};
 use lmdb::{
     self, Cursor, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
     RwTransaction, Transaction, WriteFlags,
@@ -609,10 +609,10 @@ impl ShardedLmdb {
                             }
                             Err(StoreError::Lmdb(lmdb::Error::KeyExist)) => return Ok(()),
                             Err(StoreError::Lmdb(err)) => {
-                                return Err(format!("Error storing {expected_digest:?}: {err}"))
+                                return Err(format!("Error storing {expected_digest:?}: {err}"));
                             }
                             Err(StoreError::Io(err)) => {
-                                return Err(format!("Error storing {expected_digest:?}: {err}"))
+                                return Err(format!("Error storing {expected_digest:?}: {err}"));
                             }
                         };
                     }

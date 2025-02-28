@@ -14,13 +14,13 @@ use protos::gen::pants::cache::{CacheKey, CacheKeyType};
 use serde::{Deserialize, Serialize};
 use store::{Store, StoreError};
 use workunit_store::{
-    in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, WorkunitMetadata,
+    Level, Metric, ObservationMetric, RunningWorkunit, WorkunitMetadata, in_workunit,
 };
 
 use crate::{
-    check_cache_content, CacheContentBehavior, Context, FallibleProcessResultWithPlatform,
-    Platform, Process, ProcessCacheScope, ProcessError, ProcessExecutionEnvironment,
-    ProcessResultSource,
+    CacheContentBehavior, Context, FallibleProcessResultWithPlatform, Platform, Process,
+    ProcessCacheScope, ProcessError, ProcessExecutionEnvironment, ProcessResultSource,
+    check_cache_content,
 };
 
 // TODO: Consider moving into protobuf as a CacheValue type.

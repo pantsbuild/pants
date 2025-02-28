@@ -4,10 +4,10 @@
 use super::id::{NameTransform, OptionId};
 use super::scope::Scope;
 use super::{DictEdit, OptionsSource};
+use crate::ListEdit;
 use crate::fromfile::FromfileExpander;
 use crate::parse::{ParseError, Parseable};
-use crate::ListEdit;
-use itertools::{chain, Itertools};
+use itertools::{Itertools, chain};
 use parking_lot::Mutex;
 use std::any::Any;
 use std::collections::{HashMap, HashSet};
@@ -42,11 +42,7 @@ impl Flag {
     }
 
     fn _prefix<'a>(negate: bool) -> impl Iterator<Item = &'a str> {
-        if negate {
-            once("--no")
-        } else {
-            once("-")
-        }
+        if negate { once("--no") } else { once("-") }
     }
 
     // Check if --scope-flag matches.

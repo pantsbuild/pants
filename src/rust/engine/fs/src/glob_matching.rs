@@ -17,8 +17,8 @@ use log::warn;
 use parking_lot::Mutex;
 
 use crate::{
-    Dir, GitignoreStyleExcludes, GlobExpansionConjunction, Link, LinkDepth, PathStat, Stat,
-    StrictGlobMatching, SymlinkBehavior, Vfs, MAX_LINK_DEPTH,
+    Dir, GitignoreStyleExcludes, GlobExpansionConjunction, Link, LinkDepth, MAX_LINK_DEPTH,
+    PathStat, Stat, StrictGlobMatching, SymlinkBehavior, Vfs,
 };
 
 static DOUBLE_STAR: &str = "**";
@@ -532,11 +532,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
                 .zip(matched)
                 .filter_map(
                     |(source, matched)| {
-                        if matched {
-                            Some(source.clone())
-                        } else {
-                            None
-                        }
+                        if matched { Some(source.clone()) } else { None }
                     },
                 )
                 .collect::<HashSet<_>>();

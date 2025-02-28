@@ -11,8 +11,8 @@ use fs::{
 use testutil::make_file;
 
 use crate::{
-    snapshot_tests::{expand_all_sorted, setup, STR, STR2},
     OneOffStoreFileByDigest, Snapshot, SnapshotOps, SubsetParams,
+    snapshot_tests::{STR, STR2, expand_all_sorted, setup},
 };
 
 async fn get_duplicate_rolands<T: SnapshotOps>(

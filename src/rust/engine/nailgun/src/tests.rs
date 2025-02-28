@@ -6,9 +6,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use futures::{future, FutureExt};
-use nails::execution::{child_channel, ChildInput, Command, ExitCode};
+use futures::{FutureExt, future};
 use nails::Config;
+use nails::execution::{ChildInput, Command, ExitCode, child_channel};
 use task_executor::Executor;
 use tokio::net::TcpStream;
 use tokio::sync::Notify;

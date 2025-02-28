@@ -9,22 +9,22 @@ use fs::{
     DigestTrie, DirectoryDigest, GlobMatching, PathStat, RelativePath, SymlinkBehavior, TypedPath,
 };
 use hashing::{Digest, EMPTY_DIGEST};
-use pyo3::prelude::{pyfunction, wrap_pyfunction, PyModule, PyRef, PyResult, Python};
+use pyo3::prelude::{PyModule, PyRef, PyResult, Python, pyfunction, wrap_pyfunction};
 use pyo3::types::{PyAnyMethods, PyModuleMethods, PyTuple, PyTypeMethods};
 use pyo3::{Bound, IntoPyObject, PyAny};
 use store::{SnapshotOps, SubsetParams};
 
+use crate::Failure;
 use crate::externs;
+use crate::externs::PyGeneratorResponseNativeCall;
 use crate::externs::fs::{
     PyAddPrefix, PyFileDigest, PyMergeDigests, PyPathMetadata, PyPathNamespace, PyRemovePrefix,
 };
-use crate::externs::PyGeneratorResponseNativeCall;
 use crate::nodes::{
-    lift_directory_digest, task_get_context, unmatched_globs_additional_context, DownloadedFile,
-    NodeResult, PathMetadataNode, Snapshot, SubjectPath,
+    DownloadedFile, NodeResult, PathMetadataNode, Snapshot, SubjectPath, lift_directory_digest,
+    task_get_context, unmatched_globs_additional_context,
 };
-use crate::python::{throw, Key, Value};
-use crate::Failure;
+use crate::python::{Key, Value, throw};
 
 pub fn register(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(add_prefix, m)?)?;

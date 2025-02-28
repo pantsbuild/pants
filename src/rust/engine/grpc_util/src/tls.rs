@@ -5,9 +5,9 @@ use std::io;
 use std::sync::Arc;
 
 use rustls::{
+    DigitallySignedStruct,
     client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
     crypto::{verify_tls12_signature, verify_tls13_signature},
-    DigitallySignedStruct,
 };
 use rustls_pki_types::{CertificateDer, PrivateKeyDer, ServerName, UnixTime};
 use tokio_rustls::rustls::{ClientConfig, RootCertStore};
@@ -91,9 +91,11 @@ impl TryFrom<Config> for ClientConfig {
                         None => {
                             let native_root_certs_result = rustls_native_certs::load_native_certs();
                             if !native_root_certs_result.errors.is_empty() {
-                                let mut msg = String::from("Could not discover root CA cert files to use TLS with remote caching and remote \
+                                let mut msg = String::from(
+                                    "Could not discover root CA cert files to use TLS with remote caching and remote \
             execution. Consider setting `--remote-ca-certs-path` instead to explicitly point to \
-            the correct PEM file. Error(s):\n\n");
+            the correct PEM file. Error(s):\n\n",
+                                );
                                 for error in &native_root_certs_result.errors {
                                     write!(&mut msg, "{}\n\n", &error)
                                         .expect("write into mutable string");

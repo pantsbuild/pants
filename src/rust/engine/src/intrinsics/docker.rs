@@ -1,11 +1,11 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use docker::docker::{ImagePullPolicy, ImagePullScope, DOCKER, IMAGE_PULL_CACHE};
+use docker::docker::{DOCKER, IMAGE_PULL_CACHE, ImagePullPolicy, ImagePullScope};
 use process_execution::Platform;
-use pyo3::prelude::{pyfunction, wrap_pyfunction, PyModule, PyResult, Python};
-use pyo3::types::{PyModuleMethods, PyString};
 use pyo3::Bound;
+use pyo3::prelude::{PyModule, PyResult, Python, pyfunction, wrap_pyfunction};
+use pyo3::types::{PyModuleMethods, PyString};
 
 use crate::externs::{self, PyGeneratorResponseNativeCall};
 use crate::nodes::task_get_context;

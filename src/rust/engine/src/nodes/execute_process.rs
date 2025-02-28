@@ -12,18 +12,18 @@ use process_execution::{
     self, CacheName, InputDigests, Process, ProcessCacheScope, ProcessExecutionStrategy,
     ProcessResultSource,
 };
+use pyo3::Bound;
 use pyo3::prelude::{PyAny, Python};
 use pyo3::pybacked::PyBackedStr;
-use pyo3::Bound;
 use store::{self, Store, StoreError};
 use workunit_store::{
     Metric, ObservationMetric, RunningWorkunit, UserMetadataItem, WorkunitMetadata,
 };
 
-use super::{lift_directory_digest, NodeKey, NodeOutput, NodeResult};
+use super::{NodeKey, NodeOutput, NodeResult, lift_directory_digest};
 use crate::context::Context;
 use crate::externs;
-use crate::python::{throw, Value};
+use crate::python::{Value, throw};
 
 /// A Node that represents a process to execute.
 ///
