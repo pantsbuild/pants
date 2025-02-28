@@ -6,8 +6,9 @@ from __future__ import annotations
 import dataclasses
 import logging
 from collections import defaultdict
+from collections.abc import Iterable, Mapping, Sequence
 from enum import Enum
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any
 
 from pants.base.deprecated import warn_or_error
 from pants.engine.fs import FileContent
@@ -421,7 +422,7 @@ class Options:
                             f"""
                             Can only provide one of these mutually exclusive options in
                             {scope_str}, but multiple given:
-                            {', '.join(mutex_map[mutex_map_key])}
+                            {", ".join(mutex_map[mutex_map_key])}
                             """
                         )
                     )

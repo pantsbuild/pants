@@ -13,18 +13,32 @@ from pants.backend.shell.target_types import (
     SkipShellCommandTestsField,
 )
 from pants.backend.shell.util_rules import shell_command
-from pants.backend.shell.util_rules.shell_command import ShellCommandProcessFromTargetRequest
-from pants.core.goals.test import TestExtraEnv, TestFieldSet, TestRequest, TestResult, TestSubsystem
-from pants.core.util_rules.environments import EnvironmentField
-from pants.engine.internals.selectors import Get
-from pants.engine.process import (
-    Process,
-    ProcessCacheScope,
-    ProcessResultWithRetries,
-    ProcessWithRetries,
+from pants.backend.shell.util_rules.shell_command import (
+    ShellCommandProcessFromTargetRequest,
+    prepare_process_request_from_target,
 )
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import Target, WrappedTarget, WrappedTargetRequest
+from pants.core.goals.test import (
+    TestDebugRequest,
+    TestExtraEnv,
+    TestFieldSet,
+    TestRequest,
+    TestResult,
+    TestSubsystem,
+)
+from pants.core.util_rules.adhoc_process_support import (
+    AdhocProcessRequest,
+    FallibleAdhocProcessResult,
+    prepare_adhoc_process,
+)
+from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
+from pants.core.util_rules.adhoc_process_support import run_prepared_adhoc_process
+from pants.core.util_rules.environments import EnvironmentField
+from pants.engine.fs import EMPTY_DIGEST, Snapshot
+from pants.engine.internals.graph import resolve_target
+from pants.engine.intrinsics import digest_to_snapshot
+from pants.engine.process import InteractiveProcess, ProcessCacheScope
+from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.target import Target, WrappedTargetRequest
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
@@ -46,6 +60,7 @@ class TestShellCommandFieldSet(TestFieldSet):
 class ShellTestRequest(TestRequest):
     tool_subsystem = ShellTestSubsystem
     field_set_type = TestShellCommandFieldSet
+    supports_debug = True
 
 
 @rule(desc="Test with shell command", level=LogLevel.DEBUG)
@@ -55,14 +70,13 @@ async def test_shell_command(
     test_extra_env: TestExtraEnv,
 ) -> TestResult:
     field_set = batch.single_element
-    wrapped_tgt = await Get(
-        WrappedTarget,
+    wrapped_tgt = await resolve_target(
         WrappedTargetRequest(field_set.address, description_of_origin="<infallible>"),
+        **implicitly(),
     )
 
-    shell_process = await Get(
-        Process,
-        ShellCommandProcessFromTargetRequest(wrapped_tgt.target),
+    shell_process = await prepare_process_request_from_target(
+        ShellCommandProcessFromTargetRequest(wrapped_tgt.target), **implicitly()
     )
 
     shell_process = dataclasses.replace(
@@ -70,21 +84,59 @@ async def test_shell_command(
         cache_scope=(
             ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
         ),
-        env=FrozenDict(
+        env_vars=FrozenDict(
             {
                 **test_extra_env.env,
-                **shell_process.env,
+                **shell_process.env_vars,
             }
         ),
     )
 
-    shell_result = await Get(
-        ProcessResultWithRetries, ProcessWithRetries(shell_process, test_subsystem.attempts_default)
-    )
+    results: list[FallibleAdhocProcessResult] = []
+    for _ in range(test_subsystem.attempts_default):
+        result = await run_prepared_adhoc_process(
+            **implicitly({shell_process: AdhocProcessRequest})
+        )  # noqa: PNT30: retry loop
+        results.append(result)
+        if result.process_result.exit_code == 0:
+            break
+
+    extra_output: Snapshot | None = None
+    if results[-1].adjusted_digest != EMPTY_DIGEST:
+        extra_output = await digest_to_snapshot(results[-1].adjusted_digest)
+
     return TestResult.from_fallible_process_result(
-        process_results=shell_result.results,
+        process_results=tuple(r.process_result for r in results),
         address=field_set.address,
         output_setting=test_subsystem.output,
+        extra_output=extra_output,
+        log_extra_output=extra_output is not None,
+    )
+
+
+@rule(desc="Test with shell command (interactively)", level=LogLevel.DEBUG)
+async def test_shell_command_interactively(
+    batch: ShellTestRequest.Batch[TestShellCommandFieldSet, Any],
+) -> TestDebugRequest:
+    field_set = batch.single_element
+    wrapped_tgt = await resolve_target(
+        WrappedTargetRequest(field_set.address, description_of_origin="<infallible>"),
+        **implicitly(),
+    )
+
+    prepared_request = await prepare_adhoc_process(
+        **implicitly(ShellCommandProcessFromTargetRequest(wrapped_tgt.target))
+    )
+
+    # This is probably not strictly necessary given the use of `InteractiveProcess` but good to be correct in any event.
+    shell_process = dataclasses.replace(
+        prepared_request.process, cache_scope=ProcessCacheScope.PER_SESSION
+    )
+
+    return TestDebugRequest(
+        InteractiveProcess.from_process(
+            shell_process, forward_signals_to_process=False, restartable=True
+        )
     )
 
 
@@ -93,4 +145,5 @@ def rules():
         *collect_rules(),
         *shell_command.rules(),
         *ShellTestRequest.rules(),
+        *adhoc_process_support_rules(),
     )

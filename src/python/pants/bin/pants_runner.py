@@ -6,8 +6,8 @@ import os
 import platform
 import sys
 import warnings
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import List, Mapping
 
 from packaging.version import Version
 
@@ -35,7 +35,7 @@ class PantsRunner:
     """A higher-level runner that delegates runs to either a LocalPantsRunner or
     RemotePantsRunner."""
 
-    args: List[str]
+    args: list[str]
     env: Mapping[str, str]
 
     # This could be a bootstrap option, but it's preferable to keep these very limited to make it
@@ -84,10 +84,13 @@ class PantsRunner:
         stdin_fileno = sys.stdin.fileno()
         stdout_fileno = sys.stdout.fileno()
         stderr_fileno = sys.stderr.fileno()
-        with initialize_stdio(global_bootstrap_options), stdio_destination(
-            stdin_fileno=stdin_fileno,
-            stdout_fileno=stdout_fileno,
-            stderr_fileno=stderr_fileno,
+        with (
+            initialize_stdio(global_bootstrap_options),
+            stdio_destination(
+                stdin_fileno=stdin_fileno,
+                stdout_fileno=stdout_fileno,
+                stderr_fileno=stderr_fileno,
+            ),
         ):
             run_via_scie = "SCIE" in os.environ
             enable_scie_warnings = "NO_SCIE_WARNING" not in os.environ

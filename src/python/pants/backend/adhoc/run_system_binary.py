@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from io import StringIO
-from typing import Mapping
 
 from pants.backend.adhoc.target_types import (
     SystemBinaryExtraSearchPathsField,

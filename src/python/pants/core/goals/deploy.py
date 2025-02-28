@@ -5,17 +5,23 @@ from __future__ import annotations
 
 import logging
 from abc import ABCMeta
+from collections.abc import Iterable
 from dataclasses import dataclass
 from itertools import chain
-from typing import Iterable
+from typing import cast
 
 from pants.core.goals.package import PackageFieldSet
 from pants.core.goals.publish import PublishFieldSet, PublishProcesses, PublishProcessesRequest
 from pants.engine.console import Console
-from pants.engine.environment import EnvironmentName
+from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.intrinsics import run_interactive_process
-from pants.engine.process import InteractiveProcess
+from pants.engine.process import (
+    FallibleProcessResult,
+    InteractiveProcess,
+    InteractiveProcessResult,
+    Process,
+)
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
@@ -144,6 +150,32 @@ async def _all_publish_processes(targets: Iterable[Target]) -> PublishProcesses:
     return PublishProcesses(chain.from_iterable(processes_per_target))
 
 
+def _process_results_to_string(
+    console: Console,
+    res: InteractiveProcessResult | FallibleProcessResult,
+    *,
+    names: Iterable[str],
+    success_status: str,
+    description: str | None = None,
+) -> tuple[int, tuple[str, ...]]:
+    results = []
+    if res.exit_code == 0:
+        sigil = console.sigil_succeeded()
+        status = success_status
+        prep = "to"
+    else:
+        sigil = console.sigil_failed()
+        status = "failed"
+        prep = "for"
+
+    if description:
+        status += f" {prep} {description}"
+
+    for name in names:
+        results.append(f"{sigil} {name} {status}")
+    return res.exit_code, tuple(results)
+
+
 async def _invoke_process(
     console: Console,
     process: InteractiveProcess | None,
@@ -165,26 +197,17 @@ async def _invoke_process(
 
     logger.debug(f"Execute {process}")
     res = await run_interactive_process(process)
-    if res.exit_code == 0:
-        sigil = console.sigil_succeeded()
-        status = success_status
-        prep = "to"
-    else:
-        sigil = console.sigil_failed()
-        status = "failed"
-        prep = "for"
-
-    if description:
-        status += f" {prep} {description}"
-
-    for name in names:
-        results.append(f"{sigil} {name} {status}")
-
-    return res.exit_code, tuple(results)
+    return _process_results_to_string(
+        console, res, names=names, success_status=success_status, description=description
+    )
 
 
 @goal_rule
-async def run_deploy(console: Console, deploy_subsystem: DeploySubsystem) -> Deploy:
+async def run_deploy(
+    console: Console,
+    deploy_subsystem: DeploySubsystem,
+    local_environment: ChosenLocalEnvironmentName,
+) -> Deploy:
     target_roots_to_deploy_field_sets = await Get(
         TargetRootsToFieldSets,
         TargetRootsToFieldSetsRequest(
@@ -213,12 +236,40 @@ async def run_deploy(console: Console, deploy_subsystem: DeploySubsystem) -> Dep
 
     if publish_processes:
         logger.info(f"Publishing {pluralize(len(publish_processes), 'dependency')}...")
+        background_publish_processes = [
+            publish for publish in publish_processes if isinstance(publish.process, Process)
+        ]
+        foreground_publish_processes = [
+            publish
+            for publish in publish_processes
+            if isinstance(publish.process, InteractiveProcess) or publish.process is None
+        ]
 
-        # Publish all deployment dependencies first.
-        for publish in publish_processes:
+        # Publish all background deployments first
+        background_results = await MultiGet(
+            Get(
+                FallibleProcessResult,
+                {cast(Process, publish.process): Process, local_environment.val: EnvironmentName},
+            )
+            for publish in background_publish_processes
+        )
+        for pub, res in zip(background_publish_processes, background_results):
+            ec, statuses = _process_results_to_string(
+                console,
+                res,
+                names=pub.names,
+                description=pub.description,
+                success_status="published",
+            )
+            exit_code = ec if ec != 0 else exit_code
+            results.extend(statuses)
+
+        # Publish all foreground deployments next.
+        for publish in foreground_publish_processes:
+            process = cast(InteractiveProcess | None, publish.process)
             ec, statuses = await _invoke_process(
                 console,
-                publish.process,
+                process,
                 names=publish.names,
                 description=publish.description,
                 success_status="published",

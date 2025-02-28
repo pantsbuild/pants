@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -115,7 +115,7 @@ class MyPy(PythonToolBase):
 
             To instead load third-party plugins, set the option `[mypy].install_from_resolve`
             to a resolve whose lockfile includes those plugins, and set the `plugins` option
-            in `mypy.ini`.  See {doc_url('docs/python/goals/check')}.
+            in `mypy.ini`.  See {doc_url("docs/python/goals/check")}.
             """
         ),
     )
@@ -162,7 +162,7 @@ class MyPy(PythonToolBase):
                     f"""
                     You set {formatted_configured}. Normally, Pants would automatically set this
                     for you based on your code's interpreter constraints
-                    ({doc_url('docs/python/overview/interpreter-compatibility')}). Instead, it will
+                    ({doc_url("docs/python/overview/interpreter-compatibility")}). Instead, it will
                     use what you set.
 
                     (Allowing Pants to automatically set the option allows Pants to partition your
@@ -218,7 +218,7 @@ class MyPyFirstPartyPlugins:
     source_roots: tuple[str, ...]
 
 
-@rule("Prepare [mypy].source_plugins", level=LogLevel.DEBUG)
+@rule(desc="Prepare [mypy].source_plugins", level=LogLevel.DEBUG)
 async def mypy_first_party_plugins(
     mypy: MyPy,
 ) -> MyPyFirstPartyPlugins:

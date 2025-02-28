@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Iterable, Mapping
+from collections.abc import Iterable, Mapping
 
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.rule_runner import RuleRunner

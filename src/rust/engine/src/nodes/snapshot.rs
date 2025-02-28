@@ -10,13 +10,13 @@ use fs::{
 };
 use futures::TryFutureExt;
 use graph::CompoundNode;
-use pyo3::prelude::{Py, PyAny, Python};
 use pyo3::Bound;
+use pyo3::prelude::{Py, PyAny, Python};
 
-use super::{unmatched_globs_additional_context, NodeKey, NodeOutput, NodeResult};
+use super::{NodeKey, NodeOutput, NodeResult, unmatched_globs_additional_context};
 use crate::context::Context;
 use crate::externs;
-use crate::python::{throw, Value};
+use crate::python::{Value, throw};
 
 ///
 /// A Node that captures an store::Snapshot for a PathGlobs subject.

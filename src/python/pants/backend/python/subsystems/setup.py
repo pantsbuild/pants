@@ -6,7 +6,8 @@ from __future__ import annotations
 import enum
 import logging
 import os
-from typing import Iterable, List, Optional, TypeVar, cast
+from collections.abc import Iterable
+from typing import Optional, TypeVar, cast
 
 from packaging.utils import canonicalize_name
 
@@ -154,7 +155,7 @@ class PythonSetup(Subsystem):
             interpreter constraints, update `[python].interpreter_constraints`, the
             `interpreter_constraints` field, and relevant tool options like
             `[isort].interpreter_constraints` to tell Pants which interpreters your code
-            actually uses. See {doc_url('docs/python/overview/interpreter-compatibility')}.
+            actually uses. See {doc_url("docs/python/overview/interpreter-compatibility")}.
 
             All elements must be the minor and major Python version, e.g. `'2.7'` or `'3.10'`. Do
             not include the patch version.
@@ -267,7 +268,7 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
-    _resolves_to_interpreter_constraints = DictOption[List[str]](
+    _resolves_to_interpreter_constraints = DictOption[list[str]](
         help=softwrap(
             """
             Override the interpreter constraints to use when generating a resolve's lockfile
@@ -315,7 +316,7 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
-    _resolves_to_no_binary = DictOption[List[str]](
+    _resolves_to_no_binary = DictOption[list[str]](
         help=softwrap(
             f"""
             When generating a resolve's lockfile, do not use binary packages (i.e. wheels) for
@@ -339,7 +340,7 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
-    _resolves_to_only_binary = DictOption[List[str]](
+    _resolves_to_only_binary = DictOption[list[str]](
         help=softwrap(
             f"""
             When generating a resolve's lockfile, do not use source packages (i.e. sdists) for

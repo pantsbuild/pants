@@ -490,6 +490,7 @@ class ShellCommandTestTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ShellCommandTestDependenciesField,
+        ShellCommandRunnableDependenciesField,
         ShellCommandCommandField,
         ShellCommandLogOutputField,
         ShellCommandSourcesField,
@@ -500,6 +501,10 @@ class ShellCommandTestTarget(Target):
         EnvironmentField,
         SkipShellCommandTestsField,
         ShellCommandWorkdirField,
+        ShellCommandOutputFilesField,
+        ShellCommandOutputDirectoriesField,
+        ShellCommandOutputRootDirField,
+        ShellCommandOutputsMatchMode,
     )
     help = help_text(
         """

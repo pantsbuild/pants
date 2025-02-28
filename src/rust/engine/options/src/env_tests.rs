@@ -2,9 +2,9 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use crate::env::{Env, EnvReader};
-use crate::fromfile::test_util::write_fromfile;
 use crate::fromfile::FromfileExpander;
-use crate::{option_id, DictEdit, DictEditAction};
+use crate::fromfile::test_util::write_fromfile;
+use crate::{DictEdit, DictEditAction, option_id};
 use crate::{ListEdit, ListEditAction, OptionId, OptionsSource, Val};
 use maplit::hashmap;
 use std::collections::HashMap;
@@ -72,10 +72,11 @@ fn test_display() {
 #[test]
 fn test_scope() {
     let env = env([("PANTS_FOO_BAR_EXAMPLE", "true")]);
-    assert!(env
-        .get_bool(&option_id!(["foo.bar"], "example"))
-        .unwrap()
-        .unwrap());
+    assert!(
+        env.get_bool(&option_id!(["foo.bar"], "example"))
+            .unwrap()
+            .unwrap()
+    );
 }
 
 #[test]

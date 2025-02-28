@@ -25,8 +25,8 @@ macro_rules! try_future {
 
 #[cfg(test)]
 mod tests {
-    use futures::future::{self, BoxFuture};
     use futures::FutureExt;
+    use futures::future::{self, BoxFuture};
 
     fn returns_normally(
         result: Result<&'static str, &'static str>,

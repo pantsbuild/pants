@@ -6,9 +6,9 @@ import dataclasses
 import hashlib
 import os.path
 from collections import deque
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Mapping
 
 from pants.backend.go.util_rules import cgo, coverage
 from pants.backend.go.util_rules.assembly import (

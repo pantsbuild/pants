@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Mapping
 from textwrap import dedent
-from typing import Any, Mapping, cast
+from typing import Any
 
 import pytest
 
@@ -237,7 +238,7 @@ def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
             ),
         ],
     )
-    return cast(BuildFilePreludeSymbols, symbols)
+    return symbols
 
 
 def test_prelude_parsing_good() -> None:

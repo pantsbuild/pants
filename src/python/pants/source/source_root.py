@@ -6,9 +6,9 @@ from __future__ import annotations
 import itertools
 import logging
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable
 
 from pants.build_graph.address import Address
 from pants.engine.collection import DeduplicatedCollection
@@ -126,7 +126,7 @@ class SourceRootConfig(Subsystem):
 
             Use `/` to signify that the buildroot itself is a source root.
 
-            See {doc_url('docs/using-pants/key-concepts/source-roots')}.
+            See {doc_url("docs/using-pants/key-concepts/source-roots")}.
             """
         ),
         advanced=True,

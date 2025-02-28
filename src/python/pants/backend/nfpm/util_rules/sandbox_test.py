@@ -446,7 +446,7 @@ def test_populate_nfpm_content_sandbox(
                     name="{_PKG_NAME}",
                     package_name="{_PKG_NAME}",
                     version="{_PKG_VERSION}",
-                    {'' if packager != 'deb' else 'maintainer="Foo Bar <deb@example.com>",'}
+                    {"" if packager != "deb" else 'maintainer="Foo Bar <deb@example.com>",'}
                     dependencies={repr(dependencies)},
                     scripts={repr(scripts)},
                 )

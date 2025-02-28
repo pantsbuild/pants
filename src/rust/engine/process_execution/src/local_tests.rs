@@ -19,9 +19,8 @@ use tokio::sync::RwLock;
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
-    local, local::KeepSandboxes, CacheName, CommandRunner as CommandRunnerTrait, Context,
-    FallibleProcessResultWithPlatform, InputDigests, NamedCaches, Process, ProcessError,
-    RelativePath,
+    CacheName, CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
+    InputDigests, NamedCaches, Process, ProcessError, RelativePath, local, local::KeepSandboxes,
 };
 
 #[derive(PartialEq, Debug)]
@@ -466,9 +465,11 @@ async fn test_directory_preservation() {
     // Ensure the bash command line is provided.
     let bytes_quoted_command_line = Bash::quote_vec(&bash_contents);
     let quoted_command_line = str::from_utf8(&bytes_quoted_command_line).unwrap();
-    assert!(std::fs::read_to_string(&run_script_path)
-        .unwrap()
-        .contains(quoted_command_line));
+    assert!(
+        std::fs::read_to_string(&run_script_path)
+            .unwrap()
+            .contains(quoted_command_line)
+    );
 }
 
 #[tokio::test]

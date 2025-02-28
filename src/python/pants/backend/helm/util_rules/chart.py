@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any
 
 from pants.backend.helm.dependency_inference import chart as chart_inference
 from pants.backend.helm.resolve import fetch
@@ -195,7 +196,7 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
         logger.debug(
             softwrap(
                 f"""
-                Found {pluralize(len(subcharts), 'subchart')} as direct dependencies
+                Found {pluralize(len(subcharts), "subchart")} as direct dependencies
                 on Helm chart at: {request.field_set.address}.
                 """
             )

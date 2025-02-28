@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::borrow::Cow;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
@@ -15,7 +15,6 @@ use pyo3::pybacked::PyBackedStr;
 use pyo3::types::{PyDict, PyFrozenSet, PyType};
 
 use fnv::FnvHasher;
-use lazy_static::lazy_static;
 
 use crate::python::PyComparedBool;
 
@@ -70,15 +69,10 @@ pub fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     Ok(())
 }
 
-lazy_static! {
-  // `:`, `#`, `@` are used as delimiters already. Others are reserved for possible future needs.
-  pub static ref BANNED_CHARS_IN_TARGET_NAME: HashSet<char> =
-    [':', '#', '!', '@', '?', '/', '\\', '='].into();
-  pub static ref BANNED_CHARS_IN_GENERATED_NAME: HashSet<char> =
-    [':', '#', '!', '@', '?', '='].into();
-  pub static ref BANNED_CHARS_IN_PARAMETERS: HashSet<char> =
-    [':', '#', '!', '@', '?', '=', ',', ' '].into();
-}
+// `:`, `#`, `@` are used as delimiters already. Others are reserved for possible future needs.
+pub static BANNED_CHARS_IN_TARGET_NAME: [char; 8] = [':', '#', '!', '@', '?', '/', '\\', '='];
+pub static BANNED_CHARS_IN_GENERATED_NAME: [char; 6] = [':', '#', '!', '@', '?', '='];
+pub static BANNED_CHARS_IN_PARAMETERS: [char; 8] = [':', '#', '!', '@', '?', '=', ',', ' '];
 
 #[pyclass(name = "AddressInput")]
 #[derive(Debug, Hash, Eq, PartialEq)]
@@ -303,13 +297,13 @@ impl AddressInput {
                     // AddressSpec constructor because we weren't sure if the path_spec referred to a file
                     // vs. a directory.
                     return Err(InvalidTargetNameError::new_err(format!(
-            "Addresses for generated first-party targets in the build root must include \
+                        "Addresses for generated first-party targets in the build root must include \
              which target generator they come from, such as `{}:original_target`. However, \
              `{}` from {} did not have a target name.",
-            self.path_component.display(),
-            self.original_spec,
-            self.description_of_origin,
-          )));
+                        self.path_component.display(),
+                        self.original_spec,
+                        self.description_of_origin,
+                    )));
                 }
             }
         };
@@ -478,12 +472,12 @@ impl Address {
                 .collect::<Vec<_>>();
             if !banned.is_empty() {
                 return Err(InvalidTargetNameError::new_err(format!(
-          "The generated name `{generated_name}` (defined in directory {}, the part after \
+                    "The generated name `{generated_name}` (defined in directory {}, the part after \
           `#`) contains banned characters (`{}`). Please replace \
            these characters with another separator character like `_`, `-`, or `/`.",
-          spec_path.display(),
-          banned.join(","),
-        )));
+                    spec_path.display(),
+                    banned.join(","),
+                )));
             }
         }
 

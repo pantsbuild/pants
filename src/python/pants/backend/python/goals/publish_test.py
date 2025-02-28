@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from textwrap import dedent
-from typing import Callable
 
 import pytest
 
@@ -21,7 +21,7 @@ from pants.core.goals.publish import PublishPackages, PublishProcesses
 from pants.core.util_rules.config_files import rules as config_files_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST
-from pants.engine.process import Process
+from pants.engine.process import InteractiveProcess, Process
 from pants.testutil.process_util import process_assertion
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import QueryRule
@@ -109,6 +109,7 @@ def assert_package(
     assert package.description == expect_description
     if expect_process:
         assert package.process
+        assert isinstance(package.process, InteractiveProcess)
         expect_process(package.process.process)
     else:
         assert package.process is None
@@ -217,6 +218,8 @@ def test_twine_cert_arg(rule_runner, packages, options, cert_arg) -> None:
     process = result[0].process
     assert process
     if cert_arg:
+        assert isinstance(process, InteractiveProcess)
         assert cert_arg in process.process.argv
     else:
+        assert isinstance(process, InteractiveProcess)
         assert not any(arg.startswith("--cert") for arg in process.process.argv)

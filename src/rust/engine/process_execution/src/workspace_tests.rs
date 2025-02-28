@@ -23,9 +23,8 @@ use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::local_tests::named_caches_and_immutable_inputs;
 use crate::{
-    workspace, CacheName, CommandRunner as CommandRunnerTrait, Context,
-    FallibleProcessResultWithPlatform, InputDigests, NamedCaches, Process, ProcessError,
-    RelativePath,
+    CacheName, CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
+    InputDigests, NamedCaches, Process, ProcessError, RelativePath, workspace,
 };
 
 #[derive(PartialEq, Debug)]

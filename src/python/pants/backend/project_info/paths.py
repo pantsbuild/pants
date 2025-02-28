@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import json
 from collections import deque
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
@@ -139,7 +139,7 @@ async def get_paths_between_root_and_destination(pair: RootDestinationPair) -> S
     return SpecsPaths(paths=spec_paths)
 
 
-@rule("Get paths between root and multiple destinations.")
+@rule(desc="Get paths between root and multiple destinations.")
 async def get_paths_between_root_and_destinations(
     pair: RootDestinationsPair,
 ) -> SpecsPathsCollection:

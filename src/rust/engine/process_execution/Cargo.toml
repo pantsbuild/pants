@@ -37,7 +37,6 @@ uname = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 workunit_store = { path = "../workunit_store" }
 regex = { workspace = true }
-lazy_static = { workspace = true }
 parking_lot = { workspace = true }
 itertools = { workspace = true }
 serde = { workspace = true }

@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::nodes::{ExecuteProcess, NodeKey, NodeOutput, NodeResult, SubjectPath};
-use crate::python::{throw, Failure};
+use crate::python::{Failure, throw};
 use crate::session::{Session, Sessions};
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
@@ -21,14 +21,14 @@ use fs::{GitignoreStyleExcludes, PosixFS};
 use futures::FutureExt;
 use graph::{Graph, InvalidationResult};
 use hashing::Digest;
-use log::{log, Level};
+use log::{Level, log};
 use parking_lot::Mutex;
 // use docker::docker::{self, DOCKER, IMAGE_PULL_CACHE};
 use docker::docker;
 use process_execution::switched::SwitchedCommandRunner;
 use process_execution::{
-    self, bounded, local, CacheContentBehavior, CommandRunner, NamedCaches,
-    ProcessExecutionStrategy,
+    self, CacheContentBehavior, CommandRunner, NamedCaches, ProcessExecutionStrategy, bounded,
+    local,
 };
 use regex::Regex;
 use remote::remote_cache::{RemoteCacheRunnerOptions, RemoteCacheWarningsBehavior};
@@ -914,9 +914,9 @@ impl SessionCore {
                     // TODO: This message should likely be at `info`, or eventually, debug.
                     //   see https://github.com/pantsbuild/pants/issues/15867
                     log::warn!(
-            "Making attempt {new_level} to backtrack and retry `{description}`, due to \
+                        "Making attempt {new_level} to backtrack and retry `{description}`, due to \
               missing digest {digest:?}."
-          );
+                    );
                     Some(root)
                 } else {
                     None

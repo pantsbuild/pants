@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import re
 from enum import Enum
-from typing import Pattern
+from re import Pattern
 
 from pants.base.deprecated import warn_or_error
 from pants.engine.addresses import Addresses

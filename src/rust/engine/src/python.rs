@@ -5,10 +5,10 @@ use std::convert::Infallible;
 use std::sync::Arc;
 use std::{fmt, hash};
 
-use deepsize::{known_deep_size, DeepSizeOf};
+use deepsize::{DeepSizeOf, known_deep_size};
+use pyo3::FromPyObject;
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyType};
-use pyo3::FromPyObject;
 use smallvec::SmallVec;
 
 use hashing::Digest;
@@ -475,11 +475,11 @@ impl Failure {
                     // engine traceback and restoring the original python exception cause.
                     py_err.set_cause(py, Some(PyErr::from_value(val.0.bind(py).to_owned())));
                     (
-            format!(
-              "{python_traceback}\nDuring handling of the above exception, another exception occurred:\n\n"
-            ),
-            engine_traceback,
-          )
+                        format!(
+                            "{python_traceback}\nDuring handling of the above exception, another exception occurred:\n\n"
+                        ),
+                        engine_traceback,
+                    )
                 }
                 _ => ("".to_string(), Vec::new()),
             }
@@ -630,7 +630,7 @@ impl<'py> IntoPyObject<'py> for PyComparedBool {
 #[cfg(test)]
 mod pycomparedbool_tests {
     use super::PyComparedBool;
-    use pyo3::{types::PyAnyMethods, IntoPyObject, Python};
+    use pyo3::{IntoPyObject, Python, types::PyAnyMethods};
 
     #[test]
     fn pycomparedbool_conversion_tests() {
@@ -653,10 +653,12 @@ mod pycomparedbool_tests {
                     .unwrap(),
                 false
             );
-            assert!(PyComparedBool(None)
-                .into_pyobject(py)
-                .unwrap()
-                .is(&py.NotImplemented()),);
+            assert!(
+                PyComparedBool(None)
+                    .into_pyobject(py)
+                    .unwrap()
+                    .is(&py.NotImplemented()),
+            );
         })
     }
 }

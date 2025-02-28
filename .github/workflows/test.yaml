@@ -40,7 +40,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: Linux-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.84.1-*
+        path: '~/.rustup/toolchains/1.85.0-*
 
           ~/.rustup/update-hashes
 
@@ -145,7 +145,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.84.1-*
+        path: '~/.rustup/toolchains/1.85.0-*
 
           ~/.rustup/update-hashes
 
@@ -260,7 +260,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.84.1-*
+        path: '~/.rustup/toolchains/1.85.0-*
 
           ~/.rustup/update-hashes
 
@@ -336,6 +336,10 @@ jobs:
     name: Build wheels (Linux-ARM64)
     needs:
     - classify_changes
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
     runs-on:
     - self-hosted
     - runs-on
@@ -406,6 +410,10 @@ jobs:
     name: Build wheels (Linux-x86_64)
     needs:
     - classify_changes
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
     runs-on:
     - ubuntu-22.04
     steps:
@@ -474,6 +482,10 @@ jobs:
     name: Build wheels (macOS13-x86_64)
     needs:
     - classify_changes
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
     runs-on:
     - macos-13
     steps:
@@ -508,7 +520,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.84.1-*
+        path: '~/.rustup/toolchains/1.85.0-*
 
           ~/.rustup/update-hashes
 
@@ -560,6 +572,10 @@ jobs:
     name: Build wheels (macOS14-ARM64)
     needs:
     - classify_changes
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
     runs-on:
     - macos-14
     steps:
@@ -590,7 +606,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.84.1-*
+        path: '~/.rustup/toolchains/1.85.0-*
 
           ~/.rustup/update-hashes
 

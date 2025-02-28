@@ -27,8 +27,8 @@ pub fn verify_directory_canonical(
         .collect();
     if child_names.len() != directory.files.len() + directory.directories.len() {
         return Err(format!(
-      "Child paths must be unique, but a child path of {digest:?} was both a file and a directory: {directory:?}"
-    ));
+            "Child paths must be unique, but a child path of {digest:?} was both a file and a directory: {directory:?}"
+        ));
     }
     Ok(())
 }

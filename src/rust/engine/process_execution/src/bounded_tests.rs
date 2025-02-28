@@ -7,7 +7,7 @@ use futures::channel::oneshot;
 use futures::future::{self, FutureExt};
 use tokio::time::{sleep, timeout};
 
-use crate::bounded::{balance, AsyncSemaphore, State, Task};
+use crate::bounded::{AsyncSemaphore, State, Task, balance};
 
 fn mk_semaphore(permits: usize) -> AsyncSemaphore {
     mk_semaphore_with_preemptible_duration(permits, Duration::from_millis(200))

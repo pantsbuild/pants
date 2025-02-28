@@ -1,6 +1,6 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-use std::iter::{once, Once};
+use std::iter::{Once, once};
 use std::ops::Deref;
 use std::option::Option;
 use std::path::Path;

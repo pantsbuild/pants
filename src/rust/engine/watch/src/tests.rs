@@ -135,9 +135,11 @@ async fn liveness_watch_error() {
         .unwrap();
 
     // Should exit.
-    assert!(liveness_receiver
-        .recv_timeout(Duration::from_millis(1000))
-        .is_ok());
+    assert!(
+        liveness_receiver
+            .recv_timeout(Duration::from_millis(1000))
+            .is_ok()
+    );
     join_handle.join().unwrap();
 }
 

@@ -9,7 +9,7 @@ See https://semgrep.dev/ for details.
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from pants.backend.python.goals import lockfile as python_lockfile
 from pants.backend.tools.semgrep import rules as semgrep_rules

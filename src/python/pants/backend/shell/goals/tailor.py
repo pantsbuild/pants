@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
@@ -19,9 +19,8 @@ from pants.core.goals.tailor import (
     PutativeTargets,
     PutativeTargetsRequest,
 )
-from pants.engine.fs import PathGlobs, Paths
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import collect_rules, rule
+from pants.engine.intrinsics import path_globs_to_paths
+from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
 from pants.source.filespec import FilespecMatcher
@@ -50,10 +49,10 @@ async def find_putative_targets(
     if not (shell_setup.tailor_sources or shell_setup.tailor_shunit2_tests):
         return PutativeTargets()
 
-    all_shell_files = await Get(Paths, PathGlobs, req.path_globs("*.sh"))
+    all_shell_files = await path_globs_to_paths(req.path_globs("*.sh"))
     unowned_shell_files = set(all_shell_files.files) - set(all_owned_sources)
     classified_unowned_shell_files = classify_source_files(unowned_shell_files)
-    pts = []
+    pts: list[PutativeTarget] = []
     for tgt_type, paths in classified_unowned_shell_files.items():
         for dirname, filenames in group_by_dir(paths).items():
             if tgt_type == Shunit2TestsGeneratorTarget:
@@ -73,5 +72,5 @@ async def find_putative_targets(
     return PutativeTargets(pts)
 
 
-def rules():
-    return [*collect_rules(), UnionRule(PutativeTargetsRequest, PutativeShellTargetsRequest)]
+def rules() -> Iterable[Rule | UnionRule]:
+    return (*collect_rules(), UnionRule(PutativeTargetsRequest, PutativeShellTargetsRequest))

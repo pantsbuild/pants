@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
 from pants.engine.environment import EnvironmentName
@@ -135,7 +135,9 @@ async def determine_injected_nfpm_package_fields(
             )
         )
     inject_nfpm_config_request_type = applicable_inject_nfpm_config_requests[0]
-    inject_nfpm_config_request: InjectNfpmPackageFieldsRequest = inject_nfpm_config_request_type(target)  # type: ignore[abstract]
+    inject_nfpm_config_request: InjectNfpmPackageFieldsRequest = inject_nfpm_config_request_type(
+        target
+    )  # type: ignore[abstract]
     return await Get(
         InjectedNfpmPackageFields, InjectNfpmPackageFieldsRequest, inject_nfpm_config_request
     )

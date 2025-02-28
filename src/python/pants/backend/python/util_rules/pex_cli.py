@@ -6,8 +6,8 @@ from __future__ import annotations
 import dataclasses
 import logging
 import os.path
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Iterable, List, Mapping, Optional, Tuple
 
 from pants.backend.python.subsystems.python_native_code import PythonNativeCodeSubsystem
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -42,7 +42,7 @@ class PexCli(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pex-tool/pex)."
 
-    default_version = "v2.33.0"
+    default_version = "v2.33.1"
     default_url_template = "https://github.com/pex-tool/pex/releases/download/{version}/pex"
     version_constraints = ">=2.13.0,<3.0"
 
@@ -65,8 +65,8 @@ class PexCli(TemplatedExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "349a1cf2a13edeb6237318156773f66d2032d5dfa6b5ce724aa5a11cbecff4a1",
-                    "4556348",
+                    "5ebed0e2ba875983a72b4715ee3b2ca6ae5fedbf28d738634e02e30e3bb5ed28",
+                    "4559974",
                 )
             )
             for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
@@ -78,10 +78,10 @@ class PexCliProcess:
     subcommand: tuple[str, ...]
     extra_args: tuple[str, ...]
     description: str = dataclasses.field(compare=False)
-    additional_input_digest: Optional[Digest]
-    extra_env: Optional[FrozenDict[str, str]]
-    output_files: Optional[Tuple[str, ...]]
-    output_directories: Optional[Tuple[str, ...]]
+    additional_input_digest: Digest | None
+    extra_env: FrozenDict[str, str] | None
+    output_files: tuple[str, ...] | None
+    output_directories: tuple[str, ...] | None
     level: LogLevel
     concurrency_available: int
     cache_scope: ProcessCacheScope
@@ -92,10 +92,10 @@ class PexCliProcess:
         subcommand: Iterable[str],
         extra_args: Iterable[str],
         description: str,
-        additional_input_digest: Optional[Digest] = None,
-        extra_env: Optional[Mapping[str, str]] = None,
-        output_files: Optional[Iterable[str]] = None,
-        output_directories: Optional[Iterable[str]] = None,
+        additional_input_digest: Digest | None = None,
+        extra_env: Mapping[str, str] | None = None,
+        output_files: Iterable[str] | None = None,
+        output_directories: Iterable[str] | None = None,
         level: LogLevel = LogLevel.INFO,
         concurrency_available: int = 0,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
@@ -143,7 +143,7 @@ async def setup_pex_cli_process(
     python_setup: PythonSetup,
 ) -> Process:
     tmpdir = ".tmp"
-    gets: List[Get] = [Get(Digest, CreateDigest([Directory(tmpdir)]))]
+    gets: list[Get] = [Get(Digest, CreateDigest([Directory(tmpdir)]))]
 
     cert_args = []
     if global_options.ca_certs_path:

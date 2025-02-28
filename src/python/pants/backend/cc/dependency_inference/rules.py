@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import DefaultDict, Iterable
+from typing import DefaultDict
 
 from pants.backend.cc.subsystems.cc_infer import CCInferSubsystem
 from pants.backend.cc.target_types import CCDependenciesField, CCSourceField

@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -21,25 +21,25 @@ from pants.backend.python.util_rules.partition import (
     _partition_by_interpreter_constraints_and_resolve,
 )
 from pants.backend.python.util_rules.pex import (
-    Pex,
     PexRequest,
-    VenvPex,
     VenvPexProcess,
     VenvPexRequest,
+    create_pex,
+    create_venv_pex,
 )
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import config_files
-from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.config_files import find_config_file
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.collection import Collection
-from pants.engine.fs import Digest
+from pants.engine.internals.graph import coarsened_targets as coarsened_targets_get
 from pants.engine.internals.native_engine import MergeDigests
-from pants.engine.internals.selectors import MultiGet
-from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, Rule, collect_rules, rule
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import execute_process, merge_digests
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest, FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -92,36 +92,27 @@ async def pytype_typecheck_partition(
     pytype: Pytype,
     pex_environment: PexEnvironment,
 ) -> CheckResult:
-    roots_sources, requirements_pex, pytype_pex, config_files = await MultiGet(
-        Get(
-            SourceFiles,
-            SourceFilesRequest(fs.sources for fs in partition.field_sets),
+    roots_sources, requirements_pex, pytype_pex, config_files = await concurrently(
+        determine_source_files(SourceFilesRequest(fs.sources for fs in partition.field_sets)),
+        create_pex(
+            **implicitly(
+                RequirementsPexRequest(
+                    (fs.address for fs in partition.field_sets),
+                    hardcoded_interpreter_constraints=partition.interpreter_constraints,
+                )
+            )
         ),
-        Get(
-            Pex,
-            RequirementsPexRequest(
-                (fs.address for fs in partition.field_sets),
-                hardcoded_interpreter_constraints=partition.interpreter_constraints,
-            ),
+        create_pex(
+            pytype.to_pex_request(interpreter_constraints=partition.interpreter_constraints)
         ),
-        Get(
-            Pex,
-            PexRequest,
-            pytype.to_pex_request(interpreter_constraints=partition.interpreter_constraints),
-        ),
-        Get(
-            ConfigFiles,
-            ConfigFilesRequest,
-            pytype.config_request(),
-        ),
+        find_config_file(pytype.config_request()),
     )
 
-    input_digest = await Get(
-        Digest, MergeDigests((roots_sources.snapshot.digest, config_files.snapshot.digest))
+    input_digest = await merge_digests(
+        MergeDigests((roots_sources.snapshot.digest, config_files.snapshot.digest))
     )
 
-    runner = await Get(
-        VenvPex,
+    runner = await create_venv_pex(
         VenvPexRequest(
             PexRequest(
                 output_filename="pytype_runner.pex",
@@ -132,28 +123,30 @@ async def pytype_typecheck_partition(
             ),
             pex_environment.in_sandbox(working_directory=None),
         ),
+        **implicitly(),
     )
 
-    result = await Get(
-        FallibleProcessResult,
-        VenvPexProcess(
-            runner,
-            argv=(
-                *(("--config", pytype.config) if pytype.config else ()),
-                "{pants_concurrency}",
-                *pytype.args,
-                *roots_sources.files,
-            ),
-            # This adds the venv/bin folder to PATH
-            extra_env={
-                "PEX_VENV_BIN_PATH": "prepend",
-            },
-            input_digest=input_digest,
-            output_files=roots_sources.files,
-            concurrency_available=len(roots_sources.files),
-            description=f"Run Pytype on {pluralize(len(roots_sources.files), 'file')}.",
-            level=LogLevel.DEBUG,
-        ),
+    result = await execute_process(
+        **implicitly(
+            VenvPexProcess(
+                runner,
+                argv=(
+                    *(("--config", pytype.config) if pytype.config else ()),
+                    "{pants_concurrency}",
+                    *pytype.args,
+                    *roots_sources.files,
+                ),
+                # This adds the venv/bin folder to PATH
+                extra_env={
+                    "PEX_VENV_BIN_PATH": "prepend",
+                },
+                input_digest=input_digest,
+                output_files=roots_sources.files,
+                concurrency_available=len(roots_sources.files),
+                description=f"Run Pytype on {pluralize(len(roots_sources.files), 'file')}.",
+                level=LogLevel.DEBUG,
+            )
+        )
     )
 
     return CheckResult.from_fallible_process_result(
@@ -175,9 +168,9 @@ async def pytype_determine_partitions(
         _partition_by_interpreter_constraints_and_resolve(request.field_sets, python_setup)
     )
 
-    coarsened_targets = await Get(
-        CoarsenedTargets,
+    coarsened_targets = await coarsened_targets_get(
         CoarsenedTargetsRequest(field_set.address for field_set in request.field_sets),
+        **implicitly(),
     )
     coarsened_targets_by_address = coarsened_targets.by_address()
 
@@ -206,9 +199,11 @@ async def pytype_typecheck(
     if pytype.skip:
         return CheckResults([], checker_name=request.tool_name)
 
-    partitions = await Get(PytypePartitions, PytypeRequest, request)
-    partitioned_results = await MultiGet(
-        Get(CheckResult, PytypePartition, partition) for partition in partitions
+    # Explicitly excluding `pytype` as a function argument to `pytype_determine_partitions` and `pytype_typecheck_partition`
+    # as it throws "TypeError: unhashable type: 'Pytype'"
+    partitions = await pytype_determine_partitions(request, **implicitly())
+    partitioned_results = await concurrently(
+        pytype_typecheck_partition(partition, **implicitly()) for partition in partitions
     )
     return CheckResults(
         partitioned_results,

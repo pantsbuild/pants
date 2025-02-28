@@ -14,12 +14,12 @@ mod posixfs_tests;
 mod testutil;
 
 pub use crate::directory::{
-    DigestTrie, DirectoryDigest, Entry, SymlinkBehavior, TypedPath, EMPTY_DIGEST_TREE,
-    EMPTY_DIRECTORY_DIGEST,
+    DigestTrie, DirectoryDigest, EMPTY_DIGEST_TREE, EMPTY_DIRECTORY_DIGEST, Entry, SymlinkBehavior,
+    TypedPath,
 };
 pub use crate::gitignore::GitignoreStyleExcludes;
 pub use crate::glob_matching::{
-    FilespecMatcher, GlobMatching, PathGlob, PreparedPathGlobs, DOUBLE_STAR_GLOB, SINGLE_STAR_GLOB,
+    DOUBLE_STAR_GLOB, FilespecMatcher, GlobMatching, PathGlob, PreparedPathGlobs, SINGLE_STAR_GLOB,
 };
 
 use std::cmp::min;
@@ -81,10 +81,10 @@ impl RelativePath {
         for component in candidate.components() {
             match component {
                 Component::Prefix(_) => {
-                    return Err(format!("Windows paths are not allowed: {candidate:?}"))
+                    return Err(format!("Windows paths are not allowed: {candidate:?}"));
                 }
                 Component::RootDir => {
-                    return Err(format!("Absolute paths are not allowed: {candidate:?}"))
+                    return Err(format!("Absolute paths are not allowed: {candidate:?}"));
                 }
                 Component::CurDir => continue,
                 Component::ParentDir => {
@@ -544,11 +544,11 @@ impl PosixFS {
         };
         if cfg!(debug_assertions) && !path_to_stat.is_absolute() {
             return Err(io::Error::new(
-        io::ErrorKind::InvalidInput,
-        format!(
-          "Argument path_to_stat to PosixFS::stat_internal must be absolute path, got {path_to_stat:?}"
-        ),
-      ));
+                io::ErrorKind::InvalidInput,
+                format!(
+                    "Argument path_to_stat to PosixFS::stat_internal must be absolute path, got {path_to_stat:?}"
+                ),
+            ));
         }
         let path = file_name.to_owned().into();
         if file_type.is_symlink() {
@@ -579,11 +579,11 @@ impl PosixFS {
     pub fn stat_sync(&self, relative_path: &Path) -> Result<Option<Stat>, io::Error> {
         if cfg!(debug_assertions) && relative_path.is_absolute() {
             return Err(io::Error::new(
-        io::ErrorKind::InvalidInput,
-        format!(
-          "Argument relative_path to PosixFS::stat_sync must be relative path, got {relative_path:?}"
-        ),
-      ));
+                io::ErrorKind::InvalidInput,
+                format!(
+                    "Argument relative_path to PosixFS::stat_sync must be relative path, got {relative_path:?}"
+                ),
+            ));
         }
         let abs_path = self.root.0.join(relative_path);
         let metadata = match self.symlink_behavior {
@@ -672,14 +672,14 @@ impl Vfs<String> for DigestTrie {
                 return Err(format!(
                     "Path `{}` was a file rather than a symlink.",
                     link.path.display()
-                ))
+                ));
             }
             directory::Entry::Symlink(s) => s.target(),
             directory::Entry::Directory(_) => {
                 return Err(format!(
                     "Path `{}` was a directory rather than a symlink.",
                     link.path.display()
-                ))
+                ));
             }
         };
         Ok(target.to_path_buf())
@@ -699,13 +699,13 @@ impl Vfs<String> for DigestTrie {
                     return Err(format!(
                         "Path `{}` was a file rather than a directory.",
                         dir.0.display()
-                    ))
+                    ));
                 }
                 directory::Entry::Symlink(_) => {
                     return Err(format!(
                         "Path `{}` was a symlink rather than a directory.",
                         dir.0.display()
-                    ))
+                    ));
                 }
                 directory::Entry::Directory(d) => d.tree().entries(),
             }
@@ -861,10 +861,10 @@ pub fn increase_limits() -> Result<String, String> {
         // If the limit is less than our target.
         if cur < TARGET_NOFILE_LIMIT {
             let err_suffix = format!(
-        "To avoid 'too many open file handle' errors, we recommend a limit of at least {TARGET_NOFILE_LIMIT}: \
+                "To avoid 'too many open file handle' errors, we recommend a limit of at least {TARGET_NOFILE_LIMIT}: \
         please see https://www.pantsbuild.org/docs/troubleshooting#too-many-open-files-error \
         for more information."
-      );
+            );
             // If we might be able to increase the soft limit, try to.
             if cur < max {
                 let target_soft_limit = std::cmp::min(max, TARGET_NOFILE_LIMIT);

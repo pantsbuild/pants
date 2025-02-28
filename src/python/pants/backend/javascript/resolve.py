@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.javascript import nodejs_project
 from pants.backend.javascript.nodejs_project import AllNodeJSProjects, NodeJSProject

@@ -7,9 +7,10 @@ import dataclasses
 import os
 import urllib.parse
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Generic, Optional, Sequence, TypeVar, Union, cast
+from typing import Generic, TypeVar, cast
 
 from pants.core.goals import package
 from pants.core.goals.package import (
@@ -235,9 +236,9 @@ class AssetSourceField(SingleSourceField):
     @classmethod
     def compute_value(  # type: ignore[override]
         cls,
-        raw_value: Optional[Union[str, http_source, per_platform[http_source]]],
+        raw_value: str | http_source | per_platform[http_source] | None,
         address: Address,
-    ) -> Optional[Union[str, http_source, per_platform[http_source]]]:
+    ) -> str | http_source | per_platform[http_source] | None:
         if raw_value is None or isinstance(raw_value, str):
             return super().compute_value(raw_value, address)
         elif isinstance(raw_value, per_platform):

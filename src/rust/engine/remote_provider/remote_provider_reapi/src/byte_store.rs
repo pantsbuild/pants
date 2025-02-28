@@ -13,15 +13,14 @@ use bytes::Bytes;
 use futures::{FutureExt, StreamExt};
 use grpc_util::retry::{retry_call, status_is_retryable};
 use grpc_util::{
-    headers_to_http_header_map, layered_service, status_ref_to_str, status_to_str, LayeredService,
+    LayeredService, headers_to_http_header_map, layered_service, status_ref_to_str, status_to_str,
 };
 use hashing::{Digest, Hasher};
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::gen::google::bytestream::byte_stream_client::ByteStreamClient;
 use remexec::{
-    capabilities_client::CapabilitiesClient,
-    content_addressable_storage_client::ContentAddressableStorageClient, BatchUpdateBlobsRequest,
-    ServerCapabilities,
+    BatchUpdateBlobsRequest, ServerCapabilities, capabilities_client::CapabilitiesClient,
+    content_addressable_storage_client::ContentAddressableStorageClient,
 };
 use tokio::fs::File;
 use tokio::io::{AsyncRead, AsyncSeekExt, AsyncWriteExt};

@@ -15,8 +15,8 @@ use fs::{
     DirectoryDigest, GlobExpansionConjunction, GlobMatching, Permissions, PreparedPathGlobs,
     RelativePath, StrictGlobMatching, SymlinkBehavior,
 };
-use futures::future::{self, BoxFuture};
 use futures::FutureExt;
+use futures::future::{self, BoxFuture};
 use grpc_util::prost::MessageExt;
 use grpc_util::tls::CertificateCheck;
 use hashing::{Digest, Fingerprint};
@@ -650,7 +650,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
                     format => {
                         return Err(
                             format!("Unexpected value of --output-format arg: {format}").into()
-                        )
+                        );
                     }
                 };
 

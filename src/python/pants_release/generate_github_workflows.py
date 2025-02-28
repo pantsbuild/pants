@@ -7,11 +7,12 @@ import argparse
 import difflib
 import os
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import Enum, ReprEnum
 from pathlib import Path
 from textwrap import dedent  # noqa: PNT20
-from typing import Any, Dict, Sequence, cast
+from typing import Any, cast
 
 import toml
 import yaml
@@ -21,6 +22,7 @@ from pants_release.common import die
 def action(name: str) -> str:
     version_map = {
         "action-send-mail": "dawidd6/action-send-mail@v3.8.0",
+        "attest-build-provenance": "actions/attest-build-provenance@v2",
         "cache": "actions/cache@v4",
         "checkout": "actions/checkout@v4",
         "download-artifact": "actions/download-artifact@v4",
@@ -52,9 +54,9 @@ HEADER = dedent(
 )
 
 
-Step = Dict[str, Any]
-Jobs = Dict[str, Any]
-Env = Dict[str, str]
+Step = dict[str, Any]
+Jobs = dict[str, Any]
+Env = dict[str, str]
 
 
 class Platform(Enum):
@@ -880,6 +882,11 @@ def build_wheels_job(
             "if": if_condition,
             "name": f"Build wheels ({str(platform.value)})",
             "runs-on": helper.runs_on(),
+            "permissions": {
+                "id-token": "write",
+                "contents": "write",
+                "attestations": "write",
+            },
             **({"container": container} if container else {}),
             **({"needs": needs} if needs else {}),
             "timeout-minutes": 90,
@@ -914,12 +921,16 @@ def build_wheels_job(
                 *(
                     [
                         {
-                            "name": "Upload Wheel and Pex",
+                            "name": "Attest the pantsbuild.pants wheel",
                             "if": "needs.release_info.outputs.is-release == 'true'",
-                            # NB: We can't use `gh` or even `./pants run 3rdparty/tools/gh` reliably
-                            #   in this job. Certain variations run on docker images without `gh`,
-                            #   and we could be building on a tag that doesn't have the `pants run <gh>`
-                            #   support. `curl` is a good lowest-common-denominator way to upload the assets.
+                            "uses": action("attest-build-provenance"),
+                            "with": {
+                                "subject-path": "dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants-*.whl",
+                            },
+                        },
+                        {
+                            "name": "Rename the Pants Pex to its final name for upload",
+                            "if": "needs.release_info.outputs.is-release == 'true'",
                             "run": dedent(
                                 """\
                                 PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
@@ -928,7 +939,27 @@ def build_wheels_job(
                                 PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
 
                                 mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
-
+                                echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
+                                """
+                            ),
+                        },
+                        {
+                            "name": "Attest the Pants Pex artifact",
+                            "if": "needs.release_info.outputs.is-release == 'true'",
+                            "uses": action("attest-build-provenance"),
+                            "with": {
+                                "subject-path": "dist/src.python.pants/*.pex",
+                            },
+                        },
+                        {
+                            "name": "Upload Wheel and Pex",
+                            "if": "needs.release_info.outputs.is-release == 'true'",
+                            # NB: We can't use `gh` or even `./pants run 3rdparty/tools/gh` reliably
+                            #   in this job. Certain variations run on docker images without `gh`,
+                            #   and we could be building on a tag that doesn't have the `pants run <gh>`
+                            #   support. `curl` is a good lowest-common-denominator way to upload the assets.
+                            "run": dedent(
+                                """\
                                 curl -L --fail \\
                                     -X POST \\
                                     -H "Authorization: Bearer ${{ github.token }}" \\
@@ -948,6 +979,14 @@ def build_wheels_job(
                         },
                         *(
                             [
+                                {
+                                    "name": "Attest the pantsbuild.pants.testutil wheel",
+                                    "if": "needs.release_info.outputs.is-release == 'true'",
+                                    "uses": action("attest-build-provenance"),
+                                    "with": {
+                                        "subject-path": "dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants.testutil*.whl",
+                                    },
+                                },
                                 {
                                     "name": "Upload testutil Wheel",
                                     "if": "needs.release_info.outputs.is-release == 'true'",
@@ -1283,7 +1322,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     },
                     "run": dedent(
                         f"""\
-                        gh release edit {gha_expr("needs.release_info.outputs.build-ref") } --draft=false --notes-file notes.txt
+                        gh release edit {gha_expr("needs.release_info.outputs.build-ref")} --draft=false --notes-file notes.txt
                         """
                     ),
                 },
@@ -1702,7 +1741,7 @@ def merge_ok(pr_jobs: list[str]) -> Jobs:
                 {
                     "run": dedent(
                         f"""\
-                merge_ok="{gha_expr('needs.set_merge_ok.outputs.merge_ok')}"
+                merge_ok="{gha_expr("needs.set_merge_ok.outputs.merge_ok")}"
                 if [[ "${{merge_ok}}" == "true" ]]; then
                     echo "Merge OK"
                     exit 0
@@ -1772,7 +1811,7 @@ def generate() -> dict[Path, str]:
                         *checkout(),
                         {
                             "name": "Cargo audit (for security vulnerabilities)",
-                            "run": f"./cargo install --version 0.17.5 cargo-audit\n./cargo audit {ignore_advisories}\n",
+                            "run": f"./cargo install cargo-audit --locked\n./cargo audit {ignore_advisories}\n",
                         },
                     ],
                 }

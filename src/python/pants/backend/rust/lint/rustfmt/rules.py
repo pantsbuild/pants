@@ -12,9 +12,8 @@ from pants.backend.rust.target_types import RustPackageSourcesField
 from pants.backend.rust.util_rules.toolchains import RustToolchainProcess
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.partitions import PartitionerType
-from pants.engine.internals.selectors import Get
-from pants.engine.process import ProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.process import execute_process_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import FieldSet, Target
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -39,23 +38,24 @@ class RustfmtRequest(FmtTargetsRequest):
 
 @rule(desc="Format with rustfmt")
 async def rustfmt_fmt(request: RustfmtRequest.Batch) -> FmtResult:
-    result = await Get(
-        ProcessResult,
-        RustToolchainProcess(
-            binary="rustfmt",
-            args=request.snapshot.files,
-            input_digest=request.snapshot.digest,
-            output_files=request.snapshot.files,
-            description=f"Run rustfmt on {pluralize(len(request.files), 'file')}.",
-            level=LogLevel.DEBUG,
-        ),
+    result = await execute_process_or_raise(
+        **implicitly(
+            RustToolchainProcess(
+                binary="rustfmt",
+                args=request.snapshot.files,
+                input_digest=request.snapshot.digest,
+                output_files=request.snapshot.files,
+                description=f"Run rustfmt on {pluralize(len(request.files), 'file')}.",
+                level=LogLevel.DEBUG,
+            )
+        )
     )
     return await FmtResult.create(request, result)
 
 
 def rules():
-    return [
+    return (
         *collect_rules(),
         *skip_field.rules(),
         *RustfmtRequest.rules(),
-    ]
+    )

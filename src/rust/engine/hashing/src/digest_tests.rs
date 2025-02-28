@@ -1,6 +1,6 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-use self::serde_test::{assert_tokens, Token};
+use self::serde_test::{Token, assert_tokens};
 use super::Digest;
 use super::Fingerprint;
 use serde_test;

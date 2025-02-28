@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Collection
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path, PurePath
-from typing import Collection
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot

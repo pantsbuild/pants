@@ -219,25 +219,27 @@ fn test_banned_alias_names() {
     assert_eq!(
         "Invalid alias in `[cli].alias` option: fmt. This is already a registered goal or subsytem.",
         cli_alias::create_alias_map(
-            Some(&hashmap!{"fmt".to_string() => hashset!{}}),
-            &owned_map(hashmap!{"fmt" => ""}),
-        ).unwrap_err()
+            Some(&hashmap! {"fmt".to_string() => hashset!{}}),
+            &owned_map(hashmap! {"fmt" => ""}),
+        )
+        .unwrap_err()
     );
 
     assert_eq!(
         "Invalid alias in `[cli].alias` option: --keep-sandboxes. This is already a registered flag in the GLOBAL scope.",
         cli_alias::create_alias_map(
-            Some(&hashmap!{"".to_string() => hashset!{"--keep-sandboxes".to_string()}}),
-            &owned_map(hashmap!{"--keep-sandboxes" => ""},
+            Some(&hashmap! {"".to_string() => hashset!{"--keep-sandboxes".to_string()}}),
+            &owned_map(hashmap! {"--keep-sandboxes" => ""},)
         )
-    ).unwrap_err()
-        );
+        .unwrap_err()
+    );
 
     assert_eq!(
         "Invalid alias in `[cli].alias` option: --changed-since. This is already a registered flag in the changed scope.",
         cli_alias::create_alias_map(
-            Some(&hashmap!{"changed".to_string() => hashset!{"--changed-since".to_string()}}),
-            &owned_map(hashmap!{"--changed-since" => ""})
-        ).unwrap_err()
+            Some(&hashmap! {"changed".to_string() => hashset!{"--changed-since".to_string()}}),
+            &owned_map(hashmap! {"--changed-since" => ""})
+        )
+        .unwrap_err()
     );
 }

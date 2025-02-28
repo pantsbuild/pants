@@ -14,12 +14,12 @@ use std::time::Instant;
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use fs::{
-    self, DigestTrie, DirectoryDigest, GlobExpansionConjunction, GlobMatching, PathGlobs,
-    Permissions, RelativePath, StrictGlobMatching, SymlinkBehavior, TypedPath,
-    EMPTY_DIRECTORY_DIGEST,
+    self, DigestTrie, DirectoryDigest, EMPTY_DIRECTORY_DIGEST, GlobExpansionConjunction,
+    GlobMatching, PathGlobs, Permissions, RelativePath, StrictGlobMatching, SymlinkBehavior,
+    TypedPath,
 };
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
-use futures::{try_join, FutureExt, TryFutureExt};
+use futures::{FutureExt, TryFutureExt, try_join};
 use log::{debug, info};
 use nails::execution::ExitCode;
 use shell_quote::Bash;
@@ -33,7 +33,7 @@ use tokio::process::Command;
 use tokio::sync::RwLock;
 use tokio::time::timeout;
 use tokio_util::codec::{BytesCodec, FramedRead};
-use workunit_store::{in_workunit, Level, Metric, RunningWorkunit};
+use workunit_store::{Level, Metric, RunningWorkunit, in_workunit};
 
 use crate::fork_exec::spawn_process;
 use crate::{
