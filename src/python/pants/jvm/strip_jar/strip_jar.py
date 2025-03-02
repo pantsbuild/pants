@@ -1,9 +1,8 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import importlib.resources
 from dataclasses import dataclass
-
-import pkg_resources
 
 from pants.core.goals.resolves import ExportableTool
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, Directory, FileContent
@@ -97,7 +96,8 @@ async def strip_jar(
 
 
 def _load_strip_jar_source() -> bytes:
-    return pkg_resources.resource_string(__name__, _STRIP_JAR_BASENAME)
+    parent_module = ".".join(__name__.split(".")[:-1])
+    return importlib.resources.files(parent_module).joinpath(_STRIP_JAR_BASENAME).read_bytes()
 
 
 # TODO(13879): Consolidate compilation of wrapper binaries to common rules.
