@@ -249,7 +249,7 @@ def test_mocha_tests(
             "foo/BUILD": "package_json()",
             "foo/package.json": given_package_json(
                 test_script={"test": "mocha"},
-                runner={"mocha": "^10.4.0"},
+                runner={"mocha": "^11.1.0"},
             ),
             **{f"foo/{key}": value for key, value in mocha_lockfile.items()},
             "foo/src/BUILD": "javascript_sources()",
