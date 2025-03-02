@@ -220,7 +220,7 @@ def _load_jar_tool_sources() -> list[FileContent]:
                 continue
             result.append(
                 FileContent(
-                    path=resource.name,
+                    path=os.path.join(package, resource.name),
                     content=resource.read_bytes(),
                 )
             )
