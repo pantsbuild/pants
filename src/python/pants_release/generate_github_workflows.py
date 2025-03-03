@@ -322,9 +322,12 @@ def install_rustup() -> Step:
     return {
         "name": "Install rustup",
         "run": dedent(
-            """\
+            f"""\
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y --default-toolchain none
-            echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
+            rustup show active-toolchain || rustup toolchain install
+            rustup toolchain install {rust_channel()}
+            cargo version
+            echo "${{HOME}}/.cargo/bin" >> $GITHUB_PATH
             """
         ),
     }
