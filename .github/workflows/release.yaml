@@ -37,13 +37,13 @@ jobs:
       run: 'curl --proto ''=https'' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s --
         -v -y --default-toolchain none
 
-        rustup show active-toolchain || rustup toolchain install
+        echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
 
-        rustup toolchain install 1.85.0
+        '
+    - name: Install Rust toolchain
+      run: 'rustup toolchain install 1.85.0
 
         cargo version
-
-        echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
 
         '
     - name: Expose Pythons
@@ -152,13 +152,13 @@ jobs:
       run: 'curl --proto ''=https'' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s --
         -v -y --default-toolchain none
 
-        rustup show active-toolchain || rustup toolchain install
+        echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
 
-        rustup toolchain install 1.85.0
+        '
+    - name: Install Rust toolchain
+      run: 'rustup toolchain install 1.85.0
 
         cargo version
-
-        echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
 
         '
     - name: Expose Pythons

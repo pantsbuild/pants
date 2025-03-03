@@ -318,19 +318,27 @@ def rust_channel() -> str:
     return cast(str, rust_toolchain["toolchain"]["channel"])
 
 
-def install_rustup() -> Step:
-    return {
-        "name": "Install rustup",
-        "run": dedent(
-            f"""\
+def install_rustup() -> list[Step]:
+    return [
+        {
+            "name": "Install rustup",
+            "run": dedent(
+                """\
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y --default-toolchain none
-            rustup show active-toolchain || rustup toolchain install
+            echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
+            """
+            ),
+        },
+        {
+            "name": "Install Rust toolchain",
+            "run": dedent(
+                f"""\
             rustup toolchain install {rust_channel()}
             cargo version
-            echo "${{HOME}}/.cargo/bin" >> $GITHUB_PATH
             """
-        ),
-    }
+            ),
+        },
+    ]
 
 
 def install_pythons(versions: list[str]) -> Step:
@@ -850,7 +858,7 @@ def build_wheels_job(
     if container:
         initial_steps = [
             *checkout(containerized=True, ref=for_deploy_ref),
-            install_rustup(),
+            *install_rustup(),
             {
                 "name": "Expose Pythons",
                 "run": dedent(
