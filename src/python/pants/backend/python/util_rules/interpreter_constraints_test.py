@@ -46,6 +46,7 @@ def test_merge_interpreter_constraints() -> None:
         normalized_expected = sorted(str(Requirement(v)) for v in expected)
         assert result == normalized_expected
 
+
     # Multiple constraint sets get merged so that they are ANDed.
     # A & B => A & B
     assert_merged(inp=[["CPython==2.7.*"], ["CPython==3.6.*"]], expected=["CPython==2.7.*,==3.6.*"])
@@ -489,7 +490,6 @@ def test_partition_into_major_minor_versions(constraints: list[str], expected: l
         (["==3.0.*"], (3, 0)),
         (["==3.45.*"], (3, 45)),
         ([">=3.45,<3.46"], (3, 45)),
-        ([">=3.45.*,<3.46.*"], (3, 45)),
         (["CPython>=3.45,<3.46"], (3, 45)),
         (["<3.46,>=3.45"], (3, 45)),
         # Invalid/too hard
@@ -513,7 +513,6 @@ def test_partition_into_major_minor_versions(constraints: list[str], expected: l
         ([">3.45,<=3.46"], None),
         ([">3.45,<3.47"], None),
         (["===3.45"], None),
-        ([">=3.45,<=3.45.*"], None),
         # wrong number of elements
         ([], None),
         (["==3.45.*", "==3.46.*"], None),
