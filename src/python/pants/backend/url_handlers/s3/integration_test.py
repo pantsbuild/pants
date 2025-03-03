@@ -58,6 +58,9 @@ def monkeypatch_botocore(monkeypatch):
             def set_config_variable(self, key, value):
                 self.config_vars.update({key: value})
 
+            def get_config_variable(self, key):
+                return self.config_vars.get(key) or "us-east-1"
+
             def get_credentials(self):
                 if self.creds:
                     return self.creds
@@ -91,14 +94,17 @@ def monkeypatch_botocore(monkeypatch):
             Credentials=FakeCredentials.create,
         )
 
-        def fake_auth_ctor(creds):
+        def fake_auth_ctor(creds, service_name, region_name):
+            assert service_name == "s3"
+            assert region_name in ["us-east-1", "us-west-2"]
+
             def add_auth(request):
                 request.url == expected_url
                 request.headers["AUTH"] = "TOKEN"
 
             return SimpleNamespace(add_auth=add_auth)
 
-        botocore.auth = SimpleNamespace(HmacV1Auth=fake_auth_ctor)
+        botocore.auth = SimpleNamespace(SigV4Auth=fake_auth_ctor)
 
         monkeypatch.setitem(sys.modules, "botocore", botocore)
 
