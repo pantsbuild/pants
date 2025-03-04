@@ -263,6 +263,31 @@ def test_infers_js_dependencies_via_config_and_extension_less_imports(
     assert set(addresses) == {Address("root/project/src/components", relative_file_path="index.js")}
 
 
+def test_infers_js_dependencies_with_file_suffix(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "root/project/src/__generated__/BUILD": "javascript_sources()",
+            "root/project/src/__generated__/moduleA.generated.js": "",
+            "root/project/src/BUILD": "javascript_sources()",
+            "root/project/src/index.js": dedent(
+                """\
+                import { x } from "./__generated__/moduleA.generated";
+                """
+            ),
+        }
+    )
+
+    index_tgt = rule_runner.get_target(Address("root/project/src", relative_file_path="index.js"))
+    addresses = rule_runner.request(
+        InferredDependencies,
+        [InferJSDependenciesRequest(JSSourceInferenceFieldSet.create(index_tgt))],
+    ).include
+
+    assert set(addresses) == {
+        Address("root/project/src/__generated__", relative_file_path="moduleA.generated.js"),
+    }
+
+
 def test_infers_js_dependencies_with_compiled_typescript_modules(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
