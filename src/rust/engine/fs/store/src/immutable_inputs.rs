@@ -96,9 +96,9 @@ impl ImmutableInputs {
         cell.get_or_try_init(async {
             let chroot = TempDir::new_in(self.0.workdir.path()).map_err(|e| {
                 format!(
-            "Failed to create a temporary directory for materialization of immutable input \
+                    "Failed to create a temporary directory for materialization of immutable input \
             digest {digest:?}: {e}"
-          )
+                )
             })?;
 
             let dest = chroot.path().join(digest.hash.to_hex());

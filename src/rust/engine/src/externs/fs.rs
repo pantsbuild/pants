@@ -15,14 +15,14 @@ use pyo3::pybacked::PyBackedStr;
 use pyo3::types::{PyIterator, PyString, PyTuple, PyType};
 
 use fs::{
-    DirectoryDigest, FilespecMatcher, GlobExpansionConjunction, PathGlobs, PathMetadata,
-    StrictGlobMatching, EMPTY_DIRECTORY_DIGEST,
+    DirectoryDigest, EMPTY_DIRECTORY_DIGEST, FilespecMatcher, GlobExpansionConjunction, PathGlobs,
+    PathMetadata, StrictGlobMatching,
 };
-use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
+use hashing::{Digest, EMPTY_DIGEST, Fingerprint};
 use store::Snapshot;
 
-use crate::python::PyComparedBool;
 use crate::Failure;
+use crate::python::PyComparedBool;
 
 pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDigest>()?;

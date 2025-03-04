@@ -8,13 +8,13 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Instant;
 
-use futures::ready;
 use futures::Future;
+use futures::ready;
 use http::{Request, Response};
 use pin_project::pin_project;
 use tower_layer::Layer;
 use tower_service::Service;
-use workunit_store::{record_observation_if_in_workunit, ObservationMetric};
+use workunit_store::{ObservationMetric, record_observation_if_in_workunit};
 
 #[derive(Clone, Debug)]
 pub struct NetworkMetricsLayer {

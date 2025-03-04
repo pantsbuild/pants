@@ -34,7 +34,6 @@ tree-sitter = { workspace = true }
 tree-sitter-javascript = { workspace = true }
 tree-sitter-python = { workspace = true }
 tree-sitter-dockerfile = { workspace = true }
-lazy_static = { workspace = true }
 regex = { workspace = true }
 
 [lints]

@@ -1,6 +1,6 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-use std::iter::{once, Once};
+use std::iter::{Once, once};
 use std::path::{Path, PathBuf};
 
 use fnv::{FnvBuildHasher, FnvHashMap as HashMap, FnvHashSet as HashSet};
@@ -10,10 +10,10 @@ use tree_sitter::{Node, Parser};
 
 use crate::code;
 use protos::gen::pants::cache::{
-    javascript_inference_metadata::ImportPattern, JavascriptInferenceMetadata,
+    JavascriptInferenceMetadata, javascript_inference_metadata::ImportPattern,
 };
 
-use crate::javascript::import_pattern::{imports_from_patterns, Import};
+use crate::javascript::import_pattern::{Import, imports_from_patterns};
 use crate::javascript::util::normalize_path;
 
 mod import_pattern;

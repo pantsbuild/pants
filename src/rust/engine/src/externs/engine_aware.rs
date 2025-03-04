@@ -3,10 +3,10 @@
 
 use std::sync::Arc;
 
+use crate::Value;
 use crate::externs;
 use crate::externs::fs::PyFileDigest;
 use crate::nodes::{lift_directory_digest, lift_file_digest};
-use crate::Value;
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;

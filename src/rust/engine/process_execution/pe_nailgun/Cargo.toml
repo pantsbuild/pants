@@ -20,7 +20,6 @@ tokio-util = { workspace = true, features = ["codec"] }
 workunit_store = { path = "../../workunit_store" }
 itertools = { workspace = true }
 process_execution = { path = ".." }
-lazy_static = { workspace = true }
 regex = { workspace = true }
 tempfile = { workspace = true }
 hashing = { path = "../../hashing" }

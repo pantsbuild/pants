@@ -13,19 +13,19 @@ use fs::{DirectoryDigest, Entry, SymlinkBehavior};
 use grpc_util::prost::MessageExt;
 use hashing::Digest;
 use protos::gen::pants::cache::{
-    dependency_inference_request, CacheKey, CacheKeyType, DependencyInferenceRequest,
+    CacheKey, CacheKeyType, DependencyInferenceRequest, dependency_inference_request,
 };
-use pyo3::prelude::{pyfunction, wrap_pyfunction, PyModule, PyResult, Python};
+use pyo3::prelude::{PyModule, PyResult, Python, pyfunction, wrap_pyfunction};
 use pyo3::types::{PyAnyMethods, PyModuleMethods};
 use pyo3::{Bound, IntoPyObject, PyErr};
 use store::Store;
-use workunit_store::{in_workunit, Level};
+use workunit_store::{Level, in_workunit};
 
 use crate::externs::dep_inference::PyNativeDependenciesRequest;
-use crate::externs::{store_dict, PyGeneratorResponseNativeCall};
-use crate::nodes::{task_get_context, NodeResult};
+use crate::externs::{PyGeneratorResponseNativeCall, store_dict};
+use crate::nodes::{NodeResult, task_get_context};
 use crate::python::{Failure, Value};
-use crate::{externs, Core};
+use crate::{Core, externs};
 
 pub fn register(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_dockerfile_info, m)?)?;

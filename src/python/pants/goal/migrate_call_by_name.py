@@ -95,7 +95,7 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
         files_to_migrate = requested_files.intersection(plan_files)
         if not files_to_migrate:
             logger.info(
-                f"None of the {len(requested_files)} requested files are part of the {len(plan_files)} files in the migration plan"
+                f"None of the {len(requested_files)} requested files are part of the {len(plan_files)} files in the migration plan. Please ensure the backend containing these files is activated in pants.toml."
             )
             return PANTS_SUCCEEDED_EXIT_CODE
 

@@ -218,7 +218,7 @@ class MyPyFirstPartyPlugins:
     source_roots: tuple[str, ...]
 
 
-@rule("Prepare [mypy].source_plugins", level=LogLevel.DEBUG)
+@rule(desc="Prepare [mypy].source_plugins", level=LogLevel.DEBUG)
 async def mypy_first_party_plugins(
     mypy: MyPy,
 ) -> MyPyFirstPartyPlugins:

@@ -47,9 +47,10 @@ fn test_expand_fromfile() {
     );
     assert_eq!(Ok(None), expand("@?/does/not/exist".to_string()));
     let err = expand("@/does/not/exist".to_string()).unwrap_err();
-    assert!(err
-        .render("XXX")
-        .starts_with("Problem reading /does/not/exist for XXX: No such file or directory"))
+    assert!(
+        err.render("XXX")
+            .starts_with("Problem reading /does/not/exist for XXX: No such file or directory")
+    )
 }
 
 #[test]

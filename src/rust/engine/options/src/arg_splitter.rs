@@ -3,11 +3,12 @@
 
 use crate::flags::Flag;
 use crate::{GoalInfo, Scope};
-use lazy_static::lazy_static;
+
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
 // These are the names for the built in goals to print help message when there is no goal, or any
 // unknown goals respectively. They begin with underlines to exclude them from the list of goals in
@@ -15,13 +16,13 @@ use std::path::{Path, PathBuf};
 pub const NO_GOAL_NAME: &str = "__no_goal";
 pub const UNKNOWN_GOAL_NAME: &str = "__unknown_goal";
 
-lazy_static! {
-    static ref SPEC_RE: Regex = Regex::new(r"[/\\.:*#]").unwrap();
-    static ref SINGLE_DASH_FLAGS: HashSet<&'static str> = HashSet::from([
+static SPEC_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[/\\.:*#]").unwrap());
+static SINGLE_DASH_FLAGS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+    HashSet::from([
         "-h", "-v", "-V", "-ltrace", "-ldebug", "-linfo", "-lwarn", "-lerror", "-l=trace",
         "-l=debug", "-l=info", "-l=warn", "-l=error",
-    ]);
-}
+    ])
+});
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Args {
@@ -40,11 +41,11 @@ impl Args {
     pub fn argv() -> Self {
         let mut args = env::args().collect::<Vec<_>>().into_iter();
         args.next(); // Consume the process name (argv[0]).
-                     // TODO: In Pants's own integration tests we may invoke Pants in a subprocess via
-                     //  `python -m pants` or `python path/to/__main__.py` or similar. So
-                     //  skipping argv[0] may not be sufficient to get just the set of args to split.
-                     //  In practice our tests pass despite these extra args being interpreted as specs
-                     //  or goals, but that is skating on thin ice.
+        // TODO: In Pants's own integration tests we may invoke Pants in a subprocess via
+        //  `python -m pants` or `python path/to/__main__.py` or similar. So
+        //  skipping argv[0] may not be sufficient to get just the set of args to split.
+        //  In practice our tests pass despite these extra args being interpreted as specs
+        //  or goals, but that is skating on thin ice.
         Self::new(args.collect::<Vec<_>>())
     }
 }

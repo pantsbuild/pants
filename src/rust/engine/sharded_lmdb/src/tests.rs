@@ -8,7 +8,7 @@ use parking_lot::Mutex;
 use task_executor::Executor;
 use tempfile::TempDir;
 
-use crate::{ShardedLmdb, DEFAULT_LEASE_TIME};
+use crate::{DEFAULT_LEASE_TIME, ShardedLmdb};
 
 fn new_store(shard_count: u8) -> (ShardedLmdb, TempDir) {
     let tempdir = TempDir::new().unwrap();

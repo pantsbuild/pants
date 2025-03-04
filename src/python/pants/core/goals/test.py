@@ -624,7 +624,7 @@ class TestSubsystem(GoalSubsystem):
         advanced=True,
         help="The maximum timeout (in seconds) that may be used on a test target.",
     )
-    attempts_default = IntOption(
+    _attempts_default = IntOption(
         default=1,
         help=softwrap(
             """
@@ -700,6 +700,15 @@ class TestSubsystem(GoalSubsystem):
 
     def report_dir(self, distdir: DistDir) -> PurePath:
         return PurePath(self._report_dir.format(distdir=distdir.relpath))
+
+    @property
+    def attempts_default(self):
+        if self._attempts_default < 1:
+            raise ValueError(
+                "The `--test-attempts-default` option must have a value equal or greater than 1. "
+                f"Instead, it was set to {self._attempts_default}."
+            )
+        return self._attempts_default
 
 
 class Test(Goal):

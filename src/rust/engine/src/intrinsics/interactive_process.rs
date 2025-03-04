@@ -8,20 +8,20 @@ use std::str::FromStr;
 
 use futures::future::TryFutureExt;
 use process_execution::local::{
-    apply_chroot, create_sandbox, prepare_workdir, setup_run_sh_script, KeepSandboxes,
+    KeepSandboxes, apply_chroot, create_sandbox, prepare_workdir, setup_run_sh_script,
 };
 use process_execution::{ManagedChild, ProcessExecutionStrategy};
-use pyo3::prelude::{pyfunction, wrap_pyfunction, PyAny, PyModule, PyResult, Python};
+use pyo3::Bound;
+use pyo3::prelude::{PyAny, PyModule, PyResult, Python, pyfunction, wrap_pyfunction};
 use pyo3::pybacked::PyBackedStr;
 use pyo3::types::{PyAnyMethods, PyModuleMethods};
-use pyo3::Bound;
 use stdio::TryCloneAsFile;
 use tokio::process;
-use workunit_store::{in_workunit, Level};
+use workunit_store::{Level, in_workunit};
 
 use crate::context::Context;
 use crate::externs::{self, PyGeneratorResponseNativeCall};
-use crate::nodes::{task_get_context, ExecuteProcess, NodeResult};
+use crate::nodes::{ExecuteProcess, NodeResult, task_get_context};
 use crate::python::{Failure, Value};
 
 pub fn register(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {

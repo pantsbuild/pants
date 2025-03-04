@@ -4,7 +4,7 @@ use std::cmp;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{self, AtomicUsize};
-use std::sync::{mpsc, Arc};
+use std::sync::{Arc, mpsc};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -251,9 +251,9 @@ async fn invalidate_randomly() {
     }
 
     assert!(
-    max_distinct_context_values > 1,
-    "In {iterations} iterations, observed a maximum of {max_distinct_context_values} distinct context values."
-  );
+        max_distinct_context_values > 1,
+        "In {iterations} iterations, observed a maximum of {max_distinct_context_values} distinct context values."
+    );
 }
 
 #[tokio::test]
@@ -533,11 +533,13 @@ async fn retries() {
     let sleep_per_invalidation = Duration::from_millis(10);
     let invalidation_deadline = Instant::now() + Duration::from_secs(1);
     let graph2 = graph.clone();
-    let join_handle = thread::spawn(move || loop {
-        thread::sleep(sleep_per_invalidation);
-        graph2.invalidate_from_roots(true, |n| n.id == 0);
-        if Instant::now() > invalidation_deadline {
-            break;
+    let join_handle = thread::spawn(move || {
+        loop {
+            thread::sleep(sleep_per_invalidation);
+            graph2.invalidate_from_roots(true, |n| n.id == 0);
+            if Instant::now() > invalidation_deadline {
+                break;
+            }
         }
     });
 

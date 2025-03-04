@@ -1,29 +1,28 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::borrow::Cow;
-use std::cmp::{max, min, Ordering, Reverse};
+use std::cmp::{Ordering, Reverse, max, min};
 use std::collections::VecDeque;
 use std::fmt::{self, Debug};
 use std::future::Future;
-use std::sync::{atomic, Arc};
+use std::sync::LazyLock;
+use std::sync::{Arc, atomic};
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
-use lazy_static::lazy_static;
 use log::Level;
 use parking_lot::Mutex;
 use regex::Regex;
 use task_executor::Executor;
 use tokio::sync::{Notify, Semaphore, SemaphorePermit};
 use tokio::time::sleep;
-use workunit_store::{in_workunit, RunningWorkunit};
+use workunit_store::{RunningWorkunit, in_workunit};
 
 use crate::{Context, FallibleProcessResultWithPlatform, Process, ProcessError};
 
-lazy_static! {
-  // TODO: Runtime formatting is unstable in Rust, so we imitate it.
-  static ref CONCURRENCY_TEMPLATE_RE: Regex = Regex::new(r"\{pants_concurrency\}").unwrap();
-}
+// TODO: Runtime formatting is unstable in Rust, so we imitate it.
+static CONCURRENCY_TEMPLATE_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\{pants_concurrency\}").unwrap());
 
 ///
 /// A CommandRunner wrapper which limits the number of concurrent requests and which provides

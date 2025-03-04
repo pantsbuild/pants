@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use bollard::Docker;
-use fs::{RelativePath, EMPTY_DIRECTORY_DIGEST};
+use fs::{EMPTY_DIRECTORY_DIGEST, RelativePath};
 use maplit::hashset;
 use store::{ImmutableInputs, Store};
 use tempfile::TempDir;
@@ -17,8 +17,8 @@ use workunit_store::{RunningWorkunit, WorkunitStore};
 use crate::docker::{DockerOnceCell, ImagePullCache, SANDBOX_BASE_PATH_IN_CONTAINER};
 use process_execution::local::KeepSandboxes;
 use process_execution::{
-    local, CacheName, CommandRunner, Context, FallibleProcessResultWithPlatform, InputDigests,
-    Platform, Process, ProcessError,
+    CacheName, CommandRunner, Context, FallibleProcessResultWithPlatform, InputDigests, Platform,
+    Process, ProcessError, local,
 };
 
 /// Docker image to use for most tests in this file.

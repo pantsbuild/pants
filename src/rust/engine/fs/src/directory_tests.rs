@@ -3,8 +3,8 @@
 
 use std::collections::HashMap;
 
-use crate::directory::{DigestTrie, Entry, Name, TypedPath};
 use crate::MAX_LINK_DEPTH;
+use crate::directory::{DigestTrie, Entry, Name, TypedPath};
 use hashing::EMPTY_DIGEST;
 use std::path::{Path, PathBuf};
 

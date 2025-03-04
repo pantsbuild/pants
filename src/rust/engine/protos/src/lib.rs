@@ -38,11 +38,11 @@ pub mod gen {
 
                         pub fn empty_digest() -> Digest {
                             Digest {
-                hash: String::from(
-                  "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                ),
-                size_bytes: 0,
-              }
+                                hash: String::from(
+                                    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                                ),
+                                size_bytes: 0,
+                            }
                         }
                     }
                 }

@@ -7,16 +7,16 @@ from dataclasses import dataclass
 from pants.backend.visibility.subsystem import VisibilitySubsystem
 from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.partitions import PartitionerType
-from pants.engine.addresses import Addresses
+from pants.engine.internals.build_files import get_dependencies_rule_application
 from pants.engine.internals.dep_rules import DependencyRuleActionDeniedError
+from pants.engine.internals.graph import resolve_dependencies
 from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     AlwaysTraverseDeps,
     Dependencies,
     DependenciesRequest,
-    DependenciesRuleApplication,
     DependenciesRuleApplicationRequest,
     FieldSet,
 )
@@ -39,29 +39,29 @@ class EnforceVisibilityRules(LintTargetsRequest):
 async def check_visibility_rule_violations(
     request: EnforceVisibilityRules.Batch, platform: Platform, run_id: RunId
 ) -> LintResult:
-    all_dependencies = await MultiGet(
-        Get(
-            Addresses,
+    all_dependencies = await concurrently(
+        resolve_dependencies(
             DependenciesRequest(
                 field_set.dependencies,
                 should_traverse_deps_predicate=AlwaysTraverseDeps(),
             ),
+            **implicitly(),
         )
         for field_set in request.elements
     )
-    all_dependencies_rule_action = await MultiGet(
-        Get(
-            DependenciesRuleApplication,
+    all_dependencies_rule_action = await concurrently(
+        get_dependencies_rule_application(
             DependenciesRuleApplicationRequest(
                 address=field_set.address,
                 dependencies=dependencies,
                 description_of_origin=f"get dependency rules for {field_set.address}",
             ),
+            **implicitly(),
         )
         for field_set, dependencies in zip(request.elements, all_dependencies)
     )
 
-    violations = []
+    violations: list[str] = []
     for deps_rule_action in all_dependencies_rule_action:
         try:
             deps_rule_action.execute_actions()

@@ -1,8 +1,8 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::hash_map::DefaultHasher;
 use std::collections::BTreeMap;
+use std::collections::hash_map::DefaultHasher;
 use std::fs::Permissions;
 use std::hash::{Hash, Hasher};
 use std::os::unix::fs::PermissionsExt;
@@ -18,8 +18,8 @@ use tempfile::TempDir;
 use workunit_store::RunId;
 
 use crate::{
-    maybe_make_wrapper_script, CacheName, Platform, Process, ProcessExecutionEnvironment,
-    ProcessExecutionStrategy, ProcessResultMetadata, ProcessResultSource,
+    CacheName, Platform, Process, ProcessExecutionEnvironment, ProcessExecutionStrategy,
+    ProcessResultMetadata, ProcessResultSource, maybe_make_wrapper_script,
 };
 
 #[test]

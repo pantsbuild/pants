@@ -8,17 +8,17 @@ use std::time::Duration;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
-use futures::future::BoxFuture;
 use futures::FutureExt;
-use prodash::progress::Step;
-use prodash::render::line;
+use futures::future::BoxFuture;
 use prodash::Root;
 use prodash::TreeOptions;
+use prodash::progress::Step;
+use prodash::render::line;
 
 use logging::fatal_log;
 use task_executor::Executor;
-use workunit_store::format_workunit_duration_ms;
 use workunit_store::SpanId;
+use workunit_store::format_workunit_duration_ms;
 
 use super::TaskState;
 use crate::ConsoleUI;

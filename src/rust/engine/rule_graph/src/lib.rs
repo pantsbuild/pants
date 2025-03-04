@@ -397,11 +397,11 @@ impl<R: Rule> RuleGraph<R> {
                 } else {
                     suggestions.sort();
                     format!(
-            "can compute {} given input Params({}), but it can be produced using:\n  {}",
-            product,
-            params_str(&params),
-            suggestions.join("\n  ")
-          )
+                        "can compute {} given input Params({}), but it can be produced using:\n  {}",
+                        product,
+                        params_str(&params),
+                        suggestions.join("\n  ")
+                    )
                 };
                 Err(format!("No installed QueryRules {suggestions_str}",))
             }

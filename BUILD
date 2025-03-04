@@ -35,7 +35,7 @@ files(
 )
 
 # NB: This should be in `lint` when we implement `lint` in https://github.com/pantsbuild/pants/issues/17729
-experimental_test_shell_command(
+test_shell_command(
     name="checks-empty-init-files",
     command="""
         NONEMPTY_INITS=$(find . -type f -name "*.py" -size +0);

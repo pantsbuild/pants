@@ -14,12 +14,12 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use concrete_time::{Duration, TimeSpan};
 use deepsize::DeepSizeOf;
-use fs::{DirectoryDigest, RelativePath, EMPTY_DIRECTORY_DIGEST};
+use fs::{DirectoryDigest, EMPTY_DIRECTORY_DIGEST, RelativePath};
 use fs::{File, PathStat};
+use futures::FutureExt;
 use futures::future::try_join_all;
 use futures::future::{self, BoxFuture, TryFutureExt};
 use futures::try_join;
-use futures::FutureExt;
 use grpc_util::prost::MessageExt;
 use hashing::Digest;
 use itertools::Itertools;
@@ -37,7 +37,7 @@ use store::{SnapshotOps, Store, StoreError};
 use task_executor::TailTasks;
 use tryfuture::try_future;
 use uuid::Uuid;
-use workunit_store::{in_workunit, Level, RunId, RunningWorkunit, WorkunitStore};
+use workunit_store::{Level, RunId, RunningWorkunit, WorkunitStore, in_workunit};
 
 pub mod bounded;
 #[cfg(test)]
@@ -1522,7 +1522,7 @@ pub fn extract_output_files(
                         return future::ready::<Result<_, StoreError>>(Ok(
                             DirectoryDigest::from_persisted_digest(digest),
                         ))
-                        .boxed()
+                        .boxed();
                     }
                     Err(err) => return futures::future::err(err.into()).boxed(),
                 };
@@ -1620,14 +1620,15 @@ pub fn extract_output_files(
     }
 
     async move {
-        let files_snapshot =
-            Snapshot::from_path_stats(StoreOneOffRemoteDigest::new(path_map), path_stats).map_err(
-                move |error| {
-                    format!(
+        let files_snapshot = Snapshot::from_path_stats(
+            StoreOneOffRemoteDigest::new(path_map),
+            path_stats,
+        )
+        .map_err(move |error| {
+            format!(
                 "Error when storing the output file directory info in the remote CAS: {error:?}"
             )
-                },
-            );
+        });
 
         let (files_snapshot, mut directory_digests) =
             future::try_join(files_snapshot, future::try_join_all(directory_digests)).await?;

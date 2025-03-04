@@ -2,8 +2,8 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use parking_lot::Mutex;
@@ -128,7 +128,7 @@ impl ActionCache for ActionCacheResponder {
             None => {
                 return Err(Status::invalid_argument(
                     "Must provide action result".to_owned(),
-                ))
+                ));
             }
         };
 
