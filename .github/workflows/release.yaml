@@ -36,6 +36,15 @@ jobs:
         echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
 
         '
+    - name: Install Rust toolchain
+      run: '# Set the default toolchain. Installs the toolchain if it is not already
+        installed.
+
+        rustup default 1.82.0
+
+        cargo version
+
+        '
     - name: Expose Pythons
       run: 'echo "/opt/python/cp37-cp37m/bin" >> $GITHUB_PATH
 
@@ -115,6 +124,15 @@ jobs:
         -v -y --default-toolchain none
 
         echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
+
+        '
+    - name: Install Rust toolchain
+      run: '# Set the default toolchain. Installs the toolchain if it is not already
+        installed.
+
+        rustup default 1.82.0
+
+        cargo version
 
         '
     - name: Expose Pythons
