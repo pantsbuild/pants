@@ -24,7 +24,6 @@ First, activate the relevant backend in `pants.toml`:
 backend_packages = [
   ...
   "pants.backend.experimental.k8s",
-  ...
 ]
 ```
 
@@ -104,10 +103,13 @@ pants experimental-deploy src/k8s:webpages
 ✓ src/k8s:webpages deployed to context kind-kind
 ```
 
-note::: To prevent accidentally deploying kubernetes manifests to the wrong
-cluster, the context field is required on `k8s_bundle` for deployment. For
-deploying the same `k8s_bundle` to multiple contexts, consider using
-`parametrize` like `k8s_bundle(..., context=parametrize("stage", "prod"))`. For
-CI agents which will only have access to a single context, set the
+:::note Explicitly set kubectl contexts
+To prevent accidentally deploying kubernetes manifests to the wrong cluster,
+the context field is required on `k8s_bundle` for deployment. For deploying the
+same `k8s_bundle` to multiple contexts, consider using [`parametrize`
+builtin](../using-pants/key-concepts/targets-and-build-files.mdx#parametrizing-targets)
+like `k8s_bundle(..., context=parametrize("stage", "prod"))`. For CI agents
+which will only have access to a single context, set the
 `[kubectl].pass_context` to false in `pants.toml` to have them use their
 default context.
+:::
