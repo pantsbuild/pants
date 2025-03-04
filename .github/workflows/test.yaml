@@ -358,7 +358,7 @@ jobs:
     - name: Install Rust toolchain
       run: '# Set the default toolchain. Installs the toolchain if it is not already installed.
 
-        rustup default 1.85.0
+        rustup default 1.82.0
 
         cargo version
 
@@ -430,7 +430,7 @@ jobs:
     - name: Install Rust toolchain
       run: '# Set the default toolchain. Installs the toolchain if it is not already installed.
 
-        rustup default 1.85.0
+        rustup default 1.82.0
 
         cargo version
 
