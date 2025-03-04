@@ -114,7 +114,7 @@ async def _resolve_entry_point(
         entry_point_module = module_mapping[field_set.address][0]
     elif len(reqs) == 1:
         # Use the canonicalized project name for a single-requirement target
-        entry_point_module = canonicalize_project_name(reqs[0].project_name)
+        entry_point_module = canonicalize_project_name(reqs[0].name)
     else:
         raise Exception(
             "Requirement must provide a single module, specify a single requirement, or specify "

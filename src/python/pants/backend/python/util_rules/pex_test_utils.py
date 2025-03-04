@@ -38,20 +38,20 @@ class ExactRequirement:
     @classmethod
     def parse(cls, requirement: str) -> ExactRequirement:
         req = PipRequirement.parse(requirement)
-        assert len(req.specs) == 1, softwrap(
+        assert len(req.specifier_set) == 1, softwrap(
             f"""
             Expected an exact requirement with only 1 specifier, given {requirement} with
-            {len(req.specs)} specifiers
+            {len(req.specifier_set)} specifiers
             """
         )
-        operator, version = req.specs[0]
-        assert operator == "==", softwrap(
+        specifier = next(iter(req.specifier_set))
+        assert specifier.operator == "==", softwrap(
             f"""
             Expected an exact requirement using only the '==' specifier, given {requirement}
-            using the {operator!r} operator
+            using the {specifier.operator!r} operator
             """
         )
-        return cls(project_name=req.project_name, version=version)
+        return cls(project_name=req.name, version=specifier.version)
 
 
 def parse_requirements(requirements: Iterable[str]) -> Iterator[ExactRequirement]:

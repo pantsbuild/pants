@@ -10,8 +10,7 @@ from collections import defaultdict
 from collections.abc import Iterable, Iterator, Sequence
 from typing import Protocol, TypeVar
 
-from packaging.requirements import InvalidRequirement
-from pkg_resources import Requirement
+from packaging.requirements import InvalidRequirement, Requirement
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
@@ -67,10 +66,10 @@ def parse_constraint(constraint: str) -> Requirement:
     interpreter.py's `parse_requirement()`.
     """
     try:
-        parsed_requirement = Requirement.parse(constraint)
+        parsed_requirement = Requirement(constraint)
     except ValueError as err:
         try:
-            parsed_requirement = Requirement.parse(f"CPython{constraint}")
+            parsed_requirement = Requirement(f"CPython{constraint}")
         except ValueError:
             raise InvalidRequirement(
                 f"Failed to parse Python interpreter constraint `{constraint}`: {err.args[0]}"
@@ -147,16 +146,12 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         if len(parsed_constraint_sets) == 1:
             return next(iter(parsed_constraint_sets))
 
-        def and_constraints(parsed_constraints: Sequence[Requirement]) -> Requirement:
-            merged_specs: set[tuple[str, str]] = set()
-            expected_interpreter = parsed_constraints[0].project_name
-            for parsed_constraint in parsed_constraints:
-                if parsed_constraint.project_name != expected_interpreter:
-                    return impossible
-                merged_specs.update(parsed_constraint.specs)
-
-            formatted_specs = ",".join(f"{op}{version}" for op, version in merged_specs)
-            return parse_constraint(f"{expected_interpreter}{formatted_specs}")
+        def and_constraints(parsed_requirements: Sequence[Requirement]) -> Requirement:
+            assert len(parsed_requirements) > 0, "At least one `Requirement` must be supplied."
+            current_requirement_specifier = parsed_requirements[0].specifier
+            for requirement in parsed_requirements[1:]:
+                current_requirement_specifier &= requirement.specifier
+            return Requirement(str(current_requirement_specifier))
 
         ored_constraints = (
             and_constraints(constraints_product)
@@ -238,7 +233,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
     def _valid_patch_versions(self, major: int, minor: int) -> Iterator[int]:
         for p in range(0, _PATCH_VERSION_UPPER_BOUND + 1):
             for req in self:
-                if req.specifier.contains(f"{major}.{minor}.{p}"):  # type: ignore[attr-defined]
+                if req.specifier.contains(f"{major}.{minor}.{p}"):
                     yield p
 
     def _includes_version(self, major: int, minor: int) -> bool:
@@ -271,9 +266,9 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         for major, minor in sorted(_major_minor_to_int(s) for s in interpreter_universe):
             for p in range(0, _PATCH_VERSION_UPPER_BOUND + 1):
                 for req in self:
-                    if req.specifier.contains(f"{major}.{minor}.{p}"):  # type: ignore[attr-defined]
+                    if req.specifier.contains(f"{major}.{minor}.{p}"):
                         # We've found the minimum major.minor that is compatible.
-                        req_strs = [f"{req.project_name}=={major}.{minor}.*"]
+                        req_strs = [f"{req.name}=={major}.{minor}.*"]
                         # Now find any patches within that major.minor that we must exclude.
                         invalid_patches = sorted(
                             set(range(0, _PATCH_VERSION_UPPER_BOUND + 1))
@@ -302,15 +297,9 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         ]
 
         def valid_constraint(constraint: Requirement) -> bool:
-            if any(
-                constraint.specifier.contains(prior)  # type: ignore[attr-defined]
-                for prior in prior_versions
-            ):
+            if any(constraint.specifier.contains(prior) for prior in prior_versions):
                 return False
-            if not any(
-                constraint.specifier.contains(allowed)  # type: ignore[attr-defined]
-                for allowed in allowed_versions
-            ):
+            if not any(constraint.specifier.contains(allowed) for allowed in allowed_versions):
                 return False
             return True
 
@@ -333,7 +322,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         specifiers = []
         wildcard_encountered = False
         for constraint in self:
-            specifier = str(constraint.specifier)  # type: ignore[attr-defined]
+            specifier = str(constraint.specifier)
             if specifier:
                 specifiers.append(specifier)
             else:
@@ -482,21 +471,23 @@ def _major_minor_version_when_single_and_entire(ics: InterpreterConstraints) -> 
 
     req = next(iter(ics))
 
-    just_cpython = req.project_name == "CPython" and not req.extras and not req.marker
+    just_cpython = req.name == "CPython" and not req.extras and not req.marker
     if not just_cpython:
         raise _NonSimpleMajorMinor()
 
     # ==major.minor or ==major.minor.*
-    if len(req.specs) == 1:
-        operator, version = next(iter(req.specs))
-        if operator != "==":
+    if len(req.specifier) == 1:
+        specifier = next(iter(req.specifier))
+        if specifier.operator != "==":
             raise _NonSimpleMajorMinor()
 
-        return _parse_simple_version(version, require_any_patch=True)
+        return _parse_simple_version(specifier.version, require_any_patch=True)
 
     # >=major.minor,<major.(minor+1)
-    if len(req.specs) == 2:
-        (operator_lo, version_lo), (operator_hi, version_hi) = iter(req.specs)
+    if len(req.specifier) == 2:
+        specifiers = list(req.specifier)
+        operator_lo, version_lo = (specifiers[0].operator, specifiers[0].version)
+        operator_hi, version_hi = (specifiers[1].operator, specifiers[1].version)
 
         if operator_lo != ">=":
             # if the lo operator isn't >=, they might be in the wrong order (or, if not, the check

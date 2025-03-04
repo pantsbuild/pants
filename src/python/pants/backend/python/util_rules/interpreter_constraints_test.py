@@ -7,8 +7,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 import pytest
-from packaging.requirements import InvalidRequirement
-from pkg_resources import Requirement
+from packaging.requirements import InvalidRequirement, Requirement
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
@@ -44,7 +43,7 @@ def test_merge_interpreter_constraints() -> None:
         result = sorted(str(req) for req in InterpreterConstraints.merge_constraint_sets(inp))
         # Requirement.parse() sorts specs differently than we'd like, so we convert each str to a
         # Requirement.
-        normalized_expected = sorted(str(Requirement.parse(v)) for v in expected)
+        normalized_expected = sorted(str(Requirement(v)) for v in expected)
         assert result == normalized_expected
 
     # Multiple constraint sets get merged so that they are ANDed.
@@ -324,7 +323,7 @@ def test_group_field_sets_by_constraints_with_unsorted_inputs() -> None:
         ),
     ]
 
-    ic_36 = InterpreterConstraints([Requirement.parse("CPython==3.6.*")])
+    ic_36 = InterpreterConstraints([Requirement("CPython==3.6.*")])
 
     output = InterpreterConstraints.group_field_sets_by_constraints(
         py3_fs,
@@ -548,7 +547,7 @@ def test_major_minor_version_when_single_and_entire(
     ],
 )
 def test_parse_python_interpreter_constraint_when_valid(input_ic: str, expected: str) -> None:
-    assert parse_constraint(input_ic) == Requirement.parse(expected)
+    assert parse_constraint(input_ic) == Requirement(expected)
 
 
 @pytest.mark.parametrize(
