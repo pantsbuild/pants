@@ -1,10 +1,10 @@
 // Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use crate::arg_splitter::{ArgSplitter, Args, PantsCommand, NO_GOAL_NAME, UNKNOWN_GOAL_NAME};
+use crate::Scope;
+use crate::arg_splitter::{ArgSplitter, Args, NO_GOAL_NAME, PantsCommand, UNKNOWN_GOAL_NAME};
 use crate::flags::Flag;
 use crate::scope::GoalInfo;
-use crate::Scope;
 use shlex;
 use std::fs::File;
 use std::path::Path;

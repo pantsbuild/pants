@@ -4,9 +4,9 @@
 use crate::arg_splitter::ArgSplitter;
 use crate::arg_splitter::Args;
 use crate::flags::FlagsReader;
-use crate::fromfile::test_util::write_fromfile;
 use crate::fromfile::FromfileExpander;
-use crate::{option_id, DictEdit, DictEditAction, GoalInfo, Scope, Val};
+use crate::fromfile::test_util::write_fromfile;
+use crate::{DictEdit, DictEditAction, GoalInfo, Scope, Val, option_id};
 use crate::{ListEdit, ListEditAction, OptionId, OptionsSource};
 use core::fmt::Debug;
 use maplit::hashmap;
@@ -216,12 +216,14 @@ fn test_scalar_fromfile() {
         negate: bool,
     ) {
         let (_tmpdir, fromfile_path) = write_fromfile("fromfile.txt", content);
-        let args = mk_args(vec![format!(
-            "--{}foo=@{}",
-            if negate { "no-" } else { "" },
-            fromfile_path.display()
-        )
-        .as_str()]);
+        let args = mk_args(vec![
+            format!(
+                "--{}foo=@{}",
+                if negate { "no-" } else { "" },
+                fromfile_path.display()
+            )
+            .as_str(),
+        ]);
         let actual = getter(&args, &option_id!("foo")).unwrap().unwrap();
         assert_eq!(expected, actual)
     }
@@ -252,7 +254,9 @@ fn test_scalar_fromfile() {
 fn test_list_fromfile() {
     fn do_test(content: &str, expected: &[ListEdit<i64>], filename: &str) {
         let (_tmpdir, fromfile_path) = write_fromfile(filename, content);
-        let args = mk_args(vec![format!("--foo=@{}", &fromfile_path.display()).as_str()]);
+        let args = mk_args(vec![
+            format!("--foo=@{}", &fromfile_path.display()).as_str(),
+        ]);
         let actual = args.get_int_list(&option_id!("foo")).unwrap().unwrap();
         assert_eq!(expected.to_vec(), actual)
     }
@@ -359,7 +363,9 @@ fn test_dict_fromfile() {
     }];
 
     let (_tmpdir, fromfile_path) = write_fromfile("fromfile.txt", "+{'FOO':42}");
-    let args = mk_args(vec![format!("--foo=@{}", &fromfile_path.display()).as_str()]);
+    let args = mk_args(vec![
+        format!("--foo=@{}", &fromfile_path.display()).as_str(),
+    ]);
     assert_eq!(
         expected_add,
         args.get_dict(&option_id!("foo")).unwrap().unwrap()
@@ -370,7 +376,9 @@ fn test_dict_fromfile() {
 fn test_nonexistent_required_fromfile() {
     let args = mk_args(vec!["--foo=@/does/not/exist"]);
     let err = args.get_string(&option_id!("foo")).unwrap_err();
-    assert!(err.starts_with("Problem reading /does/not/exist for --foo: No such file or directory"));
+    assert!(
+        err.starts_with("Problem reading /does/not/exist for --foo: No such file or directory")
+    );
 }
 
 #[test]

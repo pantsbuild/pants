@@ -3,12 +3,11 @@
 
 from __future__ import annotations
 
+import importlib.resources
 import os
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import Enum, unique
-
-import pkg_resources
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.resolves import ExportableTool
@@ -211,17 +210,18 @@ _JAR_TOOL_SRC_PACKAGES = ["args4j", "jar_tool_source"]
 
 
 def _load_jar_tool_sources() -> list[FileContent]:
+    parent_module = ".".join(__name__.split(".")[:-1])
     result = []
     for package in _JAR_TOOL_SRC_PACKAGES:
         # pkg_path = package.replace(".", os.path.sep)
         # relative_folder = os.path.join("src", pkg_path)
-        for basename in pkg_resources.resource_listdir(__name__, package):
+        for resource in importlib.resources.files(parent_module).joinpath(package).iterdir():
+            if not resource.is_file():
+                continue
             result.append(
                 FileContent(
-                    path=os.path.join(package, basename),
-                    content=pkg_resources.resource_string(
-                        __name__, os.path.join(package, basename)
-                    ),
+                    path=os.path.join(package, resource.name),
+                    content=resource.read_bytes(),
                 )
             )
     return result

@@ -21,7 +21,7 @@ use crate::context::{Context, Core};
 use crate::downloads;
 use crate::externs;
 use crate::externs::fs::PyFileDigest;
-use crate::python::{throw, Key};
+use crate::python::{Key, throw};
 
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct DownloadedFile(pub Key);

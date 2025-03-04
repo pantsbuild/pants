@@ -3,7 +3,7 @@
 
 use super::{BuildRoot, DictEdit, DictEditAction, ListEdit, ListEditAction};
 
-use crate::parse::{mk_parse_err, parse_dict, ParseError, Parseable};
+use crate::parse::{ParseError, Parseable, mk_parse_err, parse_dict};
 use log::warn;
 use serde::de::Deserialize;
 use std::path::{Path, PathBuf};
@@ -154,7 +154,7 @@ pub(crate) mod test_util {
     use std::fs::File;
     use std::io::Write;
     use std::path::PathBuf;
-    use tempfile::{tempdir, TempDir};
+    use tempfile::{TempDir, tempdir};
 
     pub(crate) fn write_fromfile(filename: &str, content: &str) -> (TempDir, PathBuf) {
         let tmpdir = tempdir().unwrap();

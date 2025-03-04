@@ -55,7 +55,7 @@ class CherryPickHelper {
       .sort((a, b) => semver.compare(semver.coerce(a), semver.coerce(b)));
     const index = sorted_milestones.indexOf(milestone_title);
     const relevant_milestones = sorted_milestones.slice(
-      index === -1 ? 0 : index
+      index === -1 ? 0 : index,
     );
     return relevant_milestones;
   }
@@ -72,7 +72,7 @@ class CherryPickHelper {
           ...this.context.repo,
         });
       const workflow_url = workflows.workflows.filter(
-        (workflow) => workflow.name === this.context.workflow
+        (workflow) => workflow.name === this.context.workflow,
       )[0].url;
 
       await this.#add_failed_label();
@@ -83,14 +83,14 @@ class CherryPickHelper {
           pull.merged_by.login
         }: Please add the milestone to the PR and re-run the [Auto Cherry-Picker job](${workflow_url}) using the "Run workflow" button.
 
-${this.#run_link}`
+${this.#run_link}`,
       );
       this.core.setFailed(`PR missing milestone.`);
       return null;
     }
 
     const milestones = await this.#get_relevant_milestones(
-      pull.milestone.title
+      pull.milestone.title,
     );
     return {
       pr_num: this.pull_number,
@@ -110,11 +110,11 @@ ${this.#run_link}`
           state: "open",
           head: `${this.context.repo.owner}:${branch_name}`,
         });
-      })
+      }),
     ).then((all_pulls) =>
       all_pulls.map(({ data: pulls }, index) => {
         return { ...matrix_info[index], pr_url: (pulls[0] || {}).html_url };
-      })
+      }),
     );
 
     let any_failed = false;

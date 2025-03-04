@@ -35,7 +35,7 @@ class NodeJSToolBase(Subsystem):
     version = StrOption(
         advanced=True,
         default=lambda cls: cls.default_version,
-        help="Version string for the tool in the form package@version (e.g. prettier@2.6.2)",
+        help="Version string for the tool in the form package@version (e.g. prettier@3.5.2)",
     )
 
     install_from_resolve = StrOption(

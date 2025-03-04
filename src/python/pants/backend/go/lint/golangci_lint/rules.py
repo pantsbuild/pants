@@ -9,33 +9,32 @@ from pants.backend.go.lint.golangci_lint.skip_field import SkipGolangciLintField
 from pants.backend.go.lint.golangci_lint.subsystem import GolangciLint
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.target_types import GoPackageSourcesField
-from pants.backend.go.util_rules.build_opts import GoBuildOptions, GoBuildOptionsFromTargetRequest
+from pants.backend.go.util_rules.build_opts import (
+    GoBuildOptionsFromTargetRequest,
+    go_extract_build_options_from_target,
+)
 from pants.backend.go.util_rules.go_mod import (
-    GoModInfo,
     GoModInfoRequest,
-    OwningGoMod,
     OwningGoModRequest,
+    determine_go_mod_info,
+    find_owning_go_mod,
 )
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.goals.resolves import ExportableTool
-from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
-from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
+from pants.core.util_rules.config_files import find_config_file
+from pants.core.util_rules.external_tool import download_external_tool
 from pants.core.util_rules.partitions import PartitionerType
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.core.util_rules.system_binaries import BashBinary
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.fs import CreateDigest, FileContent, MergeDigests
+from pants.engine.internals.graph import transitive_targets as transitive_targets_get
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import create_digest, execute_process, merge_digests
 from pants.engine.platform import Platform
-from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import (
-    FieldSet,
-    SourcesField,
-    Target,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-)
+from pants.engine.process import Process
+from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.target import FieldSet, SourcesField, Target, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
@@ -67,55 +66,45 @@ async def run_golangci_lint(
     golang_subsystem: GolangSubsystem,
     golang_env_aware: GolangSubsystem.EnvironmentAware,
 ) -> LintResult:
-    transitive_targets = await Get(
-        TransitiveTargets,
+    transitive_targets = await transitive_targets_get(
         TransitiveTargetsRequest(field_set.address for field_set in request.elements),
+        **implicitly(),
     )
-
-    all_source_files_request = Get(
-        SourceFiles,
+    all_source_files_request = determine_source_files(
         SourceFilesRequest(
             tgt[SourcesField] for tgt in transitive_targets.closure if tgt.has_field(SourcesField)
-        ),
+        )
     )
-
-    target_source_files_request = Get(
-        SourceFiles,
-        SourceFilesRequest(field_set.sources for field_set in request.elements),
+    target_source_files_request = determine_source_files(
+        SourceFilesRequest(field_set.sources for field_set in request.elements)
     )
-
-    downloaded_golangci_lint_request = Get(
-        DownloadedExternalTool,
-        ExternalToolRequest,
-        golangci_lint.get_request(platform),
-    )
-
-    config_files_request = Get(ConfigFiles, ConfigFilesRequest, golangci_lint.config_request())
+    downloaded_golangci_lint_request = download_external_tool(golangci_lint.get_request(platform))
+    config_files_request = find_config_file(golangci_lint.config_request())
 
     (
         target_source_files,
         all_source_files,
         downloaded_golangci_lint,
         config_files,
-    ) = await MultiGet(
+    ) = await concurrently(
         target_source_files_request,
         all_source_files_request,
         downloaded_golangci_lint_request,
         config_files_request,
     )
 
-    owning_go_mods = await MultiGet(
-        Get(OwningGoMod, OwningGoModRequest(field_set.address)) for field_set in request.elements
+    owning_go_mods = await concurrently(
+        find_owning_go_mod(OwningGoModRequest(field_set.address), **implicitly())
+        for field_set in request.elements
     )
-
     owning_go_mod_addresses = {x.address for x in owning_go_mods}
-
-    go_mod_infos = await MultiGet(
-        Get(GoModInfo, GoModInfoRequest(address)) for address in owning_go_mod_addresses
+    go_mod_infos = await concurrently(
+        determine_go_mod_info(GoModInfoRequest(address)) for address in owning_go_mod_addresses
     )
-
-    go_build_opts = await MultiGet(
-        Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(address))
+    go_build_opts = await concurrently(
+        go_extract_build_options_from_target(
+            GoBuildOptionsFromTargetRequest(address), **implicitly()
+        )
         for address in owning_go_mod_addresses
     )
 
@@ -146,10 +135,8 @@ async def run_golangci_lint(
         ).encode("utf-8"),
     )
 
-    golangci_lint_run_script_digest = await Get(Digest, CreateDigest([golangci_lint_run_script]))
-
-    input_digest = await Get(
-        Digest,
+    golangci_lint_run_script_digest = await create_digest(CreateDigest([golangci_lint_run_script]))
+    input_digest = await merge_digests(
         MergeDigests(
             [
                 golangci_lint_run_script_digest,
@@ -159,10 +146,10 @@ async def run_golangci_lint(
                 all_source_files.snapshot.digest,
                 *(info.digest for info in set(go_mod_infos)),
             ]
-        ),
+        )
     )
 
-    argv = [
+    argv: list[str] = [
         bash.path,
         golangci_lint_run_script.path,
         downloaded_golangci_lint.exe,
@@ -179,22 +166,21 @@ async def run_golangci_lint(
         argv.append("--no-config")
     argv.extend(golangci_lint.args)
 
-    process_result = await Get(
-        FallibleProcessResult,
+    process_result = await execute_process(
         Process(
             argv=argv,
             input_digest=input_digest,
             description="Run `golangci-lint`.",
             level=LogLevel.DEBUG,
         ),
+        **implicitly(),
     )
-
     return LintResult.create(request, process_result)
 
 
 def rules():
-    return [
+    return (
         *collect_rules(),
         *GolangciLintRequest.rules(),
         UnionRule(ExportableTool, GolangciLint),
-    ]
+    )

@@ -13,7 +13,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::future::{self, join_all, try_join, try_join_all};
 use hashing::{
-    async_copy_and_hash, async_verified_copy, AgedFingerprint, Digest, Fingerprint, EMPTY_DIGEST,
+    AgedFingerprint, Digest, EMPTY_DIGEST, Fingerprint, async_copy_and_hash, async_verified_copy,
 };
 use parking_lot::Mutex;
 use sharded_lmdb::ShardedLmdb;
@@ -950,13 +950,13 @@ impl ByteStore {
                 Ok(f(bytes))
             } else {
                 Err(format!(
-          "Got hash collision reading from store - digest {:?} was requested, but retrieved \
+                    "Got hash collision reading from store - digest {:?} was requested, but retrieved \
                 bytes with that fingerprint had length {}. Congratulations, you may have broken \
                 sha256! Underlying bytes: {:?}",
-          digest,
-          bytes.len(),
-          bytes
-        ))
+                    digest,
+                    bytes.len(),
+                    bytes
+                ))
             }
         };
 

@@ -4,20 +4,20 @@
 // File-specific allowances to silence internal warnings of `[pyclass]`.
 #![allow(clippy::used_underscore_binding)]
 
-use futures::future::{BoxFuture, Future};
 use futures::FutureExt;
-use lazy_static::lazy_static;
+use futures::future::{BoxFuture, Future};
+use pyo3::FromPyObject;
 use pyo3::exceptions::{PyAssertionError, PyException, PyStopIteration, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::sync::GILProtected;
 use pyo3::types::{PyBool, PyBytes, PyDict, PySequence, PyString, PyTuple, PyType};
-use pyo3::FromPyObject;
 use pyo3::{create_exception, import_exception, intern};
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use std::cell::{Ref, RefCell};
 use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::fmt;
+use std::sync::LazyLock;
 
 use logging::PythonLogLevel;
 use rule_graph::RuleId;
@@ -376,8 +376,8 @@ pub(crate) fn generator_send(
         Ok(GeneratorResponse::All(gogs))
     } else {
         Err(PyValueError::new_err(format!(
-      "Async @rule error. Expected a rule query such as `Get(..)` or similar, but got: {response}"
-    )))
+            "Async @rule error. Expected a rule query such as `Get(..)` or similar, but got: {response}"
+        )))
     };
 
     Ok(result?)
@@ -400,9 +400,7 @@ pub fn unsafe_call(py: Python, type_id: TypeId, args: &[Value]) -> Value {
     Value::from(&res)
 }
 
-lazy_static! {
-    pub static ref INTERNS: Interns = Interns::new();
-}
+pub static INTERNS: LazyLock<Interns> = LazyLock::new(Interns::new);
 
 /// Interprets the `Get` and `implicitly(..)` syntax, which reduces to two optional positional
 /// arguments, and results in input types and inputs.
@@ -472,9 +470,9 @@ fn interpret_get_inputs(
             let actual_type = input_arg1.get_type();
             if !declared_type.is(&actual_type) && !is_union(py, declared_type)? {
                 return Err(PyTypeError::new_err(format!(
-          "Invalid Get. The third argument `{input_arg1}` must have the exact same type as the \
+                    "Invalid Get. The third argument `{input_arg1}` must have the exact same type as the \
           second argument, {declared_type}, but had the type {actual_type}."
-        )));
+                )));
             }
 
             Ok((

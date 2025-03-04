@@ -9,12 +9,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use deepsize::DeepSizeOf;
-use futures::future;
 use futures::FutureExt;
+use futures::future;
 
 use fs::{
-    DigestTrie, Dir, DirectoryDigest, Entry, File, GitignoreStyleExcludes, GlobMatching, PathStat,
-    PosixFS, PreparedPathGlobs, SymlinkBehavior, EMPTY_DIGEST_TREE,
+    DigestTrie, Dir, DirectoryDigest, EMPTY_DIGEST_TREE, Entry, File, GitignoreStyleExcludes,
+    GlobMatching, PathStat, PosixFS, PreparedPathGlobs, SymlinkBehavior,
 };
 use hashing::{Digest, EMPTY_DIGEST};
 

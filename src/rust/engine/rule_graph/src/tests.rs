@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::fmt;
 
-use indexmap::{indexset, IndexSet};
+use indexmap::{IndexSet, indexset};
 
 use crate::builder::combinations_of_one;
 use crate::{DependencyKey, Palette, Query, RuleGraph, RuleId};
@@ -42,10 +42,12 @@ fn validation() {
         Rule::new("t", "get_t", vec![DependencyKey::new("v")])
     ];
     let queries = indexset![Query::new("a", vec!["b"])];
-    assert!(RuleGraph::new(rules, queries)
-        .err()
-        .unwrap()
-        .contains("The following rule ids were each used by more than one rule: get_a, get_t"));
+    assert!(
+        RuleGraph::new(rules, queries)
+            .err()
+            .unwrap()
+            .contains("The following rule ids were each used by more than one rule: get_a, get_t")
+    );
 }
 
 #[test]
@@ -73,10 +75,12 @@ fn insufficient_query() {
     let rules = indexset![Rule::new("a", "a_from_b", vec![DependencyKey::new("b")])];
     let queries = indexset![Query::new("a", vec![])];
 
-    assert!(RuleGraph::new(rules, queries)
-        .err()
-        .unwrap()
-        .contains("No installed rules return the type b"));
+    assert!(
+        RuleGraph::new(rules, queries)
+            .err()
+            .unwrap()
+            .contains("No installed rules return the type b")
+    );
 }
 
 #[test]
@@ -84,10 +88,12 @@ fn no_rules() {
     let rules: IndexSet<Rule> = indexset![];
     let queries = indexset![Query::new("a", vec![])];
 
-    assert!(RuleGraph::new(rules, queries)
-        .err()
-        .unwrap()
-        .contains("No installed rules return the type a"));
+    assert!(
+        RuleGraph::new(rules, queries)
+            .err()
+            .unwrap()
+            .contains("No installed rules return the type a")
+    );
 }
 
 #[test]
@@ -98,10 +104,12 @@ fn ambiguity() {
     ];
     let queries = indexset![Query::new("a", vec!["b", "c"])];
 
-    assert!(RuleGraph::new(rules, queries)
-        .err()
-        .unwrap()
-        .contains("Encountered 1 rule graph error:\n  Too many"));
+    assert!(
+        RuleGraph::new(rules, queries)
+            .err()
+            .unwrap()
+            .contains("Encountered 1 rule graph error:\n  Too many")
+    );
 }
 
 #[test]
@@ -303,9 +311,11 @@ fn in_scope_basic() {
         Rule::new(
             "a",
             "a_from_b",
-            vec![DependencyKey::new("b")
-                .provided_params(vec!["c"])
-                .in_scope_params(vec!["d"])]
+            vec![
+                DependencyKey::new("b")
+                    .provided_params(vec!["c"])
+                    .in_scope_params(vec!["d"])
+            ]
         ),
         Rule::new("b", "b_from_c_and_d", vec![DependencyKey::new("c")],),
     ];
@@ -327,9 +337,11 @@ fn in_scope_filtered() {
         Rule::new(
             "a",
             "a_from_b",
-            vec![DependencyKey::new("b")
-                .provided_params(vec!["c"])
-                .in_scope_params(vec!["d"])]
+            vec![
+                DependencyKey::new("b")
+                    .provided_params(vec!["c"])
+                    .in_scope_params(vec!["d"])
+            ]
         ),
         Rule::new(
             "b",
@@ -351,9 +363,11 @@ fn in_scope_computed() {
         Rule::new(
             "a",
             "a_from_b",
-            vec![DependencyKey::new("b")
-                .provided_params(vec!["c"])
-                .in_scope_params(vec!["d"])]
+            vec![
+                DependencyKey::new("b")
+                    .provided_params(vec!["c"])
+                    .in_scope_params(vec!["d"])
+            ]
         ),
         Rule::new("b", "b_from_c", vec![DependencyKey::new("c")],),
         Rule::new("d", "d", vec![],),
@@ -373,9 +387,11 @@ fn in_scope_provided() {
         Rule::new(
             "a",
             "a_from_b",
-            vec![DependencyKey::new("b")
-                .provided_params(vec!["c", "d"])
-                .in_scope_params(vec!["d"])]
+            vec![
+                DependencyKey::new("b")
+                    .provided_params(vec!["c", "d"])
+                    .in_scope_params(vec!["d"])
+            ]
         ),
         Rule::new(
             "b",

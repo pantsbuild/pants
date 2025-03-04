@@ -23,6 +23,7 @@ from pants.core.target_types import FileSourceField
 from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.system_binaries import BashBinary
+from pants.engine import process
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.environment import EnvironmentName
@@ -89,6 +90,19 @@ class AdhocProcessRequest:
     use_working_directory_as_base_for_output_captures: bool = True
     outputs_match_error_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.error
     outputs_match_conjunction: GlobExpansionConjunction | None = GlobExpansionConjunction.all_match
+
+
+@dataclass(frozen=True)
+class PreparedAdhocProcessRequest:
+    original_request: AdhocProcessRequest
+    process: Process
+
+
+@dataclass(frozen=True)
+class FallibleAdhocProcessResult:
+    process_result: FallibleProcessResult
+    adjusted_digest: Digest
+    description: str
 
 
 @dataclass(frozen=True)
@@ -189,6 +203,22 @@ async def merge_extra_sandbox_contents(request: MergeExtraSandboxContents) -> Ex
 #
 # END THINGS THAT NEED A HOME
 #
+
+
+@rule
+async def convert_fallible_adhoc_process_result(
+    fallible_result: FallibleAdhocProcessResult,
+) -> AdhocProcessResult:
+    result = await Get(
+        ProcessResult,
+        {
+            fallible_result.process_result: FallibleProcessResult,
+            ProductDescription(fallible_result.description): ProductDescription,
+        },
+    )
+    return AdhocProcessResult(
+        process_result=result, adjusted_digest=fallible_result.adjusted_digest
+    )
 
 
 async def _resolve_runnable_dependencies(
@@ -580,25 +610,17 @@ async def check_outputs(
 
 
 @rule
-async def run_adhoc_process(
-    request: AdhocProcessRequest,
-) -> AdhocProcessResult:
-    process = await Get(Process, AdhocProcessRequest, request)
+async def run_prepared_adhoc_process(
+    prepared_request: PreparedAdhocProcessRequest,
+) -> FallibleAdhocProcessResult:
+    request = prepared_request.original_request
 
-    fallible_result = await Get(FallibleProcessResult, Process, process)
+    result = await Get(FallibleProcessResult, Process, prepared_request.process)
 
     log_on_errors = request.log_on_process_errors or FrozenDict()
-    error_to_log = log_on_errors.get(fallible_result.exit_code, None)
+    error_to_log = log_on_errors.get(result.exit_code, None)
     if error_to_log:
         logger.error(error_to_log)
-
-    result = await Get(
-        ProcessResult,
-        {
-            fallible_result: FallibleProcessResult,
-            ProductDescription(request.description): ProductDescription,
-        },
-    )
 
     if request.log_output:
         if result.stdout:
@@ -663,7 +685,11 @@ async def run_adhoc_process(
     if root_output_directory is not None:
         adjusted = await Get(Digest, RemovePrefix(output_digest, root_output_directory))
 
-    return AdhocProcessResult(result, adjusted)
+    return FallibleAdhocProcessResult(
+        process_result=result,
+        adjusted_digest=adjusted,
+        description=request.description,
+    )
 
 
 # Compute a stable bytes value for a `PathMetadata` consisting of the values to be hashed.
@@ -717,9 +743,7 @@ async def compute_workspace_invalidation_hash(path_globs: PathGlobs) -> str:
 async def prepare_adhoc_process(
     request: AdhocProcessRequest,
     bash: BashBinary,
-) -> Process:
-    # currently only used directly by `experimental_test_shell_command`
-
+) -> PreparedAdhocProcessRequest:
     description = request.description
     address = request.address
     working_directory = parse_relative_directory(request.working_directory or "", address)
@@ -750,7 +774,7 @@ async def prepare_adhoc_process(
 
     input_digest = await Get(Digest, MergeDigests([request.input_digest, work_dir]))
 
-    proc = Process(
+    process = Process(
         argv=argv,
         description=f"Running {description}",
         env=command_env,
@@ -765,9 +789,12 @@ async def prepare_adhoc_process(
     )
 
     if request.use_working_directory_as_base_for_output_captures:
-        return _output_at_build_root(proc, bash)
-    else:
-        return proc
+        process = _output_at_build_root(process, bash)
+
+    return PreparedAdhocProcessRequest(
+        original_request=request,
+        process=process,
+    )
 
 
 class PathEnvModifyMode(Enum):
@@ -888,4 +915,7 @@ def _parse_relative_file(file_in: str, relative_to: str) -> str:
 
 
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        *process.rules(),
+    )

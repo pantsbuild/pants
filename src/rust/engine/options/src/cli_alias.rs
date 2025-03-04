@@ -2,13 +2,13 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use crate::scope::Scope;
-use lazy_static::lazy_static;
+
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
+use std::sync::LazyLock;
 
-lazy_static! {
-    static ref VALID_ALIAS_RE: Regex = Regex::new(r"^(--)?\w(\w|-)*\w$").unwrap();
-}
+static VALID_ALIAS_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^(--)?\w(\w|-)*\w$").unwrap());
 
 fn validate_alias(
     known_scopes_to_flags: Option<&HashMap<String, HashSet<String>>>,
@@ -34,7 +34,8 @@ fn validate_alias(
             if args.contains(alias) {
                 return Err(format!(
                     "Invalid alias in `[cli].alias` option: {}. This is already a registered flag in the {} scope.",
-                    alias, Scope::named(scope).name()
+                    alias,
+                    Scope::named(scope).name()
                 ));
             }
         }

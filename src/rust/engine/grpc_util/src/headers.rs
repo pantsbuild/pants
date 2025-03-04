@@ -4,8 +4,8 @@
 use std::fmt;
 use std::task::{Context, Poll};
 
-use http::header::HeaderMap;
 use http::Request;
+use http::header::HeaderMap;
 use tower_layer::Layer;
 use tower_service::Service;
 

@@ -15,8 +15,8 @@ use tokio::sync::RwLock;
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
-    local::KeepSandboxes, CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context,
-    FallibleProcessResultWithPlatform, NamedCaches, Process, ProcessError,
+    CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context,
+    FallibleProcessResultWithPlatform, NamedCaches, Process, ProcessError, local::KeepSandboxes,
 };
 
 struct RoundtripResults {
@@ -175,11 +175,13 @@ async fn recover_from_missing_store_contents() {
             .unwrap();
         let removed = store.remove_file(output_child_digest).await.unwrap();
         assert!(removed);
-        assert!(store
-            .contents_for_directory(output_dir_digest)
-            .await
-            .err()
-            .is_some())
+        assert!(
+            store
+                .contents_for_directory(output_dir_digest)
+                .await
+                .err()
+                .is_some()
+        )
     }
 
     // Ensure that we don't fail if we re-run.
@@ -189,9 +191,11 @@ async fn recover_from_missing_store_contents() {
         .unwrap();
 
     // And that the entire output directory can be loaded.
-    assert!(store
-        .contents_for_directory(second_result.output_directory)
-        .await
-        .ok()
-        .is_some())
+    assert!(
+        store
+            .contents_for_directory(second_result.output_directory)
+            .await
+            .ok()
+            .is_some()
+    )
 }

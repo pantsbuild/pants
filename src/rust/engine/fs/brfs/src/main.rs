@@ -7,8 +7,8 @@ use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::{BTreeMap, HashMap};
 use std::ffi::{OsStr, OsString};
 use std::path::Path;
-use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
+use std::sync::mpsc::{Receiver, Sender, channel};
 use std::time;
 
 use clap::{Arg, Command};
@@ -20,10 +20,10 @@ use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 use store::{RemoteProvider, RemoteStoreOptions, Store, StoreError};
-use tokio::signal::unix::{signal, SignalKind};
+use tokio::signal::unix::{SignalKind, signal};
 use tokio::task;
-use tokio_stream::wrappers::SignalStream;
 use tokio_stream::StreamExt;
+use tokio_stream::wrappers::SignalStream;
 
 const TTL: time::Duration = time::Duration::from_secs(0);
 

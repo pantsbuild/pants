@@ -1,9 +1,9 @@
 // Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::path::PathBuf;
+use std::sync::LazyLock;
 
 use indexmap::IndexMap;
-use lazy_static::lazy_static;
 use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
 use tree_sitter::{Node, Parser};
@@ -23,29 +23,30 @@ include!(concat!(env!("OUT_DIR"), "/dockerfile_impl_hash.rs"));
 Replace with native address parsing? Requires more of address parsing logic
 that is currently python rules to move into rust.
 */
-lazy_static! {
-    static ref ADDRESS_REGEXP: Regex = Regex::new(
+
+static ADDRESS_REGEXP: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
         r"(?x)
-        ^
-        (?://)?  # Optionally root:ed.
-        # Optional path.
-        [^:\#\s]*
-        # Optional target name.
-        (?::[^:\#!@?/=\s]+)?
-        # Optional generated name.
-        (?:\#[^:\#!@?=\s]+)?
-        # Optional parametrizations.
-        (?:@
-          # key=value
-          [^=:\s]+=[^,:\s]*
-          # Optional additional `,key=value`s
-          (?:,[^=:\s]+=[^,:\s]*)*
-        )?
-        $
-    "
+    ^
+    (?://)?  # Optionally root:ed.
+    # Optional path.
+    [^:\#\s]*
+    # Optional target name.
+    (?::[^:\#!@?/=\s]+)?
+    # Optional generated name.
+    (?:\#[^:\#!@?=\s]+)?
+    # Optional parametrizations.
+    (?:@
+      # key=value
+      [^=:\s]+=[^,:\s]*
+      # Optional additional `,key=value`s
+      (?:,[^=:\s]+=[^,:\s]*)*
+    )?
+    $
+",
     )
-    .unwrap();
-}
+    .unwrap()
+});
 
 type DockerStagesMap = IndexMap<String, Option<String>>; // mapping of stages to their tags
 

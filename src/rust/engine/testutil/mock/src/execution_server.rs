@@ -17,17 +17,17 @@ use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::gen::build::bazel::semver::SemVer;
 use protos::gen::google::longrunning::{
-    operations_server::Operations, operations_server::OperationsServer, CancelOperationRequest,
-    DeleteOperationRequest, GetOperationRequest, ListOperationsRequest, ListOperationsResponse,
-    Operation,
+    CancelOperationRequest, DeleteOperationRequest, GetOperationRequest, ListOperationsRequest,
+    ListOperationsResponse, Operation, operations_server::Operations,
+    operations_server::OperationsServer,
 };
 use protos::require_digest;
 use remexec::{
+    ActionResult, CacheCapabilities, ExecuteRequest, ExecutionCapabilities, GetActionResultRequest,
+    GetCapabilitiesRequest, ServerCapabilities, UpdateActionResultRequest, WaitExecutionRequest,
     action_cache_server::ActionCache, action_cache_server::ActionCacheServer,
     capabilities_server::Capabilities, capabilities_server::CapabilitiesServer,
-    execution_server::Execution, execution_server::ExecutionServer, ActionResult,
-    CacheCapabilities, ExecuteRequest, ExecutionCapabilities, GetActionResultRequest,
-    GetCapabilitiesRequest, ServerCapabilities, UpdateActionResultRequest, WaitExecutionRequest,
+    execution_server::Execution, execution_server::ExecutionServer,
 };
 use tokio_stream::wrappers::TcpListenerStream;
 use tonic::metadata::MetadataMap;
@@ -174,22 +174,21 @@ impl Drop for TestServer {
             .len();
         if remaining_expected_responses != 0 {
             let message = format!(
-        "Expected {} more requests. Remaining expected responses:\n{}\nReceived requests:\n{}",
-        remaining_expected_responses,
-        MockResponder::display_all(&Vec::from_iter(
-          self
-            .mock_responder
-            .mock_execution
-            .expected_api_calls
-            .lock()
-            .deref(),
-        )),
-        MockResponder::display_all(&self.mock_responder.received_messages.deref().lock())
-      );
+                "Expected {} more requests. Remaining expected responses:\n{}\nReceived requests:\n{}",
+                remaining_expected_responses,
+                MockResponder::display_all(&Vec::from_iter(
+                    self.mock_responder
+                        .mock_execution
+                        .expected_api_calls
+                        .lock()
+                        .deref(),
+                )),
+                MockResponder::display_all(&self.mock_responder.received_messages.deref().lock())
+            );
             if std::thread::panicking() {
                 eprintln!(
-          "TestServer missing requests, but not panicking because caller is already panicking: {message}"
-        );
+                    "TestServer missing requests, but not panicking because caller is already panicking: {message}"
+                );
             } else {
                 assert_eq!(remaining_expected_responses, 0, "{message}",);
             }
@@ -291,8 +290,8 @@ impl Execution for MockResponder {
                     }
                 } else {
                     return Err(Status::invalid_argument(format!(
-            "Did not expect this request. Expected: {execute_request:?}, Got: {request:?}"
-          )));
+                        "Did not expect this request. Expected: {execute_request:?}, Got: {request:?}"
+                    )));
                 }
             }
 
@@ -335,9 +334,9 @@ impl Execution for MockResponder {
                     }
                 } else {
                     return Err(Status::invalid_argument(format!(
-            "Did not expect WaitExecution for this operation. Expected: {:?}, Got: {:?}",
-            operation_name, request.name
-          )));
+                        "Did not expect WaitExecution for this operation. Expected: {:?}, Got: {:?}",
+                        operation_name, request.name
+                    )));
                 }
             }
 

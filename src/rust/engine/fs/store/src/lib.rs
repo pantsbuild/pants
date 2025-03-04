@@ -29,9 +29,9 @@ use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bytes::Bytes;
 use fs::{
-    default_cache_path, directory, DigestEntry, DigestTrie, Dir, DirectoryDigest, File,
-    FileContent, FileEntry, Link, PathStat, Permissions, RelativePath, SymlinkBehavior,
-    SymlinkEntry, EMPTY_DIRECTORY_DIGEST,
+    DigestEntry, DigestTrie, Dir, DirectoryDigest, EMPTY_DIRECTORY_DIGEST, File, FileContent,
+    FileEntry, Link, PathStat, Permissions, RelativePath, SymlinkBehavior, SymlinkEntry,
+    default_cache_path, directory,
 };
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
@@ -50,7 +50,7 @@ use tokio::fs::copy;
 use tokio::fs::hard_link;
 use tokio::fs::symlink;
 use tryfuture::try_future;
-use workunit_store::{in_workunit, Level, Metric};
+use workunit_store::{Level, Metric, in_workunit};
 
 const KILOBYTES: usize = 1024;
 const MEGABYTES: usize = 1024 * KILOBYTES;
@@ -717,15 +717,15 @@ impl Store {
             .download_digest_to_local(self.local.clone(), digest, entry_type, f_remote)
             .await?;
 
-        Ok(
-      self
-        .local
-        .load_bytes_with(entry_type, digest, f_local)
-        .await?
-        .ok_or_else(|| {
-          format!("After downloading {digest:?}, the local store claimed that it was not present.")
-        })??,
-    )
+        Ok(self
+            .local
+            .load_bytes_with(entry_type, digest, f_local)
+            .await?
+            .ok_or_else(|| {
+                format!(
+                    "After downloading {digest:?}, the local store claimed that it was not present."
+                )
+            })??)
     }
 
     ///
@@ -1043,11 +1043,11 @@ impl Store {
             Ok(size) => {
                 if size > target_size_bytes {
                     log::warn!(
-            "Garbage collection attempted to shrink the store to {} bytes but {} bytes \
+                        "Garbage collection attempted to shrink the store to {} bytes but {} bytes \
             are currently in use.",
-            target_size_bytes,
-            size
-          )
+                        target_size_bytes,
+                        size
+                    )
                 }
                 Ok(())
             }

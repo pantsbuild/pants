@@ -4,7 +4,7 @@ use std::convert::TryInto;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
+use hashing::{Digest, EMPTY_DIGEST, Fingerprint};
 
 use testutil::data::TestDirectory;
 use testutil::make_file;

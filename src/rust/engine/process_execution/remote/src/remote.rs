@@ -12,18 +12,18 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::future;
 use futures::{Stream, StreamExt};
-use log::{debug, trace, warn, Level};
+use log::{Level, debug, trace, warn};
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::gen::google::longrunning::{
-    operations_client::OperationsClient, CancelOperationRequest, Operation,
+    CancelOperationRequest, Operation, operations_client::OperationsClient,
 };
 use protos::gen::google::rpc::{PreconditionFailure, Status as StatusProto};
-use rand::{thread_rng, Rng};
+use rand::{Rng, thread_rng};
 use remexec::{
-    capabilities_client::CapabilitiesClient, execution_client::ExecutionClient,
-    execution_stage::Value as ExecutionStageValue, Action, Command, ExecuteRequest,
-    ExecuteResponse, ExecutedActionMetadata, ServerCapabilities, WaitExecutionRequest,
+    Action, Command, ExecuteRequest, ExecuteResponse, ExecutedActionMetadata, ServerCapabilities,
+    WaitExecutionRequest, capabilities_client::CapabilitiesClient,
+    execution_client::ExecutionClient, execution_stage::Value as ExecutionStageValue,
 };
 use tonic::{Code, Request, Status};
 
@@ -31,20 +31,20 @@ use concrete_time::TimeSpan;
 use fs::{self, DirectoryDigest, EMPTY_DIRECTORY_DIGEST};
 use grpc_util::headers_to_http_header_map;
 use grpc_util::prost::MessageExt;
-use grpc_util::{layered_service, status_to_str, LayeredService};
+use grpc_util::{LayeredService, layered_service, status_to_str};
 use hashing::{Digest, Fingerprint};
 use remote_provider_reapi::apply_headers;
 use store::{Store, StoreError};
 use task_executor::Executor;
 use workunit_store::{
-    in_workunit, Metric, ObservationMetric, RunId, RunningWorkunit, SpanId, UserMetadataItem,
-    WorkunitMetadata, WorkunitStore,
+    Metric, ObservationMetric, RunId, RunningWorkunit, SpanId, UserMetadataItem, WorkunitMetadata,
+    WorkunitStore, in_workunit,
 };
 
 use process_execution::{
-    make_execute_request, populate_fallible_execution_result, Context, EntireExecuteRequest,
-    FallibleProcessResultWithPlatform, Process, ProcessError, ProcessExecutionEnvironment,
-    ProcessResultMetadata, ProcessResultSource,
+    Context, EntireExecuteRequest, FallibleProcessResultWithPlatform, Process, ProcessError,
+    ProcessExecutionEnvironment, ProcessResultMetadata, ProcessResultSource, make_execute_request,
+    populate_fallible_execution_result,
 };
 
 #[derive(Debug)]
@@ -257,8 +257,7 @@ impl CommandRunner {
             Some(Ok(operation)) => {
                 trace!(
                     "wait_on_operation_stream (build_id={}): got operation: {:?}",
-                    &context.build_id,
-                    &operation
+                    &context.build_id, &operation
                 );
 
                 // Extract the operation name.
@@ -522,7 +521,7 @@ impl CommandRunner {
                 Err(e) => {
                     return ExecutionError::Fatal(
                         format!("Bad digest in missing blob: {}: {}", parts[1], e).into(),
-                    )
+                    );
                 }
             };
 
@@ -531,7 +530,7 @@ impl CommandRunner {
                 Err(e) => {
                     return ExecutionError::Fatal(
                         format!("Missing blob had bad size: {}: {}", parts[2], e).into(),
-                    )
+                    );
                 }
             };
 
@@ -743,9 +742,9 @@ impl CommandRunner {
                     // The request has not been submitted yet. Submit the request using the REv2
                     // Execute method.
                     debug!(
-            "no current operation: submitting execute request: build_id={}; execute_request={:?}",
-            context.build_id, &execute_request
-          );
+                        "no current operation: submitting execute request: build_id={}; execute_request={:?}",
+                        context.build_id, &execute_request
+                    );
                     workunit.increment_counter(Metric::RemoteExecutionRPCExecute, 1);
                     let mut client = self.execution_client.as_ref().clone();
                     let request =
@@ -757,9 +756,9 @@ impl CommandRunner {
                     // The request has been submitted already. Reconnect to the status stream
                     // using the REv2 WaitExecution method.
                     debug!(
-            "existing operation: reconnecting to operation stream: build_id={}; operation_name={}",
-            context.build_id, operation_name
-          );
+                        "existing operation: reconnecting to operation stream: build_id={}; operation_name={}",
+                        context.build_id, operation_name
+                    );
                     workunit.increment_counter(Metric::RemoteExecutionRPCWaitExecution, 1);
                     let wait_execution_request = WaitExecutionRequest {
                         name: operation_name.to_owned(),
@@ -789,8 +788,7 @@ impl CommandRunner {
                         StreamOutcome::Complete(status) => {
                             trace!(
                                 "wait_on_operation_stream (build_id={}) returned completion={:?}",
-                                context.build_id,
-                                status
+                                context.build_id, status
                             );
                             // We completed this operation.
                             running_operation.completed();
@@ -800,8 +798,7 @@ impl CommandRunner {
                             trace!(
                                 "wait_on_operation_stream (build_id={}) returned stream close, \
                      will retry operation_name={:?}",
-                                context.build_id,
-                                running_operation.name
+                                context.build_id, running_operation.name
                             );
 
                             // Check if the number of request attempts sent thus far have exceeded the number

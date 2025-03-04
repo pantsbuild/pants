@@ -13,7 +13,7 @@ use nix::unistd::execv;
 use strum::VariantNames;
 use strum_macros::{AsRefStr, EnumString, VariantNames};
 
-use options::{option_id, render_choice, Args, BuildRoot, Env, OptionParser};
+use options::{Args, BuildRoot, Env, OptionParser, option_id, render_choice};
 use pantsd::find_pantsd;
 
 // TODO(John Sirois): Maybe consolidate with PythonLogLevel in src/rust/engine/logging/src/lib.rs.

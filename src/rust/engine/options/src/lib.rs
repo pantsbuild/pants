@@ -56,7 +56,6 @@ use crate::fromfile::FromfileExpander;
 use crate::parse::Parseable;
 pub use build_root::BuildRoot;
 pub use id::OptionId;
-use lazy_static::lazy_static;
 use parking_lot::Mutex;
 pub use scope::{GoalInfo, Scope};
 use serde::Deserialize;
@@ -67,11 +66,10 @@ use std::fs;
 use std::hash::Hash;
 use std::path::Path;
 use std::sync::Arc;
+use std::sync::LazyLock;
 pub use types::OptionType;
 
-lazy_static! {
-    static ref BIN_NAME: Mutex<String> = Mutex::new("pants".to_string());
-}
+static BIN_NAME: LazyLock<Mutex<String>> = LazyLock::new(|| Mutex::new("pants".to_string()));
 
 // NB: This will be called at import time in several Python files to define static help strings
 // (e.g. "help=f'run `{bin_name()} fmt`"). So it must be set early. But on the other hand it can

@@ -22,7 +22,7 @@ class Prettier(NodeJSToolBase):
         """
     )
 
-    default_version = "prettier@2.6.2"
+    default_version = "prettier@3.5.2"
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--version")
