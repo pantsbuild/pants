@@ -333,7 +333,8 @@ def install_rustup() -> list[Step]:
             "name": "Install Rust toolchain",
             "run": dedent(
                 f"""\
-            rustup toolchain install {rust_channel()}
+            # Set the default toolchain. Installs the toolchain if it is not already installed.
+            rustup default {rust_channel()}
             cargo version
             """
             ),
