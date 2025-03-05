@@ -1,7 +1,6 @@
 # Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import logging
-from typing import Optional
 
 from pants.core.goals.package import OutputPathField
 from pants.engine.target import (
@@ -26,7 +25,7 @@ class PythonFormatStringValuesField(DictStringToStringField):
 
 
 class PythonFormatStringOutputPathField(OutputPathField):
-    def value_or_default(self, *, file_ending: Optional[str]) -> str:
+    def value_or_default(self, *, file_ending: str | None) -> str:
         if self.address.is_generated_target:
             if self.address.is_parametrized:
                 return f"{self.address.filename}.{file_ending}{self.address.parameters_repr}"

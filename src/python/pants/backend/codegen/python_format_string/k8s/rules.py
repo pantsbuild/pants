@@ -2,6 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from pants.backend.codegen.python_format_string.target_types import (
+    PythonFormatStringOutputPathField,
+    PythonFormatStringSourceField,
+    PythonFormatStringValuesField,
+)
+from pants.backend.k8s.target_types import K8sSourceField
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, Snapshot
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
@@ -12,13 +18,6 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 
-from pants.backend.codegen.python_format_string.target_types import (
-    PythonFormatStringOutputPathField,
-    PythonFormatStringSourceField,
-    PythonFormatStringValuesField,
-)
-from pants.backend.k8s.target_types import K8sSourceField
-
 
 class GenerateK8sSourceFromPythonFormatStringRequest(GenerateSourcesRequest):
     input = PythonFormatStringSourceField
@@ -26,7 +25,9 @@ class GenerateK8sSourceFromPythonFormatStringRequest(GenerateSourcesRequest):
 
 
 @rule
-async def generate_k8s_source(request: GenerateK8sSourceFromPythonFormatStringRequest) -> GeneratedSources:
+async def generate_k8s_source(
+    request: GenerateK8sSourceFromPythonFormatStringRequest,
+) -> GeneratedSources:
     format_string_target = request.protocol_target
     hydrated_sources = await Get(
         HydratedSources, HydrateSourcesRequest(format_string_target[PythonFormatStringSourceField])
@@ -50,7 +51,9 @@ async def generate_k8s_source(request: GenerateK8sSourceFromPythonFormatStringRe
     except IndexError as e:
         raise ValueError(f"Failed to render target `{format_string_target.address}`") from e
 
-    path = format_string_target[PythonFormatStringOutputPathField].value_or_default(file_ending="rendered")
+    path = format_string_target[PythonFormatStringOutputPathField].value_or_default(
+        file_ending="rendered"
+    )
     snapshot = await Get(
         Snapshot,
         CreateDigest([FileContent(path=path, content=rendered.encode("utf-8"))]),

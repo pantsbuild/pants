@@ -1,20 +1,22 @@
-from pants.backend.codegen.python_format_string.target_types import (
-    PythonFormatStringSourceField,
-    PythonFormatStringTarget,
-)
+# Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 from textwrap import dedent
+
+import pytest
+
 from pants.backend.codegen.python_format_string.k8s import rules as k8s_rules
 from pants.backend.codegen.python_format_string.k8s.rules import (
     GenerateK8sSourceFromPythonFormatStringRequest,
 )
+from pants.backend.codegen.python_format_string.target_types import (
+    PythonFormatStringSourceField,
+    PythonFormatStringTarget,
+)
 from pants.engine.fs import DigestContents
 from pants.engine.internals.native_engine import Address
 from pants.engine.rules import QueryRule
-from pants.engine.target import GeneratedSources, HydrateSourcesRequest, HydratedSources
+from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
-
-
-import pytest
 
 
 @pytest.fixture
