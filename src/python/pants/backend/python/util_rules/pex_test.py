@@ -13,9 +13,9 @@ from pathlib import Path
 
 import pytest
 import requests
+from packaging.requirements import Requirement
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
-from pkg_resources import Requirement
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
@@ -614,7 +614,7 @@ def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | Ven
     assert dists[3].version == Version("2.23.0")
     # requires_dists is parsed from metadata written by the pex tool, and is always
     #   a set of valid pkg_resources.Requirements.
-    assert Requirement.parse('PySocks!=1.5.7,>=1.5.6; extra == "socks"') in dists[3].requires_dists
+    assert Requirement('PySocks!=1.5.7,>=1.5.6; extra == "socks"') in dists[3].requires_dists
     assert dists[4].project_name == "urllib3"
 
 
