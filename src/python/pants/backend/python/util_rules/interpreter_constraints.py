@@ -488,7 +488,7 @@ def _major_minor_version_when_single_and_entire(ics: InterpreterConstraints) -> 
 
     # >=major.minor,<major.(minor+1)
     if len(req.specifier) == 2:
-        specifiers = list(req.specifier)
+        specifiers = sorted(req.specifier, key=lambda s: s.version)
         operator_lo, version_lo = (specifiers[0].operator, specifiers[0].version)
         operator_hi, version_hi = (specifiers[1].operator, specifiers[1].version)
 
