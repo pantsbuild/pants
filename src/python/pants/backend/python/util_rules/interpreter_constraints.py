@@ -67,12 +67,12 @@ def parse_constraint(constraint: str) -> Requirement:
     """
     try:
         parsed_requirement = Requirement(constraint)
-    except InvalidRequirement:
+    except InvalidRequirement as err:
         try:
             parsed_requirement = Requirement(f"CPython{constraint}")
-        except InvalidRequirement as err2:
+        except InvalidRequirement:
             raise InvalidRequirement(
-                f"Failed to parse Python interpreter constraint `{constraint}`: {err2}"
+                f"Failed to parse Python interpreter constraint `{constraint}`: {err}"
             )
 
     return parsed_requirement
