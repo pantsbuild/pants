@@ -256,7 +256,6 @@ async def get_python_requirements(
     result: defaultdict[str, dict[str, Address]] = defaultdict(dict)
     for target in python_targets.third_party:
         for python_requirement in target[PythonRequirementsField].value:
-            # import pdb ; pdb.set_trace()
             name = canonicalize_project_name(python_requirement.name)
             resolve = target[PythonRequirementResolveField].normalized_value(python_setup)
             result[resolve][name] = target.address

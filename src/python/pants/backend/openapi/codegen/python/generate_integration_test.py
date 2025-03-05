@@ -121,7 +121,7 @@ def requirements_text() -> str:
         )
         python_requirement(
             name="python-dateutil",
-            requirements=["python_dateutil"],
+            requirements=["python-dateutil"],
         )
         python_requirement(
             name="setuptools",
