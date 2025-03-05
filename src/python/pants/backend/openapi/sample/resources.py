@@ -5,4 +5,6 @@ import importlib.resources
 
 from pants.backend.openapi import sample
 
-PETSTORE_SAMPLE_SPEC = importlib.resources.files(sample.__name__).joinpath("petstore_spec.yaml").read_text()
+PETSTORE_SAMPLE_SPEC = (
+    importlib.resources.files(sample.__name__).joinpath("petstore_spec.yaml").read_text()
+)
