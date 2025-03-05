@@ -6,6 +6,7 @@ from __future__ import annotations
 import ast
 import dataclasses
 import difflib
+import importlib.metadata
 import inspect
 import itertools
 import json
@@ -18,8 +19,6 @@ from functools import reduce
 from itertools import chain
 from pathlib import Path
 from typing import Any, DefaultDict, TypeVar, Union, cast, get_type_hints
-
-import pkg_resources
 
 import pants.backend
 from pants.base import deprecated
@@ -905,20 +904,29 @@ class HelpInfoExtracter:
             }
             return backends
 
-        def discover_plugin_backends(entry_point_name: str) -> set[DiscoveredBackend]:
-            backends = {
+        def discover_plugin_backends(entry_point_name: str) -> frozenset[DiscoveredBackend]:
+            def get_dist_file(dist: importlib.metadata.Distribution, file_path: str):
+                try:
+                    return dist.locate_file(file_path)
+                except Exception as e:
+                    raise ValueError(
+                        f"Failed to locate file `{file_path}` in distribution `{dist}`: {e}"
+                    )
+
+            backends = frozenset(
                 DiscoveredBackend(
-                    entry_point.dist.project_name,
-                    entry_point.module_name,
+                    entry_point.dist.name,
+                    entry_point.module,
                     str(
-                        Path(entry_point.dist.location)
-                        / (entry_point.module_name.replace(".", "/") + ".py")
+                        get_dist_file(
+                            entry_point.dist, entry_point.module.replace(".", "/") + ".py"
+                        )
                     ),
                     True,
                 )
-                for entry_point in pkg_resources.iter_entry_points(entry_point_name)
+                for entry_point in importlib.metadata.entry_points().select(group=entry_point_name)
                 if entry_point.dist is not None
-            }
+            )
             return backends
 
         global_options = options.for_global_scope()
