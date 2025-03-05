@@ -9,7 +9,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from packaging.utils import canonicalize_name as canonicalize_project_name
+from packaging.utils import canonicalize_name
 
 from pants.backend.codegen.utils import MissingPythonCodegenRuntimeLibrary
 from pants.backend.openapi.codegen.python.extra_fields import (
@@ -256,7 +256,7 @@ async def get_python_requirements(
     result: defaultdict[str, dict[str, Address]] = defaultdict(dict)
     for target in python_targets.third_party:
         for python_requirement in target[PythonRequirementsField].value:
-            name = canonicalize_project_name(python_requirement.name)
+            name = canonicalize_name(python_requirement.name)
             resolve = target[PythonRequirementResolveField].normalized_value(python_setup)
             result[resolve][name] = target.address
 
@@ -313,16 +313,16 @@ async def infer_openapi_python_dependencies(
 
     addresses, missing_requirements = [], []
     for runtime_dependency in compiled_sources.runtime_dependencies:
-        project_name = runtime_dependency.name
-        address = requirements_to_addresses.get(project_name.lower())
+        name = canonicalize_name(runtime_dependency.name)
+        address = requirements_to_addresses.get(name)
         if address is not None:
             addresses.append(address)
         else:
-            missing_requirements.append(project_name)
+            missing_requirements.append(name)
 
     if missing_requirements:
         for_resolve_str = f" for the resolve '{resolve}'" if python_setup.enable_resolves else ""
-        missing = ", ".join(f"`{project_name}`" for project_name in missing_requirements)
+        missing = ", ".join(f"`{name}`" for name in missing_requirements)
         raise MissingPythonCodegenRuntimeLibrary(
             softwrap(
                 f"""
