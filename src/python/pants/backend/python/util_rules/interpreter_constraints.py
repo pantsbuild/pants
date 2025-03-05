@@ -67,7 +67,7 @@ def parse_constraint(constraint: str) -> Requirement:
     """
     try:
         parsed_requirement = Requirement(constraint)
-    except InvalidRequirement as err:
+    except InvalidRequirement:
         try:
             parsed_requirement = Requirement(f"CPython{constraint}")
         except InvalidRequirement as err2:
@@ -148,10 +148,13 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
 
         def and_constraints(parsed_requirements: Sequence[Requirement]) -> Requirement:
             assert len(parsed_requirements) > 0, "At least one `Requirement` must be supplied."
+            expected_name = parsed_requirements[0].name
             current_requirement_specifier = parsed_requirements[0].specifier
             for requirement in parsed_requirements[1:]:
+                if requirement.name != expected_name:
+                    return impossible
                 current_requirement_specifier &= requirement.specifier
-            return Requirement(str(current_requirement_specifier))
+            return Requirement(f"{expected_name}{current_requirement_specifier}")
 
         ored_constraints = (
             and_constraints(constraints_product)

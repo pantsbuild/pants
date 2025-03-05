@@ -46,7 +46,6 @@ def test_merge_interpreter_constraints() -> None:
         normalized_expected = sorted(str(Requirement(v)) for v in expected)
         assert result == normalized_expected
 
-
     # Multiple constraint sets get merged so that they are ANDed.
     # A & B => A & B
     assert_merged(inp=[["CPython==2.7.*"], ["CPython==3.6.*"]], expected=["CPython==2.7.*,==3.6.*"])
