@@ -130,7 +130,7 @@ impl ImportCollector<'_> {
                 if substrings.iter().any(|s| s.is_none()) {
                     return None;
                 }
-                let substrings: Vec<String> = substrings.into_iter().map(|s| s.unwrap()).collect();
+                let substrings: Vec<String> = substrings.into_iter().flatten().collect();
                 Some(substrings.join(""))
             }
             _ => None,
