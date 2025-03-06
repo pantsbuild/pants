@@ -279,6 +279,17 @@ fn dunder_import() {
     )  # pants: no-infer-dep",
         &[],
     );
+    assert_imports(
+        "
+    __import__(
+          'foo'   # Intervening comment will be ignored.
+          \".bar\"
+          \"\"\".xyzzy\"\"\"
+          '''.funky'''
+        )
+    ",
+        &["foo.bar.xyzzy.funky"],
+    );
 }
 
 fn assert_imports_strong_weak(code: &str, strong: &[&str], weak: &[&str]) {
