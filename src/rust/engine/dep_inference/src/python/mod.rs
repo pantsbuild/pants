@@ -125,6 +125,7 @@ impl ImportCollector<'_> {
             KindID::CONCATENATED_STRING => {
                 let substrings: Vec<Option<String>> = node
                     .children(&mut node.walk())
+                    .filter(|n| n.kind_id() != KindID::COMMENT)
                     .map(|n| self.string_literal_from_node(n))
                     .collect();
                 if substrings.iter().any(|s| s.is_none()) {
