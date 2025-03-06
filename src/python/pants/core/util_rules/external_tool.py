@@ -11,7 +11,7 @@ from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 
-from pkg_resources import Requirement
+from packaging.requirements import Requirement
 
 from pants.core.goals.export import (
     ExportedBinary,
@@ -293,9 +293,9 @@ class ExternalTool(Subsystem, ExportableTool, ExternalToolOptionsMixin, metaclas
         if not self.version_constraints:
             return None
         # Note that this is not a Python requirement. We're just hackily piggybacking off
-        # pkg_resource.Requirement's ability to check version constraints.
-        constraints = Requirement.parse(f"{self.name}{self.version_constraints}")
-        if constraints.specifier.contains(self.version):  # type: ignore[attr-defined]
+        # packaging.requirements.Requirement's ability to check version constraints.
+        constraints = Requirement(f"{self.name}{self.version_constraints}")
+        if constraints.specifier.contains(self.version):
             # all ok
             return None
 
