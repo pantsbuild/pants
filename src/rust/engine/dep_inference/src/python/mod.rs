@@ -108,12 +108,12 @@ impl ImportCollector<'_> {
             KindID::STRING => {
                 let content_node = node.child(1)?;
                 if content_node.kind_id() != KindID::STRING_CONTENT {
-                    // String literals are expected to be have STRING_START STRING_CONTENT STRING_END children.
+                    // String literals are expected to have children: STRING_START STRING_CONTENT STRING_END
                     return None;
                 }
 
                 if content_node
-                    .named_children(&mut content_node.walk())
+                    .children(&mut content_node.walk())
                     .any(|n| n.kind_id() == KindID::ESCAPE_SEQUENCE)
                 {
                     // A string with an escape sequence is probably not referring to an importable name.
@@ -124,7 +124,7 @@ impl ImportCollector<'_> {
             }
             KindID::CONCATENATED_STRING => {
                 let substrings: Vec<Option<String>> = node
-                    .named_children(&mut node.walk())
+                    .children(&mut node.walk())
                     .map(|n| self.string_literal_from_node(n))
                     .collect();
                 if substrings.iter().any(|s| s.is_none()) {
