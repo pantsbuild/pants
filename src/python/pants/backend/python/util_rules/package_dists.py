@@ -651,7 +651,7 @@ async def determine_finalized_setup_kwargs(request: GenerateSetupPyRequest) -> F
             "python_requires",
             # Pick the first constraint using a generator detour, as the InterpreterConstraints is
             # based on a FrozenOrderedSet which is not indexable.
-            next(str(ic.specifier) for ic in request.interpreter_constraints),  # type: ignore[attr-defined]
+            next(str(ic.specifier) for ic in request.interpreter_constraints),
         )
 
     # The cascading defaults here are for two levels of "I know what I'm
