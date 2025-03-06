@@ -1,5 +1,6 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
+use std::borrow::Cow;
 use std::path::PathBuf;
 
 use fnv::{FnvHashMap as HashMap, FnvHashSet as HashSet};
@@ -102,6 +103,40 @@ impl ImportCollector<'_> {
         code::at_range(self.code, range)
     }
 
+    fn string_literal_from_node(&self, node: tree_sitter::Node) -> Option<String> {
+        match node.kind_id() {
+            KindID::STRING => {
+                let content_node = node.child(1)?;
+                if content_node.kind_id() != KindID::STRING_CONTENT {
+                    // String literals are expected to be have STRING_START STRING_CONTENT STRING_END children.
+                    return None;
+                }
+
+                if content_node
+                    .named_children(&mut content_node.walk())
+                    .any(|n| n.kind_id() == KindID::ESCAPE_SEQUENCE)
+                {
+                    // A string with an escape sequence is probably not referring to an importable name.
+                    return None;
+                }
+                let content = code::at_range(self.code, content_node.range());
+                Some(content.to_string())
+            }
+            KindID::CONCATENATED_STRING => {
+                let substrings: Vec<Option<String>> = node
+                    .named_children(&mut node.walk())
+                    .map(|n| self.string_literal_from_node(n))
+                    .collect();
+                if substrings.iter().any(|s| s.is_none()) {
+                    return None;
+                }
+                let substrings: Vec<String> = substrings.into_iter().map(|s| s.unwrap()).collect();
+                Some(substrings.join(""))
+            }
+            _ => None,
+        }
+    }
+
     fn string_at(&self, range: tree_sitter::Range) -> &str {
         // https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
         self.code_at(range)
@@ -192,14 +227,17 @@ impl ImportCollector<'_> {
 
         let base_range = base.range();
         let base_ref = if is_string {
-            self.string_at(base_range)
+            let Some(s) = self.string_literal_from_node(base) else {
+                return;
+            };
+            Cow::Owned(s)
         } else {
-            self.code_at(base_range)
+            Cow::Borrowed(self.code_at(base_range))
         };
 
         let full_name = match specific {
             Some(specific) => {
-                let specific_ref = self.code_at(specific.range());
+                let specific_ref = Cow::Borrowed(self.code_at(specific.range()));
                 // `from ... import a` => `...a` should concat base_ref and specific_ref directly, but `from
                 // x import a` => `x.a` needs to insert a . between them
                 let joiner = if base_ref.ends_with('.') { "" } else { "." };
@@ -340,13 +378,14 @@ impl Visitor for ImportCollector<'_> {
 
         let args = node.named_child(1).unwrap();
         if let Some(arg) = args.named_child(0) {
-            if arg.kind_id() == KindID::STRING {
-                // NB: Call nodes are children of expression nodes. The comment is a sibling of the expression.
-                if !self.is_pragma_ignored(node.parent().unwrap()) {
-                    self.insert_import(arg, None, true);
-                }
+            if self.string_literal_from_node(arg).is_some()
+                && !self.is_pragma_ignored(node.parent().unwrap())
+            {
+                self.insert_import(arg, None, true);
             }
         }
+
+        // Do not descend below the `__import__` call statement.
         ChildBehavior::Ignore
     }
 

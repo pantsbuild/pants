@@ -722,6 +722,8 @@ fn python2() {
       __import__(b'treat.as.a.regular.import.not.a.string.import')
       __import__(u'{}'.format('interpolation'))
 
+        __import__('foo' '.bar')
+
         importlib.import_module(b'dep.from.bytes')
         importlib.import_module(u'dep.from.str')
         importlib.import_module(u'dep.from.str_狗')
@@ -737,15 +739,16 @@ fn python2() {
             ("project.demo.Demo", (5, false)),
             ("pkg_resources", (7, false)),
             ("treat.as.a.regular.import.not.a.string.import", (8, false)),
-            ("weak1", (17, true)),
-            ("strong1", (18, false)),
-            ("strong2", (19, false)),
-            ("strong3", (20, false)),
+            ("weak1", (19, true)),
+            ("strong1", (20, false)),
+            ("strong2", (21, false)),
+            ("strong3", (22, false)),
+            ("foo.bar", (11, false)),
         ]),
         HashMap::from([
-            ("dep.from.bytes", 11),
-            ("dep.from.str", 12),
-            ("dep.from.str_狗", 13),
+            ("dep.from.bytes", 13),
+            ("dep.from.str", 14),
+            ("dep.from.str_狗", 15),
         ]),
     );
 }
