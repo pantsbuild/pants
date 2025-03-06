@@ -166,7 +166,7 @@ def _add_extensions(file_imports: frozenset[str], file_extensions: tuple[str, ..
         for file_import in file_imports
         for string in (
             [file_import]
-            if PurePath(file_import).suffix and PurePath(file_import).suffix in file_extensions
+            if PurePath(file_import).suffix in set(file_extensions)
             else [f"{file_import}{ext}" for ext in extensions]
         )
     )
