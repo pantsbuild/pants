@@ -940,8 +940,10 @@ class PythonTestsEntryPointDependenciesField(DictStringToStringSequenceField):
         Plus, an `entry_points.txt` file will be generated in the sandbox so that
         each of the `{PythonDistribution.alias}`s appear to be "installed". The
         `entry_points.txt` file will only include the entry points requested on this
-        field. This allows the tests, or the code under test, to lookup entry points
-        metadata using something like `pkg_resources.iter_entry_points` from `setuptools`.
+        field. This allows the tests, or the code under test, to lookup entry points'
+        metadata using an API like the `importlib.metadata.entry_points()` API in the
+        standard library (available on older Python interpreters via the
+        `importlib-metadata` distribution).
         """
     )
 
