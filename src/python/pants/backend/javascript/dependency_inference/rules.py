@@ -161,12 +161,13 @@ async def _prepare_inference_metadata(address: Address, file_path: str) -> Infer
 
 def _add_extensions(file_imports: frozenset[str], file_extensions: tuple[str, ...]) -> PathGlobs:
     extensions = file_extensions + tuple(f"/index{ext}" for ext in file_extensions)
+    valid_file_extensions = set(file_extensions)
     return PathGlobs(
         string
         for file_import in file_imports
         for string in (
             [file_import]
-            if PurePath(file_import).suffix
+            if PurePath(file_import).suffix in valid_file_extensions
             else [f"{file_import}{ext}" for ext in extensions]
         )
     )
