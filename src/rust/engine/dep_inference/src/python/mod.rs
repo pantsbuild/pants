@@ -110,7 +110,7 @@ impl ImportCollector<'_> {
     }
 
     /// Extract an optional "import name" string from a string-related `tree_sitter::Node`. The string is
-    /// expected to analyze statically as an import name and so `extract_string` ignore any strings
+    /// expected to analyze statically as an import name and so `extract_string` ignores any strings
     /// containing escape sequences as well as any use of f-strings with interpolations.
     fn extract_string(&self, node: tree_sitter::Node) -> Option<String> {
         match node.kind_id() {
@@ -127,7 +127,8 @@ impl ImportCollector<'_> {
                     || content_node.child_count() > 0
                 {
                     // The `string_content` node is expected to have no children if the string is a simple string literal.
-                    // If there are children, then it means that the string contains escape sequences and is not an import name.
+                    // If there are children, then it means that the string contains escape sequences and is not an import name
+                    // (either an `escape_sequence` or `escape_interpolation` node).
                     return None;
                 }
 
