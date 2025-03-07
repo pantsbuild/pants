@@ -138,13 +138,6 @@ impl ImportCollector<'_> {
         }
     }
 
-    fn string_at(&self, range: tree_sitter::Range) -> &str {
-        // https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
-        self.code_at(range)
-            .trim_start_matches(|c| "rRuUfFbB".contains(c))
-            .trim_matches(|c| "'\"".contains(c))
-    }
-
     fn is_pragma_ignored_at_row(&self, node: tree_sitter::Node, end_row: usize) -> bool {
         let node_range = node.range();
         if node.kind_id() == KindID::COMMENT
@@ -390,14 +383,14 @@ impl Visitor for ImportCollector<'_> {
     }
 
     fn visit_string(&mut self, node: tree_sitter::Node) -> ChildBehavior {
-        let range = node.range();
-        let text: &str = self.string_at(range);
-        if !text.contains(|c: char| c.is_ascii_whitespace() || c == '\\')
-            && !self.is_pragma_ignored_recursive(node)
-        {
-            self.string_candidates
-                .insert(text.to_string(), (range.start_point.row + 1) as u64);
-        }
+        if let Some(text) = self.extract_string(node) {
+            if !text.contains(|c: char| c.is_ascii_whitespace() || c == '\\')
+                && !self.is_pragma_ignored_recursive(node)
+            {
+                self.string_candidates
+                    .insert(text, (node.range().start_point.row + 1) as u64);
+            }
+        };
         ChildBehavior::Ignore
     }
 }
