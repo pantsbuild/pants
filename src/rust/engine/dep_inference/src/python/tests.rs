@@ -279,6 +279,8 @@ fn dunder_import() {
     )  # pants: no-infer-dep",
         &[],
     );
+
+    // Concatenated strings are accepted.
     assert_imports(
         "
     __import__(
@@ -290,6 +292,11 @@ fn dunder_import() {
     ",
         &["foo.bar.xyzzy.funky"],
     );
+
+    // f-strings with interpolations are ignored
+    assert_imports("__import__(f'foo.{name}')", &[]);
+    assert_imports("__import__(f'foo.{{name}}')", &[]);
+    assert_imports("__import__(f'foo.bar\n')", &[]);
 }
 
 fn assert_imports_strong_weak(code: &str, strong: &[&str], weak: &[&str]) {
