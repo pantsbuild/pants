@@ -254,6 +254,17 @@ impl ImportCollector<'_> {
             .and_modify(|v| *v = (v.0, v.1 && self.weaken_imports))
             .or_insert(((line0 as u64) + 1, self.weaken_imports));
     }
+
+    fn handle_string_candidate(&mut self, node: tree_sitter::Node) {
+        if let Some(text) = self.extract_string(node) {
+            if !text.contains(|c: char| c.is_ascii_whitespace() || c == '\\')
+                && !self.is_pragma_ignored_recursive(node)
+            {
+                self.string_candidates
+                    .insert(text, (node.range().start_point.row + 1) as u64);
+            }
+        }
+    }
 }
 
 // NB: https://tree-sitter.github.io/tree-sitter/playground is very helpful
@@ -390,15 +401,13 @@ impl Visitor for ImportCollector<'_> {
         ChildBehavior::Ignore
     }
 
+    fn visit_concatenated_string(&mut self, node: tree_sitter::Node) -> ChildBehavior {
+        self.handle_string_candidate(node);
+        ChildBehavior::Ignore
+    }
+
     fn visit_string(&mut self, node: tree_sitter::Node) -> ChildBehavior {
-        if let Some(text) = self.extract_string(node) {
-            if !text.contains(|c: char| c.is_ascii_whitespace() || c == '\\')
-                && !self.is_pragma_ignored_recursive(node)
-            {
-                self.string_candidates
-                    .insert(text, (node.range().start_point.row + 1) as u64);
-            }
-        };
+        self.handle_string_candidate(node);
         ChildBehavior::Ignore
     }
 }

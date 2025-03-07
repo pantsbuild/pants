@@ -689,6 +689,10 @@ fn string_candidates() {
     assert_strings("'''\na'''", &[]);
     assert_strings("'''a\n'''", &[]);
 
+    // Concatenated strings
+    assert_strings("'foo' \".bar\"", &["foo.bar"]);
+    assert_strings("'''foo''' \"\"\".bar\"\"\"", &["foo.bar"]);
+
     // Technically the value of the string doesn't contain whitespace, but the parser isn't that
     // sophisticated yet.
     assert_strings("'''\\\na'''", &[]);
@@ -718,6 +722,8 @@ fn string_candidates() {
     ",
         &[],
     );
+    assert_strings("'foo' \".bar\" # pants: no-infer-dep", &[]);
+    assert_strings("'''foo''' \"\"\".bar\"\"\" # pants: no-infer-dep", &[]);
 }
 
 #[test]
