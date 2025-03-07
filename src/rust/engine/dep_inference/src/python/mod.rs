@@ -103,22 +103,28 @@ impl ImportCollector<'_> {
         code::at_range(self.code, range)
     }
 
+    /// Extract an optional "import name" string from a string-related `tree_sitter::Node`. The string is
+    /// expected to analyze statically as an import name and so `extract_string` ignore any strings
+    /// containing escape sequences as well as any use of f-strings with interpolations.
     fn extract_string(&self, node: tree_sitter::Node) -> Option<String> {
         match node.kind_id() {
             KindID::STRING => {
-                let content_node = node.child(1)?;
-                if content_node.kind_id() != KindID::STRING_CONTENT {
-                    // String literals are expected to have children: STRING_START STRING_CONTENT STRING_END
+                if node.child_count() != 3 {
+                    // String literals are expected to have exactly three children consisting of `string_start`, `string_content`,
+                    // and `string_end`.  If there are more children, then it means that `interpolation` nodes are present, which
+                    // means that the string is an f-string and not an import name that may be analyzed statically.
                     return None;
                 }
 
-                if content_node
-                    .children(&mut content_node.walk())
-                    .any(|n| n.kind_id() == KindID::ESCAPE_SEQUENCE)
+                let content_node = node.child(1)?;
+                if content_node.kind_id() != KindID::STRING_CONTENT
+                    || content_node.child_count() > 0
                 {
-                    // A string with an escape sequence is probably not referring to an importable name.
+                    // The `string_content` node is expected to have no children if the string is a simple string literal.
+                    // If there are children, then it means that the string contains escape sequences and is not an import name.
                     return None;
                 }
+
                 let content = code::at_range(self.code, content_node.range());
                 Some(content.to_string())
             }
