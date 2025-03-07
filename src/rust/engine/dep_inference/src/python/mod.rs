@@ -103,7 +103,7 @@ impl ImportCollector<'_> {
         code::at_range(self.code, range)
     }
 
-    fn string_literal_from_node(&self, node: tree_sitter::Node) -> Option<String> {
+    fn extract_string(&self, node: tree_sitter::Node) -> Option<String> {
         match node.kind_id() {
             KindID::STRING => {
                 let content_node = node.child(1)?;
@@ -126,7 +126,7 @@ impl ImportCollector<'_> {
                 let substrings: Vec<Option<String>> = node
                     .children(&mut node.walk())
                     .filter(|n| n.kind_id() != KindID::COMMENT)
-                    .map(|n| self.string_literal_from_node(n))
+                    .map(|n| self.extract_string(n))
                     .collect();
                 if substrings.iter().any(|s| s.is_none()) {
                     return None;
@@ -228,7 +228,7 @@ impl ImportCollector<'_> {
 
         let base_range = base.range();
         let base_ref = if is_string {
-            let Some(s) = self.string_literal_from_node(base) else {
+            let Some(s) = self.extract_string(base) else {
                 return;
             };
             Cow::Owned(s)
@@ -379,8 +379,7 @@ impl Visitor for ImportCollector<'_> {
 
         let args = node.named_child(1).unwrap();
         if let Some(arg) = args.named_child(0) {
-            if self.string_literal_from_node(arg).is_some()
-                && !self.is_pragma_ignored(node.parent().unwrap())
+            if self.extract_string(arg).is_some() && !self.is_pragma_ignored(node.parent().unwrap())
             {
                 self.insert_import(arg, None, true);
             }
