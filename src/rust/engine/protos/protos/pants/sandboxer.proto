@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package pants.sandboxer;
+
+service SandboxerGrpc {
+  rpc CopyLocalFile (CopyLocalFileRequest) returns (CopyLocalFileResponse);
+}
+
+message CopyLocalFileRequest {
+  string src = 1;
+  string dst = 2;
+}
+
+message CopyLocalFileResponse {
+  string confirmation = 1;
+}
