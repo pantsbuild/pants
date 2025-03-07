@@ -162,6 +162,33 @@ def test_infers_typescript_file_imports_dependencies_parent_dirs(rule_runner: Ru
     }
 
 
+def test_infers_typescript_file_imports_dependencies_with_file_suffix(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "root/project/src/__generated__/BUILD": "typescript_sources()",
+            "root/project/src/__generated__/moduleA.generated.ts": "",
+            "root/project/src/BUILD": "typescript_sources()",
+            "root/project/src/index.ts": dedent(
+                """\
+                import { x } from "./__generated__/moduleA.generated";
+                """
+            ),
+        }
+    )
+
+    index_tgt = rule_runner.get_target(Address("root/project/src", relative_file_path="index.ts"))
+    addresses = rule_runner.request(
+        InferredDependencies,
+        [InferTypeScriptDependenciesRequest(TypeScriptSourceInferenceFieldSet.create(index_tgt))],
+    ).include
+
+    assert set(addresses) == {
+        Address("root/project/src/__generated__", relative_file_path="moduleA.generated.ts"),
+    }
+
+
 def test_unmatched_ts_dependencies_error_unowned_behaviour(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(["--nodejs-infer-unowned-dependency-behavior=error"])
     rule_runner.write_files(
