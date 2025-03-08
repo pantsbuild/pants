@@ -7,6 +7,7 @@ Example:
 pants run build-support/bin:external-tool-versions -- --tool pants.backend.k8s.kubectl_subsystem:Kubectl > list.txt
 """
 
+import json
 from itertools import groupby
 import ast
 from dataclasses import dataclass
@@ -16,6 +17,7 @@ import argparse
 import hashlib
 import logging
 import re
+import textwrap
 from typing import Any, Generator, NotRequired, Protocol, TypeVar
 from collections.abc import Iterator
 from multiprocessing.pool import ThreadPool
@@ -147,7 +149,10 @@ def replace_class_variables(file_path: Path, class_name: str, replacements: dict
             for var, (start, end) in class_var_ranges.items():
                 if start <= i <= end:
                     if i == start:
-                        new_value = f"    {var} = {repr(replacements[var])}\n"
+                        new_value = textwrap.indent(
+                            f"{var} = {json.dumps(replacements[var])}\n",
+                            "    ",
+                        )
                         file.write(new_value)
                     replaced = True
                     break
@@ -312,7 +317,6 @@ def main():
             path,
             class_name,
             replacements={
-                "default_version": versions[0].version.version,
                 "default_known_versions": ["|".join(v) for v in default_known_versions],
             },
         )
