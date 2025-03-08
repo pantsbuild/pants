@@ -26,11 +26,18 @@ import requests
 from packaging.version import Version
 from tqdm import tqdm
 
-from pants.core.util_rules.external_tool import ExternalToolVersion
 from external_tool.kubectl import KubernetesReleases
 from external_tool.github import GithubReleases
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ExternalToolVersion:
+    version: str
+    platform: str
+    sha256: str
+    filesize: int
 
 
 def format_string_to_regex(format_string: str) -> re.Pattern:
@@ -63,7 +70,7 @@ class ToolVersion:
 
 def fetch_version(
     *,
-    path: str,
+    path: Path,
     class_name: str,
     url_template: str,
     version: str,
@@ -112,34 +119,40 @@ def get_class_variables(file_path: Path, class_name: str, *, variables: type[T])
     return variables(**values)
 
 
-def replace_class_variables(
-    file_path: Path,
-    class_name: str,
-    replacements: dict[str, Any],
-) -> None:
+def replace_class_variables(file_path: Path, class_name: str, replacements: dict[str, Any]) -> None:
     """Reads a Python file, searches for a class by name, and replaces specified class variables with new values."""
     with open(file_path, "r", encoding="utf-8") as file:
-        source_code = file.read()
+        lines = file.readlines()
 
-    tree = ast.parse(source_code)
+    tree = ast.parse("".join(lines))
 
-    class ClassTransformer(ast.NodeTransformer):
-        def visit_ClassDef(self, node):
-            if node.name == class_name:
-                for stmt in node.body:
-                    if isinstance(stmt, ast.Assign):
-                        for target in stmt.targets:
-                            if isinstance(target, ast.Name) and target.id in replacements:
-                                stmt.value = ast.Constant(value=replacements[target.id])
-            return node
+    class_var_ranges = {}
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef) and node.name == class_name:
+            for stmt in node.body:
+                if isinstance(stmt, ast.Assign):
+                    for target in stmt.targets:
+                        if isinstance(target, ast.Name) and target.id in replacements:
+                            start_line = stmt.lineno - 1
+                            end_line = (
+                                stmt.end_lineno if hasattr(stmt, "end_lineno") else start_line
+                            )
+                            class_var_ranges[target.id] = (start_line, end_line)
 
-    transformer = ClassTransformer()
-    modified_tree = transformer.visit(tree)
-
-    new_code = ast.unparse(modified_tree)
+    logger.debug("class_var_ranges: %s", class_var_ranges)
 
     with open(file_path, "w", encoding="utf-8") as file:
-        file.write(new_code)
+        for i, line in enumerate(lines):
+            replaced = False
+            for var, (start, end) in class_var_ranges.items():
+                if start <= i <= end:
+                    if i == start:
+                        new_value = f"    {var} = {repr(replacements[var])}\n"
+                        file.write(new_value)
+                    replaced = True
+                    break
+            if not replaced:
+                file.write(line)
 
 
 def find_modules_with_subclasses(
@@ -166,6 +179,7 @@ def find_modules_with_subclasses(
 
 @dataclass(frozen=True)
 class Tool:
+    default_known_versions: list[str]
     default_url_template: str
     default_url_platform_mapping: NotRequired[dict[str, str] | None] = None
 
@@ -202,17 +216,21 @@ def main():
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     logging.getLogger(__name__).level = level
 
-    modules = find_modules_with_subclasses(
-        args.path,
-        base_classes={
-            "TemplatedExternalTool",
-            "ExternalHelmPlugin",
-        },
-        exclude={
-            "ExternalCCSubsystem",  # doesn't define default_url_template
-            "ExternalHelmPlugin",  # is a base class itself
-        },
+    modules = list(
+        find_modules_with_subclasses(
+            args.path,
+            base_classes={
+                "TemplatedExternalTool",
+                "ExternalHelmPlugin",
+            },
+            exclude={
+                "ExternalCCSubsystem",  # doesn't define default_url_template
+                "ExternalHelmPlugin",  # is a base class itself
+            },
+        )
     )
+
+    logger.debug("modules: %s", modules)
 
     pool = ThreadPool(processes=args.workers)
     platforms = args.platforms.split(",")
@@ -226,9 +244,14 @@ def main():
         "binaries.pantsbuild.org": None,  # TODO
     }
 
+    tools = {
+        (path, class_name): get_class_variables(path, class_name, variables=Tool)
+        for path, class_name in modules
+    }
+
     futures = []
     for path, class_name in modules:
-        tool = get_class_variables(path, class_name, variables=Tool)
+        tool = tools[(path, class_name)]
 
         platform_mapping = tool.default_url_platform_mapping
 
@@ -260,26 +283,38 @@ def main():
     ]
     results.sort(key=lambda e: (e.path, e.class_name, Version(e.version.version)))
 
-    for group, versions in groupby(results, key=lambda e: (e.path, e.class_name)):
-        known_versions = []
+    logger.debug("results: %s", results)
+
+    for group, versions_ in groupby(results, key=lambda e: (e.path, e.class_name)):
+        versions = list(versions_)
+        tool = tools[group]
+        known_versions = {
+            # Parse versions to make sure that we don't make duplicates.
+            tuple(map(str.strip, version.split("|")))
+            for version in tool.default_known_versions
+        }
         for version in versions:
             v = version.version
-            known_versions.append(
-                "|".join(
-                    [
-                        v.version,
-                        v.platform,
-                        v.sha256,
-                        str(v.filesize),
-                    ]
+            known_versions.add(
+                (
+                    v.version,
+                    v.platform,
+                    v.sha256,
+                    str(v.filesize),
                 )
             )
+
+        default_known_versions = sorted(known_versions, key=lambda tu: Version(tu[0]))
+
         path, class_name = group
 
         replace_class_variables(
             path,
             class_name,
-            replacements={"known_versions": known_versions},
+            replacements={
+                "default_version": versions[0].version.version,
+                "default_known_versions": ["|".join(v) for v in default_known_versions],
+            },
         )
 
 
