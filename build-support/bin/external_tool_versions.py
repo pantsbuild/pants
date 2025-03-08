@@ -7,13 +7,17 @@ Example:
 pants run build-support/bin:external-tool-versions -- --tool pants.backend.k8s.kubectl_subsystem:Kubectl > list.txt
 """
 
+from itertools import groupby
+import ast
+from dataclasses import dataclass
+import os
+from pathlib import Path
 import argparse
 import hashlib
-import importlib
 import logging
 import re
-import xml.etree.ElementTree as ET
-from collections.abc import Callable, Iterator
+from typing import Any, Generator, NotRequired, Protocol, TypeVar
+from collections.abc import Iterator
 from multiprocessing.pool import ThreadPool
 from string import Formatter
 from urllib.parse import urlparse
@@ -23,6 +27,8 @@ from packaging.version import Version
 from tqdm import tqdm
 
 from pants.core.util_rules.external_tool import ExternalToolVersion
+from external_tool.kubectl import KubernetesReleases
+from external_tool.github import GithubReleases
 
 logger = logging.getLogger(__name__)
 
@@ -44,45 +50,26 @@ def format_string_to_regex(format_string: str) -> re.Pattern:
     return re.compile("".join(result_regex))
 
 
-def fetch_text(url: str) -> str:
-    response = requests.get(url)
-    return response.text
+class Releases(Protocol):
+    def get_releases(self, url_template: str) -> Iterator[str]: ...
 
 
-def _parse_k8s_xml(text: str) -> Iterator[str]:
-    regex = re.compile(r"release\/stable-(?P<version>[0-9\.]+).txt")
-    root = ET.fromstring(text)
-    tag = "{http://doc.s3.amazonaws.com/2006-03-01}"
-    for item in root.iter(f"{tag}Contents"):
-        key_element = item.find(f"{tag}Key")
-        if key_element is None:
-            raise RuntimeError("Failed to parse xml, did it change?")
-
-        key = key_element.text
-        if key and regex.match(key):
-            yield f"https://cdn.dl.k8s.io/{key}"
-
-
-def get_k8s_versions(url_template: str, pool: ThreadPool) -> Iterator[str]:
-    response = requests.get("https://cdn.dl.k8s.io/", allow_redirects=True)
-    urls = _parse_k8s_xml(response.text)
-    for v in pool.imap_unordered(fetch_text, urls):
-        yield v.strip().lstrip("v")
-
-
-DOMAIN_TO_VERSIONS_MAPPING: dict[str, Callable[[str, ThreadPool], Iterator[str]]] = {
-    # TODO github.com
-    "dl.k8s.io": get_k8s_versions,
-}
+@dataclass(frozen=True)
+class ToolVersion:
+    path: Path
+    class_name: str
+    version: ExternalToolVersion
 
 
 def fetch_version(
     *,
+    path: str,
+    class_name: str,
     url_template: str,
     version: str,
     platform: str,
     platform_mapping: dict[str, str],
-) -> ExternalToolVersion | None:
+) -> ToolVersion | None:
     url = url_template.format(version=version, platform=platform_mapping[platform])
     response = requests.get(url, allow_redirects=True)
     if response.status_code != 200:
@@ -91,22 +78,100 @@ def fetch_version(
 
     size = len(response.content)
     sha256 = hashlib.sha256(response.content)
-    return ExternalToolVersion(
-        version=version,
-        platform=platform,
-        filesize=size,
-        sha256=sha256.hexdigest(),
+    return ToolVersion(
+        path=path,
+        class_name=class_name,
+        version=ExternalToolVersion(
+            version=version,
+            platform=platform,
+            filesize=size,
+            sha256=sha256.hexdigest(),
+        ),
     )
+
+
+T = TypeVar("T")
+
+
+def get_class_variables(file_path: Path, class_name: str, *, variables: type[T]) -> T:
+    """Reads a Python file and retrieves the values of specified class variables."""
+    with open(file_path, "r", encoding="utf-8") as file:
+        source_code = file.read()
+
+    tree = ast.parse(source_code)
+    values = {}
+
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef) and node.name == class_name:
+            for stmt in node.body:
+                if isinstance(stmt, ast.Assign):
+                    for target in stmt.targets:
+                        if isinstance(target, ast.Name) and target.id in variables.__annotations__:
+                            values[target.id] = ast.literal_eval(stmt.value)
+
+    return variables(**values)
+
+
+def replace_class_variables(
+    file_path: Path,
+    class_name: str,
+    replacements: dict[str, Any],
+) -> None:
+    """Reads a Python file, searches for a class by name, and replaces specified class variables with new values."""
+    with open(file_path, "r", encoding="utf-8") as file:
+        source_code = file.read()
+
+    tree = ast.parse(source_code)
+
+    class ClassTransformer(ast.NodeTransformer):
+        def visit_ClassDef(self, node):
+            if node.name == class_name:
+                for stmt in node.body:
+                    if isinstance(stmt, ast.Assign):
+                        for target in stmt.targets:
+                            if isinstance(target, ast.Name) and target.id in replacements:
+                                stmt.value = ast.Constant(value=replacements[target.id])
+            return node
+
+    transformer = ClassTransformer()
+    modified_tree = transformer.visit(tree)
+
+    new_code = ast.unparse(modified_tree)
+
+    with open(file_path, "w", encoding="utf-8") as file:
+        file.write(new_code)
+
+
+def find_modules_with_subclasses(
+    directory: Path,
+    *,
+    base_classes: set[str],
+    exclude: set[str],
+) -> Generator[tuple[Path, str], None, None]:
+    """Recursively finds Python modules that contain classes subclassing a given base class."""
+
+    for root, _, files in os.walk(directory):
+        for file in files:
+            if file.endswith(".py"):
+                file_path = Path(root) / file
+                source_code = file_path.read_text()
+
+                tree = ast.parse(source_code)
+                for node in tree.body:
+                    if isinstance(node, ast.ClassDef) and node.name not in exclude:
+                        for base in node.bases:
+                            if isinstance(base, ast.Name) and base.id in base_classes:
+                                yield file_path, node.name
+
+
+@dataclass(frozen=True)
+class Tool:
+    default_url_template: str
+    default_url_platform_mapping: NotRequired[dict[str, str] | None] = None
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-t",
-        "--tool",
-        help="Python tool location, for example: pants.backend.tools.taplo.subsystem:Taplo",
-        required=True,
-    )
     parser.add_argument(
         "--platforms",
         default="macos_arm64,macos_x86_64,linux_arm64,linux_x86_64",
@@ -115,7 +180,7 @@ def main():
     parser.add_argument(
         "-w",
         "--workers",
-        default=16,
+        default=32,
         help="Thread pool size",
     )
     parser.add_argument(
@@ -125,53 +190,96 @@ def main():
         default=False,
         help="Verbose output",
     )
+    parser.add_argument(
+        "path",
+        help="Root directory to traverse",
+        type=Path,
+    )
 
     args = parser.parse_args()
 
     level = logging.DEBUG if args.verbose else logging.INFO
-    logging.basicConfig(level=level, format="%(message)s")
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    logging.getLogger(__name__).level = level
 
-    module_string, class_name = args.tool.split(":")
-    module = importlib.import_module(module_string)
-    cls = getattr(module, class_name)
+    modules = find_modules_with_subclasses(
+        args.path,
+        base_classes={
+            "TemplatedExternalTool",
+            "ExternalHelmPlugin",
+        },
+        exclude={
+            "ExternalCCSubsystem",  # doesn't define default_url_template
+            "ExternalHelmPlugin",  # is a base class itself
+        },
+    )
 
-    platforms = args.platforms.split(",")
-    platform_mapping = cls.default_url_platform_mapping
-
-    domain = urlparse(cls.default_url_template).netloc
-    get_versions = DOMAIN_TO_VERSIONS_MAPPING[domain]
     pool = ThreadPool(processes=args.workers)
-    futures = []
-    for version in get_versions(cls.default_url_template, pool):
-        for platform in platforms:
-            logger.debug("fetching version: %s %s", version, platform)
-            futures.append(
-                pool.apply_async(
-                    fetch_version,
-                    kwds=dict(
-                        version=version,
-                        platform=platform,
-                        url_template=cls.default_url_template,
-                        platform_mapping=platform_mapping,
-                    ),
-                )
-            )
+    platforms = args.platforms.split(",")
 
-    results: list[ExternalToolVersion] = [
+    mapping: dict[str, Releases | None] = {
+        "dl.k8s.io": KubernetesReleases(pool=pool, only_latest=True),
+        "github.com": GithubReleases(only_latest=True),
+        "releases.hashicorp.com": None,  # TODO
+        "raw.githubusercontent.com": None,  # TODO
+        "get.helm.sh": None,  # TODO
+        "binaries.pantsbuild.org": None,  # TODO
+    }
+
+    futures = []
+    for path, class_name in modules:
+        tool = get_class_variables(path, class_name, variables=Tool)
+
+        platform_mapping = tool.default_url_platform_mapping
+
+        domain = urlparse(tool.default_url_template).netloc
+        releases = mapping[domain]
+        if releases is None:
+            logger.warning("can't get versions from %s, not implemented yet", domain)
+            continue
+
+        for version in releases.get_releases(tool.default_url_template):
+            for platform in platforms:
+                logger.debug("fetching version: %s %s", version, platform)
+                futures.append(
+                    pool.apply_async(
+                        fetch_version,
+                        kwds=dict(
+                            path=path,
+                            class_name=class_name,
+                            version=version,
+                            platform=platform,
+                            url_template=tool.default_url_template,
+                            platform_mapping=platform_mapping,
+                        ),
+                    )
+                )
+
+    results: list[ToolVersion] = [
         result for future in tqdm(futures) if (result := future.get(timeout=60)) is not None
     ]
-    results.sort(key=lambda e: Version(e.version))
+    results.sort(key=lambda e: (e.path, e.class_name, Version(e.version.version)))
 
-    for v in results:
-        print(
-            "|".join(
-                [
-                    v.version,
-                    v.platform,
-                    v.sha256,
-                    str(v.filesize),
-                ]
+    for group, versions in groupby(results, key=lambda e: (e.path, e.class_name)):
+        known_versions = []
+        for version in versions:
+            v = version.version
+            known_versions.append(
+                "|".join(
+                    [
+                        v.version,
+                        v.platform,
+                        v.sha256,
+                        str(v.filesize),
+                    ]
+                )
             )
+        path, class_name = group
+
+        replace_class_variables(
+            path,
+            class_name,
+            replacements={"known_versions": known_versions},
         )
 
 
