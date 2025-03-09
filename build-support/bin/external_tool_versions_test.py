@@ -82,7 +82,7 @@ class Cue(TemplatedExternalTool):
         "v0.12.0|linux_x86_64|e55cd5abd98a592c110f87a7da9ef15bc72515200aecfe1bed04bf86311f5ba1|8731479",
         "v0.12.0|linux_arm64|488012bb0e5c080e2a9694ef8765403dd1075a4ec373dda618efa2d37b47f14f|8067539",
         "v0.12.0|macos_arm64|7055a6423f753c8ea763699d48d78d341e8543397399daee281c66ecdc9ec5a5|8400578",
-        "v0.12.0|macos_x86_64|8474e522a978ecadef49b06d706ff276cd07629b1aa107b88adfc1284d3f93cc|8902127",
+        "v0.12.0|macos_x86_64|8474e522a978ecadef49b06d706ff276cd07629b1aa107b88adfc1284d3f93cc|8902127"
     ]
     default_url_template = "https://github.com/cue-lang/cue/releases/download/{version}/cue_{version}_{platform}.tar.gz"
     default_url_platform_mapping = {

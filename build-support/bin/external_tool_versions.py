@@ -143,21 +143,17 @@ def replace_class_variables(file_path: Path, class_name: str, replacements: dict
 
     logger.debug("class_var_ranges: %s", class_var_ranges)
 
+    prev_end = 0
     with open(file_path, "w", encoding="utf-8") as file:
-        for i, line in enumerate(lines):
-            replaced = False
-            for var, (start, end) in class_var_ranges.items():
-                if start <= i <= end:
-                    if i == start:
-                        new_value = textwrap.indent(
-                            f"{var} = {json.dumps(replacements[var])}\n",
-                            "    ",
-                        )
-                        file.write(new_value)
-                    replaced = True
-                    break
-            if not replaced:
-                file.write(line)
+        for var, (start, end) in class_var_ranges.items():
+            file.writelines(lines[prev_end:start])
+            line = textwrap.indent(
+                f"{var} = {json.dumps(replacements[var], indent=4)}\n",
+                "    ",
+            )
+            file.writelines([line])
+            prev_end = end
+        file.writelines(lines[prev_end:])
 
 
 def find_modules_with_subclasses(
