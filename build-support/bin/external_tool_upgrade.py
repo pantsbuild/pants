@@ -296,7 +296,8 @@ def main():
             logger.warning("can't get versions from %s, not implemented yet", domain)
             continue
 
-        for version in releases.get_releases(tool.default_url_template):
+        releases = list(releases.get_releases(tool.default_url_template))
+        for version in releases:
             for platform in platforms:
                 futures.append(
                     pool.apply_async(
