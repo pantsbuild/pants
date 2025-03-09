@@ -1,5 +1,6 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
+use std::borrow::Cow;
 use std::path::PathBuf;
 
 use fnv::{FnvHashMap as HashMap, FnvHashSet as HashSet};
@@ -76,6 +77,12 @@ struct ImportCollector<'a> {
     weaken_imports: bool,
 }
 
+/// Input to `insert_import` to specify the base of an import statement.
+enum BaseNode<'a> {
+    Node(tree_sitter::Node<'a>),
+    StringNode(String, tree_sitter::Node<'a>),
+}
+
 impl ImportCollector<'_> {
     pub fn new(code: &'_ str) -> ImportCollector<'_> {
         ImportCollector {
@@ -102,11 +109,46 @@ impl ImportCollector<'_> {
         code::at_range(self.code, range)
     }
 
-    fn string_at(&self, range: tree_sitter::Range) -> &str {
-        // https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
-        self.code_at(range)
-            .trim_start_matches(|c| "rRuUfFbB".contains(c))
-            .trim_matches(|c| "'\"".contains(c))
+    /// Extract an optional "import name" string from a string-related `tree_sitter::Node`. The string is
+    /// expected to analyze statically as an import name and so `extract_string` ignores any strings
+    /// containing escape sequences as well as any use of f-strings with interpolations.
+    fn extract_string(&self, node: tree_sitter::Node) -> Option<String> {
+        match node.kind_id() {
+            KindID::STRING => {
+                if node.child_count() != 3 {
+                    // String literals are expected to have exactly three children consisting of `string_start`, `string_content`,
+                    // and `string_end`.  If there are more children, then it means that `interpolation` nodes are present, which
+                    // means that the string is an f-string and not an import name that may be analyzed statically.
+                    return None;
+                }
+
+                let content_node = node.child(1)?;
+                if content_node.kind_id() != KindID::STRING_CONTENT
+                    || content_node.child_count() > 0
+                {
+                    // The `string_content` node is expected to have no children if the string is a simple string literal.
+                    // If there are children, then it means that the string contains escape sequences and is not an import name
+                    // (either an `escape_sequence` or `escape_interpolation` node).
+                    return None;
+                }
+
+                let content = code::at_range(self.code, content_node.range());
+                Some(content.to_string())
+            }
+            KindID::CONCATENATED_STRING => {
+                let substrings: Vec<Option<String>> = node
+                    .children(&mut node.walk())
+                    .filter(|n| n.kind_id() != KindID::COMMENT)
+                    .map(|n| self.extract_string(n))
+                    .collect();
+                if substrings.iter().any(|s| s.is_none()) {
+                    return None;
+                }
+                let substrings: Vec<String> = substrings.into_iter().flatten().collect();
+                Some(substrings.join(""))
+            }
+            _ => None,
+        }
     }
 
     fn is_pragma_ignored_at_row(&self, node: tree_sitter::Node, end_row: usize) -> bool {
@@ -170,36 +212,34 @@ impl ImportCollector<'_> {
     /// from $base import *  # (the * node is passed as `specific` too)
     /// from $base import $specific
     /// ```
-    fn insert_import(
-        &mut self,
-        base: tree_sitter::Node,
-        specific: Option<tree_sitter::Node>,
-        is_string: bool,
-    ) {
+    fn insert_import(&mut self, base: BaseNode, specific: Option<tree_sitter::Node>) {
         // the specifically-imported item takes precedence over the base name for ignoring and lines
         // etc.
-        let most_specific = specific.unwrap_or(base);
+        let most_specific = match base {
+            BaseNode::Node(n) => specific.unwrap_or(n),
+            BaseNode::StringNode(_, n) => specific.unwrap_or(n),
+        };
 
         if self.is_pragma_ignored(most_specific) {
             return;
         }
 
-        let base = ImportCollector::unnest_alias(base);
+        let base_ref = match base {
+            BaseNode::Node(node) => {
+                let node = Self::unnest_alias(node);
+                Cow::Borrowed(self.code_at(node.range()))
+            }
+            BaseNode::StringNode(s, _) => Cow::Owned(s),
+        };
+
         // * and errors are the same as not having an specific import
         let specific = specific
             .map(ImportCollector::unnest_alias)
             .filter(|n| !matches!(n.kind_id(), KindID::WILDCARD_IMPORT | KindID::ERROR));
 
-        let base_range = base.range();
-        let base_ref = if is_string {
-            self.string_at(base_range)
-        } else {
-            self.code_at(base_range)
-        };
-
         let full_name = match specific {
             Some(specific) => {
-                let specific_ref = self.code_at(specific.range());
+                let specific_ref = Cow::Borrowed(self.code_at(specific.range()));
                 // `from ... import a` => `...a` should concat base_ref and specific_ref directly, but `from
                 // x import a` => `x.a` needs to insert a . between them
                 let joiner = if base_ref.ends_with('.') { "" } else { "." };
@@ -215,13 +255,24 @@ impl ImportCollector<'_> {
             .and_modify(|v| *v = (v.0, v.1 && self.weaken_imports))
             .or_insert(((line0 as u64) + 1, self.weaken_imports));
     }
+
+    fn handle_string_candidate(&mut self, node: tree_sitter::Node) {
+        if let Some(text) = self.extract_string(node) {
+            if !text.contains(|c: char| c.is_ascii_whitespace() || c == '\\')
+                && !self.is_pragma_ignored_recursive(node)
+            {
+                self.string_candidates
+                    .insert(text, (node.range().start_point.row + 1) as u64);
+            }
+        }
+    }
 }
 
 // NB: https://tree-sitter.github.io/tree-sitter/playground is very helpful
 impl Visitor for ImportCollector<'_> {
     fn visit_import_statement(&mut self, node: tree_sitter::Node) -> ChildBehavior {
         if !self.is_pragma_ignored(node) {
-            self.insert_import(node.named_child(0).unwrap(), None, false);
+            self.insert_import(BaseNode::Node(node.named_child(0).unwrap()), None);
         }
         ChildBehavior::Ignore
     }
@@ -236,7 +287,7 @@ impl Visitor for ImportCollector<'_> {
 
             let mut any_inserted = false;
             for child in node.children_by_field_name("name", &mut node.walk()) {
-                self.insert_import(module_name, Some(child), false);
+                self.insert_import(BaseNode::Node(module_name), Some(child));
                 any_inserted = true;
             }
 
@@ -246,7 +297,7 @@ impl Visitor for ImportCollector<'_> {
                 // manually.)
                 for child in node.children(&mut node.walk()) {
                     if child.kind_id() == KindID::WILDCARD_IMPORT {
-                        self.insert_import(module_name, Some(child), false);
+                        self.insert_import(BaseNode::Node(module_name), Some(child));
                         any_inserted = true
                     }
                 }
@@ -257,7 +308,7 @@ impl Visitor for ImportCollector<'_> {
                 // understood the syntax tree! We're working on a definite import statement, so silently
                 // doing nothing with it is likely to be wrong. Let's insert the import node itself and let
                 // that be surfaced as an dep-inference failure.
-                self.insert_import(node, None, false)
+                self.insert_import(BaseNode::Node(node), None)
             }
         }
         ChildBehavior::Ignore
@@ -340,25 +391,24 @@ impl Visitor for ImportCollector<'_> {
 
         let args = node.named_child(1).unwrap();
         if let Some(arg) = args.named_child(0) {
-            if arg.kind_id() == KindID::STRING {
-                // NB: Call nodes are children of expression nodes. The comment is a sibling of the expression.
+            if let Some(content) = self.extract_string(arg) {
                 if !self.is_pragma_ignored(node.parent().unwrap()) {
-                    self.insert_import(arg, None, true);
+                    self.insert_import(BaseNode::StringNode(content, arg), None);
                 }
             }
         }
+
+        // Do not descend below the `__import__` call statement.
+        ChildBehavior::Ignore
+    }
+
+    fn visit_concatenated_string(&mut self, node: tree_sitter::Node) -> ChildBehavior {
+        self.handle_string_candidate(node);
         ChildBehavior::Ignore
     }
 
     fn visit_string(&mut self, node: tree_sitter::Node) -> ChildBehavior {
-        let range = node.range();
-        let text: &str = self.string_at(range);
-        if !text.contains(|c: char| c.is_ascii_whitespace() || c == '\\')
-            && !self.is_pragma_ignored_recursive(node)
-        {
-            self.string_candidates
-                .insert(text.to_string(), (range.start_point.row + 1) as u64);
-        }
+        self.handle_string_candidate(node);
         ChildBehavior::Ignore
     }
 }
