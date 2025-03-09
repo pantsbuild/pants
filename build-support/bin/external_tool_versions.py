@@ -80,9 +80,19 @@ def fetch_version(
     platform_mapping: dict[str, str],
 ) -> ToolVersion | None:
     url = url_template.format(version=version, platform=platform_mapping[platform])
-    response = requests.get(url, allow_redirects=True)
+    logger.debug("fetching %s version: %s", class_name, url)
+    token = os.environ.get("GITHUB_TOKEN")
+    headers = (
+        {}
+        if token is None
+        else {
+            "Authorization": "Bearer {token}",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+    )
+    response = requests.get(url, headers=headers, allow_redirects=True)
     if response.status_code != 200:
-        logger.debug("failed to fetch version: %s\n%s", version, response.text)
+        logger.debug("failed to fetch %s version %s: %s", class_name, version, response.text)
         return None
 
     size = len(response.content)
@@ -104,6 +114,8 @@ T = TypeVar("T")
 
 def get_class_variables(file_path: Path, class_name: str, *, variables: type[T]) -> T:
     """Reads a Python file and retrieves the values of specified class variables."""
+
+    logger.info("parsing %s variables in %s", class_name, file_path)
     with open(file_path, "r", encoding="utf-8") as file:
         source_code = file.read()
 
@@ -196,6 +208,7 @@ def main():
         "-w",
         "--workers",
         default=32,
+        type=int,
         help="Thread pool size",
     )
     parser.add_argument(
@@ -227,6 +240,8 @@ def main():
             exclude={
                 "ExternalCCSubsystem",  # doesn't define default_url_template
                 "ExternalHelmPlugin",  # is a base class itself
+                "Shunit2",  # can't fetch git commits yet
+                "TerraformTool",  # handled by a different script
             },
         )
     )
@@ -264,7 +279,6 @@ def main():
 
         for version in releases.get_releases(tool.default_url_template):
             for platform in platforms:
-                logger.debug("fetching version: %s %s", version, platform)
                 futures.append(
                     pool.apply_async(
                         fetch_version,
@@ -313,6 +327,7 @@ def main():
             path,
             class_name,
             replacements={
+                "default_version": default_known_versions[-1][0],
                 "default_known_versions": ["|".join(v) for v in default_known_versions],
             },
         )
