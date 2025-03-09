@@ -7,6 +7,8 @@ Example:
 pants run build-support/bin:external-tool-versions -- --tool pants.backend.k8s.kubectl_subsystem:Kubectl > list.txt
 """
 
+from __future__ import annotations
+
 import json
 from itertools import groupby
 import ast
@@ -34,12 +36,29 @@ from external_tool.github import GithubReleases
 logger = logging.getLogger(__name__)
 
 
+# The ExternalToolVersion class is copied here to avoid depending on pants.
+# This makes it possible to run this as a standalone script with uv or use a
+# separate resolve in pants.
 @dataclass(frozen=True)
 class ExternalToolVersion:
     version: str
     platform: str
     sha256: str
     filesize: int
+    url_override: str | None = None
+
+    def encode(self) -> str:
+        parts = [self.version, self.platform, self.sha256, str(self.filesize)]
+        if self.url_override:
+            parts.append(self.url_override)
+        return "|".join(parts)
+
+    @classmethod
+    def decode(cls, version_str: str) -> ExternalToolVersion:
+        parts = [x.strip() for x in version_str.split("|")]
+        version, platform, sha256, filesize = parts[:4]
+        url_override = parts[4] if len(parts) > 4 else None
+        return cls(version, platform, sha256, int(filesize), url_override=url_override)
 
 
 def format_string_to_regex(format_string: str) -> re.Pattern:
@@ -246,7 +265,7 @@ def main():
         )
     )
 
-    logger.debug("modules: %s", modules)
+    logger.debug("found tools: %s", modules)
 
     pool = ThreadPool(processes=args.workers)
     platforms = args.platforms.split(",")
@@ -303,23 +322,14 @@ def main():
     for group, versions_ in groupby(results, key=lambda e: (e.path, e.class_name)):
         versions = list(versions_)
         tool = tools[group]
-        known_versions = {
-            # Parse versions to make sure that we don't make duplicates.
-            tuple(map(str.strip, version.split("|")))
-            for version in tool.default_known_versions
-        }
-        for version in versions:
-            v = version.version
-            known_versions.add(
-                (
-                    v.version,
-                    v.platform,
-                    v.sha256,
-                    str(v.filesize),
-                )
-            )
 
-        default_known_versions = sorted(known_versions, key=lambda tu: Version(tu[0]))
+        existing_versions = {
+            ExternalToolVersion.decode(version) for version in tool.default_known_versions
+        }
+        fetched_versions = {version.version for version in versions}
+
+        known_versions = list(existing_versions | fetched_versions)
+        known_versions.sort(key=lambda tu: (Version(tu.version), tu.platform))
 
         path, class_name = group
 
@@ -327,8 +337,8 @@ def main():
             path,
             class_name,
             replacements={
-                "default_version": default_known_versions[-1][0],
-                "default_known_versions": ["|".join(v) for v in default_known_versions],
+                "default_version": known_versions[-1].version,
+                "default_known_versions": [v.encode() for v in known_versions],
             },
         )
 
