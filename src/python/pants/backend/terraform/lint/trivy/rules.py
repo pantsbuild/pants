@@ -95,7 +95,7 @@ class TrivyLintTerraformDeploymentRequest(TrivyLintTerraformRequest):
 
 @rule(desc="Lint Terraform deployment with Trivy", level=LogLevel.DEBUG)
 async def run_trivy_on_terraform_deployment(
-    request: TrivyLintTerraformDeploymentRequest.Batch[TrivyLintTerraformDeploymentFieldSet, Any]
+    request: TrivyLintTerraformDeploymentRequest.Batch[TrivyLintTerraformDeploymentFieldSet, Any],
 ) -> LintResult:
     assert len(request.elements) == 1, "not single element in partition"  # "Do we need to?"
     [fs] = request.elements
@@ -116,7 +116,7 @@ class TrivyLintTerraformModuleRequest(TrivyLintTerraformRequest):
 
 @rule(desc="Lint Terraform module with Trivy", level=LogLevel.DEBUG)
 async def run_trivy_on_terraform_module(
-    request: TrivyLintTerraformModuleRequest.Batch[TrivyLintTerraformModuleFieldSet, Any]
+    request: TrivyLintTerraformModuleRequest.Batch[TrivyLintTerraformModuleFieldSet, Any],
 ) -> LintResult:
     assert len(request.elements) == 1, "not single element in partition"  # "Do we need to?"
     [fs] = request.elements
