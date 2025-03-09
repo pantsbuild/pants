@@ -1308,9 +1308,8 @@ impl Store {
                     .await
                     .map_err(|e| {
                         format!(
-                            "Failed to set permissions for {}: {}",
+                            "Error setting permissions on {}: {e}",
                             destination.display(),
-                            e
                         )
                     })?;
             }
@@ -1366,9 +1365,14 @@ impl Store {
                         destination.display()
                     )
                 })?;
-                tokio::fs::set_permissions(destination, FSPermissions::from_mode(mode))
+                tokio::fs::set_permissions(&destination, FSPermissions::from_mode(mode))
                     .await
-                    .map_err(|e| format!("Error setting permissions on {}: {e}", path.display()))?;
+                    .map_err(|e| {
+                        format!(
+                            "Error setting permissions on {}: {e}",
+                            destination.display()
+                        )
+                    })?;
                 Ok(())
             }
             None => {
