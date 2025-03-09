@@ -29,6 +29,10 @@ class GithubReleases:
     def get_releases(self, url_template: str) -> Iterator[str]:
         parsed = urlparse(url_template)
         index = parsed.path.find("/releases/")
+        if index == -1:
+            index = parsed.path.find("/archive/")
+            if index == -1:
+                raise ValueError(url_template)
         repo = parsed.path[:index]
         url = f"https://api.github.com/repos{repo}/releases"
         releases_json = fetch_releases(url)

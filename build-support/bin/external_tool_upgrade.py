@@ -98,9 +98,12 @@ def fetch_version(
     url_template: str,
     version: str,
     platform: str,
-    platform_mapping: dict[str, str],
+    platform_mapping: dict[str, str] | None,
 ) -> ToolVersion | None:
-    url = url_template.format(version=version, platform=platform_mapping[platform])
+    if platform_mapping is not None:
+        url = url_template.format(version=version, platform=platform_mapping[platform])
+    else:
+        url = url_template.format(version=version)
     logger.debug("fetching %s version: %s", class_name, url)
     token = os.environ.get("GITHUB_TOKEN")
     headers = (
