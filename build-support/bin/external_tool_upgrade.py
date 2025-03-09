@@ -186,7 +186,7 @@ def main():
         "--mode",
         choices=list(Mode),
         type=Mode,
-        required=True,
+        default="calculate-sha-and-size",
     )
 
     args = parser.parse_args()
