@@ -280,7 +280,7 @@ def main():
         fetched_versions = {version.version for version in versions}
 
         known_versions = list(existing_versions | fetched_versions)
-        known_versions.sort(key=lambda tu: (Version(tu.version), tu.platform))
+        known_versions.sort(key=lambda tu: (Version(tu.version), tu.platform), reverse=True)
 
         path, class_name = group
 
