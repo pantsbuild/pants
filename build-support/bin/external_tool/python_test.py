@@ -1,4 +1,4 @@
-from external_tool_versions import replace_class_variables
+from external_tool.python import replace_class_variables
 from pathlib import Path
 
 CONTENT = """\

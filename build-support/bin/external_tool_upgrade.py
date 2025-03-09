@@ -288,7 +288,7 @@ def main():
             path,
             class_name,
             replacements={
-                "default_version": known_versions[-1].version,
+                "default_version": known_versions[0].version,
                 "default_known_versions": [v.encode() for v in known_versions],
             },
         )
