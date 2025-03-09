@@ -121,7 +121,7 @@ class TerraformUpgradeResponse:
 
 
 def terraform_fieldset_to_init_request(
-    terraform_fieldset: TerraformDeploymentFieldSet | TerraformFieldSet
+    terraform_fieldset: TerraformDeploymentFieldSet | TerraformFieldSet,
 ) -> TerraformInitRequest:
     """Create a TerraformInitRequest from both Terraform Modules and Deployments."""
     if isinstance(terraform_fieldset, TerraformDeploymentFieldSet):
