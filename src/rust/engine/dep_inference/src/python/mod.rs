@@ -256,9 +256,71 @@ impl ImportCollector<'_> {
             .or_insert(((line0 as u64) + 1, self.weaken_imports));
     }
 
+    /// Returns true if the given candidate name is a valid Python identifier or dotted series
+    /// of identifiers, otherwise returns false.
+    fn is_valid_dotted_name(candidate_name: &str) -> bool {
+        let mut parser = Parser::new();
+        parser
+            .set_language(tree_sitter_python::language())
+            .expect("Error loading Python tree-sitter grammar");
+        let Some(parsed) = parser.parse(candidate_name, None) else {
+            return false;
+        };
+
+        let node = parsed.root_node();
+        if node.has_error() {
+            return false;
+        }
+
+        // Drill down on `module` node.
+        if node.child_count() != 1 && node.child(0).unwrap().kind_id() != KindID::MODULE {
+            return false;
+        }
+        let node = node.child(0).unwrap();
+
+        // Drill down on `expression_statement` node.
+        if node.child_count() != 1
+            && node.child(0).unwrap().kind_id() != KindID::EXPRESSION_STATEMENT
+        {
+            return false;
+        }
+        let node = node.child(0).unwrap();
+
+        fn is_identifier_or_attribute(node: tree_sitter::Node) -> bool {
+            // Identifiers are valid names.
+            if node.kind_id() == KindID::IDENTIFIER {
+                return true;
+            }
+
+            // Reject anything other than `attribute` nodes which represent "dotted" Python names.
+            if node.kind_id() != KindID::ATTRIBUTE {
+                return false;
+            }
+
+            // Check the attribute node is an identifier.
+            let Some(attribute_node) = node.child_by_field_name("attribute") else {
+                return false;
+            };
+            if attribute_node.kind_id() != KindID::IDENTIFIER {
+                return false;
+            }
+
+            // Otherwise, the name is a dotted name if the `object` field is an `identifier`
+            // or an `attribute` node.
+            let Some(object_node) = node.child_by_field_name("object") else {
+                return false;
+            };
+            is_identifier_or_attribute(object_node)
+        }
+
+        // Check whether the current node has the shape of an `identifier` or `attribute` node.
+        is_identifier_or_attribute(node)
+    }
+
     fn handle_string_candidate(&mut self, node: tree_sitter::Node) {
         if let Some(text) = self.extract_string(node) {
             if !text.contains(|c: char| c.is_ascii_whitespace() || c == '\\')
+                && Self::is_valid_dotted_name(&text)
                 && !self.is_pragma_ignored_recursive(node)
             {
                 self.string_candidates
