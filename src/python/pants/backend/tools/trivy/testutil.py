@@ -16,6 +16,11 @@ def assert_trivy_output(
     scanner_type: str,
     expected_error_count: int,
 ):
+    """Assert that the output of Trivy matches our expectations.
+
+    For checking the error count, we assert that there are _at least_ as many errors as specified,
+    since new ones are found as time goes on and we don't want the tests to suddenly break
+    """
     if result.exit_code != expected_exit_code:
         raise AssertionError(
             f"Trivy process had incorrect exit code, expected={expected_exit_code}, actual={result.exit_code}, stdout={result.stdout}, stderr={result.stderr}"
@@ -29,20 +34,20 @@ def assert_trivy_output(
         ) from e
 
     findings_by_target = {res["Target"]: res for res in report["Results"]}
-    assert (
-        target in findings_by_target
-    ), f"Did not find expected file in results, target={target} files={list(findings_by_target.keys())}"
+    assert target in findings_by_target, (
+        f"Did not find expected file in results, target={target} files={list(findings_by_target.keys())}"
+    )
 
     if scanner_type == "config":
         found_count = findings_by_target[target]["MisconfSummary"]["Failures"]
-        assert (
-            found_count == expected_error_count
-        ), f"Did not find expected failure count actual={found_count} expected={expected_error_count}"
+        assert found_count >= expected_error_count, (
+            f"Did not find expected failure count actual={found_count} expected={expected_error_count}"
+        )
     elif scanner_type == "image":
         found_count = len(findings_by_target[target]["Vulnerabilities"])
-        assert (
-            found_count == expected_error_count
-        ), f"Did not find expected vulnerabilities found={found_count} expected={expected_error_count}"
+        assert found_count >= expected_error_count, (
+            f"Did not find expected vulnerabilities found={found_count} expected={expected_error_count}"
+        )
 
 
 def assert_trivy_success(result: LintResult):
