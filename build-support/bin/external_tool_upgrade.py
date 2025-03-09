@@ -8,6 +8,7 @@ pants run build-support/bin:external-tool-versions -- --tool pants.backend.k8s.k
 """
 
 from __future__ import annotations
+from enum import StrEnum
 
 from external_tool.python import (
     replace_class_variables,
@@ -22,7 +23,7 @@ import argparse
 import hashlib
 import logging
 import re
-from typing import NotRequired, Protocol
+from typing import NotRequired, Protocol, assert_never
 from collections.abc import Iterator
 from multiprocessing.pool import ThreadPool
 from string import Formatter
@@ -99,6 +100,7 @@ def fetch_version(
     version: str,
     platform: str,
     platform_mapping: dict[str, str] | None,
+    mode: Mode,
 ) -> ToolVersion | None:
     if platform_mapping is not None:
         url = url_template.format(version=version, platform=platform_mapping[platform])
@@ -114,13 +116,22 @@ def fetch_version(
             "X-GitHub-Api-Version": "2022-11-28",
         }
     )
-    response = requests.get(url, headers=headers, allow_redirects=True)
-    if response.status_code != 200:
-        logger.debug("failed to fetch %s version %s: %s", class_name, version, response.text)
-        return None
 
-    size = len(response.content)
-    sha256 = hashlib.sha256(response.content)
+    if mode == Mode.only_fetch_versions:
+        size = 0
+        sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+
+    elif mode == Mode.calculate_sha_and_size:
+        response = requests.get(url, headers=headers, allow_redirects=True)
+        if response.status_code != 200:
+            logger.debug("failed to fetch %s version %s: %s", class_name, version, response.text)
+            return None
+
+        size = len(response.content)
+        sha256 = hashlib.sha256(response.content).hexdigest()
+    else:
+        assert_never(mode)
+
     return ToolVersion(
         path=path,
         class_name=class_name,
@@ -128,7 +139,7 @@ def fetch_version(
             version=version,
             platform=platform,
             filesize=size,
-            sha256=sha256.hexdigest(),
+            sha256=sha256,
         ),
     )
 
@@ -138,6 +149,11 @@ class Tool:
     default_known_versions: list[str]
     default_url_template: str
     default_url_platform_mapping: NotRequired[dict[str, str] | None] = None
+
+
+class Mode(StrEnum):
+    only_fetch_versions = "only-fetch-versions"
+    calculate_sha_and_size = "calculate-sha-and-size"
 
 
 def main():
@@ -166,12 +182,20 @@ def main():
         help="Root directory to traverse",
         type=Path,
     )
+    parser.add_argument(
+        "--mode",
+        choices=list(Mode),
+        type=Mode,
+        required=True,
+    )
 
     args = parser.parse_args()
 
     level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     logging.getLogger(__name__).level = level
+
+    logger.info("starting in %s mode", args.mode)
 
     modules = list(
         find_modules_with_subclasses(
@@ -185,6 +209,7 @@ def main():
                 "ExternalHelmPlugin",  # is a base class itself
                 "Shunit2",  # can't fetch git commits yet
                 "TerraformTool",  # handled by a different script
+                "MakeselfSubsystem",  # weird git tag format, skip for now
             },
         )
     )
@@ -233,6 +258,7 @@ def main():
                             platform=platform,
                             url_template=tool.default_url_template,
                             platform_mapping=platform_mapping,
+                            mode=args.mode,
                         ),
                     )
                 )
