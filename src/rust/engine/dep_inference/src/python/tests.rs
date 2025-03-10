@@ -590,12 +590,12 @@ fn contextlib_suppress_weak_imports() {
     let withitems_open = r"
     with (
         open('/dev/null') as f0,
-        open('data/subdir1/a.json') as f1,
+        open('foo.bar.txt') as f1,
     ):
         pass
     ";
     assert_imports_strong_weak(withitems_open, &[], &[]);
-    assert_strings(withitems_open, &["/dev/null", "data/subdir1/a.json"]);
+    assert_strings(withitems_open, &["foo.bar.txt"]);
     // Ensure suppress bound to variable
     assert_imports_strong_weak(
         r"
@@ -666,6 +666,7 @@ fn contextlib_suppress_weak_imports_dunder() {
     )
 }
 
+#[track_caller]
 fn assert_strings(code: &str, strings: &[&str]) {
     let mut collector = ImportCollector::new(code);
     collector.collect();
@@ -685,9 +686,9 @@ fn string_candidates() {
     assert_strings("'''a'''", &["a"]);
     assert_strings("'a.b'", &["a.b"]);
     assert_strings("'a.b.c_狗'", &["a.b.c_狗"]);
-    assert_strings("'..a.b.c.d'", &["..a.b.c.d"]);
 
     // Not candidates
+    assert_strings("'..a.b.c.d'", &[]);
     assert_strings("'I\\\\have\\\\backslashes'", &[]);
     assert_strings("'I have whitespace'", &[]);
     assert_strings("'\ttabby'", &[]);
