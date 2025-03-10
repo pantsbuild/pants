@@ -268,26 +268,27 @@ impl ImportCollector<'_> {
         };
 
         let node = parsed.root_node();
-        if node.has_error() {
+        if node.has_error() || node.kind_id() != KindID::MODULE {
             return false;
         }
 
-        // Drill down on `module` node.
-        if node.child_count() != 1 && node.child(0).unwrap().kind_id() != KindID::MODULE {
-            return false;
-        }
-        let node = node.child(0).unwrap();
-
-        // Drill down on `expression_statement` node.
+        // Drill down to the `expression_statement` node.
         if node.child_count() != 1
-            && node.child(0).unwrap().kind_id() != KindID::EXPRESSION_STATEMENT
+            || node.child(0).unwrap().kind_id() != KindID::EXPRESSION_STATEMENT
         {
             return false;
         }
         let node = node.child(0).unwrap();
 
+        // There must be a single child of the `expression_statement` node.
+        if node.child_count() != 1 {
+            return false;
+        }
+        let node = node.child(0).unwrap();
+
+        /// Helper function to traverse the remainder of the tree.
         fn is_identifier_or_attribute(node: tree_sitter::Node) -> bool {
-            // Identifiers are valid names.
+            // Identifiers are valid names and end the recursion.
             if node.kind_id() == KindID::IDENTIFIER {
                 return true;
             }
