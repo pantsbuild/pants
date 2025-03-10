@@ -8,33 +8,32 @@ pants run build-support/bin:external-tool-versions -- --tool pants.backend.k8s.k
 """
 
 from __future__ import annotations
-from enum import StrEnum
 
-from external_tool.python import (
-    replace_class_variables,
-    find_modules_with_subclasses,
-    get_class_variables,
-)
-from itertools import groupby
-from dataclasses import dataclass
-import os
-from pathlib import Path
 import argparse
 import hashlib
 import logging
+import os
 import re
-from typing import NotRequired, Protocol, assert_never
 from collections.abc import Iterator
+from dataclasses import dataclass
+from enum import StrEnum
+from itertools import groupby
 from multiprocessing.pool import ThreadPool
+from pathlib import Path
 from string import Formatter
+from typing import NotRequired, Protocol, assert_never
 from urllib.parse import urlparse
 
 import requests
+from external_tool.github import GithubReleases
+from external_tool.kubectl import KubernetesReleases
+from external_tool.python import (
+    find_modules_with_subclasses,
+    get_class_variables,
+    replace_class_variables,
+)
 from packaging.version import Version
 from tqdm import tqdm
-
-from external_tool.kubectl import KubernetesReleases
-from external_tool.github import GithubReleases
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +155,19 @@ class Mode(StrEnum):
     calculate_sha_and_size = "calculate-sha-and-size"
 
 
+EXCLUDE_TOOLS = {
+    "ExternalCCSubsystem",  # Doesn't define default_url_template.
+    "ExternalHelmPlugin",  # Is a base class itself.
+    "MakeselfSubsystem",  # Weird git tag format, skip for now.
+    # google.protobuf.runtime_version.VersionError: Detected mismatched
+    # Protobuf Gencode/Runtime major versions when loading codegen/hello.proto:
+    # gencode 6.30.0 runtime 5.29.3. Same major version is required.
+    "Protoc",
+    "Shunit2",  # Can't fetch git commits yet.
+    "TerraformTool",  # Handled by a different script.
+}
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -204,13 +216,7 @@ def main():
                 "TemplatedExternalTool",
                 "ExternalHelmPlugin",
             },
-            exclude={
-                "ExternalCCSubsystem",  # doesn't define default_url_template
-                "ExternalHelmPlugin",  # is a base class itself
-                "Shunit2",  # can't fetch git commits yet
-                "TerraformTool",  # handled by a different script
-                "MakeselfSubsystem",  # weird git tag format, skip for now
-            },
+            exclude=EXCLUDE_TOOLS,
         )
     )
 
