@@ -25,7 +25,7 @@ class Taplo(TemplatedExternalTool):
         "0.8.0|macos_x86_64|a1917f1b9168cb4f7d579422dcdf9c733028d873963d8fa3a6f499e41719c502|3926263",
         "0.8.0|macos_arm64|79c1691c3c46be981fa0cec930ec9a6d6c4ffd27272d37d1885514ce59bd8ccf|3661689",
         "0.8.0|linux_x86_64|3703294fac37ca9a9f76308f9f98c3939ccb7588f8972acec68a48d7a10d8ee5|4123593",
-        "0.8.0|linux_arm64|a6a94482f125c21090593f94cad23df099c4924f5b9620cda4a8653527c097a1|3995383"
+        "0.8.0|linux_arm64|a6a94482f125c21090593f94cad23df099c4924f5b9620cda4a8653527c097a1|3995383",
     ]
     default_url_template = (
         "https://github.com/tamasfe/taplo/releases/download/{version}/taplo-{platform}.gz"

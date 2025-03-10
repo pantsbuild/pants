@@ -24,7 +24,7 @@ class GolangciLint(TemplatedExternalTool):
         "1.51.1|macos_x86_64|fba08acc4027f69f07cef48fbff70b8a7ecdfaa1c2aba9ad3fb31d60d9f5d4bc|10054954",
         "1.51.1|macos_arm64|75b8f0ff3a4e68147156be4161a49d4576f1be37a0b506473f8c482140c1e7f2|9724049",
         "1.51.1|linux_x86_64|17aeb26c76820c22efa0e1838b0ab93e90cfedef43fbfc9a2f33f27eb9e5e070|9712769",
-        "1.51.1|linux_arm64|9744bc34e7b8d82ca788b667bfb7155a39b4be9aef43bf9f10318b1372cea338|8927955"
+        "1.51.1|linux_arm64|9744bc34e7b8d82ca788b667bfb7155a39b4be9aef43bf9f10318b1372cea338|8927955",
     ]
     default_url_template = (
         "https://github.com/golangci/golangci-lint/releases/download/v{version}/"

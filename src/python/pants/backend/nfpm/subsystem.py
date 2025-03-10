@@ -41,7 +41,7 @@ class NfpmSubsystem(TemplatedExternalTool):
         "2.38.0|macos_x86_64|781420f18ed6bd84a437fe3b272c1b1a03bad546aaaf4f7251b21c25a24ce32b|5294310",
         "2.38.0|macos_arm64|48788831696cf056b1a0f9f52e187dbb65c191f5488962696ab3b98fff9f7821|4978997",
         "2.38.0|linux_x86_64|d9eebe93ee2832cfc8435b3f79ee92a845f1e5fbb99db5a3777a0013e175170d|5196368",
-        "2.38.0|linux_arm64|e63be8d586d7c8f6af06945956aa29fb88388caa19d7c5b652f41ae37a155b27|4780662"
+        "2.38.0|linux_arm64|e63be8d586d7c8f6af06945956aa29fb88388caa19d7c5b652f41ae37a155b27|4780662",
     ]
 
     default_url_template = (

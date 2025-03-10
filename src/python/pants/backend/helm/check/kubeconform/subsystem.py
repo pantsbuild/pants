@@ -35,7 +35,7 @@ class KubeconformSubsystem(TemplatedExternalTool):
         "0.6.2|macos_x86_64|88e53c2562482ed5ab7434188ca5ba03d3482088ac52d53da7499d579923f2e8|5656173",
         "0.6.2|macos_arm64|881e3fe2ecdb1cc41bce80013113f24da80e1bec593876ffe88668333ae69b51|5423607",
         "0.6.2|linux_x86_64|d2a10db6b78d56de8fe9375b9c351bc573aa218a74da04d114767b505a675090|5739066",
-        "0.6.2|linux_arm64|41c15ecbb120042bee0aca8a616e479b555084d5d14bc2e095ed96081c1e9404|5335394"
+        "0.6.2|linux_arm64|41c15ecbb120042bee0aca8a616e479b555084d5d14bc2e095ed96081c1e9404|5335394",
     ]
     default_url_platform_mapping = {
         "linux_arm64": "linux-arm64",

@@ -92,7 +92,7 @@ class PyenvPythonProviderSubsystem(TemplatedExternalTool):
         "2.4.7|macos_x86_64|0c0137963dd3c4b356663a3a152a64815e5e4364f131f2976a2731a13ab1de4d|799490",
         "2.4.7|macos_arm64|0c0137963dd3c4b356663a3a152a64815e5e4364f131f2976a2731a13ab1de4d|799490",
         "2.4.7|linux_x86_64|0c0137963dd3c4b356663a3a152a64815e5e4364f131f2976a2731a13ab1de4d|799490",
-        "2.4.7|linux_arm64|0c0137963dd3c4b356663a3a152a64815e5e4364f131f2976a2731a13ab1de4d|799490"
+        "2.4.7|linux_arm64|0c0137963dd3c4b356663a3a152a64815e5e4364f131f2976a2731a13ab1de4d|799490",
     ]
 
     def generate_exe(self, plat: Platform) -> str:

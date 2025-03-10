@@ -32,7 +32,7 @@ class Buildifier(TemplatedExternalTool):
         "7.1.2|macos_x86_64|687c49c318fb655970cf716eed3c7bfc9caeea4f2931a2fd36593c458de0c537|7591232",
         "7.1.2|macos_arm64|d0909b645496608fd6dfc67f95d9d3b01d90736d7b8c8ec41e802cb0b7ceae7c|7528994",
         "7.1.2|linux_x86_64|28285fe7e39ed23dc1a3a525dfcdccbc96c0034ff1d4277905d2672a71b38f13|7702060",
-        "7.1.2|linux_arm64|c22a44eee37b8927167ee6ee67573303f4e31171e7ec3a8ea021a6a660040437|7568336"
+        "7.1.2|linux_arm64|c22a44eee37b8927167ee6ee67573303f4e31171e7ec3a8ea021a6a660040437|7568336",
     ]
     default_url_template = "https://github.com/bazelbuild/buildtools/releases/download/v{version}/buildifier-{platform}"
     default_url_platform_mapping = {
