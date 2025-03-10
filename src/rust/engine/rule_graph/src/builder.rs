@@ -304,6 +304,7 @@ impl<R: Rule> Builder<R> {
     /// Validate that all rules have unique RuleIds.
     ///
     fn validate_rule_ids(&self) -> Result<(), String> {
+        log::debug!("Rule graph: validating rule IDs...");
         let mut invalid_rule_ids: Vec<&RuleId> = self
             .rules
             .values()
@@ -331,6 +332,7 @@ impl<R: Rule> Builder<R> {
     /// and each node in this phase represents all of those possibilities.
     ///
     fn initial_polymorphic(&self) -> OutLabeledGraph<R> {
+        log::debug!("Rule graph: building initial polymorphic graph...");
         let mut graph: Graph<R> = DiGraph::new();
 
         // Initialize the graph with nodes for Queries, Params, and Reentries.
@@ -603,6 +605,7 @@ impl<R: Rule> Builder<R> {
     /// This represents ambiguity that must be handled (likely by erroring) in later phases.
     ///
     fn monomorphize(graph: LabeledGraph<R>) -> MonomorphizedGraph<R> {
+        log::debug!("Rule graph: monomophizing graph...");
         // The monomorphized graph contains nodes and edges that have been marked deleted, because:
         //   1. we expose which nodes and edges were deleted to allow for improved error messages
         //   2. it is slow to delete nodes/edges with petgraph: marking them is much cheaper.
@@ -1008,6 +1011,7 @@ impl<R: Rule> Builder<R> {
     /// See https://en.wikipedia.org/wiki/Live_variable_analysis
     ///
     fn live_param_labeled_graph(&self, graph: OutLabeledGraph<R>) -> LabeledGraph<R> {
+        log::debug!("Rule graph: labelling live variables...");
         // Add in_sets for each node, with all sets empty initially.
         let mut graph: LabeledGraph<R> = graph.map(
             |_node_id, node| {
@@ -1066,6 +1070,7 @@ impl<R: Rule> Builder<R> {
     /// most specific error possible.
     ///
     fn prune_edges(&self, mut graph: MonomorphizedGraph<R>) -> Result<InLabeledGraph<R>, String> {
+        log::debug!("Rule graph: pruning edges...");
         // Walk from roots, choosing one source for each DependencyKey of each node.
         let mut visited = graph.visit_map();
         let mut errored = HashMap::default();
@@ -1386,6 +1391,7 @@ impl<R: Rule> Builder<R> {
     /// this point are errors.
     ///
     fn finalize(self, graph: InLabeledGraph<R>) -> Result<RuleGraph<R>, String> {
+        log::debug!("Rule graph: finalizing...");
         let entry_for = |node_id| -> Entry<R> {
             let (node, in_set): &(Node<R>, ParamTypes<_>) = &graph[node_id];
             match node {
