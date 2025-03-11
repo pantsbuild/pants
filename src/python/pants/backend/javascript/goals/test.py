@@ -23,6 +23,7 @@ from pants.backend.javascript.package_json import (
 )
 from pants.backend.javascript.subsystems.nodejstest import NodeJSTest
 from pants.backend.javascript.target_types import JSRuntimeSourceField, JSTestRuntimeSourceField
+from pants.backend.typescript.target_types import TypeScriptSourceField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.build_graph.address import Address
 from pants.core.goals.test import (
@@ -171,7 +172,11 @@ async def run_javascript_tests(
         SourceFilesRequest(
             (tgt.get(SourcesField) for tgt in transitive_tgts.closure),
             enable_codegen=True,
-            for_sources_types=[JSRuntimeSourceField, AssetSourceField],
+            for_sources_types=[
+                JSRuntimeSourceField,
+                TypeScriptSourceField,
+                AssetSourceField,
+            ],
         ),
     )
     merged_digest = await Get(Digest, MergeDigests([sources.snapshot.digest, installation.digest]))
