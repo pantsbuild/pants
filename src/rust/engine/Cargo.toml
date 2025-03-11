@@ -46,6 +46,7 @@ deepsize = { workspace = true, features = ["internment", "smallvec"] }
 dep_inference = { path = "dep_inference" }
 derivative = { workspace = true }
 async-oncecell = { workspace = true }
+children = { path = "process_execution/children" }
 docker = { path = "process_execution/docker" }
 fnv = { workspace = true }
 fs = { path = "fs" }

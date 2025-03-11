@@ -49,8 +49,6 @@ mod cache_tests;
 
 pub mod switched;
 
-pub mod children;
-
 pub mod local;
 #[cfg(test)]
 pub mod local_tests;
@@ -67,8 +65,8 @@ pub mod workspace_tests;
 
 extern crate uname;
 
-pub use crate::children::ManagedChild;
 pub use crate::named_caches::{CacheName, NamedCaches};
+pub use children::ManagedChild;
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an Process, and may be populated only by the
