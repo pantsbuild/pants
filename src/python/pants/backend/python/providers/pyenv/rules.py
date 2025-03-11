@@ -27,7 +27,6 @@ from pants.engine.unions import UnionRule
 from pants.option.option_types import StrListOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import classproperty
 from pants.util.strutil import softwrap, stable_hash
 
 PYENV_NAMED_CACHE = ".pyenv"
@@ -85,19 +84,12 @@ class PyenvPythonProviderSubsystem(TemplatedExternalTool):
             ),
         )
 
-    @classproperty
-    def default_known_versions(cls):
-        return [
-            "|".join(
-                (
-                    cls.default_version,
-                    plat,
-                    "0c0137963dd3c4b356663a3a152a64815e5e4364f131f2976a2731a13ab1de4d",
-                    "799490",
-                )
-            )
-            for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
-        ]
+    default_known_versions = [
+        "2.4.7|macos_arm64|0c0137963dd3c4b356663a3a152a64815e5e4364f131f2976a2731a13ab1de4d|799490",
+        "2.4.7|macos_x86_64|0c0137963dd3c4b356663a3a152a64815e5e4364f131f2976a2731a13ab1de4d|799490",
+        "2.4.7|linux_x86_64|0c0137963dd3c4b356663a3a152a64815e5e4364f131f2976a2731a13ab1de4d|799490",
+        "2.4.7|linux_arm64|0c0137963dd3c4b356663a3a152a64815e5e4364f131f2976a2731a13ab1de4d|799490",
+    ]
 
     def generate_exe(self, plat: Platform) -> str:
         """Returns the path to the tool executable.
