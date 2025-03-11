@@ -42,6 +42,7 @@ def given_package_with_name(name: str) -> str:
                 "ts-jest": "*",
                 "typescript": "*",
             },
+            "packageManager": "npm@10.9.2",
         }
     )
 
