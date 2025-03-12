@@ -1,17 +1,13 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-# mypy: disable-error-code="import-untyped"
-#   Disables checking of the `pkg_resources` below which was awkward to figure out how to disable
-#   with a `# type: ignore[import-untyped]` comment.
-
 from __future__ import annotations
 
 import logging
 import urllib.parse
 
-import pkg_resources
-from pkg_resources.extern.packaging.requirements import InvalidRequirement
+from packaging.requirements import InvalidRequirement, Requirement
+from packaging.specifiers import SpecifierSet
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +18,7 @@ class PipRequirement:
     @classmethod
     def parse(cls, line: str, description_of_origin: str = "") -> PipRequirement:
         try:
-            return cls(pkg_resources.Requirement.parse(line))
+            return cls(Requirement(line))
         except InvalidRequirement as e:
             scheme, netloc, path, query, fragment = urllib.parse.urlsplit(line, scheme="file")
             if fragment:
@@ -43,7 +39,7 @@ class PipRequirement:
                     full_url = urllib.parse.urlunsplit((scheme, netloc, path, query, fragment))
                     pep_440_req_str = f"{project}@ {full_url}"
                     try:
-                        return cls(pkg_resources.Requirement.parse(pep_440_req_str))
+                        return cls(Requirement(pep_440_req_str))
                     except InvalidRequirement:
                         # If parsing the converted URL fails for some reason, it's probably less
                         # confusing to the user if we raise the original error instead of one for
@@ -52,19 +48,19 @@ class PipRequirement:
             origin_str = f" in {description_of_origin}" if description_of_origin else ""
             raise ValueError(f"Invalid requirement '{line}'{origin_str}: {e}")
 
-    def __init__(self, req: pkg_resources.Requirement):
+    def __init__(self, req: Requirement):
         self._req = req
 
-    def as_pkg_resources_requirement(self) -> pkg_resources.Requirement:
+    def as_packaging_requirement(self) -> Requirement:
         return self._req
 
     @property
-    def project_name(self) -> str:
-        return self._req.project_name
+    def name(self) -> str:
+        return self._req.name
 
     @property
-    def specs(self):
-        return self._req.specs
+    def specifier_set(self) -> SpecifierSet:
+        return self._req.specifier
 
     @property
     def url(self):
