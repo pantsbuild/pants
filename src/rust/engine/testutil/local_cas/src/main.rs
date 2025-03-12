@@ -18,7 +18,7 @@ async fn main() -> Result<(), String> {
                 .long("port")
                 .short('p')
                 .required(false)
-                .takes_value(true)
+                .num_args(1)
                 .help("Port that the CAS should listen to.")
                 .default_value("0"),
         )
@@ -27,20 +27,19 @@ async fn main() -> Result<(), String> {
                 .long("instance-name")
                 .short('i')
                 .required(false)
-                .takes_value(true)
+                .num_args(1)
                 .default_value(""),
         )
         .get_matches();
 
     let cas = StubCAS::builder()
-        .port(
+        .port(*matches.get_one("port").unwrap())
+        .instance_name(
             matches
-                .value_of("port")
+                .get_one::<String>("instance-name")
                 .unwrap()
-                .parse::<u16>()
-                .expect("port must be a non-negative number"),
+                .to_owned(),
         )
-        .instance_name(matches.value_of("instance-name").unwrap().to_owned())
         .build()
         .await;
     println!("Started CAS at address: {}", cas.address());

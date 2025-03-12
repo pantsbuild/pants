@@ -10,7 +10,7 @@ use std::process::exit;
 use std::sync::Arc;
 use std::time::Duration;
 
-use clap::StructOpt;
+use clap::Parser;
 use fs::{DirectoryDigest, Permissions, RelativePath};
 use hashing::{Digest, Fingerprint};
 use process_execution::{
@@ -32,168 +32,168 @@ struct ProcessMetadata {
     cache_key_gen_version: Option<String>,
 }
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct CommandSpec {
-    #[structopt(last = true)]
+    #[arg(last = true)]
     argv: Vec<String>,
 
     /// Fingerprint (hex string) of the digest to use as the input file tree.
-    #[structopt(long)]
+    #[arg(long)]
     input_digest: Option<Fingerprint>,
 
     /// Length of the proto-bytes whose digest to use as the input file tree.
-    #[structopt(long)]
+    #[arg(long)]
     input_digest_length: Option<usize>,
 
     /// Extra platform properties to set on the execution request during remote execution.
-    #[structopt(long)]
+    #[arg(long)]
     extra_platform_property: Vec<String>,
 
     /// Environment variables with which the process should be run.
-    #[structopt(long)]
+    #[arg(long)]
     env: Vec<String>,
 
     /// Symlink a JDK from .jdk in the working directory.
     /// For local execution, symlinks to the value of this flag.
     /// For remote execution, just requests that some JDK is symlinked if this flag has any value.
     /// <https://github.com/pantsbuild/pants/issues/6416> will make this less weird in the future.
-    #[structopt(long)]
+    #[arg(long)]
     jdk: Option<PathBuf>,
 
     /// Path to file that is considered to be output.
-    #[structopt(long)]
+    #[arg(long)]
     output_file_path: Vec<PathBuf>,
 
     /// Path to directory that is considered to be output.
-    #[structopt(long)]
+    #[arg(long)]
     output_directory_path: Vec<PathBuf>,
 
     /// Path to execute the binary at relative to its input digest root.
-    #[structopt(long)]
+    #[arg(long)]
     working_directory: Option<PathBuf>,
 
-    #[structopt(long)]
+    #[arg(long)]
     concurrency_available: Option<usize>,
 
-    #[structopt(long)]
+    #[arg(long)]
     cache_key_gen_version: Option<String>,
 }
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct ActionDigestSpec {
     /// Fingerprint (hex string) of the digest of the action to run.
-    #[structopt(long)]
+    #[arg(long)]
     action_digest: Option<Fingerprint>,
 
     /// Length of the proto-bytes whose digest is the action to run.
-    #[structopt(long)]
+    #[arg(long)]
     action_digest_length: Option<usize>,
 }
 
-#[derive(StructOpt)]
-#[structopt(name = "process_executor", setting = clap::AppSettings::TrailingVarArg)]
+#[derive(Parser)]
+#[command(name = "process_executor")]
 struct Opt {
-    #[structopt(flatten)]
+    #[command(flatten)]
     command: CommandSpec,
 
-    #[structopt(flatten)]
+    #[command(flatten)]
     action_digest: ActionDigestSpec,
 
-    #[structopt(long)]
+    #[arg(long)]
     buildbarn_url: Option<String>,
 
-    #[structopt(long)]
+    #[arg(long)]
     run_under: Option<String>,
 
     /// The name of a directory (which may or may not exist), where the output tree will be materialized.
-    #[structopt(long)]
+    #[arg(long)]
     materialize_output_to: Option<PathBuf>,
 
     /// Path to workdir.
-    #[structopt(long)]
+    #[arg(long)]
     work_dir: Option<PathBuf>,
 
     ///Path to lmdb directory used for local file storage.
-    #[structopt(long)]
+    #[arg(long)]
     local_store_path: Option<PathBuf>,
 
     /// Path to a directory to be used for named caches.
-    #[structopt(long)]
+    #[arg(long)]
     named_cache_path: Option<PathBuf>,
 
-    #[structopt(long)]
+    #[arg(long)]
     remote_instance_name: Option<String>,
 
     /// The host:port of the gRPC server to connect to. Forces remote execution.
     /// If unspecified, local execution will be performed.
-    #[structopt(long)]
+    #[arg(long)]
     server: Option<String>,
 
     /// Path to file containing root certificate authority certificates for the execution server.
     /// If not set, TLS will not be used when connecting to the execution server.
-    #[structopt(long)]
+    #[arg(long)]
     execution_root_ca_cert_file: Option<PathBuf>,
 
     /// Path to file containing oauth bearer token for communication with the execution server.
     /// If not set, no authorization will be provided to remote servers.
-    #[structopt(long)]
+    #[arg(long)]
     execution_oauth_bearer_token_path: Option<PathBuf>,
 
     /// The host:port of the gRPC CAS server to connect to.
-    #[structopt(long)]
+    #[arg(long)]
     cas_server: Option<String>,
 
     /// Path to file containing root certificate authority certificates for the CAS server.
     /// If not set, TLS will not be used when connecting to the CAS server.
-    #[structopt(long)]
+    #[arg(long)]
     cas_root_ca_cert_file: Option<PathBuf>,
 
     /// Path to file containing client certificates for the CAS server.
     /// If not set, client authentication will not be used when connecting to the CAS server.
-    #[structopt(long)]
+    #[arg(long)]
     cas_client_certs_file: Option<PathBuf>,
 
     /// Path to file containing client key for the CAS server.
     /// If not set, client authentication will not be used when connecting to the CAS server.
-    #[structopt(long)]
+    #[arg(long)]
     cas_client_key_file: Option<PathBuf>,
 
     /// Path to file containing oauth bearer token for communication with the CAS server.
     /// If not set, no authorization will be provided to remote servers.
-    #[structopt(long)]
+    #[arg(long)]
     cas_oauth_bearer_token_path: Option<PathBuf>,
 
     /// Number of bytes to include per-chunk when uploading bytes.
     /// grpc imposes a hard message-size limit of around 4MB.
-    #[structopt(long, default_value = "3145728")]
+    #[arg(long, default_value = "3145728")]
     upload_chunk_bytes: usize,
 
     /// Number of retries per request to the store service.
-    #[structopt(long, default_value = "3")]
+    #[arg(long, default_value = "3")]
     store_rpc_retries: usize,
 
     /// Number of concurrent requests to the store service.
-    #[structopt(long, default_value = "128")]
+    #[arg(long, default_value = "128")]
     store_rpc_concurrency: usize,
 
     /// Total size of blobs allowed to be sent in a single API call.
-    #[structopt(long, default_value = "4194304")]
+    #[arg(long, default_value = "4194304")]
     store_batch_api_size_limit: usize,
 
     /// Number of concurrent requests to the execution service.
-    #[structopt(long, default_value = "128")]
+    #[arg(long, default_value = "128")]
     execution_rpc_concurrency: usize,
 
     /// Number of concurrent requests to the cache service.
-    #[structopt(long, default_value = "128")]
+    #[arg(long, default_value = "128")]
     cache_rpc_concurrency: usize,
 
     /// Overall timeout in seconds for each request from time of submission.
-    #[structopt(long, default_value = "600")]
+    #[arg(long, default_value = "600")]
     overall_deadline_secs: u64,
 
     /// Extra header to pass on remote execution request.
-    #[structopt(long)]
+    #[arg(long)]
     header: Vec<String>,
 }
 
@@ -210,7 +210,7 @@ async fn main() {
     let workunit_store = WorkunitStore::new(false, log::Level::Debug);
     workunit_store.init_thread_state(None);
 
-    let args = Opt::from_args();
+    let args = Opt::parse();
 
     let mut headers: BTreeMap<String, String> = collection_from_keyvalues(args.header.iter());
 

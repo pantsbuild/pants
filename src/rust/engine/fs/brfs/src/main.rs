@@ -677,68 +677,66 @@ pub fn mount<P: AsRef<Path>>(
 async fn main() {
     env_logger::init();
 
-    let default_store_path = Store::default_path();
-
     let args = Command::new("brfs")
     .arg(
       Arg::new("local-store-path")
-        .takes_value(true)
+        .num_args(1)
         .long("local-store-path")
-        .default_value_os(default_store_path.as_ref())
+        .default_value(Store::default_path().to_str().unwrap().to_string())
         .required(false),
     ).arg(
       Arg::new("server-address")
-        .takes_value(true)
+        .num_args(1)
         .long("server-address")
         .required(false),
     ).arg(
       Arg::new("remote-instance-name")
-        .takes_value(true)
+        .num_args(1)
         .long("remote-instance-name")
         .required(false),
     ).arg(
       Arg::new("root-ca-cert-file")
         .help("Path to file containing root certificate authority certificates. If not set, TLS will not be used when connecting to the remote.")
-        .takes_value(true)
+        .num_args(1)
         .long("root-ca-cert-file")
         .required(false)
     ).arg(
       Arg::new("oauth-bearer-token-file")
         .help("Path to file containing oauth bearer token. If not set, no authorization will be provided to remote servers.")
-        .takes_value(true)
+        .num_args(1)
         .long("oauth-bearer-token-file")
         .required(false)
     ).arg(
       Arg::new("mount-path")
         .required(true)
-        .takes_value(true),
+        .num_args(1),
     )
     .arg(
       Arg::new("rpc-concurrency-limit")
           .help("Maximum concurrenct RPCs to the service.")
-          .takes_value(true)
+          .num_args(1)
           .long("rpc-concurrency-limit")
           .required(false)
           .default_value("128")
     ).arg(
     Arg::new("batch-api-size-limit")
         .help("Maximum total size of blobs allowed to be sent in a single batch API call to the remote store.")
-        .takes_value(true)
+        .num_args(1)
         .long("batch-api-size-limit")
         .required(false)
         .default_value("4194304")
   )
       .get_matches();
 
-    let mount_path = args.value_of("mount-path").unwrap();
-    let store_path = args.value_of("local-store-path").unwrap();
+    let mount_path = args.get_one::<String>("mount-path").unwrap();
+    let store_path = args.get_one::<String>("local-store-path").unwrap();
 
     let root_ca_certs = args
-        .value_of("root-ca-cert-file")
+        .get_one::<String>("root-ca-cert-file")
         .map(|path| std::fs::read(path).expect("Error reading root CA certs file"));
 
     let mut headers = BTreeMap::new();
-    if let Some(oauth_path) = args.value_of("oauth-bearer-token-file") {
+    if let Some(oauth_path) = args.get_one::<String>("oauth-bearer-token-file") {
         let token = match std::fs::read_to_string(oauth_path) {
             Ok(token) => token,
             Err(err) => {
@@ -767,23 +765,19 @@ async fn main() {
 
     let local_only_store =
         Store::local_only(runtime.clone(), store_path).expect("Error making local store.");
-    let store = match args.value_of("server-address") {
+    let store = match args.get_one::<String>("server-address") {
         Some(address) => local_only_store
             .into_with_remote(RemoteStoreOptions {
                 provider: RemoteProvider::Reapi,
                 store_address: address.to_owned(),
-                instance_name: args.value_of("remote-instance-name").map(str::to_owned),
+                instance_name: args.get_one::<String>("remote-instance-name").cloned(),
                 tls_config,
                 headers,
                 chunk_size_bytes: 4 * 1024 * 1024,
                 timeout: std::time::Duration::from_secs(5 * 60),
                 retries: 1,
-                concurrency_limit: args
-                    .value_of_t::<usize>("rpc-concurrency-limit")
-                    .expect("Bad rpc-concurrency-limit flag"),
-                batch_api_size_limit: args
-                    .value_of_t::<usize>("batch-api-size-limit")
-                    .expect("Bad batch-api-size-limit flag"),
+                concurrency_limit: *args.get_one("rpc-concurrency-limit").unwrap(),
+                batch_api_size_limit: *args.get_one::<usize>("batch-api-size-limit").unwrap(),
             })
             .await
             .expect("Error making remote store"),

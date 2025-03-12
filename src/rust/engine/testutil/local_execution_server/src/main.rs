@@ -8,22 +8,22 @@ use protos::{
 };
 use std::io::Read;
 
-use clap::StructOpt;
+use clap::Parser;
 
-#[derive(StructOpt)]
-#[structopt(
+#[derive(Parser)]
+#[command(
     name = "local_execution_server",
     about = "A mock execution server, to test remote execution capabilities.\nThe server will handle exactly one request as specified by the optional arguments: request_size and request_digest. In response to this request, it will perform a default operation. It will reject any subsequent request."
 )]
 struct Options {
-    #[structopt(short = 'p', long = "port")]
+    #[arg(short = 'p', long = "port")]
     port: Option<u16>,
-    #[structopt(
+    #[arg(
         long = "request_hash",
         help = "The hash of the digest from the request the server should expect to receive"
     )]
     request_hash: String,
-    #[structopt(
+    #[arg(
         long = "request_size",
         help = "The size (in bytes) of the digest from the request the server should expect to receive"
     )]
@@ -32,7 +32,7 @@ struct Options {
 
 #[tokio::main]
 async fn main() {
-    let options = Options::from_args();
+    let options = Options::parse();
 
     // When the request is executed, perform this operation
     let operation = MockOperation {
