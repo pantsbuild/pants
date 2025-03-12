@@ -582,6 +582,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
+name = "children"
+version = "0.0.1"
+dependencies = [
+ "log",
+ "nix",
+ "tokio",
+]
+
+[[package]]
 name = "chrono"
 version = "0.4.39"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1129,6 +1138,7 @@ dependencies = [
  "axum-server",
  "bytes",
  "cache",
+ "children",
  "concrete_time",
  "crossbeam-channel",
  "deepsize",
@@ -3062,6 +3072,7 @@ dependencies = [
  "bincode",
  "bytes",
  "cache",
+ "children",
  "concrete_time",
  "deepsize",
  "derivative",
