@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::Bytes;
-use clap::{Arg, ArgAction, Command};
+use clap::{Arg, ArgAction, Command, value_parser};
 use fs::{
     DirectoryDigest, GlobExpansionConjunction, GlobMatching, Permissions, PreparedPathGlobs,
     RelativePath, StrictGlobMatching, SymlinkBehavior,
@@ -73,12 +73,12 @@ async fn main() {
           .subcommand(
             Command::new("cat")
               .about("Output the contents of a file by fingerprint.")
-              .arg(Arg::new("fingerprint").required(true).num_args(
-                1,
-              ))
-              .arg(Arg::new("size_bytes").required(true).num_args(
-                1,
-              )),
+              .arg(Arg::new("fingerprint").required(true).num_args(1))
+              .arg(
+                Arg::new("size_bytes")
+                .value_parser(value_parser!(usize))
+                .required(true)
+                .num_args(1)),
           )
           .subcommand(
             Command::new("save")
@@ -107,12 +107,13 @@ Destination must not exist before this command is run.",
               .arg(Arg::new("fingerprint").required(true).num_args(
                 1,
               ))
-              .arg(Arg::new("size_bytes").required(true).num_args(
-                1,
-              ))
-              .arg(Arg::new("destination").required(true).num_args(
-                1,
-              )),
+              .arg(
+                Arg::new("size_bytes")
+                .value_parser(value_parser!(usize))
+                .required(true)
+                .num_args(1)
+            )
+              .arg(Arg::new("destination").required(true).num_args(1)),
           )
           .subcommand(
             Command::new("save")
@@ -154,7 +155,8 @@ to this directory.",
                   .long("output-format")
                   .num_args(1)
                   .default_value("binary")
-                  .value_parser(["binary", "recursive-file-list", "recursive-file-list-with-digests", "text"]),
+                  .value_parser(
+                    ["binary", "recursive-file-list", "recursive-file-list-with-digests", "text"]),
               )
               .arg(
                 Arg::new("child-dir")
@@ -165,9 +167,10 @@ to this directory.",
               .arg(Arg::new("fingerprint").required(true).num_args(
                 1,
               ))
-              .arg(Arg::new("size_bytes").required(true).num_args(
-                1,
-              )),
+              .arg(
+                Arg::new("size_bytes")
+                .value_parser(value_parser!(usize))
+                .required(true).num_args(1)),
           ),
       )
       .subcommand(
@@ -182,9 +185,11 @@ Destination must not exist before this command is run.",
                   .arg(Arg::new("fingerprint").required(true).num_args(
                     1,
                   ))
-                  .arg(Arg::new("size_bytes").required(true).num_args(
-                    1,
-                  ))
+                  .arg(
+                    Arg::new("size_bytes")
+                    .value_parser(value_parser!(usize))
+                    .required(true)
+                    .num_args(1))
                   .arg(Arg::new("destination").required(true).num_args(
                     1,
                   )),
@@ -198,9 +203,11 @@ Destination must not exist before this command is run.",
           .arg(Arg::new("fingerprint").required(true).num_args(
             1,
           ))
-          .arg(Arg::new("size_bytes").required(true).num_args(
-            1,
-          )),
+          .arg(
+            Arg::new("size_bytes")
+            .value_parser(value_parser!(usize))
+            .required(true)
+            .num_args(1)),
       )
         .subcommand(
           Command::new("directories")
@@ -212,6 +219,7 @@ Destination must not exist before this command is run.",
               .about("Garbage collect the on-disk store. Note that after running this command, any processes with an open store (e.g. a pantsd) may need to re-initialize their store.")
               .arg(
                 Arg::new("target-size-bytes")
+                    .value_parser(value_parser!(usize))
                     .num_args(1)
                     .long("target-size-bytes")
                     .required(true),
@@ -278,6 +286,7 @@ Destination must not exist before this command is run.",
         .arg(
           Arg::new("chunk-bytes")
               .help("Number of bytes to include per-chunk when uploading bytes. grpc imposes a hard message-size limit of around 4MB.")
+              .value_parser(value_parser!(usize))
               .num_args(1)
               .long("chunk-bytes")
               .required(false)
@@ -286,6 +295,7 @@ Destination must not exist before this command is run.",
         .arg(
           Arg::new("rpc-attempts")
               .help("Number of times to attempt any RPC before giving up.")
+              .value_parser(value_parser!(usize))
               .num_args(1)
               .long("rpc-attempts")
               .required(false)
@@ -294,6 +304,7 @@ Destination must not exist before this command is run.",
         .arg(
           Arg::new("rpc-concurrency-limit")
               .help("Maximum concurrenct RPCs to the service.")
+              .value_parser(value_parser!(usize))
               .num_args(1)
               .long("rpc-concurrency-limit")
               .required(false)
@@ -302,6 +313,7 @@ Destination must not exist before this command is run.",
         .arg(
           Arg::new("batch-api-size-limit")
                .help("Maximum total size of blobs allowed to be sent in a single batch API call to the remote store.")
+               .value_parser(value_parser!(usize))
                .num_args(1)
                .long("batch-api-size-limit")
                .required(false)
@@ -329,9 +341,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             .map_err(|e| format!("Failed to open/create store for directory {store_dir:?}: {e}"))?;
         let (store_result, store_has_remote) = match top_match.get_one::<String>("server-address") {
             Some(cas_address) => {
-                let chunk_size_bytes = *top_match
-                    .get_one("chunk-bytes")
-                    .expect("Bad chunk-bytes flag");
+                let chunk_size_bytes = *top_match.get_one("chunk-bytes").unwrap();
 
                 let root_ca_certs =
                     if let Some(path) = top_match.get_one::<String>("root-ca-cert-file") {

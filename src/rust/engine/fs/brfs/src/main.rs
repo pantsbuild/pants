@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::time;
 
-use clap::{Arg, Command};
+use clap::{Arg, Command, value_parser};
 use futures::future::FutureExt;
 use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
@@ -714,6 +714,7 @@ async fn main() {
     .arg(
       Arg::new("rpc-concurrency-limit")
           .help("Maximum concurrenct RPCs to the service.")
+          .value_parser(value_parser!(usize))
           .num_args(1)
           .long("rpc-concurrency-limit")
           .required(false)
@@ -721,6 +722,7 @@ async fn main() {
     ).arg(
     Arg::new("batch-api-size-limit")
         .help("Maximum total size of blobs allowed to be sent in a single batch API call to the remote store.")
+        .value_parser(value_parser!(usize))
         .num_args(1)
         .long("batch-api-size-limit")
         .required(false)
@@ -777,7 +779,7 @@ async fn main() {
                 timeout: std::time::Duration::from_secs(5 * 60),
                 retries: 1,
                 concurrency_limit: *args.get_one("rpc-concurrency-limit").unwrap(),
-                batch_api_size_limit: *args.get_one::<usize>("batch-api-size-limit").unwrap(),
+                batch_api_size_limit: *args.get_one("batch-api-size-limit").unwrap(),
             })
             .await
             .expect("Error making remote store"),
