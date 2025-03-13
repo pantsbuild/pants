@@ -8,7 +8,8 @@ import logging
 import os.path
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import override
+
+from typing_extensions import override
 
 from pants.backend.python.subsystems.python_native_code import PythonNativeCodeSubsystem
 from pants.backend.python.subsystems.setup import PythonSetup
