@@ -8,6 +8,7 @@ import logging
 import os.path
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from typing import override
 
 from pants.backend.python.subsystems.python_native_code import PythonNativeCodeSubsystem
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -67,6 +68,11 @@ class PexCli(TemplatedExternalTool):
         "2.33.1|linux_x86_64|5ebed0e2ba875983a72b4715ee3b2ca6ae5fedbf28d738634e02e30e3bb5ed28|4559974",
         "2.33.1|linux_arm64|5ebed0e2ba875983a72b4715ee3b2ca6ae5fedbf28d738634e02e30e3bb5ed28|4559974",
     ]
+
+    @override
+    def generate_url(self, plat: Platform) -> str:
+        platform = self.url_platform_mapping.get(plat.value, "")
+        return self.url_template.format(version=self.version.lstrip("v"), platform=platform)
 
 
 @dataclass(frozen=True)
