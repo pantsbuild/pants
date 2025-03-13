@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 protos = { path = "../../protos" }
 bytes = { workspace = true }
-clap = { workspace = true }
+clap = { workspace = true, features = ["string"] }
 env_logger = { workspace = true }
 grpc_util = { path = "../../grpc_util" }
 fs = { path = ".." }

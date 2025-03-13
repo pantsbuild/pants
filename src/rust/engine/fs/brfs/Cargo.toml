@@ -6,7 +6,7 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-clap = { workspace = true }
+clap = { workspace = true, features = ["string"] }
 dirs-next = { workspace = true }
 env_logger = { workspace = true }
 errno = { workspace = true }
