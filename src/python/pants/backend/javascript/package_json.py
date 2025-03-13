@@ -929,7 +929,12 @@ async def generate_node_package_targets(
 
 
 def target_types() -> Iterable[type[Target]]:
-    return [PackageJsonTarget, NodePackageTarget, NodeThirdPartyPackageTarget]
+    return [
+        PackageJsonTarget,
+        NodePackageTarget,
+        NodeThirdPartyPackageTarget,
+        NPMDistributionTarget,
+    ]
 
 
 def rules() -> Iterable[Rule | UnionRule]:
