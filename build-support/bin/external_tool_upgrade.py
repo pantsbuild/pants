@@ -1,10 +1,10 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-"""Script to fetch external tool versions.
+"""Script to upgrade external tool versions.
 
 Example:
 
-pants run build-support/bin:external-tool-versions -- --tool pants.backend.k8s.kubectl_subsystem:Kubectl > list.txt
+pants run build-support/bin:external-tool-upgrade -- src/python/pants/backend/python/
 """
 
 from __future__ import annotations
