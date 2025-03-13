@@ -79,6 +79,7 @@ Created as part of the release process.
 + Daniel Peebles
 + Daniel Wagner-Hall
 + Danny McClanahan
++ Darren Clark
 + Dave Brewster
 + David Katz
 + David Singleton

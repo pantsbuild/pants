@@ -1,0 +1,14 @@
+[package]
+version = "0.0.1"
+edition = "2021"
+name = "children"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[dependencies]
+log = { workspace = true }
+nix = { workspace = true }
+tokio = { workspace = true, features = ["process"] }
+
+[lints]
+workspace = true
