@@ -31,7 +31,6 @@ from pants.option.global_options import GlobalOptions, ca_certs_path_to_file_con
 from pants.option.option_types import ArgsListOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import classproperty
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -42,7 +41,7 @@ class PexCli(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pex-tool/pex)."
 
-    default_version = "v2.33.2"
+    default_version = "v2.33.4"
     default_url_template = "https://github.com/pex-tool/pex/releases/download/{version}/pex"
     version_constraints = ">=2.13.0,<3.0"
 
@@ -58,19 +57,16 @@ class PexCli(TemplatedExternalTool):
         ),
     )
 
-    @classproperty
-    def default_known_versions(cls):
-        return [
-            "|".join(
-                (
-                    cls.default_version,
-                    plat,
-                    "b6c035db294d9c84d72ec723c8bb31c9640e3a8603dbc48233352c1db1ccf5e8",
-                    "4588594",
-                )
-            )
-            for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
-        ]
+    default_known_versions = [
+        "v2.33.4|macos_x86_64|d6a4041d52732ea0a323db2bea3e6a5995391fed3bc1f2b81d84ee0bcbc16e7c|4589638",
+        "v2.33.4|macos_arm64|d6a4041d52732ea0a323db2bea3e6a5995391fed3bc1f2b81d84ee0bcbc16e7c|4589638",
+        "v2.33.4|linux_x86_64|d6a4041d52732ea0a323db2bea3e6a5995391fed3bc1f2b81d84ee0bcbc16e7c|4589638",
+        "v2.33.4|linux_arm64|d6a4041d52732ea0a323db2bea3e6a5995391fed3bc1f2b81d84ee0bcbc16e7c|4589638",
+        "v2.33.1|macos_x86_64|5ebed0e2ba875983a72b4715ee3b2ca6ae5fedbf28d738634e02e30e3bb5ed28|4559974",
+        "v2.33.1|macos_arm64|5ebed0e2ba875983a72b4715ee3b2ca6ae5fedbf28d738634e02e30e3bb5ed28|4559974",
+        "v2.33.1|linux_x86_64|5ebed0e2ba875983a72b4715ee3b2ca6ae5fedbf28d738634e02e30e3bb5ed28|4559974",
+        "v2.33.1|linux_arm64|5ebed0e2ba875983a72b4715ee3b2ca6ae5fedbf28d738634e02e30e3bb5ed28|4559974",
+    ]
 
 
 @dataclass(frozen=True)

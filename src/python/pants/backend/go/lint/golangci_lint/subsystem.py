@@ -15,12 +15,16 @@ class GolangciLint(TemplatedExternalTool):
     name = "golangci-lint"
     help = "A fast Go linters runner"
 
-    default_version = "1.51.1"
+    default_version = "1.64.6"
     default_known_versions = [
-        "1.51.1|macos_arm64 |75b8f0ff3a4e68147156be4161a49d4576f1be37a0b506473f8c482140c1e7f2|9724049",  # noqa: E501
-        "1.51.1|macos_x86_64|fba08acc4027f69f07cef48fbff70b8a7ecdfaa1c2aba9ad3fb31d60d9f5d4bc|10054954",  # noqa: E501
-        "1.51.1|linux_arm64 |9744bc34e7b8d82ca788b667bfb7155a39b4be9aef43bf9f10318b1372cea338|8927955",  # noqa: E501
-        "1.51.1|linux_x86_64|17aeb26c76820c22efa0e1838b0ab93e90cfedef43fbfc9a2f33f27eb9e5e070|9712769",  # noqa: E501
+        "1.64.6|macos_x86_64|08f9459e7125fed2612abd71596e04d172695921aff82120d1c1e5e9b6fff2a3|12671159",
+        "1.64.6|macos_arm64|8c10d0c7c3935b8c2269d628b6a06a8f48d8fb4cc31af02fe4ce0cd18b0704c1|11978218",
+        "1.64.6|linux_x86_64|71e290acbacb7b3ba4f68f0540fb74dc180c4336ac8a6f3bdcd7fcc48b15148d|12365159",
+        "1.64.6|linux_arm64|99a7ff13dec7a8781a68408b6ecb8a1c5e82786cba3189eaa91d5cdcc24362ce|11415605",
+        "1.51.1|macos_x86_64|fba08acc4027f69f07cef48fbff70b8a7ecdfaa1c2aba9ad3fb31d60d9f5d4bc|10054954",
+        "1.51.1|macos_arm64|75b8f0ff3a4e68147156be4161a49d4576f1be37a0b506473f8c482140c1e7f2|9724049",
+        "1.51.1|linux_x86_64|17aeb26c76820c22efa0e1838b0ab93e90cfedef43fbfc9a2f33f27eb9e5e070|9712769",
+        "1.51.1|linux_arm64|9744bc34e7b8d82ca788b667bfb7155a39b4be9aef43bf9f10318b1372cea338|8927955",
     ]
     default_url_template = (
         "https://github.com/golangci/golangci-lint/releases/download/v{version}/"
