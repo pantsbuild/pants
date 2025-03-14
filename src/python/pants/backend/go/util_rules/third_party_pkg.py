@@ -230,6 +230,7 @@ async def analyze_module_dependencies(request: ModuleDescriptorsRequest) -> Modu
             continue
 
         # Skip first-party modules referenced from other first-party modules.
+        # TODO These cross-module references could be used for dependency inference
         if "Replace" in mod_json and "Version" not in mod_json["Replace"]:
             continue
 
