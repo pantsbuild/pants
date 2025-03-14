@@ -4230,6 +4230,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "bytes",
+ "clap 4.5.32",
  "concrete_time",
  "criterion",
  "deepsize",

@@ -1,8 +1,8 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-use std::fmt::Write;
 use std::io;
 use std::sync::Arc;
+use std::{fmt::Write, path::PathBuf};
 
 use rustls::{
     DigitallySignedStruct,
@@ -47,6 +47,47 @@ impl Config {
             mtls,
             certificate_check: CertificateCheck::Enabled,
         })
+    }
+
+    pub fn new_from_files(
+        root_ca_cert_file: &Option<PathBuf>,
+        client_certs_file: &Option<PathBuf>,
+        client_key_file: &Option<PathBuf>,
+    ) -> Result<Self, String> {
+        let root_ca_certs = root_ca_cert_file
+            .as_ref()
+            .map(|path| {
+                std::fs::read(path).map_err(|e| format!("Error reading root CA certs file: {}", e))
+            })
+            .transpose()?;
+
+        let client_certs = client_certs_file
+            .as_ref()
+            .map(|path| {
+                std::fs::read(path)
+                    .map_err(|e| format!("Error reading client authentication certs file: {}", e))
+            })
+            .transpose()?;
+
+        let client_key = client_key_file
+            .as_ref()
+            .map(|path| {
+                std::fs::read(path)
+                    .map_err(|e| format!("Error reading client authentication key file: {}", e))
+            })
+            .transpose()?;
+
+        let mtls_data = match (client_certs, client_key) {
+            (Some(certs), Some(key)) => Ok(Some((certs, key))),
+            (None, None) => Ok(None),
+            _ => Err(
+                "Must provide both a client certs file and a client key file, or neither"
+                    .to_string(),
+            ),
+        }?;
+
+        Self::new(root_ca_certs, mtls_data)
+            .map_err(|e| format!("failed parsing root CA certs: {}", e))
     }
 }
 
