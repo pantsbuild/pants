@@ -767,7 +767,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     keep_sandboxes=KeepSandboxes.never,
     local_cache=True,
     cache_content_behavior=CacheContentBehavior.fetch,
-    process_execution_local_enable_nailgun=True,
+    process_execution_local_enable_nailgun=False,
     process_execution_graceful_shutdown_timeout=3,
     # Remote store setup.
     remote_store_address=None,
