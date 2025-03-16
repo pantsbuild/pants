@@ -91,9 +91,9 @@ impl StoreCliOpt {
 
         if let Some(cas_server) = &self.cas_server {
             let tls_config = grpc_util::tls::Config::new_from_files(
-                &self.cas_root_ca_cert_file,
-                &self.cas_client_certs_file,
-                &self.cas_client_key_file,
+                self.cas_root_ca_cert_file.as_deref(),
+                self.cas_client_certs_file.as_deref(),
+                self.cas_client_key_file.as_deref(),
             )?;
             let headers = self.get_headers(&self.cas_oauth_bearer_token_path)?;
             local_only_store

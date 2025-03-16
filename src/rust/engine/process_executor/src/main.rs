@@ -185,9 +185,9 @@ async fn main() -> Result<(), String> {
     let runner: Box<dyn process_execution::CommandRunner> = match args.server {
         Some(address) => {
             let tls_config = grpc_util::tls::Config::new_from_files(
-                &args.execution_root_ca_cert_file,
-                &args.store_options.cas_client_certs_file,
-                &args.store_options.cas_client_key_file,
+                args.execution_root_ca_cert_file.as_deref(),
+                args.store_options.cas_client_certs_file.as_deref(),
+                args.store_options.cas_client_key_file.as_deref(),
             )?;
             let headers = args
                 .store_options

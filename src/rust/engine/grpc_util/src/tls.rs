@@ -1,8 +1,10 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+use std::fmt::Write;
 use std::io;
+use std::path::Path;
 use std::sync::Arc;
-use std::{fmt::Write, path::PathBuf};
 
 use rustls::{
     DigitallySignedStruct,
@@ -50,19 +52,17 @@ impl Config {
     }
 
     pub fn new_from_files(
-        root_ca_cert_file: &Option<PathBuf>,
-        client_certs_file: &Option<PathBuf>,
-        client_key_file: &Option<PathBuf>,
+        root_ca_cert_file: Option<&Path>,
+        client_certs_file: Option<&Path>,
+        client_key_file: Option<&Path>,
     ) -> Result<Self, String> {
         let root_ca_certs = root_ca_cert_file
-            .as_ref()
             .map(|path| {
                 std::fs::read(path).map_err(|e| format!("Error reading root CA certs file: {}", e))
             })
             .transpose()?;
 
         let client_certs = client_certs_file
-            .as_ref()
             .map(|path| {
                 std::fs::read(path)
                     .map_err(|e| format!("Error reading client authentication certs file: {}", e))
@@ -70,7 +70,6 @@ impl Config {
             .transpose()?;
 
         let client_key = client_key_file
-            .as_ref()
             .map(|path| {
                 std::fs::read(path)
                     .map_err(|e| format!("Error reading client authentication key file: {}", e))
