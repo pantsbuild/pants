@@ -22,6 +22,9 @@ python_tests(
                 "3rdparty/python#types-setuptools",
             ]
         },
+        "external_tool_upgrade_test.py": {
+            "resolve": "external-tool-upgrade",
+        }
     },
 )
 

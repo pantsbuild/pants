@@ -64,7 +64,7 @@ class ExternalToolVersion:
 
 
 def format_string_to_regex(format_string: str) -> re.Pattern:
-    """Converts a format string to a regex.
+    r"""Converts a format string to a regex.
 
     >>> format_string_to_regex("/release/v{version}/bin/{platform}/kubectl")
     re.compile('^\\/release\\/v(?P<version>.*)\\/bin\\/(?P<platform>.*)\\/kubectl$')
