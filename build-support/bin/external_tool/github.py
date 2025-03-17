@@ -1,7 +1,10 @@
-from typing import Generator, TypedDict
+# Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+from collections.abc import Generator, Iterator
+from typing import TypedDict
 from urllib.parse import urlparse
+
 import requests
-from collections.abc import Iterator
 
 
 class Release(TypedDict):

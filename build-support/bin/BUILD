@@ -24,7 +24,7 @@ python_tests(
         },
         "external_tool_upgrade_test.py": {
             "resolve": "external-tool-upgrade",
-        }
+        },
     },
 )
 

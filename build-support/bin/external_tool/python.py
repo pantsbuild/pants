@@ -1,10 +1,13 @@
+# Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+import ast
+import json
 import logging
 import os
-import json
 import textwrap
-from typing import TypeVar, Any, Generator
+from collections.abc import Generator
 from pathlib import Path
-import ast
+from typing import Any, TypeVar
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T")
@@ -14,7 +17,7 @@ def get_class_variables(file_path: Path, class_name: str, *, variables: type[T])
     """Reads a Python file and retrieves the values of specified class variables."""
 
     logger.info("parsing %s variables in %s", class_name, file_path)
-    with open(file_path, "r", encoding="utf-8") as file:
+    with open(file_path, encoding="utf-8") as file:
         source_code = file.read()
 
     tree = ast.parse(source_code)
@@ -32,8 +35,9 @@ def get_class_variables(file_path: Path, class_name: str, *, variables: type[T])
 
 
 def replace_class_variables(file_path: Path, class_name: str, replacements: dict[str, Any]) -> None:
-    """Reads a Python file, searches for a class by name, and replaces specified class variables with new values."""
-    with open(file_path, "r", encoding="utf-8") as file:
+    """Reads a Python file, searches for a class by name, and replaces specified class variables
+    with new values."""
+    with open(file_path, encoding="utf-8") as file:
         lines = file.readlines()
 
     tree = ast.parse("".join(lines))

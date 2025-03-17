@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import logging
+import multiprocessing
 import os
 import re
 from collections.abc import Iterator
@@ -178,7 +179,7 @@ def main():
     parser.add_argument(
         "-w",
         "--workers",
-        default=32,
+        default=multiprocessing.cpu_count(),
         type=int,
         help="Thread pool size",
     )

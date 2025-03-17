@@ -1,5 +1,8 @@
-from external_tool.python import replace_class_variables
+# Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 from pathlib import Path
+
+from external_tool.python import replace_class_variables
 
 CONTENT = """\
 from __future__ import annotations
