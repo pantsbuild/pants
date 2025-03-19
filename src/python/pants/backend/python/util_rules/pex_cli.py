@@ -21,6 +21,7 @@ from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalToolRequest,
+    ExternalToolVersion,
     TemplatedExternalTool,
 )
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests
