@@ -26,6 +26,8 @@ from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.third_party_pkg import (
     AllThirdPartyPackages,
     AllThirdPartyPackagesRequest,
+    ModuleDescriptors,
+    ModuleDescriptorsRequest,
     ThirdPartyPkgAnalysis,
     ThirdPartyPkgAnalysisRequest,
 )
@@ -53,6 +55,8 @@ def rule_runner() -> RuleRunner:
             *go_mod.rules(),
             QueryRule(AllThirdPartyPackages, [AllThirdPartyPackagesRequest]),
             QueryRule(ThirdPartyPkgAnalysis, [ThirdPartyPkgAnalysisRequest]),
+            QueryRule(ThirdPartyPkgAnalysis, [ThirdPartyPkgAnalysisRequest]),
+            QueryRule(ModuleDescriptors, [ModuleDescriptorsRequest]),
         ],
         target_types=[GoModTarget],
     )
@@ -607,3 +611,30 @@ def test_go_sum_with_missing_entries_triggers_error(rule_runner: RuleRunner) -> 
                 )
             ],
         )
+
+
+def test_local_path_replace_statement_is_not_considered_third_party(
+    rule_runner: RuleRunner,
+) -> None:
+    """Regression test for https://github.com/pantsbuild/pants/issues/14996."""
+    digest = set_up_go_mod(
+        rule_runner,
+        dedent(
+            """\
+            module example.com/first-party/module-a
+            go 1.16
+            require example.com/first-party/module-b v1.3.0
+            replace example.com/first-party/module-b => ../module-b
+            """
+        ),
+        dedent(
+            """\
+            """
+        ),
+    )
+    module_analysis = rule_runner.request(
+        ModuleDescriptors,
+        [ModuleDescriptorsRequest(digest=digest, path=".")],
+    )
+    # The module replaced to a local path should not be considered for third party analysis.
+    assert len(module_analysis.modules) == 0
