@@ -73,7 +73,14 @@ class PexCli(TemplatedExternalTool):
     @override
     def generate_url(self, plat: Platform) -> str:
         platform = self.url_platform_mapping.get(plat.value, "")
+        # for backward compatibility with version format like "v2.33.4"
         return self.url_template.format(version=self.version.lstrip("v"), platform=platform)
+
+    @override
+    @classmethod
+    def decode_known_version(cls, known_version: str) -> ExternalToolVersion:
+        # for backward compatibility with version format like "v2.33.4"
+        return super().decode_known_version(known_version.lstrip("v"))
 
 
 @dataclass(frozen=True)
