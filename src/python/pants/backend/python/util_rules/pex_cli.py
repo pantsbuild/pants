@@ -9,6 +9,8 @@ import os.path
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
+from typing_extensions import override
+
 from pants.backend.python.subsystems.python_native_code import PythonNativeCodeSubsystem
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules import pex_environment
@@ -19,6 +21,7 @@ from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalToolRequest,
+    ExternalToolVersion,
     TemplatedExternalTool,
 )
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests
@@ -41,8 +44,8 @@ class PexCli(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pex-tool/pex)."
 
-    default_version = "v2.33.4"
-    default_url_template = "https://github.com/pex-tool/pex/releases/download/{version}/pex"
+    default_version = "2.33.4"
+    default_url_template = "https://github.com/pex-tool/pex/releases/download/v{version}/pex"
     version_constraints = ">=2.13.0,<3.0"
 
     # extra args to be passed to the pex tool; note that they
@@ -58,15 +61,27 @@ class PexCli(TemplatedExternalTool):
     )
 
     default_known_versions = [
-        "v2.33.4|macos_x86_64|d6a4041d52732ea0a323db2bea3e6a5995391fed3bc1f2b81d84ee0bcbc16e7c|4589638",
-        "v2.33.4|macos_arm64|d6a4041d52732ea0a323db2bea3e6a5995391fed3bc1f2b81d84ee0bcbc16e7c|4589638",
-        "v2.33.4|linux_x86_64|d6a4041d52732ea0a323db2bea3e6a5995391fed3bc1f2b81d84ee0bcbc16e7c|4589638",
-        "v2.33.4|linux_arm64|d6a4041d52732ea0a323db2bea3e6a5995391fed3bc1f2b81d84ee0bcbc16e7c|4589638",
-        "v2.33.1|macos_x86_64|5ebed0e2ba875983a72b4715ee3b2ca6ae5fedbf28d738634e02e30e3bb5ed28|4559974",
-        "v2.33.1|macos_arm64|5ebed0e2ba875983a72b4715ee3b2ca6ae5fedbf28d738634e02e30e3bb5ed28|4559974",
-        "v2.33.1|linux_x86_64|5ebed0e2ba875983a72b4715ee3b2ca6ae5fedbf28d738634e02e30e3bb5ed28|4559974",
-        "v2.33.1|linux_arm64|5ebed0e2ba875983a72b4715ee3b2ca6ae5fedbf28d738634e02e30e3bb5ed28|4559974",
+        "2.33.4|macos_x86_64|d6a4041d52732ea0a323db2bea3e6a5995391fed3bc1f2b81d84ee0bcbc16e7c|4589638",
+        "2.33.4|macos_arm64|d6a4041d52732ea0a323db2bea3e6a5995391fed3bc1f2b81d84ee0bcbc16e7c|4589638",
+        "2.33.4|linux_x86_64|d6a4041d52732ea0a323db2bea3e6a5995391fed3bc1f2b81d84ee0bcbc16e7c|4589638",
+        "2.33.4|linux_arm64|d6a4041d52732ea0a323db2bea3e6a5995391fed3bc1f2b81d84ee0bcbc16e7c|4589638",
+        "2.33.1|macos_x86_64|5ebed0e2ba875983a72b4715ee3b2ca6ae5fedbf28d738634e02e30e3bb5ed28|4559974",
+        "2.33.1|macos_arm64|5ebed0e2ba875983a72b4715ee3b2ca6ae5fedbf28d738634e02e30e3bb5ed28|4559974",
+        "2.33.1|linux_x86_64|5ebed0e2ba875983a72b4715ee3b2ca6ae5fedbf28d738634e02e30e3bb5ed28|4559974",
+        "2.33.1|linux_arm64|5ebed0e2ba875983a72b4715ee3b2ca6ae5fedbf28d738634e02e30e3bb5ed28|4559974",
     ]
+
+    @override
+    def generate_url(self, plat: Platform) -> str:
+        platform = self.url_platform_mapping.get(plat.value, "")
+        # for backward compatibility with version format like "v2.33.4"
+        return self.url_template.format(version=self.version.lstrip("v"), platform=platform)
+
+    @override
+    @classmethod
+    def decode_known_version(cls, known_version: str) -> ExternalToolVersion:
+        # for backward compatibility with version format like "v2.33.4"
+        return super().decode_known_version(known_version.lstrip("v"))
 
 
 @dataclass(frozen=True)
