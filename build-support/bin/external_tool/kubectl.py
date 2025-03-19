@@ -33,8 +33,9 @@ class KubernetesReleases:
         self.pool = pool
 
     def get_releases(self, url_template: str) -> Iterator[str]:
+        urls: Iterator[str]
         if self.only_latest:
-            urls = ["https://cdn.dl.k8s.io/release/stable.txt"]
+            urls = iter(("https://cdn.dl.k8s.io/release/stable.txt",))
         else:
             response = requests.get("https://cdn.dl.k8s.io/", allow_redirects=True)
             urls = _parse_k8s_xml(response.text)

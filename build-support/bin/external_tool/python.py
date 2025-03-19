@@ -51,7 +51,7 @@ def replace_class_variables(file_path: Path, class_name: str, replacements: dict
                         if isinstance(target, ast.Name) and target.id in replacements:
                             start_line = stmt.lineno - 1
                             end_line = (
-                                stmt.end_lineno if hasattr(stmt, "end_lineno") else start_line
+                                stmt.end_lineno if stmt.end_lineno is not None else start_line
                             )
                             class_var_ranges[target.id] = (start_line, end_line)
 

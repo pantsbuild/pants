@@ -22,7 +22,7 @@ from itertools import groupby
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
 from string import Formatter
-from typing import NotRequired, Protocol, assert_never
+from typing import Protocol, assert_never
 from urllib.parse import urlparse
 
 import requests
@@ -148,7 +148,7 @@ def fetch_version(
 class Tool:
     default_known_versions: list[str]
     default_url_template: str
-    default_url_platform_mapping: NotRequired[dict[str, str] | None] = None
+    default_url_platform_mapping: dict[str, str] | None = None
 
 
 class Mode(StrEnum):
