@@ -13,4 +13,5 @@ echo "Installing py-sy and memray for CPU and Memory profiling..."
 pip install py-spy memray
 
 echo "Bootstrapping Pants..."
+mkdir dist
 ./pants --version
