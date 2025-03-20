@@ -113,3 +113,171 @@ which will only have access to a single context, set the
 `[kubectl].pass_context` to false in `pants.toml` to have them use their
 default context.
 :::
+
+## Simple templates
+
+At some point, you may need to inject variables from a BUILD file into
+Kubernetes resources — also known as templating. The simplest way to achieve
+this is by using the `python_format_string` target, which generates
+`k8s_sources` by substituting the values you specify in the BUILD file.
+
+First, add the codegen backend:
+
+```toml title="pants.toml"
+backend_packages = [
+    ...
+    "pants.backend.experimental.k8s",
+    "pants.backend.experimental.codegen.python_format_string",
+    "pants.backend.experimental.codegen.python_format_string.k8s",
+]
+```
+
+Then parametrize the yaml using python format string syntax, e.g. the
+namespace:
+
+```yaml title="src/k8s/webpages.yaml
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: webpages
+  namespace: {namespace}
+data:
+  index.html: |
+    <html>
+      <head>Hello pants!</head>
+      <body>Hello pants!</body>
+    </html>
+```
+
+Now replace `k8s_sources` with a `python_format_string` target and pass the
+namespace value:
+
+```python title="src/k8s/BUILD"
+python_format_string(
+    name="webpages-template",
+    source="webpages.yaml",
+    values={"namespace": "web"},
+)
+k8s_bundle(
+    name="webpages",
+    sources=("src/k8s:webpages-template",),
+    context="kind-kind",
+)
+```
+
+Now you can deploy the bundle:
+
+```bash
+pants experimental-deploy src/k8s/:webpages
+```
+
+This setup can now be used to deploy the same resource to multiple namespaces
+with [`parametrize`
+builtin](../using-pants/key-concepts/targets-and-build-files.mdx#parametrizing-targets):
+
+```python title="src/k8s/BUILD"
+python_format_string(
+    name="webpages-template",
+    source="webpages.yaml",
+    **parametrize("default", values={"namespace": "default"}),
+    **parametrize("web", values={"namespace": "web"}),
+)
+k8s_bundle(
+    name="webpages",
+    context="kind-kind",
+    **parametrize("default", sources=("src/k8s:webpages-template@parametrize=default",)),
+    **parametrize("web", sources=("src/k8s:webpages-template@parametrize=web",)),
+)
+```
+
+## Docker images
+
+Before we continue, add the docker backend:
+
+```toml title="pants.toml"
+[GLOBAL]
+backend_packages = [
+  ...
+  "pants.backend.docker",
+]
+
+[dockerfile-parser]
+use_rust_parser = true
+```
+
+To use docker images you most likely will need some templating. This is because
+your docker image tags will be probably versioned.
+
+You might want to use git to generate the version for your images, but you
+can't directly run git commands in a BUILD file. You can use a
+`.pants.bootstrap` file as a workaround:
+
+```python title=".pants.bootstrap"
+#!/bin/sh
+
+VERSION="${VERSION:-$(git describe --tags --dirty --match "[0-9\.]*" || echo 0.0.1)}"
+export VERSION
+```
+
+This script will run before every pants command, so you can now use the
+`VERSION` env var in the BUILD file:
+
+```python title="src/k8s/BUILD"
+...
+docker_image(
+    name="custom-nginx",
+    instructions=["FROM nginx"],
+    image_tags=[env("VERSION")],
+)
+python_format_string(
+    name="webserver-template",
+    source="deployment.yaml",
+    values={"VERSION": env("VERSION")},
+)
+k8s_bundle(
+    name="webserver",
+    context="kind-kind",
+    sources=("src/k8s:webserver-template",),
+    dependencies=(":custom-nginx",),
+)
+```
+
+Create the deployment:
+
+```yaml title="src/k8s/deployment.yaml"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webserver
+  namespace: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webserver
+  template:
+    metadata:
+      labels:
+        app: webserver
+    spec:
+      containers:
+        - name: nginx
+          image: custom-nginx:{VERSION}
+```
+
+Now deploy the bundle:
+
+```bash
+pants experimental-deploy src/k8s:webserver
+```
+
+Notice, that pants will automatically publish the image. This happens because
+we've configured `dependencies=(":custom-nginx",)` field on `k8s_bundle`
+target. You can disable this behaviour and publish the image manually:
+
+```bash
+pants publish src/k8s:custom-nginx
+pants experimental-deploy --no-publish-dependencies src/k8s:webserver
+```
