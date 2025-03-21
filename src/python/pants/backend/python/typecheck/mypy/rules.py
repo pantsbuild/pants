@@ -233,6 +233,8 @@ async def mypy_typecheck_partition(
     )
     named_cache_dir = ".cache/mypy_cache"
     mypy_cache_dir = f"{named_cache_dir}/{sha256(build_root.path.encode()).hexdigest()}"
+    if partition.resolve_description:
+        mypy_cache_dir += f"/{partition.resolve_description}"
     run_cache_dir = ".tmp_cache/mypy_cache"
     argv = await _generate_argv(
         mypy,
