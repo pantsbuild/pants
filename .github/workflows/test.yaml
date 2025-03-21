@@ -6,7 +6,6 @@ concurrency:
   cancel-in-progress: true
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
 env:
-  PANTS_CONFIG_FILES: +['pants.ci.toml']
   RUST_BACKTRACE: all
 jobs:
   build_wheels_macos14_arm64:
