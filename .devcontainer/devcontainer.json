@@ -42,6 +42,7 @@
             "editor.defaultFormatter": "rust-lang.rust-analyzer",
             "editor.formatOnSave": true
           },
+          "dev.containers.dockerCredentialHelper": false,
           "python.analysis.extraPaths": ["src/python"],
           "black-formatter.args": ["--config=pyproject.toml"],
           "flake8.args": ["--config=build-support/flake8/.flake8"],
