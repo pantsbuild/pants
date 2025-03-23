@@ -56,6 +56,8 @@ const KILOBYTES: usize = 1024;
 const MEGABYTES: usize = 1024 * KILOBYTES;
 const GIGABYTES: usize = 1024 * MEGABYTES;
 
+mod cli_options;
+
 mod local;
 #[cfg(test)]
 pub mod local_tests;
@@ -66,6 +68,7 @@ mod remote_tests;
 
 // Consumers of this crate shouldn't need to worry about the exact crate structure that comes
 // together to make a store.
+pub use cli_options::StoreCliOpt;
 pub use remote_provider::{RemoteProvider, RemoteStoreOptions};
 
 pub struct LocalOptions {
@@ -336,6 +339,10 @@ impl Store {
             remote: None,
             immutable_inputs_base: Some(immutable_inputs_base.to_path_buf()),
         })
+    }
+
+    pub fn is_local_only(&self) -> bool {
+        self.remote.is_none()
     }
 
     ///

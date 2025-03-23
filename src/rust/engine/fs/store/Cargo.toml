@@ -9,6 +9,7 @@ async-stream = { workspace = true }
 async-trait = { workspace = true }
 protos = { path = "../../protos" }
 bytes = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
 concrete_time = { path = "../../concrete_time" }
 async-oncecell = { workspace = true }
 deepsize = { workspace = true }

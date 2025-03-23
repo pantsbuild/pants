@@ -143,6 +143,7 @@ async def digest_complete_platform_addresses(
                     FileSourceField,
                     ResourceSourceField,
                 ),
+                enable_codegen=True,
             ),
         )
         for tgt in original_file_targets
