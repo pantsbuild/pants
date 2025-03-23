@@ -30,7 +30,7 @@ use workunit_store::{Metric, ObservationMetric};
 
 use remote_provider_traits::{ByteStoreProvider, LoadDestination, RemoteStoreOptions};
 
-const RPC_DIGEST_SIZE: usize = 70;
+const RPC_DIGEST_SIZE: usize = 78;
 
 pub struct Provider {
     instance_name: Option<String>,
@@ -465,10 +465,47 @@ impl ByteStoreProvider for Provider {
 
 #[cfg(test)]
 mod tests {
+
     use super::RPC_DIGEST_SIZE;
     use crate::remexec::FindMissingBlobsRequest;
     use prost::Message;
+    use protos::gen::build::bazel::remote::execution::v2;
     use testutil::data::TestData;
+
+    #[test]
+    fn test_variable_size_of_blobs_request() {
+        let instance_name = "";
+
+        let small_request = FindMissingBlobsRequest {
+            instance_name: instance_name.to_string(),
+            blob_digests: vec![TestData::catnip().digest().into()],
+        };
+        assert_eq!(small_request.encoded_len(), 70);
+
+        let medium_request = FindMissingBlobsRequest {
+            instance_name: instance_name.to_string(),
+            blob_digests: vec![TestData::all_the_henries().digest().into()],
+        };
+        assert_eq!(medium_request.encoded_len(), 72);
+
+        let input_data = "a".repeat(400000000);
+        let big_blob = TestData::new(&input_data).digest();
+
+        let large_request = FindMissingBlobsRequest {
+            instance_name: instance_name.to_string(),
+            blob_digests: vec![big_blob.into()],
+        };
+        assert_eq!(large_request.encoded_len(), 74);
+
+        let max_request = FindMissingBlobsRequest {
+            instance_name: instance_name.to_string(),
+            blob_digests: vec![v2::Digest {
+                hash: big_blob.hash.to_string(),
+                size_bytes: i64::MAX,
+            }],
+        };
+        assert_eq!(max_request.encoded_len(), 78);
+    }
 
     #[test]
     fn test_size_of_find_missing_blobs_request() {
@@ -489,7 +526,8 @@ mod tests {
 
             let size = request.encoded_len();
 
-            assert_eq!(size, RPC_DIGEST_SIZE * it);
+            // The test digests have a short lengths, so the length encoded size is smaller than the max
+            assert_eq!(size, (RPC_DIGEST_SIZE - 8) * it);
         }
     }
 }

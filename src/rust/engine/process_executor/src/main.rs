@@ -22,7 +22,7 @@ use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
 use protos::gen::buildbarn::cas::UncachedActionResult;
 use protos::require_digest;
 use remote::remote_cache::RemoteCacheRunnerOptions;
-use store::{ImmutableInputs, RemoteProvider, RemoteStoreOptions, Store};
+use store::{ImmutableInputs, RemoteProvider, RemoteStoreOptions, Store, StoreCliOpt};
 use tokio::sync::RwLock;
 use workunit_store::{Level, WorkunitStore, in_workunit};
 
@@ -99,6 +99,9 @@ struct Opt {
     #[command(flatten)]
     action_digest: ActionDigestSpec,
 
+    #[command(flatten)]
+    store_options: StoreCliOpt,
+
     #[arg(long)]
     buildbarn_url: Option<String>,
 
@@ -113,16 +116,9 @@ struct Opt {
     #[arg(long)]
     work_dir: Option<PathBuf>,
 
-    ///Path to lmdb directory used for local file storage.
-    #[arg(long)]
-    local_store_path: Option<PathBuf>,
-
     /// Path to a directory to be used for named caches.
     #[arg(long)]
     named_cache_path: Option<PathBuf>,
-
-    #[arg(long)]
-    remote_instance_name: Option<String>,
 
     /// The host:port of the gRPC server to connect to. Forces remote execution.
     /// If unspecified, local execution will be performed.
@@ -139,47 +135,6 @@ struct Opt {
     #[arg(long)]
     execution_oauth_bearer_token_path: Option<PathBuf>,
 
-    /// The host:port of the gRPC CAS server to connect to.
-    #[arg(long)]
-    cas_server: Option<String>,
-
-    /// Path to file containing root certificate authority certificates for the CAS server.
-    /// If not set, TLS will not be used when connecting to the CAS server.
-    #[arg(long)]
-    cas_root_ca_cert_file: Option<PathBuf>,
-
-    /// Path to file containing client certificates for the CAS server.
-    /// If not set, client authentication will not be used when connecting to the CAS server.
-    #[arg(long)]
-    cas_client_certs_file: Option<PathBuf>,
-
-    /// Path to file containing client key for the CAS server.
-    /// If not set, client authentication will not be used when connecting to the CAS server.
-    #[arg(long)]
-    cas_client_key_file: Option<PathBuf>,
-
-    /// Path to file containing oauth bearer token for communication with the CAS server.
-    /// If not set, no authorization will be provided to remote servers.
-    #[arg(long)]
-    cas_oauth_bearer_token_path: Option<PathBuf>,
-
-    /// Number of bytes to include per-chunk when uploading bytes.
-    /// grpc imposes a hard message-size limit of around 4MB.
-    #[arg(long, default_value = "3145728")]
-    upload_chunk_bytes: usize,
-
-    /// Number of retries per request to the store service.
-    #[arg(long, default_value = "3")]
-    store_rpc_retries: usize,
-
-    /// Number of concurrent requests to the store service.
-    #[arg(long, default_value = "128")]
-    store_rpc_concurrency: usize,
-
-    /// Total size of blobs allowed to be sent in a single API call.
-    #[arg(long, default_value = "4194304")]
-    store_batch_api_size_limit: usize,
-
     /// Number of concurrent requests to the execution service.
     #[arg(long, default_value = "128")]
     execution_rpc_concurrency: usize,
@@ -191,10 +146,6 @@ struct Opt {
     /// Overall timeout in seconds for each request from time of submission.
     #[arg(long, default_value = "600")]
     overall_deadline_secs: u64,
-
-    /// Extra header to pass on remote execution request.
-    #[arg(long)]
-    header: Vec<String>,
 }
 
 /// A binary which takes args of format:
@@ -205,86 +156,22 @@ struct Opt {
 ///
 /// It does not perform $PATH lookup or shell expansion.
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), String> {
     env_logger::init();
     let workunit_store = WorkunitStore::new(false, log::Level::Debug);
     workunit_store.init_thread_state(None);
 
     let args = Opt::parse();
 
-    let mut headers: BTreeMap<String, String> = collection_from_keyvalues(args.header.iter());
-
     let executor = task_executor::Executor::new();
 
-    let local_store_path = args
-        .local_store_path
-        .clone()
-        .unwrap_or_else(Store::default_path);
+    let store = args.store_options.create_store(executor.clone()).await?;
 
-    let local_only_store =
-        Store::local_only(executor.clone(), local_store_path).expect("Error making local store");
-    let store = match (&args.server, &args.cas_server) {
-    (_, Some(cas_server)) => {
-      let root_ca_certs = args
-        .cas_root_ca_cert_file
-        .as_ref()
-        .map(|path| std::fs::read(path).expect("Error reading root CA certs file"));
-
-      let client_certs = args
-        .cas_client_certs_file
-        .as_ref()
-        .map(|path| std::fs::read(path).expect("Error reading client authentication certs file"));
-
-      let client_key = args
-        .cas_client_key_file
-        .as_ref()
-        .map(|path| std::fs::read(path).expect("Error reading client authentication key file"));
-
-      let mtls_data = match (client_certs, client_key) {
-        (Some(certs), Some(key)) => Some((certs, key)),
-        (None, None) => None,
-        _ => {
-          panic!("Must specify both --cas-client-certs-file and --cas-client-key-file or neither")
-        }
-      };
-
-      let mut headers = BTreeMap::new();
-      if let Some(ref oauth_path) = args.cas_oauth_bearer_token_path {
-        let token =
-          std::fs::read_to_string(oauth_path).expect("Error reading oauth bearer token file");
-        headers.insert(
-          "authorization".to_owned(),
-          format!("Bearer {}", token.trim()),
-        );
-      }
-
-      let tls_config = grpc_util::tls::Config::new(root_ca_certs, mtls_data)
-        .expect("failed parsing root CA certs");
-
-      local_only_store
-            .into_with_remote(RemoteStoreOptions {
-                provider: RemoteProvider::Reapi,
-          store_address: cas_server.to_owned(),
-          instance_name: args.remote_instance_name.clone(),
-          tls_config,
-          headers,
-          chunk_size_bytes: args.upload_chunk_bytes,
-          timeout: Duration::from_secs(30),
-          retries: args.store_rpc_retries,
-          concurrency_limit: args.store_rpc_concurrency,
-
-          batch_api_size_limit: args.store_batch_api_size_limit,
-        })
-        .await
+    if args.server.is_some() && store.is_local_only() {
+        return Err("Can't specify --server without --cas-server".to_string());
     }
-    (None, None) => Ok(local_only_store),
-    _ => panic!("Can't specify --server without --cas-server"),
-  }
-  .expect("Error making remote store");
 
-    let (mut request, process_metadata) = make_request(&store, &args)
-        .await
-        .expect("Failed to construct request");
+    let (mut request, process_metadata) = make_request(&store, &args).await?;
 
     if let Some(run_under) = args.run_under {
         let run_under = shlex::split(&run_under).expect("Could not shlex --run-under arg");
@@ -297,40 +184,14 @@ async fn main() {
 
     let runner: Box<dyn process_execution::CommandRunner> = match args.server {
         Some(address) => {
-            let root_ca_certs = args
-                .execution_root_ca_cert_file
-                .map(|path| std::fs::read(path).expect("Error reading root CA certs file"));
-
-            let client_certs = args
-                .cas_client_certs_file
-                .as_ref()
-                .map(|path| std::fs::read(path).expect("Error reading root client certs file"));
-
-            let client_key = args.cas_client_key_file.as_ref().map(|path| {
-                std::fs::read(path).expect("Error reading client authentication key file")
-            });
-
-            let mtls_data = match (client_certs, client_key) {
-                (Some(certs), Some(key)) => Some((certs, key)),
-                (None, None) => None,
-                _ => {
-                    panic!(
-                        "Must specify both --cas-client-certs-file and --cas-client-key-file or neither"
-                    )
-                }
-            };
-
-            let tls_config = grpc_util::tls::Config::new(root_ca_certs, mtls_data)
-                .expect("failed parsing root CA certs");
-
-            if let Some(oauth_path) = args.execution_oauth_bearer_token_path {
-                let token = std::fs::read_to_string(oauth_path)
-                    .expect("Error reading oauth bearer token file");
-                headers.insert(
-                    "authorization".to_owned(),
-                    format!("Bearer {}", token.trim()),
-                );
-            }
+            let tls_config = grpc_util::tls::Config::new_from_files(
+                args.execution_root_ca_cert_file.as_deref(),
+                args.store_options.cas_client_certs_file.as_deref(),
+                args.store_options.cas_client_key_file.as_deref(),
+            )?;
+            let headers = args
+                .store_options
+                .get_headers(&args.execution_oauth_bearer_token_path)?;
 
             let remote_runner = remote::remote::CommandRunner::new(
                 &address,
@@ -475,7 +336,7 @@ async fn make_request(
         store,
         Digest::new(action_fingerprint, action_digest_length),
         execution_environment,
-        args.remote_instance_name.clone(),
+        args.store_options.remote_instance_name.clone(),
         args.command.cache_key_gen_version.clone(),
       ).await
     }
@@ -555,7 +416,7 @@ async fn make_request_from_flat_args(
         attempt: 0,
     };
     let metadata = ProcessMetadata {
-        instance_name: args.remote_instance_name.clone(),
+        instance_name: args.store_options.remote_instance_name.clone(),
         cache_key_gen_version: args.command.cache_key_gen_version.clone(),
     };
     Ok((process, metadata))
