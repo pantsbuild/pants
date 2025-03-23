@@ -24,6 +24,10 @@ jobs:
         with:
           python-version: "3.10"
       - run: |
+          spctl --status
+      - run: |
+          sudo spctl --master-enable
+      - run: |
           curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash
 
           cd $(mktemp -d)
