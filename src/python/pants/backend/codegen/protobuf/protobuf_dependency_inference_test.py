@@ -7,6 +7,7 @@ import pytest
 
 from pants.backend.codegen.protobuf import protobuf_dependency_inference
 from pants.backend.codegen.protobuf.protobuf_dependency_inference import (
+    _NO_RESOLVE_LIKE_FIELDS_DEFINED,
     InferProtobufDependencies,
     ProtobufDependencyInferenceFieldSet,
     ProtobufMapping,
@@ -105,15 +106,23 @@ def test_protobuf_mapping(rule_runner: RuleRunner) -> None:
     assert result == ProtobufMapping(
         mapping=FrozenDict(
             {
-                "protos/f1.proto": Address("root1/protos", relative_file_path="f1.proto"),
-                "protos/f2.proto": Address("root1/protos", relative_file_path="f2.proto"),
+                _NO_RESOLVE_LIKE_FIELDS_DEFINED: FrozenDict(
+                    {
+                        "protos/f1.proto": Address("root1/protos", relative_file_path="f1.proto"),
+                        "protos/f2.proto": Address("root1/protos", relative_file_path="f2.proto"),
+                    }
+                )
             }
         ),
         ambiguous_modules=FrozenDict(
             {
-                "two_owners/f.proto": (
-                    Address("root1/two_owners", relative_file_path="f.proto"),
-                    Address("root2/two_owners", relative_file_path="f.proto"),
+                _NO_RESOLVE_LIKE_FIELDS_DEFINED: FrozenDict(
+                    {
+                        "two_owners/f.proto": (
+                            Address("root1/two_owners", relative_file_path="f.proto"),
+                            Address("root2/two_owners", relative_file_path="f.proto"),
+                        )
+                    }
                 )
             }
         ),
