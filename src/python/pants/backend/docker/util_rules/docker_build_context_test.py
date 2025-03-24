@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import zipfile
+from platform import machine
 from textwrap import dedent
 from typing import Any, ContextManager
 
@@ -448,17 +449,28 @@ def test_packaged_pex_path(rule_runner: RuleRunner) -> None:
 
 
 def test_packaged_pex_environment(rule_runner: RuleRunner) -> None:
+    image = "python:3.8-buster@sha256:04c3f641c2254c229fd2f704c5199ff4bea57d26c1c29008ae3a4afddde98709"
+    if machine() == "x86_64":
+        platform = "linux_x86_64"
+        expected_dist = "psutil-5.9.2-cp38-cp38-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+    elif machine() == "aarch64":
+        platform = "linux_arm64"
+        expected_dist = "psutil-5.9.2-cp38-cp38-linux_aarch64.whl"
+    else:
+        pytest.skip("This test only runs on amd64 and arm64.")
+        return
+
     rule_runner.write_files(
         {
             "BUILD": dedent(
-                """
+                f"""
               docker_environment(
                 name="python_38",
-                image="python:3.8-buster@sha256:bc4b9fb034a871b285bea5418cedfcaa9d2ab5590fb5fb6f0c42aaebb2e2c911",
-                platform="linux_x86_64",
+                image="{image}",
+                platform="{platform}",
                 python_bootstrap_search_path=["<PATH>"],
               )
-
+              
               python_requirement(name="psutil", requirements=["psutil==5.9.2"])
               """
             ),
@@ -490,7 +502,7 @@ def test_packaged_pex_environment(rule_runner: RuleRunner) -> None:
     rule_runner.write_digest(context.digest, path_prefix="contents")
     with zipfile.ZipFile(os.path.join(rule_runner.build_root, "contents", pex_file), "r") as zf:
         assert json.loads(zf.read("PEX-INFO"))["distributions"].keys() == {
-            "psutil-5.9.2-cp38-cp38-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+            expected_dist,
         }
 
 
