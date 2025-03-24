@@ -148,6 +148,7 @@ Created as part of the release process.
 + Jack Zhao
 + Jackson Davis
 + Jacob Floyd
++ Jake
 + Jake Donham
 + Jake Zerrer
 + Jakub Bujny
@@ -379,6 +380,7 @@ Created as part of the release process.
 + csqzhang
 + csteiner
 + eugene yokota
++ fabric-peter
 + gyudoza
 + hephex
 + jgartdele/del
