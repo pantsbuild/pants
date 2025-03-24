@@ -15,6 +15,7 @@ from pants.backend.url_handlers.s3.register import (
     DownloadS3SchemeURL,
 )
 from pants.backend.url_handlers.s3.register import rules as s3_rules
+from pants.backend.url_handlers.s3.subsystem import S3AuthSigning
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import Digest, FileDigest, NativeDownloadFile, Snapshot
 from pants.engine.rules import QueryRule
@@ -44,11 +45,15 @@ def rule_runner() -> RuleRunner:
     )
 
 
+class NoCredentialsError(Exception):
+    pass
+
+
 @pytest.fixture
 def monkeypatch_botocore(monkeypatch):
-    def do_patching(expected_url):
+    def do_patching(expected_auth_url):
         botocore = SimpleNamespace()
-        botocore.exceptions = SimpleNamespace(NoCredentialsError=Exception)
+        botocore.exceptions = SimpleNamespace(NoCredentialsError=NoCredentialsError)
 
         class FakeSession:
             def __init__(self):
@@ -99,12 +104,19 @@ def monkeypatch_botocore(monkeypatch):
             assert region_name in ["us-east-1", "us-west-2"]
 
             def add_auth(request):
-                request.url == expected_url
+                assert request.url == expected_auth_url
                 request.headers["AUTH"] = "TOKEN"
 
             return SimpleNamespace(add_auth=add_auth)
 
-        botocore.auth = SimpleNamespace(SigV4Auth=fake_auth_ctor)
+        def fake_hmac_v1_auth_ctor(creds):
+            def add_auth(request):
+                assert request.url == expected_auth_url
+                request.headers["AUTH"] = "TOKEN"
+
+            return SimpleNamespace(add_auth=add_auth)
+
+        botocore.auth = SimpleNamespace(SigV4Auth=fake_auth_ctor, HmacV1Auth=fake_hmac_v1_auth_ctor)
 
         monkeypatch.setitem(sys.modules, "botocore", botocore)
 
@@ -127,19 +139,35 @@ def replace_url(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "request_url, expected_auth_url, expected_native_url, req_type",
+    "request_url, expected_auth_url, expected_native_url, req_type, auth_type",
     [
+        (
+            "s3://bucket/keypart1/keypart2/file.txt",
+            "https://s3.amazonaws.com/bucket/keypart1/keypart2/file.txt",
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt",
+            DownloadS3SchemeURL,
+            S3AuthSigning.HMACV1,
+        ),
         (
             "s3://bucket/keypart1/keypart2/file.txt",
             "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt",
             "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt",
             DownloadS3SchemeURL,
+            S3AuthSigning.SIGV4,
+        ),
+        (
+            "s3://bucket/keypart1/keypart2/file.txt?versionId=ABC123",
+            "https://s3.amazonaws.com/bucket/keypart1/keypart2/file.txt?versionId=ABC123",
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
+            DownloadS3SchemeURL,
+            S3AuthSigning.HMACV1,
         ),
         (
             "s3://bucket/keypart1/keypart2/file.txt?versionId=ABC123",
             "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
             "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
             DownloadS3SchemeURL,
+            S3AuthSigning.SIGV4,
         ),
         # Path-style
         (
@@ -147,24 +175,56 @@ def replace_url(monkeypatch):
             "https://s3.amazonaws.com/bucket/keypart1/keypart2/file.txt",
             "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt",
             DownloadS3AuthorityPathStyleURL,
+            S3AuthSigning.HMACV1,
+        ),
+        (
+            "https://s3.amazonaws.com/bucket/keypart1/keypart2/file.txt",
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt",
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt",
+            DownloadS3AuthorityPathStyleURL,
+            S3AuthSigning.SIGV4,
         ),
         (
             "https://s3.amazonaws.com/bucket/keypart1/keypart2/file.txt?versionId=ABC123",
             "https://s3.amazonaws.com/bucket/keypart1/keypart2/file.txt?versionId=ABC123",
             "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
             DownloadS3AuthorityPathStyleURL,
+            S3AuthSigning.HMACV1,
+        ),
+        (
+            "https://s3.amazonaws.com/bucket/keypart1/keypart2/file.txt?versionId=ABC123",
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
+            DownloadS3AuthorityPathStyleURL,
+            S3AuthSigning.SIGV4,
         ),
         (
             "https://s3.us-west-2.amazonaws.com/bucket/keypart1/keypart2/file.txt",
             "https://s3.us-west-2.amazonaws.com/bucket/keypart1/keypart2/file.txt",
             "https://bucket.s3.us-west-2.amazonaws.com/keypart1/keypart2/file.txt",
             DownloadS3AuthorityPathStyleURL,
+            S3AuthSigning.HMACV1,
+        ),
+        (
+            "https://s3.us-west-2.amazonaws.com/bucket/keypart1/keypart2/file.txt",
+            "https://bucket.s3.us-west-2.amazonaws.com/keypart1/keypart2/file.txt",
+            "https://bucket.s3.us-west-2.amazonaws.com/keypart1/keypart2/file.txt",
+            DownloadS3AuthorityPathStyleURL,
+            S3AuthSigning.SIGV4,
         ),
         (
             "https://s3.us-west-2.amazonaws.com/bucket/keypart1/keypart2/file.txt?versionId=ABC123",
             "https://s3.us-west-2.amazonaws.com/bucket/keypart1/keypart2/file.txt?versionId=ABC123",
             "https://bucket.s3.us-west-2.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
             DownloadS3AuthorityPathStyleURL,
+            S3AuthSigning.HMACV1,
+        ),
+        (
+            "https://s3.us-west-2.amazonaws.com/bucket/keypart1/keypart2/file.txt?versionId=ABC123",
+            "https://bucket.s3.us-west-2.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
+            "https://bucket.s3.us-west-2.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
+            DownloadS3AuthorityPathStyleURL,
+            S3AuthSigning.SIGV4,
         ),
         # Virtual-hosted-style
         (
@@ -172,24 +232,56 @@ def replace_url(monkeypatch):
             "https://s3.amazonaws.com/bucket/keypart1/keypart2/file.txt",
             "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt",
             DownloadS3AuthorityVirtualHostedStyleURL,
+            S3AuthSigning.HMACV1,
+        ),
+        (
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt",
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt",
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt",
+            DownloadS3AuthorityVirtualHostedStyleURL,
+            S3AuthSigning.SIGV4,
         ),
         (
             "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
             "https://s3.amazonaws.com/bucket/keypart1/keypart2/file.txt?versionId=ABC123",
             "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
             DownloadS3AuthorityVirtualHostedStyleURL,
+            S3AuthSigning.HMACV1,
+        ),
+        (
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
+            DownloadS3AuthorityVirtualHostedStyleURL,
+            S3AuthSigning.SIGV4,
         ),
         (
             "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
             "https://s3.amazonaws.com/bucket/keypart1/keypart2/file.txt?versionId=ABC123",
             "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
             DownloadS3AuthorityVirtualHostedStyleURL,
+            S3AuthSigning.HMACV1,
+        ),
+        (
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
+            DownloadS3AuthorityVirtualHostedStyleURL,
+            S3AuthSigning.SIGV4,
         ),
         (
             "https://bucket.s3.us-west-2.amazonaws.com/keypart1/keypart2/file.txt",
             "https://s3.us-west-2.amazonaws.com/bucket/keypart1/keypart2/file.txt",
             "https://bucket.s3.us-west-2.amazonaws.com/keypart1/keypart2/file.txt",
             DownloadS3AuthorityVirtualHostedStyleURL,
+            S3AuthSigning.HMACV1,
+        ),
+        (
+            "https://bucket.s3.us-west-2.amazonaws.com/keypart1/keypart2/file.txt",
+            "https://bucket.s3.us-west-2.amazonaws.com/keypart1/keypart2/file.txt",
+            "https://bucket.s3.us-west-2.amazonaws.com/keypart1/keypart2/file.txt",
+            DownloadS3AuthorityVirtualHostedStyleURL,
+            S3AuthSigning.SIGV4,
         ),
     ],
 )
@@ -200,6 +292,7 @@ def test_download_s3(
     expected_auth_url: str,
     expected_native_url: str,
     req_type: type,
+    auth_type: S3AuthSigning,
     replace_url,
 ) -> None:
     class S3HTTPHandler(BaseHTTPRequestHandler):
@@ -218,6 +311,12 @@ def test_download_s3(
             self.send_header("Content-Type", "binary/octet-stream")
             self.send_header("Content-Length", f"{len(self.response_text)}")
             self.end_headers()
+
+    rule_runner.set_options(
+        args=[
+            f"--s3-url-handler-auth-signing={auth_type.value}",
+        ],
+    )
 
     monkeypatch_botocore(expected_auth_url)
     with http_server(S3HTTPHandler) as port:
