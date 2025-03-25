@@ -449,7 +449,9 @@ def test_packaged_pex_path(rule_runner: RuleRunner) -> None:
 
 
 def test_packaged_pex_environment(rule_runner: RuleRunner) -> None:
-    image = "python:3.8-buster@sha256:04c3f641c2254c229fd2f704c5199ff4bea57d26c1c29008ae3a4afddde98709"
+    image = (
+        "python:3.8-buster@sha256:04c3f641c2254c229fd2f704c5199ff4bea57d26c1c29008ae3a4afddde98709"
+    )
     if machine() == "x86_64":
         platform = "linux_x86_64"
         expected_dist = "psutil-5.9.2-cp38-cp38-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
