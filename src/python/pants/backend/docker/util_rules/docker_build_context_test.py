@@ -458,7 +458,6 @@ def test_packaged_pex_environment(rule_runner: RuleRunner) -> None:
         expected_dist = "psutil-5.9.2-cp38-cp38-linux_aarch64.whl"
     else:
         pytest.skip("This test only runs on amd64 and arm64.")
-        return
 
     rule_runner.write_files(
         {

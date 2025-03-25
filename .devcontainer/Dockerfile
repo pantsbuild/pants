@@ -1,9 +1,9 @@
 FROM mcr.microsoft.com/devcontainers/base:noble
 
-RUN arch=$(arch | sed s/aarch64/arm64/ | sed s/x86_64/amd64/) && apt-get update && export DEBIAN_FRONTEND=noninteractive \
+ARG ARCH=${TARGETARCH:-amd64}
+RUN ARCH=$(ARCH | sed s/aarch64/arm64/ | sed s/x86_64/amd64/) && apt-get update && export DEBIAN_FRONTEND=noninteractive \
     # Install prerequisites.
     && apt-get install --no-install-recommends -y build-essential clang libffi-dev libfuse-dev libssl-dev protobuf-compiler python3-dev \
-    wget checkinstall libreadline-dev libncursesw5-dev libsqlite3-dev tk-dev libgdbm-dev libc6-dev libbz2-dev zlib1g-dev \
     ca-certificates software-properties-common \
     # Install `hyperfine` and `dbg` for debugging and benchmarking.
     # See: https://www.pantsbuild.org/stable/docs/contributions/development/debugging-and-benchmarking
