@@ -944,36 +944,32 @@ impl<'a> ContainerCache<'a> {
         }
     }
 
-    async fn check_missing_containers(docker: &Docker, expected_container_platform_mapping: HashMap<String, Platform>) -> Result<HashSet<String>, String> {
+    async fn check_container_exists(docker: &Docker, image_name: &str, expected_platform: &Platform) -> Result<bool, String> {
         let container_filters = ListContainersOptions {
             all: false,
             limit: None,
             size: false,
             filters: HashMap::from([
-                ("name", expected_container_platform_mapping.keys().map(|s| s.as_str()).collect()),
+                ("name", vec![image_name]),
                 ("status", vec!["created", "running"])
             ]),
         };
-        docker.list_containers(Some(container_filters)).and_then(async |container_summaries| {
-            let image_id_to_name_mapping: HashMap<String, String> = container_summaries.into_iter()
-                .filter_map(|summary| summary.id.and_then(|id| summary.image.map(|name| (id, name))))
-                .collect();
-            let inspect_container_results_by_name: Result<HashMap<String, ContainerInspectResponse>, bollard::errors::Error> = stream::iter(image_id_to_name_mapping.iter())
-                .then(async |(image_id, image_name)| -> Result<(String, ContainerInspectResponse), bollard::errors::Error> {
-                    docker.inspect_container(image_id.as_str(), None)
-                        .await
-                        .map(|cir| (image_name.to_owned(), cir))
-                })
-                .try_collect()
-                .await;
-            inspect_container_results_by_name.map(|crbn| crbn.into_iter().filter_map(|(image_name, cir)| -> Option<(String, Platform)> {
-                cir.platform.map(Platform::try_from).unwrap_or_else(Platform::current).ok().map(|platform| (image_name, platform))
-            }))
+        docker.list_containers(Some(container_filters)).and_then(async |container_summaries| -> Result<bool, bollard::errors::Error> {
+            // TODO: figure out how to get owned option
+            let image_id_opt = container_summaries.first().and_then(|summary| summary.id);
+            match image_id_opt {
+                Some(image_id) => docker.inspect_container(image_id.as_str(), None).await.map(|inspect_results| -> bool {
+                    inspect_results.platform.map(Platform::try_from)
+                        .unwrap_or_else(Platform::current)
+                        .ok()
+                        .filter(|platform| expected_platform.eq(platform))
+                        .is_some()
+                }),
+                None => Ok(true)
+            }
         })
         .await
-        .map()
         .map_err(|e| e.to_string())
-
     }
 
     /// Return the container ID and NamedCaches for a container running `image_name` for use as a place
@@ -989,6 +985,7 @@ impl<'a> ContainerCache<'a> {
 
         let container_id_cell = {
             let mut containers = self.containers.lock();
+            // TODO: remove entry if container does not exist
             let cell = containers
                 .entry((image_name.to_string(), *platform))
                 .or_insert_with(|| Arc::new(OnceCell::new()));
