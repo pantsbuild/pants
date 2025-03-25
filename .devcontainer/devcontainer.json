@@ -13,7 +13,9 @@
       "ghcr.io/devcontainers/features/python:1": {
         "version": "3.11.11"
       },
-      "ghcr.io/devcontainers/features/rust:1": {},
+      "ghcr.io/devcontainers/features/rust:1": {
+        "profile": "complete"
+      },
       "ghcr.io/stuartleeks/dev-container-features/shell-history:0": {}
     },
     "customizations": {
