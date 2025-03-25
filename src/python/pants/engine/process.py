@@ -8,6 +8,7 @@ import logging
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Literal
 
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.fs import EMPTY_DIGEST, Digest, FileDigest
@@ -51,16 +52,26 @@ class ProcessCacheScope(Enum):
 
 
 @dataclass(frozen=True)
-class ProcessConcurrencyRange:
+class ProcessConcurrency:
+    kind: Literal["range", "exclusive"]
     min: int | None = None
     max: int | None = None
 
-@dataclass(frozen=True)
-class ProcessConcurrencyExclusive:
-    pass
+    def __post_init__(self):
+        if self.min is not None and self.min < 1:
+            raise ValueError(f"min concurrency must be >= 1, got {self.min}")
+        if self.max is not None and self.max < 1:
+            raise ValueError(f"max concurrency must be >= 1, got {self.max}")
+        if self.min is not None and self.max is not None and self.min > self.max:
+            raise ValueError(f"min concurrency must be <= max concurrency, got {self.min} and {self.max}")
 
-ProcessConcurrency = ProcessConcurrencyRange | ProcessConcurrencyExclusive
+    @staticmethod
+    def range(min: int | None = None, max: int | None = None):
+        return ProcessConcurrency("range", min, max)
 
+    @staticmethod
+    def exclusive():
+        return ProcessConcurrency("exclusive")
 
 @dataclass(frozen=True)
 class Process:
@@ -78,6 +89,7 @@ class Process:
     timeout_seconds: int | float
     jdk_home: str | None
     execution_slot_variable: str | None
+    concurrency_available: int
     concurrency: ProcessConcurrency | None
     cache_scope: ProcessCacheScope
     remote_cache_speculation_delay_millis: int
