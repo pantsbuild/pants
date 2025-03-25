@@ -469,7 +469,7 @@ def test_packaged_pex_environment(rule_runner: RuleRunner) -> None:
                 platform="{platform}",
                 python_bootstrap_search_path=["<PATH>"],
               )
-              
+
               python_requirement(name="psutil", requirements=["psutil==5.9.2"])
               """
             ),
