@@ -484,7 +484,8 @@ pub struct ProcessExecutionEnvironment {
     pub strategy: ProcessExecutionStrategy,
 }
 
-#[derive(DeepSizeOf, Debug, Clone, Hash, PartialEq, Eq, Serialize)]
+#[derive(DeepSizeOf, Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum ProcessConcurrency {
     /// A range of acceptable cpu cores with optional bounds
     Range {
@@ -497,13 +498,10 @@ pub enum ProcessConcurrency {
     Exclusive,
 }
 
-// TODO Unclear why I need this or when its invoked, compile error for CommandSpec
 impl FromStr for ProcessConcurrency {
-    type Err = core::convert::Infallible;
-
+    type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        log::warn!("Parsing process concurrency from string: {s}");
-        Ok(ProcessConcurrency::Range { min: Some(1), max: Some(1) })
+        serde_json::from_str(s).map_err(|e| e.to_string())
     }
 }
 
@@ -566,6 +564,7 @@ pub struct Process {
     pub concurrency_available: usize,
 
     /// The number of cores required for this process to run.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub concurrency: Option<ProcessConcurrency>,
 
     #[derivative(PartialEq = "ignore", Hash = "ignore")]
@@ -727,6 +726,11 @@ impl Process {
 
     pub fn cache_scope(mut self, cache_scope: ProcessCacheScope) -> Process {
         self.cache_scope = cache_scope;
+        self
+    }
+
+    pub fn concurrency(mut self, concurrency: ProcessConcurrency) -> Process {
+        self.concurrency = Some(concurrency);
         self
     }
 }
