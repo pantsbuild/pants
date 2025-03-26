@@ -20,6 +20,7 @@ use fs::{
 };
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
 use futures::{FutureExt, TryFutureExt, try_join};
+use hashing::Digest;
 use log::{debug, info};
 use nails::execution::ExitCode;
 use shell_quote::Bash;
@@ -347,6 +348,59 @@ impl CapturedWorkdir for CommandRunner {
     }
 }
 
+pub enum CapturedWorkdirError {
+    Recoverable(Box<dyn CapturedWorkdirRecoverableError>),
+    Fatal(String),
+}
+
+impl From<String> for CapturedWorkdirError {
+    fn from(value: String) -> Self {
+        Self::Fatal(value)
+    }
+}
+
+pub trait CapturedWorkdirTryRecoverProcessResult: Send {
+    fn make_process_result(&self, stdout_digest: Digest, stderr_digest: Digest, result_metadata: ProcessResultMetadata) -> FallibleProcessResultWithPlatform;
+}
+
+pub trait CapturedWorkdirRecoverableError: ToString + Send {
+    fn try_recover_process_result(self: Box<Self>, stderr: &mut BytesMut) -> Result<Box<dyn CapturedWorkdirTryRecoverProcessResult>, String>;
+}
+
+pub struct CapturedWorkdirTimeoutError {
+    timeout: Option<std::time::Duration>,
+    description: String
+}
+
+impl ToString for CapturedWorkdirTimeoutError {
+    fn to_string(&self) -> String {
+        format!(
+            "Exceeded timeout of {:.1} seconds when executing local process: {}",
+            self.timeout.map(|dur| dur.as_secs_f32()).unwrap_or(-1.0),
+            self.description
+        )
+    }
+}
+
+impl CapturedWorkdirTryRecoverProcessResult for CapturedWorkdirTimeoutError {
+    fn make_process_result(&self, stdout_digest: Digest, stderr_digest: Digest, result_metadata: ProcessResultMetadata) -> FallibleProcessResultWithPlatform {
+        FallibleProcessResultWithPlatform {
+            stdout_digest,
+            stderr_digest,
+            exit_code: -libc::SIGTERM,
+            output_directory: EMPTY_DIRECTORY_DIGEST.clone(),
+            metadata: result_metadata,
+        }
+    }
+}
+
+impl CapturedWorkdirRecoverableError for CapturedWorkdirTimeoutError {
+    fn try_recover_process_result(self: Box<Self>, stderr: &mut BytesMut) -> Result<Box<dyn CapturedWorkdirTryRecoverProcessResult>, String> {
+        stderr.extend_from_slice(format!("\n\n{}", self.to_string()).as_bytes());
+        Ok(self)
+    }
+}
+
 #[async_trait]
 pub trait CapturedWorkdir {
     type WorkdirToken: Clone + Send;
@@ -364,7 +418,7 @@ pub trait CapturedWorkdir {
         workdir_path: PathBuf,
         workdir_token: Self::WorkdirToken,
         exclusive_spawn: bool,
-    ) -> Result<FallibleProcessResultWithPlatform, String> {
+    ) -> Result<FallibleProcessResultWithPlatform, CapturedWorkdirError> {
         let start_time = Instant::now();
         let mut stdout = BytesMut::with_capacity(8192);
         let mut stderr = BytesMut::with_capacity(8192);
@@ -387,14 +441,17 @@ pub trait CapturedWorkdir {
                 )
                 .await?,
             );
-            if let Some(req_timeout) = req.timeout {
-                timeout(req_timeout, exit_code_future)
-                    .await
-                    .map_err(|e| e.to_string())
-                    .and_then(|r| r)
-            } else {
-                exit_code_future.await
-            }
+            let final_result = {
+                if let Some(req_timeout) = req.timeout {
+                    timeout(req_timeout, exit_code_future)
+                        .await
+                        .map_err(|e| e.to_string())
+                        .and_then(|r| r)
+                } else {
+                    exit_code_future.await
+                }
+            };
+            final_result.map_err(CapturedWorkdirError::from)
         };
 
         // Capture the process outputs.
@@ -449,28 +506,13 @@ pub trait CapturedWorkdir {
                     metadata: result_metadata,
                 })
             }
-            Err(msg) if msg == "deadline has elapsed" => {
-                stderr.extend_from_slice(
-                    format!(
-                        "\n\nExceeded timeout of {:.1} seconds when executing local process: {}",
-                        req.timeout.map(|dur| dur.as_secs_f32()).unwrap_or(-1.0),
-                        req.description
-                    )
-                    .as_bytes(),
-                );
-
+            Err(CapturedWorkdirError::Recoverable(recoverable_error)) => {
+                let recoverer = recoverable_error.try_recover_process_result(&mut stderr)?;
                 let (stdout_digest, stderr_digest) = try_join!(
                     store.store_file_bytes(stdout.into(), true),
                     store.store_file_bytes(stderr.into(), true),
                 )?;
-
-                Ok(FallibleProcessResultWithPlatform {
-                    stdout_digest,
-                    stderr_digest,
-                    exit_code: -libc::SIGTERM,
-                    output_directory: EMPTY_DIRECTORY_DIGEST.clone(),
-                    metadata: result_metadata,
-                })
+                Ok(recoverer.make_process_result(stdout_digest, stderr_digest, result_metadata))
             }
             Err(msg) => Err(msg),
         }
@@ -506,7 +548,7 @@ pub trait CapturedWorkdir {
         workdir_token: Self::WorkdirToken,
         req: Process,
         exclusive_spawn: bool,
-    ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String>;
+    ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, CapturedWorkdirError>;
 
     ///
     /// An optionally-implemented method which is called after the child process has completed, but
@@ -518,7 +560,7 @@ pub trait CapturedWorkdir {
         _workdir_path: &Path,
         _workdir_token: Self::WorkdirToken,
         _req: &Process,
-    ) -> Result<(), String> {
+    ) -> Result<(), CapturedWorkdirError> {
         Ok(())
     }
 }

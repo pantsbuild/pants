@@ -633,6 +633,30 @@ impl CapturedWorkdir for CommandRunner<'_> {
 /// A loose clone of `std::process:Command` for Docker `exec`.
 struct Command(bollard::exec::CreateExecOptions<String>);
 
+enum CommandSpawnStep {
+    Create,
+    Start(String),
+    Inspect(String),
+    RetrieveExitCode(String),
+}
+
+struct CommandSpawnError {
+    step: CommandSpawnStep,
+    err: Option<bollard::errors::Error>,
+}
+
+impl ToString for CommandSpawnError {
+    fn to_string(&self) -> String {
+        let (step_name, suffix) = match &self.step {
+            CommandSpawnStep::RetrieveExitCode(exec_id) => return format!("Inspected execution `{}` for exit status but status was missing.", &exec_id),
+            CommandSpawnStep::Create => ("create", "in container"),
+            CommandSpawnStep::Start(exec_id) => ("start", exec_id.as_str()),
+            CommandSpawnStep::Inspect(exec_id) => ("inspect", exec_id.as_str())
+        };
+        format!("Failed to {} Docker execution {}: {}", step_name, suffix, self.err.as_ref().map(|e| e.to_string()).unwrap_or("{}".to_string()))
+    }
+}
+
 impl Command {
     fn new(argv: Vec<String>) -> Self {
         Self(bollard::exec::CreateExecOptions {
@@ -664,20 +688,20 @@ impl Command {
         &'a mut self,
         docker: &'a Docker,
         container_id: String,
-    ) -> Result<BoxStream<'b, Result<ChildOutput, String>>, String> {
+    ) -> Result<BoxStream<'b, Result<ChildOutput, CommandSpawnError>>, CommandSpawnError> {
         log::trace!("creating execution with config: {:?}", self.0);
 
         let exec = docker
             .create_exec::<String>(&container_id, self.0.clone())
             .await
-            .map_err(|err| format!("Failed to create Docker execution in container: {err:?}"))?;
+            .map_err(|err| CommandSpawnError { step: CommandSpawnStep::Create, err: Some(err) })?;
 
         log::trace!("created execution {}", &exec.id);
 
         let exec_result = docker
             .start_exec(&exec.id, None)
             .await
-            .map_err(|err| format!("Failed to start Docker execution `{}`: {:?}", &exec.id, err))?;
+            .map_err(|err| CommandSpawnError { step: CommandSpawnStep::Start(exec.id), err: Some(err) })?;
         let mut output_stream = if let StartExecResults::Attached { output, .. } = exec_result {
             output.boxed()
         } else {
@@ -711,11 +735,11 @@ impl Command {
           let exec_metadata = docker
             .inspect_exec(&exec_id)
             .await
-            .map_err(|err| format!("Failed to inspect Docker execution `{}`: {:?}", &exec_id, err))?;
+            .map_err(|err| CommandSpawnError { step: CommandSpawnStep::Inspect(exec.id), err: Some(err) })?;
 
           let status_code = exec_metadata
             .exit_code
-            .ok_or_else(|| format!("Inspected execution `{}` for exit status but status was missing.", &exec_id))?;
+            .ok_or_else(|| CommandSpawnError { step: CommandSpawnStep::RetrieveExitCode(exec_id.clone()), err: None })?;
 
           log::trace!("execution {} exited with status code {}", &exec_id, status_code);
 
