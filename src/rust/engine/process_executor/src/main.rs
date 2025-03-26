@@ -15,7 +15,8 @@ use fs::{DirectoryDigest, Permissions, RelativePath};
 use hashing::{Digest, Fingerprint};
 use process_execution::{
     CacheContentBehavior, Context, InputDigests, NamedCaches, Platform, ProcessCacheScope,
-    ProcessExecutionEnvironment, ProcessExecutionStrategy, local::KeepSandboxes, ProcessConcurrency,
+    ProcessConcurrency, ProcessExecutionEnvironment, ProcessExecutionStrategy,
+    local::KeepSandboxes,
 };
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
@@ -605,33 +606,39 @@ mod tests {
     #[test]
     fn test_process_args() {
         let test_cases = vec![
-            (
-                vec![],
-                None
-            ),
+            (vec![], None),
             (
                 vec!["--concurrency={\"type\":\"range\",\"min\":1}"],
-                Some(ProcessConcurrency::Range { min: Some(1), max: None })
+                Some(ProcessConcurrency::Range {
+                    min: Some(1),
+                    max: None,
+                }),
             ),
             (
                 vec!["--concurrency={\"type\":\"range\",\"min\":1,\"max\":4}"],
-                Some(ProcessConcurrency::Range { min: Some(1), max: Some(4) })
+                Some(ProcessConcurrency::Range {
+                    min: Some(1),
+                    max: Some(4),
+                }),
             ),
             (
                 vec!["--concurrency={\"type\":\"range\",\"max\":4}"],
-                Some(ProcessConcurrency::Range { min: None, max: Some(4) })
+                Some(ProcessConcurrency::Range {
+                    min: None,
+                    max: Some(4),
+                }),
             ),
             (
                 vec!["--concurrency={\"type\":\"exclusive\"}"],
-                Some(ProcessConcurrency::Exclusive)
+                Some(ProcessConcurrency::Exclusive),
             ),
         ];
-    
+
         for (args, expected_concurrency) in test_cases {
             let mut full_args = vec!["process_executor"];
             full_args.extend(args);
             full_args.extend(vec!["--", "/bin/echo", "test"]);
-            
+
             let opt = Opt::try_parse_from(full_args).unwrap();
             assert_eq!(opt.command.concurrency, expected_concurrency);
         }

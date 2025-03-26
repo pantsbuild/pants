@@ -413,6 +413,7 @@ def test_workspace_execution_support() -> None:
     snapshot = rule_runner.request(Snapshot, [result3.output_digest])
     assert snapshot.files == ("capture-this-file",)
 
+
 @pytest.mark.parametrize(
     "concurrency",
     [
@@ -442,12 +443,12 @@ def test_concurrency_enum():
     max_one = ProcessConcurrency.range(max=1)
     min_one_max_two = ProcessConcurrency.range(min=1, max=2)
     exclusive = ProcessConcurrency.exclusive()
-    
+
     assert min_one.kind == "range"
     assert max_one.kind == "range"
     assert min_one_max_two.kind == "range"
     assert exclusive.kind == "exclusive"
-    
+
     assert min_one.min == 1
     assert min_one.max is None
     assert max_one.min is None

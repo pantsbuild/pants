@@ -9,8 +9,8 @@ use deepsize::DeepSizeOf;
 use fs::RelativePath;
 use graph::CompoundNode;
 use process_execution::{
-    self, CacheName, InputDigests, Process, ProcessCacheScope, ProcessExecutionStrategy,
-    ProcessResultSource, ProcessConcurrency,
+    self, CacheName, InputDigests, Process, ProcessCacheScope, ProcessConcurrency,
+    ProcessExecutionStrategy, ProcessResultSource,
 };
 use pyo3::Bound;
 use pyo3::prelude::{PyAny, Python};
@@ -124,7 +124,7 @@ impl ExecuteProcess {
                 .map_err(|e| format!("Failed to get `execution_slot_variable` for field: {e}"))?;
 
         let concurrency_available: usize = externs::getattr(value, "concurrency_available")?;
-        
+
         let concurrency_value: Option<Bound<'_, PyAny>> = externs::getattr(value, "concurrency")?;
         let concurrency: Option<ProcessConcurrency> = match concurrency_value {
             None => Ok(None),
@@ -143,7 +143,7 @@ impl ExecuteProcess {
                 }
             }
         }?;
-        
+
         let cache_scope: ProcessCacheScope = {
             let cache_scope_enum: Bound<'_, PyAny> = externs::getattr(value, "cache_scope")?;
             externs::getattr::<String>(&cache_scope_enum, "name")?.try_into()?

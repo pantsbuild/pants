@@ -161,32 +161,38 @@ async fn correct_semaphore_slot_ids_2() {
 #[tokio::test]
 async fn correct_semaphore_slot_ids_range() {
     let sema = mk_semaphore(3);
-    
+
     let wait_duration = Duration::from_secs(5);
     // Channels to signal when the processes should start and complete execution
     let (send_start1, rcv_start1) = oneshot::channel();
     let (send_start2, rcv_start2) = oneshot::channel();
     let (send_start3, rcv_start3) = oneshot::channel();
     let (send_start4, rcv_start4) = oneshot::channel();
-    
+
     let (send_complete1, rcv_complete1) = oneshot::channel();
     let (send_complete2, rcv_complete2) = oneshot::channel();
     let (send_complete3, rcv_complete3) = oneshot::channel();
     let (send_complete4, rcv_complete4) = oneshot::channel();
-    
+
     // Process 1 (takes 2 slots)
-    let t1 = tokio::spawn(sema.clone().with_acquired_range(2, 2, move |id| async move {
-        send_start1.send(()).unwrap();
-        rcv_complete1.await.unwrap();
-        id
-    }));
+    let t1 = tokio::spawn(
+        sema.clone()
+            .with_acquired_range(2, 2, move |id| async move {
+                send_start1.send(()).unwrap();
+                rcv_complete1.await.unwrap();
+                id
+            }),
+    );
 
     // Process 2 (takes 1 slot)
-    let t2 = tokio::spawn(sema.clone().with_acquired_range(1, 1, move |id| async move {
-        send_start2.send(()).unwrap();
-        rcv_complete2.await.unwrap();
-        id
-    }));
+    let t2 = tokio::spawn(
+        sema.clone()
+            .with_acquired_range(1, 1, move |id| async move {
+                send_start2.send(()).unwrap();
+                rcv_complete2.await.unwrap();
+                id
+            }),
+    );
 
     // Wait for first two processes to start
     if let Err(_) = timeout(wait_duration, rcv_start1).await {
@@ -197,40 +203,46 @@ async fn correct_semaphore_slot_ids_range() {
     }
 
     assert_eq!(0, sema.available_permits());
-    
+
     // Process 3 (takes 2 slot, will need to wait for process 1 and 2 to complete)
-    let t3 = tokio::spawn(sema.clone().with_acquired_range(2, 2, move |id| async move {
-        send_start3.send(()).unwrap();
-        rcv_complete3.await.unwrap();
-        id
-    }));
-    
+    let t3 = tokio::spawn(
+        sema.clone()
+            .with_acquired_range(2, 2, move |id| async move {
+                send_start3.send(()).unwrap();
+                rcv_complete3.await.unwrap();
+                id
+            }),
+    );
+
     // Process 4 (takes 1 slot, should execute before process 3, but does not)
-    let t4 = tokio::spawn(sema.clone().with_acquired_range(1, 1, move |id| async move {
-        send_start4.send(()).unwrap();
-        rcv_complete4.await.unwrap();
-        id
-    }));
+    let t4 = tokio::spawn(
+        sema.clone()
+            .with_acquired_range(1, 1, move |id| async move {
+                send_start4.send(()).unwrap();
+                rcv_complete4.await.unwrap();
+                id
+            }),
+    );
 
     // Release process 2 first, allowing process 4 to run
     send_complete2.send(()).unwrap();
     let id2 = t2.await.unwrap();
-    
+
     // Tokio appears to impliment strict FIFO fairness which has the downside that
     // process 4 must wait now, even though there are enough permits for it to run.
-    // 
+    //
     // From tokio docs:
     // | This method uses a queue to fairly distribute permits in the order they
-    // | were requested. 
-    // 
+    // | were requested.
+    //
     // if let Err(_) = timeout(wait_duration, rcv_start4).await {
     //     panic!("Process 4 didn't start within timeout");
     // }
-    
+
     // There are zero permits available because 1 is being held by process 3
     assert_eq!(0, sema.available_permits());
 
-    // Complete process 1, allowing process 3 to run 
+    // Complete process 1, allowing process 3 to run
     send_complete1.send(()).unwrap();
     let id1 = t1.await.unwrap();
 
@@ -264,7 +276,6 @@ async fn correct_semaphore_slot_ids_range() {
     assert_eq!(id3, 3);
     assert_eq!(id4, 2);
 }
-
 
 #[tokio::test]
 async fn at_most_n_acquisitions() {
