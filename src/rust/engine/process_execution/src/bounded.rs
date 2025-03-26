@@ -273,6 +273,22 @@ impl AsyncSemaphore {
     }
 
     ///
+    /// Runs the given Future-creating function (and the Future it returns) under the semaphore.
+    ///
+    // TODO: https://github.com/rust-lang/rust/issues/46379
+    #[allow(dead_code)]
+    pub(crate) async fn with_acquired_range<F, B, O>(self, min_concurrency: usize, max_concurrency: usize, f: F) -> O
+    where
+        F: FnOnce(usize) -> B,
+        B: Future<Output = O>,
+    {
+        let permit = self.acquire(min_concurrency, max_concurrency).await;
+        let res = f(permit.task.id).await;
+        drop(permit);
+        res
+    }
+
+    ///
     /// Acquire a slot on the semaphore when it becomes available. Additionally, attempt to acquire
     /// the given amount of concurrency. The amount actually acquired will be reported on the
     /// returned Permit.
