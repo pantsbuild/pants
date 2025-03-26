@@ -291,7 +291,7 @@ impl CapturedWorkdir for CommandRunner {
         _workdir_token: (),
         req: Process,
         exclusive_spawn: bool,
-    ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String> {
+    ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, CapturedWorkdirError> {
         let cwd = if let Some(ref working_directory) = req.working_directory {
             workdir_path.join(working_directory)
         } else {
@@ -350,6 +350,7 @@ impl CapturedWorkdir for CommandRunner {
 
 pub enum CapturedWorkdirError {
     Recoverable(Box<dyn CapturedWorkdirRecoverableError>),
+    Retryable(String),
     Fatal(String),
 }
 
@@ -514,7 +515,7 @@ pub trait CapturedWorkdir {
                 )?;
                 Ok(recoverer.make_process_result(stdout_digest, stderr_digest, result_metadata))
             }
-            Err(msg) => Err(msg),
+            Err(err) => Err(err),
         }
     }
 
