@@ -63,7 +63,9 @@ class ProcessConcurrency:
         if self.max is not None and self.max < 1:
             raise ValueError(f"max concurrency must be >= 1, got {self.max}")
         if self.min is not None and self.max is not None and self.min > self.max:
-            raise ValueError(f"min concurrency must be <= max concurrency, got {self.min} and {self.max}")
+            raise ValueError(
+                f"min concurrency must be <= max concurrency, got {self.min} and {self.max}"
+            )
 
     @staticmethod
     def range(min: int | None = None, max: int | None = None):
@@ -72,6 +74,7 @@ class ProcessConcurrency:
     @staticmethod
     def exclusive():
         return ProcessConcurrency("exclusive")
+
 
 @dataclass(frozen=True)
 class Process:
