@@ -6,6 +6,7 @@ from __future__ import annotations
 import os.path
 import re
 from hashlib import sha256
+from pathlib import Path
 from textwrap import dedent
 
 import pytest
@@ -635,7 +636,9 @@ def test_cache_directory_per_resolve(rule_runner: PythonRuleRunner) -> None:
     ]
     run_mypy(rule_runner, [target_a, target_b], extra_args=runner_options)
 
-    bootstrap_options = rule_runner.options_bootstrapper.bootstrap_options.for_global_scope()
+    with rule_runner.pushd():
+        Path("BUILDROOT").touch()
+        bootstrap_options = rule_runner.options_bootstrapper.bootstrap_options.for_global_scope()
     named_cache_dir = bootstrap_options.named_caches_dir
     mypy_cache_dir = (
         f"{named_cache_dir}/mypy_cache/{sha256(rule_runner.build_root.encode()).hexdigest()}"
