@@ -13,6 +13,7 @@ use std::time::Instant;
 
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
+use deepsize::DeepSizeOf;
 use fs::{
     self, DigestTrie, DirectoryDigest, EMPTY_DIRECTORY_DIGEST, GlobExpansionConjunction,
     GlobMatching, PathGlobs, Permissions, RelativePath, StrictGlobMatching, SymlinkBehavior,
@@ -22,6 +23,7 @@ use futures::stream::{BoxStream, StreamExt, TryStreamExt};
 use futures::{FutureExt, TryFutureExt, try_join};
 use log::{debug, info};
 use nails::execution::ExitCode;
+use serde::Serialize;
 use shell_quote::Bash;
 use store::{
     ImmutableInputs, OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, StoreError,
@@ -43,7 +45,9 @@ use crate::{
 
 pub const USER_EXECUTABLE_MODE: u32 = 0o100755;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, strum_macros::EnumString)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, Hash, DeepSizeOf, strum_macros::EnumString, Serialize,
+)]
 #[strum(serialize_all = "snake_case")]
 pub enum KeepSandboxes {
     Always,

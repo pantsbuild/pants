@@ -41,7 +41,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.option import custom_types
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.option.option_types import DictOption, OptionInfo, collect_options_info
 from pants.option.subsystem import Subsystem
 from pants.util.enums import match
@@ -1052,6 +1052,7 @@ async def extract_process_config_from_environment(
     tgt: EnvironmentTarget,
     platform: Platform,
     global_options: GlobalOptions,
+    keep_sandboxes: KeepSandboxes,
     environments_subsystem: EnvironmentsSubsystem,
 ) -> ProcessExecutionEnvironment:
     docker_image = None
@@ -1105,6 +1106,7 @@ async def extract_process_config_from_environment(
             for pair in raw_remote_execution_extra_platform_properties
         ],
         execute_in_workspace=execute_in_workspace,
+        keep_sandboxes=keep_sandboxes.value,
     )
 
 

@@ -312,12 +312,14 @@ async fn make_request(
             // TODO: Make configurable.
             platform: Platform::Linux_x86_64,
             strategy,
+            local_keep_sandboxes: KeepSandboxes::Never,
         }
     } else {
         ProcessExecutionEnvironment {
             name: None,
             platform: Platform::current().unwrap(),
             strategy: ProcessExecutionStrategy::Local,
+            local_keep_sandboxes: KeepSandboxes::Never,
         }
     };
 
