@@ -1769,22 +1769,6 @@ class BootstrapOptions:
             )
         return value
 
-    allow_deprecated_macos_before_12 = BoolOption(
-        default=False,
-        advanced=True,
-        help=softwrap(
-            f"""
-            Silence warnings about running Pants on macOS 10.15 - 11. In future versions, Pants will
-            only be supported on macOS 12 and newer.
-
-            If you have questions or concerns about this, please reach out to us at
-            {doc_url("community/getting-help")}.
-            """
-        ),
-        removal_version="2.27.0.dev0",
-        removal_hint='Upgrade your operating system or write `allow_deprecated_macos_versions = ["10", "11"]` instead.',
-    )
-
     allow_deprecated_macos_versions = StrListOption(
         default=[],
         advanced=True,
