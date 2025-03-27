@@ -190,10 +190,11 @@ class DockerBuildContext:
 
             if stage != f"stage{idx}":
                 stage_names.add(stage)
-            if idx == 0:
-                # Expose the first (stage0) FROM directive as the "baseimage".
-                tags_values["baseimage"] = tag
-            tags_values[stage] = tag
+            if tag:
+                if idx == 0:
+                    # Expose the first (stage0) FROM directive as the "baseimage".
+                    tags_values["baseimage"] = tag
+                tags_values[stage] = tag
 
         return stage_names, tags_values
 
