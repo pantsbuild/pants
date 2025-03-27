@@ -61,6 +61,7 @@ pub struct CommandRunner {
     work_dir_base: PathBuf,
     named_caches: NamedCaches,
     immutable_inputs: ImmutableInputs,
+    #[allow(dead_code)]
     keep_sandboxes: KeepSandboxes,
     spawn_lock: Arc<RwLock<()>>,
 }
@@ -202,11 +203,12 @@ impl super::CommandRunner for CommandRunner {
             // renders at the Process's level.
             desc = Some(req.description.clone()),
             |workunit| async move {
+                let keep_sandboxes = req.execution_environment.local_keep_sandboxes;
                 let mut workdir = create_sandbox(
                     self.executor.clone(),
                     &self.work_dir_base,
                     &req.description,
-                    self.keep_sandboxes,
+                    keep_sandboxes,
                 )?;
 
                 // Start working on a mutable version of the process.
@@ -258,8 +260,8 @@ impl super::CommandRunner for CommandRunner {
                     })
                     .await;
 
-                if self.keep_sandboxes == KeepSandboxes::Always
-                    || self.keep_sandboxes == KeepSandboxes::OnFailure
+                if keep_sandboxes == KeepSandboxes::Always
+                    || keep_sandboxes == KeepSandboxes::OnFailure
                         && res.as_ref().map(|r| r.exit_code).unwrap_or(1) != 0
                 {
                     workdir.keep(&req.description);

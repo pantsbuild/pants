@@ -476,7 +476,8 @@ async fn test_chroot_placeholder() {
     let result = run_command_via_docker_in_dir(
         Process::new(vec!["/bin/env".to_owned()])
             .env(env.clone())
-            .docker(IMAGE.to_owned()),
+            .docker(IMAGE.to_owned())
+            .local_keep_sandboxes(KeepSandboxes::Always),
         work_root.clone(),
         KeepSandboxes::Always,
         &mut workunit,

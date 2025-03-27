@@ -54,6 +54,7 @@ pub struct CommandRunner<'a> {
     docker: &'a DockerOnceCell,
     work_dir_base: PathBuf,
     immutable_inputs: ImmutableInputs,
+    #[allow(dead_code)]
     keep_sandboxes: KeepSandboxes,
     container_cache: ContainerCache<'a>,
 }
@@ -404,11 +405,12 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
             // renders at the Process's level.
             desc = Some(req.description.clone()),
             |workunit| async move {
+                let keep_sandboxes = req.execution_environment.local_keep_sandboxes;
                 let mut workdir = create_sandbox(
                     self.executor.clone(),
                     &self.work_dir_base,
                     &req.description,
-                    self.keep_sandboxes,
+                    keep_sandboxes,
                 )?;
 
                 // Obtain ID of the base container in which to run the execution for this process.
@@ -518,8 +520,8 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                     Err(_) => workunit.increment_counter(Metric::DockerExecutionErrors, 1),
                 }
 
-                if self.keep_sandboxes == KeepSandboxes::Always
-                    || self.keep_sandboxes == KeepSandboxes::OnFailure
+                if keep_sandboxes == KeepSandboxes::Always
+                    || keep_sandboxes == KeepSandboxes::OnFailure
                         && res.as_ref().map(|r| r.exit_code).unwrap_or(1) != 0
                 {
                     workdir.keep(&req.description);

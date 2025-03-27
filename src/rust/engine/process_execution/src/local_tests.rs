@@ -418,8 +418,9 @@ async fn test_directory_preservation() {
     let bash_contents = format!("echo $PWD && {} roland.ext ..", cp.display());
     let argv = vec![find_bash(), "-c".to_owned(), bash_contents.to_owned()];
 
-    let mut process =
-        Process::new(argv.clone()).output_files(relative_paths(&["roland.ext"]).collect());
+    let mut process = Process::new(argv.clone())
+        .output_files(relative_paths(&["roland.ext"]).collect())
+        .local_keep_sandboxes(KeepSandboxes::Always);
     process.input_digests =
         InputDigests::with_input_files(TestDirectory::nested().directory_digest());
     process.working_directory = Some(RelativePath::new("cats").unwrap());
@@ -483,7 +484,7 @@ async fn test_directory_preservation_error() {
     assert_eq!(testutil::file::list_dir(&preserved_work_root).len(), 0);
 
     run_command_locally_in_dir(
-        Process::new(vec!["doesnotexist".to_owned()]),
+        Process::new(vec!["doesnotexist".to_owned()]).local_keep_sandboxes(KeepSandboxes::Always),
         preserved_work_root.clone(),
         KeepSandboxes::Always,
         &mut workunit,
