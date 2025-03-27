@@ -349,56 +349,14 @@ impl CapturedWorkdir for CommandRunner {
 }
 
 pub enum CapturedWorkdirError {
-    Recoverable(Box<dyn CapturedWorkdirRecoverableError>),
-    Retryable(String),
+    BlackBox { status: i32, message: String },
+    Retryable { status: i32, message: String },
     Fatal(String),
 }
 
 impl From<String> for CapturedWorkdirError {
     fn from(value: String) -> Self {
         Self::Fatal(value)
-    }
-}
-
-pub trait CapturedWorkdirTryRecoverProcessResult: Send {
-    fn make_process_result(&self, stdout_digest: Digest, stderr_digest: Digest, result_metadata: ProcessResultMetadata) -> FallibleProcessResultWithPlatform;
-}
-
-pub trait CapturedWorkdirRecoverableError: ToString + Send {
-    fn try_recover_process_result(self: Box<Self>, stderr: &mut BytesMut) -> Result<Box<dyn CapturedWorkdirTryRecoverProcessResult>, String>;
-}
-
-pub struct CapturedWorkdirTimeoutError {
-    timeout: Option<std::time::Duration>,
-    description: String
-}
-
-impl ToString for CapturedWorkdirTimeoutError {
-    fn to_string(&self) -> String {
-        format!(
-            "Exceeded timeout of {:.1} seconds when executing local process: {}",
-            self.timeout.map(|dur| dur.as_secs_f32()).unwrap_or(-1.0),
-            self.description
-        )
-    }
-}
-
-impl CapturedWorkdirTryRecoverProcessResult for CapturedWorkdirTimeoutError {
-    fn make_process_result(&self, stdout_digest: Digest, stderr_digest: Digest, result_metadata: ProcessResultMetadata) -> FallibleProcessResultWithPlatform {
-        FallibleProcessResultWithPlatform {
-            stdout_digest,
-            stderr_digest,
-            exit_code: -libc::SIGTERM,
-            output_directory: EMPTY_DIRECTORY_DIGEST.clone(),
-            metadata: result_metadata,
-        }
-    }
-}
-
-impl CapturedWorkdirRecoverableError for CapturedWorkdirTimeoutError {
-    fn try_recover_process_result(self: Box<Self>, stderr: &mut BytesMut) -> Result<Box<dyn CapturedWorkdirTryRecoverProcessResult>, String> {
-        stderr.extend_from_slice(format!("\n\n{}", self.to_string()).as_bytes());
-        Ok(self)
     }
 }
 
@@ -442,17 +400,18 @@ pub trait CapturedWorkdir {
                 )
                 .await?,
             );
-            let final_result = {
-                if let Some(req_timeout) = req.timeout {
-                    timeout(req_timeout, exit_code_future)
-                        .await
-                        .map_err(|e| e.to_string())
-                        .and_then(|r| r)
-                } else {
-                    exit_code_future.await
+            
+            if let Some(req_timeout) = req.timeout {
+                match timeout(req_timeout, exit_code_future).await {
+                    Ok(Ok(exit_code)) => Ok(exit_code),
+                    _ => Err(CapturedWorkdirError::BlackBox {
+                        status: -libc::SIGTERM,
+                        message: format!("Exceeded timeout of {:.1} seconds when executing local process: {}", req_timeout.as_secs_f32(), req.description)
+                    })
                 }
-            };
-            final_result.map_err(CapturedWorkdirError::from)
+            } else {
+                exit_code_future.await.map_err(CapturedWorkdirError::from)
+            }
         };
 
         // Capture the process outputs.
@@ -493,30 +452,25 @@ pub trait CapturedWorkdir {
             context.run_id,
         );
 
-        match exit_code_result {
-            Ok(exit_code) => {
-                let (stdout_digest, stderr_digest) = try_join!(
-                    store.store_file_bytes(stdout.into(), true),
-                    store.store_file_bytes(stderr.into(), true),
-                )?;
-                Ok(FallibleProcessResultWithPlatform {
-                    stdout_digest,
-                    stderr_digest,
-                    exit_code,
-                    output_directory: output_snapshot.into(),
-                    metadata: result_metadata,
-                })
-            }
-            Err(CapturedWorkdirError::Recoverable(recoverable_error)) => {
-                let recoverer = recoverable_error.try_recover_process_result(&mut stderr)?;
-                let (stdout_digest, stderr_digest) = try_join!(
-                    store.store_file_bytes(stdout.into(), true),
-                    store.store_file_bytes(stderr.into(), true),
-                )?;
-                Ok(recoverer.make_process_result(stdout_digest, stderr_digest, result_metadata))
-            }
-            Err(err) => Err(err),
-        }
+        let (exit_code, output_directory) = match exit_code_result {
+            Ok(exit_code) => (exit_code, output_snapshot.into()),
+            Err(CapturedWorkdirError::BlackBox {status: status, message: message}) => {
+                stderr.extend_from_slice(message.as_bytes());
+                (status, EMPTY_DIRECTORY_DIGEST.clone())
+            },
+            Err(err) => return Err(err),
+        };
+        let (stdout_digest, stderr_digest) = try_join!(
+            store.store_file_bytes(stdout.into(), true),
+            store.store_file_bytes(stderr.into(), true),
+        )?;
+        Ok(FallibleProcessResultWithPlatform {
+            stdout_digest,
+            stderr_digest,
+            exit_code,
+            output_directory: output_directory,
+            metadata: result_metadata,
+        })
     }
 
     ///
