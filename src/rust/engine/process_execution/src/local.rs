@@ -61,8 +61,6 @@ pub struct CommandRunner {
     work_dir_base: PathBuf,
     named_caches: NamedCaches,
     immutable_inputs: ImmutableInputs,
-    #[allow(dead_code)]
-    keep_sandboxes: KeepSandboxes,
     spawn_lock: Arc<RwLock<()>>,
 }
 
@@ -73,7 +71,6 @@ impl CommandRunner {
         work_dir_base: PathBuf,
         named_caches: NamedCaches,
         immutable_inputs: ImmutableInputs,
-        keep_sandboxes: KeepSandboxes,
         spawn_lock: Arc<RwLock<()>>,
     ) -> CommandRunner {
         CommandRunner {
@@ -82,7 +79,6 @@ impl CommandRunner {
             work_dir_base,
             named_caches,
             immutable_inputs,
-            keep_sandboxes,
             spawn_lock,
         }
     }

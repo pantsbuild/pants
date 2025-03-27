@@ -479,7 +479,6 @@ async fn test_chroot_placeholder() {
             .docker(IMAGE.to_owned())
             .local_keep_sandboxes(KeepSandboxes::Always),
         work_root.clone(),
-        KeepSandboxes::Always,
         &mut workunit,
         None,
         None,
@@ -647,7 +646,6 @@ async fn working_directory() {
     let result = run_command_via_docker_in_dir(
         process,
         work_dir.path().to_owned(),
-        KeepSandboxes::Never,
         &mut workunit,
         Some(store),
         Some(executor),
@@ -715,7 +713,6 @@ async fn immutable_inputs() {
     let result = run_command_via_docker_in_dir(
         process,
         work_dir.path().to_owned(),
-        KeepSandboxes::Never,
         &mut workunit,
         Some(store),
         Some(executor),
@@ -735,7 +732,6 @@ async fn immutable_inputs() {
 async fn run_command_via_docker_in_dir(
     mut req: Process,
     dir: PathBuf,
-    cleanup: KeepSandboxes,
     workunit: &mut RunningWorkunit,
     store: Option<Store>,
     executor: Option<task_executor::Executor>,
@@ -761,7 +757,6 @@ async fn run_command_via_docker_in_dir(
         &image_pull_cache,
         dir.clone(),
         immutable_inputs,
-        cleanup,
     )?;
     let result: Result<_, ProcessError> = async {
         let original = runner.run(Context::default(), workunit, req).await?;
@@ -787,13 +782,5 @@ async fn run_command_via_docker(req: Process) -> Result<LocalTestResult, Process
     let (_, mut workunit) = WorkunitStore::setup_for_tests();
     let work_dir = TempDir::new().unwrap();
     let work_dir_path = work_dir.path().to_owned();
-    run_command_via_docker_in_dir(
-        req,
-        work_dir_path,
-        KeepSandboxes::Never,
-        &mut workunit,
-        None,
-        None,
-    )
-    .await
+    run_command_via_docker_in_dir(req, work_dir_path, &mut workunit, None, None).await
 }

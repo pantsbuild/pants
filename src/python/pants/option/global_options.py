@@ -616,7 +616,6 @@ class ExecutionOptions:
     remote_client_certs_path: str | None
     remote_client_key_path: str | None
 
-    keep_sandboxes: KeepSandboxes
     local_cache: bool
     process_execution_local_parallelism: int
     process_execution_local_enable_nailgun: bool
@@ -665,7 +664,6 @@ class ExecutionOptions:
             remote_client_certs_path=bootstrap_options.remote_client_certs_path,
             remote_client_key_path=bootstrap_options.remote_client_key_path,
             # Process execution setup.
-            keep_sandboxes=GlobalOptions.resolve_keep_sandboxes(bootstrap_options),
             local_cache=bootstrap_options.local_cache,
             process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
             process_execution_remote_parallelism=dynamic_remote_options.parallelism,
@@ -764,7 +762,6 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_local_parallelism=CPU_COUNT,
     process_execution_remote_parallelism=128,
     process_execution_cache_namespace=None,
-    keep_sandboxes=KeepSandboxes.never,
     local_cache=True,
     cache_content_behavior=CacheContentBehavior.fetch,
     process_execution_local_enable_nailgun=True,

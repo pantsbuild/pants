@@ -256,7 +256,6 @@ async fn main() -> Result<(), String> {
                     .unwrap_or_else(NamedCaches::default_local_path),
             ),
             ImmutableInputs::new(store.clone(), &workdir).unwrap(),
-            KeepSandboxes::Never,
             Arc::new(RwLock::new(())),
         )) as Box<dyn process_execution::CommandRunner>,
     };

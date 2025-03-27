@@ -54,8 +54,6 @@ pub struct CommandRunner<'a> {
     docker: &'a DockerOnceCell,
     work_dir_base: PathBuf,
     immutable_inputs: ImmutableInputs,
-    #[allow(dead_code)]
-    keep_sandboxes: KeepSandboxes,
     container_cache: ContainerCache<'a>,
 }
 
@@ -360,7 +358,6 @@ impl<'a> CommandRunner<'a> {
         image_pull_cache: &'a ImagePullCache,
         work_dir_base: PathBuf,
         immutable_inputs: ImmutableInputs,
-        keep_sandboxes: KeepSandboxes,
     ) -> Result<Self, String> {
         let container_cache = ContainerCache::new(
             docker,
@@ -376,7 +373,6 @@ impl<'a> CommandRunner<'a> {
             docker,
             work_dir_base,
             immutable_inputs,
-            keep_sandboxes,
             container_cache,
         })
     }
