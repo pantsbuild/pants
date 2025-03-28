@@ -367,7 +367,7 @@ async def mypy_typecheck_partition(
             append_only_caches={"mypy_cache": named_cache_dir},
         ),
     )
-    process = dataclasses.replace(process, argv=("__mypy_runner.sh",))
+    process = dataclasses.replace(process, argv=("./__mypy_runner.sh",))
     result = await Get(FallibleProcessResult, Process, process)
     report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
     return CheckResult.from_fallible_process_result(
