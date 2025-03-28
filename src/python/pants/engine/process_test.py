@@ -417,12 +417,12 @@ def test_workspace_execution_support() -> None:
 @pytest.mark.parametrize(
     "concurrency",
     [
-        ProcessConcurrency.range(min=1),
+        ProcessConcurrency.exactly(1),
+        ProcessConcurrency.range(1, min=1),
         ProcessConcurrency.range(max=2),
-        ProcessConcurrency.range(min=1, max=2),
+        ProcessConcurrency.range(max=2, min=1),
         ProcessConcurrency.exclusive(),
         # Values larger than num cores still work (they get clamped to num cores)
-        ProcessConcurrency.range(min=10000),
         ProcessConcurrency.range(max=10000),
         ProcessConcurrency.range(min=100, max=200),
     ],
@@ -439,10 +439,20 @@ def test_concurrency(rule_runner: RuleRunner, concurrency: ProcessConcurrency) -
 
 
 def test_concurrency_enum():
-    min_one = ProcessConcurrency.range(min=1)
+    exactly_one = ProcessConcurrency.exactly(1)
+    min_one = ProcessConcurrency.range(1, min=1)
     max_one = ProcessConcurrency.range(max=1)
     min_one_max_two = ProcessConcurrency.range(min=1, max=2)
     exclusive = ProcessConcurrency.exclusive()
+
+    assert exactly_one.kind == "range"
+    assert exactly_one == min_one # these are the same
+
+    up_to_two = ProcessConcurrency.range(2)
+    assert up_to_two.kind == "range"
+    assert up_to_two.min == 1
+    assert up_to_two.max == 2
+    assert up_to_two == min_one_max_two
 
     assert min_one.kind == "range"
     assert max_one.kind == "range"
@@ -450,19 +460,20 @@ def test_concurrency_enum():
     assert exclusive.kind == "exclusive"
 
     assert min_one.min == 1
-    assert min_one.max is None
-    assert max_one.min is None
+    assert min_one.max == 1
+    assert max_one.min == 1
     assert max_one.max == 1
     assert min_one_max_two.min == 1
     assert min_one_max_two.max == 2
     assert exclusive.min is None
     assert exclusive.max is None
 
-    assert min_one == ProcessConcurrency.range(min=1)
+    assert exactly_one == ProcessConcurrency.exactly(1)
+    assert min_one == ProcessConcurrency.range(1, min=1)
     assert max_one == ProcessConcurrency.range(max=1)
     assert min_one_max_two == ProcessConcurrency.range(min=1, max=2)
     assert exclusive == ProcessConcurrency.exclusive()
-    assert min_one != max_one
+    assert min_one == max_one
     assert min_one != min_one_max_two
     assert max_one != min_one_max_two
     assert min_one != exclusive
