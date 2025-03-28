@@ -1312,6 +1312,37 @@ async def setup_venv_pex_process(
 
 
 @dataclass(frozen=True)
+class VenvPexVenvPath:
+    abs_path: PurePath
+
+
+@rule
+async def venv_pex_materialize_and_extract_venv_path(venv_pex: VenvPex) -> VenvPexVenvPath:
+    """Force the venv pex to be materialized on the executing machine and return its path."""
+
+    result = await Get(
+        ProcessResult,
+        VenvPexProcess(
+            venv_pex,
+            description="Materialize and print venv path",
+            # `sys.prefix` stores the root directory of the virtualenv when executing in one, as
+            # this VenvPex does. See:
+            #
+            # - https://docs.python.org/3/library/sys.html#sys.prefix
+            # - https://docs.python.org/3/library/venv.html#how-venvs-work
+            argv=["-c", "import sys; print(sys.prefix)"],
+            # This operation must be run every time, to maximise the chance that the the venv is
+            # actually materialized (e.g. if the cache is cleared). If the user clears the cache
+            # while a single session is still running, they might get confusing output, but
+            # restarting pants should resolve that.
+            cache_scope=ProcessCacheScope.PER_SESSION,
+        ),
+    )
+
+    return VenvPexVenvPath(PurePath(result.stdout.decode().strip()))
+
+
+@dataclass(frozen=True)
 class PexDistributionInfo:
     """Information about an individual distribution in a PEX file, as reported by `PEX_TOOLS=1
     repository info -v`."""
