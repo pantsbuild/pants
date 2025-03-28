@@ -79,7 +79,7 @@ impl crate::CommandRunner for CommandRunner {
         process: Process,
     ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
         let total_concurrency = self.sema.state.lock().total_concurrency;
-        
+
         let min_concurrency = match process.concurrency {
             Some(ProcessConcurrency::Range { min, .. }) => min.unwrap_or(1),
             Some(ProcessConcurrency::Exclusive) => total_concurrency,
@@ -154,14 +154,11 @@ impl crate::CommandRunner for CommandRunner {
                     )
                     .collect();
                 if !matched {
-
                     if process.concurrency_available > 0 {
                         return Err(format!(
                             "Process {} set `concurrency_available={}`, but did not include \
                                  the `{}` template variable in its arguments.",
-                            process.description,
-                            max_concurrency,
-                            *CONCURRENCY_TEMPLATE_RE
+                            process.description, max_concurrency, *CONCURRENCY_TEMPLATE_RE
                         )
                         .into());
                     } else {
@@ -175,8 +172,6 @@ impl crate::CommandRunner for CommandRunner {
                         )
                         .into());
                     }
-
-                    
                 }
             }
 
