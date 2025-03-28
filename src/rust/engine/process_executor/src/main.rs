@@ -629,10 +629,7 @@ mod tests {
                     max: Some(4),
                 }),
             ),
-            (
-                vec!["--concurrency=x"],
-                Some(ProcessConcurrency::Exclusive),
-            ),
+            (vec!["--concurrency=x"], Some(ProcessConcurrency::Exclusive)),
         ];
 
         for (args, expected_concurrency) in test_cases {
@@ -653,7 +650,7 @@ mod tests {
                 "error: invalid value '0' for '--concurrency <CONCURRENCY>': Concurrency must be at least 1, got: 0",
             ),
             (
-                vec!["--concurrency=4,2"], 
+                vec!["--concurrency=4,2"],
                 "error: invalid value '4,2' for '--concurrency <CONCURRENCY>': Maximum concurrency must be at least the minimum concurrency, got: 2 and 4",
             ),
             (
@@ -666,7 +663,7 @@ mod tests {
             ),
             (
                 vec!["--concurrency=1,abc"],
-                "error: invalid value '1,abc' for '--concurrency <CONCURRENCY>': Invalid max value: invalid digit found in string", 
+                "error: invalid value '1,abc' for '--concurrency <CONCURRENCY>': Invalid max value: invalid digit found in string",
             ),
         ];
 
@@ -678,12 +675,19 @@ mod tests {
             let result = Opt::try_parse_from(full_args);
             match result {
                 Ok(opt) => {
-                    assert!(false, "Expected error '{}' but got '{:?}'", expected_error, opt.command.concurrency);
+                    assert!(
+                        false,
+                        "Expected error '{}' but got '{:?}'",
+                        expected_error, opt.command.concurrency
+                    );
                 }
                 Err(e) => {
                     // remove \n\nFor more information, try '--help'.\n if present
                     let original_error = e.to_string();
-                    let error_message = original_error.split("\n\nFor more information, try '--help'.\n").next().unwrap();
+                    let error_message = original_error
+                        .split("\n\nFor more information, try '--help'.\n")
+                        .next()
+                        .unwrap();
                     assert_eq!(error_message, expected_error);
                 }
             }
