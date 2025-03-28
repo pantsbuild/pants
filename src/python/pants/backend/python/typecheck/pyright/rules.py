@@ -28,10 +28,10 @@ from pants.backend.python.util_rules.partition import (
 )
 from pants.backend.python.util_rules.pex import (
     PexRequest,
-    VenvPexProcess,
     VenvPexRequest,
     create_pex,
     create_venv_pex,
+    venv_pex_materialize_and_extract_venv_path,
 )
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
@@ -54,7 +54,6 @@ from pants.engine.intrinsics import (
     get_digest_contents,
     merge_digests,
 )
-from pants.engine.process import ProcessCacheScope, execute_process_or_raise
 from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest, FieldSet, Target
 from pants.engine.unions import UnionRule
@@ -211,24 +210,13 @@ async def pyright_typecheck_partition(
         VenvPexRequest(requirements_pex_request, complete_pex_env), **implicitly()
     )
 
-    # Force the requirements venv to materialize always by running a no-op.
-    # This operation must be called with `ProcessCacheScope.SESSION`
-    # so that it runs every time.
-    _ = await execute_process_or_raise(
-        **implicitly(
-            VenvPexProcess(
-                requirements_venv_pex,
-                description="Force venv to materialize",
-                argv=["-c", "''"],
-                cache_scope=ProcessCacheScope.PER_SESSION,
-            )
-        )
-    )
+    # Force the requirements venv to materialize and gets its path
+    venv_path = await venv_pex_materialize_and_extract_venv_path(requirements_venv_pex)
 
     # Patch the config file to use the venv directory from the requirements pex,
     # and add source roots to the `extraPaths` key in the config file.
     patched_config_digest = await _patch_config_file(
-        config_files, requirements_venv_pex.venv_rel_dir, transitive_sources.source_roots
+        config_files, str(venv_path.abs_path), transitive_sources.source_roots
     )
 
     input_digest = await merge_digests(
@@ -244,7 +232,19 @@ async def pyright_typecheck_partition(
     process = await prepare_tool_process(
         pyright.request(
             args=(
-                f"--venvpath={complete_pex_env.pex_root}",  # Used with `venv` in config
+                # Pyright splits its config for finding a venv into two:
+                #
+                # - `venvPath` / `--venvpath` pointing to a directory _containing_ venvs:
+                #   https://github.com/microsoft/pyright/blob/4f24eccce8c71cf59f4847a516eecf1a675ba978/docs/configuration.md#:~:text=venvPath,-[path%2C%20optional]:%20Path
+                #
+                # - `venv` choosing which specific venv within `venvPath` to use:
+                #   https://github.com/microsoft/pyright/blob/4f24eccce8c71cf59f4847a516eecf1a675ba978/docs/configuration.md#:~:text=venv,-[string%2C%20optional]:%20Used
+                #
+                # @huonw performed some basic experiments, and it seems that there's no particular
+                # structured required other than both being specified. It also seems they're joined
+                # with 'simple' path join, so we specify the full absolute path for `venv` above,
+                # and just ensure this is set to a valid path:
+                "--venvpath=/",
                 *pyright.args,  # User-added arguments
                 *(os.path.join("{chroot}", file) for file in root_sources.snapshot.files),
             ),
