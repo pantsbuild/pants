@@ -228,7 +228,7 @@ async fn correct_semaphore_slot_ids_range() {
     send_complete2.send(()).unwrap();
     let id2 = t2.await.unwrap();
 
-    // Tokio appears to impliment strict FIFO fairness which has the downside that
+    // Tokio appears to implement strict FIFO fairness which has the downside that
     // process 4 must wait now, even though there are enough permits for it to run.
     //
     // From tokio docs:
