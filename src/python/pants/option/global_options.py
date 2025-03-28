@@ -43,7 +43,7 @@ from pants.option.option_types import (
     collect_options_info,
 )
 from pants.option.option_value_container import OptionValueContainer
-from pants.option.options import NativeOptionsValidation, Options
+from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
 from pants.util.dirutil import fast_relpath_optional
@@ -981,33 +981,6 @@ class BootstrapOptions:
             """
         ),
     )
-    native_options_validation = EnumOption(
-        default=NativeOptionsValidation.warning,
-        removal_version="2.27.0.dev0",
-        removal_hint="The legacy parser has been removed so this option has no effect.",
-        help=softwrap(
-            """
-            Pants is switching its option parsing system from a legacy parser written in Python
-            to a new one written in Rust.
-
-            The results of parsing a given option by each system should be identical. However
-            during a transition period we will run both parsers and compare their results.
-            This option controls how to report discrepancies that arise.
-
-            - `error`: Discrepancies will cause Pants to exit.
-
-            - `warning`: Discrepancies will be logged but Pants will continue.
-
-            - `ignore`: A last resort to turn off this check entirely.
-
-            If you encounter discrepancies that are not easily resolvable, please reach out to
-            us on Slack or file an issue: https://www.pantsbuild.org/community/getting-help.
-
-            The native parser will become the default in 2.23.x, and the legacy parser will be removed in 2.24.x.
-            So it is imperative that we find out about any discrepancies during this transition period.
-            """
-        ),
-    )
     pantsrc = BoolOption(
         advanced=True,
         default=True,
@@ -1795,22 +1768,6 @@ class BootstrapOptions:
                 f"Global option `--file-downloads-max-attempts` must be at least 1, got {value}"
             )
         return value
-
-    allow_deprecated_macos_before_12 = BoolOption(
-        default=False,
-        advanced=True,
-        help=softwrap(
-            f"""
-            Silence warnings about running Pants on macOS 10.15 - 11. In future versions, Pants will
-            only be supported on macOS 12 and newer.
-
-            If you have questions or concerns about this, please reach out to us at
-            {doc_url("community/getting-help")}.
-            """
-        ),
-        removal_version="2.27.0.dev0",
-        removal_hint='Upgrade your operating system or write `allow_deprecated_macos_versions = ["10", "11"]` instead.',
-    )
 
     allow_deprecated_macos_versions = StrListOption(
         default=[],

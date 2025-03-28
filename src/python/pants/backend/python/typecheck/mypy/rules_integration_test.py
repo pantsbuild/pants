@@ -3,7 +3,10 @@
 
 from __future__ import annotations
 
+import os.path
 import re
+from hashlib import sha256
+from pathlib import Path
 from textwrap import dedent
 
 import pytest
@@ -600,6 +603,49 @@ def test_protobuf_mypy(rule_runner: PythonRuleRunner) -> None:
     assert 'Argument "name" to "Person" has incompatible type "int"' in result[0].stdout
     assert 'Argument "id" to "Person" has incompatible type "str"' in result[0].stdout
     assert result[0].exit_code == 1
+
+
+def test_cache_directory_per_resolve(rule_runner: PythonRuleRunner) -> None:
+    build_multiple_resolves = dedent(
+        """\
+        python_source(
+            name='f_from_a',
+            source='f.py',
+            resolve='a',
+        )
+        python_source(
+           name='f_from_b',
+           source='f.py',
+           resolve='b',
+        )
+        """
+    )
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/f.py": GOOD_FILE,
+            f"{PACKAGE}/BUILD": build_multiple_resolves,
+            "mypy.lock": read_sibling_resource(__name__, "mypy_with_django_stubs.lock"),
+        }
+    )
+    target_a = rule_runner.get_target(Address(PACKAGE, target_name="f_from_a"))
+    target_b = rule_runner.get_target(Address(PACKAGE, target_name="f_from_b"))
+
+    runner_options = [
+        "--python-resolves={'a': 'mypy.lock', 'b': 'mypy.lock'}",
+        "--python-enable-resolves",
+    ]
+    run_mypy(rule_runner, [target_a, target_b], extra_args=runner_options)
+
+    with rule_runner.pushd():
+        Path("BUILDROOT").touch()
+        bootstrap_options = rule_runner.options_bootstrapper.bootstrap_options.for_global_scope()
+    named_cache_dir = bootstrap_options.named_caches_dir
+    mypy_cache_dir = (
+        f"{named_cache_dir}/mypy_cache/{sha256(rule_runner.build_root.encode()).hexdigest()}"
+    )
+    for resolve in ["a", "b"]:
+        expected_cache_dir = f"{mypy_cache_dir}/{resolve}"
+        assert os.path.exists(expected_cache_dir)
 
 
 @skip_unless_all_pythons_present("3.8", "3.9")
