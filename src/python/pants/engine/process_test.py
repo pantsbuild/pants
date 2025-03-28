@@ -446,7 +446,7 @@ def test_concurrency_enum():
     exclusive = ProcessConcurrency.exclusive()
 
     assert exactly_one.kind == "range"
-    assert exactly_one == min_one # these are the same
+    assert exactly_one == min_one  # these are the same
 
     up_to_two = ProcessConcurrency.range(2)
     assert up_to_two.kind == "range"
