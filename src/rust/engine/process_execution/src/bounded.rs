@@ -79,10 +79,11 @@ impl crate::CommandRunner for CommandRunner {
         process: Process,
     ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
         let total_concurrency = self.sema.state.lock().total_concurrency;
+        
         let min_concurrency = match process.concurrency {
             Some(ProcessConcurrency::Range { min, .. }) => min.unwrap_or(1),
             Some(ProcessConcurrency::Exclusive) => total_concurrency,
-            None => process.concurrency_available,
+            None => 1,
         };
 
         let max_concurrency = match process.concurrency {
@@ -137,7 +138,7 @@ impl crate::CommandRunner for CommandRunner {
                     format!("{}", permit.concurrency_slot()),
                 );
             }
-            if process.concurrency_available > 0 {
+            if max_concurrency > min_concurrency {
                 let concurrency = format!("{}", permit.concurrency());
                 let mut matched = false;
                 process.argv = std::mem::take(&mut process.argv)
@@ -153,14 +154,29 @@ impl crate::CommandRunner for CommandRunner {
                     )
                     .collect();
                 if !matched {
-                    return Err(format!(
-                        "Process {} set `concurrency_available={}`, but did not include \
-                             the `{}` template variable in its arguments.",
-                        process.description,
-                        process.concurrency_available,
-                        *CONCURRENCY_TEMPLATE_RE
-                    )
-                    .into());
+
+                    if process.concurrency_available > 0 {
+                        return Err(format!(
+                            "Process {} set `concurrency_available={}`, but did not include \
+                                 the `{}` template variable in its arguments.",
+                            process.description,
+                            max_concurrency,
+                            *CONCURRENCY_TEMPLATE_RE
+                        )
+                        .into());
+                    } else {
+                        return Err(format!(
+                            "Process {} set a `concurrency` range with the max {} above the min {}, but did not include \
+                                 the `{}` template variable in its arguments.",
+                            process.description,
+                            max_concurrency,
+                            min_concurrency,
+                            *CONCURRENCY_TEMPLATE_RE
+                        )
+                        .into());
+                    }
+
+                    
                 }
             }
 
