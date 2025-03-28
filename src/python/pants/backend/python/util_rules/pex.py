@@ -999,6 +999,7 @@ class VenvScriptWriter:
 class VenvPex:
     digest: Digest
     append_only_caches: FrozenDict[str, str] | None
+    env: FrozenDict[str, str]
     pex_filename: str
     pex: Script
     python: Script
@@ -1123,6 +1124,7 @@ async def create_venv_pex(
     return VenvPex(
         digest=input_digest,
         append_only_caches=append_only_caches,
+        env=FrozenDict(request.complete_pex_env.environment_dict()),
         pex_filename=venv_pex_result.pex_filename,
         pex=pex.script,
         python=python.script,
@@ -1294,13 +1296,19 @@ async def setup_venv_pex_process(
         **request.append_only_caches,
         **(FrozenDict({}) if venv_pex.append_only_caches is None else venv_pex.append_only_caches),
     )
+    env = dict(venv_pex.env)
+    env.update(request.extra_env)
+    # If both the request and the venv specify a PATH, combine them.
+    if (venv_path := venv_pex.env.get("PATH")) and (request_path := request.extra_env.get("PATH")):
+        env["PATH"] = os.pathsep.join([venv_path, request_path])
+
     return Process(
         argv=argv,
         description=request.description,
         level=request.level,
         input_digest=input_digest,
         working_directory=request.working_directory,
-        env=request.extra_env,
+        env=env,
         output_files=request.output_files,
         output_directories=request.output_directories,
         append_only_caches=append_only_caches,
