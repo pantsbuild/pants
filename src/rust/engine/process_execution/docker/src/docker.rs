@@ -17,8 +17,9 @@ use bollard::service::CreateImageInfo;
 use bollard::volume::CreateVolumeOptions;
 use bollard::{Docker, errors::Error as DockerError};
 use bytes::{Bytes, BytesMut};
+use either::Either;
 use futures::stream::BoxStream;
-use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
+use futures::{FutureExt, StreamExt};
 use hashing::Digest;
 use log::Level;
 use nails::execution::ExitCode;
@@ -29,7 +30,8 @@ use task_executor::Executor;
 use workunit_store::{Metric, RunningWorkunit, in_workunit};
 
 use process_execution::local::{
-    apply_chroot, collect_child_outputs, create_sandbox, prepare_workdir, setup_run_sh_script, CapturedWorkdir, CapturedWorkdirError, ChildOutput, KeepSandboxes
+    CapturedWorkdir, CapturedWorkdirError, ChildOutput, KeepSandboxes, apply_chroot,
+    collect_child_outputs, create_sandbox, prepare_workdir, setup_run_sh_script,
 };
 use process_execution::{
     Context, FallibleProcessResultWithPlatform, NamedCaches, Platform, Process, ProcessError,
@@ -395,10 +397,13 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
         _workunit: &mut RunningWorkunit,
         req: Process,
     ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
-        let req_debug_repr = format!("{req:#?}");
         let mut original_error: Option<String> = None;
         loop {
-            let process_result: Result<FallibleProcessResultWithPlatform, Option<ProcessError>> = in_workunit!(
+            // Make a mutable copy of the process in the closure
+            let mut mreq = req.clone();
+            let context = context.clone();
+            // TODO: do we run loop within closure or outside of it?
+            let process_result: Result<FallibleProcessResultWithPlatform, Either<String, ProcessError>> = in_workunit!(
                 "run_local_process_via_docker",
                 req.level,
                 // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
@@ -408,71 +413,64 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                     let mut workdir = create_sandbox(
                         self.executor.clone(),
                         &self.work_dir_base,
-                        &req.description,
+                        &mreq.description,
                         self.keep_sandboxes,
-                    ).map_err(|s| Some(ProcessError::from(s)))?;
-    
+                    ).map_err(|s| Either::Right(ProcessError::from(s)))?;
                     // Obtain ID of the base container in which to run the execution for this process.
                     let (image_name, image_platform, container_id, named_caches) = {
                         let ProcessExecutionStrategy::Docker(image) =
-                            &req.execution_environment.strategy
+                            &mreq.execution_environment.strategy
                         else {
-                            return Err(Some(ProcessError::Unclassified(
+                            return Err(Either::Right(ProcessError::Unclassified(
                                 "The Docker execution strategy was not set on the Process, but \
                                 the Docker CommandRunner was used."
                                 .to_owned(),
                             )));
                         };
-    
                         let (cid, nc) = self.container_cache
                             .container_for_image(
                                 image,
-                                &req.execution_environment.platform,
+                                &mreq.execution_environment.platform,
                                 &context.build_id,
                             )
                             .await
-                            .map_err(|msg| Some(ProcessError::from(msg)))?;
-                        (image.to_owned(), &req.execution_environment.platform, cid, nc)
+                            .map_err(|msg| Either::Right(ProcessError::from(msg)))?;
+                        (image.to_owned(), &(mreq.execution_environment.platform), cid, nc)
                     };
-    
-                    // Start working on a mutable version of the process.
-                    let mut req = req;
-    
                     // Compute the absolute working directory within the container, and update the env to
                     // replace `{chroot}` placeholders with the path to the sandbox within the Docker container.
                     let working_dir = {
                         let sandbox_relpath = workdir.path()
                             .strip_prefix(&self.work_dir_base)
-                            .map_err(|err| Some(ProcessError::from(
+                            .map_err(|err| Either::Right(ProcessError::from(
                                 format!("Internal error - base directory was not prefix of sandbox directory: {err}")
                             )))?;
                         let sandbox_path_in_container = Path::new(&SANDBOX_BASE_PATH_IN_CONTAINER)
                             .join(sandbox_relpath)
                             .into_os_string()
                             .into_string()
-                            .map_err(|s| Some(ProcessError::from(
+                            .map_err(|s| Either::Right(ProcessError::from(
                                 format!("Unable to convert sandbox path to string due to non UTF-8 characters: {s:?}")
                             )))?;
-                        apply_chroot(&sandbox_path_in_container, &mut req);
+                        apply_chroot(&sandbox_path_in_container, &mut mreq);
                         log::trace!("sandbox_path_in_container = {:?}", &sandbox_path_in_container);
-                        req.working_directory
+                        mreq.working_directory
                             .as_ref()
                             .map(|relpath| Path::new(&sandbox_path_in_container).join(relpath))
                             .unwrap_or_else(|| Path::new(&sandbox_path_in_container).to_path_buf())
                             .into_os_string()
                             .into_string()
-                            .map_err(|s| Some(ProcessError::from(
+                            .map_err(|s| Either::Right(ProcessError::from(
                                 format!("Unable to convert working directory due to non UTF-8 characters: {s:?}")
                             )))?
                     };
-    
                     // Prepare the workdir.
                     // DOCKER-NOTE: The input root will be bind mounted into the container.
                     let exclusive_spawn = prepare_workdir(
                         workdir.path().to_owned(),
                         &self.work_dir_base,
-                        &req,
-                        req.input_digests.inputs.clone(),
+                        &mreq,
+                        mreq.input_digests.inputs.clone(),
                         &self.store,
                         &named_caches,
                         &self.immutable_inputs,
@@ -480,12 +478,11 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                         Some(Path::new(IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER)),
                     )
                     .await
-                    .map_err(|s| Some(ProcessError::from(s)))?;
-    
+                    .map_err(|s| Either::Right(ProcessError::from(s)))?;
+
                     workunit.increment_counter(Metric::DockerExecutionRequests, 1);
-    
                     let res = self.run_and_capture_workdir(
-                        req.clone(),
+                        mreq.clone(),
                         context,
                         self.store.clone(),
                         self.executor.clone(),
@@ -493,43 +490,30 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                         (container_id, working_dir),
                         exclusive_spawn,
                     ).await;
-    
                     match &res {
                         Ok(_) => workunit.increment_counter(Metric::DockerExecutionSuccesses, 1),
                         Err(_) => workunit.increment_counter(Metric::DockerExecutionErrors, 1),
                     }
-    
                     if self.keep_sandboxes == KeepSandboxes::Always
                         || self.keep_sandboxes == KeepSandboxes::OnFailure
                             && res.as_ref().map(|r| r.exit_code).unwrap_or(1) != 0
                     {
-                        workdir.keep(&req.description);
+                        workdir.keep(&mreq.description);
                         setup_run_sh_script(
                             workdir.path(),
-                            &req.env,
-                            &req.working_directory,
-                            &req.argv,
+                            &mreq.env,
+                            &mreq.working_directory,
+                            &mreq.argv,
                             workdir.path(),
                         )
-                        .map_err(|s| Some(ProcessError::from(s)))?;
+                        .map_err(|s| Either::Right(ProcessError::from(s)))?;
                     }
-    
                     match res {
                         Err(CapturedWorkdirError::Retryable { status: status, message: message }) if status == 404 => {
-                            match original_error {
-                                Some(prev_message) => Err(Some(ProcessError::Unclassified(format!(
-                                    "Failed to execute due to missing container: {req_debug_repr}\n\n\
-                                    First attempt failed with: {prev_message}\n\n\
-                                    Attempted to restart container but failed with: {message}"
-                                )))),
-                                None => {
-                                    self.container_cache.prune_container(image_name, image_platform);
-                                    original_error = Some(message);
-                                    Err(None)
-                                }
-                            }
+                            self.container_cache.prune_container(image_name, image_platform);
+                            Err(Either::Left(message))
                         },
-                        _ => res.map_err(|msg| Some(
+                        _ => res.map_err(|cwe| Either::Right(
                             // Processes that experience no infrastructure issues should result in an "Ok" return,
                             // potentially with an exit code that indicates that they failed (with more information
                             // on stderr). Actually failing at this level indicates a failure to start or otherwise
@@ -538,13 +522,26 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                             //
                             // Given that this is expected to be rare, we dump the entire process definition in the
                             // error.
-                            ProcessError::Unclassified(format!(
-                                "Failed to execute: {req_debug_repr}\n\n{msg}"
-                            ))
+                            ProcessError::Unclassified(format!("Failed to execute: {mreq:#?}\n\n{cwe}"))
                         )),
                     }
                 }
             ).await;
+            return match process_result {
+                Err(Either::Left(message)) => match original_error {
+                    Some(prev_message) => Err(ProcessError::Unclassified(format!(
+                        "Failed to execute due to missing container: {req:#?}\n\n\
+                            First attempt failed with: {prev_message}\n\n\
+                            Attempted to restart container but failed with: {message}"
+                    ))),
+                    None => {
+                        original_error = Some(message);
+                        continue;
+                    }
+                },
+                _ => process_result
+                    .map_err(|known_process_result| known_process_result.unwrap_right()),
+            };
         }
     }
 
@@ -578,8 +575,14 @@ impl CapturedWorkdir for CommandRunner<'_> {
             .await
             .map_err(|spawn_err: CommandSpawnError| -> CapturedWorkdirError {
                 match spawn_err.err {
-                    DockerError::DockerResponseServerError { status_code: status_code, message: message } if status_code == 404 =>
-                        CapturedWorkdirError::Retryable { status: 404, message: spawn_err.message },
+                    DockerError::DockerResponseServerError { status_code, .. }
+                        if status_code == 404 =>
+                    {
+                        CapturedWorkdirError::Retryable {
+                            status: 404,
+                            message: spawn_err.message,
+                        }
+                    }
                     _ => CapturedWorkdirError::Fatal(spawn_err.message),
                 }
             })
@@ -692,14 +695,28 @@ impl Command {
         let exec = docker
             .create_exec::<String>(&container_id, self.0.clone())
             .await
-            .map_err(|err| CommandSpawnError { message: format!("Failed to create Docker execution in container: {}", err.to_string()), err: err })?;
+            .map_err(|err| CommandSpawnError {
+                message: format!(
+                    "Failed to create Docker execution in container: {}",
+                    err.to_string()
+                ),
+                err: err,
+            })?;
 
-        log::trace!("created execution {}",  &exec.id);
+        log::trace!("created execution {}", &exec.id);
 
-        let exec_result = docker
-            .start_exec(&exec.id, None)
-            .await
-            .map_err(|err| CommandSpawnError { message: format!("Failed to start Docker execution `{}`: {}", exec.id.as_str(), err.to_string()), err: err })?;
+        let exec_result =
+            docker
+                .start_exec(&exec.id, None)
+                .await
+                .map_err(|err| CommandSpawnError {
+                    message: format!(
+                        "Failed to start Docker execution `{}`: {}",
+                        exec.id.as_str(),
+                        err.to_string()
+                    ),
+                    err: err,
+                })?;
         let mut output_stream = if let StartExecResults::Attached { output, .. } = exec_result {
             output.boxed()
         } else {
@@ -753,7 +770,10 @@ impl Command {
         docker: &Docker,
         container_id: String,
     ) -> Result<(i32, Bytes, Bytes), String> {
-        let child_outputs= self.spawn(docker, container_id).await.map_err(|cse| cse.message)?;
+        let child_outputs = self
+            .spawn(docker, container_id)
+            .await
+            .map_err(|cse| cse.message)?;
         let mut stdout = BytesMut::with_capacity(8192);
         let mut stderr = BytesMut::with_capacity(8192);
         let exit_code = collect_child_outputs(&mut stdout, &mut stderr, child_outputs).await?;
@@ -1030,11 +1050,16 @@ impl<'a> ContainerCache<'a> {
         Ok(container_id.to_owned())
     }
 
-    async fn remove_container(docker: &Docker, container_id: String, options: Option<RemoveContainerOptions>) -> Result<(), String> {
-        docker.remove_container(container_id.as_str(), options)
+    async fn remove_container(
+        docker: &Docker,
+        container_id: String,
+        options: Option<RemoveContainerOptions>,
+    ) -> Result<(), String> {
+        docker
+            .remove_container(container_id.as_str(), options)
             .await
             .map_err(|err| format!("Failed to remove Docker container `{container_id}`: {err:?}"))
-    } 
+    }
 
     pub async fn shutdown(&self) -> Result<(), String> {
         // Skip shutting down if Docker was never used in the first place.

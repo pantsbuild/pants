@@ -11,6 +11,7 @@ async-trait = { workspace = true }
 async-lock = { workspace = true }
 bollard = { workspace = true }
 docker_credential = { workspace = true }
+either = { workspace = true }
 fs = { path = "../../fs" }
 futures = { workspace = true }
 log = { workspace = true }

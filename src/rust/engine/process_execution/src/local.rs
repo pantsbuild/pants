@@ -1,7 +1,7 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::fmt::{self, Debug};
+use std::fmt::{self, Debug, Display};
 use std::io::Write;
 use std::ops::Neg;
 use std::os::unix::{fs::OpenOptionsExt, process::ExitStatusExt};
@@ -20,7 +20,6 @@ use fs::{
 };
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
 use futures::{FutureExt, TryFutureExt, try_join};
-use hashing::Digest;
 use log::{debug, info};
 use nails::execution::ExitCode;
 use shell_quote::Bash;
@@ -240,7 +239,7 @@ impl super::CommandRunner for CommandRunner {
                         (),
                         exclusive_spawn,
                     )
-                    .map_err(|msg| {
+                    .map_err(|cwe| {
                         // Processes that experience no infrastructure issues should result in an "Ok" return,
                         // potentially with an exit code that indicates that they failed (with more information
                         // on stderr). Actually failing at this level indicates a failure to start or otherwise
@@ -250,7 +249,7 @@ impl super::CommandRunner for CommandRunner {
                         // Given that this is expected to be rare, we dump the entire process definition in the
                         // error.
                         ProcessError::Unclassified(format!(
-                            "Failed to execute: {req_debug_repr}\n\n{msg}"
+                            "Failed to execute: {req_debug_repr}\n\n{cwe}"
                         ))
                     })
                     .await;
@@ -360,6 +359,20 @@ impl From<String> for CapturedWorkdirError {
     }
 }
 
+impl Display for CapturedWorkdirError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::BlackBox { status, message } => {
+                write!(f, "{message} (blackbox error status {status}")
+            }
+            Self::Retryable { status, message } => {
+                write!(f, "{message} (retryable error status {status}")
+            }
+            Self::Fatal(s) => write!(f, "{s}"),
+        }
+    }
+}
+
 #[async_trait]
 pub trait CapturedWorkdir {
     type WorkdirToken: Clone + Send;
@@ -400,14 +413,18 @@ pub trait CapturedWorkdir {
                 )
                 .await?,
             );
-            
+
             if let Some(req_timeout) = req.timeout {
                 match timeout(req_timeout, exit_code_future).await {
                     Ok(Ok(exit_code)) => Ok(exit_code),
                     _ => Err(CapturedWorkdirError::BlackBox {
                         status: -libc::SIGTERM,
-                        message: format!("Exceeded timeout of {:.1} seconds when executing local process: {}", req_timeout.as_secs_f32(), req.description)
-                    })
+                        message: format!(
+                            "Exceeded timeout of {:.1} seconds when executing local process: {}",
+                            req_timeout.as_secs_f32(),
+                            req.description
+                        ),
+                    }),
                 }
             } else {
                 exit_code_future.await.map_err(CapturedWorkdirError::from)
@@ -454,10 +471,10 @@ pub trait CapturedWorkdir {
 
         let (exit_code, output_directory) = match exit_code_result {
             Ok(exit_code) => (exit_code, output_snapshot.into()),
-            Err(CapturedWorkdirError::BlackBox {status: status, message: message}) => {
+            Err(CapturedWorkdirError::BlackBox { status, message }) => {
                 stderr.extend_from_slice(message.as_bytes());
                 (status, EMPTY_DIRECTORY_DIGEST.clone())
-            },
+            }
             Err(err) => return Err(err),
         };
         let (stdout_digest, stderr_digest) = try_join!(
