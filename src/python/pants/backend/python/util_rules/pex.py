@@ -876,41 +876,25 @@ class VenvScript:
 
 @dataclass(frozen=True)
 class VenvScriptWriter:
-    complete_pex_env: CompletePexEnvironment
     pex: Pex
-    venv_dir: PurePath
 
     @classmethod
     def create(
-        cls, complete_pex_env: CompletePexEnvironment, pex: Pex, venv_rel_dir: PurePath
+        cls,
+        pex: Pex,
     ) -> VenvScriptWriter:
-        # N.B.: We don't know the working directory that will be used in any given
-        # invocation of the venv scripts; so we deal with working_directory once in an
-        # `adjust_relative_paths` function inside the script to save rule authors from having to do
-        # CWD offset math in every rule for all the relative paths their process depends on.
-        venv_dir = complete_pex_env.pex_root / venv_rel_dir
-        return cls(complete_pex_env=complete_pex_env, pex=pex, venv_dir=venv_dir)
+        return cls(pex=pex)
 
     def _create_venv_script(
-        self,
-        bash: BashBinary,
-        *,
-        script_path: PurePath,
-        venv_executable: PurePath,
+        self, bash: BashBinary, *, script_path: PurePath, vars: dict[str, str]
     ) -> VenvScript:
-        env_vars = (
-            f"{name}={shlex.quote(value)}"
-            for name, value in self.complete_pex_env.environment_dict(
-                python=self.pex.python
-            ).items()
-        )
+        for name in vars.keys():
+            if shlex.quote(name) != name:
+                raise ValueError(
+                    f"Cannot safely set environment variable called {name} for process execution because it requires quoting"
+                )
 
-        target_venv_executable = shlex.quote(str(venv_executable))
-        venv_dir = shlex.quote(str(self.venv_dir))
-        execute_pex_args = " ".join(
-            f"$(adjust_relative_paths {shlex.quote(arg)})"
-            for arg in self.complete_pex_env.create_argv(self.pex.name)
-        )
+        prefix_vars = " ".join(f"{name}={shlex.quote(value)}" for name, value in vars.items())
 
         script = dedent(
             f"""\
@@ -919,66 +903,16 @@ class VenvScriptWriter:
 
             # N.B.: This relies on BASH_SOURCE which has been available since bash-3.0, released in
             # 2004. It will either contain the absolute path of the venv script or it will contain
-            # the relative path from the CWD to the venv script. Either way, we know the venv script
-            # parent directory is the sandbox root directory.
-            SANDBOX_ROOT="${{BASH_SOURCE%/*}}"
+            # the relative path from the CWD to the venv script. Either way, we know the VenvPex
+            # (this script, any other scripts, and the pex itself) are stored in this directory.
+            VENV_PEX_DIR="${{BASH_SOURCE%/*}}"
 
-            function adjust_relative_paths() {{
-                local value0="$1"
-                shift
-                if [ "${{value0:0:1}}" == "/" ]; then
-                    # Don't relativize absolute paths.
-                    echo "${{value0}}" "$@"
-                else
-                    # N.B.: We convert all relative paths to paths relative to the sandbox root so
-                    # this script works when run with a PWD set somewhere else than the sandbox
-                    # root.
-                    #
-                    # There are two cases to consider. For the purposes of example, assume PWD is
-                    # `/tmp/sandboxes/abc123/foo/bar`; i.e.: the rule API sets working_directory to
-                    # `foo/bar`. Also assume `config/tool.yml` is the relative path in question.
-                    #
-                    # 1. If our BASH_SOURCE is  `/tmp/sandboxes/abc123/pex_shim.sh`; so our
-                    #    SANDBOX_ROOT is `/tmp/sandboxes/abc123`, we calculate
-                    #    `/tmp/sandboxes/abc123/config/tool.yml`.
-                    # 2. If our BASH_SOURCE is instead `../../pex_shim.sh`; so our SANDBOX_ROOT is
-                    #    `../..`, we calculate `../../config/tool.yml`.
-                    echo "${{SANDBOX_ROOT}}/${{value0}}" "$@"
-                fi
-            }}
-
-            export {" ".join(env_vars)}
-            export PEX_ROOT="$(adjust_relative_paths ${{PEX_ROOT}})"
-
-            execute_pex_args="{execute_pex_args}"
-            target_venv_executable="$(adjust_relative_paths {target_venv_executable})"
-            venv_dir="$(adjust_relative_paths {venv_dir})"
-
-            # Let PEX_TOOLS invocations pass through to the original PEX file since venvs don't come
-            # with tools support.
-            if [ -n "${{PEX_TOOLS:-}}" ]; then
-              exec ${{execute_pex_args}} "$@"
-            fi
-
-            # If the seeded venv has been removed from the PEX_ROOT, we re-seed from the original
-            # `--venv` mode PEX file.
-            if [ ! -e "${{venv_dir}}" ]; then
-                PEX_INTERPRETER=1 ${{execute_pex_args}} -c ''
-            fi
-
-            exec "${{target_venv_executable}}" "$@"
+            {prefix_vars} exec "${{VENV_PEX_DIR}}/{self.pex.name}/pex" "$@"
             """
         )
         return VenvScript(
             script=Script(script_path),
             content=FileContent(path=str(script_path), content=script.encode(), is_executable=True),
-        )
-
-    def exe(self, bash: BashBinary) -> VenvScript:
-        """Writes a safe shim for the venv's executable `pex` script."""
-        script_path = PurePath(f"{self.pex.name}_pex_shim.sh")
-        return self._create_venv_script(
-            bash, script_path=script_path, venv_executable=self.venv_dir / "pex"
         )
 
     def bin(self, bash: BashBinary, name: str) -> VenvScript:
@@ -987,12 +921,17 @@ class VenvScriptWriter:
         return self._create_venv_script(
             bash,
             script_path=script_path,
-            venv_executable=self.venv_dir / "bin" / name,
+            vars={"PEX_SCRIPT": name},
         )
 
     def python(self, bash: BashBinary) -> VenvScript:
         """Writes a safe shim for the venv's python binary."""
-        return self.bin(bash, "python")
+        script_path = PurePath(f"{self.pex.name}_bin_python_shim.sh")
+        return self._create_venv_script(
+            bash,
+            script_path=script_path,
+            vars={"PEX_INTERPRETER": "1"},
+        )
 
 
 @dataclass(frozen=True)
@@ -1080,37 +1019,27 @@ async def create_venv_pex(
         pex_request,
         additional_args=pex_request.additional_args
         + (
-            "--venv",
-            "prepend",
-            "--seed",
-            "verbose",
+            "--venv=prepend",
+            "--sh-boot",
+            "--seed=none",
+            "--no-pre-install-wheels",
             pex_environment.venv_site_packages_copies_option(
                 use_copies=request.site_packages_copies
             ),
         ),
     )
     venv_pex_result = await Get(BuildPexResult, PexRequest, seeded_venv_request)
-    # Pex verbose --seed mode outputs the absolute path of the PEX executable as well as the
-    # absolute path of the PEX_ROOT.  In the --venv case this is the `pex` script in the venv root
-    # directory.
-    seed_info = json.loads(venv_pex_result.result.stdout.decode())
-    abs_pex_root = PurePath(seed_info["pex_root"])
-    abs_pex_path = PurePath(seed_info["pex"])
-    venv_rel_dir = abs_pex_path.relative_to(abs_pex_root).parent
 
+    pex = venv_pex_result.create_pex()
     venv_script_writer = VenvScriptWriter.create(
-        complete_pex_env=request.complete_pex_env,
-        pex=venv_pex_result.create_pex(),
-        venv_rel_dir=venv_rel_dir,
+        pex=pex,
     )
-    pex = venv_script_writer.exe(bash)
     python = venv_script_writer.python(bash)
     scripts = {bin_name: venv_script_writer.bin(bash, bin_name) for bin_name in request.bin_names}
     scripts_digest = await Get(
         Digest,
         CreateDigest(
             (
-                pex.content,
                 python.content,
                 *(venv_script.content for venv_script in scripts.values()),
             )
@@ -1126,10 +1055,10 @@ async def create_venv_pex(
         append_only_caches=append_only_caches,
         env=FrozenDict(request.complete_pex_env.environment_dict()),
         pex_filename=venv_pex_result.pex_filename,
-        pex=pex.script,
+        pex=Script(PurePath(f"{pex.name}/pex")),
         python=python.script,
         bin=FrozenDict((bin_name, venv_script.script) for bin_name, venv_script in scripts.items()),
-        venv_rel_dir=venv_rel_dir.as_posix(),
+        venv_rel_dir="FIXME",
     )
 
 
