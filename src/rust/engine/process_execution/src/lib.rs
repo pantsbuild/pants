@@ -705,6 +705,11 @@ impl Process {
         self.cache_scope = cache_scope;
         self
     }
+
+    pub fn local_keep_sandboxes(mut self, local_keep_sandboxes: local::KeepSandboxes) -> Process {
+        self.execution_environment.local_keep_sandboxes = local_keep_sandboxes;
+        self
+    }
 }
 
 ///
