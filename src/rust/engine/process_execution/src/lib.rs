@@ -486,7 +486,6 @@ pub struct ProcessExecutionEnvironment {
 }
 
 #[derive(DeepSizeOf, Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
 pub enum ProcessConcurrency {
     /// A range of acceptable cpu cores with optional bounds
     Range {
@@ -502,7 +501,32 @@ pub enum ProcessConcurrency {
 impl FromStr for ProcessConcurrency {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        serde_json::from_str(s).map_err(|e| e.to_string())
+        // string is in the form min,max or literal X for exclusive
+        if s == "x" {
+            Ok(ProcessConcurrency::Exclusive)
+        } else if s.contains(",") {
+            let parts = s.split(',').collect::<Vec<_>>();
+            if parts.len() != 2 {
+                return Err(format!("Expected two values for concurrency range, got: {}", s));
+            }
+            let min = parts[0].parse::<usize>().map_err(|e| format!("Invalid min value: {}", e))?;
+            let max = parts[1].parse::<usize>().map_err(|e| format!("Invalid max value: {}", e))?;
+
+            if min < 1 {
+                return Err(format!("Minimum concurrency must be at least 1, got: {}", min));
+            }
+            if max < min {
+                return Err(format!("Maximum concurrency must be at least the minimum concurrency, got: {} and {}", max, min));
+            }
+
+            Ok(ProcessConcurrency::Range { min: Some(min), max: Some(max) })
+        } else {
+            let exactly = s.parse::<usize>().map_err(|e| format!("Invalid concurrency value: {}", e))?;
+            if exactly < 1 {
+                return Err(format!("Concurrency must be at least 1, got: {}", exactly));
+            }
+            Ok(ProcessConcurrency::Range { min: Some(exactly), max: Some(exactly) })
+        }
     }
 }
 
@@ -565,7 +589,6 @@ pub struct Process {
     pub concurrency_available: usize,
 
     /// The number of cores required for this process to run.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub concurrency: Option<ProcessConcurrency>,
 
     #[derivative(PartialEq = "ignore", Hash = "ignore")]

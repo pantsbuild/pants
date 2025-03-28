@@ -76,6 +76,7 @@ struct CommandSpec {
     #[arg(long)]
     concurrency_available: Option<usize>,
 
+    /// The number of cores to use for the process in the form of min,max or x (exclusive)
     #[arg(long)]
     concurrency: Option<ProcessConcurrency>,
 
@@ -608,28 +609,28 @@ mod tests {
         let test_cases = vec![
             (vec![], None),
             (
-                vec!["--concurrency={\"type\":\"range\",\"min\":1}"],
+                vec!["--concurrency=1"],
                 Some(ProcessConcurrency::Range {
                     min: Some(1),
-                    max: None,
+                    max: Some(1),
                 }),
             ),
             (
-                vec!["--concurrency={\"type\":\"range\",\"min\":1,\"max\":4}"],
+                vec!["--concurrency=2,4"],
+                Some(ProcessConcurrency::Range {
+                    min: Some(2),
+                    max: Some(4),
+                }),
+            ),
+            (
+                vec!["--concurrency=1,4"],
                 Some(ProcessConcurrency::Range {
                     min: Some(1),
                     max: Some(4),
                 }),
             ),
             (
-                vec!["--concurrency={\"type\":\"range\",\"max\":4}"],
-                Some(ProcessConcurrency::Range {
-                    min: None,
-                    max: Some(4),
-                }),
-            ),
-            (
-                vec!["--concurrency={\"type\":\"exclusive\"}"],
+                vec!["--concurrency=x"],
                 Some(ProcessConcurrency::Exclusive),
             ),
         ];
@@ -641,6 +642,51 @@ mod tests {
 
             let opt = Opt::try_parse_from(full_args).unwrap();
             assert_eq!(opt.command.concurrency, expected_concurrency);
+        }
+    }
+
+    #[test]
+    fn test_process_args_errors() {
+        let test_cases = vec![
+            (
+                vec!["--concurrency=0"],
+                "error: invalid value '0' for '--concurrency <CONCURRENCY>': Concurrency must be at least 1, got: 0",
+            ),
+            (
+                vec!["--concurrency=4,2"], 
+                "error: invalid value '4,2' for '--concurrency <CONCURRENCY>': Maximum concurrency must be at least the minimum concurrency, got: 2 and 4",
+            ),
+            (
+                vec!["--concurrency=1,2,3"],
+                "error: invalid value '1,2,3' for '--concurrency <CONCURRENCY>': Expected two values for concurrency range, got: 1,2,3",
+            ),
+            (
+                vec!["--concurrency=abc"],
+                "error: invalid value 'abc' for '--concurrency <CONCURRENCY>': Invalid concurrency value: invalid digit found in string",
+            ),
+            (
+                vec!["--concurrency=1,abc"],
+                "error: invalid value '1,abc' for '--concurrency <CONCURRENCY>': Invalid max value: invalid digit found in string", 
+            ),
+        ];
+
+        for (args, expected_error) in test_cases {
+            let mut full_args = vec!["process_executor"];
+            full_args.extend(args);
+            full_args.extend(vec!["--", "/bin/echo", "test"]);
+
+            let result = Opt::try_parse_from(full_args);
+            match result {
+                Ok(opt) => {
+                    assert!(false, "Expected error '{}' but got '{:?}'", expected_error, opt.command.concurrency);
+                }
+                Err(e) => {
+                    // remove \n\nFor more information, try '--help'.\n if present
+                    let original_error = e.to_string();
+                    let error_message = original_error.split("\n\nFor more information, try '--help'.\n").next().unwrap();
+                    assert_eq!(error_message, expected_error);
+                }
+            }
         }
     }
 }
