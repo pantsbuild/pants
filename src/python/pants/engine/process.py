@@ -68,8 +68,12 @@ class ProcessConcurrency:
             )
 
     @staticmethod
-    def range(min: int | None = None, max: int | None = None):
+    def range(max: int, min: int = 1):
         return ProcessConcurrency("range", min, max)
+
+    @staticmethod
+    def exactly(count: int):
+        return ProcessConcurrency("range", count, count)
 
     @staticmethod
     def exclusive():
@@ -180,6 +184,13 @@ class Process:
             self, "remote_cache_speculation_delay_millis", remote_cache_speculation_delay_millis
         )
         object.__setattr__(self, "attempt", attempt)
+
+    def __post_init__(self) -> None:
+        if self.concurrency_available and self.concurrency:
+            raise ValueError(
+                "Cannot specify both concurrency_available and concurrency. "
+                "Only one concurrency setting may be used at a time."
+            )
 
 
 @dataclass(frozen=True)
