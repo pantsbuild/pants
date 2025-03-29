@@ -13,8 +13,8 @@ from pants.backend.javascript.package_json import PackageJsonTarget
 from pants.backend.javascript.subsystems import nodejs_tool
 from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase, NodeJSToolRequest
 from pants.engine.internals.native_engine import EMPTY_DIGEST
-from pants.engine.process import Process, ProcessResult
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.engine.process import InteractiveProcess, Process, ProcessResult
+from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
 from pants.util.logging import LogLevel
 
 
@@ -52,8 +52,8 @@ def test_version_option_overrides_default(rule_runner: RuleRunner):
     "package_manager, expected_argv",
     [
         pytest.param("yarn", ("yarn", "dlx", "--quiet"), id="yarn"),
-        pytest.param("npm", ("npm", "exec", "--yes", "--"), id="npm"),
-        pytest.param("pnpm", ("pnpm", "dlx"), id="pnpm"),
+        pytest.param("npm", ("npm@10.8.2", "exec", "--yes", "--"), id="npm"),
+        pytest.param("pnpm", ("pnpm@9.5.0", "dlx"), id="pnpm"),
     ],
 )
 def test_execute_process_with_package_manager(
@@ -74,7 +74,13 @@ def test_execute_process_with_package_manager(
 
     to_run = rule_runner.request(Process, [request])
 
-    assert to_run.argv == expected_argv + ("cowsay@1.6.0", "--version")
+    ip = InteractiveProcess.from_process(to_run)
+    with mock_console(rule_runner.options_bootstrapper) as mocked_console:
+        interactive_result = rule_runner.run_interactive_process(ip)
+        assert interactive_result.exit_code == 0, mocked_console[1].get_stderr()
+
+    # Remove the corepack binary path from argv.
+    assert to_run.argv[1:] == expected_argv + ("cowsay@1.6.0", "--version")
 
     result = rule_runner.request(ProcessResult, [request])
 
@@ -193,8 +199,12 @@ def request_package_manager_version_for_tool(
 ) -> str:
     request = tool.request((), EMPTY_DIGEST, "Inspect package manager version", LogLevel.DEBUG)
     process = rule_runner.request(Process, [request])
+    if process.argv[0].find("corepack") != -1:
+        args = process.argv[:2] + ("--version",)
+    else:
+        args = (package_manager, "--version")
     result = rule_runner.request(
         ProcessResult,
-        [dataclasses.replace(process, argv=(package_manager, "--version"))],
+        [dataclasses.replace(process, argv=args)],
     )
     return result.stdout.decode().strip()
