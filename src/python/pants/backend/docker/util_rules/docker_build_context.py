@@ -166,7 +166,8 @@ class DockerBuildContext:
     ) -> tuple[set[str], dict[str, str]]:
         # Go over all FROM tags and names for all stages.
         stage_names: set[str] = set()
-        stage_tags = (tag.split(maxsplit=1) for tag in dockerfile_info.version_tags)
+        # tag is empty if image is referenced by digest instead
+        stage_tags = ([*tag.split(maxsplit=1), ""][:2] for tag in dockerfile_info.version_tags)
         tags_values: dict[str, str] = {}
         for idx, (stage, tag) in enumerate(stage_tags):
             if tag.startswith("build-arg:"):
@@ -189,10 +190,11 @@ class DockerBuildContext:
 
             if stage != f"stage{idx}":
                 stage_names.add(stage)
-            if idx == 0:
-                # Expose the first (stage0) FROM directive as the "baseimage".
-                tags_values["baseimage"] = tag
-            tags_values[stage] = tag
+            if tag:
+                if idx == 0:
+                    # Expose the first (stage0) FROM directive as the "baseimage".
+                    tags_values["baseimage"] = tag
+                tags_values[stage] = tag
 
         return stage_names, tags_values
 
