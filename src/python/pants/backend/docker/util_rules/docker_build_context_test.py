@@ -788,7 +788,8 @@ def test_create_docker_build_context() -> None:
             copy_source_paths=(),
             copy_build_args=DockerBuildArgs.from_strings(),
             from_image_build_args=DockerBuildArgs.from_strings(),
-            version_tags=("base latest", "stage1 1.2", "dev 2.0", "prod 2.0"),
+            # Stage without tags tests regression of #22108
+            version_tags=("base latest", "stage1 1.2", "dev 2.0", "prod 2.0", "stage4"),
         ),
     )
     assert list(context.build_args) == ["ARGNAME=value1"]
@@ -796,6 +797,35 @@ def test_create_docker_build_context() -> None:
     assert context.upstream_image_ids == ("abc", "def")
     assert context.dockerfile == "test/Dockerfile"
     assert context.stages == ("base", "dev", "prod")
+    assert context.interpolation_context["tags"] == {
+        "baseimage": "latest",
+        "base": "latest",
+        "stage1": "1.2",
+        "dev": "2.0",
+        "prod": "2.0",
+    }
+
+
+def test_create_docker_build_context_digest_only() -> None:
+    context = DockerBuildContext.create(
+        build_args=DockerBuildArgs.from_strings("ARGNAME=value1"),
+        snapshot=EMPTY_SNAPSHOT,
+        build_env=DockerBuildEnvironment.create({"ENVNAME": "value2"}),
+        upstream_image_ids=["def", "abc"],
+        dockerfile_info=DockerfileInfo(
+            address=Address("test"),
+            digest=EMPTY_DIGEST,
+            source="test/Dockerfile",
+            build_args=DockerBuildArgs.from_strings(),
+            copy_source_paths=(),
+            copy_build_args=DockerBuildArgs.from_strings(),
+            from_image_build_args=DockerBuildArgs.from_strings(),
+            # Stage without tags tests regression of #22108
+            version_tags=("bydigest",),
+        ),
+    )
+    assert context.stages == ("bydigest",)
+    assert context.interpolation_context["tags"] == {}
 
 
 def test_pex_custom_output_path_issue14031(rule_runner: RuleRunner) -> None:
