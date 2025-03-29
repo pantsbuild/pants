@@ -260,12 +260,16 @@ def test_complete_platforms(rule_runner: PythonRuleRunner, target_type: str) -> 
     linux_complete_platform = pkgutil.get_data(__name__, "platform-linux-py38.json")
     assert linux_complete_platform is not None
 
+    linux_arm64_complete_platform = pkgutil.get_data(__name__, "platform-linux-arm64-py311.json")
+    assert linux_arm64_complete_platform is not None
+
     mac_complete_platform = pkgutil.get_data(__name__, "platform-mac-py38.json")
     assert mac_complete_platform is not None
 
     rule_runner.write_files(
         {
             "src/py/project/platform-linux-py38.json": linux_complete_platform,
+            "src/py/project/platform-linux-arm64-py311.json": linux_arm64_complete_platform,
             "src/py/project/platform-mac-py38.json": mac_complete_platform,
             "src/py/project/BUILD": dedent(
                 f"""\
@@ -300,6 +304,7 @@ def test_complete_platforms(rule_runner: PythonRuleRunner, target_type: str) -> 
     assert sorted(
         [
             "p537-1.0.6-cp38-cp38-manylinux_2_5_x86_64.manylinux1_x86_64.whl",
+            "p537-1.0.6-cp311-cp311-linux_aarch64.whl",
             "p537-1.0.6-cp38-cp38-macosx_10_15_x86_64.whl",
         ]
     ) == sorted(pex_info["distributions"])
