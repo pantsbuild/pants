@@ -493,38 +493,52 @@ async fn preemption() {
 fn test_balance(
     total_concurrency: usize,
     expected_preempted: usize,
-    task_defs: Vec<(usize, usize, usize)>,
+    task_defs: Vec<(usize, usize, usize, usize)>,
 ) {
     let ten_minutes_from_now = Instant::now() + Duration::from_secs(10 * 60);
     let tasks = task_defs
         .iter()
         .enumerate()
-        .map(|(id, (desired, actual, _))| {
-            Arc::new(Task::new(id, *desired, *actual, ten_minutes_from_now))
+        .map(|(id, (min, desired, actual, _))| {
+            Arc::new(Task::new(id, *min, *desired, *actual, ten_minutes_from_now))
         })
         .collect::<Vec<_>>();
 
     let mut state = State::new_for_tests(total_concurrency, tasks.clone());
 
     assert_eq!(expected_preempted, balance(Instant::now(), &mut state));
-    for (task, (_, _, expected)) in tasks.iter().zip(task_defs.into_iter()) {
+    for (task, (_, _, _, expected)) in tasks.iter().zip(task_defs.into_iter()) {
         assert_eq!(expected, task.concurrency());
     }
 }
 
 #[tokio::test]
 async fn balance_noop() {
-    test_balance(2, 0, vec![(1, 1, 1), (1, 1, 1)]);
+    test_balance(2, 0, vec![(1, 1, 1, 1), (1, 1, 1, 1)]);
 }
 
 #[tokio::test]
 async fn balance_overcommitted() {
     // Preempt the first Task and give it one slot, without adjusting the second task.
-    test_balance(2, 1, vec![(2, 2, 1), (1, 1, 1)]);
+    test_balance(2, 1, vec![(1, 2, 2, 1), (1, 1, 1, 1)]);
 }
 
 #[tokio::test]
 async fn balance_undercommitted() {
     // Should preempt both Tasks to give them more concurrency.
-    test_balance(4, 2, vec![(2, 1, 2), (2, 1, 2)]);
+    test_balance(4, 2, vec![(1, 2, 1, 2), (1, 2, 1, 2)]);
+}
+
+#[tokio::test]
+async fn balance_overcommitted_with_minimum_constraints() {
+    // First task cannot be preempted because of the minimum concurrency requirement
+    // So the second task will be preempted and given less concurrency
+    test_balance(6, 1, vec![(4, 4, 4, 4), (1, 4, 3, 2)]);
+}
+
+#[tokio::test]
+async fn balance_overcommitted_with_minimum_and_range() {
+    // Both tasks are preempted to even out the allocation
+    // But the minimum constraint on the first task is respected
+    test_balance(6, 2, vec![(4, 6, 6, 4), (1, 6, 3, 2)]);
 }

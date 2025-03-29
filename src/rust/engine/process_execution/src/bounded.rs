@@ -147,9 +147,11 @@ impl crate::CommandRunner for CommandRunner {
                 );
             }
 
-            let can_preempt = matches!(process.concurrency, Some(ProcessConcurrency::Range { .. }))
-                || process.concurrency_available > 0;
-            if can_preempt {
+            let has_concurrency_template =
+                matches!(process.concurrency, Some(ProcessConcurrency::Range { .. }))
+                    || process.concurrency_available > 0;
+
+            if has_concurrency_template {
                 let concurrency = format!("{}", permit.concurrency());
                 let mut matched = false;
                 process.argv = std::mem::take(&mut process.argv)
@@ -345,14 +347,18 @@ impl AsyncSemaphore {
             //
             // This is because we cannot anticipate the number of inbound processes, and we never want to
             // delay a process from starting.
-            let concurrency_desired = max(max_concurrency, min_concurrency);
-            let concurrency_actual = min(
-                concurrency_desired,
+            let mut concurrency_actual = min(
+                max_concurrency,
                 state.total_concurrency / (state.tasks.len() + 1),
             );
+
+            // We've acquired a minimum level of concurrency
+            concurrency_actual = max(concurrency_actual, min_concurrency);
+
             let task = Arc::new(Task::new(
                 id,
-                concurrency_desired,
+                min_concurrency,
+                max_concurrency,
                 concurrency_actual,
                 Instant::now() + self.preemptible_duration,
             ));
@@ -403,7 +409,8 @@ impl Drop for Permit<'_> {
 
 pub(crate) struct Task {
     id: usize,
-    concurrency_desired: usize,
+    concurrency_min: usize,
+    concurrency_max: usize,
     pub(crate) concurrency_actual: atomic::AtomicUsize,
     notify_concurrency_changed: Notify,
     preemptible_until: Instant,
@@ -412,14 +419,20 @@ pub(crate) struct Task {
 impl Task {
     pub(crate) fn new(
         id: usize,
-        concurrency_desired: usize,
+        concurrency_min: usize,
+        concurrency_max: usize,
         concurrency_actual: usize,
         preemptible_until: Instant,
     ) -> Self {
-        assert!(concurrency_actual <= concurrency_desired);
+        assert!(concurrency_min >= 1);
+        assert!(concurrency_min <= concurrency_max);
+        assert!(concurrency_actual >= concurrency_min);
+        assert!(concurrency_actual <= concurrency_max);
+
         Self {
             id,
-            concurrency_desired,
+            concurrency_min,
+            concurrency_max,
             concurrency_actual: atomic::AtomicUsize::new(concurrency_actual),
             notify_concurrency_changed: Notify::new(),
             preemptible_until,
@@ -462,7 +475,7 @@ pub(crate) fn balance(now: Instant, state: &mut State) -> usize {
                 .iter()
                 .filter_map(|t| {
                     // A task may never have less than one slot.
-                    let relinquishable = t.concurrency() - 1;
+                    let relinquishable = t.concurrency() - t.concurrency_min;
                     if relinquishable > 0 && t.preemptible(now) {
                         Some((relinquishable, t))
                     } else {
@@ -491,7 +504,7 @@ pub(crate) fn balance(now: Instant, state: &mut State) -> usize {
                 .tasks
                 .iter()
                 .filter_map(|t| {
-                    let desired = t.concurrency_desired - t.concurrency();
+                    let desired = t.concurrency_max - t.concurrency();
                     if desired > 0 && t.preemptible(now) {
                         Some((desired, t))
                     } else {
