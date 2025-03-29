@@ -7,6 +7,7 @@ python_tests(
     timeout=120,
     overrides={
         "embed_integration_test.py": {"timeout": 240},
-        "cgo_test.py": {"timeout": 240},
+        "cgo_test.py": {"dependencies": [":go_sum"], "timeout": 240},
     },
 )
+resources(name="go_sum", sources=["*_mod.sum"])
