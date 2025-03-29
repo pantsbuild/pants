@@ -53,7 +53,7 @@ class ProcessCacheScope(Enum):
 
 @dataclass(frozen=True)
 class ProcessConcurrency:
-    kind: Literal["range", "exclusive"]
+    kind: Literal["exactly", "range", "exclusive"]
     min: int | None = None
     max: int | None = None
 
@@ -66,17 +66,39 @@ class ProcessConcurrency:
             raise ValueError(
                 f"min concurrency must be <= max concurrency, got {self.min} and {self.max}"
             )
+        if self.kind == "exactly" and self.min != self.max:
+            raise ValueError(
+                f"exactly concurrency must have min and max equal, got {self.min} and {self.max}"
+            )
 
     @staticmethod
     def range(max: int, min: int = 1):
+        """The amount of parallelism that this process is capable of given its inputs. This value
+        does not directly set the number of cores allocated to the process: that is computed based
+        on availability, and provided as a template value in the arguments of the process.
+
+        When set, a `{pants_concurrency}` variable will be templated into the `argv` of the process.
+
+        Processes which set this value may be preempted (i.e. canceled and restarted) for a short
+        period after starting if available resources have changed (because other processes have
+        started or finished).
+        """
         return ProcessConcurrency("range", min, max)
 
     @staticmethod
     def exactly(count: int):
-        return ProcessConcurrency("range", count, count)
+        """A specific number of cores required to run the process.
+
+        The process will wait until the specified number of cores are available.
+        """
+        return ProcessConcurrency("exactly", count, count)
 
     @staticmethod
     def exclusive():
+        """Exclusive access to all cores.
+
+        No other processes will be scheduled to run while this process is running.
+        """
         return ProcessConcurrency("exclusive")
 
 

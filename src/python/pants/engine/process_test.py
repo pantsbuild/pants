@@ -418,23 +418,54 @@ def test_workspace_execution_support() -> None:
     "concurrency",
     [
         ProcessConcurrency.exactly(1),
+        ProcessConcurrency.exactly(2),
+        ProcessConcurrency.exclusive(),
+    ],
+)
+def test_concurrency(rule_runner: RuleRunner, concurrency: ProcessConcurrency) -> None:
+    test_description = f"concurrency-test-{concurrency.kind}-{concurrency.min}-{concurrency.max}"
+    process = Process(
+        argv=("/bin/echo", test_description),
+        concurrency=concurrency,
+        description=test_description,
+    )
+    result = rule_runner.request(ProcessResult, [process])
+    assert result.stdout.decode() == test_description + "\n"
+    assert result.stderr == b""
+
+
+@pytest.mark.parametrize(
+    "concurrency",
+    [
         ProcessConcurrency.range(1, min=1),
         ProcessConcurrency.range(max=2),
         ProcessConcurrency.range(max=2, min=1),
-        ProcessConcurrency.exclusive(),
         # Values larger than num cores still work (they get clamped to num cores)
         ProcessConcurrency.range(max=10000),
         ProcessConcurrency.range(min=100, max=200),
     ],
 )
-def test_concurrency(rule_runner: RuleRunner, concurrency: ProcessConcurrency) -> None:
+def test_concurrency_range(rule_runner: RuleRunner, concurrency: ProcessConcurrency) -> None:
+    test_description = f"concurrency-test-{concurrency.kind}-{concurrency.min}-{concurrency.max}"
     process = Process(
-        argv=("/bin/echo", "hello"),
+        # range concurrency must be templated with {pants_concurrency}
+        argv=("/bin/echo", test_description + " {pants_concurrency}"),
         concurrency=concurrency,
+        description=test_description,
+    )
+    result = rule_runner.request(ProcessResult, [process])
+    assert result.stdout.decode().startswith(test_description)
+    assert result.stderr == b""
+
+
+def test_concurrency_templating(rule_runner: RuleRunner) -> None:
+    process = Process(
+        argv=("/bin/echo", "concurrency: {pants_concurrency}"),
+        concurrency=ProcessConcurrency.range(max=1),
         description="concurrency-test",
     )
     result = rule_runner.request(ProcessResult, [process])
-    assert result.stdout == b"hello\n"
+    assert result.stdout == b"concurrency: 1\n"
     assert result.stderr == b""
 
 
@@ -445,8 +476,9 @@ def test_concurrency_enum():
     min_one_max_two = ProcessConcurrency.range(min=1, max=2)
     exclusive = ProcessConcurrency.exclusive()
 
-    assert exactly_one.kind == "range"
-    assert exactly_one == min_one  # these are the same
+    assert exactly_one.kind == "exactly"
+    assert exactly_one.min == 1
+    assert exactly_one.max == 1
 
     up_to_two = ProcessConcurrency.range(2)
     assert up_to_two.kind == "range"
