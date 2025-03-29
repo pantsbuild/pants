@@ -23,6 +23,7 @@ use tokio_util::codec::{BytesCodec, FramedRead};
 use workunit_store::{RunningWorkunit, in_workunit};
 
 use crate::fork_exec::spawn_process;
+use crate::local::CapturedWorkdirError;
 use crate::{
     Context, FallibleProcessResultWithPlatform, ManagedChild, NamedCaches, Process, ProcessError,
     local::{
@@ -158,7 +159,7 @@ impl CapturedWorkdir for CommandRunner {
         build_root: Self::WorkdirToken,
         req: Process,
         exclusive_spawn: bool,
-    ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String> {
+    ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, CapturedWorkdirError> {
         let cwd = if let Some(working_directory) = &req.working_directory {
             build_root.join(working_directory)
         } else {
