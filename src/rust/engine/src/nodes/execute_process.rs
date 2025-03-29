@@ -133,6 +133,10 @@ impl ExecuteProcess {
                     .map_err(|e| format!("Failed to get `kind` from field: {e}"))?;
 
                 match kind_opt {
+                    Some(kind) if kind == "exactly" => {
+                        let count: usize = externs::getattr(&conc, "min")?;
+                        Ok(Some(ProcessConcurrency::Exactly { count }))
+                    }
                     Some(kind) if kind == "range" => {
                         let min: Option<usize> = externs::getattr(&conc, "min")?;
                         let max: Option<usize> = externs::getattr(&conc, "max")?;
