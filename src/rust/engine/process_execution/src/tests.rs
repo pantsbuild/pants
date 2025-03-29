@@ -19,7 +19,7 @@ use workunit_store::RunId;
 
 use crate::{
     CacheName, Platform, Process, ProcessExecutionEnvironment, ProcessExecutionStrategy,
-    ProcessResultMetadata, ProcessResultSource, maybe_make_wrapper_script,
+    ProcessResultMetadata, ProcessResultSource, local::KeepSandboxes, maybe_make_wrapper_script,
 };
 
 #[test]
@@ -63,6 +63,7 @@ fn process_result_metadata_to_and_from_executed_action_metadata() {
         name: None,
         platform: Platform::Linux_x86_64,
         strategy: ProcessExecutionStrategy::Local,
+        local_keep_sandboxes: KeepSandboxes::Never,
     };
     let action_metadata = ExecutedActionMetadata {
         worker_start_timestamp: Some(Timestamp {
@@ -128,6 +129,7 @@ fn process_result_metadata_time_saved_from_cache() {
         name: None,
         platform: Platform::Linux_x86_64,
         strategy: ProcessExecutionStrategy::Local,
+        local_keep_sandboxes: KeepSandboxes::Never,
     };
     let mut metadata = ProcessResultMetadata::new(
         Some(concrete_time::Duration::new(5, 150)),

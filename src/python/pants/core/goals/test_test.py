@@ -110,6 +110,7 @@ def make_process_result_metadata(
             remote_execution=remote_execution,
             remote_execution_extra_platform_properties=[],
             execute_in_workspace=False,
+            keep_sandboxes="never",
         ),
         source,
         source_run_id,

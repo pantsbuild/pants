@@ -616,7 +616,6 @@ class ExecutionOptions:
     remote_client_certs_path: str | None
     remote_client_key_path: str | None
 
-    keep_sandboxes: KeepSandboxes
     local_cache: bool
     process_execution_local_parallelism: int
     process_execution_local_enable_nailgun: bool
@@ -665,7 +664,6 @@ class ExecutionOptions:
             remote_client_certs_path=bootstrap_options.remote_client_certs_path,
             remote_client_key_path=bootstrap_options.remote_client_key_path,
             # Process execution setup.
-            keep_sandboxes=GlobalOptions.resolve_keep_sandboxes(bootstrap_options),
             local_cache=bootstrap_options.local_cache,
             process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
             process_execution_remote_parallelism=dynamic_remote_options.parallelism,
@@ -764,7 +762,6 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_local_parallelism=CPU_COUNT,
     process_execution_remote_parallelism=128,
     process_execution_cache_namespace=None,
-    keep_sandboxes=KeepSandboxes.never,
     local_cache=True,
     cache_content_behavior=CacheContentBehavior.fetch,
     process_execution_local_enable_nailgun=True,
@@ -1309,32 +1306,6 @@ class BootstrapOptions:
             """
             Whether to cache process executions in a local cache persisted to disk at
             `--local-store-dir`.
-            """
-        ),
-    )
-    process_cleanup = BoolOption(
-        default=(DEFAULT_EXECUTION_OPTIONS.keep_sandboxes == KeepSandboxes.never),
-        removal_version="3.0.0.dev0",
-        removal_hint="Use the `keep_sandboxes` option instead.",
-        help=softwrap(
-            """
-            If false, Pants will not clean up local directories used as chroots for running
-            processes. Pants will log their location so that you can inspect the chroot, and
-            run the `__run.sh` script to recreate the process using the same argv and
-            environment variables used by Pants. This option is useful for debugging.
-            """
-        ),
-    )
-    keep_sandboxes = EnumOption(
-        default=DEFAULT_EXECUTION_OPTIONS.keep_sandboxes,
-        help=softwrap(
-            """
-            Controls whether Pants will clean up local directories used as chroots for running
-            processes.
-
-            Pants will log their location so that you can inspect the chroot, and run the
-            `__run.sh` script to recreate the process using the same argv and environment variables
-            used by Pants. This option is useful for debugging.
             """
         ),
     )
@@ -1940,6 +1911,34 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         advanced=True,
     )
 
+    process_cleanup = BoolOption(
+        # Should be aligned to `keep_sandboxes`'s `default`
+        default=True,
+        removal_version="3.0.0.dev0",
+        removal_hint="Use the `keep_sandboxes` option instead.",
+        help=softwrap(
+            """
+            If false, Pants will not clean up local directories used as chroots for running
+            processes. Pants will log their location so that you can inspect the chroot, and
+            run the `__run.sh` script to recreate the process using the same argv and
+            environment variables used by Pants. This option is useful for debugging.
+            """
+        ),
+    )
+    keep_sandboxes = EnumOption(
+        default=KeepSandboxes.never,
+        help=softwrap(
+            """
+            Controls whether Pants will clean up local directories used as chroots for running
+            processes.
+
+            Pants will log their location so that you can inspect the chroot, and run the
+            `__run.sh` script to recreate the process using the same argv and environment variables
+            used by Pants. This option is useful for debugging.
+            """
+        ),
+    )
+
     docker_execution = BoolOption(
         default=True,
         advanced=True,
@@ -2104,15 +2103,15 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
     @staticmethod
     def resolve_keep_sandboxes(
-        bootstrap_options: OptionValueContainer,
+        global_options: OptionValueContainer,
     ) -> KeepSandboxes:
         resolved_value = resolve_conflicting_options(
             old_option="process_cleanup",
             new_option="keep_sandboxes",
             old_scope="",
             new_scope="",
-            old_container=bootstrap_options,
-            new_container=bootstrap_options,
+            old_container=global_options,
+            new_container=global_options,
         )
 
         if isinstance(resolved_value, bool):

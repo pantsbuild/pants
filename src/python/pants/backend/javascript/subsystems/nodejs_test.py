@@ -453,6 +453,7 @@ def test_node_process_environment_with_tools(rule_runner: RuleRunner) -> None:
                     remote_execution=False,
                     remote_execution_extra_platform_properties=[],
                     execute_in_workspace=False,
+                    keep_sandboxes="never",
                 ),
                 "ran_locally",
                 0,

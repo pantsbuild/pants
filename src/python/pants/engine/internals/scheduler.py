@@ -223,7 +223,6 @@ class Scheduler:
             local_cache=execution_options.local_cache,
             remote_cache_read=execution_options.remote_cache_read,
             remote_cache_write=execution_options.remote_cache_write,
-            local_keep_sandboxes=execution_options.keep_sandboxes.value,
             local_parallelism=execution_options.process_execution_local_parallelism,
             local_enable_nailgun=execution_options.process_execution_local_enable_nailgun,
             remote_parallelism=execution_options.process_execution_remote_parallelism,

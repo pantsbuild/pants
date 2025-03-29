@@ -138,7 +138,6 @@ impl RemotingOptions {
 pub struct ExecutionStrategyOptions {
     pub local_parallelism: usize,
     pub remote_parallelism: usize,
-    pub local_keep_sandboxes: local::KeepSandboxes,
     pub local_cache: bool,
     pub local_enable_nailgun: bool,
     pub remote_cache_read: bool,
@@ -221,7 +220,6 @@ impl Core {
             local_execution_root_dir.to_path_buf(),
             named_caches.clone(),
             immutable_inputs.clone(),
-            exec_strategy_opts.local_keep_sandboxes,
             spawn_lock.clone(),
         );
 
@@ -285,7 +283,6 @@ impl Core {
             &docker::IMAGE_PULL_CACHE,
             local_execution_root_dir.to_path_buf(),
             immutable_inputs.clone(),
-            exec_strategy_opts.local_keep_sandboxes,
         )?);
         let runner = Box::new(SwitchedCommandRunner::new(docker_runner, runner, |req| {
             matches!(

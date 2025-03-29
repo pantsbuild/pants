@@ -481,6 +481,7 @@ pub struct ProcessExecutionEnvironment {
     pub name: Option<String>,
     pub platform: Platform,
     pub strategy: ProcessExecutionStrategy,
+    pub local_keep_sandboxes: local::KeepSandboxes,
 }
 
 ///
@@ -619,6 +620,7 @@ impl Process {
                 name: None,
                 platform: Platform::current().unwrap(),
                 strategy: ProcessExecutionStrategy::Local,
+                local_keep_sandboxes: local::KeepSandboxes::Never,
             },
             remote_cache_speculation_delay: std::time::Duration::from_millis(0),
             attempt: 0,
@@ -676,6 +678,7 @@ impl Process {
             name: None,
             platform: Platform::current().unwrap(),
             strategy: ProcessExecutionStrategy::Docker(image),
+            local_keep_sandboxes: local::KeepSandboxes::Never,
         };
         self
     }
@@ -688,6 +691,7 @@ impl Process {
             name: None,
             platform: Platform::current().unwrap(),
             strategy: ProcessExecutionStrategy::RemoteExecution(properties),
+            local_keep_sandboxes: local::KeepSandboxes::Never,
         };
         self
     }
@@ -699,6 +703,11 @@ impl Process {
 
     pub fn cache_scope(mut self, cache_scope: ProcessCacheScope) -> Process {
         self.cache_scope = cache_scope;
+        self
+    }
+
+    pub fn local_keep_sandboxes(mut self, local_keep_sandboxes: local::KeepSandboxes) -> Process {
+        self.execution_environment.local_keep_sandboxes = local_keep_sandboxes;
         self
     }
 }

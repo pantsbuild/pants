@@ -26,7 +26,7 @@ use process_execution::{
     CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context, EntireExecuteRequest,
     FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
     ProcessExecutionEnvironment, ProcessExecutionStrategy, ProcessResultMetadata,
-    ProcessResultSource, make_execute_request,
+    ProcessResultSource, local::KeepSandboxes, make_execute_request,
 };
 
 const CACHE_READ_TIMEOUT: Duration = Duration::from_secs(5);
@@ -58,6 +58,7 @@ impl MockLocalCommandRunner {
                         name: None,
                         platform: Platform::current().unwrap(),
                         strategy: ProcessExecutionStrategy::Local,
+                        local_keep_sandboxes: KeepSandboxes::Never,
                     },
                     RunId(0),
                 ),
@@ -805,6 +806,7 @@ async fn make_action_result_basic() {
                 name: None,
                 platform: Platform::Linux_x86_64,
                 strategy: ProcessExecutionStrategy::Local,
+                local_keep_sandboxes: KeepSandboxes::Never,
             },
             RunId(0),
         ),
