@@ -9,8 +9,8 @@ use deepsize::DeepSizeOf;
 use fs::RelativePath;
 use graph::CompoundNode;
 use process_execution::{
-    self, CacheName, InputDigests, Process, ProcessCacheScope, ProcessExecutionStrategy,
-    ProcessResultSource,
+    self, CacheName, InputDigests, Process, ProcessCacheScope, ProcessConcurrency,
+    ProcessExecutionStrategy, ProcessResultSource,
 };
 use pyo3::Bound;
 use pyo3::prelude::{PyAny, Python};
@@ -125,6 +125,29 @@ impl ExecuteProcess {
 
         let concurrency_available: usize = externs::getattr(value, "concurrency_available")?;
 
+        let concurrency_value: Option<Bound<'_, PyAny>> = externs::getattr(value, "concurrency")?;
+        let concurrency: Option<ProcessConcurrency> = match concurrency_value {
+            None => Ok(None),
+            Some(conc) => {
+                let kind_opt = externs::getattr_as_optional_string(&conc, "kind")
+                    .map_err(|e| format!("Failed to get `kind` from field: {e}"))?;
+
+                match kind_opt {
+                    Some(kind) if kind == "exactly" => {
+                        let count: usize = externs::getattr(&conc, "min")?;
+                        Ok(Some(ProcessConcurrency::Exactly { count }))
+                    }
+                    Some(kind) if kind == "range" => {
+                        let min: Option<usize> = externs::getattr(&conc, "min")?;
+                        let max: Option<usize> = externs::getattr(&conc, "max")?;
+                        Ok(Some(ProcessConcurrency::Range { min, max }))
+                    }
+                    Some(kind) if kind == "exclusive" => Ok(Some(ProcessConcurrency::Exclusive)),
+                    _ => Err(format!("Unknown ProcessConcurrency kind: {:?}", kind_opt)),
+                }
+            }
+        }?;
+
         let cache_scope: ProcessCacheScope = {
             let cache_scope_enum: Bound<'_, PyAny> = externs::getattr(value, "cache_scope")?;
             externs::getattr::<String>(&cache_scope_enum, "name")?.try_into()?
@@ -151,6 +174,7 @@ impl ExecuteProcess {
             jdk_home,
             execution_slot_variable,
             concurrency_available,
+            concurrency,
             cache_scope,
             execution_environment: process_config.environment,
             remote_cache_speculation_delay,

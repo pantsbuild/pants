@@ -29,6 +29,7 @@ from pants.engine.process import (
     InteractiveProcessResult,
     Process,
     ProcessCacheScope,
+    ProcessConcurrency,
     ProcessResult,
 )
 from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
@@ -411,3 +412,102 @@ def test_workspace_execution_support() -> None:
     assert result3.stderr.decode() == "this-goes-to-stderr\n"
     snapshot = rule_runner.request(Snapshot, [result3.output_digest])
     assert snapshot.files == ("capture-this-file",)
+
+
+@pytest.mark.parametrize(
+    "concurrency",
+    [
+        ProcessConcurrency.exactly(1),
+        ProcessConcurrency.exactly(2),
+        ProcessConcurrency.exclusive(),
+    ],
+)
+def test_concurrency(rule_runner: RuleRunner, concurrency: ProcessConcurrency) -> None:
+    test_description = f"concurrency-test-{concurrency.kind}-{concurrency.min}-{concurrency.max}"
+    process = Process(
+        argv=("/bin/echo", test_description),
+        concurrency=concurrency,
+        description=test_description,
+    )
+    result = rule_runner.request(ProcessResult, [process])
+    assert result.stdout.decode() == test_description + "\n"
+    assert result.stderr == b""
+
+
+@pytest.mark.parametrize(
+    "concurrency",
+    [
+        ProcessConcurrency.range(1, min=1),
+        ProcessConcurrency.range(max=2),
+        ProcessConcurrency.range(max=2, min=1),
+        # Values larger than num cores still work (they get clamped to num cores)
+        ProcessConcurrency.range(max=10000),
+        ProcessConcurrency.range(min=100, max=200),
+    ],
+)
+def test_concurrency_range(rule_runner: RuleRunner, concurrency: ProcessConcurrency) -> None:
+    test_description = f"concurrency-test-{concurrency.kind}-{concurrency.min}-{concurrency.max}"
+    process = Process(
+        # range concurrency must be templated with {pants_concurrency}
+        argv=("/bin/echo", test_description + " {pants_concurrency}"),
+        concurrency=concurrency,
+        description=test_description,
+    )
+    result = rule_runner.request(ProcessResult, [process])
+    assert result.stdout.decode().startswith(test_description)
+    assert result.stderr == b""
+
+
+def test_concurrency_templating(rule_runner: RuleRunner) -> None:
+    process = Process(
+        argv=("/bin/echo", "concurrency: {pants_concurrency}"),
+        concurrency=ProcessConcurrency.range(max=1),
+        description="concurrency-test",
+    )
+    result = rule_runner.request(ProcessResult, [process])
+    assert result.stdout == b"concurrency: 1\n"
+    assert result.stderr == b""
+
+
+def test_concurrency_enum():
+    exactly_one = ProcessConcurrency.exactly(1)
+    min_one = ProcessConcurrency.range(1, min=1)
+    max_one = ProcessConcurrency.range(max=1)
+    min_one_max_two = ProcessConcurrency.range(min=1, max=2)
+    exclusive = ProcessConcurrency.exclusive()
+
+    assert exactly_one.kind == "exactly"
+    assert exactly_one.min == 1
+    assert exactly_one.max == 1
+
+    up_to_two = ProcessConcurrency.range(2)
+    assert up_to_two.kind == "range"
+    assert up_to_two.min == 1
+    assert up_to_two.max == 2
+    assert up_to_two == min_one_max_two
+
+    assert min_one.kind == "range"
+    assert max_one.kind == "range"
+    assert min_one_max_two.kind == "range"
+    assert exclusive.kind == "exclusive"
+
+    assert min_one.min == 1
+    assert min_one.max == 1
+    assert max_one.min == 1
+    assert max_one.max == 1
+    assert min_one_max_two.min == 1
+    assert min_one_max_two.max == 2
+    assert exclusive.min is None
+    assert exclusive.max is None
+
+    assert exactly_one == ProcessConcurrency.exactly(1)
+    assert min_one == ProcessConcurrency.range(1, min=1)
+    assert max_one == ProcessConcurrency.range(max=1)
+    assert min_one_max_two == ProcessConcurrency.range(min=1, max=2)
+    assert exclusive == ProcessConcurrency.exclusive()
+    assert min_one == max_one
+    assert min_one != min_one_max_two
+    assert max_one != min_one_max_two
+    assert min_one != exclusive
+    assert max_one != exclusive
+    assert min_one_max_two != exclusive
