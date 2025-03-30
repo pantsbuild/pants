@@ -206,6 +206,7 @@ Created as part of the release process.
 + Kris Wilson
 + Krishna Vudata
 + Krishnan Chandra
++ Kristian Tashkov
 + Kushal Dave
 + Kyle Derr
 + Kyujin Cho
