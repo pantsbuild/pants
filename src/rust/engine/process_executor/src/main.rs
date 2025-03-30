@@ -256,7 +256,6 @@ async fn main() -> Result<(), String> {
                     .unwrap_or_else(NamedCaches::default_local_path),
             ),
             ImmutableInputs::new(store.clone(), &workdir).unwrap(),
-            KeepSandboxes::Never,
             Arc::new(RwLock::new(())),
         )) as Box<dyn process_execution::CommandRunner>,
     };
@@ -312,12 +311,14 @@ async fn make_request(
             // TODO: Make configurable.
             platform: Platform::Linux_x86_64,
             strategy,
+            local_keep_sandboxes: KeepSandboxes::Never,
         }
     } else {
         ProcessExecutionEnvironment {
             name: None,
             platform: Platform::current().unwrap(),
             strategy: ProcessExecutionStrategy::Local,
+            local_keep_sandboxes: KeepSandboxes::Never,
         }
     };
 
