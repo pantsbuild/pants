@@ -41,7 +41,7 @@ from pants.engine.internals.docker import DockerResolveImageRequest, DockerResol
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessCacheScope
 from pants.engine.target import FieldSet, OptionalSingleSourceField, Target
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import (
     MockGet,
@@ -100,12 +100,14 @@ def test_extract_process_config_from_environment() -> None:
             EnvironmentsSubsystem,
             names={name: "addr"} if envs_enabled else {},
         )
+        keep_sandboxes = KeepSandboxes.on_failure
         result = run_rule_with_mocks(
             extract_process_config_from_environment,
             rule_args=[
                 EnvironmentTarget(name, env_tgt),
                 Platform.linux_arm64,
                 global_options,
+                keep_sandboxes,
                 env_subsystem,
             ],
             mock_gets=[

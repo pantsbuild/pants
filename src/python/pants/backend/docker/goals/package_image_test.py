@@ -153,6 +153,7 @@ def assert_build(
                     remote_execution=False,
                     remote_execution_extra_platform_properties=[],
                     execute_in_workspace=False,
+                    keep_sandboxes="never",
                 ),
                 "ran_locally",
                 0,
