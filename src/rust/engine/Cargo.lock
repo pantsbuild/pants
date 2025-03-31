@@ -1157,6 +1157,7 @@ dependencies = [
  "fs",
  "futures",
  "hashing",
+ "itertools",
  "log",
  "maplit",
  "mock",

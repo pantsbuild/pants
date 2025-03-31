@@ -21,6 +21,7 @@ use either::Either;
 use futures::stream::BoxStream;
 use futures::{FutureExt, StreamExt};
 use hashing::Digest;
+use itertools::Itertools;
 use log::Level;
 use nails::execution::ExitCode;
 use once_cell::sync::Lazy;
@@ -389,6 +390,8 @@ impl fmt::Debug for CommandRunner<'_> {
     }
 }
 
+const MAX_RUN_ATTEMPTS: usize = 2;
+
 #[async_trait]
 impl process_execution::CommandRunner for CommandRunner<'_> {
     async fn run(
@@ -397,12 +400,22 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
         _workunit: &mut RunningWorkunit,
         req: Process,
     ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
-        let mut original_error: Option<String> = None;
-        loop {
+        let (image_name, image_platform) = {
+            let ProcessExecutionStrategy::Docker(image) = &req.execution_environment.strategy
+            else {
+                return Err(ProcessError::Unclassified(
+                    "The Docker execution strategy was not set on the Process, but \
+                    the Docker CommandRunner was used."
+                        .to_owned(),
+                ));
+            };
+            (image, &req.execution_environment.platform)
+        };
+        let mut errors: Vec<String> = vec![];
+        while errors.len() < MAX_RUN_ATTEMPTS {
             // Make a mutable copy of the process in the closure
             let mut mreq = req.clone();
             let context = context.clone();
-            // TODO: do we run loop within closure or outside of it?
             let process_result: Result<FallibleProcessResultWithPlatform, Either<String, ProcessError>> = in_workunit!(
                 "run_local_process_via_docker",
                 req.level,
@@ -417,26 +430,13 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                         self.keep_sandboxes,
                     ).map_err(|s| Either::Right(ProcessError::from(s)))?;
                     // Obtain ID of the base container in which to run the execution for this process.
-                    let (image_name, image_platform, container_id, named_caches) = {
-                        let ProcessExecutionStrategy::Docker(image) =
-                            &mreq.execution_environment.strategy
-                        else {
-                            return Err(Either::Right(ProcessError::Unclassified(
-                                "The Docker execution strategy was not set on the Process, but \
-                                the Docker CommandRunner was used."
-                                .to_owned(),
-                            )));
-                        };
-                        let (cid, nc) = self.container_cache
-                            .container_for_image(
-                                image,
-                                &mreq.execution_environment.platform,
-                                &context.build_id,
-                            )
-                            .await
-                            .map_err(|msg| Either::Right(ProcessError::from(msg)))?;
-                        (image.to_owned(), &(mreq.execution_environment.platform), cid, nc)
-                    };
+                    let (container_id, named_caches) = self.container_cache.container_for_image(
+                        image_name,
+                        image_platform,
+                        &context.build_id,
+                    )
+                    .await
+                    .map_err(|msg| Either::Right(ProcessError::from(msg)))?;
                     // Compute the absolute working directory within the container, and update the env to
                     // replace `{chroot}` placeholders with the path to the sandbox within the Docker container.
                     let working_dir = {
@@ -510,7 +510,10 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                     }
                     match res {
                         Err(CapturedWorkdirError::Retryable { status: status, message: message }) if status == 404 => {
-                            self.container_cache.prune_container(image_name, image_platform);
+                            self.container_cache.prune_container(image_name, image_platform)
+                                .await
+                                .map_err(|s| Either::Right(ProcessError::Unclassified(s)))?;
+                            log::debug!("Failed to execute: {mreq:#?}\n\n{message}\n\nThis is a retryable error");
                             Err(Either::Left(message))
                         },
                         _ => res.map_err(|cwe| Either::Right(
@@ -527,22 +530,23 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                     }
                 }
             ).await;
-            return match process_result {
-                Err(Either::Left(message)) => match original_error {
-                    Some(prev_message) => Err(ProcessError::Unclassified(format!(
-                        "Failed to execute due to missing container: {req:#?}\n\n\
-                            First attempt failed with: {prev_message}\n\n\
-                            Attempted to restart container but failed with: {message}"
-                    ))),
-                    None => {
-                        original_error = Some(message);
-                        continue;
-                    }
-                },
-                _ => process_result
-                    .map_err(|known_process_result| known_process_result.unwrap_right()),
+            match process_result {
+                Err(Either::Left(message)) => errors.push(message),
+                _ => {
+                    return process_result
+                        .map_err(|known_process_result| known_process_result.unwrap_right());
+                }
             };
         }
+        Err(ProcessError::Unclassified(format!(
+            "Failed to execute due to missing container: {:#?}\n\n{}",
+            req,
+            errors
+                .iter()
+                .enumerate()
+                .map(|(i, s)| format!("Attempt {} failed due to: {}", i + 1, s))
+                .join("\n\n")
+        )))
     }
 
     async fn shutdown(&self) -> Result<(), String> {
@@ -700,7 +704,7 @@ impl Command {
                     "Failed to create Docker execution in container: {}",
                     err.to_string()
                 ),
-                err: err,
+                err,
             })?;
 
         log::trace!("created execution {}", &exec.id);
@@ -715,7 +719,7 @@ impl Command {
                         exec.id.as_str(),
                         err.to_string()
                     ),
-                    err: err,
+                    err,
                 })?;
         let mut output_stream = if let StartExecResults::Attached { output, .. } = exec_result {
             output.boxed()
@@ -984,12 +988,34 @@ impl<'a> ContainerCache<'a> {
         }
     }
 
-    async fn prune_container(&self, image_name: String, platform: &Platform) -> Result<(), String> {
+    pub async fn prune_container(
+        &self,
+        image_name: &str,
+        platform: &Platform,
+    ) -> Result<(), String> {
         let mut containers = self.containers.lock();
-        let cell = containers.remove(&(image_name, *platform));
-        match cell {
+        match containers.remove(&(image_name.to_string(), *platform)) {
             None => Ok(()),
-            Some(cell_arc) => todo!(),
+            Some(cell_arc) => {
+                let docker = match self.docker.get().await {
+                    Ok(d) => d,
+                    Err(err) => {
+                        return Err(format!(
+                            "Failed to get Docker connection during container removal: {err}"
+                        ));
+                    }
+                };
+                let remove_options = RemoveContainerOptions {
+                    force: true,
+                    ..RemoveContainerOptions::default()
+                };
+                Self::remove_container(
+                    docker,
+                    cell_arc.get().unwrap().0.as_str(),
+                    Some(remove_options),
+                )
+                .await
+            }
         }
     }
 
@@ -1052,11 +1078,11 @@ impl<'a> ContainerCache<'a> {
 
     async fn remove_container(
         docker: &Docker,
-        container_id: String,
+        container_id: &str,
         options: Option<RemoveContainerOptions>,
     ) -> Result<(), String> {
         docker
-            .remove_container(container_id.as_str(), options)
+            .remove_container(container_id, options)
             .await
             .map_err(|err| format!("Failed to remove Docker container `{container_id}`: {err:?}"))
     }
@@ -1091,9 +1117,8 @@ impl<'a> ContainerCache<'a> {
                 force: true,
                 ..RemoveContainerOptions::default()
             };
-            Self::remove_container(docker, id, Some(remove_options))
+            Self::remove_container(docker, id.as_str(), Some(remove_options)).await
         });
-
         futures::future::try_join_all(removal_futures).await?;
         Ok(())
     }

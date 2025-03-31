@@ -14,6 +14,7 @@ docker_credential = { workspace = true }
 either = { workspace = true }
 fs = { path = "../../fs" }
 futures = { workspace = true }
+itertools = { workspace = true }
 log = { workspace = true }
 nails = { workspace = true }
 store = { path = "../../fs/store" }

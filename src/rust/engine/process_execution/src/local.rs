@@ -348,8 +348,14 @@ impl CapturedWorkdir for CommandRunner {
 }
 
 pub enum CapturedWorkdirError {
-    Timeout { timeout: std::time::Duration, description: String },
-    Retryable { status: i32, message: String },
+    Timeout {
+        timeout: std::time::Duration,
+        description: String,
+    },
+    Retryable {
+        status: i32,
+        message: String,
+    },
     Fatal(String),
 }
 
@@ -362,8 +368,16 @@ impl From<String> for CapturedWorkdirError {
 impl Display for CapturedWorkdirError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Timeout { timeout, description } => {
-                write!(f, "Exceeded timeout of {:.1} seconds when executing local process: {}", timeout.as_secs_f32(), description)
+            Self::Timeout {
+                timeout,
+                description,
+            } => {
+                write!(
+                    f,
+                    "Exceeded timeout of {:.1} seconds when executing local process: {}",
+                    timeout.as_secs_f32(),
+                    description
+                )
             }
             Self::Retryable { status, message } => {
                 write!(f, "{message} (retryable error status {status}")
@@ -419,7 +433,7 @@ pub trait CapturedWorkdir {
                     Ok(Ok(exit_code)) => Ok(exit_code),
                     _ => Err(CapturedWorkdirError::Timeout {
                         timeout: req_timeout,
-                        description: req.description.clone()
+                        description: req.description.clone(),
                     }),
                 }
             } else {
