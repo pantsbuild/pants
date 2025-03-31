@@ -192,13 +192,9 @@ async def find_node_js_projects(
 ) -> AllNodeJSProjects:
     project_paths = []
     for pkg in package_workspaces:
+        package_manager = pkg.package_manager or nodejs.default_package_manager
         if (
-            nodejs.default_package_manager
-            and PackageManager.from_string(nodejs.default_package_manager).name == "pnpm"
-            or (
-                pkg.package_manager
-                and PackageManager.from_string(pkg.package_manager).name == "pnpm"
-            )
+            package_manager and PackageManager.from_string(package_manager).name == "pnpm"
         ):  # case for pnpm
             if pkg in pnpm_workspaces:
                 project_paths.append(
