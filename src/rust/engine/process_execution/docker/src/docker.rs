@@ -17,7 +17,6 @@ use bollard::service::CreateImageInfo;
 use bollard::volume::CreateVolumeOptions;
 use bollard::{Docker, errors::Error as DockerError};
 use bytes::{Bytes, BytesMut};
-use either::Either;
 use futures::stream::BoxStream;
 use futures::{FutureExt, StreamExt};
 use hashing::Digest;
@@ -416,7 +415,7 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
             // Make a mutable copy of the process in the closure
             let mut mreq = req.clone();
             let context = context.clone();
-            let process_result: Result<FallibleProcessResultWithPlatform, Either<String, ProcessError>> = in_workunit!(
+            let process_result: Result<FallibleProcessResultWithPlatform, CapturedWorkdirError> = in_workunit!(
                 "run_local_process_via_docker",
                 req.level,
                 // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
@@ -428,30 +427,25 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                         &self.work_dir_base,
                         &mreq.description,
                         self.keep_sandboxes,
-                    ).map_err(|s| Either::Right(ProcessError::from(s)))?;
+                    )?;
                     // Obtain ID of the base container in which to run the execution for this process.
                     let (container_id, named_caches) = self.container_cache.container_for_image(
                         image_name,
                         image_platform,
                         &context.build_id,
                     )
-                    .await
-                    .map_err(|msg| Either::Right(ProcessError::from(msg)))?;
+                    .await?;
                     // Compute the absolute working directory within the container, and update the env to
                     // replace `{chroot}` placeholders with the path to the sandbox within the Docker container.
                     let working_dir = {
                         let sandbox_relpath = workdir.path()
                             .strip_prefix(&self.work_dir_base)
-                            .map_err(|err| Either::Right(ProcessError::from(
-                                format!("Internal error - base directory was not prefix of sandbox directory: {err}")
-                            )))?;
+                            .map_err(|err| format!("Internal error - base directory was not prefix of sandbox directory: {err}"))?;
                         let sandbox_path_in_container = Path::new(&SANDBOX_BASE_PATH_IN_CONTAINER)
                             .join(sandbox_relpath)
                             .into_os_string()
                             .into_string()
-                            .map_err(|s| Either::Right(ProcessError::from(
-                                format!("Unable to convert sandbox path to string due to non UTF-8 characters: {s:?}")
-                            )))?;
+                            .map_err(|s| format!("Unable to convert sandbox path to string due to non UTF-8 characters: {s:?}"))?;
                         apply_chroot(&sandbox_path_in_container, &mut mreq);
                         log::trace!("sandbox_path_in_container = {:?}", &sandbox_path_in_container);
                         mreq.working_directory
@@ -460,9 +454,7 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                             .unwrap_or_else(|| Path::new(&sandbox_path_in_container).to_path_buf())
                             .into_os_string()
                             .into_string()
-                            .map_err(|s| Either::Right(ProcessError::from(
-                                format!("Unable to convert working directory due to non UTF-8 characters: {s:?}")
-                            )))?
+                            .map_err(|s| format!("Unable to convert working directory due to non UTF-8 characters: {s:?}"))?
                     };
                     // Prepare the workdir.
                     // DOCKER-NOTE: The input root will be bind mounted into the container.
@@ -478,7 +470,7 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                         Some(Path::new(IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER)),
                     )
                     .await
-                    .map_err(|s| Either::Right(ProcessError::from(s)))?;
+                    .map_err(|store_error| CapturedWorkdirError::Fatal(store_error.to_string()))?;
 
                     workunit.increment_counter(Metric::DockerExecutionRequests, 1);
                     let res = self.run_and_capture_workdir(
@@ -493,7 +485,7 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                     match &res {
                         Ok(_) => workunit.increment_counter(Metric::DockerExecutionSuccesses, 1),
                         Err(_) => workunit.increment_counter(Metric::DockerExecutionErrors, 1),
-                    }
+                    };
                     if self.keep_sandboxes == KeepSandboxes::Always
                         || self.keep_sandboxes == KeepSandboxes::OnFailure
                             && res.as_ref().map(|r| r.exit_code).unwrap_or(1) != 0
@@ -505,36 +497,23 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                             &mreq.working_directory,
                             &mreq.argv,
                             workdir.path(),
-                        )
-                        .map_err(|s| Either::Right(ProcessError::from(s)))?;
+                        )?;
                     }
-                    match res {
-                        Err(CapturedWorkdirError::Retryable { status: status, message: message }) if status == 404 => {
-                            self.container_cache.prune_container(image_name, image_platform)
-                                .await
-                                .map_err(|s| Either::Right(ProcessError::Unclassified(s)))?;
-                            log::debug!("Failed to execute: {mreq:#?}\n\n{message}\n\nThis is a retryable error");
-                            Err(Either::Left(message))
-                        },
-                        _ => res.map_err(|cwe| Either::Right(
-                            // Processes that experience no infrastructure issues should result in an "Ok" return,
-                            // potentially with an exit code that indicates that they failed (with more information
-                            // on stderr). Actually failing at this level indicates a failure to start or otherwise
-                            // interact with the process, which would generally be an infrastructure or implementation
-                            // error (something missing from the sandbox, incorrect permissions, etc).
-                            //
-                            // Given that this is expected to be rare, we dump the entire process definition in the
-                            // error.
-                            ProcessError::Unclassified(format!("Failed to execute: {mreq:#?}\n\n{cwe}"))
-                        )),
+                    if let Err(CapturedWorkdirError::Retryable { status, .. }) = res {
+                        if status == 404 {
+                            self.container_cache.prune_container(image_name, image_platform).await?;
+                        }
                     }
+                    res
                 }
             ).await;
             match process_result {
-                Err(Either::Left(message)) => errors.push(message),
+                Err(CapturedWorkdirError::Retryable { message, .. }) => {
+                    errors.push(message);
+                }
                 _ => {
                     return process_result
-                        .map_err(|known_process_result| known_process_result.unwrap_right());
+                        .map_err(|cwe| ProcessError::Unclassified(cwe.to_string()));
                 }
             };
         }
@@ -544,7 +523,7 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
             errors
                 .iter()
                 .enumerate()
-                .map(|(i, s)| format!("Attempt {} failed due to: {}", i + 1, s))
+                .map(|(i, s)| format!("Attempt #{} failed due to: {}", i + 1, s))
                 .join("\n\n")
         )))
     }
@@ -994,29 +973,27 @@ impl<'a> ContainerCache<'a> {
         platform: &Platform,
     ) -> Result<(), String> {
         let mut containers = self.containers.lock();
-        match containers.remove(&(image_name.to_string(), *platform)) {
-            None => Ok(()),
-            Some(cell_arc) => {
-                let docker = match self.docker.get().await {
-                    Ok(d) => d,
-                    Err(err) => {
-                        return Err(format!(
-                            "Failed to get Docker connection during container removal: {err}"
-                        ));
-                    }
-                };
-                let remove_options = RemoveContainerOptions {
-                    force: true,
-                    ..RemoveContainerOptions::default()
-                };
-                Self::remove_container(
-                    docker,
-                    cell_arc.get().unwrap().0.as_str(),
-                    Some(remove_options),
-                )
-                .await
-            }
+        if let Some(cell_arc) = containers.remove(&(image_name.to_string(), *platform)) {
+            let docker = match self.docker.get().await {
+                Ok(d) => d,
+                Err(err) => {
+                    return Err(format!(
+                        "Failed to get Docker connection during container removal: {err}"
+                    ));
+                }
+            };
+            let remove_options = RemoveContainerOptions {
+                force: true,
+                ..RemoveContainerOptions::default()
+            };
+            Self::remove_container(
+                docker,
+                cell_arc.get().unwrap().0.as_str(),
+                Some(remove_options),
+            )
+            .await?;
         }
+        Ok(())
     }
 
     /// Return the container ID and NamedCaches for a container running `image_name` for use as a place

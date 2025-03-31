@@ -1152,7 +1152,6 @@ dependencies = [
  "bollard",
  "bytes",
  "docker_credential",
- "either",
  "env_logger",
  "fs",
  "futures",

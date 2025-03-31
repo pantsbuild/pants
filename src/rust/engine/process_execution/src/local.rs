@@ -380,7 +380,7 @@ impl Display for CapturedWorkdirError {
                 )
             }
             Self::Retryable { status, message } => {
-                write!(f, "{message} (retryable error status {status}")
+                write!(f, "{message} (retryable error status {status})")
             }
             Self::Fatal(s) => write!(f, "{s}"),
         }
