@@ -348,7 +348,7 @@ impl CapturedWorkdir for CommandRunner {
 }
 
 pub enum CapturedWorkdirError {
-    BlackBox { status: i32, message: String },
+    Timeout { timeout: std::time::Duration, description: String },
     Retryable { status: i32, message: String },
     Fatal(String),
 }
@@ -362,8 +362,8 @@ impl From<String> for CapturedWorkdirError {
 impl Display for CapturedWorkdirError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::BlackBox { status, message } => {
-                write!(f, "{message} (blackbox error status {status}")
+            Self::Timeout { timeout, description } => {
+                write!(f, "Exceeded timeout of {:.1} seconds when executing local process: {}", timeout.as_secs_f32(), description)
             }
             Self::Retryable { status, message } => {
                 write!(f, "{message} (retryable error status {status}")
@@ -417,13 +417,9 @@ pub trait CapturedWorkdir {
             if let Some(req_timeout) = req.timeout {
                 match timeout(req_timeout, exit_code_future).await {
                     Ok(Ok(exit_code)) => Ok(exit_code),
-                    _ => Err(CapturedWorkdirError::BlackBox {
-                        status: -libc::SIGTERM,
-                        message: format!(
-                            "Exceeded timeout of {:.1} seconds when executing local process: {}",
-                            req_timeout.as_secs_f32(),
-                            req.description
-                        ),
+                    _ => Err(CapturedWorkdirError::Timeout {
+                        timeout: req_timeout,
+                        description: req.description.clone()
                     }),
                 }
             } else {
@@ -471,9 +467,9 @@ pub trait CapturedWorkdir {
 
         let (exit_code, output_directory) = match exit_code_result {
             Ok(exit_code) => (exit_code, output_snapshot.into()),
-            Err(CapturedWorkdirError::BlackBox { status, message }) => {
-                stderr.extend_from_slice(message.as_bytes());
-                (status, EMPTY_DIRECTORY_DIGEST.clone())
+            Err(timeout @ CapturedWorkdirError::Timeout { .. }) => {
+                stderr.extend_from_slice(timeout.to_string().as_bytes());
+                (-libc::SIGTERM, EMPTY_DIRECTORY_DIGEST.clone())
             }
             Err(err) => return Err(err),
         };
