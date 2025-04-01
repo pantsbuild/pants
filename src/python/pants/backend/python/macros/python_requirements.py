@@ -51,7 +51,7 @@ def parse_pyproject_toml(pyproject_toml: str, *, rel_path: str) -> Iterator[PipR
     all_deps_iter = chain(
         deps_vals,
         chain.from_iterable(optional_dependencies.values()),
-        chain.from_iterable(dependency_groups.values()) # Add the new source
+        chain.from_iterable(dependency_groups.values()),  # Add the new source
     )
 
     for dep in all_deps_iter:
@@ -60,7 +60,6 @@ def parse_pyproject_toml(pyproject_toml: str, *, rel_path: str) -> Iterator[PipR
         if not dep_spec or dep_spec.startswith("-"):
             continue
         yield PipRequirement.parse(dep_spec, description_of_origin=rel_path)
-
 
 
 class PythonRequirementsSourceField(SingleSourceField):
