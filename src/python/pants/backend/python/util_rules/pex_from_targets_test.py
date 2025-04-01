@@ -922,9 +922,9 @@ def test_lockfile_requirements_selection(
         mode_files.update({"3rdparty/python/default.lock": setuptools_poetry_lockfile})
     else:
         assert mode == ResolveMode.pex
-        lock_content = importlib.resources.read_binary(
-            "pants.backend.python.subsystems", "setuptools.lock"
-        )
+        lock_content = (
+            importlib.resources.files("pants.backend.python.subsystems") / "setuptools.lock"
+        ).read_bytes()
         mode_files.update({"3rdparty/python/default.lock": lock_content})
 
     rule_runner.write_files(mode_files)
