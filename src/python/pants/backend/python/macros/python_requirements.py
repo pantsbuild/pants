@@ -43,7 +43,7 @@ def parse_pyproject_toml(pyproject_toml: str, *, rel_path: str) -> Iterator[PipR
     if not deps_vals and not optional_dependencies and not dependency_groups:
         raise KeyError(
             softwrap(
-                "No section project.dependencies, project.optional-dependencies, "
+                "No non-empty section `project.dependencies`, `project.optional-dependencies`, "
                 f"or dependency-groups found in {rel_path}"
             )
         )
