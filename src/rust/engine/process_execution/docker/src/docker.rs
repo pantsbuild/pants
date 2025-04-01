@@ -972,8 +972,11 @@ impl<'a> ContainerCache<'a> {
         image_name: &str,
         platform: &Platform,
     ) -> Result<(), String> {
-        let mut containers = self.containers.lock();
-        if let Some(cell_arc) = containers.remove(&(image_name.to_string(), *platform)) {
+        let maybe_cell_arc = {
+            let mut containers = self.containers.lock();
+            containers.remove(&(image_name.to_string(), *platform))
+        };
+        if let Some(cell_arc) = maybe_cell_arc {
             let docker = match self.docker.get().await {
                 Ok(d) => d,
                 Err(err) => {
@@ -987,7 +990,7 @@ impl<'a> ContainerCache<'a> {
                 ..RemoveContainerOptions::default()
             };
             Self::remove_container(
-                docker,
+                &docker,
                 cell_arc.get().unwrap().0.as_str(),
                 Some(remove_options),
             )
