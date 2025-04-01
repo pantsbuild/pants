@@ -43,7 +43,7 @@ from pants.option.option_types import (
     collect_options_info,
 )
 from pants.option.option_value_container import OptionValueContainer
-from pants.option.options import NativeOptionsValidation, Options
+from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
 from pants.util.dirutil import fast_relpath_optional
@@ -616,7 +616,6 @@ class ExecutionOptions:
     remote_client_certs_path: str | None
     remote_client_key_path: str | None
 
-    keep_sandboxes: KeepSandboxes
     local_cache: bool
     process_execution_local_parallelism: int
     process_execution_local_enable_nailgun: bool
@@ -665,7 +664,6 @@ class ExecutionOptions:
             remote_client_certs_path=bootstrap_options.remote_client_certs_path,
             remote_client_key_path=bootstrap_options.remote_client_key_path,
             # Process execution setup.
-            keep_sandboxes=GlobalOptions.resolve_keep_sandboxes(bootstrap_options),
             local_cache=bootstrap_options.local_cache,
             process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
             process_execution_remote_parallelism=dynamic_remote_options.parallelism,
@@ -764,7 +762,6 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_local_parallelism=CPU_COUNT,
     process_execution_remote_parallelism=128,
     process_execution_cache_namespace=None,
-    keep_sandboxes=KeepSandboxes.never,
     local_cache=True,
     cache_content_behavior=CacheContentBehavior.fetch,
     process_execution_local_enable_nailgun=True,
@@ -978,33 +975,6 @@ class BootstrapOptions:
             Paths to Pants config files. This may only be set through the environment variable
             `PANTS_CONFIG_FILES` and the command line argument `--pants-config-files`; it will
             be ignored if in a config file like `pants.toml`.
-            """
-        ),
-    )
-    native_options_validation = EnumOption(
-        default=NativeOptionsValidation.warning,
-        removal_version="2.27.0.dev0",
-        removal_hint="The legacy parser has been removed so this option has no effect.",
-        help=softwrap(
-            """
-            Pants is switching its option parsing system from a legacy parser written in Python
-            to a new one written in Rust.
-
-            The results of parsing a given option by each system should be identical. However
-            during a transition period we will run both parsers and compare their results.
-            This option controls how to report discrepancies that arise.
-
-            - `error`: Discrepancies will cause Pants to exit.
-
-            - `warning`: Discrepancies will be logged but Pants will continue.
-
-            - `ignore`: A last resort to turn off this check entirely.
-
-            If you encounter discrepancies that are not easily resolvable, please reach out to
-            us on Slack or file an issue: https://www.pantsbuild.org/community/getting-help.
-
-            The native parser will become the default in 2.23.x, and the legacy parser will be removed in 2.24.x.
-            So it is imperative that we find out about any discrepancies during this transition period.
             """
         ),
     )
@@ -1336,32 +1306,6 @@ class BootstrapOptions:
             """
             Whether to cache process executions in a local cache persisted to disk at
             `--local-store-dir`.
-            """
-        ),
-    )
-    process_cleanup = BoolOption(
-        default=(DEFAULT_EXECUTION_OPTIONS.keep_sandboxes == KeepSandboxes.never),
-        removal_version="3.0.0.dev0",
-        removal_hint="Use the `keep_sandboxes` option instead.",
-        help=softwrap(
-            """
-            If false, Pants will not clean up local directories used as chroots for running
-            processes. Pants will log their location so that you can inspect the chroot, and
-            run the `__run.sh` script to recreate the process using the same argv and
-            environment variables used by Pants. This option is useful for debugging.
-            """
-        ),
-    )
-    keep_sandboxes = EnumOption(
-        default=DEFAULT_EXECUTION_OPTIONS.keep_sandboxes,
-        help=softwrap(
-            """
-            Controls whether Pants will clean up local directories used as chroots for running
-            processes.
-
-            Pants will log their location so that you can inspect the chroot, and run the
-            `__run.sh` script to recreate the process using the same argv and environment variables
-            used by Pants. This option is useful for debugging.
             """
         ),
     )
@@ -1796,22 +1740,6 @@ class BootstrapOptions:
             )
         return value
 
-    allow_deprecated_macos_before_12 = BoolOption(
-        default=False,
-        advanced=True,
-        help=softwrap(
-            f"""
-            Silence warnings about running Pants on macOS 10.15 - 11. In future versions, Pants will
-            only be supported on macOS 12 and newer.
-
-            If you have questions or concerns about this, please reach out to us at
-            {doc_url("community/getting-help")}.
-            """
-        ),
-        removal_version="2.27.0.dev0",
-        removal_hint='Upgrade your operating system or write `allow_deprecated_macos_versions = ["10", "11"]` instead.',
-    )
-
     allow_deprecated_macos_versions = StrListOption(
         default=[],
         advanced=True,
@@ -1983,6 +1911,34 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         advanced=True,
     )
 
+    process_cleanup = BoolOption(
+        # Should be aligned to `keep_sandboxes`'s `default`
+        default=True,
+        removal_version="3.0.0.dev0",
+        removal_hint="Use the `keep_sandboxes` option instead.",
+        help=softwrap(
+            """
+            If false, Pants will not clean up local directories used as chroots for running
+            processes. Pants will log their location so that you can inspect the chroot, and
+            run the `__run.sh` script to recreate the process using the same argv and
+            environment variables used by Pants. This option is useful for debugging.
+            """
+        ),
+    )
+    keep_sandboxes = EnumOption(
+        default=KeepSandboxes.never,
+        help=softwrap(
+            """
+            Controls whether Pants will clean up local directories used as chroots for running
+            processes.
+
+            Pants will log their location so that you can inspect the chroot, and run the
+            `__run.sh` script to recreate the process using the same argv and environment variables
+            used by Pants. This option is useful for debugging.
+            """
+        ),
+    )
+
     docker_execution = BoolOption(
         default=True,
         advanced=True,
@@ -2147,15 +2103,15 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
     @staticmethod
     def resolve_keep_sandboxes(
-        bootstrap_options: OptionValueContainer,
+        global_options: OptionValueContainer,
     ) -> KeepSandboxes:
         resolved_value = resolve_conflicting_options(
             old_option="process_cleanup",
             new_option="keep_sandboxes",
             old_scope="",
             new_scope="",
-            old_container=bootstrap_options,
-            new_container=bootstrap_options,
+            old_container=global_options,
+            new_container=global_options,
         )
 
         if isinstance(resolved_value, bool):

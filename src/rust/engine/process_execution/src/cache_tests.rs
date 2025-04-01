@@ -16,7 +16,7 @@ use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
     CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context,
-    FallibleProcessResultWithPlatform, NamedCaches, Process, ProcessError, local::KeepSandboxes,
+    FallibleProcessResultWithPlatform, NamedCaches, Process, ProcessError,
 };
 
 struct RoundtripResults {
@@ -36,7 +36,6 @@ fn create_local_runner() -> (Box<dyn CommandRunnerTrait>, Store, TempDir) {
         base_dir.path().to_owned(),
         NamedCaches::new_local(named_cache_dir),
         ImmutableInputs::new(store.clone(), base_dir.path()).unwrap(),
-        KeepSandboxes::Never,
         Arc::new(RwLock::new(())),
     ));
     (runner, store, base_dir)

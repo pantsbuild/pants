@@ -48,10 +48,10 @@ class DockerfileParser(PythonToolRequirementsBase):
     default_lockfile_resource = (_DOCKERFILE_PACKAGE, "dockerfile.lock")
 
     use_rust_parser = BoolOption(
-        default=False,
+        default=True,
         help=softwrap(
             f"""
-            Use the new experimental Rust-based, multithreaded, in-process dependency parser.
+            Use the new Rust-based, multithreaded, in-process dependency parser.
 
             This new parser does not require the `dockerfile` dependency and thus, for instance,
             doesn't require Go to be installed to run on platforms for which that package doesn't
@@ -218,33 +218,20 @@ async def parse_dockerfile(
         f"got: {dockerfiles}."
     )
 
-    if dockerfile_parser.options.is_default("use_rust_parser"):
+    if not dockerfile_parser.use_rust_parser:
         warn_or_error(
-            # In 2.27, consider changing:
-            #
-            # - the default value of use_rust_parser to True
-            # - this deprecation to check for `use_rust_parser == False` instead
-            #
-            # This means switching to the Rust parser by default and deprecate the old one, in one
-            # step. This may not be appropriate if we don't feel the Rust parser is reliable
-            # enough, yet. Please make an assessment!
-            removal_version="2.27.0.dev0",
-            entity="Implicitly relying on the old Dockerfile parser",
+            removal_version="2.30.0.dev0",
+            entity="Using the old Dockerfile parser",
             hint=softwrap(
                 f"""
-                Future versions of Pants will use a Rust-based parser for Dockerfiles. The new
+                Future versions of Pants will only support the Rust-based parser for Dockerfiles. The new
                 parser is faster and does not require installing extra dependencies.
 
-                To aid in this migration, please set the `[dockerfile-parser].use_rust_parser`
-                option, to either:
+                The `[dockerfile-parser].use_rust_parser` option is currently explicitly set to `false` to
+                force the use of the old parser. This parser will be removed in future.
 
-                - `true`, to opt-in to the new parser now
-
-                - `false`, to continue using the old parser if you find issues with the new parser
-                  (please let us know: <https://github.com/pantsbuild/pants/issues/new/choose>)
-
-                If this option is not set, the default parser will change when upgrading to a future
-                version of Pants, outside of your control.
+                Please remove this setting to use the new parser. If you find issues with the new parser,
+                please let us know: <https://github.com/pantsbuild/pants/issues/new/choose>
 
                 See {doc_url("reference/subsystems/dockerfile-parser#use_rust_parser")} for
                 additional information.

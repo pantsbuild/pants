@@ -40,6 +40,7 @@ from pants.core.target_types import rules as core_target_types_rules
 from pants.testutil.python_interpreter_selection import skip_unless_python38_present
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import QueryRule
+from pants.testutil.skip_utils import skip_if_linux_arm64
 
 
 @pytest.fixture
@@ -254,6 +255,7 @@ def pex_executable(rule_runner: PythonRuleRunner) -> str:
     return os.path.join(rule_runner.build_root, expected_pex_relpath)
 
 
+@skip_if_linux_arm64
 @skip_unless_python38_present
 @pytest.mark.parametrize("target_type", ["files", "resources"])
 def test_complete_platforms(rule_runner: PythonRuleRunner, target_type: str) -> None:
