@@ -35,30 +35,32 @@ from pants.util.strutil import help_text, softwrap
 
 def parse_pyproject_toml(pyproject_toml: str, *, rel_path: str) -> Iterator[PipRequirement]:
     parsed: dict[str, Any] = toml.loads(pyproject_toml)
-    deps_vals: list[str] = parsed.get("project", {}).get("dependencies", [])
-    optional_dependencies: dict[str, list[str]] = parsed.get("project", {}).get(
-        "optional-dependencies", {}
-    )
-    if not deps_vals and not optional_dependencies:
+    project_section: dict[str, Any] = parsed.get("project", {})
+    deps_vals: list[str] = project_section.get("dependencies", [])
+    optional_dependencies: dict[str, list[str]] = project_section.get("optional-dependencies", {})
+    dependency_groups: dict[str, list[str]] = parsed.get("dependency-groups", {})
+
+    if not deps_vals and not optional_dependencies and not dependency_groups:
         raise KeyError(
             softwrap(
-                "No section `project.dependencies` or `project.optional-dependencies` "
-                f"found in {rel_path}"
+                "No section project.dependencies, project.optional-dependencies, "
+                f"or dependency-groups found in {rel_path}"
             )
         )
-    for dep in deps_vals:
-        dep, _, _ = dep.partition("--")
-        dep = dep.strip().rstrip("\\")
-        if not dep or dep.startswith(("#", "-")):
+
+    all_deps_iter = chain(
+        deps_vals,
+        chain.from_iterable(optional_dependencies.values()),
+        chain.from_iterable(dependency_groups.values()) # Add the new source
+    )
+
+    for dep in all_deps_iter:
+        dep_spec, _, _ = dep.partition("#")
+        dep_spec = dep_spec.strip().rstrip("\\")
+        if not dep_spec or dep_spec.startswith("-"):
             continue
-        yield PipRequirement.parse(dep, description_of_origin=rel_path)
-    for dep in chain.from_iterable(optional_dependencies.values()):
-        dep, _, _ = dep.partition("--")
-        dep = dep.strip().rstrip("\\")
-        if not dep or dep.startswith(("#", "-")):
-            continue
-        req = PipRequirement.parse(dep, description_of_origin=rel_path)
-        yield req
+        yield PipRequirement.parse(dep_spec, description_of_origin=rel_path)
+
 
 
 class PythonRequirementsSourceField(SingleSourceField):

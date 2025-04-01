@@ -257,6 +257,10 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
                 "Un-Normalized-PROJECT",  # Inline comment.
                 "pip@ git+https://github.com/pypa/pip.git",
             ]
+            [dependency-groups]
+            dev = [
+                "matplotlib>=3.0.0"
+            ]
             [project.optional-dependencies]
             test = [
                 "pytest>=5.7.0",
@@ -301,6 +305,13 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
                     "dependencies": [file_addr.spec],
                 },
                 Address("", target_name="reqs", generated_name="pip"),
+            ),
+            PythonRequirementTarget(
+                {
+                    "requirements": ["matplotlib>=3.0.0"],
+                    "dependencies": [file_addr.spec],
+                },
+                Address("", target_name="reqs", generated_name="pytest"),
             ),
             PythonRequirementTarget(
                 {
