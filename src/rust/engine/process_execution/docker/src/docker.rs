@@ -556,14 +556,12 @@ impl CapturedWorkdir for CommandRunner<'_> {
             .await
             .map_err(|spawn_err: CommandSpawnError| -> CapturedWorkdirError {
                 match spawn_err.err {
-                    DockerError::DockerResponseServerError { status_code, .. }
-                        if status_code == 404 =>
-                    {
-                        CapturedWorkdirError::Retryable {
-                            status: 404,
-                            message: spawn_err.message,
-                        }
-                    }
+                    DockerError::DockerResponseServerError {
+                        status_code: 404, ..
+                    } => CapturedWorkdirError::Retryable {
+                        status: 404,
+                        message: spawn_err.message,
+                    },
                     _ => CapturedWorkdirError::Fatal(spawn_err.message),
                 }
             })
@@ -677,10 +675,7 @@ impl Command {
             .create_exec::<String>(&container_id, self.0.clone())
             .await
             .map_err(|err| CommandSpawnError {
-                message: format!(
-                    "Failed to create Docker execution in container: {}",
-                    err.to_string()
-                ),
+                message: format!("Failed to create Docker execution in container: {err}"),
                 err,
             })?;
 
@@ -691,11 +686,7 @@ impl Command {
                 .start_exec(&exec.id, None)
                 .await
                 .map_err(|err| CommandSpawnError {
-                    message: format!(
-                        "Failed to start Docker execution `{}`: {}",
-                        exec.id.as_str(),
-                        err.to_string()
-                    ),
+                    message: format!("Failed to start Docker execution `{}`: {}", exec.id, err),
                     err,
                 })?;
         let mut output_stream = if let StartExecResults::Attached { output, .. } = exec_result {
@@ -988,7 +979,7 @@ impl<'a> ContainerCache<'a> {
                 ..RemoveContainerOptions::default()
             };
             Self::remove_container(
-                &docker,
+                docker,
                 cell_arc.get().unwrap().0.as_str(),
                 Some(remove_options),
             )
