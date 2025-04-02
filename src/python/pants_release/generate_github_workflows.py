@@ -139,13 +139,14 @@ def classify_changes() -> Jobs:
             "runs-on": linux_x86_64_helper.runs_on(),
             "if": IS_PANTS_OWNER,
             "outputs": {
-                "docs_only": gha_expr("steps.classify.outputs.docs_only"),
+                "dev_utils": gha_expr("steps.classify.outputs.dev_utils"),
                 "docs": gha_expr("steps.classify.outputs.docs"),
                 "rust": gha_expr("steps.classify.outputs.rust"),
                 "release": gha_expr("steps.classify.outputs.release"),
                 "ci_config": gha_expr("steps.classify.outputs.ci_config"),
                 "notes": gha_expr("steps.classify.outputs.notes"),
                 "other": gha_expr("steps.classify.outputs.other"),
+                "no_code": gha_expr("steps.classify.outputs.no_code"),
             },
             "steps": [
                 *checkout(),
@@ -165,12 +166,9 @@ def classify_changes() -> Jobs:
                         fi
                         echo "comparison_sha=$comparison_sha"
 
-                        affected=$(git diff --name-only "$comparison_sha" HEAD | python build-support/bin/classify_changed_files.py)
-                        echo "Affected:"
-                        if [[ "${affected}" == "docs" || "${affected}" == "docs notes" ]]; then
-                          echo "docs_only=true" | tee -a $GITHUB_OUTPUT
-                        fi
-                        for i in ${affected}; do
+                        change_labels=$(git diff --name-only "$comparison_sha" HEAD | python build-support/bin/classify_changed_files.py)
+                        echo "Change Labels:"
+                        for i in ${change_labels}; do
                           echo "${i}=true" | tee -a $GITHUB_OUTPUT
                         done
                         """
@@ -1783,8 +1781,8 @@ def generate() -> dict[Path, str]:
         needs.extend(["classify_changes"])
         val["needs"] = needs
         if_cond = val.get("if")
-        not_docs_only = "needs.classify_changes.outputs.docs_only != 'true'"
-        val["if"] = not_docs_only if if_cond is None else f"({if_cond}) && ({not_docs_only})"
+        has_code_changes = "needs.classify_changes.outputs.no_code != 'true'"
+        val["if"] = has_code_changes if if_cond is None else f"({if_cond}) && ({has_code_changes})"
     pr_jobs.update(merge_ok(sorted(pr_jobs.keys())))
 
     test_workflow_name = "Pull Request CI"
