@@ -178,12 +178,12 @@ impl<'b> DockerCommandTestRunner<'b> for DockerTestRunners {
     }
 }
 
-#[parameterized(runner = {DockerTestRunners::Default}, name = {"default"})]
-#[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[cfg(unix)]
-async fn runner_errors_if_docker_image_not_set(runner: DockerTestRunners) {
+async fn runner_errors_if_docker_image_not_set() {
     skip_if_no_docker_available_in_macos_ci!();
 
+    let runner = DockerTestRunners::Default;
     // Because `docker_image` is set but it does not exist, this process should fail.
     let err = runner
         .run_command_via_docker(
@@ -212,7 +212,8 @@ async fn runner_errors_if_docker_image_not_set(runner: DockerTestRunners) {
     }
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+#[parameterized(runner = {DockerTestRunners::Default}, name = {"default"})]
+#[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
 #[cfg(unix)]
 async fn stdout() {
     skip_if_no_docker_available_in_macos_ci!();
