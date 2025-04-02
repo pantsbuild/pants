@@ -465,7 +465,7 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
 
     module = request.runtime.known_runtimes_complete_platforms_module()
 
-    content = importlib.resources.read_binary(module, file_name)
+    content = (importlib.resources.files(module) / file_name).read_bytes()
     snapshot = await Get(Snapshot, CreateDigest([FileContent(file_name, content)]))
 
     return RuntimePlatforms(
