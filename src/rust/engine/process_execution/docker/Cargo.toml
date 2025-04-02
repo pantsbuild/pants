@@ -33,6 +33,7 @@ bytes = { workspace = true }
 env_logger = { workspace = true }
 maplit = { workspace = true }
 mock = { path = "../../testutil/mock" }
+parameterized = { workspace = true }
 parking_lot = { workspace = true }
 sharded_lmdb = { path = "../../sharded_lmdb" }
 tempfile = { workspace = true }

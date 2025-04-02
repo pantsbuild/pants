@@ -5,9 +5,11 @@ use std::env;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use async_trait::async_trait;
 use bollard::Docker;
 use fs::{EMPTY_DIRECTORY_DIGEST, RelativePath};
 use maplit::hashset;
+use parameterized::parameterized;
 use store::{ImmutableInputs, Store};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
@@ -75,18 +77,121 @@ fn platform_for_tests() -> Result<Platform, String> {
     })
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+#[async_trait]
+trait DockerCommandTestRunner<'b>: Send + Sync {
+    fn setup<'a>(
+        &'b self,
+        store: Store,
+        executor: task_executor::Executor,
+        docker: &'a DockerOnceCell,
+        image_pull_cache: &'a ImagePullCache,
+        work_dir_base: PathBuf,
+        immutable_inputs: ImmutableInputs,
+    ) -> Result<crate::docker::CommandRunner<'a>, String>;
+
+    async fn run_command_via_docker_in_dir(
+        &'b self,
+        mut req: Process,
+        dir: PathBuf,
+        workunit: &mut RunningWorkunit,
+        store: Option<Store>,
+        executor: Option<task_executor::Executor>,
+    ) -> Result<LocalTestResult, ProcessError> {
+        req.execution_environment.platform =
+            platform_for_tests().map_err(ProcessError::Unclassified)?;
+        let store_dir = TempDir::new().unwrap();
+        let executor = executor.unwrap_or_else(task_executor::Executor::new);
+        let store =
+            store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
+
+        let root = TempDir::new().unwrap();
+        let root_path = root.path().to_owned();
+
+        let immutable_inputs = ImmutableInputs::new(store.clone(), &root_path).unwrap();
+
+        let docker = Box::new(DockerOnceCell::new());
+        let image_pull_cache = Box::new(ImagePullCache::new());
+        let runner = self.setup(
+            store.clone(),
+            executor.clone(),
+            &docker,
+            &image_pull_cache,
+            dir.clone(),
+            immutable_inputs,
+        )?;
+        let result: Result<_, ProcessError> = async {
+            let original = runner.run(Context::default(), workunit, req).await?;
+            let stdout_bytes = store
+                .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
+                .await?;
+            let stderr_bytes = store
+                .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
+                .await?;
+            Ok((original, stdout_bytes, stderr_bytes))
+        }
+        .await;
+        let (original, stdout_bytes, stderr_bytes) = result?;
+        runner.shutdown().await?;
+        Ok(LocalTestResult {
+            original,
+            stdout_bytes,
+            stderr_bytes,
+        })
+    }
+
+    async fn run_command_via_docker(
+        &'b self,
+        req: Process,
+    ) -> Result<LocalTestResult, ProcessError> {
+        let (_, mut workunit) = WorkunitStore::setup_for_tests();
+        let work_dir = TempDir::new().unwrap();
+        let work_dir_path = work_dir.path().to_owned();
+        self.run_command_via_docker_in_dir(req, work_dir_path, &mut workunit, None, None)
+            .await
+    }
+}
+
+enum DockerTestRunners {
+    Default,
+}
+
+impl<'b> DockerCommandTestRunner<'b> for DockerTestRunners {
+    fn setup<'a>(
+        &'b self,
+        store: Store,
+        executor: task_executor::Executor,
+        docker: &'a DockerOnceCell,
+        image_pull_cache: &'a ImagePullCache,
+        work_dir_base: PathBuf,
+        immutable_inputs: ImmutableInputs,
+    ) -> Result<crate::docker::CommandRunner<'a>, String> {
+        match self {
+            Self::Default => crate::docker::CommandRunner::new(
+                store,
+                executor,
+                docker,
+                image_pull_cache,
+                work_dir_base,
+                immutable_inputs,
+            ),
+        }
+    }
+}
+
+#[parameterized(runner = {DockerTestRunners::Default}, name = {"default"})]
+#[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
 #[cfg(unix)]
-async fn runner_errors_if_docker_image_not_set() {
+async fn runner_errors_if_docker_image_not_set(runner: DockerTestRunners) {
     skip_if_no_docker_available_in_macos_ci!();
 
     // Because `docker_image` is set but it does not exist, this process should fail.
-    let err = run_command_via_docker(
-        Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"]))
-            .docker("does-not-exist:latest".to_owned()),
-    )
-    .await
-    .unwrap_err();
+    let err = runner
+        .run_command_via_docker(
+            Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"]))
+                .docker("does-not-exist:latest".to_owned()),
+        )
+        .await
+        .unwrap_err();
     if let ProcessError::Unclassified(msg) = err {
         assert!(msg.contains("Failed to pull Docker image"));
     } else {
@@ -94,7 +199,8 @@ async fn runner_errors_if_docker_image_not_set() {
     }
 
     // Otherwise, if docker_image is not set, use the local runner.
-    let err = run_command_via_docker(Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])))
+    let err = runner
+        .run_command_via_docker(Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])))
         .await
         .unwrap_err();
     if let ProcessError::Unclassified(msg) = &err {
