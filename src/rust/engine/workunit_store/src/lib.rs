@@ -870,7 +870,6 @@ macro_rules! in_workunit {
       $workunit.complete();
       result
     })
-    .boxed()
   }};
 }
 
