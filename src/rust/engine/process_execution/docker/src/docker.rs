@@ -55,7 +55,7 @@ pub struct CommandRunner<'a> {
     docker: &'a DockerOnceCell,
     work_dir_base: PathBuf,
     immutable_inputs: ImmutableInputs,
-    container_cache: ContainerCache<'a>,
+    pub(crate) container_cache: ContainerCache<'a>,
 }
 
 #[derive(Clone)]
@@ -1045,7 +1045,7 @@ impl<'a> ContainerCache<'a> {
         Ok(container_id.to_owned())
     }
 
-    async fn remove_container(
+    pub(crate) async fn remove_container(
         docker: &Docker,
         container_id: &str,
         options: Option<RemoveContainerOptions>,

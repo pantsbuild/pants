@@ -3,10 +3,12 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::env;
 use std::path::PathBuf;
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use async_trait::async_trait;
 use bollard::Docker;
+use bollard::container::RemoveContainerOptions;
 use fs::{EMPTY_DIRECTORY_DIGEST, RelativePath};
 use maplit::hashset;
 use parameterized::parameterized;
@@ -16,11 +18,13 @@ use testutil::data::{TestData, TestDirectory};
 use testutil::{owned_string_vec, relative_paths};
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
-use crate::docker::{DockerOnceCell, ImagePullCache, SANDBOX_BASE_PATH_IN_CONTAINER};
+use crate::docker::{
+    ContainerCache, DockerOnceCell, ImagePullCache, SANDBOX_BASE_PATH_IN_CONTAINER,
+};
 use process_execution::local::KeepSandboxes;
 use process_execution::{
-    CacheName, CommandRunner, Context, FallibleProcessResultWithPlatform, InputDigests, Platform,
-    Process, ProcessError, local,
+    CacheName, CommandRunner, Context, FallibleProcessResultWithPlatform, InputDigests,
+    NamedCaches, Platform, Process, ProcessError, local,
 };
 
 /// Docker image to use for most tests in this file.
@@ -78,9 +82,9 @@ fn platform_for_tests() -> Result<Platform, String> {
 }
 
 #[async_trait]
-trait DockerCommandTestRunner<'b>: Send + Sync {
-    fn setup<'a>(
-        &'b self,
+trait DockerCommandTestRunner: Send + Sync {
+    async fn setup<'a>(
+        &self,
         store: Store,
         executor: task_executor::Executor,
         docker: &'a DockerOnceCell,
@@ -90,7 +94,7 @@ trait DockerCommandTestRunner<'b>: Send + Sync {
     ) -> Result<crate::docker::CommandRunner<'a>, String>;
 
     async fn run_command_via_docker_in_dir(
-        &'b self,
+        &self,
         mut req: Process,
         dir: PathBuf,
         workunit: &mut RunningWorkunit,
@@ -111,14 +115,16 @@ trait DockerCommandTestRunner<'b>: Send + Sync {
 
         let docker = Box::new(DockerOnceCell::new());
         let image_pull_cache = Box::new(ImagePullCache::new());
-        let runner = self.setup(
-            store.clone(),
-            executor.clone(),
-            &docker,
-            &image_pull_cache,
-            dir.clone(),
-            immutable_inputs,
-        )?;
+        let runner = self
+            .setup(
+                store.clone(),
+                executor.clone(),
+                &docker,
+                &image_pull_cache,
+                dir.clone(),
+                immutable_inputs,
+            )
+            .await?;
         let result: Result<_, ProcessError> = async {
             let original = runner.run(Context::default(), workunit, req).await?;
             let stdout_bytes = store
@@ -139,10 +145,7 @@ trait DockerCommandTestRunner<'b>: Send + Sync {
         })
     }
 
-    async fn run_command_via_docker(
-        &'b self,
-        req: Process,
-    ) -> Result<LocalTestResult, ProcessError> {
+    async fn run_command_via_docker(&self, req: Process) -> Result<LocalTestResult, ProcessError> {
         let (_, mut workunit) = WorkunitStore::setup_for_tests();
         let work_dir = TempDir::new().unwrap();
         let work_dir_path = work_dir.path().to_owned();
@@ -151,13 +154,12 @@ trait DockerCommandTestRunner<'b>: Send + Sync {
     }
 }
 
-enum DockerTestRunners {
-    Default,
-}
+struct DefaultTestRunner;
 
-impl<'b> DockerCommandTestRunner<'b> for DockerTestRunners {
-    fn setup<'a>(
-        &'b self,
+#[async_trait]
+impl DockerCommandTestRunner for DefaultTestRunner {
+    async fn setup<'a>(
+        &self,
         store: Store,
         executor: task_executor::Executor,
         docker: &'a DockerOnceCell,
@@ -165,16 +167,14 @@ impl<'b> DockerCommandTestRunner<'b> for DockerTestRunners {
         work_dir_base: PathBuf,
         immutable_inputs: ImmutableInputs,
     ) -> Result<crate::docker::CommandRunner<'a>, String> {
-        match self {
-            Self::Default => crate::docker::CommandRunner::new(
-                store,
-                executor,
-                docker,
-                image_pull_cache,
-                work_dir_base,
-                immutable_inputs,
-            ),
-        }
+        crate::docker::CommandRunner::new(
+            store,
+            executor,
+            docker,
+            image_pull_cache,
+            work_dir_base,
+            immutable_inputs,
+        )
     }
 }
 
@@ -183,7 +183,7 @@ impl<'b> DockerCommandTestRunner<'b> for DockerTestRunners {
 async fn runner_errors_if_docker_image_not_set() {
     skip_if_no_docker_available_in_macos_ci!();
 
-    let runner = DockerTestRunners::Default;
+    let runner = DefaultTestRunner;
     // Because `docker_image` is set but it does not exist, this process should fail.
     let err = runner
         .run_command_via_docker(
@@ -212,16 +212,111 @@ async fn runner_errors_if_docker_image_not_set() {
     }
 }
 
-#[parameterized(runner = {DockerTestRunners::Default}, name = {"default"})]
+struct ExistingContainerTestRunner {
+    image_name: String,
+    platform: Platform,
+    container_id: OnceLock<(String, NamedCaches)>,
+}
+
+impl ExistingContainerTestRunner {
+    fn new(image_name: &str) -> Self {
+        ExistingContainerTestRunner {
+            image_name: image_name.to_string(),
+            platform: platform_for_tests().unwrap(),
+            container_id: OnceLock::new(),
+        }
+    }
+}
+
+#[async_trait]
+impl DockerCommandTestRunner for ExistingContainerTestRunner {
+    async fn setup<'a>(
+        &self,
+        store: Store,
+        executor: task_executor::Executor,
+        docker: &'a DockerOnceCell,
+        image_pull_cache: &'a ImagePullCache,
+        work_dir_base: PathBuf,
+        immutable_inputs: ImmutableInputs,
+    ) -> Result<crate::docker::CommandRunner<'a>, String> {
+        let command_runner = crate::docker::CommandRunner::new(
+            store,
+            executor,
+            docker,
+            image_pull_cache,
+            work_dir_base,
+            immutable_inputs,
+        )?;
+        match self.container_id.set(
+            command_runner
+                .container_cache
+                .container_for_image(&self.image_name, &self.platform, "")
+                .await?,
+        ) {
+            Ok(()) => Ok(command_runner),
+            Err(_) => Err("An error occurred when attempting to save container ID".to_string()),
+        }
+    }
+}
+
+struct MissingContainerTestRunner {
+    inner: ExistingContainerTestRunner,
+}
+
+impl MissingContainerTestRunner {
+    fn new(image_name: &str) -> Self {
+        MissingContainerTestRunner {
+            inner: ExistingContainerTestRunner::new(image_name),
+        }
+    }
+}
+
+#[async_trait]
+impl DockerCommandTestRunner for MissingContainerTestRunner {
+    async fn setup<'a>(
+        &self,
+        store: Store,
+        executor: task_executor::Executor,
+        docker: &'a DockerOnceCell,
+        image_pull_cache: &'a ImagePullCache,
+        work_dir_base: PathBuf,
+        immutable_inputs: ImmutableInputs,
+    ) -> Result<crate::docker::CommandRunner<'a>, String> {
+        let command_runner = self
+            .inner
+            .setup(
+                store,
+                executor,
+                docker,
+                image_pull_cache,
+                work_dir_base,
+                immutable_inputs,
+            )
+            .await?;
+        ContainerCache::remove_container(
+            docker.get().await?,
+            self.inner.container_id.get().unwrap().0.as_str(),
+            Some(RemoveContainerOptions {
+                force: true,
+                ..RemoveContainerOptions::default()
+            }),
+        )
+        .await?;
+        Ok(command_runner)
+    }
+}
+
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
 #[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
 #[cfg(unix)]
-async fn stdout() {
+async fn stdout(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
-    let result = run_command_via_docker(
-        Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])).docker(IMAGE.to_owned()),
-    )
-    .await
-    .unwrap();
+    let result = runner
+        .run_command_via_docker(
+            Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])).docker(IMAGE.to_owned()),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(result.stdout_bytes, "foo".as_bytes());
     assert_eq!(result.stderr_bytes, "".as_bytes());
