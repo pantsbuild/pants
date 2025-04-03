@@ -1,0 +1,11 @@
+[importlinter]
+root_package = import_lint
+
+[importlinter:contract:1]
+name=Foo doesn't import bar or baz
+type=forbidden
+source_modules=
+    import_lint.foo
+forbidden_modules=
+    import_lint.bar
+    import_lint.baz
