@@ -3120,6 +3120,7 @@ dependencies = [
  "rand",
  "regex",
  "serde",
+ "serde_json",
  "sha2",
  "sharded_lmdb",
  "shell-quote",
