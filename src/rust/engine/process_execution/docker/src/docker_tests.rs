@@ -293,15 +293,19 @@ impl DockerCommandTestRunner for MissingContainerTestRunner {
                 immutable_inputs,
             )
             .await?;
+        let container_id = self.inner.container_id.get().unwrap().0.as_str();
         ContainerCache::remove_container(
             docker.get().await?,
-            self.inner.container_id.get().unwrap().0.as_str(),
+            container_id,
             Some(RemoveContainerOptions {
                 force: true,
                 ..RemoveContainerOptions::default()
             }),
         )
-        .await?;
+        .await
+        .map_err(|err| {
+            format!("Failed to remove Docker container during missing container test setup `{container_id}`: {err:?}")
+        })?;
         Ok(command_runner)
     }
 }

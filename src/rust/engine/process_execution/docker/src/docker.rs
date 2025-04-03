@@ -978,12 +978,12 @@ impl<'a> ContainerCache<'a> {
                 force: true,
                 ..RemoveContainerOptions::default()
             };
-            Self::remove_container(
-                docker,
-                cell_arc.get().unwrap().0.as_str(),
-                Some(remove_options),
-            )
-            .await?;
+            let container_id = cell_arc.get().unwrap().0.as_str();
+            Self::remove_container(docker, container_id, Some(remove_options))
+                .await
+                .map_err(|err| {
+                    format!("Failed to remove Docker container `{container_id}`: {err:?}")
+                })?;
         }
         Ok(())
     }
@@ -1049,11 +1049,8 @@ impl<'a> ContainerCache<'a> {
         docker: &Docker,
         container_id: &str,
         options: Option<RemoveContainerOptions>,
-    ) -> Result<(), String> {
-        docker
-            .remove_container(container_id, options)
-            .await
-            .map_err(|err| format!("Failed to remove Docker container `{container_id}`: {err:?}"))
+    ) -> Result<(), DockerError> {
+        docker.remove_container(container_id, options).await
     }
 
     pub async fn shutdown(&self) -> Result<(), String> {
@@ -1086,7 +1083,11 @@ impl<'a> ContainerCache<'a> {
                 force: true,
                 ..RemoveContainerOptions::default()
             };
-            Self::remove_container(docker, id.as_str(), Some(remove_options)).await
+            Self::remove_container(docker, id.as_str(), Some(remove_options))
+                .await
+                .map_err(|err| {
+                    format!("Failed to remove Docker container during shutdown `{id}`: {err:?}")
+                })
         });
         futures::future::try_join_all(removal_futures).await?;
         Ok(())
