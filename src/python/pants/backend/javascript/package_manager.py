@@ -97,3 +97,6 @@ class PackageManager:
             pack_archive_format="{}-{}.tgz",
             extra_caches=FrozenDict(),
         )
+
+    def spec(self) -> str:
+        return self.name if self.version is None else f"{self.name}@{self.version}"
