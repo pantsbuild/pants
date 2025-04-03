@@ -497,10 +497,8 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                             workdir.path(),
                         )?;
                     }
-                    if let Err(CapturedWorkdirError::Retryable { status, .. }) = res {
-                        if status == 404 {
-                            self.container_cache.prune_container(image_name, image_platform).await?;
-                        }
+                    if let Err(CapturedWorkdirError::Retryable { status: 404, .. }) = res {
+                        self.container_cache.prune_dead_container(image_name, image_platform);
                     }
                     res
                 }
@@ -956,36 +954,9 @@ impl<'a> ContainerCache<'a> {
         }
     }
 
-    pub async fn prune_container(
-        &self,
-        image_name: &str,
-        platform: &Platform,
-    ) -> Result<(), String> {
-        let maybe_cell_arc = {
-            let mut containers = self.containers.lock();
-            containers.remove(&(image_name.to_string(), *platform))
-        };
-        if let Some(cell_arc) = maybe_cell_arc {
-            let docker = match self.docker.get().await {
-                Ok(d) => d,
-                Err(err) => {
-                    return Err(format!(
-                        "Failed to get Docker connection during container removal: {err}"
-                    ));
-                }
-            };
-            let remove_options = RemoveContainerOptions {
-                force: true,
-                ..RemoveContainerOptions::default()
-            };
-            let container_id = cell_arc.get().unwrap().0.as_str();
-            Self::remove_container(docker, container_id, Some(remove_options))
-                .await
-                .map_err(|err| {
-                    format!("Failed to remove Docker container `{container_id}`: {err:?}")
-                })?;
-        }
-        Ok(())
+    pub(crate) fn prune_dead_container(&self, image_name: &str, platform: &Platform) {
+        let mut containers = self.containers.lock();
+        containers.remove(&(image_name.to_string(), *platform));
     }
 
     /// Return the container ID and NamedCaches for a container running `image_name` for use as a place
