@@ -81,6 +81,34 @@ class PexSubsystem(Subsystem):
         ),
         advanced=True,
     )
+    include_requirements = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            Set globally whether 3rd party requirements should be included into PEX files.
+
+            This may be helpful if you want to skip attempting to install any requirement. 
+            For instance, you may disable including requirements when your builds rely 
+            on having system packages installed in your build environment accessible on 
+            a certain path or if your dependencies are not provided via Python packages.
+            
+            For example, with this setting disabled, you could do:
+            
+            ```
+            $ PEX_EXTRA_SYS_PATH="/usr/lib/python3.11/site-packages:/usr/lib64/python3.11/site-packages" pants test ::
+            ```
+            
+            and any requirements discovered with the dependency inference will not be resolved 
+            and placed into the PEX executables that would be packaged before running the relevant 
+            build steps. Required dependencies will be searched at those extra system paths you have
+            provided during the Pants goal execution. You would need to make sure the extra environment 
+            variables are going to be accessible to your build targets by setting the `extra_env_vars` 
+            argument in their declarations (or using the `__defaults__` symbol to apply the
+            argument values to targets in the filesystem tree under that BUILD file's directory).           
+            """
+        ),
+        advanced=True,
+    )
     emit_warnings = BoolOption(
         default=False,
         help=softwrap(
