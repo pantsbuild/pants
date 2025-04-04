@@ -20,7 +20,7 @@ from pants.backend.python.util_rules.local_dists_pep660 import (
     EditableLocalDists,
     EditableLocalDistsRequest,
 )
-from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex
+from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexVenvPath
 from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.backend.python.util_rules.pex_environment import PexEnvironment, PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import EntireLockfile, Lockfile
@@ -46,7 +46,7 @@ from pants.engine.internals.native_engine import (
     Snapshot,
 )
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import Process, ProcessCacheScope, ProcessResult
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import AllTargets, HydratedSources, HydrateSourcesRequest, SourcesField
 from pants.engine.unions import UnionMembership, UnionRule
@@ -194,16 +194,15 @@ async def do_export(
     if export_format == PythonResolveExportFormat.symlinked_immutable_virtualenv:
         # NB: The symlink performance hack leaks an internal named cache location as output (via
         #  the symlink target). If the user partially or fully deletes the named cache, the symlink
-        #  target might point to a malformed venv, or it might not exist at all.
-        #  To prevent returning a symlink to a busted or nonexistent venv from a cached process
-        #  (or a memoized rule) we force the process to rerun per-session.
-        #  This does mean re-running the process superfluously when the named cache is intact, but
-        #  that is generally fast, since all wheels are already cached, and it's best to be safe.
+        #  target might point to a malformed venv, or it might not exist at all: getting
+        #  VenvPexVenvPath will re-materialize it, if required.
         requirements_venv_pex = await Get(
             VenvPex,
             PexRequest,
-            dataclasses.replace(req.pex_request, cache_scope=ProcessCacheScope.PER_SESSION),
+            req.pex_request,
         )
+        venv_path = await Get(VenvPexVenvPath, VenvPex, requirements_venv_pex)
+
         # Note that for symlinking we ignore qualify_path_with_python_version and always qualify,
         # since we need some name for the symlink anyway.
         dest = f"{dest_prefix}/{req.py_version}"
@@ -211,7 +210,6 @@ async def do_export(
             f"symlink to immutable virtualenv for {req.resolve_name or 'requirements'} "
             f"(using Python {req.py_version})"
         )
-        venv_abspath = os.path.join(complete_pex_env.pex_root, requirements_venv_pex.venv_rel_dir)
         return ExportResult(
             description,
             dest,
@@ -219,7 +217,7 @@ async def do_export(
                 # export creates an empty directory for us when the digest gets written.
                 # We have to remove that before creating the symlink in its place.
                 PostProcessingCommand(["rmdir", output_path]),
-                PostProcessingCommand(["ln", "-s", venv_abspath, output_path]),
+                PostProcessingCommand(["ln", "-s", str(venv_path.abs_path), output_path]),
             ],
             resolve=req.resolve_name or None,
         )

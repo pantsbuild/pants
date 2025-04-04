@@ -43,7 +43,7 @@ class PexCli(TemplatedExternalTool):
 
     default_version = "v2.33.7"
     default_url_template = "https://github.com/pex-tool/pex/releases/download/{version}/pex"
-    version_constraints = ">=2.13.0,<3.0"
+    version_constraints = ">=2.33.7,<3.0"
 
     # extra args to be passed to the pex tool; note that they
     # are going to apply to all invocations of the pex tool.
