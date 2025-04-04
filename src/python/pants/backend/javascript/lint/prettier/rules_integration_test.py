@@ -13,6 +13,7 @@ from pants.backend.javascript.lint.prettier.rules import PrettierFmtFieldSet, Pr
 from pants.backend.javascript.subsystems import nodejs
 from pants.backend.javascript.target_types import JSSourcesGeneratorTarget
 from pants.backend.python import target_types_rules
+from pants.backend.typescript.target_types import TypeScriptSourcesGeneratorTarget
 from pants.core.goals.fmt import FmtResult
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -34,7 +35,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(FmtResult, (PrettierFmtRequest.Batch,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
-        target_types=[JSSourcesGeneratorTarget],
+        target_types=[JSSourcesGeneratorTarget, TypeScriptSourcesGeneratorTarget],
     )
 
 
@@ -151,6 +152,48 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     fmt_result = run_prettier(rule_runner, tgts)
     assert fmt_result.output == rule_runner.make_snapshot(
         {"good.js": DEFAULT_FORMATTED_FILE, "bad.js": DEFAULT_FORMATTED_FILE}
+    )
+    assert fmt_result.did_change is True
+
+
+UNFORMATTED_TS_FILE = dedent(
+    """\
+    function greet(): void {
+    let message: string = "Hello, World!";
+    console.log(message);
+    }
+
+    greet();
+    """
+)
+
+DEFAULT_FORMATTED_TS_FILE = dedent(
+    """\
+    function greet(): void {
+      let message: string = "Hello, World!";
+      console.log(message);
+    }
+
+    greet();
+    """
+)
+
+
+def test_typescript(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "good.ts": DEFAULT_FORMATTED_TS_FILE,
+            "bad.ts": UNFORMATTED_TS_FILE,
+            "BUILD": "typescript_sources(name='t')",
+        }
+    )
+    tgts = [
+        rule_runner.get_target(Address("", target_name="t", relative_file_path="good.ts")),
+        rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.ts")),
+    ]
+    fmt_result = run_prettier(rule_runner, tgts)
+    assert fmt_result.output == rule_runner.make_snapshot(
+        {"good.ts": DEFAULT_FORMATTED_TS_FILE, "bad.ts": DEFAULT_FORMATTED_TS_FILE}
     )
     assert fmt_result.did_change is True
 
