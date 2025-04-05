@@ -375,8 +375,8 @@ async def map_third_party_modules_to_addresses(
             # NB: We don't use `canonicalize_project_name()` for the fallback value because we
             # want to preserve `.` in the module name. See
             # https://www.python.org/dev/peps/pep-0503/#normalized-names.
-            proj_name = canonicalize_project_name(req.project_name)
-            fallback_value = req.project_name.strip().lower().replace("-", "_")
+            proj_name = canonicalize_project_name(req.name)
+            fallback_value = req.name.strip().lower().replace("-", "_")
 
             modules_to_add: tuple[str, ...]
             is_type_stub: bool

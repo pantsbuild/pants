@@ -18,7 +18,6 @@ hashing = { path = "../hashing" }
 ignore = { workspace = true }
 internment = { workspace = true }
 itertools = { workspace = true }
-lazy_static = { workspace = true }
 log = { workspace = true }
 parking_lot = { workspace = true }
 protos = { path = "../protos" }

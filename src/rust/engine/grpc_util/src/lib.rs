@@ -4,7 +4,7 @@
 use std::collections::{BTreeMap, HashMap};
 use std::iter::FromIterator;
 use std::str::FromStr;
-use std::sync::{Arc, Once};
+use std::sync::{Arc, LazyLock, Once};
 use std::task::{Context, Poll};
 use std::time::Duration;
 
@@ -15,13 +15,12 @@ use http::header::HeaderName;
 use http::{HeaderMap, HeaderValue};
 use hyper::Uri;
 use itertools::Itertools;
-use lazy_static::lazy_static;
 use tokio_rustls::rustls::ClientConfig;
+use tower::ServiceBuilder;
 use tower::limit::ConcurrencyLimit;
 use tower::timeout::{Timeout, TimeoutLayer};
-use tower::ServiceBuilder;
 use tower_service::Service;
-use workunit_store::{increment_counter_if_in_workunit, Metric, ObservationMetric};
+use workunit_store::{Metric, ObservationMetric, increment_counter_if_in_workunit};
 
 use crate::channel::Channel;
 use crate::headers::{SetRequestHeaders, SetRequestHeadersLayer};
@@ -72,16 +71,15 @@ pub fn layered_service(
         .service(channel)
 }
 
-lazy_static! {
-    static ref METRIC_FOR_REAPI_PATH: Arc<HashMap<String, ObservationMetric>> = {
+static METRIC_FOR_REAPI_PATH: LazyLock<Arc<HashMap<String, ObservationMetric>>> =
+    LazyLock::new(|| {
         let mut m = HashMap::new();
         m.insert(
             "/build.bazel.remote.execution.v2.ActionCache/GetActionResult".to_string(),
             ObservationMetric::RemoteCacheGetActionResultNetworkTimeMicros,
         );
         Arc::new(m)
-    };
-}
+    });
 
 pub async fn create_channel(
     addr: &str,
@@ -201,8 +199,8 @@ mod tests {
                             Ok(Response::new(gen::Output {}))
                         } else {
                             Err(Status::invalid_argument(format!(
-                "user-agent header did not contain expected value: actual={user_agent}"
-              )))
+                                "user-agent header did not contain expected value: actual={user_agent}"
+                            )))
                         }
                     }
                     None => Err(Status::invalid_argument("user-agent header was not set")),

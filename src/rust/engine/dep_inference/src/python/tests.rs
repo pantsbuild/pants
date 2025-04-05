@@ -1,6 +1,6 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-use crate::python::{get_dependencies, ImportCollector};
+use crate::python::{ImportCollector, get_dependencies};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
@@ -279,6 +279,24 @@ fn dunder_import() {
     )  # pants: no-infer-dep",
         &[],
     );
+
+    // Concatenated strings are accepted.
+    assert_imports(
+        "
+    __import__(
+          'foo'   # Intervening comment will be ignored.
+          \".bar\"
+          \"\"\".xyzzy\"\"\"
+          '''.funky'''
+        )
+    ",
+        &["foo.bar.xyzzy.funky"],
+    );
+
+    // f-strings with interpolations are ignored
+    assert_imports("__import__(f'foo.{name}')", &[]);
+    assert_imports("__import__(f'foo.{{name}}')", &[]);
+    assert_imports("__import__(f'foo.bar\n')", &[]);
 }
 
 fn assert_imports_strong_weak(code: &str, strong: &[&str], weak: &[&str]) {
@@ -678,6 +696,10 @@ fn string_candidates() {
     assert_strings("'''\na'''", &[]);
     assert_strings("'''a\n'''", &[]);
 
+    // Concatenated strings
+    assert_strings("'foo' \".bar\"", &["foo.bar"]);
+    assert_strings("'''foo''' \"\"\".bar\"\"\"", &["foo.bar"]);
+
     // Technically the value of the string doesn't contain whitespace, but the parser isn't that
     // sophisticated yet.
     assert_strings("'''\\\na'''", &[]);
@@ -707,6 +729,8 @@ fn string_candidates() {
     ",
         &[],
     );
+    assert_strings("'foo' \".bar\" # pants: no-infer-dep", &[]);
+    assert_strings("'''foo''' \"\"\".bar\"\"\" # pants: no-infer-dep", &[]);
 }
 
 #[test]
@@ -721,6 +745,11 @@ fn python2() {
       __import__(u'pkg_resources')
       __import__(b'treat.as.a.regular.import.not.a.string.import')
       __import__(u'{}'.format('interpolation'))
+
+        __import__(
+          'foo'   # Intervening comment will be ignored.
+          '.bar'
+        )
 
         importlib.import_module(b'dep.from.bytes')
         importlib.import_module(u'dep.from.str')
@@ -737,15 +766,16 @@ fn python2() {
             ("project.demo.Demo", (5, false)),
             ("pkg_resources", (7, false)),
             ("treat.as.a.regular.import.not.a.string.import", (8, false)),
-            ("weak1", (17, true)),
-            ("strong1", (18, false)),
-            ("strong2", (19, false)),
-            ("strong3", (20, false)),
+            ("weak1", (22, true)),
+            ("strong1", (23, false)),
+            ("strong2", (24, false)),
+            ("strong3", (25, false)),
+            ("foo.bar", (12, false)),
         ]),
         HashMap::from([
-            ("dep.from.bytes", 11),
-            ("dep.from.str", 12),
-            ("dep.from.str_狗", 13),
+            ("dep.from.bytes", 16),
+            ("dep.from.str", 17),
+            ("dep.from.str_狗", 18),
         ]),
     );
 }

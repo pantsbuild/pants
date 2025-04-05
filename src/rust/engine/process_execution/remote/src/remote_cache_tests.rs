@@ -2,8 +2,8 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, HashSet};
 use std::convert::TryInto;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -11,7 +11,7 @@ use maplit::hashset;
 use tempfile::TempDir;
 use tokio::time::sleep;
 
-use fs::{DirectoryDigest, RelativePath, EMPTY_DIRECTORY_DIGEST};
+use fs::{DirectoryDigest, EMPTY_DIRECTORY_DIGEST, RelativePath};
 use grpc_util::tls;
 use hashing::{Digest, EMPTY_DIGEST};
 use mock::StubCAS;
@@ -23,10 +23,10 @@ use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
 use crate::remote::ensure_action_stored_locally;
 use crate::remote_cache::{RemoteCacheRunnerOptions, RemoteCacheWarningsBehavior};
 use process_execution::{
-    make_execute_request, CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context,
-    EntireExecuteRequest, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope,
-    ProcessError, ProcessExecutionEnvironment, ProcessExecutionStrategy, ProcessResultMetadata,
-    ProcessResultSource,
+    CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context, EntireExecuteRequest,
+    FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
+    ProcessExecutionEnvironment, ProcessExecutionStrategy, ProcessResultMetadata,
+    ProcessResultSource, local::KeepSandboxes, make_execute_request,
 };
 
 const CACHE_READ_TIMEOUT: Duration = Duration::from_secs(5);
@@ -58,6 +58,7 @@ impl MockLocalCommandRunner {
                         name: None,
                         platform: Platform::current().unwrap(),
                         strategy: ProcessExecutionStrategy::Local,
+                        local_keep_sandboxes: KeepSandboxes::Never,
                     },
                     RunId(0),
                 ),
@@ -682,26 +683,30 @@ async fn extract_output_file() {
     assert_eq!(file_digest, TestData::roland().digest());
 
     // Extract non-existent files to make sure that Ok(None) is returned.
-    assert!(crate::remote_cache::CommandRunner::extract_output_file(
-        &input_tree.digest_trie(),
-        "animals.ext",
-    )
-    .unwrap()
-    .is_none());
-    assert!(crate::remote_cache::CommandRunner::extract_output_file(
-        &input_tree.digest_trie(),
-        "cats/xyzzy",
-    )
-    .unwrap()
-    .is_none());
+    assert!(
+        crate::remote_cache::CommandRunner::extract_output_file(
+            &input_tree.digest_trie(),
+            "animals.ext",
+        )
+        .unwrap()
+        .is_none()
+    );
+    assert!(
+        crate::remote_cache::CommandRunner::extract_output_file(
+            &input_tree.digest_trie(),
+            "cats/xyzzy",
+        )
+        .unwrap()
+        .is_none()
+    );
 
     // Error if a path has been declared as a file but isn't.
     assert_eq!(
         crate::remote_cache::CommandRunner::extract_output_file(&input_tree.digest_trie(), "cats",),
         Err(format!(
-      "Declared output file path \"cats\" in output digest {:?} contained a directory instead.",
-      TestDirectory::nested().digest()
-    ))
+            "Declared output file path \"cats\" in output digest {:?} contained a directory instead.",
+            TestDirectory::nested().digest()
+        ))
     );
 }
 
@@ -801,6 +806,7 @@ async fn make_action_result_basic() {
                 name: None,
                 platform: Platform::Linux_x86_64,
                 strategy: ProcessExecutionStrategy::Local,
+                local_keep_sandboxes: KeepSandboxes::Never,
             },
             RunId(0),
         ),

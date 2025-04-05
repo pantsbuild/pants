@@ -7,7 +7,7 @@ use futures::channel::oneshot;
 use futures::future::{self, FutureExt};
 use tokio::time::{sleep, timeout};
 
-use crate::bounded::{balance, AsyncSemaphore, State, Task};
+use crate::bounded::{AsyncSemaphore, State, Task, balance};
 
 fn mk_semaphore(permits: usize) -> AsyncSemaphore {
     mk_semaphore_with_preemptible_duration(permits, Duration::from_millis(200))
@@ -159,6 +159,125 @@ async fn correct_semaphore_slot_ids_2() {
 }
 
 #[tokio::test]
+async fn correct_semaphore_slot_ids_range() {
+    let sema = mk_semaphore(3);
+
+    let wait_duration = Duration::from_secs(5);
+    // Channels to signal when the processes should start and complete execution
+    let (send_start1, rcv_start1) = oneshot::channel();
+    let (send_start2, rcv_start2) = oneshot::channel();
+    let (send_start3, rcv_start3) = oneshot::channel();
+    let (send_start4, rcv_start4) = oneshot::channel();
+
+    let (send_complete1, rcv_complete1) = oneshot::channel();
+    let (send_complete2, rcv_complete2) = oneshot::channel();
+    let (send_complete3, rcv_complete3) = oneshot::channel();
+    let (send_complete4, rcv_complete4) = oneshot::channel();
+
+    // Process 1 (takes 2 slots)
+    let t1 = tokio::spawn(
+        sema.clone()
+            .with_acquired_range(2, 2, move |id| async move {
+                send_start1.send(()).unwrap();
+                rcv_complete1.await.unwrap();
+                id
+            }),
+    );
+
+    // Process 2 (takes 1 slot)
+    let t2 = tokio::spawn(
+        sema.clone()
+            .with_acquired_range(1, 1, move |id| async move {
+                send_start2.send(()).unwrap();
+                rcv_complete2.await.unwrap();
+                id
+            }),
+    );
+
+    // Wait for first two processes to start
+    if let Err(_) = timeout(wait_duration, rcv_start1).await {
+        panic!("Process 1 didn't start within timeout");
+    }
+    if let Err(_) = timeout(wait_duration, rcv_start2).await {
+        panic!("Process 2 didn't start within timeout");
+    }
+
+    assert_eq!(0, sema.available_permits());
+
+    // Process 3 (takes 2 slot, will need to wait for process 1 and 2 to complete)
+    let t3 = tokio::spawn(
+        sema.clone()
+            .with_acquired_range(2, 2, move |id| async move {
+                send_start3.send(()).unwrap();
+                rcv_complete3.await.unwrap();
+                id
+            }),
+    );
+
+    // Process 4 (takes 1 slot, should execute before process 3, but does not)
+    let t4 = tokio::spawn(
+        sema.clone()
+            .with_acquired_range(1, 1, move |id| async move {
+                send_start4.send(()).unwrap();
+                rcv_complete4.await.unwrap();
+                id
+            }),
+    );
+
+    // Release process 2 first, allowing process 4 to run
+    send_complete2.send(()).unwrap();
+    let id2 = t2.await.unwrap();
+
+    // Tokio appears to implement strict FIFO fairness which has the downside that
+    // process 4 must wait now, even though there are enough permits for it to run.
+    //
+    // From tokio docs:
+    // | This method uses a queue to fairly distribute permits in the order they
+    // | were requested.
+    //
+    // if let Err(_) = timeout(wait_duration, rcv_start4).await {
+    //     panic!("Process 4 didn't start within timeout");
+    // }
+
+    // There are zero permits available because 1 is being held by process 3
+    assert_eq!(0, sema.available_permits());
+
+    // Complete process 1, allowing process 3 to run
+    send_complete1.send(()).unwrap();
+    let id1 = t1.await.unwrap();
+
+    // Wait for process 3 to start with timeout
+    if let Err(_) = timeout(wait_duration, rcv_start3).await {
+        panic!("Process 3 didn't start within timeout");
+    }
+    assert_eq!(0, sema.available_permits());
+
+    send_complete3.send(()).unwrap();
+    let id3 = t3.await.unwrap();
+
+    // Wait for process 4 to start with timeout
+    if let Err(_) = timeout(wait_duration, rcv_start4).await {
+        panic!("Process 4 didn't start within timeout");
+    }
+
+    assert_eq!(2, sema.available_permits());
+
+    // Allow process 4 to complete
+    send_complete4.send(()).unwrap();
+    let id4 = t4.await.unwrap();
+
+    assert_eq!(3, sema.available_permits());
+
+    // Process 1 should get ID 1, then process 2 should run with id 2 and complete.
+    // Process 3 will block until both process 1 and 2 complete,
+    // Process 4 will run in the same "slot" as process 2 and get the same id (2).
+    assert_eq!(id1, 1);
+    assert_eq!(id2, 2);
+    assert_eq!(id3, 3);
+    assert_eq!(id4, 2);
+}
+
+#[tokio::test]
 async fn at_most_n_acquisitions() {
     let sema = mk_semaphore(1);
     let handle1 = sema.clone();
@@ -250,7 +369,7 @@ async fn drop_while_waiting() {
 
     // thread2 will wait for a little while, but then drop its PermitFuture to give up on waiting.
     tokio::spawn(async move {
-        let permit_future = handle2.acquire(1).boxed();
+        let permit_future = handle2.acquire(1, 1).boxed();
         let delay_future = sleep(Duration::from_millis(100)).boxed();
         let raced_result = future::select(delay_future, permit_future).await;
         // We expect to have timed out, because the other Future will not resolve until asked.
@@ -348,14 +467,14 @@ async fn preemption() {
     let sema = mk_semaphore_with_preemptible_duration(2, ten_secs);
 
     // Acquire a permit which will take all concurrency, and confirm that it doesn't get preempted.
-    let permit1 = sema.acquire(2).await;
+    let permit1 = sema.acquire(1, 2).await;
     assert_eq!(2, permit1.concurrency());
     if let Ok(_) = timeout(ten_secs / 100, permit1.notified_concurrency_changed()).await {
         panic!("permit1 should not have been preempted.");
     }
 
     // Acquire another permit, and confirm that it doesn't get preempted.
-    let permit2 = sema.acquire(2).await;
+    let permit2 = sema.acquire(1, 2).await;
     if let Ok(_) = timeout(ten_secs / 100, permit2.notified_concurrency_changed()).await {
         panic!("permit2 should not have been preempted.");
     }
@@ -374,38 +493,52 @@ async fn preemption() {
 fn test_balance(
     total_concurrency: usize,
     expected_preempted: usize,
-    task_defs: Vec<(usize, usize, usize)>,
+    task_defs: Vec<(usize, usize, usize, usize)>,
 ) {
     let ten_minutes_from_now = Instant::now() + Duration::from_secs(10 * 60);
     let tasks = task_defs
         .iter()
         .enumerate()
-        .map(|(id, (desired, actual, _))| {
-            Arc::new(Task::new(id, *desired, *actual, ten_minutes_from_now))
+        .map(|(id, (min, desired, actual, _))| {
+            Arc::new(Task::new(id, *min, *desired, *actual, ten_minutes_from_now))
         })
         .collect::<Vec<_>>();
 
     let mut state = State::new_for_tests(total_concurrency, tasks.clone());
 
     assert_eq!(expected_preempted, balance(Instant::now(), &mut state));
-    for (task, (_, _, expected)) in tasks.iter().zip(task_defs.into_iter()) {
+    for (task, (_, _, _, expected)) in tasks.iter().zip(task_defs.into_iter()) {
         assert_eq!(expected, task.concurrency());
     }
 }
 
 #[tokio::test]
 async fn balance_noop() {
-    test_balance(2, 0, vec![(1, 1, 1), (1, 1, 1)]);
+    test_balance(2, 0, vec![(1, 1, 1, 1), (1, 1, 1, 1)]);
 }
 
 #[tokio::test]
 async fn balance_overcommitted() {
     // Preempt the first Task and give it one slot, without adjusting the second task.
-    test_balance(2, 1, vec![(2, 2, 1), (1, 1, 1)]);
+    test_balance(2, 1, vec![(1, 2, 2, 1), (1, 1, 1, 1)]);
 }
 
 #[tokio::test]
 async fn balance_undercommitted() {
     // Should preempt both Tasks to give them more concurrency.
-    test_balance(4, 2, vec![(2, 1, 2), (2, 1, 2)]);
+    test_balance(4, 2, vec![(1, 2, 1, 2), (1, 2, 1, 2)]);
+}
+
+#[tokio::test]
+async fn balance_overcommitted_with_minimum_constraints() {
+    // First task cannot be preempted because of the minimum concurrency requirement
+    // So the second task will be preempted and given less concurrency
+    test_balance(6, 1, vec![(4, 4, 4, 4), (1, 4, 3, 2)]);
+}
+
+#[tokio::test]
+async fn balance_overcommitted_with_minimum_and_range() {
+    // Both tasks are preempted to even out the allocation
+    // But the minimum constraint on the first task is respected
+    test_balance(6, 2, vec![(4, 6, 6, 4), (1, 6, 3, 2)]);
 }

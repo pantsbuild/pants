@@ -17,50 +17,49 @@ use std::panic;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
+use std::sync::LazyLock;
 use std::time::Duration;
-use tokio::sync::Mutex;
-
-use lazy_static::lazy_static;
 
 use async_latch::AsyncLatch;
 use fnv::FnvHasher;
 use fs::DirectoryDigest;
-use futures::future::{self, FutureExt};
 use futures::Future;
+use futures::future::{self, FutureExt};
 use hashing::Digest;
-use log::{self, debug, error, warn, Log};
+use log::{self, Log, debug, error, warn};
 use logging::logger::PANTS_LOGGER;
 use logging::{Logger, PythonLogLevel};
 use petgraph::graph::{DiGraph, Graph};
 use process_execution::CacheContentBehavior;
 use pyo3::exceptions::{PyException, PyIOError, PyKeyboardInterrupt, PyValueError};
 use pyo3::prelude::{
-    pyclass, pyfunction, pymethods, pymodule, wrap_pyfunction, PyModule, PyObject,
-    PyResult as PyO3Result, Python,
+    PyModule, PyObject, PyResult as PyO3Result, Python, pyclass, pyfunction, pymethods, pymodule,
+    wrap_pyfunction,
 };
 use pyo3::sync::GILProtected;
 use pyo3::types::{
     PyAnyMethods, PyBytes, PyDict, PyDictMethods, PyList, PyListMethods, PyModuleMethods, PyTuple,
     PyType,
 };
-use pyo3::{create_exception, Bound, IntoPyObject, PyAny, PyRef};
+use pyo3::{Bound, IntoPyObject, PyAny, PyRef, create_exception};
 use regex::Regex;
 use remote::remote_cache::RemoteCacheWarningsBehavior;
 use rule_graph::{self, RuleGraph};
 use store::RemoteProvider;
 use task_executor::Executor;
+use tokio::sync::Mutex;
 use workunit_store::{
     ArtifactOutput, ObservationMetric, UserMetadataItem, Workunit, WorkunitState, WorkunitStore,
     WorkunitStoreHandle,
 };
 
-use crate::externs::fs::{possible_store_missing_digest, PyFileDigest};
+use crate::externs::fs::{PyFileDigest, possible_store_missing_digest};
 use crate::externs::process::PyProcessExecutionEnvironment;
 use crate::intrinsics;
 use crate::{
-    externs, nodes, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination,
-    Failure, Function, Key, LocalStoreOptions, Params, RemotingOptions, Rule, Scheduler, Session,
-    SessionCore, Tasks, TypeId, Types, Value,
+    Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination, Failure, Function, Key,
+    LocalStoreOptions, Params, RemotingOptions, Rule, Scheduler, Session, SessionCore, Tasks,
+    TypeId, Types, Value, externs, nodes,
 };
 
 #[pymodule]
@@ -293,7 +292,6 @@ impl PyExecutionStrategyOptions {
     fn __new__(
         local_parallelism: usize,
         remote_parallelism: usize,
-        local_keep_sandboxes: String,
         local_cache: bool,
         local_enable_nailgun: bool,
         remote_cache_read: bool,
@@ -305,10 +303,6 @@ impl PyExecutionStrategyOptions {
         Self(ExecutionStrategyOptions {
             local_parallelism,
             remote_parallelism,
-            local_keep_sandboxes: process_execution::local::KeepSandboxes::from_str(
-                &local_keep_sandboxes,
-            )
-            .unwrap(),
             local_cache,
             local_enable_nailgun,
             remote_cache_read,
@@ -1862,9 +1856,7 @@ fn ensure_path_doesnt_exist(path: &Path) -> io::Result<()> {
     }
 }
 
-lazy_static! {
-    static ref GLOBAL_WORKSPACE_WRITE_LOCK: Mutex<()> = Mutex::new(());
-}
+static GLOBAL_WORKSPACE_WRITE_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 #[pyfunction]
 fn write_digest(

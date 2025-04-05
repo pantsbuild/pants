@@ -19,9 +19,8 @@ use tokio::sync::RwLock;
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
-    local, local::KeepSandboxes, CacheName, CommandRunner as CommandRunnerTrait, Context,
-    FallibleProcessResultWithPlatform, InputDigests, NamedCaches, Process, ProcessError,
-    RelativePath,
+    CacheName, CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
+    InputDigests, NamedCaches, Process, ProcessError, RelativePath, local, local::KeepSandboxes,
 };
 
 #[derive(PartialEq, Debug)]
@@ -363,7 +362,6 @@ async fn test_chroot_placeholder() {
     let result = run_command_locally_in_dir(
         Process::new(vec!["/usr/bin/env".to_owned()]).env(env.clone()),
         work_root.clone(),
-        KeepSandboxes::Always,
         &mut workunit,
         None,
         None,
@@ -419,8 +417,9 @@ async fn test_directory_preservation() {
     let bash_contents = format!("echo $PWD && {} roland.ext ..", cp.display());
     let argv = vec![find_bash(), "-c".to_owned(), bash_contents.to_owned()];
 
-    let mut process =
-        Process::new(argv.clone()).output_files(relative_paths(&["roland.ext"]).collect());
+    let mut process = Process::new(argv.clone())
+        .output_files(relative_paths(&["roland.ext"]).collect())
+        .local_keep_sandboxes(KeepSandboxes::Always);
     process.input_digests =
         InputDigests::with_input_files(TestDirectory::nested().directory_digest());
     process.working_directory = Some(RelativePath::new("cats").unwrap());
@@ -428,7 +427,6 @@ async fn test_directory_preservation() {
     let result = run_command_locally_in_dir(
         process,
         preserved_work_root.clone(),
-        KeepSandboxes::Always,
         &mut workunit,
         Some(store),
         Some(executor),
@@ -466,9 +464,11 @@ async fn test_directory_preservation() {
     // Ensure the bash command line is provided.
     let bytes_quoted_command_line = Bash::quote_vec(&bash_contents);
     let quoted_command_line = str::from_utf8(&bytes_quoted_command_line).unwrap();
-    assert!(std::fs::read_to_string(&run_script_path)
-        .unwrap()
-        .contains(quoted_command_line));
+    assert!(
+        std::fs::read_to_string(&run_script_path)
+            .unwrap()
+            .contains(quoted_command_line)
+    );
 }
 
 #[tokio::test]
@@ -482,9 +482,8 @@ async fn test_directory_preservation_error() {
     assert_eq!(testutil::file::list_dir(&preserved_work_root).len(), 0);
 
     run_command_locally_in_dir(
-        Process::new(vec!["doesnotexist".to_owned()]),
+        Process::new(vec!["doesnotexist".to_owned()]).local_keep_sandboxes(KeepSandboxes::Always),
         preserved_work_root.clone(),
-        KeepSandboxes::Always,
         &mut workunit,
         None,
         None,
@@ -607,7 +606,6 @@ async fn working_directory() {
     let result = run_command_locally_in_dir(
         process,
         work_dir.path().to_owned(),
-        KeepSandboxes::Never,
         &mut workunit,
         Some(store),
         Some(executor),
@@ -669,7 +667,6 @@ async fn immutable_inputs() {
     let result = run_command_locally_in_dir(
         process,
         work_dir.path().to_owned(),
-        KeepSandboxes::Never,
         &mut workunit,
         Some(store),
         Some(executor),
@@ -764,21 +761,12 @@ async fn run_command_locally(req: Process) -> Result<LocalTestResult, ProcessErr
     let (_, mut workunit) = WorkunitStore::setup_for_tests();
     let work_dir = TempDir::new().unwrap();
     let work_dir_path = work_dir.path().to_owned();
-    run_command_locally_in_dir(
-        req,
-        work_dir_path,
-        KeepSandboxes::Never,
-        &mut workunit,
-        None,
-        None,
-    )
-    .await
+    run_command_locally_in_dir(req, work_dir_path, &mut workunit, None, None).await
 }
 
 async fn run_command_locally_in_dir(
     req: Process,
     dir: PathBuf,
-    cleanup: KeepSandboxes,
     workunit: &mut RunningWorkunit,
     store: Option<Store>,
     executor: Option<task_executor::Executor>,
@@ -795,7 +783,6 @@ async fn run_command_locally_in_dir(
         dir.clone(),
         named_caches,
         immutable_inputs,
-        cleanup,
         Arc::new(RwLock::new(())),
     );
     let original = runner.run(Context::default(), workunit, req).await?;

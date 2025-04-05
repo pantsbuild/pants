@@ -241,7 +241,14 @@ impl<R: Rule> RuleGraph<R> {
         rules: IndexSet<R>,
         queries: IndexSet<Query<R::TypeId>>,
     ) -> Result<RuleGraph<R>, String> {
-        Builder::new(rules, queries).graph()
+        log::debug!("Rule graph: building...");
+        let start = std::time::Instant::now();
+
+        let graph = Builder::new(rules, queries).graph();
+
+        log::debug!("Rule graph: built in {:.3}s", start.elapsed().as_secs_f64());
+
+        graph
     }
 
     pub fn find_root_edges<I: IntoIterator<Item = R::TypeId>>(
@@ -397,11 +404,11 @@ impl<R: Rule> RuleGraph<R> {
                 } else {
                     suggestions.sort();
                     format!(
-            "can compute {} given input Params({}), but it can be produced using:\n  {}",
-            product,
-            params_str(&params),
-            suggestions.join("\n  ")
-          )
+                        "can compute {} given input Params({}), but it can be produced using:\n  {}",
+                        product,
+                        params_str(&params),
+                        suggestions.join("\n  ")
+                    )
                 };
                 Err(format!("No installed QueryRules {suggestions_str}",))
             }

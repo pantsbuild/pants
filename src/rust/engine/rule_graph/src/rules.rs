@@ -9,7 +9,7 @@ use std::hash::Hash;
 use deepsize::DeepSizeOf;
 use smallvec::SmallVec;
 
-use super::{params_str, Palette};
+use super::{Palette, params_str};
 
 pub type ParamTypes<T> = BTreeSet<T>;
 
@@ -216,19 +216,11 @@ pub struct DisplayForGraphArgs {
 
 impl DisplayForGraphArgs {
     pub fn line_separator(&self) -> &'static str {
-        if self.multiline {
-            "\n"
-        } else {
-            " "
-        }
+        if self.multiline { "\n" } else { " " }
     }
 
     pub fn optional_line_separator(&self) -> &'static str {
-        if self.multiline {
-            "\n"
-        } else {
-            ""
-        }
+        if self.multiline { "\n" } else { "" }
     }
 }
 

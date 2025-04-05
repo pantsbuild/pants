@@ -151,9 +151,7 @@ async def _generate_requirements(
         )
 
     requirements = parse_requirements_callback(digest_contents[0].content, requirements_full_path)
-    grouped_requirements = itertools.groupby(
-        requirements, lambda parsed_req: parsed_req.project_name
-    )
+    grouped_requirements = itertools.groupby(requirements, lambda parsed_req: parsed_req.name)
     result = tuple(
         generate_tgt(project_name, parsed_reqs_)
         for project_name, parsed_reqs_ in grouped_requirements

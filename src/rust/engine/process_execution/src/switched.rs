@@ -68,8 +68,8 @@ mod tests {
     use async_trait::async_trait;
     use workunit_store::{RunningWorkunit, WorkunitStore};
 
-    use crate::switched::SwitchedCommandRunner;
     use crate::CommandRunner;
+    use crate::switched::SwitchedCommandRunner;
     use crate::{Context, FallibleProcessResultWithPlatform, Process, ProcessError};
 
     #[derive(Debug)]

@@ -16,9 +16,9 @@ use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use workunit_store::WorkunitStore;
 
+use crate::MEGABYTES;
 use crate::remote::ByteStore;
 use crate::tests::new_cas;
-use crate::MEGABYTES;
 
 #[tokio::test]
 async fn smoke_test_from_options_reapi_provider() {

@@ -8,18 +8,19 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::convert::TryFrom;
 use std::fmt::{self, Debug, Display};
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use concrete_time::{Duration, TimeSpan};
 use deepsize::DeepSizeOf;
-use fs::{DirectoryDigest, RelativePath, EMPTY_DIRECTORY_DIGEST};
+use fs::{DirectoryDigest, EMPTY_DIRECTORY_DIGEST, RelativePath};
 use fs::{File, PathStat};
+use futures::FutureExt;
 use futures::future::try_join_all;
 use futures::future::{self, BoxFuture, TryFutureExt};
 use futures::try_join;
-use futures::FutureExt;
 use grpc_util::prost::MessageExt;
 use hashing::Digest;
 use itertools::Itertools;
@@ -37,7 +38,7 @@ use store::{SnapshotOps, Store, StoreError};
 use task_executor::TailTasks;
 use tryfuture::try_future;
 use uuid::Uuid;
-use workunit_store::{in_workunit, Level, RunId, RunningWorkunit, WorkunitStore};
+use workunit_store::{Level, RunId, RunningWorkunit, WorkunitStore, in_workunit};
 
 pub mod bounded;
 #[cfg(test)]
@@ -48,8 +49,6 @@ pub mod cache;
 mod cache_tests;
 
 pub mod switched;
-
-pub mod children;
 
 pub mod local;
 #[cfg(test)]
@@ -67,8 +66,8 @@ pub mod workspace_tests;
 
 extern crate uname;
 
-pub use crate::children::ManagedChild;
 pub use crate::named_caches::{CacheName, NamedCaches};
+pub use children::ManagedChild;
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an Process, and may be populated only by the
@@ -483,6 +482,86 @@ pub struct ProcessExecutionEnvironment {
     pub name: Option<String>,
     pub platform: Platform,
     pub strategy: ProcessExecutionStrategy,
+    pub local_keep_sandboxes: local::KeepSandboxes,
+}
+
+#[derive(DeepSizeOf, Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ProcessConcurrency {
+    /// A specific number of cores required to run the process.
+    /// The process will wait until the specified number of cores are available.
+    Exactly { count: usize },
+
+    /// The amount of parallelism that this process is capable of given its inputs. This
+    /// value does not directly set the number of cores allocated to the process: that is computed
+    /// based on availability, and provided as a template value in the arguments of the process.
+    ///
+    /// When set, a `{pants_concurrency}` variable will be templated into the `argv` of the process.
+    ///
+    /// Processes which set this value may be preempted (i.e. canceled and restarted) for a short
+    /// period after starting if available resources have changed (because other processes have
+    /// started or finished).
+    Range {
+        // Minimum number of cores to use, defaults to 1
+        min: Option<usize>,
+        // Maximum number of cores to use, defaults to min
+        max: Option<usize>,
+    },
+
+    /// Exclusive access to all cores. No other processes will be scheduled to run while this process is running.
+    Exclusive,
+}
+
+impl FromStr for ProcessConcurrency {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // string is in the form min,max or literal X for exclusive
+        if s == "x" {
+            Ok(ProcessConcurrency::Exclusive)
+        } else if s.contains(",") {
+            let parts = s.split(',').collect::<Vec<_>>();
+            if parts.len() != 2 {
+                return Err(format!(
+                    "Expected two values for concurrency range, got: {}",
+                    s
+                ));
+            }
+            let min = parts[0]
+                .parse::<usize>()
+                .map_err(|e| format!("Invalid min value: {}", e))?;
+            let max = parts[1]
+                .parse::<usize>()
+                .map_err(|e| format!("Invalid max value: {}", e))?;
+
+            if min < 1 {
+                return Err(format!(
+                    "Minimum concurrency must be at least 1, got: {}",
+                    min
+                ));
+            }
+            if max < min {
+                return Err(format!(
+                    "Maximum concurrency must be at least the minimum concurrency, got: {} and {}",
+                    max, min
+                ));
+            }
+
+            Ok(ProcessConcurrency::Range {
+                min: Some(min),
+                max: Some(max),
+            })
+        } else {
+            let exactly = s
+                .parse::<usize>()
+                .map_err(|e| format!("Invalid concurrency value: {}", e))?;
+            if exactly < 1 {
+                return Err(format!("Concurrency must be at least 1, got: {}", exactly));
+            }
+            Ok(ProcessConcurrency::Range {
+                min: Some(exactly),
+                max: Some(exactly),
+            })
+        }
+    }
 }
 
 ///
@@ -542,6 +621,9 @@ pub struct Process {
     /// period after starting if available resources have changed (because other processes have
     /// started or finished).
     pub concurrency_available: usize,
+
+    /// The number of cores required for this process to run.
+    pub concurrency: Option<ProcessConcurrency>,
 
     #[derivative(PartialEq = "ignore", Hash = "ignore")]
     pub description: String,
@@ -616,11 +698,13 @@ impl Process {
             jdk_home: None,
             execution_slot_variable: None,
             concurrency_available: 0,
+            concurrency: None,
             cache_scope: ProcessCacheScope::Successful,
             execution_environment: ProcessExecutionEnvironment {
                 name: None,
                 platform: Platform::current().unwrap(),
                 strategy: ProcessExecutionStrategy::Local,
+                local_keep_sandboxes: local::KeepSandboxes::Never,
             },
             remote_cache_speculation_delay: std::time::Duration::from_millis(0),
             attempt: 0,
@@ -678,6 +762,7 @@ impl Process {
             name: None,
             platform: Platform::current().unwrap(),
             strategy: ProcessExecutionStrategy::Docker(image),
+            local_keep_sandboxes: local::KeepSandboxes::Never,
         };
         self
     }
@@ -690,6 +775,7 @@ impl Process {
             name: None,
             platform: Platform::current().unwrap(),
             strategy: ProcessExecutionStrategy::RemoteExecution(properties),
+            local_keep_sandboxes: local::KeepSandboxes::Never,
         };
         self
     }
@@ -701,6 +787,16 @@ impl Process {
 
     pub fn cache_scope(mut self, cache_scope: ProcessCacheScope) -> Process {
         self.cache_scope = cache_scope;
+        self
+    }
+
+    pub fn local_keep_sandboxes(mut self, local_keep_sandboxes: local::KeepSandboxes) -> Process {
+        self.execution_environment.local_keep_sandboxes = local_keep_sandboxes;
+        self
+    }
+
+    pub fn concurrency(mut self, concurrency: ProcessConcurrency) -> Process {
+        self.concurrency = Some(concurrency);
         self
     }
 }
@@ -1522,7 +1618,7 @@ pub fn extract_output_files(
                         return future::ready::<Result<_, StoreError>>(Ok(
                             DirectoryDigest::from_persisted_digest(digest),
                         ))
-                        .boxed()
+                        .boxed();
                     }
                     Err(err) => return futures::future::err(err.into()).boxed(),
                 };
@@ -1620,14 +1716,15 @@ pub fn extract_output_files(
     }
 
     async move {
-        let files_snapshot =
-            Snapshot::from_path_stats(StoreOneOffRemoteDigest::new(path_map), path_stats).map_err(
-                move |error| {
-                    format!(
+        let files_snapshot = Snapshot::from_path_stats(
+            StoreOneOffRemoteDigest::new(path_map),
+            path_stats,
+        )
+        .map_err(move |error| {
+            format!(
                 "Error when storing the output file directory info in the remote CAS: {error:?}"
             )
-                },
-            );
+        });
 
         let (files_snapshot, mut directory_digests) =
             future::try_join(files_snapshot, future::try_join_all(directory_digests)).await?;

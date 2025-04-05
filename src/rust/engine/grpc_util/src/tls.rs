@@ -1,13 +1,15 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 use std::fmt::Write;
 use std::io;
+use std::path::Path;
 use std::sync::Arc;
 
 use rustls::{
+    DigitallySignedStruct,
     client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
     crypto::{verify_tls12_signature, verify_tls13_signature},
-    DigitallySignedStruct,
 };
 use rustls_pki_types::{CertificateDer, PrivateKeyDer, ServerName, UnixTime};
 use tokio_rustls::rustls::{ClientConfig, RootCertStore};
@@ -47,6 +49,44 @@ impl Config {
             mtls,
             certificate_check: CertificateCheck::Enabled,
         })
+    }
+
+    pub fn new_from_files(
+        root_ca_cert_file: Option<&Path>,
+        client_certs_file: Option<&Path>,
+        client_key_file: Option<&Path>,
+    ) -> Result<Self, String> {
+        let root_ca_certs = root_ca_cert_file
+            .map(|path| {
+                std::fs::read(path).map_err(|e| format!("Error reading root CA certs file: {}", e))
+            })
+            .transpose()?;
+
+        let client_certs = client_certs_file
+            .map(|path| {
+                std::fs::read(path)
+                    .map_err(|e| format!("Error reading client authentication certs file: {}", e))
+            })
+            .transpose()?;
+
+        let client_key = client_key_file
+            .map(|path| {
+                std::fs::read(path)
+                    .map_err(|e| format!("Error reading client authentication key file: {}", e))
+            })
+            .transpose()?;
+
+        let mtls_data = match (client_certs, client_key) {
+            (Some(certs), Some(key)) => Ok(Some((certs, key))),
+            (None, None) => Ok(None),
+            _ => Err(
+                "Must provide both a client certs file and a client key file, or neither"
+                    .to_string(),
+            ),
+        }?;
+
+        Self::new(root_ca_certs, mtls_data)
+            .map_err(|e| format!("failed parsing root CA certs: {}", e))
     }
 }
 
@@ -91,9 +131,11 @@ impl TryFrom<Config> for ClientConfig {
                         None => {
                             let native_root_certs_result = rustls_native_certs::load_native_certs();
                             if !native_root_certs_result.errors.is_empty() {
-                                let mut msg = String::from("Could not discover root CA cert files to use TLS with remote caching and remote \
+                                let mut msg = String::from(
+                                    "Could not discover root CA cert files to use TLS with remote caching and remote \
             execution. Consider setting `--remote-ca-certs-path` instead to explicitly point to \
-            the correct PEM file. Error(s):\n\n");
+            the correct PEM file. Error(s):\n\n",
+                                );
                                 for error in &native_root_certs_result.errors {
                                     write!(&mut msg, "{}\n\n", &error)
                                         .expect("write into mutable string");

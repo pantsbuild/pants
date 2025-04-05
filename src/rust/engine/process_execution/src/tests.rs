@@ -1,8 +1,8 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::hash_map::DefaultHasher;
 use std::collections::BTreeMap;
+use std::collections::hash_map::DefaultHasher;
 use std::fs::Permissions;
 use std::hash::{Hash, Hasher};
 use std::os::unix::fs::PermissionsExt;
@@ -18,8 +18,8 @@ use tempfile::TempDir;
 use workunit_store::RunId;
 
 use crate::{
-    maybe_make_wrapper_script, CacheName, Platform, Process, ProcessExecutionEnvironment,
-    ProcessExecutionStrategy, ProcessResultMetadata, ProcessResultSource,
+    CacheName, Platform, Process, ProcessExecutionEnvironment, ProcessExecutionStrategy,
+    ProcessResultMetadata, ProcessResultSource, local::KeepSandboxes, maybe_make_wrapper_script,
 };
 
 #[test]
@@ -63,6 +63,7 @@ fn process_result_metadata_to_and_from_executed_action_metadata() {
         name: None,
         platform: Platform::Linux_x86_64,
         strategy: ProcessExecutionStrategy::Local,
+        local_keep_sandboxes: KeepSandboxes::Never,
     };
     let action_metadata = ExecutedActionMetadata {
         worker_start_timestamp: Some(Timestamp {
@@ -128,6 +129,7 @@ fn process_result_metadata_time_saved_from_cache() {
         name: None,
         platform: Platform::Linux_x86_64,
         strategy: ProcessExecutionStrategy::Local,
+        local_keep_sandboxes: KeepSandboxes::Never,
     };
     let mut metadata = ProcessResultMetadata::new(
         Some(concrete_time::Duration::new(5, 150)),

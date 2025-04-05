@@ -8,7 +8,7 @@ use http::Uri;
 use hyper::body::Incoming;
 use hyper_rustls::HttpsConnector;
 use hyper_util::client::legacy::{
-    connect::HttpConnector, Client as HyperClient, Error as HyperClientError,
+    Client as HyperClient, Error as HyperClientError, connect::HttpConnector,
 };
 use hyper_util::rt::TokioExecutor;
 use rustls::ClientConfig;
@@ -116,14 +116,14 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::Arc;
 
-    use axum::{routing::get, Router};
+    use axum::{Router, routing::get};
     use axum_server::tls_rustls::RustlsConfig;
     use http::{Request, Uri};
     use http_body_util::BodyExt;
     use rustls::{
+        ClientConfig, DigitallySignedStruct, RootCertStore, SignatureScheme,
         client::danger::HandshakeSignatureValid,
         crypto::{verify_tls12_signature, verify_tls13_signature},
-        ClientConfig, DigitallySignedStruct, RootCertStore, SignatureScheme,
     };
     use rustls_pki_types::{CertificateDer, UnixTime};
     use tower::ServiceExt;

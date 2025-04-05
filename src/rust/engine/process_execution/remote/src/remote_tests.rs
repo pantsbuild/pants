@@ -13,7 +13,7 @@ use mock::execution_server::{ExpectedAPICall, MockOperation};
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::gen::google::longrunning::Operation;
-use remexec::{execution_stage::Value as ExecutionStageValue, ExecutedActionMetadata};
+use remexec::{ExecutedActionMetadata, execution_stage::Value as ExecutionStageValue};
 use store::{RemoteProvider, RemoteStoreOptions, SnapshotOps, Store, StoreError};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
@@ -22,11 +22,11 @@ use tokio::time::{sleep, timeout};
 use workunit_store::{Level, RunId, RunningWorkunit, WorkunitStore};
 
 use crate::remote::{CommandRunner, ExecutionError, OperationOrStatus};
-use fs::{DirectoryDigest, RelativePath, SymlinkBehavior, EMPTY_DIRECTORY_DIGEST};
+use fs::{DirectoryDigest, EMPTY_DIRECTORY_DIGEST, RelativePath, SymlinkBehavior};
 use process_execution::{
     CacheName, CommandRunner as CommandRunnerTrait, Context, EntireExecuteRequest,
     FallibleProcessResultWithPlatform, InputDigests, Platform, Process, ProcessCacheScope,
-    ProcessError, ProcessExecutionEnvironment, ProcessExecutionStrategy,
+    ProcessError, ProcessExecutionEnvironment, ProcessExecutionStrategy, local::KeepSandboxes,
 };
 use std::any::type_name;
 use std::io::Cursor;
@@ -73,6 +73,7 @@ fn make_environment(platform: Platform) -> ProcessExecutionEnvironment {
         name: None,
         platform,
         strategy: ProcessExecutionStrategy::RemoteExecution(vec![]),
+        local_keep_sandboxes: KeepSandboxes::Never,
     }
 }
 
@@ -100,6 +101,7 @@ async fn make_execute_request() {
         jdk_home: None,
         execution_slot_variable: None,
         concurrency_available: 0,
+        concurrency: None,
         cache_scope: ProcessCacheScope::Always,
         execution_environment: make_environment(Platform::Linux_x86_64),
         remote_cache_speculation_delay: std::time::Duration::from_millis(0),
@@ -193,6 +195,7 @@ async fn make_execute_request_with_instance_name() {
         jdk_home: None,
         execution_slot_variable: None,
         concurrency_available: 0,
+        concurrency: None,
         cache_scope: ProcessCacheScope::Always,
         execution_environment: ProcessExecutionEnvironment {
             name: None,
@@ -201,6 +204,7 @@ async fn make_execute_request_with_instance_name() {
                 "target_platform".to_owned(),
                 "apple-2e".to_owned(),
             )]),
+            local_keep_sandboxes: KeepSandboxes::Never,
         },
         remote_cache_speculation_delay: std::time::Duration::from_millis(0),
         attempt: 0,
@@ -306,6 +310,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
         jdk_home: None,
         execution_slot_variable: None,
         concurrency_available: 0,
+        concurrency: None,
         cache_scope: ProcessCacheScope::Always,
         execution_environment: make_environment(Platform::Linux_x86_64),
         remote_cache_speculation_delay: std::time::Duration::from_millis(0),
@@ -580,6 +585,7 @@ async fn make_execute_request_with_timeout() {
         jdk_home: None,
         execution_slot_variable: None,
         concurrency_available: 0,
+        concurrency: None,
         cache_scope: ProcessCacheScope::Always,
         execution_environment: make_environment(Platform::Linux_x86_64),
         remote_cache_speculation_delay: std::time::Duration::from_millis(0),
@@ -680,6 +686,7 @@ async fn make_execute_request_with_append_only_caches() {
         jdk_home: None,
         execution_slot_variable: None,
         concurrency_available: 0,
+        concurrency: None,
         cache_scope: ProcessCacheScope::Always,
         execution_environment: make_environment(Platform::Linux_x86_64),
         remote_cache_speculation_delay: std::time::Duration::from_millis(0),
@@ -840,6 +847,7 @@ async fn make_execute_request_using_immutable_inputs() {
         jdk_home: None,
         execution_slot_variable: None,
         concurrency_available: 0,
+        concurrency: None,
         cache_scope: ProcessCacheScope::Always,
         execution_environment: make_environment(Platform::Linux_x86_64),
         remote_cache_speculation_delay: std::time::Duration::from_millis(0),
@@ -1677,9 +1685,11 @@ async fn initial_response_missing_response_and_error() {
         .await
         .expect_err("Want Err");
 
-    assert!(result
-        .to_string()
-        .ends_with("Operation finished but no response supplied"));
+    assert!(
+        result
+            .to_string()
+            .ends_with("Operation finished but no response supplied")
+    );
 }
 
 #[tokio::test]

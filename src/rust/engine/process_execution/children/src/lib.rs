@@ -1,11 +1,12 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 use std::ops::{Deref, DerefMut};
 use std::{thread, time};
 
 use nix::sys::signal;
-use nix::unistd::getpgid;
 use nix::unistd::Pid;
+use nix::unistd::getpgid;
 use tokio::process::{Child, Command};
 
 const GRACEFUL_SHUTDOWN_POLL_TIME: time::Duration = time::Duration::from_millis(50);
@@ -135,11 +136,14 @@ impl ManagedChild {
                 Ok(false) => {
                     // We timed out waiting for the child to exit, so we need to kill it.
                     log::warn!(
-            "Timed out waiting for graceful shutdown of process group. Will try SIGKILL instead."
-          );
+                        "Timed out waiting for graceful shutdown of process group. Will try SIGKILL instead."
+                    );
                 }
                 Err(e) => {
-                    log::warn!("An error occurred while waiting for graceful shutdown of process group ({}). Will try SIGKILL instead.", e);
+                    log::warn!(
+                        "An error occurred while waiting for graceful shutdown of process group ({}). Will try SIGKILL instead.",
+                        e
+                    );
                 }
             }
         }

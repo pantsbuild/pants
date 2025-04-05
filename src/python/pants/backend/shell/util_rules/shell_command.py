@@ -36,27 +36,37 @@ from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.adhoc_process_support import (
     AdhocProcessRequest,
-    AdhocProcessResult,
     ExtraSandboxContents,
     MergeExtraSandboxContents,
-    ResolvedExecutionDependencies,
     ResolveExecutionDependenciesRequest,
+    convert_fallible_adhoc_process_result,
+    merge_extra_sandbox_contents,
     parse_relative_directory,
     prepare_env_vars,
+    resolve_execution_environment,
 )
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
-from pants.core.util_rules.environments import EnvironmentNameRequest, EnvironmentTarget
-from pants.core.util_rules.system_binaries import BashBinary, BinaryShims, BinaryShimsRequest
+from pants.core.util_rules.environments import (
+    EnvironmentNameRequest,
+    EnvironmentTarget,
+    resolve_environment_name,
+)
+from pants.core.util_rules.system_binaries import (
+    BashBinary,
+    BinaryShimsRequest,
+    create_binary_shims,
+)
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import Digest, PathGlobs, Snapshot
+from pants.engine.fs import PathGlobs
+from pants.engine.internals.graph import resolve_target
 from pants.engine.internals.native_engine import EMPTY_DIGEST
+from pants.engine.intrinsics import digest_to_snapshot
 from pants.engine.process import Process
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
     GeneratedSources,
     GenerateSourcesRequest,
     Target,
-    WrappedTarget,
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
@@ -77,12 +87,15 @@ class ShellCommandProcessFromTargetRequest:
     target: Target
 
 
-async def _prepare_process_request_from_target(
-    shell_command: Target,
+@rule
+async def prepare_process_request_from_target(
+    request: ShellCommandProcessFromTargetRequest,
     shell_setup: ShellSetup.EnvironmentAware,
     bash: BashBinary,
     env_target: EnvironmentTarget,
 ) -> AdhocProcessRequest:
+    shell_command = request.target
+
     description = f"the `{shell_command.alias}` at `{shell_command.address}`"
 
     working_directory = shell_command[ShellCommandWorkdirField].value
@@ -92,14 +105,15 @@ async def _prepare_process_request_from_target(
     if not command:
         raise ValueError(f"Missing `command` line in `{description}.")
 
-    execution_environment = await Get(
-        ResolvedExecutionDependencies,
+    execution_environment = await resolve_execution_environment(
         ResolveExecutionDependenciesRequest(
             shell_command.address,
             shell_command.get(ShellCommandExecutionDependenciesField).value,
             shell_command.get(ShellCommandRunnableDependenciesField).value,
         ),
+        **implicitly(),
     )
+
     dependencies_digest = execution_environment.digest
 
     output_files = shell_command.get(ShellCommandOutputFilesField).value or ()
@@ -108,19 +122,17 @@ async def _prepare_process_request_from_target(
     # Resolve the `tools` field into a digest
     tools = shell_command.get(ShellCommandToolsField, default_raw_value=()).value or ()
     tools = tuple(tool for tool in tools if tool not in BASH_BUILTIN_COMMANDS)
-
-    resolved_tools = await Get(
-        BinaryShims,
+    resolved_tools = await create_binary_shims(
         BinaryShimsRequest.for_binaries(
             *tools,
             rationale=f"execute {description}",
             search_path=shell_setup.executable_search_path,
         ),
+        bash,
     )
 
     runnable_dependencies = execution_environment.runnable_dependencies
-    extra_sandbox_contents = []
-
+    extra_sandbox_contents: list[ExtraSandboxContents] = []
     extra_sandbox_contents.append(
         ExtraSandboxContents(
             digest=EMPTY_DIGEST,
@@ -142,8 +154,8 @@ async def _prepare_process_request_from_target(
             )
         )
 
-    merged_extras = await Get(
-        ExtraSandboxContents, MergeExtraSandboxContents(tuple(extra_sandbox_contents))
+    merged_extras = await merge_extra_sandbox_contents(
+        MergeExtraSandboxContents(tuple(extra_sandbox_contents))
     )
 
     env_vars = await prepare_env_vars(
@@ -203,29 +215,6 @@ async def _prepare_process_request_from_target(
     )
 
 
-@rule
-async def run_adhoc_result_from_target(
-    request: ShellCommandProcessFromTargetRequest,
-    shell_setup: ShellSetup.EnvironmentAware,
-    bash: BashBinary,
-    env_target: EnvironmentTarget,
-) -> AdhocProcessResult:
-    scpr = await _prepare_process_request_from_target(request.target, shell_setup, bash, env_target)
-    return await Get(AdhocProcessResult, AdhocProcessRequest, scpr)
-
-
-@rule
-async def prepare_process_request_from_target(
-    request: ShellCommandProcessFromTargetRequest,
-    shell_setup: ShellSetup.EnvironmentAware,
-    bash: BashBinary,
-    env_target: EnvironmentTarget,
-) -> Process:
-    # Needed to support `experimental_test_shell_command`
-    scpr = await _prepare_process_request_from_target(request.target, shell_setup, bash, env_target)
-    return await Get(Process, AdhocProcessRequest, scpr)
-
-
 class RunShellCommand(RunFieldSet):
     required_fields = (
         ShellCommandCommandField,
@@ -239,21 +228,23 @@ async def shell_command_in_sandbox(
     request: GenerateFilesFromShellCommandRequest,
 ) -> GeneratedSources:
     shell_command = request.protocol_target
-    environment_name = await Get(
-        EnvironmentName, EnvironmentNameRequest, EnvironmentNameRequest.from_target(shell_command)
+    environment_name = await resolve_environment_name(
+        EnvironmentNameRequest.from_target(shell_command),
+        **implicitly(),
     )
 
-    adhoc_result = await Get(
-        AdhocProcessResult,
-        {
-            environment_name: EnvironmentName,
-            ShellCommandProcessFromTargetRequest(
-                shell_command
-            ): ShellCommandProcessFromTargetRequest,
-        },
+    adhoc_result = await convert_fallible_adhoc_process_result(
+        **implicitly(
+            {
+                environment_name: EnvironmentName,
+                ShellCommandProcessFromTargetRequest(
+                    shell_command
+                ): ShellCommandProcessFromTargetRequest,
+            }
+        )
     )
 
-    output = await Get(Snapshot, Digest, adhoc_result.adjusted_digest)
+    output = await digest_to_snapshot(adhoc_result.adjusted_digest)
     return GeneratedSources(output)
 
 
@@ -275,13 +266,13 @@ async def _interactive_shell_command(
         "CHROOT": "{chroot}",
     }
 
-    execution_environment = await Get(
-        ResolvedExecutionDependencies,
+    execution_environment = await resolve_execution_environment(
         ResolveExecutionDependenciesRequest(
             shell_command.address,
             shell_command.get(ShellCommandExecutionDependenciesField).value,
             shell_command.get(ShellCommandRunnableDependenciesField).value,
         ),
+        bash,
     )
     dependencies_digest = execution_environment.digest
 
@@ -303,9 +294,9 @@ async def _interactive_shell_command(
 
 @rule
 async def run_shell_command_request(bash: BashBinary, shell_command: RunShellCommand) -> RunRequest:
-    wrapped_tgt = await Get(
-        WrappedTarget,
+    wrapped_tgt = await resolve_target(
         WrappedTargetRequest(shell_command.address, description_of_origin="<infallible>"),
+        **implicitly(),
     )
     process = await _interactive_shell_command(wrapped_tgt.target, bash)
     return RunRequest(

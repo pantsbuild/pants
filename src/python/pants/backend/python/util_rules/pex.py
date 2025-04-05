@@ -16,7 +16,7 @@ from typing import TypeVar
 
 import packaging.specifiers
 import packaging.version
-from pkg_resources import Requirement
+from packaging.requirements import Requirement
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -143,6 +143,7 @@ async def digest_complete_platform_addresses(
                     FileSourceField,
                     ResourceSourceField,
                 ),
+                enable_codegen=True,
             ),
         )
         for tgt in original_file_targets
@@ -1319,7 +1320,7 @@ class PexDistributionInfo:
     version: packaging.version.Version
     requires_python: packaging.specifiers.SpecifierSet | None
     # Note: These are parsed from metadata written by the pex tool, and are always
-    #   a valid pkg_resources.Requirement.
+    #   a valid packaging.requirements.Requirement.
     requires_dists: tuple[Requirement, ...]
 
 
@@ -1353,9 +1354,7 @@ def parse_repository_info(repository_info: str) -> PexResolveInfo:
                     if requires_python is not None
                     else None
                 ),
-                requires_dists=tuple(
-                    Requirement.parse(req) for req in sorted(info["requires_dists"])
-                ),
+                requires_dists=tuple(Requirement(req) for req in sorted(info["requires_dists"])),
             )
 
     return PexResolveInfo(sorted(iter_dist_info(), key=lambda dist: dist.project_name))

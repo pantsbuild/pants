@@ -10,21 +10,22 @@ use std::process::exit;
 use std::sync::Arc;
 use std::time::Duration;
 
-use clap::StructOpt;
+use clap::Parser;
 use fs::{DirectoryDigest, Permissions, RelativePath};
 use hashing::{Digest, Fingerprint};
 use process_execution::{
-    local::KeepSandboxes, CacheContentBehavior, Context, InputDigests, NamedCaches, Platform,
-    ProcessCacheScope, ProcessExecutionEnvironment, ProcessExecutionStrategy,
+    CacheContentBehavior, Context, InputDigests, NamedCaches, Platform, ProcessCacheScope,
+    ProcessConcurrency, ProcessExecutionEnvironment, ProcessExecutionStrategy,
+    local::KeepSandboxes,
 };
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
 use protos::gen::buildbarn::cas::UncachedActionResult;
 use protos::require_digest;
 use remote::remote_cache::RemoteCacheRunnerOptions;
-use store::{ImmutableInputs, RemoteProvider, RemoteStoreOptions, Store};
+use store::{ImmutableInputs, RemoteProvider, RemoteStoreOptions, Store, StoreCliOpt};
 use tokio::sync::RwLock;
-use workunit_store::{in_workunit, Level, WorkunitStore};
+use workunit_store::{Level, WorkunitStore, in_workunit};
 
 #[derive(Clone, Debug, Default)]
 struct ProcessMetadata {
@@ -32,169 +33,124 @@ struct ProcessMetadata {
     cache_key_gen_version: Option<String>,
 }
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct CommandSpec {
-    #[structopt(last = true)]
+    #[arg(last = true)]
     argv: Vec<String>,
 
     /// Fingerprint (hex string) of the digest to use as the input file tree.
-    #[structopt(long)]
+    #[arg(long)]
     input_digest: Option<Fingerprint>,
 
     /// Length of the proto-bytes whose digest to use as the input file tree.
-    #[structopt(long)]
+    #[arg(long)]
     input_digest_length: Option<usize>,
 
     /// Extra platform properties to set on the execution request during remote execution.
-    #[structopt(long)]
+    #[arg(long)]
     extra_platform_property: Vec<String>,
 
     /// Environment variables with which the process should be run.
-    #[structopt(long)]
+    #[arg(long)]
     env: Vec<String>,
 
     /// Symlink a JDK from .jdk in the working directory.
     /// For local execution, symlinks to the value of this flag.
     /// For remote execution, just requests that some JDK is symlinked if this flag has any value.
     /// <https://github.com/pantsbuild/pants/issues/6416> will make this less weird in the future.
-    #[structopt(long)]
+    #[arg(long)]
     jdk: Option<PathBuf>,
 
     /// Path to file that is considered to be output.
-    #[structopt(long)]
+    #[arg(long)]
     output_file_path: Vec<PathBuf>,
 
     /// Path to directory that is considered to be output.
-    #[structopt(long)]
+    #[arg(long)]
     output_directory_path: Vec<PathBuf>,
 
     /// Path to execute the binary at relative to its input digest root.
-    #[structopt(long)]
+    #[arg(long)]
     working_directory: Option<PathBuf>,
 
-    #[structopt(long)]
+    #[arg(long)]
     concurrency_available: Option<usize>,
 
-    #[structopt(long)]
+    /// The number of cores to use for the process in the form of min,max or x (exclusive)
+    #[arg(long)]
+    concurrency: Option<ProcessConcurrency>,
+
+    #[arg(long)]
     cache_key_gen_version: Option<String>,
 }
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct ActionDigestSpec {
     /// Fingerprint (hex string) of the digest of the action to run.
-    #[structopt(long)]
+    #[arg(long)]
     action_digest: Option<Fingerprint>,
 
     /// Length of the proto-bytes whose digest is the action to run.
-    #[structopt(long)]
+    #[arg(long)]
     action_digest_length: Option<usize>,
 }
 
-#[derive(StructOpt)]
-#[structopt(name = "process_executor", setting = clap::AppSettings::TrailingVarArg)]
+#[derive(Parser)]
+#[command(name = "process_executor")]
 struct Opt {
-    #[structopt(flatten)]
+    #[command(flatten)]
     command: CommandSpec,
 
-    #[structopt(flatten)]
+    #[command(flatten)]
     action_digest: ActionDigestSpec,
 
-    #[structopt(long)]
+    #[command(flatten)]
+    store_options: StoreCliOpt,
+
+    #[arg(long)]
     buildbarn_url: Option<String>,
 
-    #[structopt(long)]
+    #[arg(long)]
     run_under: Option<String>,
 
     /// The name of a directory (which may or may not exist), where the output tree will be materialized.
-    #[structopt(long)]
+    #[arg(long)]
     materialize_output_to: Option<PathBuf>,
 
     /// Path to workdir.
-    #[structopt(long)]
+    #[arg(long)]
     work_dir: Option<PathBuf>,
 
-    ///Path to lmdb directory used for local file storage.
-    #[structopt(long)]
-    local_store_path: Option<PathBuf>,
-
     /// Path to a directory to be used for named caches.
-    #[structopt(long)]
+    #[arg(long)]
     named_cache_path: Option<PathBuf>,
-
-    #[structopt(long)]
-    remote_instance_name: Option<String>,
 
     /// The host:port of the gRPC server to connect to. Forces remote execution.
     /// If unspecified, local execution will be performed.
-    #[structopt(long)]
+    #[arg(long)]
     server: Option<String>,
 
     /// Path to file containing root certificate authority certificates for the execution server.
     /// If not set, TLS will not be used when connecting to the execution server.
-    #[structopt(long)]
+    #[arg(long)]
     execution_root_ca_cert_file: Option<PathBuf>,
 
     /// Path to file containing oauth bearer token for communication with the execution server.
     /// If not set, no authorization will be provided to remote servers.
-    #[structopt(long)]
+    #[arg(long)]
     execution_oauth_bearer_token_path: Option<PathBuf>,
 
-    /// The host:port of the gRPC CAS server to connect to.
-    #[structopt(long)]
-    cas_server: Option<String>,
-
-    /// Path to file containing root certificate authority certificates for the CAS server.
-    /// If not set, TLS will not be used when connecting to the CAS server.
-    #[structopt(long)]
-    cas_root_ca_cert_file: Option<PathBuf>,
-
-    /// Path to file containing client certificates for the CAS server.
-    /// If not set, client authentication will not be used when connecting to the CAS server.
-    #[structopt(long)]
-    cas_client_certs_file: Option<PathBuf>,
-
-    /// Path to file containing client key for the CAS server.
-    /// If not set, client authentication will not be used when connecting to the CAS server.
-    #[structopt(long)]
-    cas_client_key_file: Option<PathBuf>,
-
-    /// Path to file containing oauth bearer token for communication with the CAS server.
-    /// If not set, no authorization will be provided to remote servers.
-    #[structopt(long)]
-    cas_oauth_bearer_token_path: Option<PathBuf>,
-
-    /// Number of bytes to include per-chunk when uploading bytes.
-    /// grpc imposes a hard message-size limit of around 4MB.
-    #[structopt(long, default_value = "3145728")]
-    upload_chunk_bytes: usize,
-
-    /// Number of retries per request to the store service.
-    #[structopt(long, default_value = "3")]
-    store_rpc_retries: usize,
-
-    /// Number of concurrent requests to the store service.
-    #[structopt(long, default_value = "128")]
-    store_rpc_concurrency: usize,
-
-    /// Total size of blobs allowed to be sent in a single API call.
-    #[structopt(long, default_value = "4194304")]
-    store_batch_api_size_limit: usize,
-
     /// Number of concurrent requests to the execution service.
-    #[structopt(long, default_value = "128")]
+    #[arg(long, default_value = "128")]
     execution_rpc_concurrency: usize,
 
     /// Number of concurrent requests to the cache service.
-    #[structopt(long, default_value = "128")]
+    #[arg(long, default_value = "128")]
     cache_rpc_concurrency: usize,
 
     /// Overall timeout in seconds for each request from time of submission.
-    #[structopt(long, default_value = "600")]
+    #[arg(long, default_value = "600")]
     overall_deadline_secs: u64,
-
-    /// Extra header to pass on remote execution request.
-    #[structopt(long)]
-    header: Vec<String>,
 }
 
 /// A binary which takes args of format:
@@ -205,86 +161,22 @@ struct Opt {
 ///
 /// It does not perform $PATH lookup or shell expansion.
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), String> {
     env_logger::init();
     let workunit_store = WorkunitStore::new(false, log::Level::Debug);
     workunit_store.init_thread_state(None);
 
-    let args = Opt::from_args();
-
-    let mut headers: BTreeMap<String, String> = collection_from_keyvalues(args.header.iter());
+    let args = Opt::parse();
 
     let executor = task_executor::Executor::new();
 
-    let local_store_path = args
-        .local_store_path
-        .clone()
-        .unwrap_or_else(Store::default_path);
+    let store = args.store_options.create_store(executor.clone()).await?;
 
-    let local_only_store =
-        Store::local_only(executor.clone(), local_store_path).expect("Error making local store");
-    let store = match (&args.server, &args.cas_server) {
-    (_, Some(cas_server)) => {
-      let root_ca_certs = args
-        .cas_root_ca_cert_file
-        .as_ref()
-        .map(|path| std::fs::read(path).expect("Error reading root CA certs file"));
-
-      let client_certs = args
-        .cas_client_certs_file
-        .as_ref()
-        .map(|path| std::fs::read(path).expect("Error reading client authentication certs file"));
-
-      let client_key = args
-        .cas_client_key_file
-        .as_ref()
-        .map(|path| std::fs::read(path).expect("Error reading client authentication key file"));
-
-      let mtls_data = match (client_certs, client_key) {
-        (Some(certs), Some(key)) => Some((certs, key)),
-        (None, None) => None,
-        _ => {
-          panic!("Must specify both --cas-client-certs-file and --cas-client-key-file or neither")
-        }
-      };
-
-      let mut headers = BTreeMap::new();
-      if let Some(ref oauth_path) = args.cas_oauth_bearer_token_path {
-        let token =
-          std::fs::read_to_string(oauth_path).expect("Error reading oauth bearer token file");
-        headers.insert(
-          "authorization".to_owned(),
-          format!("Bearer {}", token.trim()),
-        );
-      }
-
-      let tls_config = grpc_util::tls::Config::new(root_ca_certs, mtls_data)
-        .expect("failed parsing root CA certs");
-
-      local_only_store
-            .into_with_remote(RemoteStoreOptions {
-                provider: RemoteProvider::Reapi,
-          store_address: cas_server.to_owned(),
-          instance_name: args.remote_instance_name.clone(),
-          tls_config,
-          headers,
-          chunk_size_bytes: args.upload_chunk_bytes,
-          timeout: Duration::from_secs(30),
-          retries: args.store_rpc_retries,
-          concurrency_limit: args.store_rpc_concurrency,
-
-          batch_api_size_limit: args.store_batch_api_size_limit,
-        })
-        .await
+    if args.server.is_some() && store.is_local_only() {
+        return Err("Can't specify --server without --cas-server".to_string());
     }
-    (None, None) => Ok(local_only_store),
-    _ => panic!("Can't specify --server without --cas-server"),
-  }
-  .expect("Error making remote store");
 
-    let (mut request, process_metadata) = make_request(&store, &args)
-        .await
-        .expect("Failed to construct request");
+    let (mut request, process_metadata) = make_request(&store, &args).await?;
 
     if let Some(run_under) = args.run_under {
         let run_under = shlex::split(&run_under).expect("Could not shlex --run-under arg");
@@ -297,38 +189,14 @@ async fn main() {
 
     let runner: Box<dyn process_execution::CommandRunner> = match args.server {
         Some(address) => {
-            let root_ca_certs = args
-                .execution_root_ca_cert_file
-                .map(|path| std::fs::read(path).expect("Error reading root CA certs file"));
-
-            let client_certs = args
-                .cas_client_certs_file
-                .as_ref()
-                .map(|path| std::fs::read(path).expect("Error reading root client certs file"));
-
-            let client_key = args.cas_client_key_file.as_ref().map(|path| {
-                std::fs::read(path).expect("Error reading client authentication key file")
-            });
-
-            let mtls_data = match (client_certs, client_key) {
-                (Some(certs), Some(key)) => Some((certs, key)),
-                (None, None) => None,
-                _ => {
-                    panic!("Must specify both --cas-client-certs-file and --cas-client-key-file or neither")
-                }
-            };
-
-            let tls_config = grpc_util::tls::Config::new(root_ca_certs, mtls_data)
-                .expect("failed parsing root CA certs");
-
-            if let Some(oauth_path) = args.execution_oauth_bearer_token_path {
-                let token = std::fs::read_to_string(oauth_path)
-                    .expect("Error reading oauth bearer token file");
-                headers.insert(
-                    "authorization".to_owned(),
-                    format!("Bearer {}", token.trim()),
-                );
-            }
+            let tls_config = grpc_util::tls::Config::new_from_files(
+                args.execution_root_ca_cert_file.as_deref(),
+                args.store_options.cas_client_certs_file.as_deref(),
+                args.store_options.cas_client_key_file.as_deref(),
+            )?;
+            let headers = args
+                .store_options
+                .get_headers(&args.execution_oauth_bearer_token_path)?;
 
             let remote_runner = remote::remote::CommandRunner::new(
                 &address,
@@ -393,7 +261,6 @@ async fn main() {
                     .unwrap_or_else(NamedCaches::default_local_path),
             ),
             ImmutableInputs::new(store.clone(), &workdir).unwrap(),
-            KeepSandboxes::Never,
             Arc::new(RwLock::new(())),
         )) as Box<dyn process_execution::CommandRunner>,
     };
@@ -449,12 +316,14 @@ async fn make_request(
             // TODO: Make configurable.
             platform: Platform::Linux_x86_64,
             strategy,
+            local_keep_sandboxes: KeepSandboxes::Never,
         }
     } else {
         ProcessExecutionEnvironment {
             name: None,
             platform: Platform::current().unwrap(),
             strategy: ProcessExecutionStrategy::Local,
+            local_keep_sandboxes: KeepSandboxes::Never,
         }
     };
 
@@ -473,7 +342,7 @@ async fn make_request(
         store,
         Digest::new(action_fingerprint, action_digest_length),
         execution_environment,
-        args.remote_instance_name.clone(),
+        args.store_options.remote_instance_name.clone(),
         args.command.cache_key_gen_version.clone(),
       ).await
     }
@@ -547,13 +416,14 @@ async fn make_request_from_flat_args(
         jdk_home: args.command.jdk.clone(),
         execution_slot_variable: None,
         concurrency_available: args.command.concurrency_available.unwrap_or(0),
+        concurrency: args.command.concurrency.clone(),
         cache_scope: ProcessCacheScope::Always,
         execution_environment,
         remote_cache_speculation_delay: Duration::from_millis(0),
         attempt: 0,
     };
     let metadata = ProcessMetadata {
-        instance_name: args.remote_instance_name.clone(),
+        instance_name: args.store_options.remote_instance_name.clone(),
         cache_key_gen_version: args.command.cache_key_gen_version.clone(),
     };
     Ok((process, metadata))
@@ -633,6 +503,7 @@ async fn extract_request_from_action_digest(
         }),
         execution_slot_variable: None,
         concurrency_available: 0,
+        concurrency: None,
         description: "".to_string(),
         level: Level::Error,
         append_only_caches: BTreeMap::new(),
@@ -726,4 +597,100 @@ where
             )
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+
+    #[test]
+    fn test_process_args() {
+        let test_cases = vec![
+            (vec![], None),
+            (
+                vec!["--concurrency=1"],
+                Some(ProcessConcurrency::Range {
+                    min: Some(1),
+                    max: Some(1),
+                }),
+            ),
+            (
+                vec!["--concurrency=2,4"],
+                Some(ProcessConcurrency::Range {
+                    min: Some(2),
+                    max: Some(4),
+                }),
+            ),
+            (
+                vec!["--concurrency=1,4"],
+                Some(ProcessConcurrency::Range {
+                    min: Some(1),
+                    max: Some(4),
+                }),
+            ),
+            (vec!["--concurrency=x"], Some(ProcessConcurrency::Exclusive)),
+        ];
+
+        for (args, expected_concurrency) in test_cases {
+            let mut full_args = vec!["process_executor"];
+            full_args.extend(args);
+            full_args.extend(vec!["--", "/bin/echo", "test"]);
+
+            let opt = Opt::try_parse_from(full_args).unwrap();
+            assert_eq!(opt.command.concurrency, expected_concurrency);
+        }
+    }
+
+    #[test]
+    fn test_process_args_errors() {
+        let test_cases = vec![
+            (
+                vec!["--concurrency=0"],
+                "error: invalid value '0' for '--concurrency <CONCURRENCY>': Concurrency must be at least 1, got: 0",
+            ),
+            (
+                vec!["--concurrency=4,2"],
+                "error: invalid value '4,2' for '--concurrency <CONCURRENCY>': Maximum concurrency must be at least the minimum concurrency, got: 2 and 4",
+            ),
+            (
+                vec!["--concurrency=1,2,3"],
+                "error: invalid value '1,2,3' for '--concurrency <CONCURRENCY>': Expected two values for concurrency range, got: 1,2,3",
+            ),
+            (
+                vec!["--concurrency=abc"],
+                "error: invalid value 'abc' for '--concurrency <CONCURRENCY>': Invalid concurrency value: invalid digit found in string",
+            ),
+            (
+                vec!["--concurrency=1,abc"],
+                "error: invalid value '1,abc' for '--concurrency <CONCURRENCY>': Invalid max value: invalid digit found in string",
+            ),
+        ];
+
+        for (args, expected_error) in test_cases {
+            let mut full_args = vec!["process_executor"];
+            full_args.extend(args);
+            full_args.extend(vec!["--", "/bin/echo", "test"]);
+
+            let result = Opt::try_parse_from(full_args);
+            match result {
+                Ok(opt) => {
+                    assert!(
+                        false,
+                        "Expected error '{}' but got '{:?}'",
+                        expected_error, opt.command.concurrency
+                    );
+                }
+                Err(e) => {
+                    // remove \n\nFor more information, try '--help'.\n if present
+                    let original_error = e.to_string();
+                    let error_message = original_error
+                        .split("\n\nFor more information, try '--help'.\n")
+                        .next()
+                        .unwrap();
+                    assert_eq!(error_message, expected_error);
+                }
+            }
+        }
+    }
 }

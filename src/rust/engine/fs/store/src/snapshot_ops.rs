@@ -9,8 +9,8 @@ use std::iter::Iterator;
 use async_trait::async_trait;
 use bytes::BytesMut;
 use fs::{
-    directory, DigestTrie, DirectoryDigest, GlobMatching, PreparedPathGlobs, RelativePath,
-    SymlinkBehavior, EMPTY_DIRECTORY_DIGEST,
+    DigestTrie, DirectoryDigest, EMPTY_DIRECTORY_DIGEST, GlobMatching, PreparedPathGlobs,
+    RelativePath, SymlinkBehavior, directory,
 };
 use futures::future::{self, FutureExt};
 use hashing::Digest;

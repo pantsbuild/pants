@@ -21,11 +21,13 @@ async fn missing_digest() {
         Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
 
     let _fs = mount(mount_dir.path(), store, runtime).expect("Mounting");
-    assert!(!&mount_dir
-        .path()
-        .join("digest")
-        .join(digest_to_filepath(&TestData::roland().digest()))
-        .exists());
+    assert!(
+        !&mount_dir
+            .path()
+            .join("digest")
+            .join(digest_to_filepath(&TestData::roland().digest()))
+            .exists()
+    );
 }
 
 #[tokio::test]

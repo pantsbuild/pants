@@ -5,11 +5,11 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use grpc_util::retry::{retry_call, status_is_retryable};
-use grpc_util::{headers_to_http_header_map, layered_service, status_to_str, LayeredService};
+use grpc_util::{LayeredService, headers_to_http_header_map, layered_service, status_to_str};
 use hashing::Digest;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use remexec::action_cache_client::ActionCacheClient;
 use remexec::ActionResult;
+use remexec::action_cache_client::ActionCacheClient;
 use remote_provider_traits::{ActionCacheProvider, RemoteStoreOptions};
 use workunit_store::Metric;
 

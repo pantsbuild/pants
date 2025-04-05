@@ -6,15 +6,15 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use bytes::{Bytes, BytesMut};
-use futures::stream::StreamExt;
 use futures::Stream;
+use futures::stream::StreamExt;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::gen::build::bazel::semver::SemVer;
 use protos::gen::google::bytestream::{
-    byte_stream_server::ByteStream, QueryWriteStatusRequest, QueryWriteStatusResponse, ReadRequest,
-    ReadResponse, WriteRequest, WriteResponse,
+    QueryWriteStatusRequest, QueryWriteStatusResponse, ReadRequest, ReadResponse, WriteRequest,
+    WriteResponse, byte_stream_server::ByteStream,
 };
 use remexec::capabilities_server::Capabilities;
 use remexec::content_addressable_storage_server::ContentAddressableStorage;
@@ -262,7 +262,7 @@ impl ByteStream for StubCASResponder {
                 Err(e) => {
                     return Err(Status::invalid_argument(format!(
                         "Client sent an error: {e}"
-                    )))
+                    )));
                 }
             };
 
@@ -271,9 +271,9 @@ impl ByteStream for StubCASResponder {
                 Some(ref resource_name) => {
                     if *resource_name != req.resource_name {
                         return Err(Status::invalid_argument(format!(
-              "All resource names in stream must be the same. Got {} but earlier saw {}",
-              req.resource_name, resource_name
-            )));
+                            "All resource names in stream must be the same. Got {} but earlier saw {}",
+                            req.resource_name, resource_name
+                        )));
                     }
                 }
             }
@@ -556,8 +556,8 @@ impl Capabilities for StubCASResponder {
 #[cfg(test)]
 mod tests {
     use super::{
-        parse_read_resource_name, parse_write_resource_name, ParsedReadResourceName,
-        ParsedWriteResourceName,
+        ParsedReadResourceName, ParsedWriteResourceName, parse_read_resource_name,
+        parse_write_resource_name,
     };
 
     #[test]

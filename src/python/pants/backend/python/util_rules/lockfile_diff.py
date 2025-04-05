@@ -8,14 +8,9 @@ import json
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-from packaging.version import parse
-
-if TYPE_CHECKING:
-    # We seem to get a version of `packaging` that doesn't have `LegacyVersion` when running
-    # pytest..
-    from packaging.version import LegacyVersion, Version
+from packaging.version import Version, parse
 
 from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfile,
@@ -34,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True, order=True)
 class PythonRequirementVersion:
-    _parsed: LegacyVersion | Version
+    _parsed: Version
 
     @classmethod
     def parse(cls, version: str) -> PythonRequirementVersion:

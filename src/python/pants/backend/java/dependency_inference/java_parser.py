@@ -3,12 +3,11 @@
 
 from __future__ import annotations
 
+import importlib.resources
 import json
 import logging
 import os.path
 from dataclasses import dataclass
-
-import pkg_resources
 
 from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
 from pants.core.goals.resolves import ExportableTool
@@ -142,7 +141,8 @@ async def analyze_java_source_dependencies(
 
 
 def _load_javaparser_launcher_source() -> bytes:
-    return pkg_resources.resource_string(__name__, _LAUNCHER_BASENAME)
+    parent_module = ".".join(__name__.split(".")[:-1])
+    return importlib.resources.files(parent_module).joinpath(_LAUNCHER_BASENAME).read_bytes()
 
 
 # TODO(13879): Consolidate compilation of wrapper binaries to common rules.

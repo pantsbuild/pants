@@ -3,18 +3,18 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::LazyLock;
 
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
-use lazy_static::lazy_static;
 
 use crate::Stat;
 
-lazy_static! {
-    static ref EMPTY_IGNORE: Arc<GitignoreStyleExcludes> = Arc::new(GitignoreStyleExcludes {
+static EMPTY_IGNORE: LazyLock<Arc<GitignoreStyleExcludes>> = LazyLock::new(|| {
+    Arc::new(GitignoreStyleExcludes {
         patterns: vec![],
         gitignore: Gitignore::empty(),
-    });
-}
+    })
+});
 
 #[derive(Debug)]
 pub struct GitignoreStyleExcludes {

@@ -5,12 +5,12 @@ use std::io;
 use std::net::Ipv4Addr;
 
 use futures::channel::mpsc;
-use futures::{try_join, SinkExt, Stream, StreamExt};
-use nails::execution::{stream_for, ChildInput, ChildOutput, ExitCode};
+use futures::{SinkExt, Stream, StreamExt, try_join};
 use nails::Config;
+use nails::execution::{ChildInput, ChildOutput, ExitCode, stream_for};
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
-use tokio::signal::unix::{signal, Signal, SignalKind};
+use tokio::signal::unix::{Signal, SignalKind, signal};
 
 pub enum NailgunClientError {
     PreConnect(String),
@@ -98,7 +98,7 @@ pub async fn client_execute(
     args: Vec<String>,
     env: Vec<(String, String)>,
 ) -> Result<i32, NailgunClientError> {
-    use nails::execution::{child_channel, Command};
+    use nails::execution::{Command, child_channel};
 
     let working_dir =
         std::env::current_dir().map_err(|e| NailgunClientError::PreConnect(e.to_string()))?;

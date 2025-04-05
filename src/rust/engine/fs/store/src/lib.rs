@@ -29,9 +29,9 @@ use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bytes::Bytes;
 use fs::{
-    default_cache_path, directory, DigestEntry, DigestTrie, Dir, DirectoryDigest, File,
-    FileContent, FileEntry, Link, PathStat, Permissions, RelativePath, SymlinkBehavior,
-    SymlinkEntry, EMPTY_DIRECTORY_DIGEST,
+    DigestEntry, DigestTrie, Dir, DirectoryDigest, EMPTY_DIRECTORY_DIGEST, File, FileContent,
+    FileEntry, Link, PathStat, Permissions, RelativePath, SymlinkBehavior, SymlinkEntry,
+    default_cache_path, directory,
 };
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
@@ -50,11 +50,13 @@ use tokio::fs::copy;
 use tokio::fs::hard_link;
 use tokio::fs::symlink;
 use tryfuture::try_future;
-use workunit_store::{in_workunit, Level, Metric};
+use workunit_store::{Level, Metric, in_workunit};
 
 const KILOBYTES: usize = 1024;
 const MEGABYTES: usize = 1024 * KILOBYTES;
 const GIGABYTES: usize = 1024 * MEGABYTES;
+
+mod cli_options;
 
 mod local;
 #[cfg(test)]
@@ -66,6 +68,7 @@ mod remote_tests;
 
 // Consumers of this crate shouldn't need to worry about the exact crate structure that comes
 // together to make a store.
+pub use cli_options::StoreCliOpt;
 pub use remote_provider::{RemoteProvider, RemoteStoreOptions};
 
 pub struct LocalOptions {
@@ -336,6 +339,10 @@ impl Store {
             remote: None,
             immutable_inputs_base: Some(immutable_inputs_base.to_path_buf()),
         })
+    }
+
+    pub fn is_local_only(&self) -> bool {
+        self.remote.is_none()
     }
 
     ///
@@ -717,15 +724,15 @@ impl Store {
             .download_digest_to_local(self.local.clone(), digest, entry_type, f_remote)
             .await?;
 
-        Ok(
-      self
-        .local
-        .load_bytes_with(entry_type, digest, f_local)
-        .await?
-        .ok_or_else(|| {
-          format!("After downloading {digest:?}, the local store claimed that it was not present.")
-        })??,
-    )
+        Ok(self
+            .local
+            .load_bytes_with(entry_type, digest, f_local)
+            .await?
+            .ok_or_else(|| {
+                format!(
+                    "After downloading {digest:?}, the local store claimed that it was not present."
+                )
+            })??)
     }
 
     ///
@@ -1043,11 +1050,11 @@ impl Store {
             Ok(size) => {
                 if size > target_size_bytes {
                     log::warn!(
-            "Garbage collection attempted to shrink the store to {} bytes but {} bytes \
+                        "Garbage collection attempted to shrink the store to {} bytes but {} bytes \
             are currently in use.",
-            target_size_bytes,
-            size
-          )
+                        target_size_bytes,
+                        size
+                    )
                 }
                 Ok(())
             }
@@ -1308,9 +1315,8 @@ impl Store {
                     .await
                     .map_err(|e| {
                         format!(
-                            "Failed to set permissions for {}: {}",
+                            "Error setting permissions on {}: {e}",
                             destination.display(),
-                            e
                         )
                     })?;
             }
@@ -1366,9 +1372,14 @@ impl Store {
                         destination.display()
                     )
                 })?;
-                tokio::fs::set_permissions(destination, FSPermissions::from_mode(mode))
+                tokio::fs::set_permissions(&destination, FSPermissions::from_mode(mode))
                     .await
-                    .map_err(|e| format!("Error setting permissions on {}: {e}", path.display()))?;
+                    .map_err(|e| {
+                        format!(
+                            "Error setting permissions on {}: {e}",
+                            destination.display()
+                        )
+                    })?;
                 Ok(())
             }
             None => {

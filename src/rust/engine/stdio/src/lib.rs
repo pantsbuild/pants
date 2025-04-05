@@ -158,7 +158,7 @@ impl Destination {
             _ => {
                 return Err(format!(
                     "Cannot start Exclusive access on Destination {destination:?}"
-                ))
+                ));
             }
         };
         let console = std::mem::replace(

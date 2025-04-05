@@ -13,15 +13,17 @@ use std::time::Instant;
 
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
+use deepsize::DeepSizeOf;
 use fs::{
-    self, DigestTrie, DirectoryDigest, GlobExpansionConjunction, GlobMatching, PathGlobs,
-    Permissions, RelativePath, StrictGlobMatching, SymlinkBehavior, TypedPath,
-    EMPTY_DIRECTORY_DIGEST,
+    self, DigestTrie, DirectoryDigest, EMPTY_DIRECTORY_DIGEST, GlobExpansionConjunction,
+    GlobMatching, PathGlobs, Permissions, RelativePath, StrictGlobMatching, SymlinkBehavior,
+    TypedPath,
 };
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
-use futures::{try_join, FutureExt, TryFutureExt};
+use futures::{FutureExt, TryFutureExt, try_join};
 use log::{debug, info};
 use nails::execution::ExitCode;
+use serde::Serialize;
 use shell_quote::Bash;
 use store::{
     ImmutableInputs, OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, StoreError,
@@ -33,7 +35,7 @@ use tokio::process::Command;
 use tokio::sync::RwLock;
 use tokio::time::timeout;
 use tokio_util::codec::{BytesCodec, FramedRead};
-use workunit_store::{in_workunit, Level, Metric, RunningWorkunit};
+use workunit_store::{Level, Metric, RunningWorkunit, in_workunit};
 
 use crate::fork_exec::spawn_process;
 use crate::{
@@ -43,7 +45,9 @@ use crate::{
 
 pub const USER_EXECUTABLE_MODE: u32 = 0o100755;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, strum_macros::EnumString)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, Hash, DeepSizeOf, strum_macros::EnumString, Serialize,
+)]
 #[strum(serialize_all = "snake_case")]
 pub enum KeepSandboxes {
     Always,
@@ -57,7 +61,6 @@ pub struct CommandRunner {
     work_dir_base: PathBuf,
     named_caches: NamedCaches,
     immutable_inputs: ImmutableInputs,
-    keep_sandboxes: KeepSandboxes,
     spawn_lock: Arc<RwLock<()>>,
 }
 
@@ -68,7 +71,6 @@ impl CommandRunner {
         work_dir_base: PathBuf,
         named_caches: NamedCaches,
         immutable_inputs: ImmutableInputs,
-        keep_sandboxes: KeepSandboxes,
         spawn_lock: Arc<RwLock<()>>,
     ) -> CommandRunner {
         CommandRunner {
@@ -77,7 +79,6 @@ impl CommandRunner {
             work_dir_base,
             named_caches,
             immutable_inputs,
-            keep_sandboxes,
             spawn_lock,
         }
     }
@@ -198,11 +199,12 @@ impl super::CommandRunner for CommandRunner {
             // renders at the Process's level.
             desc = Some(req.description.clone()),
             |workunit| async move {
+                let keep_sandboxes = req.execution_environment.local_keep_sandboxes;
                 let mut workdir = create_sandbox(
                     self.executor.clone(),
                     &self.work_dir_base,
                     &req.description,
-                    self.keep_sandboxes,
+                    keep_sandboxes,
                 )?;
 
                 // Start working on a mutable version of the process.
@@ -254,8 +256,8 @@ impl super::CommandRunner for CommandRunner {
                     })
                     .await;
 
-                if self.keep_sandboxes == KeepSandboxes::Always
-                    || self.keep_sandboxes == KeepSandboxes::OnFailure
+                if keep_sandboxes == KeepSandboxes::Always
+                    || keep_sandboxes == KeepSandboxes::OnFailure
                         && res.as_ref().map(|r| r.exit_code).unwrap_or(1) != 0
                 {
                     workdir.keep(&req.description);

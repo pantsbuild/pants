@@ -6,26 +6,26 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use async_trait::async_trait;
-use fs::{directory, DigestTrie, RelativePath, SymlinkBehavior};
-use futures::future::{BoxFuture, TryFutureExt};
+use fs::{DigestTrie, RelativePath, SymlinkBehavior, directory};
 use futures::FutureExt;
+use futures::future::{BoxFuture, TryFutureExt};
 use hashing::Digest;
 use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 use remexec::{ActionResult, Command, Tree};
-use remote_provider::{choose_action_cache_provider, ActionCacheProvider};
+use remote_provider::{ActionCacheProvider, choose_action_cache_provider};
 use store::{Store, StoreError};
 use workunit_store::{
-    in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, WorkunitMetadata,
+    Level, Metric, ObservationMetric, RunningWorkunit, WorkunitMetadata, in_workunit,
 };
 
 use process_execution::{
-    check_cache_content, populate_fallible_execution_result, CacheContentBehavior, Context,
-    FallibleProcessResultWithPlatform, Process, ProcessCacheScope, ProcessError,
-    ProcessExecutionEnvironment, ProcessResultSource,
+    CacheContentBehavior, Context, FallibleProcessResultWithPlatform, Process, ProcessCacheScope,
+    ProcessError, ProcessExecutionEnvironment, ProcessResultSource, check_cache_content,
+    populate_fallible_execution_result,
 };
-use process_execution::{make_execute_request, EntireExecuteRequest};
+use process_execution::{EntireExecuteRequest, make_execute_request};
 
 // Consumers of this crate shouldn't need to worry about the exact crate structure that comes
 // together to make a remote cache command runner.
@@ -141,14 +141,14 @@ impl CommandRunner {
                     "Declared output directory path {directory_path:?} in output \
            digest {trie_digest:?} contained a symlink instead.",
                     trie_digest = root_trie.compute_root_digest(),
-                ))
+                ));
             }
             Some(directory::Entry::File(_)) => {
                 return Err(format!(
                     "Declared output directory path {directory_path:?} in output \
            digest {trie_digest:?} contained a file instead.",
                     trie_digest = root_trie.compute_root_digest(),
-                ))
+                ));
             }
         };
 

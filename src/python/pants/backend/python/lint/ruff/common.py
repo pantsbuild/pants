@@ -1,5 +1,6 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+import os
 from dataclasses import dataclass
 from typing import assert_never
 
@@ -44,7 +45,6 @@ async def run_ruff(
         Digest,
         MergeDigests(
             (
-                ruff_tool.digest,
                 request.snapshot.digest,
                 config_files.snapshot.digest,
                 report_directory,
@@ -69,11 +69,15 @@ async def run_ruff(
     # For other cases, the flags should work the same regardless of the order.
     initial_args = extra_initial_args + ("--force-exclude",)
 
+    immutable_input_key = "__ruff_tool"
+    exe_path = os.path.join(immutable_input_key, ruff_tool.exe)
+
     result = await Get(
         FallibleProcessResult,
         Process(
-            argv=(ruff_tool.exe, *initial_args, *conf_args, *ruff.args, *request.snapshot.files),
+            argv=(exe_path, *initial_args, *conf_args, *ruff.args, *request.snapshot.files),
             input_digest=input_digest,
+            immutable_input_digests={immutable_input_key: ruff_tool.digest},
             output_files=request.snapshot.files,
             output_directories=(REPORT_DIR,) if request.mode is RuffMode.LINT else (),
             description=f"Run ruff {' '.join(initial_args)} on {pluralize(len(request.snapshot.files), 'file')}.",

@@ -79,6 +79,7 @@ Created as part of the release process.
 + Daniel Peebles
 + Daniel Wagner-Hall
 + Danny McClanahan
++ Darren Clark
 + Dave Brewster
 + David Katz
 + David Singleton
@@ -147,6 +148,7 @@ Created as part of the release process.
 + Jack Zhao
 + Jackson Davis
 + Jacob Floyd
++ Jake
 + Jake Donham
 + Jake Zerrer
 + Jakub Bujny
@@ -204,6 +206,7 @@ Created as part of the release process.
 + Kris Wilson
 + Krishna Vudata
 + Krishnan Chandra
++ Kristian Tashkov
 + Kushal Dave
 + Kyle Derr
 + Kyujin Cho
@@ -378,6 +381,7 @@ Created as part of the release process.
 + csqzhang
 + csteiner
 + eugene yokota
++ fabric-peter
 + gyudoza
 + hephex
 + jgartdele/del

@@ -46,6 +46,7 @@ deepsize = { workspace = true, features = ["internment", "smallvec"] }
 dep_inference = { path = "dep_inference" }
 derivative = { workspace = true }
 async-oncecell = { workspace = true }
+children = { path = "process_execution/children" }
 docker = { path = "process_execution/docker" }
 fnv = { workspace = true }
 fs = { path = "fs" }
@@ -58,7 +59,6 @@ humansize = { workspace = true }
 indexmap = { workspace = true }
 internment = { workspace = true }
 itertools = { workspace = true }
-lazy_static = { workspace = true }
 libc = { workspace = true }
 log = { workspace = true }
 logging = { path = "logging" }
@@ -227,8 +227,8 @@ bollard = "0.17.1"
 byteorder = "1.5"
 bytes = "1.10"
 chrono = "0.4.22"
-clap = "3"
-colored = "2.0.0"
+clap = "4.5"
+colored = "2.2.0"
 console = "0.15.8"
 criterion = "0.4"
 crossbeam-channel = "0.5"
@@ -240,7 +240,7 @@ dirs-next = "2"
 docker_credential = "1.2"
 either = "1"
 env_logger = "0.10.2"
-errno = "0.2.8"
+errno = "0.3.6"
 fixedbitset = "0.4"
 fnv = "1.0.5"
 fs-set-times = "0.19"
@@ -260,13 +260,12 @@ hyper-rustls = "0.27"
 hyper-util = "0.1"
 ignore = "0.4.23"
 indexmap = { version = "2.2", features = ["std", "serde"] }
-indicatif = "0.17.9"
+indicatif = "0.17.11"
 internment = "0.6"
 itertools = "0.10"
-lazy_static = "1"
-libc = "0.2.137"
+libc = "0.2.171"
 lmdb-rkv = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "6ae7a552aa2c932c3ddf652a68cdde2fed547cbc" }
-log = "0.4.20"
+log = "0.4.26"
 madvise = "0.1"
 maplit = "1.0.1"
 nails = "0.13"
@@ -275,7 +274,7 @@ notify = { git = "https://github.com/pantsbuild/notify", rev = "276af0f3c5f300bf
 num_cpus = "1"
 num_enum = "0.5"
 once_cell = "1.20"
-opendal = { version = "0.51.1", default-features = false, features = [
+opendal = { version = "0.52.0", default-features = false, features = [
   "services-memory",
   "services-fs",
   "services-ghac",
@@ -302,8 +301,8 @@ rlimit = "0.8"
 rustls = "0.23"
 rustls-native-certs = "0.8"
 rustls-pemfile = "2.0"
-rustls-pki-types = "1.7"
-serde = "1.0.160"
+rustls-pki-types = "1.11"
+serde = "1.0.219"
 serde_derive = "1.0.98"
 serde_json = "1.0"
 serde_test = "1.0"

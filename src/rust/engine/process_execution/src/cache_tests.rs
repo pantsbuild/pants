@@ -15,7 +15,7 @@ use tokio::sync::RwLock;
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
-    local::KeepSandboxes, CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context,
+    CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context,
     FallibleProcessResultWithPlatform, NamedCaches, Process, ProcessError,
 };
 
@@ -36,7 +36,6 @@ fn create_local_runner() -> (Box<dyn CommandRunnerTrait>, Store, TempDir) {
         base_dir.path().to_owned(),
         NamedCaches::new_local(named_cache_dir),
         ImmutableInputs::new(store.clone(), base_dir.path()).unwrap(),
-        KeepSandboxes::Never,
         Arc::new(RwLock::new(())),
     ));
     (runner, store, base_dir)
@@ -175,11 +174,13 @@ async fn recover_from_missing_store_contents() {
             .unwrap();
         let removed = store.remove_file(output_child_digest).await.unwrap();
         assert!(removed);
-        assert!(store
-            .contents_for_directory(output_dir_digest)
-            .await
-            .err()
-            .is_some())
+        assert!(
+            store
+                .contents_for_directory(output_dir_digest)
+                .await
+                .err()
+                .is_some()
+        )
     }
 
     // Ensure that we don't fail if we re-run.
@@ -189,9 +190,11 @@ async fn recover_from_missing_store_contents() {
         .unwrap();
 
     // And that the entire output directory can be loaded.
-    assert!(store
-        .contents_for_directory(second_result.output_directory)
-        .await
-        .ok()
-        .is_some())
+    assert!(
+        store
+            .contents_for_directory(second_result.output_directory)
+            .await
+            .ok()
+            .is_some()
+    )
 }

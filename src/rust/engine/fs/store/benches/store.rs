@@ -1,7 +1,7 @@
 // Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 
 use std::collections::{BTreeSet, HashSet};
 use std::io::{BufRead, BufReader, BufWriter, Write};

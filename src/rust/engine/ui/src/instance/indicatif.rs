@@ -7,8 +7,8 @@ use std::future;
 use std::sync::Arc;
 use std::time::SystemTime;
 
-use futures::future::BoxFuture;
 use futures::FutureExt;
+use futures::future::BoxFuture;
 use indexmap::IndexSet;
 use indicatif::MultiProgress;
 use indicatif::ProgressBar;
@@ -17,8 +17,8 @@ use indicatif::ProgressStyle;
 use indicatif::WeakProgressBar;
 use parking_lot::Mutex;
 
-use workunit_store::format_workunit_duration_ms;
 use workunit_store::SpanId;
+use workunit_store::format_workunit_duration_ms;
 
 use super::TaskState;
 use crate::ConsoleUI;

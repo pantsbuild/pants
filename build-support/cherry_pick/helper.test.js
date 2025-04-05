@@ -102,13 +102,13 @@ test("get_prereqs fails when no milestone", async () => {
   ]);
   expect(helper.octokit.rest.issues.createComment).toBeCalledTimes(1);
   expect(
-    helper.octokit.rest.issues.createComment.mock.calls[0][0].body
+    helper.octokit.rest.issues.createComment.mock.calls[0][0].body,
   ).toEqual(
     `I was unable to cherry-pick this PR; the milestone seems to be missing.
 
 @steve_buscemi: Please add the milestone to the PR and re-run the [Auto Cherry-Picker job](<WORKFLOW_URL>) using the "Run workflow" button.
 
-:robot: [Beep Boop here's my run link](https://github.com/pantsbuild/pants/actions/runs/5148273558)`
+:robot: [Beep Boop here's my run link](https://github.com/pantsbuild/pants/actions/runs/5148273558)`,
   );
   expect(helper.core.setFailed).toBeCalledTimes(1);
 });
@@ -202,7 +202,7 @@ test("cherry_pick_finished one pass one fail", async () => {
     "auto-cherry-picking-failed",
   ]);
   expect(
-    helper.octokit.rest.issues.createComment.mock.calls[0][0].body
+    helper.octokit.rest.issues.createComment.mock.calls[0][0].body,
   ).toEqual(
     `I tried to automatically cherry-pick this change back to each relevant milestone, so that it is available in those older releases of Pants.
 
@@ -239,7 +239,7 @@ When you're done manually cherry-picking, please remove the \`needs-cherrypick\`
 
 Thanks again for your contributions!
 
-:robot: [Beep Boop here's my run link](https://github.com/pantsbuild/pants/actions/runs/5148273558)`
+:robot: [Beep Boop here's my run link](https://github.com/pantsbuild/pants/actions/runs/5148273558)`,
   );
 });
 
@@ -262,10 +262,10 @@ test("cherry_pick_finished all pass", async () => {
 
   expect(helper.octokit.rest.issues.removeLabel).toBeCalledTimes(1);
   expect(helper.octokit.rest.issues.removeLabel.mock.calls[0][0].name).toEqual(
-    "needs-cherrypick"
+    "needs-cherrypick",
   );
   expect(
-    helper.octokit.rest.issues.createComment.mock.calls[0][0].body
+    helper.octokit.rest.issues.createComment.mock.calls[0][0].body,
   ).toEqual(
     `I tried to automatically cherry-pick this change back to each relevant milestone, so that it is available in those older releases of Pants.
 
@@ -277,6 +277,6 @@ Successfully opened <URL for 2.16.x>.
 
 Thanks again for your contributions!
 
-:robot: [Beep Boop here's my run link](https://github.com/pantsbuild/pants/actions/runs/5148273558)`
+:robot: [Beep Boop here's my run link](https://github.com/pantsbuild/pants/actions/runs/5148273558)`,
   );
 });

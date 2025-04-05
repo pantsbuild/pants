@@ -18,10 +18,10 @@ use log::warn;
 use parking_lot::Mutex;
 use pyo3::prelude::*;
 use task_executor::{Executor, TailTasks};
-use tokio::signal::unix::{signal, SignalKind};
+use tokio::signal::unix::{SignalKind, signal};
 use tokio::task::JoinHandle;
 use ui::ConsoleUI;
-use workunit_store::{format_workunit_duration_ms, RunId, WorkunitStore};
+use workunit_store::{RunId, WorkunitStore, format_workunit_duration_ms};
 
 // When enabled, the interval at which all stragglers that have been running for longer than a
 // threshold should be logged. The threshold might become configurable, but this might not need

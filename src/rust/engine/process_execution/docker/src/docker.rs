@@ -15,7 +15,7 @@ use bollard::exec::StartExecResults;
 use bollard::image::CreateImageOptions;
 use bollard::service::CreateImageInfo;
 use bollard::volume::CreateVolumeOptions;
-use bollard::{errors::Error as DockerError, Docker};
+use bollard::{Docker, errors::Error as DockerError};
 use bytes::{Bytes, BytesMut};
 use futures::stream::BoxStream;
 use futures::{FutureExt, StreamExt, TryFutureExt};
@@ -26,11 +26,11 @@ use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use store::{ImmutableInputs, Store};
 use task_executor::Executor;
-use workunit_store::{in_workunit, Metric, RunningWorkunit};
+use workunit_store::{Metric, RunningWorkunit, in_workunit};
 
 use process_execution::local::{
-    apply_chroot, collect_child_outputs, create_sandbox, prepare_workdir, setup_run_sh_script,
-    CapturedWorkdir, ChildOutput, KeepSandboxes,
+    CapturedWorkdir, ChildOutput, KeepSandboxes, apply_chroot, collect_child_outputs,
+    create_sandbox, prepare_workdir, setup_run_sh_script,
 };
 use process_execution::{
     Context, FallibleProcessResultWithPlatform, NamedCaches, Platform, Process, ProcessError,
@@ -54,7 +54,6 @@ pub struct CommandRunner<'a> {
     docker: &'a DockerOnceCell,
     work_dir_base: PathBuf,
     immutable_inputs: ImmutableInputs,
-    keep_sandboxes: KeepSandboxes,
     container_cache: ContainerCache<'a>,
 }
 
@@ -281,25 +280,20 @@ async fn pull_image(
     };
 
     let (do_pull, pull_reason) = match (policy, image_exists) {
-    (ImagePullPolicy::Always, _) => {
-      (true, "the image pull policy is set to \"always\"")
-    },
-    (ImagePullPolicy::IfMissing, false) => {
-      (true, "the image is missing locally")
-    },
-    (ImagePullPolicy::OnlyIfLatestOrMissing, false) => {
-      (true, "the image is missing locally")
-    },
-    (ImagePullPolicy::OnlyIfLatestOrMissing, true) if has_latest_tag => {
-      (true, "the image is present but the image tag is 'latest' and the image pull policy is set to pull images in this case")
-    },
-    (ImagePullPolicy::Never, false) => {
-      return Err(format!(
-        "Image `{image}` was not found locally and Pants is configured to not attempt to pull"
-      ));
-    }
-    _ => (false, "")
-  };
+        (ImagePullPolicy::Always, _) => (true, "the image pull policy is set to \"always\""),
+        (ImagePullPolicy::IfMissing, false) => (true, "the image is missing locally"),
+        (ImagePullPolicy::OnlyIfLatestOrMissing, false) => (true, "the image is missing locally"),
+        (ImagePullPolicy::OnlyIfLatestOrMissing, true) if has_latest_tag => (
+            true,
+            "the image is present but the image tag is 'latest' and the image pull policy is set to pull images in this case",
+        ),
+        (ImagePullPolicy::Never, false) => {
+            return Err(format!(
+                "Image `{image}` was not found locally and Pants is configured to not attempt to pull"
+            ));
+        }
+        _ => (false, ""),
+    };
 
     if do_pull {
         in_workunit!(
@@ -342,7 +336,7 @@ async fn pull_image(
                             _ => (),
                         },
                         Err(err) => {
-                            return Err(format!("Failed to pull Docker image `{image}`: {err:?}"))
+                            return Err(format!("Failed to pull Docker image `{image}`: {err:?}"));
                         }
                     }
                 }
@@ -364,7 +358,6 @@ impl<'a> CommandRunner<'a> {
         image_pull_cache: &'a ImagePullCache,
         work_dir_base: PathBuf,
         immutable_inputs: ImmutableInputs,
-        keep_sandboxes: KeepSandboxes,
     ) -> Result<Self, String> {
         let container_cache = ContainerCache::new(
             docker,
@@ -380,7 +373,6 @@ impl<'a> CommandRunner<'a> {
             docker,
             work_dir_base,
             immutable_inputs,
-            keep_sandboxes,
             container_cache,
         })
     }
@@ -409,11 +401,12 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
             // renders at the Process's level.
             desc = Some(req.description.clone()),
             |workunit| async move {
+                let keep_sandboxes = req.execution_environment.local_keep_sandboxes;
                 let mut workdir = create_sandbox(
                     self.executor.clone(),
                     &self.work_dir_base,
                     &req.description,
-                    self.keep_sandboxes,
+                    keep_sandboxes,
                 )?;
 
                 // Obtain ID of the base container in which to run the execution for this process.
@@ -523,8 +516,8 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                     Err(_) => workunit.increment_counter(Metric::DockerExecutionErrors, 1),
                 }
 
-                if self.keep_sandboxes == KeepSandboxes::Always
-                    || self.keep_sandboxes == KeepSandboxes::OnFailure
+                if keep_sandboxes == KeepSandboxes::Always
+                    || keep_sandboxes == KeepSandboxes::OnFailure
                         && res.as_ref().map(|r| r.exit_code).unwrap_or(1) != 0
                 {
                     workdir.keep(&req.description);
@@ -778,13 +771,15 @@ impl<'a> ContainerCache<'a> {
             })?;
 
         let immutable_inputs_base_dir = immutable_inputs
-      .workdir()
-      .to_path_buf()
-      .into_os_string()
-      .into_string()
-      .map_err(|s| {
-        format!("Unable to convert immutable_inputs base dir due to non UTF-8 characters: {s:?}")
-      })?;
+            .workdir()
+            .to_path_buf()
+            .into_os_string()
+            .into_string()
+            .map_err(|s| {
+                format!(
+                    "Unable to convert immutable_inputs base dir due to non UTF-8 characters: {s:?}"
+                )
+            })?;
 
         Ok(Self {
             docker,
@@ -1013,7 +1008,7 @@ impl<'a> ContainerCache<'a> {
             Err(err) => {
                 return Err(format!(
                     "Failed to get Docker connection during container removal: {err}"
-                ))
+                ));
             }
         };
 
