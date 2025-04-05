@@ -13,6 +13,7 @@ from pants.backend.javascript.lint.prettier.rules import PrettierFmtFieldSet, Pr
 from pants.backend.javascript.subsystems import nodejs
 from pants.backend.javascript.target_types import JSSourcesGeneratorTarget
 from pants.backend.python import target_types_rules
+from pants.backend.tsx.target_types import TSXSourcesGeneratorTarget
 from pants.backend.typescript.target_types import TypeScriptSourcesGeneratorTarget
 from pants.core.goals.fmt import FmtResult
 from pants.core.util_rules import config_files, source_files
@@ -35,7 +36,11 @@ def rule_runner() -> RuleRunner:
             QueryRule(FmtResult, (PrettierFmtRequest.Batch,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
-        target_types=[JSSourcesGeneratorTarget, TypeScriptSourcesGeneratorTarget],
+        target_types=[
+            JSSourcesGeneratorTarget,
+            TypeScriptSourcesGeneratorTarget,
+            TSXSourcesGeneratorTarget,
+        ],
     )
 
 
@@ -194,6 +199,42 @@ def test_typescript(rule_runner: RuleRunner) -> None:
     fmt_result = run_prettier(rule_runner, tgts)
     assert fmt_result.output == rule_runner.make_snapshot(
         {"good.ts": DEFAULT_FORMATTED_TS_FILE, "bad.ts": DEFAULT_FORMATTED_TS_FILE}
+    )
+    assert fmt_result.did_change is True
+
+
+UNFORMATTED_TSX_FILE = dedent(
+    """\
+    const Foo: FunctionalComponent = () => {
+    return <div>Hello World!</div>;
+    };
+    """
+)
+
+DEFAULT_FORMATTED_TSX_FILE = dedent(
+    """\
+    const Foo: FunctionalComponent = () => {
+      return <div>Hello World!</div>;
+    };
+    """
+)
+
+
+def test_tsx(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "good.tsx": DEFAULT_FORMATTED_TSX_FILE,
+            "bad.tsx": UNFORMATTED_TSX_FILE,
+            "BUILD": "tsx_sources(name='t')",
+        }
+    )
+    tgts = [
+        rule_runner.get_target(Address("", target_name="t", relative_file_path="good.tsx")),
+        rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.tsx")),
+    ]
+    fmt_result = run_prettier(rule_runner, tgts)
+    assert fmt_result.output == rule_runner.make_snapshot(
+        {"good.tsx": DEFAULT_FORMATTED_TSX_FILE, "bad.tsx": DEFAULT_FORMATTED_TSX_FILE}
     )
     assert fmt_result.did_change is True
 
