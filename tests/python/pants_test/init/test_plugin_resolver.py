@@ -59,6 +59,11 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
+@pytest.fixture(params=[False, True], ids=["pex", "uv"])
+def use_uv(request) -> bool:
+    return request.param
+
+
 def _create_pex(
     rule_runner: RuleRunner,
     interpreter_constraints: InterpreterConstraints,
@@ -153,6 +158,8 @@ def plugin_resolution(
     with provide_chroot(chroot) as (root_dir, create_artifacts):
         env: dict[str, str] = {}
         repo_dir = os.path.join(root_dir, "repo")
+        safe_mkdir(repo_dir)
+        print(f"repo_dir: {repo_dir}")
 
         def _create_artifact(name, version, install_requires):
             if create_artifacts:
@@ -168,7 +175,7 @@ def plugin_resolution(
                 )
 
         env.update(
-            PANTS_PYTHON_REPOS_REPOS=f"['file://{repo_dir}']",
+            PANTS_PYTHON_REPOS_FIND_LINKS=f"['file://{repo_dir}']",
             PANTS_PYTHON_RESOLVER_CACHE_TTL="1",
             PANTS_EXPERIMENTAL_USE_UV_FOR_PLUGIN_RESOLUTION="True" if use_uv else "False",
         )
@@ -218,18 +225,15 @@ def plugin_resolution(
         yield working_set, root_dir, repo_dir
 
 
-@pytest.mark.parametrize("use_uv", (False, True))
 def test_no_plugins(rule_runner: RuleRunner, use_uv: bool) -> None:
     with plugin_resolution(rule_runner, use_uv=use_uv) as (working_set, _, _):
         assert [] == list(working_set)
 
 
-@pytest.mark.parametrize("use_uv", (False, True))
 def test_plugins_sdist(rule_runner: RuleRunner, use_uv: bool) -> None:
     _do_test_plugins(rule_runner, True, use_uv=use_uv)
 
 
-@pytest.mark.parametrize("use_uv", (False, True))
 def test_plugins_bdist(rule_runner: RuleRunner, use_uv: bool) -> None:
     _do_test_plugins(rule_runner, False, use_uv=use_uv)
 
@@ -255,12 +259,10 @@ def _do_test_plugins(rule_runner: RuleRunner, sdist: bool, *, use_uv: bool) -> N
         assert_dist_version(name="jane", expected_version=DEFAULT_VERSION)
 
 
-@pytest.mark.parametrize("use_uv", (False, True))
 def test_exact_requirements_sdist(rule_runner: RuleRunner, use_uv: bool) -> None:
     _do_test_exact_requirements(rule_runner, True, use_uv=use_uv)
 
 
-@pytest.mark.parametrize("use_uv", (False, True))
 def test_exact_requirements_bdist(rule_runner: RuleRunner, use_uv: bool) -> None:
     _do_test_exact_requirements(rule_runner, False, use_uv=use_uv)
 
@@ -290,7 +292,6 @@ def _do_test_exact_requirements(rule_runner: RuleRunner, sdist: bool, *, use_uv:
             assert list(working_set) == list(working_set2)
 
 
-@pytest.mark.parametrize("use_uv", (False, True))
 def test_range_deps(rule_runner: RuleRunner, use_uv: bool) -> None:
     # Test that when a plugin has a range dependency, specifying a working set constrains
     # to a particular version, where otherwise we would get the highest released (2.27.0 in
@@ -311,13 +312,11 @@ def test_range_deps(rule_runner: RuleRunner, use_uv: bool) -> None:
 
 
 @skip_unless_python38_and_python39_present
-@pytest.mark.parametrize("use_uv", (False, True))
 def test_exact_requirements_interpreter_change_sdist(rule_runner: RuleRunner, use_uv: bool) -> None:
     _do_test_exact_requirements_interpreter_change(rule_runner, True, use_uv=use_uv)
 
 
 @skip_unless_python38_and_python39_present
-@pytest.mark.parametrize("use_uv", (False, True))
 def test_exact_requirements_interpreter_change_bdist(rule_runner: RuleRunner, use_uv: bool) -> None:
     _do_test_exact_requirements_interpreter_change(rule_runner, False, use_uv=use_uv)
 
