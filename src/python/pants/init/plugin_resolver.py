@@ -301,6 +301,7 @@ async def resolve_plugins_via_uv(
         remote_execution=False,
         remote_execution_extra_platform_properties=(),
         execute_in_workspace=True,
+        keep_sandboxes="never",
     )
 
     result = await execute_process(process, workspace_process_execution_environment)
