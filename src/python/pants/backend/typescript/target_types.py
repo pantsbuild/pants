@@ -1,5 +1,6 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from pants.backend.javascript.target_types import JSRuntimeSourceField
 from pants.core.goals.test import (
     TestExtraEnvVarsField,
     TestsBatchCompatibilityTagField,
@@ -10,7 +11,6 @@ from pants.engine.target import (
     Dependencies,
     MultipleSourcesField,
     OverridesField,
-    SingleSourceField,
     Target,
     TargetFilesGenerator,
     generate_file_based_overrides_field_help_message,
@@ -26,7 +26,7 @@ class TypeScriptDependenciesField(Dependencies):
     pass
 
 
-class TypeScriptSourceField(SingleSourceField):
+class TypeScriptSourceField(JSRuntimeSourceField):
     expected_file_extensions = TS_FILE_EXTENSIONS
 
 
