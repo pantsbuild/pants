@@ -26,8 +26,7 @@ use nails::execution::ExitCode;
 use serde::Serialize;
 use shell_quote::Bash;
 use store::{
-    ImmutableInputs, OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, StoreError,
-    WorkdirSymlink,
+    ImmutableInputs, OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, WorkdirSymlink,
 };
 use task_executor::Executor;
 use tempfile::TempDir;
@@ -349,6 +348,7 @@ impl CapturedWorkdir for CommandRunner {
     }
 }
 
+#[derive(Debug)]
 pub enum CapturedWorkdirError {
     Timeout {
         timeout: std::time::Duration,
@@ -575,7 +575,7 @@ pub async fn prepare_workdir_digest(
     immutable_inputs: Option<&ImmutableInputs>,
     named_caches_prefix: Option<&Path>,
     immutable_inputs_prefix: Option<&Path>,
-) -> Result<DirectoryDigest, StoreError> {
+) -> Result<DirectoryDigest, CapturedWorkdirError> {
     let mut paths = Vec::new();
 
     // Symlinks for immutable inputs and named caches.
@@ -584,7 +584,13 @@ pub async fn prepare_workdir_digest(
         if let Some(immutable_inputs) = immutable_inputs {
             let symlinks = immutable_inputs
                 .local_paths(&req.input_digests.immutable_inputs)
-                .await?;
+                .await
+                .map_err(|se| {
+                    CapturedWorkdirError::Fatal(
+                        se.enrich("An error occurred when creating symlinks to immutable inputs")
+                            .to_string(),
+                    )
+                })?;
 
             match immutable_inputs_prefix {
                 Some(prefix) => workdir_symlinks.extend(symlinks.into_iter().map(|symlink| {
@@ -602,14 +608,7 @@ pub async fn prepare_workdir_digest(
             }
         }
 
-        let symlinks = named_caches
-            .paths(&req.append_only_caches)
-            .await
-            .map_err(|err| {
-                StoreError::Unclassified(format!(
-                    "Failed to make named cache(s) for local execution: {err:?}"
-                ))
-            })?;
+        let symlinks = named_caches.paths(&req.append_only_caches).await?;
         match named_caches_prefix {
             Some(prefix) => {
                 workdir_symlinks.extend(symlinks.into_iter().map(|symlink| WorkdirSymlink {
@@ -648,7 +647,15 @@ pub async fn prepare_workdir_digest(
     // Digest.
     let additions = DigestTrie::from_unique_paths(paths, &HashMap::new())?;
 
-    store.merge(vec![input_digest, additions.into()]).await
+    store
+        .merge(vec![input_digest, additions.into()])
+        .await
+        .map_err(|se| {
+            CapturedWorkdirError::Fatal(
+                se.enrich("An error occurred when merging digests")
+                    .to_string(),
+            )
+        })
 }
 
 /// Prepares the given workdir for use by the given Process.
@@ -666,7 +673,7 @@ pub async fn prepare_workdir(
     immutable_inputs: &ImmutableInputs,
     named_caches_prefix: Option<&Path>,
     immutable_inputs_prefix: Option<&Path>,
-) -> Result<bool, StoreError> {
+) -> Result<bool, CapturedWorkdirError> {
     // Capture argv0 as the executable path so that we can test whether we have created it in the
     // sandbox.
     let maybe_executable_path = {
@@ -698,14 +705,15 @@ pub async fn prepare_workdir(
         mutable_paths.extend(req.output_directories.clone());
         store
             .materialize_directory(
-                workdir_path,
+                workdir_path.clone(),
                 workdir_root_path,
                 complete_input_digest,
                 false,
                 &mutable_paths,
                 Permissions::Writable,
             )
-            .await?;
+            .await
+            .map_err(|se| se.enrich(format!("An error occurred when attempting to materialize a working directory at {workdir_path:#?}").as_str()).to_string())?;
 
         if let Some(executable_path) = maybe_executable_path {
             Ok(tokio::fs::metadata(executable_path).await.is_ok())

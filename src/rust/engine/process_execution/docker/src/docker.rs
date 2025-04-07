@@ -739,11 +739,20 @@ impl Command {
         &mut self,
         docker: &Docker,
         container_id: String,
-    ) -> Result<(i32, Bytes, Bytes), String> {
-        let child_outputs = self
-            .spawn(docker, container_id)
-            .await
-            .map_err(|cse| cse.message)?;
+    ) -> Result<(i32, Bytes, Bytes), CapturedWorkdirError> {
+        let child_outputs =
+            self.spawn(docker, container_id)
+                .await
+                .map_err(|cse| match cse.err {
+                    DockerError::DockerResponseServerError {
+                        status_code,
+                        message,
+                    } => CapturedWorkdirError::Retryable {
+                        status: status_code as i32,
+                        message,
+                    },
+                    _ => CapturedWorkdirError::Fatal(cse.message),
+                })?;
         let mut stdout = BytesMut::with_capacity(8192);
         let mut stderr = BytesMut::with_capacity(8192);
         let exit_code = collect_child_outputs(&mut stdout, &mut stderr, child_outputs).await?;
@@ -927,7 +936,7 @@ impl<'a> ContainerCache<'a> {
         docker: Docker,
         container_id: String,
         directory: PathBuf,
-    ) -> Result<(), String> {
+    ) -> Result<(), CapturedWorkdirError> {
         let directory = directory.into_os_string().into_string().map_err(|s| {
             format!(
                 "Unable to convert named cache path to string due to non UTF-8 characters: {s:?}"
@@ -944,13 +953,13 @@ impl<'a> ContainerCache<'a> {
         if exit_code == 0 {
             Ok(())
         } else {
-            Err(format!(
+            Err(CapturedWorkdirError::Fatal(format!(
                 "Failed to create parent directory for named cache in Docker container:\n\
          stdout:\n{}\n\
          stderr:\n{}\n",
                 String::from_utf8_lossy(&stdout),
                 String::from_utf8_lossy(&stderr)
-            ))
+            )))
         }
     }
 
