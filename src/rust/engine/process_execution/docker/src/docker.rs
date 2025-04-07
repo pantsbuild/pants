@@ -467,8 +467,7 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                         Some(Path::new(NAMED_CACHES_BASE_PATH_IN_CONTAINER)),
                         Some(Path::new(IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER)),
                     )
-                    .await
-                    .map_err(|store_error| CapturedWorkdirError::Fatal(store_error.to_string()))?;
+                    .await?;
 
                     workunit.increment_counter(Metric::DockerExecutionRequests, 1);
                     let res = self.run_and_capture_workdir(
