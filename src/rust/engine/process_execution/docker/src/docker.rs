@@ -466,8 +466,7 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                         &self.immutable_inputs,
                         Some(Path::new(NAMED_CACHES_BASE_PATH_IN_CONTAINER)),
                         Some(Path::new(IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER)),
-                    )
-                    .await?;
+                    ).await?;
 
                     workunit.increment_counter(Metric::DockerExecutionRequests, 1);
                     let res = self.run_and_capture_workdir(
@@ -496,15 +495,16 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                             workdir.path(),
                         )?;
                     }
-                    if let Err(CapturedWorkdirError::Retryable { status: 404, .. }) = res {
-                        self.container_cache.prune_dead_container(image_name, image_platform);
-                    }
                     res
                 }
             ).await;
             match process_result {
-                Err(CapturedWorkdirError::Retryable { message, .. }) => {
+                Err(CapturedWorkdirError::Retryable { status, message }) => {
                     errors.push(message);
+                    if status == 404 {
+                        self.container_cache
+                            .prune_dead_container(image_name, image_platform);
+                    }
                 }
                 _ => {
                     return process_result
@@ -519,7 +519,7 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                 .iter()
                 .enumerate()
                 .map(|(i, s)| format!("Attempt #{} failed due to: {}", i + 1, s))
-                .join("\n\n")
+                .join("\n")
         )))
     }
 
