@@ -237,11 +237,7 @@ class CompletePexEnvironment:
         d = dict(
             PATH=path,
             PEX_IGNORE_RCFILES="true",
-            PEX_ROOT=(
-                os.path.relpath(self.pex_root, self._working_directory)
-                if self._working_directory
-                else str(self.pex_root)
-            ),
+            PEX_ROOT=f"{chroot}/{self.pex_root}",
             **subprocess_env_dict,
         )
         if python:
