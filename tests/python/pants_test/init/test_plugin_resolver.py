@@ -259,15 +259,8 @@ def _do_test_plugins(rule_runner: RuleRunner, sdist: bool, *, use_uv: bool) -> N
         assert_dist_version(name="jane", expected_version=DEFAULT_VERSION)
 
 
-def test_exact_requirements_sdist(rule_runner: RuleRunner, use_uv: bool) -> None:
-    _do_test_exact_requirements(rule_runner, True, use_uv=use_uv)
-
-
-def test_exact_requirements_bdist(rule_runner: RuleRunner, use_uv: bool) -> None:
-    _do_test_exact_requirements(rule_runner, False, use_uv=use_uv)
-
-
-def _do_test_exact_requirements(rule_runner: RuleRunner, sdist: bool, *, use_uv: bool) -> None:
+@pytest.mark.parametrize("sdist", [True, False], ids=("sdist", "bdist"))
+def test_exact_requirements(rule_runner: RuleRunner, sdist: bool, use_uv: bool) -> None:
     with plugin_resolution(
         rule_runner,
         use_uv=use_uv,
@@ -286,6 +279,7 @@ def _do_test_exact_requirements(rule_runner: RuleRunner, sdist: bool, *, use_uv:
             use_uv=use_uv,
             chroot=chroot,
             plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
+            use_pypi=sdist
         ) as results2:
             working_set2, _, _ = results2
 
