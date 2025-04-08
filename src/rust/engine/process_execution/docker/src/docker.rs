@@ -58,6 +58,7 @@ pub struct CommandRunner<'a> {
     pub(crate) container_cache: ContainerCache<'a>,
 }
 
+/// Struct for a single-initialization Docker client.
 #[derive(Clone)]
 pub struct DockerOnceCell {
     cell: Arc<OnceCell<Docker>>,
@@ -629,6 +630,7 @@ impl CapturedWorkdir for CommandRunner<'_> {
 /// A loose clone of `std::process:Command` for Docker `exec`.
 struct Command(bollard::exec::CreateExecOptions<String>);
 
+/// A struct to propagate errors that can occur during the `Command.spawn` method.
 struct CommandSpawnError {
     message: String,
     err: DockerError,
@@ -962,6 +964,7 @@ impl<'a> ContainerCache<'a> {
         }
     }
 
+    /// Remove an old or missing container from the container cache - does not remove the actual container.
     pub(crate) fn prune_dead_container(&self, image_name: &str, platform: &Platform) {
         let mut containers = self.containers.lock();
         containers.remove(&(image_name.to_string(), *platform));

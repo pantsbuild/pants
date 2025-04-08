@@ -348,6 +348,7 @@ impl CapturedWorkdir for CommandRunner {
     }
 }
 
+/// Variations of errors that can occur when setting up the work directory for process execution.
 #[derive(Debug)]
 pub enum CapturedWorkdirError {
     Timeout {
