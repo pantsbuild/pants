@@ -40,7 +40,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: Linux-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.85.0-*
+        path: '~/.rustup/toolchains/1.86.0-*
 
           ~/.rustup/update-hashes
 
@@ -145,7 +145,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.85.0-*
+        path: '~/.rustup/toolchains/1.86.0-*
 
           ~/.rustup/update-hashes
 
@@ -260,7 +260,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.85.0-*
+        path: '~/.rustup/toolchains/1.86.0-*
 
           ~/.rustup/update-hashes
 
@@ -362,7 +362,7 @@ jobs:
     - name: Install Rust toolchain
       run: '# Set the default toolchain. Installs the toolchain if it is not already installed.
 
-        rustup default 1.85.0
+        rustup default 1.86.0
 
         cargo version
 
@@ -440,7 +440,7 @@ jobs:
     - name: Install Rust toolchain
       run: '# Set the default toolchain. Installs the toolchain if it is not already installed.
 
-        rustup default 1.85.0
+        rustup default 1.86.0
 
         cargo version
 
@@ -536,7 +536,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.85.0-*
+        path: '~/.rustup/toolchains/1.86.0-*
 
           ~/.rustup/update-hashes
 
@@ -622,7 +622,7 @@ jobs:
       uses: actions/cache@v4
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.85.0-*
+        path: '~/.rustup/toolchains/1.86.0-*
 
           ~/.rustup/update-hashes
 
