@@ -412,10 +412,9 @@ impl<N: Node> Entry<N> {
                     // The dependencies requested by the Node so far have changed: return to cancel
                     // the work so that it can be retried from the beginning.
                     return;
-                  } else {
-                    // No dependencies have actually changed: continue waiting.
-                    continue;
                   }
+
+                  // No dependencies have actually changed: Fall through and continue waiting.
               }
               None => {
                   // We were aborted via drop: exit.

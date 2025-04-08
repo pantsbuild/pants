@@ -604,7 +604,6 @@ impl ShardedLmdb {
                                     return Err(msg);
                                 } else {
                                     attempts += 1;
-                                    continue;
                                 }
                             }
                             Err(StoreError::Lmdb(lmdb::Error::KeyExist)) => return Ok(()),
