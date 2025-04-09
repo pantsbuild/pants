@@ -146,12 +146,11 @@ impl InvalidationWatcher {
                         Ok(Err(err)) => {
                             if let notify::ErrorKind::PathNotFound = err.kind {
                                 warn!("Path(s) did not exist: {:?}", err.paths);
-                                continue;
                             } else {
                                 break format!("Watch error: {err}");
                             }
                         }
-                        Err(RecvTimeoutError::Timeout) => continue,
+                        Err(RecvTimeoutError::Timeout) => (),
                         Err(RecvTimeoutError::Disconnected) => {
                             break "The watch provider exited.".to_owned();
                         }

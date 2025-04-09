@@ -15,7 +15,8 @@ use fs::{DirectoryDigest, Permissions, RelativePath};
 use hashing::{Digest, Fingerprint};
 use process_execution::{
     CacheContentBehavior, Context, InputDigests, NamedCaches, Platform, ProcessCacheScope,
-    ProcessExecutionEnvironment, ProcessExecutionStrategy, local::KeepSandboxes,
+    ProcessConcurrency, ProcessExecutionEnvironment, ProcessExecutionStrategy,
+    local::KeepSandboxes,
 };
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
@@ -74,6 +75,10 @@ struct CommandSpec {
 
     #[arg(long)]
     concurrency_available: Option<usize>,
+
+    /// The number of cores to use for the process in the form of min,max or x (exclusive)
+    #[arg(long)]
+    concurrency: Option<ProcessConcurrency>,
 
     #[arg(long)]
     cache_key_gen_version: Option<String>,
@@ -256,7 +261,6 @@ async fn main() -> Result<(), String> {
                     .unwrap_or_else(NamedCaches::default_local_path),
             ),
             ImmutableInputs::new(store.clone(), &workdir).unwrap(),
-            KeepSandboxes::Never,
             Arc::new(RwLock::new(())),
         )) as Box<dyn process_execution::CommandRunner>,
     };
@@ -312,12 +316,14 @@ async fn make_request(
             // TODO: Make configurable.
             platform: Platform::Linux_x86_64,
             strategy,
+            local_keep_sandboxes: KeepSandboxes::Never,
         }
     } else {
         ProcessExecutionEnvironment {
             name: None,
             platform: Platform::current().unwrap(),
             strategy: ProcessExecutionStrategy::Local,
+            local_keep_sandboxes: KeepSandboxes::Never,
         }
     };
 
@@ -410,6 +416,7 @@ async fn make_request_from_flat_args(
         jdk_home: args.command.jdk.clone(),
         execution_slot_variable: None,
         concurrency_available: args.command.concurrency_available.unwrap_or(0),
+        concurrency: args.command.concurrency.clone(),
         cache_scope: ProcessCacheScope::Always,
         execution_environment,
         remote_cache_speculation_delay: Duration::from_millis(0),
@@ -496,6 +503,7 @@ async fn extract_request_from_action_digest(
         }),
         execution_slot_variable: None,
         concurrency_available: 0,
+        concurrency: None,
         description: "".to_string(),
         level: Level::Error,
         append_only_caches: BTreeMap::new(),
@@ -589,4 +597,100 @@ where
             )
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+
+    #[test]
+    fn test_process_args() {
+        let test_cases = vec![
+            (vec![], None),
+            (
+                vec!["--concurrency=1"],
+                Some(ProcessConcurrency::Range {
+                    min: Some(1),
+                    max: Some(1),
+                }),
+            ),
+            (
+                vec!["--concurrency=2,4"],
+                Some(ProcessConcurrency::Range {
+                    min: Some(2),
+                    max: Some(4),
+                }),
+            ),
+            (
+                vec!["--concurrency=1,4"],
+                Some(ProcessConcurrency::Range {
+                    min: Some(1),
+                    max: Some(4),
+                }),
+            ),
+            (vec!["--concurrency=x"], Some(ProcessConcurrency::Exclusive)),
+        ];
+
+        for (args, expected_concurrency) in test_cases {
+            let mut full_args = vec!["process_executor"];
+            full_args.extend(args);
+            full_args.extend(vec!["--", "/bin/echo", "test"]);
+
+            let opt = Opt::try_parse_from(full_args).unwrap();
+            assert_eq!(opt.command.concurrency, expected_concurrency);
+        }
+    }
+
+    #[test]
+    fn test_process_args_errors() {
+        let test_cases = vec![
+            (
+                vec!["--concurrency=0"],
+                "error: invalid value '0' for '--concurrency <CONCURRENCY>': Concurrency must be at least 1, got: 0",
+            ),
+            (
+                vec!["--concurrency=4,2"],
+                "error: invalid value '4,2' for '--concurrency <CONCURRENCY>': Maximum concurrency must be at least the minimum concurrency, got: 2 and 4",
+            ),
+            (
+                vec!["--concurrency=1,2,3"],
+                "error: invalid value '1,2,3' for '--concurrency <CONCURRENCY>': Expected two values for concurrency range, got: 1,2,3",
+            ),
+            (
+                vec!["--concurrency=abc"],
+                "error: invalid value 'abc' for '--concurrency <CONCURRENCY>': Invalid concurrency value: invalid digit found in string",
+            ),
+            (
+                vec!["--concurrency=1,abc"],
+                "error: invalid value '1,abc' for '--concurrency <CONCURRENCY>': Invalid max value: invalid digit found in string",
+            ),
+        ];
+
+        for (args, expected_error) in test_cases {
+            let mut full_args = vec!["process_executor"];
+            full_args.extend(args);
+            full_args.extend(vec!["--", "/bin/echo", "test"]);
+
+            let result = Opt::try_parse_from(full_args);
+            match result {
+                Ok(opt) => {
+                    assert!(
+                        false,
+                        "Expected error '{}' but got '{:?}'",
+                        expected_error, opt.command.concurrency
+                    );
+                }
+                Err(e) => {
+                    // remove \n\nFor more information, try '--help'.\n if present
+                    let original_error = e.to_string();
+                    let error_message = original_error
+                        .split("\n\nFor more information, try '--help'.\n")
+                        .next()
+                        .unwrap();
+                    assert_eq!(error_message, expected_error);
+                }
+            }
+        }
+    }
 }
