@@ -456,7 +456,17 @@ async def _determine_pex_python_and_platforms(request: PexRequest) -> _BuildPexP
     else:
         # `--interpreter-constraint` options are mutually exclusive with the `--python` option,
         # so we only specify them if we have not already located a concrete Python.
-        return _BuildPexPythonSetup(None, request.interpreter_constraints.generate_pex_arg_list())
+        python = await Get(
+            PythonExecutable, InterpreterConstraints, request.interpreter_constraints
+        )
+        return _BuildPexPythonSetup(
+            python,
+            [
+                *request.interpreter_constraints.generate_pex_arg_list(),
+                "--python-path",
+                os.path.dirname(python.path),
+            ],
+        )
 
     return _BuildPexPythonSetup(python, ["--python", python.path])
 
