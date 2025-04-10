@@ -240,7 +240,6 @@ class SetupKwargs:
 
         if not _allow_banned_keys:
             for arg in {
-                "data_files",
                 "install_requires",
                 "namespace_packages",
                 "package_data",
