@@ -485,7 +485,7 @@ pub trait CapturedWorkdir {
         let (exit_code, output_directory) = match exit_code_result {
             Ok(exit_code) => (exit_code, output_snapshot.into()),
             Err(timeout @ CapturedWorkdirError::Timeout { .. }) => {
-                stderr.extend_from_slice(timeout.to_string().as_bytes());
+                stderr.extend_from_slice(format!("\n\n{timeout}").as_bytes());
                 (-libc::SIGTERM, EMPTY_DIRECTORY_DIGEST.clone())
             }
             Err(err) => return Err(err),
