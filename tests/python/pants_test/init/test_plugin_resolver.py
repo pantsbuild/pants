@@ -26,6 +26,7 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessResult
 from pants.init.options_initializer import create_bootstrap_scheduler
 from pants.init.plugin_resolver import PluginResolver
+from pants.init.plugin_resolver import rules as plugin_resolver_rules
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.python_interpreter_selection import (
     PY_38,
@@ -46,6 +47,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *pex.rules(),
             *external_tool.rules(),
+            *plugin_resolver_rules(),
             QueryRule(Pex, [PexRequest]),
             QueryRule(ProcessResult, [PexProcess]),
         ]
@@ -123,6 +125,7 @@ class Plugin:
 def plugin_resolution(
     rule_runner: RuleRunner,
     *,
+    use_uv: bool,
     python_version: str | None = None,
     chroot: str | None = None,
     plugins: Sequence[Plugin] = (),
@@ -167,6 +170,7 @@ def plugin_resolution(
         env.update(
             PANTS_PYTHON_REPOS_REPOS=f"['file://{repo_dir}']",
             PANTS_PYTHON_RESOLVER_CACHE_TTL="1",
+            PANTS_EXPERIMENTAL_USE_UV_FOR_PLUGIN_RESOLUTION="True" if use_uv else "False",
         )
         if not use_pypi:
             env.update(PANTS_PYTHON_REPOS_INDEXES="[]")
@@ -203,29 +207,37 @@ def plugin_resolution(
         )
         working_set = plugin_resolver.resolve(options_bootstrapper, complete_env, requirements)
         for dist in working_set:
-            assert (
-                Path(os.path.realpath(cache_dir)) in Path(os.path.realpath(dist.location)).parents
-            )
+            if use_uv:
+                assert ".pants.d/plugins" in os.path.realpath(dist.location)
+            else:
+                assert (
+                    Path(os.path.realpath(cache_dir))
+                    in Path(os.path.realpath(dist.location)).parents
+                )
 
         yield working_set, root_dir, repo_dir
 
 
-def test_no_plugins(rule_runner: RuleRunner) -> None:
-    with plugin_resolution(rule_runner) as (working_set, _, _):
+@pytest.mark.parametrize("use_uv", (False, True))
+def test_no_plugins(rule_runner: RuleRunner, use_uv: bool) -> None:
+    with plugin_resolution(rule_runner, use_uv=use_uv) as (working_set, _, _):
         assert [] == list(working_set)
 
 
-def test_plugins_sdist(rule_runner: RuleRunner) -> None:
-    _do_test_plugins(rule_runner, True)
+@pytest.mark.parametrize("use_uv", (False, True))
+def test_plugins_sdist(rule_runner: RuleRunner, use_uv: bool) -> None:
+    _do_test_plugins(rule_runner, True, use_uv=use_uv)
 
 
-def test_plugins_bdist(rule_runner: RuleRunner) -> None:
-    _do_test_plugins(rule_runner, False)
+@pytest.mark.parametrize("use_uv", (False, True))
+def test_plugins_bdist(rule_runner: RuleRunner, use_uv: bool) -> None:
+    _do_test_plugins(rule_runner, False, use_uv=use_uv)
 
 
-def _do_test_plugins(rule_runner: RuleRunner, sdist: bool) -> None:
+def _do_test_plugins(rule_runner: RuleRunner, sdist: bool, *, use_uv: bool) -> None:
     with plugin_resolution(
         rule_runner,
+        use_uv=use_uv,
         plugins=[Plugin("jake", "1.2.3"), Plugin("jane")],
         sdist=sdist,
         requirements=["lib==4.5.6"],
@@ -243,17 +255,22 @@ def _do_test_plugins(rule_runner: RuleRunner, sdist: bool) -> None:
         assert_dist_version(name="jane", expected_version=DEFAULT_VERSION)
 
 
-def test_exact_requirements_sdist(rule_runner: RuleRunner) -> None:
-    _do_test_exact_requirements(rule_runner, True)
+@pytest.mark.parametrize("use_uv", (False, True))
+def test_exact_requirements_sdist(rule_runner: RuleRunner, use_uv: bool) -> None:
+    _do_test_exact_requirements(rule_runner, True, use_uv=use_uv)
 
 
-def test_exact_requirements_bdist(rule_runner: RuleRunner) -> None:
-    _do_test_exact_requirements(rule_runner, False)
+@pytest.mark.parametrize("use_uv", (False, True))
+def test_exact_requirements_bdist(rule_runner: RuleRunner, use_uv: bool) -> None:
+    _do_test_exact_requirements(rule_runner, False, use_uv=use_uv)
 
 
-def _do_test_exact_requirements(rule_runner: RuleRunner, sdist: bool) -> None:
+def _do_test_exact_requirements(rule_runner: RuleRunner, sdist: bool, *, use_uv: bool) -> None:
     with plugin_resolution(
-        rule_runner, plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")], sdist=sdist
+        rule_runner,
+        use_uv=use_uv,
+        plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
+        sdist=sdist,
     ) as results:
         working_set, chroot, repo_dir = results
 
@@ -263,19 +280,24 @@ def _do_test_exact_requirements(rule_runner: RuleRunner, sdist: bool) -> None:
         safe_rmtree(repo_dir)
 
         with plugin_resolution(
-            rule_runner, chroot=chroot, plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")]
+            rule_runner,
+            use_uv=use_uv,
+            chroot=chroot,
+            plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
         ) as results2:
             working_set2, _, _ = results2
 
             assert list(working_set) == list(working_set2)
 
 
-def test_range_deps(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize("use_uv", (False, True))
+def test_range_deps(rule_runner: RuleRunner, use_uv: bool) -> None:
     # Test that when a plugin has a range dependency, specifying a working set constrains
     # to a particular version, where otherwise we would get the highest released (2.27.0 in
     # this case).
     with plugin_resolution(
         rule_runner,
+        use_uv=use_uv,
         plugins=[Plugin("jane", "3.4.5", ["requests>=2.25.1,<2.28.0"])],
         working_set_entries=[Distribution(project_name="requests", version="2.26.0")],
         # Because we're resolving real distributions, we enable access to pypi.
@@ -289,18 +311,23 @@ def test_range_deps(rule_runner: RuleRunner) -> None:
 
 
 @skip_unless_python38_and_python39_present
-def test_exact_requirements_interpreter_change_sdist(rule_runner: RuleRunner) -> None:
-    _do_test_exact_requirements_interpreter_change(rule_runner, True)
+@pytest.mark.parametrize("use_uv", (False, True))
+def test_exact_requirements_interpreter_change_sdist(rule_runner: RuleRunner, use_uv: bool) -> None:
+    _do_test_exact_requirements_interpreter_change(rule_runner, True, use_uv=use_uv)
 
 
 @skip_unless_python38_and_python39_present
-def test_exact_requirements_interpreter_change_bdist(rule_runner: RuleRunner) -> None:
-    _do_test_exact_requirements_interpreter_change(rule_runner, False)
+@pytest.mark.parametrize("use_uv", (False, True))
+def test_exact_requirements_interpreter_change_bdist(rule_runner: RuleRunner, use_uv: bool) -> None:
+    _do_test_exact_requirements_interpreter_change(rule_runner, False, use_uv=use_uv)
 
 
-def _do_test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdist: bool) -> None:
+def _do_test_exact_requirements_interpreter_change(
+    rule_runner: RuleRunner, sdist: bool, *, use_uv: bool
+) -> None:
     with plugin_resolution(
         rule_runner,
+        use_uv=use_uv,
         python_version=PY_38,
         plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
         sdist=sdist,
@@ -311,6 +338,7 @@ def _do_test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdis
         with pytest.raises(ExecutionError):
             with plugin_resolution(
                 rule_runner,
+                use_uv=use_uv,
                 python_version=PY_39,
                 chroot=chroot,
                 plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
@@ -328,6 +356,7 @@ def _do_test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdis
         # directly from the still in-tact cache.
         with plugin_resolution(
             rule_runner,
+            use_uv=use_uv,
             python_version=PY_38,
             chroot=chroot,
             plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
