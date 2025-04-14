@@ -13,6 +13,8 @@ from enum import Enum
 from pathlib import Path
 from typing import TypedDict
 
+from hdrh.histogram import HdrHistogram
+
 from pants.engine.internals.scheduler import Workunit
 from pants.engine.rules import collect_rules, rule
 from pants.engine.streaming_workunit_handler import (
@@ -214,8 +216,6 @@ class StatsAggregatorCallback(WorkunitsCallback):
             _log_or_write_to_file_plain(self.output_file, output_lines)
             return
 
-        from hdrh.histogram import HdrHistogram  # pants: no-infer-dep
-
         histograms = context.get_observation_histograms()["histograms"]
         if not histograms:
             output_lines.append("No observation histogram were recorded.")
@@ -293,8 +293,6 @@ class StatsAggregatorCallback(WorkunitsCallback):
         if not self.log:
             _log_or_write_to_file_json(self.output_file, stats_object)
             return
-
-        from hdrh.histogram import HdrHistogram  # pants: no-infer-dep
 
         histograms = context.get_observation_histograms()["histograms"]
         if not histograms:
