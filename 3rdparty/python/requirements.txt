@@ -8,6 +8,7 @@ ansicolors==1.1.8
 chevron==0.14.0
 fasteners==0.16.3
 freezegun==1.2.1
+hdrhistogram==0.10.3
 ijson==3.2.3
 libcst==1.4.0
 packaging==24.2
