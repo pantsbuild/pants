@@ -18,6 +18,7 @@
 //     "fastapi==0.78.0",
 //     "fasteners==0.16.3",
 //     "freezegun==1.2.1",
+//     "hdrhistogram==0.10.3",
 //     "ijson==3.2.3",
 //     "libcst==1.4.0",
 //     "mypy-typing-asserts==0.1.1",
@@ -793,6 +794,46 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "bfd6ad77c1f7806aaeb6b340866a6bb38a1f0fe94d8f5a5f74372c33a094913f",
+              "url": "https://files.pythonhosted.org/packages/d6/99/a26df64d5069984e38305a6d6462534722f09c7f7578e5303903192f7a6a/hdrhistogram-0.10.3-cp311-cp311-musllinux_1_1_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "d5748a22ec68a5390f9d493aca933a6871788e34df91da4cc0a6ee19e336dc6d",
+              "url": "https://files.pythonhosted.org/packages/54/58/bdd5df067445478013f7a21b378181b206cc0aaf31024366ac813e0d9a96/hdrhistogram-0.10.3-cp311-cp311-macosx_10_9_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "d814811d52e699426a8b54f2448ab5e49fee3519a200cd887fd3faaaa6f4a35d",
+              "url": "https://files.pythonhosted.org/packages/93/14/20cb3a638284a5903492eecb5b5d1303aa1ec9606b9e2296ca1753df1f0c/hdrhistogram-0.10.3-cp311-cp311-musllinux_1_1_i686.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "f6d7e402365ced65309c3ffb060b6bcf7d1265bfba293509076f18b5d9ec260d",
+              "url": "https://files.pythonhosted.org/packages/a8/ba/37b9144c0372b1f48b9310a8e4fc77a4d4f8949190b0e56ebc2dd17c9e54/hdrhistogram-0.10.3-cp311-cp311-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "3f55fcbd39953b8989344cfb56cfa06094dbffc3fd4df1ff05d4b15658e1bf6d",
+              "url": "https://files.pythonhosted.org/packages/a9/22/8f1f52f3fa3291d7c1693d9266d31753be5f27b907c97ce4db495de169fa/hdrhistogram-0.10.3-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "f3890df0a6f3c582a0a8b2a49a568729cb319f1600683e4458cc98b68ca32841",
+              "url": "https://files.pythonhosted.org/packages/c2/79/674aad5279dd1a77b85efa1cbf8dcead209dc5f38f55cbbfd75bc20cc65b/hdrhistogram-0.10.3.tar.gz"
+            }
+          ],
+          "project_name": "hdrhistogram",
+          "requires_dists": [
+            "pbr>=1.4"
+          ],
+          "requires_python": null,
+          "version": "0.10.3"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "dacdd3d10ea1b4ca9df97a0a303cbacafc04b5cd375fa98732678151643d4988",
               "url": "https://files.pythonhosted.org/packages/3e/d2/84c9e23edbccc4a4c6f96a1b8d99dfd2350289e94f00e9ccc7aadde26fb5/httptools-0.6.4-cp311-cp311-musllinux_1_2_x86_64.whl"
             },
@@ -1048,6 +1089,26 @@
           "requires_dists": [],
           "requires_python": ">=3.8",
           "version": "24.2"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "38d4daea5d9fa63b3f626131b9d34947fd0c8be9b05a29276870580050a25a76",
+              "url": "https://files.pythonhosted.org/packages/47/ac/684d71315abc7b1214d59304e23a982472967f6bf4bde5a98f1503f648dc/pbr-6.1.1-py2.py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "93ea72ce6989eb2eed99d0f75721474f69ad88128afdef5ac377eb797c4bf76b",
+              "url": "https://files.pythonhosted.org/packages/01/d2/510cc0d218e753ba62a1bc1434651db3cd797a9716a0a66cc714cb4f0935/pbr-6.1.1.tar.gz"
+            }
+          ],
+          "project_name": "pbr",
+          "requires_dists": [
+            "setuptools"
+          ],
+          "requires_python": ">=2.6",
+          "version": "6.1.1"
         },
         {
           "artifacts": [
@@ -2357,6 +2418,7 @@
     "fastapi==0.78.0",
     "fasteners==0.16.3",
     "freezegun==1.2.1",
+    "hdrhistogram==0.10.3",
     "ijson==3.2.3",
     "libcst==1.4.0",
     "mypy-typing-asserts==0.1.1",
