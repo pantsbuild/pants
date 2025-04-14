@@ -155,6 +155,7 @@ async def download_from_s3(
         signer = auth.SigV4Auth(aws_credentials.creds, "s3", signing_region)
 
     else:
+        assert s3_subsystem.auth_signing == S3AuthSigning.HMACV1
         # NB: The URL for HmacV1 auth is expected to be in path-style
         path_style_url = "https://s3"
         if request.region:
