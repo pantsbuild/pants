@@ -50,7 +50,7 @@ def pass_through_unserializable_metadata(obj):
     This function is intended to be used as a `default` encoder to json.dumps to drop a minimal stub
     encoding with the name instead of throwing a TypeError and halting the entire workunit logging.
     """
-    return {"name": obj.__class__.__name__, "json_serializable": False}
+    return {"name": obj.__class__.__name__, "json_serializable": False, "str": str(obj)}
 
 
 class WorkunitLoggerCallback(WorkunitsCallback):
