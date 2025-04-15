@@ -113,7 +113,7 @@ def main() -> None:
 
     versions_info["scraped_releases"] = sorted(scraped_releases)
     pythons_dict = versions_info["pythons"]
-    asset_matcher = re.compile(r"^([a-zA-Z0-9]+)-([0-9.]+)\+([0-9.]+)-")
+    asset_matcher = re.compile(r"^([a-zA-Z0-9]+)-([0-9.a-z]+)\+([0-9.]+)-")
 
     for asset in asset_map.values():
         matched_versions = asset_matcher.match(asset.name)
