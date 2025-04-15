@@ -74,6 +74,7 @@ rand = { workspace = true }
 regex = { workspace = true }
 reqwest = { version = "0.12", default-features = false, features = ["stream", "rustls-tls"] }
 rule_graph = { path = "rule_graph" }
+sandboxer = { path = "process_execution/sandboxer" }
 smallvec = { version = "1", features = ["union"] }
 stdio = { path = "stdio" }
 store = { path = "fs/store" }

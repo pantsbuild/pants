@@ -9,7 +9,7 @@ use task_executor::Executor;
 
 use crate::Store;
 
-#[derive(Parser)]
+#[derive(Debug, Parser)]
 pub struct StoreCliOpt {
     ///Path to lmdb directory used for local file storage.
     #[arg(long)]

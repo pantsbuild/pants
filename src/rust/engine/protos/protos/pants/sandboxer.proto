@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package pants.sandboxer;
+
+import "build/bazel/remote/execution/v2/remote_execution.proto";
+
+service SandboxerGrpc {
+  rpc MaterializeDirectory (MaterializeDirectoryRequest) returns (MaterializeDirectoryResponse);
+}
+
+message MaterializeDirectoryRequest {
+  string destination = 1;
+  string destination_root = 2;
+  build.bazel.remote.execution.v2.Digest digest = 3;
+  repeated string mutable_paths = 4;
+}
+
+message MaterializeDirectoryResponse {
+  string confirmation = 1;
+}
