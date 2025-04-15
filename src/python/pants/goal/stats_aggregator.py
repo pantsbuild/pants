@@ -13,6 +13,8 @@ from enum import Enum
 from pathlib import Path
 from typing import TypedDict
 
+from hdrh.histogram import HdrHistogram
+
 from pants.engine.internals.scheduler import Workunit
 from pants.engine.rules import collect_rules, rule
 from pants.engine.streaming_workunit_handler import (
@@ -148,14 +150,12 @@ class StatsAggregatorCallback(WorkunitsCallback):
         log: bool,
         memory: bool,
         output_file: str | None,
-        has_histogram_module: bool,
         format: StatsOutputFormat,
     ) -> None:
         super().__init__()
         self.log = log
         self.memory = memory
         self.output_file = output_file
-        self.has_histogram_module = has_histogram_module
         self.format = format
 
     @property
@@ -212,11 +212,9 @@ class StatsAggregatorCallback(WorkunitsCallback):
                 f"Memory summary (total size in bytes, count, name):\n{memory_lines}"
             )
 
-        if not (self.log and self.has_histogram_module):
+        if not self.log:
             _log_or_write_to_file_plain(self.output_file, output_lines)
             return
-
-        from hdrh.histogram import HdrHistogram  # pants: no-infer-dep
 
         histograms = context.get_observation_histograms()["histograms"]
         if not histograms:
@@ -292,11 +290,9 @@ class StatsAggregatorCallback(WorkunitsCallback):
             ]
             stats_object["memory_summary"] = memory_lines
 
-        if not (self.log and self.has_histogram_module):
+        if not self.log:
             _log_or_write_to_file_json(self.output_file, stats_object)
             return
-
-        from hdrh.histogram import HdrHistogram  # pants: no-infer-dep
 
         histograms = context.get_observation_histograms()["histograms"]
         if not histograms:
@@ -358,27 +354,12 @@ class StatsAggregatorCallbackFactoryRequest:
 def construct_callback(
     _: StatsAggregatorCallbackFactoryRequest, subsystem: StatsAggregatorSubsystem
 ) -> WorkunitsCallbackFactory:
-    has_histogram_module = False
-    if subsystem.log:
-        try:
-            import hdrh.histogram  # noqa: F401
-        except ImportError:
-            logger.warning(
-                "Please run with `--plugins=hdrhistogram` if you would like histogram summaries to "
-                "be shown at the end of the run, or permanently add "
-                "`[GLOBAL].plugins = ['hdrhistogram']`. This will cause Pants to install "
-                "the `hdrhistogram` dependency from PyPI."
-            )
-        else:
-            has_histogram_module = True
-
     return WorkunitsCallbackFactory(
         lambda: (
             StatsAggregatorCallback(
                 log=subsystem.log,
                 memory=subsystem.memory_summary,
                 output_file=subsystem.output_file,
-                has_histogram_module=has_histogram_module,
                 format=subsystem.format,
             )
             if subsystem.log or subsystem.memory_summary

@@ -53,7 +53,6 @@ pub async fn spawn_process(
                         tokio::time::sleep(std::time::Duration::from_millis(sleep_millis)).await;
                         retries += 1;
                         sleep_millis *= 2;
-                        continue;
                     } else if retries > 0 {
                         break Err(format!(
                             "Error launching process after {} {} for ETXTBSY. Final error was: {:?}",

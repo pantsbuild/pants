@@ -164,6 +164,7 @@ DEFAULT_MODULE_MAPPING: dict[str, tuple[str, ...]] = {
     "grpcio-reflection": ("grpc_reflection",),
     "grpcio-status": ("grpc_status",),
     "grpcio-testing": ("grpc_testing",),
+    "hdrhistogram": ("hdrh",),
     "honeycomb-opentelemetry": ("honeycomb.opentelemetry",),
     "ipython": ("IPython",),
     "jack-client": ("jack",),

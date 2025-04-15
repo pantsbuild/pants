@@ -736,12 +736,10 @@ impl DigestTrie {
                     Ordering::Less => {
                         add_ours(our_entry, result);
                         ours = our_iter.next();
-                        continue;
                     }
                     Ordering::Greater => {
                         add_theirs(their_entry, result);
                         theirs = their_iter.next();
-                        continue;
                     }
                     Ordering::Equal => match (our_entry, their_entry) {
                         (Entry::File(our_file), Entry::File(their_file)) => {

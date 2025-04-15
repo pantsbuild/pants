@@ -90,9 +90,9 @@ impl MockExecution {
     ///
     /// # Arguments:
     ///  * `name` - The name of the operation. It is assumed that all operation_responses use this
-    ///             name.
+    ///    name.
     ///  * `expected_api_calls` - Vec of ExpectedAPICall instances representing the API calls
-    ///                            to expect from the client. Will be returned in order.
+    ///    to expect from the client. Will be returned in order.
     ///
     pub fn new(expected_api_calls: Vec<ExpectedAPICall>) -> MockExecution {
         MockExecution {
@@ -115,13 +115,13 @@ impl TestServer {
     ///
     /// # Arguments
     /// * `mock_execution` - The canned responses to issue. Returns the MockExecution's
-    ///                      operation_responses in order to any ExecuteRequest or GetOperation
-    ///                      requests.
-    ///                      If an ExecuteRequest request is received which is not equal to this
-    ///                      MockExecution's execute_request, an error will be returned.
-    ///                      If a GetOperation request is received whose name is not equal to this
-    ///                      MockExecution's name, or more requests are received than stub responses
-    ///                      are available for, an error will be returned.
+    ///   operation_responses in order to any ExecuteRequest or GetOperation
+    ///   requests.
+    ///   If an ExecuteRequest request is received which is not equal to this
+    ///   MockExecution's execute_request, an error will be returned.
+    ///   If a GetOperation request is received whose name is not equal to this
+    ///   MockExecution's name, or more requests are received than stub responses
+    ///   are available for, an error will be returned.
     pub async fn new(mock_execution: MockExecution, port: Option<u16>) -> TestServer {
         let mock_responder = MockResponder::new(mock_execution);
         let mock_responder2 = mock_responder.clone();

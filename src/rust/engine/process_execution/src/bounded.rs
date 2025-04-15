@@ -196,7 +196,6 @@ impl crate::CommandRunner for CommandRunner {
                   concurrency_available,
                   permit.concurrency(),
                 );
-                continue;
               },
               res = running_process => {
                 // The process completed.
