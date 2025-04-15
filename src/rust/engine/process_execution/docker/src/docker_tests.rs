@@ -3,22 +3,28 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::env;
 use std::path::PathBuf;
+use std::sync::OnceLock;
 use std::time::Duration;
 
+use async_trait::async_trait;
 use bollard::Docker;
+use bollard::container::RemoveContainerOptions;
 use fs::{EMPTY_DIRECTORY_DIGEST, RelativePath};
 use maplit::hashset;
+use parameterized::parameterized;
 use store::{ImmutableInputs, Store};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
 use testutil::{owned_string_vec, relative_paths};
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
-use crate::docker::{DockerOnceCell, ImagePullCache, SANDBOX_BASE_PATH_IN_CONTAINER};
+use crate::docker::{
+    ContainerCache, DockerOnceCell, ImagePullCache, SANDBOX_BASE_PATH_IN_CONTAINER,
+};
 use process_execution::local::KeepSandboxes;
 use process_execution::{
-    CacheName, CommandRunner, Context, FallibleProcessResultWithPlatform, InputDigests, Platform,
-    Process, ProcessError, local,
+    CacheName, CommandRunner, Context, FallibleProcessResultWithPlatform, InputDigests,
+    NamedCaches, Platform, Process, ProcessError, local,
 };
 
 /// Docker image to use for most tests in this file.
@@ -75,18 +81,117 @@ fn platform_for_tests() -> Result<Platform, String> {
     })
 }
 
+#[async_trait]
+trait DockerCommandTestRunner: Send + Sync {
+    async fn setup<'a>(
+        &self,
+        store: Store,
+        executor: task_executor::Executor,
+        docker: &'a DockerOnceCell,
+        image_pull_cache: &'a ImagePullCache,
+        work_dir_base: PathBuf,
+        immutable_inputs: ImmutableInputs,
+    ) -> Result<crate::docker::CommandRunner<'a>, String>;
+
+    async fn run_command_via_docker_in_dir(
+        &self,
+        mut req: Process,
+        dir: PathBuf,
+        workunit: &mut RunningWorkunit,
+        store: Option<Store>,
+        executor: Option<task_executor::Executor>,
+    ) -> Result<LocalTestResult, ProcessError> {
+        req.execution_environment.platform =
+            platform_for_tests().map_err(ProcessError::Unclassified)?;
+        let store_dir = TempDir::new().unwrap();
+        let executor = executor.unwrap_or_else(task_executor::Executor::new);
+        let store =
+            store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
+
+        let root = TempDir::new().unwrap();
+        let root_path = root.path().to_owned();
+
+        let immutable_inputs = ImmutableInputs::new(store.clone(), &root_path).unwrap();
+
+        let docker = Box::new(DockerOnceCell::new());
+        let image_pull_cache = Box::new(ImagePullCache::new());
+        let runner = self
+            .setup(
+                store.clone(),
+                executor.clone(),
+                &docker,
+                &image_pull_cache,
+                dir.clone(),
+                immutable_inputs,
+            )
+            .await?;
+        let result: Result<_, ProcessError> = async {
+            let original = runner.run(Context::default(), workunit, req).await?;
+            let stdout_bytes = store
+                .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
+                .await?;
+            let stderr_bytes = store
+                .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
+                .await?;
+            Ok((original, stdout_bytes, stderr_bytes))
+        }
+        .await;
+        let (original, stdout_bytes, stderr_bytes) = result?;
+        runner.shutdown().await?;
+        Ok(LocalTestResult {
+            original,
+            stdout_bytes,
+            stderr_bytes,
+        })
+    }
+
+    async fn run_command_via_docker(&self, req: Process) -> Result<LocalTestResult, ProcessError> {
+        let (_, mut workunit) = WorkunitStore::setup_for_tests();
+        let work_dir = TempDir::new().unwrap();
+        let work_dir_path = work_dir.path().to_owned();
+        self.run_command_via_docker_in_dir(req, work_dir_path, &mut workunit, None, None)
+            .await
+    }
+}
+
+struct DefaultTestRunner;
+
+#[async_trait]
+impl DockerCommandTestRunner for DefaultTestRunner {
+    async fn setup<'a>(
+        &self,
+        store: Store,
+        executor: task_executor::Executor,
+        docker: &'a DockerOnceCell,
+        image_pull_cache: &'a ImagePullCache,
+        work_dir_base: PathBuf,
+        immutable_inputs: ImmutableInputs,
+    ) -> Result<crate::docker::CommandRunner<'a>, String> {
+        crate::docker::CommandRunner::new(
+            store,
+            executor,
+            docker,
+            image_pull_cache,
+            work_dir_base,
+            immutable_inputs,
+        )
+    }
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[cfg(unix)]
 async fn runner_errors_if_docker_image_not_set() {
     skip_if_no_docker_available_in_macos_ci!();
 
+    let runner = DefaultTestRunner;
     // Because `docker_image` is set but it does not exist, this process should fail.
-    let err = run_command_via_docker(
-        Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"]))
-            .docker("does-not-exist:latest".to_owned()),
-    )
-    .await
-    .unwrap_err();
+    let err = runner
+        .run_command_via_docker(
+            Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"]))
+                .docker("does-not-exist:latest".to_owned()),
+        )
+        .await
+        .unwrap_err();
     if let ProcessError::Unclassified(msg) = err {
         assert!(msg.contains("Failed to pull Docker image"));
     } else {
@@ -94,7 +199,8 @@ async fn runner_errors_if_docker_image_not_set() {
     }
 
     // Otherwise, if docker_image is not set, use the local runner.
-    let err = run_command_via_docker(Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])))
+    let err = runner
+        .run_command_via_docker(Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])))
         .await
         .unwrap_err();
     if let ProcessError::Unclassified(msg) = &err {
@@ -106,15 +212,115 @@ async fn runner_errors_if_docker_image_not_set() {
     }
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+struct ExistingContainerTestRunner {
+    image_name: String,
+    platform: Platform,
+    container_id: OnceLock<(String, NamedCaches)>,
+}
+
+impl ExistingContainerTestRunner {
+    fn new(image_name: &str) -> Self {
+        ExistingContainerTestRunner {
+            image_name: image_name.to_string(),
+            platform: platform_for_tests().unwrap(),
+            container_id: OnceLock::new(),
+        }
+    }
+}
+
+#[async_trait]
+impl DockerCommandTestRunner for ExistingContainerTestRunner {
+    async fn setup<'a>(
+        &self,
+        store: Store,
+        executor: task_executor::Executor,
+        docker: &'a DockerOnceCell,
+        image_pull_cache: &'a ImagePullCache,
+        work_dir_base: PathBuf,
+        immutable_inputs: ImmutableInputs,
+    ) -> Result<crate::docker::CommandRunner<'a>, String> {
+        let command_runner = crate::docker::CommandRunner::new(
+            store,
+            executor,
+            docker,
+            image_pull_cache,
+            work_dir_base,
+            immutable_inputs,
+        )?;
+        match self.container_id.set(
+            command_runner
+                .container_cache
+                .container_for_image(&self.image_name, &self.platform, "")
+                .await?,
+        ) {
+            Ok(()) => Ok(command_runner),
+            Err(_) => Err("An error occurred when attempting to save container ID".to_string()),
+        }
+    }
+}
+
+struct MissingContainerTestRunner {
+    inner: ExistingContainerTestRunner,
+}
+
+impl MissingContainerTestRunner {
+    fn new(image_name: &str) -> Self {
+        MissingContainerTestRunner {
+            inner: ExistingContainerTestRunner::new(image_name),
+        }
+    }
+}
+
+#[async_trait]
+impl DockerCommandTestRunner for MissingContainerTestRunner {
+    async fn setup<'a>(
+        &self,
+        store: Store,
+        executor: task_executor::Executor,
+        docker: &'a DockerOnceCell,
+        image_pull_cache: &'a ImagePullCache,
+        work_dir_base: PathBuf,
+        immutable_inputs: ImmutableInputs,
+    ) -> Result<crate::docker::CommandRunner<'a>, String> {
+        let command_runner = self
+            .inner
+            .setup(
+                store,
+                executor,
+                docker,
+                image_pull_cache,
+                work_dir_base,
+                immutable_inputs,
+            )
+            .await?;
+        let container_id = self.inner.container_id.get().unwrap().0.as_str();
+        ContainerCache::remove_container(
+            docker.get().await?,
+            container_id,
+            Some(RemoveContainerOptions {
+                force: true,
+                ..RemoveContainerOptions::default()
+            }),
+        )
+        .await
+        .map_err(|err| {
+            format!("Failed to remove Docker container during missing container test setup `{container_id}`: {err:?}")
+        })?;
+        Ok(command_runner)
+    }
+}
+
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
 #[cfg(unix)]
-async fn stdout() {
+async fn stdout(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
-    let result = run_command_via_docker(
-        Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])).docker(IMAGE.to_owned()),
-    )
-    .await
-    .unwrap();
+    let result = runner
+        .run_command_via_docker(
+            Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])).docker(IMAGE.to_owned()),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(result.stdout_bytes, "foo".as_bytes());
     assert_eq!(result.stderr_bytes, "".as_bytes());
@@ -122,20 +328,22 @@ async fn stdout() {
     assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
 #[cfg(unix)]
-async fn stdout_and_stderr_and_exit_code() {
+async fn stdout_and_stderr_and_exit_code(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
-    let result = run_command_via_docker(
-        Process::new(owned_string_vec(&[
-            SH_PATH,
-            "-c",
-            "echo -n foo ; echo >&2 -n bar ; exit 1",
-        ]))
-        .docker(IMAGE.to_owned()),
-    )
-    .await
-    .unwrap();
+    let result = runner
+        .run_command_via_docker(
+            Process::new(owned_string_vec(&[
+                SH_PATH,
+                "-c",
+                "echo -n foo ; echo >&2 -n bar ; exit 1",
+            ]))
+            .docker(IMAGE.to_owned()),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(result.stdout_bytes, "foo".as_bytes());
     assert_eq!(result.stderr_bytes, "bar".as_bytes());
@@ -143,17 +351,19 @@ async fn stdout_and_stderr_and_exit_code() {
     assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
 #[cfg(unix)]
-async fn capture_exit_code_signal() {
+async fn capture_exit_code_signal(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
 
     // Launch a process that kills itself with a signal.
-    let result = run_command_via_docker(
-        Process::new(owned_string_vec(&[SH_PATH, "-c", "kill $$"])).docker(IMAGE.to_owned()),
-    )
-    .await
-    .unwrap();
+    let result = runner
+        .run_command_via_docker(
+            Process::new(owned_string_vec(&[SH_PATH, "-c", "kill $$"])).docker(IMAGE.to_owned()),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(result.stdout_bytes, "".as_bytes());
     assert_eq!(result.stderr_bytes, "".as_bytes());
@@ -194,13 +404,14 @@ async fn env() {
     env.insert("FOO".to_string(), "foo".to_string());
     env.insert("BAR".to_string(), "not foo".to_string());
 
-    let result = run_command_via_docker(
-        Process::new(owned_string_vec(&["/bin/env"]))
-            .env(env.clone())
-            .docker(IMAGE.to_owned()),
-    )
-    .await
-    .unwrap();
+    let result = DefaultTestRunner
+        .run_command_via_docker(
+            Process::new(owned_string_vec(&["/bin/env"]))
+                .env(env.clone())
+                .docker(IMAGE.to_owned()),
+        )
+        .await
+        .unwrap();
 
     let exclude_keys = &["PATH", "HOME", "HOSTNAME"];
     let got_env = extract_env(result.stdout_bytes, exclude_keys).unwrap();
@@ -221,8 +432,14 @@ async fn env_is_deterministic() {
             .docker(IMAGE.to_owned())
     }
 
-    let result1 = run_command_via_docker(make_request()).await.unwrap();
-    let result2 = run_command_via_docker(make_request()).await.unwrap();
+    let result1 = DefaultTestRunner
+        .run_command_via_docker(make_request())
+        .await
+        .unwrap();
+    let result2 = DefaultTestRunner
+        .run_command_via_docker(make_request())
+        .await
+        .unwrap();
 
     let exclude_keys = &["PATH", "HOME", "HOSTNAME"];
     let env1 = extract_env(result1.stdout_bytes, exclude_keys).unwrap();
@@ -230,29 +447,33 @@ async fn env_is_deterministic() {
     assert_eq!(env1, env2);
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn binary_not_found() {
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
+async fn binary_not_found(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
 
     // Use `xyzzy` as a command that should not exist.
-    let result = run_command_via_docker(
-        Process::new(owned_string_vec(&["xyzzy", "-n", "foo"])).docker(IMAGE.to_owned()),
-    )
-    .await
-    .unwrap();
+    let result = runner
+        .run_command_via_docker(
+            Process::new(owned_string_vec(&["xyzzy", "-n", "foo"])).docker(IMAGE.to_owned()),
+        )
+        .await
+        .unwrap();
     let stdout = String::from_utf8(result.stdout_bytes).unwrap();
     assert!(stdout.contains("exec failed"));
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn output_files_none() {
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
+async fn output_files_none(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
 
-    let result = run_command_via_docker(
-        Process::new(owned_string_vec(&[SH_PATH, "-c", "exit 0"])).docker(IMAGE.to_owned()),
-    )
-    .await
-    .unwrap();
+    let result = runner
+        .run_command_via_docker(
+            Process::new(owned_string_vec(&[SH_PATH, "-c", "exit 0"])).docker(IMAGE.to_owned()),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(result.stdout_bytes, "".as_bytes());
     assert_eq!(result.stderr_bytes, "".as_bytes());
@@ -260,21 +481,23 @@ async fn output_files_none() {
     assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn output_files_one() {
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
+async fn output_files_one(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
 
-    let result = run_command_via_docker(
-        Process::new(vec![
-            SH_PATH.to_string(),
-            "-c".to_owned(),
-            format!("echo -n {} > roland.ext", TestData::roland().string()),
-        ])
-        .output_files(relative_paths(&["roland.ext"]).collect())
-        .docker(IMAGE.to_owned()),
-    )
-    .await
-    .unwrap();
+    let result = runner
+        .run_command_via_docker(
+            Process::new(vec![
+                SH_PATH.to_string(),
+                "-c".to_owned(),
+                format!("echo -n {} > roland.ext", TestData::roland().string()),
+            ])
+            .output_files(relative_paths(&["roland.ext"]).collect())
+            .docker(IMAGE.to_owned()),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(result.stdout_bytes, "".as_bytes());
     assert_eq!(result.stderr_bytes, "".as_bytes());
@@ -285,26 +508,28 @@ async fn output_files_one() {
     );
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn output_dirs() {
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
+async fn output_dirs(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
 
-    let result = run_command_via_docker(
-        Process::new(vec![
-            SH_PATH.to_string(),
-            "-c".to_owned(),
-            format!(
-                "/bin/mkdir cats && echo -n {} > cats/roland.ext ; echo -n {} > treats.ext",
-                TestData::roland().string(),
-                TestData::catnip().string()
-            ),
-        ])
-        .output_files(relative_paths(&["treats.ext"]).collect())
-        .output_directories(relative_paths(&["cats"]).collect())
-        .docker(IMAGE.to_owned()),
-    )
-    .await
-    .unwrap();
+    let result = runner
+        .run_command_via_docker(
+            Process::new(vec![
+                SH_PATH.to_string(),
+                "-c".to_owned(),
+                format!(
+                    "/bin/mkdir cats && echo -n {} > cats/roland.ext ; echo -n {} > treats.ext",
+                    TestData::roland().string(),
+                    TestData::catnip().string()
+                ),
+            ])
+            .output_files(relative_paths(&["treats.ext"]).collect())
+            .output_directories(relative_paths(&["cats"]).collect())
+            .docker(IMAGE.to_owned()),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(result.stdout_bytes, "".as_bytes());
     assert_eq!(result.stderr_bytes, "".as_bytes());
@@ -315,25 +540,27 @@ async fn output_dirs() {
     );
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn output_files_many() {
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
+async fn output_files_many(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
 
-    let result = run_command_via_docker(
-        Process::new(vec![
-            SH_PATH.to_string(),
-            "-c".to_owned(),
-            format!(
-                "echo -n {} > cats/roland.ext ; echo -n {} > treats.ext",
-                TestData::roland().string(),
-                TestData::catnip().string()
-            ),
-        ])
-        .output_files(relative_paths(&["cats/roland.ext", "treats.ext"]).collect())
-        .docker(IMAGE.to_owned()),
-    )
-    .await
-    .unwrap();
+    let result = runner
+        .run_command_via_docker(
+            Process::new(vec![
+                SH_PATH.to_string(),
+                "-c".to_owned(),
+                format!(
+                    "echo -n {} > cats/roland.ext ; echo -n {} > treats.ext",
+                    TestData::roland().string(),
+                    TestData::catnip().string()
+                ),
+            ])
+            .output_files(relative_paths(&["cats/roland.ext", "treats.ext"]).collect())
+            .docker(IMAGE.to_owned()),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(result.stdout_bytes, "".as_bytes());
     assert_eq!(result.stderr_bytes, "".as_bytes());
@@ -344,24 +571,26 @@ async fn output_files_many() {
     );
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn output_files_execution_failure() {
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
+async fn output_files_execution_failure(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
 
-    let result = run_command_via_docker(
-        Process::new(vec![
-            SH_PATH.to_string(),
-            "-c".to_owned(),
-            format!(
-                "echo -n {} > roland.ext ; exit 1",
-                TestData::roland().string()
-            ),
-        ])
-        .output_files(relative_paths(&["roland.ext"]).collect())
-        .docker(IMAGE.to_owned()),
-    )
-    .await
-    .unwrap();
+    let result = runner
+        .run_command_via_docker(
+            Process::new(vec![
+                SH_PATH.to_string(),
+                "-c".to_owned(),
+                format!(
+                    "echo -n {} > roland.ext ; exit 1",
+                    TestData::roland().string()
+                ),
+            ])
+            .output_files(relative_paths(&["roland.ext"]).collect())
+            .docker(IMAGE.to_owned()),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(result.stdout_bytes, "".as_bytes());
     assert_eq!(result.stderr_bytes, "".as_bytes());
@@ -372,21 +601,23 @@ async fn output_files_execution_failure() {
     );
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn output_files_partial_output() {
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
+async fn output_files_partial_output(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
 
-    let result = run_command_via_docker(
-        Process::new(vec![
-            SH_PATH.to_string(),
-            "-c".to_owned(),
-            format!("echo -n {} > roland.ext", TestData::roland().string()),
-        ])
-        .output_files(relative_paths(&["roland.ext", "susannah"]).collect())
-        .docker(IMAGE.to_owned()),
-    )
-    .await
-    .unwrap();
+    let result = runner
+        .run_command_via_docker(
+            Process::new(vec![
+                SH_PATH.to_string(),
+                "-c".to_owned(),
+                format!("echo -n {} > roland.ext", TestData::roland().string()),
+            ])
+            .output_files(relative_paths(&["roland.ext", "susannah"]).collect())
+            .docker(IMAGE.to_owned()),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(result.stdout_bytes, "".as_bytes());
     assert_eq!(result.stderr_bytes, "".as_bytes());
@@ -397,22 +628,24 @@ async fn output_files_partial_output() {
     );
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn output_overlapping_file_and_dir() {
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
+async fn output_overlapping_file_and_dir(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
 
-    let result = run_command_via_docker(
-        Process::new(vec![
-            SH_PATH.to_string(),
-            "-c".to_owned(),
-            format!("echo -n {} > cats/roland.ext", TestData::roland().string()),
-        ])
-        .output_files(relative_paths(&["cats/roland.ext"]).collect())
-        .output_directories(relative_paths(&["cats"]).collect())
-        .docker(IMAGE.to_owned()),
-    )
-    .await
-    .unwrap();
+    let result = runner
+        .run_command_via_docker(
+            Process::new(vec![
+                SH_PATH.to_string(),
+                "-c".to_owned(),
+                format!("echo -n {} > cats/roland.ext", TestData::roland().string()),
+            ])
+            .output_files(relative_paths(&["cats/roland.ext"]).collect())
+            .output_directories(relative_paths(&["cats"]).collect())
+            .docker(IMAGE.to_owned()),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(result.stdout_bytes, "".as_bytes());
     assert_eq!(result.stderr_bytes, "".as_bytes());
@@ -423,21 +656,23 @@ async fn output_overlapping_file_and_dir() {
     );
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn append_only_cache_created() {
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
+async fn append_only_cache_created(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
 
     let name = "geo";
     let dest_base = ".cache";
     let cache_name = CacheName::new(name.to_owned()).unwrap();
     let cache_dest = RelativePath::new(format!("{dest_base}/{name}")).unwrap();
-    let result = run_command_via_docker(
-        Process::new(owned_string_vec(&["/bin/ls", dest_base]))
-            .append_only_caches(vec![(cache_name, cache_dest)].into_iter().collect())
-            .docker(IMAGE.to_owned()),
-    )
-    .await
-    .unwrap();
+    let result = runner
+        .run_command_via_docker(
+            Process::new(owned_string_vec(&["/bin/ls", dest_base]))
+                .append_only_caches(vec![(cache_name, cache_dest)].into_iter().collect())
+                .docker(IMAGE.to_owned()),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(result.stdout_bytes, format!("{name}\n").as_bytes());
     assert_eq!(result.stderr_bytes, "".as_bytes());
@@ -473,18 +708,19 @@ async fn test_chroot_placeholder() {
     let work_tmpdir = TempDir::new().unwrap();
     let work_root = work_tmpdir.path().to_owned();
 
-    let result = run_command_via_docker_in_dir(
-        Process::new(vec!["/bin/env".to_owned()])
-            .env(env.clone())
-            .docker(IMAGE.to_owned())
-            .local_keep_sandboxes(KeepSandboxes::Always),
-        work_root.clone(),
-        &mut workunit,
-        None,
-        None,
-    )
-    .await
-    .unwrap();
+    let result = DefaultTestRunner
+        .run_command_via_docker_in_dir(
+            Process::new(vec!["/bin/env".to_owned()])
+                .env(env.clone())
+                .docker(IMAGE.to_owned())
+                .local_keep_sandboxes(KeepSandboxes::Always),
+            work_root.clone(),
+            &mut workunit,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
 
     let got_env = extract_env(result.stdout_bytes, &[]).unwrap();
     let path = format!("/usr/bin:{SANDBOX_BASE_PATH_IN_CONTAINER}");
@@ -492,28 +728,30 @@ async fn test_chroot_placeholder() {
     assert!(got_env.get(&"PATH".to_string()).unwrap().ends_with("/bin"));
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn all_containing_directories_for_outputs_are_created() {
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
+async fn all_containing_directories_for_outputs_are_created(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
 
-    let result = run_command_via_docker(
-        Process::new(vec![
-            SH_PATH.to_string(),
-            "-c".to_owned(),
-            format!(
-                // mkdir would normally fail, since birds/ doesn't yet exist, as would echo, since cats/
-                // does not exist, but we create the containing directories for all outputs before the
-                // process executes.
-                "/bin/mkdir birds/falcons && echo -n {} > cats/roland.ext",
-                TestData::roland().string()
-            ),
-        ])
-        .output_files(relative_paths(&["cats/roland.ext"]).collect())
-        .output_directories(relative_paths(&["birds/falcons"]).collect())
-        .docker(IMAGE.to_owned()),
-    )
-    .await
-    .unwrap();
+    let result = runner
+        .run_command_via_docker(
+            Process::new(vec![
+                SH_PATH.to_string(),
+                "-c".to_owned(),
+                format!(
+                    // mkdir would normally fail, since birds/ doesn't yet exist, as would echo, since cats/
+                    // does not exist, but we create the containing directories for all outputs before the
+                    // process executes.
+                    "/bin/mkdir birds/falcons && echo -n {} > cats/roland.ext",
+                    TestData::roland().string()
+                ),
+            ])
+            .output_files(relative_paths(&["cats/roland.ext"]).collect())
+            .output_directories(relative_paths(&["birds/falcons"]).collect())
+            .docker(IMAGE.to_owned()),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(result.stdout_bytes, "".as_bytes());
     assert_eq!(result.stderr_bytes, "".as_bytes());
@@ -524,11 +762,14 @@ async fn all_containing_directories_for_outputs_are_created() {
     );
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn outputs_readable_only_by_container_user_are_captured() {
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
+async fn outputs_readable_only_by_container_user_are_captured(
+    runner: &dyn DockerCommandTestRunner,
+) {
     skip_if_no_docker_available_in_macos_ci!();
 
-    let result = run_command_via_docker(
+    let result = runner.run_command_via_docker(
         Process::new(vec![
             SH_PATH.to_string(),
             "-c".to_owned(),
@@ -555,21 +796,23 @@ async fn outputs_readable_only_by_container_user_are_captured() {
     );
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn output_empty_dir() {
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
+async fn output_empty_dir(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
 
-    let result = run_command_via_docker(
-        Process::new(vec![
-            SH_PATH.to_string(),
-            "-c".to_owned(),
-            "/bin/mkdir falcons".to_string(),
-        ])
-        .output_directories(relative_paths(&["falcons"]).collect())
-        .docker(IMAGE.to_owned()),
-    )
-    .await
-    .unwrap();
+    let result = runner
+        .run_command_via_docker(
+            Process::new(vec![
+                SH_PATH.to_string(),
+                "-c".to_owned(),
+                "/bin/mkdir falcons".to_string(),
+            ])
+            .output_directories(relative_paths(&["falcons"]).collect())
+            .docker(IMAGE.to_owned()),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(result.stdout_bytes, "".as_bytes());
     assert_eq!(result.stderr_bytes, "".as_bytes());
@@ -580,8 +823,9 @@ async fn output_empty_dir() {
     );
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn timeout() {
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
+async fn timeout(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
 
     let argv = vec![
@@ -594,7 +838,7 @@ async fn timeout() {
     process.timeout = Some(Duration::from_millis(500));
     process.description = "sleepy-cat".to_string();
 
-    let result = run_command_via_docker(process).await.unwrap();
+    let result = runner.run_command_via_docker(process).await.unwrap();
 
     assert_eq!(result.original.exit_code, -15);
     let stdout = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
@@ -604,8 +848,9 @@ async fn timeout() {
     assert!(&stderr.contains("sleepy-cat"));
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn working_directory() {
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
+async fn working_directory(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
     let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
@@ -643,15 +888,16 @@ async fn working_directory() {
     process.timeout = Some(Duration::from_secs(1));
     process.description = "confused-cat".to_string();
 
-    let result = run_command_via_docker_in_dir(
-        process,
-        work_dir.path().to_owned(),
-        &mut workunit,
-        Some(store),
-        Some(executor),
-    )
-    .await
-    .unwrap();
+    let result = runner
+        .run_command_via_docker_in_dir(
+            process,
+            work_dir.path().to_owned(),
+            &mut workunit,
+            Some(store),
+            Some(executor),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(result.stdout_bytes, "roland.ext\n".as_bytes());
     assert_eq!(result.stderr_bytes, "".as_bytes());
@@ -662,8 +908,9 @@ async fn working_directory() {
     );
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn immutable_inputs() {
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
+async fn immutable_inputs(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
     let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
@@ -710,15 +957,16 @@ async fn immutable_inputs() {
     process.timeout = Some(Duration::from_secs(1));
     process.description = "confused-cat".to_string();
 
-    let result = run_command_via_docker_in_dir(
-        process,
-        work_dir.path().to_owned(),
-        &mut workunit,
-        Some(store),
-        Some(executor),
-    )
-    .await
-    .unwrap();
+    let result = runner
+        .run_command_via_docker_in_dir(
+            process,
+            work_dir.path().to_owned(),
+            &mut workunit,
+            Some(store),
+            Some(executor),
+        )
+        .await
+        .unwrap();
 
     let stdout_lines = std::str::from_utf8(&result.stdout_bytes)
         .unwrap()
@@ -727,60 +975,4 @@ async fn immutable_inputs() {
     assert_eq!(stdout_lines, hashset! {"falcons", "cats"});
     assert_eq!(result.stderr_bytes, "".as_bytes());
     assert_eq!(result.original.exit_code, 0);
-}
-
-async fn run_command_via_docker_in_dir(
-    mut req: Process,
-    dir: PathBuf,
-    workunit: &mut RunningWorkunit,
-    store: Option<Store>,
-    executor: Option<task_executor::Executor>,
-) -> Result<LocalTestResult, ProcessError> {
-    req.execution_environment.platform =
-        platform_for_tests().map_err(ProcessError::Unclassified)?;
-    let store_dir = TempDir::new().unwrap();
-    let executor = executor.unwrap_or_else(task_executor::Executor::new);
-    let store =
-        store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
-
-    let root = TempDir::new().unwrap();
-    let root_path = root.path().to_owned();
-
-    let immutable_inputs = ImmutableInputs::new(store.clone(), &root_path).unwrap();
-
-    let docker = Box::new(DockerOnceCell::new());
-    let image_pull_cache = Box::new(ImagePullCache::new());
-    let runner = crate::docker::CommandRunner::new(
-        store.clone(),
-        executor.clone(),
-        &docker,
-        &image_pull_cache,
-        dir.clone(),
-        immutable_inputs,
-    )?;
-    let result: Result<_, ProcessError> = async {
-        let original = runner.run(Context::default(), workunit, req).await?;
-        let stdout_bytes = store
-            .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
-            .await?;
-        let stderr_bytes = store
-            .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
-            .await?;
-        Ok((original, stdout_bytes, stderr_bytes))
-    }
-    .await;
-    let (original, stdout_bytes, stderr_bytes) = result?;
-    runner.shutdown().await?;
-    Ok(LocalTestResult {
-        original,
-        stdout_bytes,
-        stderr_bytes,
-    })
-}
-
-async fn run_command_via_docker(req: Process) -> Result<LocalTestResult, ProcessError> {
-    let (_, mut workunit) = WorkunitStore::setup_for_tests();
-    let work_dir = TempDir::new().unwrap();
-    let work_dir_path = work_dir.path().to_owned();
-    run_command_via_docker_in_dir(req, work_dir_path, &mut workunit, None, None).await
 }
