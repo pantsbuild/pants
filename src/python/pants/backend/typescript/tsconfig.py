@@ -64,15 +64,21 @@ async def _read_parent_config(
         relative = os.path.dirname(child_path)
     else:
         relative = child_path
+    print(f"Child path: {child_path}")
+    print(f"Extends path: {extends_path}")
+
     relative = os.path.normpath(os.path.join(relative, extends_path))
+    print(f"Relative: {relative}")
     if not extends_path.endswith(".json"):
         relative = os.path.join(relative, target_file)
     parent = next((other for other in others if other.path == relative), None)
+    print(f"Parent: {parent}")
     if not parent:
         logger.warning(
             f"pants could not locate {child_path}'s 'extends' at {relative}. Found: {[other.path for other in others]}."
         )
         return None
+
     return await Get(  # Must be a Get until https://github.com/pantsbuild/pants/pull/21174 lands
         TSConfig, ParseTSConfigRequest(parent, others, target_file)
     )
@@ -118,7 +124,7 @@ def _parse_config_from_content(content: FileContent) -> tuple[TSConfig, str | No
         module_resolution=compiler_options.get("moduleResolution"),
         paths=compiler_options.get("paths"),
         base_url=compiler_options.get("baseUrl"),
-    ), compiler_options.get("extends")
+    ), parsed_ts_config_json.get("extends")
 
 
 @rule
@@ -147,7 +153,9 @@ class TSConfigsRequest:
 
 @rule
 async def construct_effective_ts_configs(req: TSConfigsRequest) -> AllTSConfigs:
-    all_files = await path_globs_to_digest(PathGlobs([f"**/{req.target_file}"]))
+    all_files = await path_globs_to_digest(
+        PathGlobs([f"**/{req.target_file}", "**/tsconfig*.json", "**/jsconfig*.json"])
+    )
     digest_contents = await get_digest_contents(all_files)
 
     return AllTSConfigs(
