@@ -149,8 +149,12 @@ async def download_from_s3(
         )
 
         # A region is required to sign the request with sigv4. If we don't know where the bucket is,
-        # default to the region from the credentials and fallback to us-east-1
-        signing_region = request.region or aws_credentials.default_region or "us-east-1"
+        # default to the region from the credentials
+        signing_region = request.region or aws_credentials.default_region
+        if not signing_region:
+            raise Exception(
+                "An aws region is required to sign requests with sigv4. Please specify a region in the url or configure the default region in aws config or environment variables."
+            )
 
         signer = auth.SigV4Auth(aws_credentials.creds, "s3", signing_region)
 
