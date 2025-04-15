@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import os.path
 import pkgutil
 import subprocess
@@ -37,6 +38,7 @@ from pants.core.target_types import (
     ResourcesGeneratorTarget,
 )
 from pants.core.target_types import rules as core_target_types_rules
+from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
 from pants.testutil.python_interpreter_selection import skip_unless_python38_present
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import QueryRule
@@ -456,3 +458,33 @@ def test_extra_build_args(rule_runner: PythonRuleRunner) -> None:
 
     assert additional_args[-2] == "--example-extra-arg"
     assert additional_args[-1] == "value-goes-here"
+
+
+def test_package_with_python_provider() -> None:
+    # Per https://github.com/pantsbuild/pants/issues/21048, test packaging a local/unconstrained pex
+    # binary when using a Python that isn't automatically visible on $PATH (using the PBS provider
+    # as just one way to get such a Python)
+
+    sources = {
+        "app.py": "",
+        "BUILD": dedent(
+            """\
+            python_sources()
+            pex_binary(name="target", entry_point="./app.py")
+            """
+        ),
+    }
+
+    with setup_tmpdir(sources) as tmpdir:
+        run_pants(
+            [
+                "--backend-packages=pants.backend.python",
+                "--backend-packages=pants.backend.python.providers.experimental.python_build_standalone",
+                # a "random" old version of Python, that seems unlikely to be installed on most systems, by default
+                "--python-interpreter-constraints=CPython==3.10.2",
+                "package",
+                f"{tmpdir}:target",
+            ],
+        ).assert_success()
+
+        assert os.path.isfile(f"dist/{tmpdir}/target.pex")
