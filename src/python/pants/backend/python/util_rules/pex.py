@@ -464,7 +464,7 @@ async def _determine_pex_python_and_platforms(request: PexRequest) -> _BuildPexP
             [
                 *request.interpreter_constraints.generate_pex_arg_list(),
                 "--python-path",
-                os.path.dirname(python.path),
+                python.path,
             ],
         )
 
