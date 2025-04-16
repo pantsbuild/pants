@@ -13,9 +13,10 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use std::{collections::BTreeSet, io};
-use std::{fs, process, thread};
+use std::{fs, thread};
 use store::{Store, StoreCliOpt};
 use tokio::net::UnixListener;
+use tokio::sync::oneshot;
 use tokio_stream::wrappers::UnixListenerStream;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status};
@@ -93,19 +94,6 @@ impl SandboxerService {
     }
 
     pub async fn serve(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.do_serve(true).await
-    }
-
-    // Used only in tests, in which case we don't want to run the shutdown thread
-    // since it'll exit the test process itself.
-    pub async fn serve_in_process(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.do_serve(false).await
-    }
-
-    pub async fn do_serve(
-        &mut self,
-        with_shutdown_thread: bool,
-    ) -> Result<(), Box<dyn std::error::Error>> {
         // `bind()` expects the socket file not to exist, so we ensure that.
         ensure_socket_file_removed(&self.socket_path)?;
         // Wait a beat, to let any previous sandboxer process notice this removal and exit.
@@ -126,24 +114,25 @@ impl SandboxerService {
         let socket_path = self.socket_path.clone();
         let inactivity_counter = Arc::new(AtomicUsize::new(0));
         let inactivity_counter_ref = inactivity_counter.clone();
-        if with_shutdown_thread {
-            thread::spawn(move || {
-                loop {
-                    // Note: just a regular thread::sleep() since this is not an async context.
-                    thread::sleep(SandboxerService::POLLING_INTERVAL);
-                    if !fs::exists(&socket_path).unwrap_or(false) {
-                        warn!("Socket file {} deleted. Exiting.", &socket_path.display());
-                        process::exit(22);
-                    }
-                    if inactivity_counter_ref.fetch_add(1, Ordering::Relaxed)
-                        > Self::ALLOWED_IDLE_BEATS
-                    {
-                        warn!("Idle time limit exceeded. Exiting.");
-                        process::exit(23);
-                    }
+        let (shutdown_tx, shutdown_rx) = oneshot::channel();
+
+        thread::spawn(move || {
+            loop {
+                // Note: just a regular thread::sleep() since this is not an async context.
+                thread::sleep(SandboxerService::POLLING_INTERVAL);
+                if !fs::exists(&socket_path).unwrap_or(false) {
+                    warn!("Socket file {} deleted. Exiting.", &socket_path.display());
+                    let _ = shutdown_tx.send(());
+                    break;
                 }
-            });
-        }
+                if inactivity_counter_ref.fetch_add(1, Ordering::Relaxed) > Self::ALLOWED_IDLE_BEATS
+                {
+                    warn!("Idle time limit exceeded. Exiting.");
+                    let _ = shutdown_tx.send(());
+                    break;
+                }
+            }
+        });
 
         info!(
             "Sandboxer server started on socket path {}",
@@ -158,7 +147,9 @@ impl SandboxerService {
             inactivity_counter,
         }));
         router
-            .serve_with_incoming(UnixListenerStream::new(listener))
+            .serve_with_incoming_shutdown(UnixListenerStream::new(listener), async {
+                drop(shutdown_rx.await)
+            })
             .await?;
         Ok(())
     }
@@ -182,13 +173,11 @@ impl SandboxerGrpcImpl {
         let destination_root: PathBuf = r.destination_root.into();
         let digest: Digest = r.digest.ok_or("No digest provided")?.try_into()?;
         let dir_digest = DirectoryDigest::from_persisted_digest(digest);
-        let mutable_paths = BTreeSet::<RelativePath>::from_iter(
-            r.mutable_paths
-                .iter()
-                .map(RelativePath::new)
-                .collect::<Result<Vec<_>, _>>()?
-                .into_iter(),
-        );
+        let mutable_paths = r
+            .mutable_paths
+            .into_iter()
+            .map(RelativePath::new)
+            .collect::<Result<BTreeSet<_>, _>>()?;
         self.store
             .materialize_directory(
                 r.destination.into(),
@@ -200,9 +189,7 @@ impl SandboxerGrpcImpl {
             )
             .await
             .map_err(|e| e.to_string())?;
-        Ok(Response::new(MaterializeDirectoryResponse {
-            confirmation: { "OK".to_string() },
-        }))
+        Ok(Response::new(MaterializeDirectoryResponse {}))
     }
 }
 
