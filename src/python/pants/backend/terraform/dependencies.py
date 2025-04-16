@@ -11,6 +11,7 @@ from pants.backend.terraform.dependency_inference import (
     TerraformDeploymentInvocationFilesRequest,
 )
 from pants.backend.terraform.target_types import (
+    LockfileSourceField,
     TerraformBackendConfigField,
     TerraformDependenciesField,
     TerraformModuleSourcesField,
@@ -156,6 +157,7 @@ async def run_terraform_init(request: TerraformInitRequest, upgrade: bool):
                     TerraformModuleSourcesField,
                     TerraformBackendConfigField,
                     TerraformVarFileSourceField,
+                    LockfileSourceField,
                     FileSourceField,
                 ),
                 enable_codegen=True,
