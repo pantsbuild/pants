@@ -20,9 +20,6 @@ use tokio_stream::wrappers::UnixListenerStream;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status};
 
-#[cfg(test)]
-mod tests;
-
 // The Sandboxer is a solution to the following problem:
 //
 // For isolation, Pants executes subprocesses in "sandbox directories". Just before executing a
