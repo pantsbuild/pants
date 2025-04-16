@@ -81,7 +81,7 @@ def run_run_request(
 
 
 @pytest.mark.platform_specific_behavior
-@pytest.mark.parametrize("py_version", ["3.8.*", "3.9.*", "3.9.10"])
+@pytest.mark.parametrize("py_version", ["3.8.*", "3.9.*", "3.9.10", "3.14.0a6"])
 def test_using_pbs(rule_runner, py_version):
     rule_runner.write_files(
         {
