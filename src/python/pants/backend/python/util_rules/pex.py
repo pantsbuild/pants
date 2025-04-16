@@ -446,19 +446,32 @@ async def _determine_pex_python_and_platforms(request: PexRequest) -> _BuildPexP
 
     if request.python:
         python = request.python
-    elif request.internal_only:
-        # NB: If it's an internal_only PEX, we do our own lookup of the interpreter based on the
-        # interpreter constraints, and then will run the PEX with that specific interpreter. We
-        # will have already validated that there were no platforms.
+    else:
         python = await Get(
             PythonExecutable, InterpreterConstraints, request.interpreter_constraints
         )
-    else:
-        # `--interpreter-constraint` options are mutually exclusive with the `--python` option,
-        # so we only specify them if we have not already located a concrete Python.
-        return _BuildPexPythonSetup(None, request.interpreter_constraints.generate_pex_arg_list())
 
-    return _BuildPexPythonSetup(python, ["--python", python.path])
+    if request.python or request.internal_only:
+        # Sometimes we want to build and run with a specific interpreter (either because request
+        # demanded it, or because it's an internal-only PEX). We will have already validated that
+        # there were no platforms.
+        return _BuildPexPythonSetup(python, ["--python", python.path])
+
+    else:
+        # Otherwise, we don't want to force compatibility with a particular interpreter (as in, the
+        # resulting PEX should follow the ICs), but we _do_ want to tell PEX about at least one
+        # interpreter that is compatible, to ensure that an interpreter installed/managed by
+        # provider backends are visible (in the extreme case, a machine may have no Python
+        # interpreters installed at all, and just rely on Pants' provider backends to install them,
+        # and thus pex searching $PATH will find nothing).
+        return _BuildPexPythonSetup(
+            python,
+            [
+                *request.interpreter_constraints.generate_pex_arg_list(),
+                "--python-path",
+                python.path,
+            ],
+        )
 
 
 @dataclass

@@ -656,10 +656,15 @@ def test_determine_pex_python_and_platforms() -> None:
         )
         assert result == expected
 
-    assert_setup(expected=_BuildPexPythonSetup(None, []))
+    assert_setup(
+        expected=_BuildPexPythonSetup(discovered_python, ["--python-path", discovered_python.path])
+    )
     assert_setup(
         interpreter_constraints=ics,
-        expected=_BuildPexPythonSetup(None, ["--interpreter-constraint", "CPython==3.8"]),
+        expected=_BuildPexPythonSetup(
+            discovered_python,
+            ["--interpreter-constraint", "CPython==3.8", "--python-path", discovered_python.path],
+        ),
     )
     assert_setup(
         internal_only=True,
