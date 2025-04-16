@@ -31,6 +31,7 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.python_interpreter_selection import (
     PY_38,
     PY_39,
+    PY_311,
     skip_unless_python38_and_python39_present,
 )
 from pants.testutil.rule_runner import EXECUTOR, QueryRule, RuleRunner
@@ -213,6 +214,8 @@ def plugin_resolution(
             bootstrap_scheduler, interpreter_constraints, input_working_set
         )
         working_set = plugin_resolver.resolve(options_bootstrapper, complete_env, requirements)
+        print(f"working_set: {working_set}")
+        import pdb ; pdb.set_trace()
         for dist in working_set:
             if use_uv:
                 assert ".pants.d/plugins" in os.path.realpath(dist.location)
@@ -230,15 +233,8 @@ def test_no_plugins(rule_runner: RuleRunner, use_uv: bool) -> None:
         assert [] == list(working_set)
 
 
-def test_plugins_sdist(rule_runner: RuleRunner, use_uv: bool) -> None:
-    _do_test_plugins(rule_runner, True, use_uv=use_uv)
-
-
-def test_plugins_bdist(rule_runner: RuleRunner, use_uv: bool) -> None:
-    _do_test_plugins(rule_runner, False, use_uv=use_uv)
-
-
-def _do_test_plugins(rule_runner: RuleRunner, sdist: bool, *, use_uv: bool) -> None:
+@pytest.mark.parametrize("sdist", (True, False), ids=("sdist", "bdist"))
+def test_plugins(rule_runner: RuleRunner, sdist: bool, *, use_uv: bool) -> None:
     with plugin_resolution(
         rule_runner,
         use_uv=use_uv,
@@ -259,7 +255,7 @@ def _do_test_plugins(rule_runner: RuleRunner, sdist: bool, *, use_uv: bool) -> N
         assert_dist_version(name="jane", expected_version=DEFAULT_VERSION)
 
 
-@pytest.mark.parametrize("sdist", [True, False], ids=("sdist", "bdist"))
+@pytest.mark.parametrize("sdist", (True, False), ids=("sdist", "bdist"))
 def test_exact_requirements(rule_runner: RuleRunner, sdist: bool, use_uv: bool) -> None:
     with plugin_resolution(
         rule_runner,
@@ -306,22 +302,14 @@ def test_range_deps(rule_runner: RuleRunner, use_uv: bool) -> None:
 
 
 @skip_unless_python38_and_python39_present
-def test_exact_requirements_interpreter_change_sdist(rule_runner: RuleRunner, use_uv: bool) -> None:
-    _do_test_exact_requirements_interpreter_change(rule_runner, True, use_uv=use_uv)
-
-
-@skip_unless_python38_and_python39_present
-def test_exact_requirements_interpreter_change_bdist(rule_runner: RuleRunner, use_uv: bool) -> None:
-    _do_test_exact_requirements_interpreter_change(rule_runner, False, use_uv=use_uv)
-
-
-def _do_test_exact_requirements_interpreter_change(
+@pytest.mark.parametrize("sdist", (True, False), ids=("sdist", "bdist"))
+def test_exact_requirements_interpreter_change(
     rule_runner: RuleRunner, sdist: bool, *, use_uv: bool
 ) -> None:
     with plugin_resolution(
         rule_runner,
         use_uv=use_uv,
-        python_version=PY_38,
+        python_version=PY_311,
         plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
         sdist=sdist,
     ) as results:
@@ -350,7 +338,7 @@ def _do_test_exact_requirements_interpreter_change(
         with plugin_resolution(
             rule_runner,
             use_uv=use_uv,
-            python_version=PY_38,
+            python_version=PY_311,
             chroot=chroot,
             plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
         ) as results2:
