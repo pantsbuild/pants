@@ -11,12 +11,16 @@ from pants.backend.terraform.dependency_inference import (
     TerraformDeploymentInvocationFilesRequest,
 )
 from pants.backend.terraform.target_types import (
+    TerraformBackendConfigField,
     TerraformDependenciesField,
+    TerraformModuleSourcesField,
     TerraformRootModuleField,
+    TerraformVarFileSourceField,
 )
 from pants.backend.terraform.tool import TerraformProcess
 from pants.backend.terraform.utils import terraform_arg, terraform_relpath
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
+from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import DigestSubset, PathGlobs
 from pants.engine.internals.native_engine import Address, AddressInput, Digest, MergeDigests
@@ -147,7 +151,14 @@ async def run_terraform_init(request: TerraformInitRequest, upgrade: bool):
         Get(
             SourceFiles,
             SourceFilesRequest(
-                [tgt.get(SourcesField) for tgt in this_targets_dependencies.dependencies]
+                [tgt.get(SourcesField) for tgt in this_targets_dependencies.dependencies],
+                for_sources_types=(
+                    TerraformModuleSourcesField,
+                    TerraformBackendConfigField,
+                    TerraformVarFileSourceField,
+                    FileSourceField,
+                ),
+                enable_codegen=True,
             ),
         ),
     )
