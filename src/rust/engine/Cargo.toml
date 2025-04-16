@@ -262,7 +262,7 @@ ignore = "0.4.23"
 indexmap = { version = "2.2", features = ["std", "serde"] }
 indicatif = "0.17.11"
 internment = "0.6"
-itertools = "0.10"
+itertools = "0.14"
 libc = "0.2.171"
 lmdb-rkv = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "6ae7a552aa2c932c3ddf652a68cdde2fed547cbc" }
 log = "0.4.26"
