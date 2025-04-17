@@ -21,7 +21,7 @@ from pants.backend.terraform.target_types import (
 from pants.backend.terraform.tool import TerraformProcess
 from pants.backend.terraform.utils import terraform_arg, terraform_relpath
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.core.target_types import FileSourceField
+from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import DigestSubset, PathGlobs
 from pants.engine.internals.native_engine import Address, AddressInput, Digest, MergeDigests
@@ -159,6 +159,7 @@ async def run_terraform_init(request: TerraformInitRequest, upgrade: bool):
                     TerraformVarFileSourceField,
                     LockfileSourceField,
                     FileSourceField,
+                    ResourceSourceField,
                 ),
                 enable_codegen=True,
             ),
