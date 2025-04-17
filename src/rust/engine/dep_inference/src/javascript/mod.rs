@@ -251,7 +251,7 @@ impl Visitor for ImportCollector<'_> {
         if let (Some(function), Some(args)) = (node.named_child(0), node.named_child(1)) {
             if let "require" | "import" = self.code_at(function.range()) {
                 for arg in args.children(&mut args.walk()) {
-                    if arg.kind_id() == KindID::STRING {
+                    if KindID::STRING.contains(&arg.kind_id()) {
                         self.insert_import(Some(arg))
                     }
                 }
