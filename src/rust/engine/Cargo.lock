@@ -3832,7 +3832,7 @@ version = "0.0.1"
 dependencies = [
  "bytes",
  "children",
- "clap 4.5.32",
+ "clap 4.5.36",
  "env_logger",
  "fs",
  "hashing",
@@ -3845,7 +3845,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tonic",
- "tower",
+ "tower 0.4.13",
 ]
 
 [[package]]
