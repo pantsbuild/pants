@@ -1,26 +1,25 @@
 // Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::{collections::BTreeMap, path::PathBuf, time::Duration};
+use std::{collections::BTreeMap, ffi::OsString, path::PathBuf, time::Duration};
 
 use clap::Parser;
 use remote_provider::{RemoteProvider, RemoteStoreOptions};
 use task_executor::Executor;
 
 use crate::Store;
-
-#[derive(Debug, Parser)]
+#[derive(Debug, Clone, Parser)]
 pub struct StoreCliOpt {
     ///Path to lmdb directory used for local file storage.
     #[arg(long)]
-    local_store_path: Option<PathBuf>,
-
-    #[arg(long)]
-    pub remote_instance_name: Option<String>,
+    pub local_store_path: Option<PathBuf>,
 
     /// The host:port of the gRPC CAS server to connect to.
     #[arg(long)]
     pub cas_server: Option<String>,
+
+    #[arg(long)]
+    pub remote_instance_name: Option<String>,
 
     /// Path to file containing root certificate authority certificates for the CAS server.
     /// If not set, TLS will not be used when connecting to the CAS server.
@@ -65,6 +64,87 @@ pub struct StoreCliOpt {
 }
 
 impl StoreCliOpt {
+    pub fn new_local_only(local_store_path: PathBuf) -> Self {
+        Self {
+            local_store_path: Some(local_store_path),
+            cas_server: None,
+            remote_instance_name: None,
+            cas_root_ca_cert_file: None,
+            cas_client_certs_file: None,
+            cas_client_key_file: None,
+            cas_oauth_bearer_token_path: None,
+            upload_chunk_bytes: 0,
+            store_rpc_retries: 0,
+            store_rpc_concurrency: 0,
+            store_batch_api_size_limit: 0,
+            header: vec![],
+        }
+    }
+
+    pub fn to_cli_args(&self) -> Vec<OsString> {
+        let mut ret: Vec<OsString> = vec![];
+        if let Some(local_store_path) = &self.local_store_path {
+            ret.push("--local-store-path".into());
+            ret.push(local_store_path.into());
+        }
+        if let Some(cas_server) = &self.cas_server {
+            ret.push("--cas-server".into());
+            ret.push(cas_server.into());
+
+            if let Some(remote_instance_name) = &self.remote_instance_name {
+                ret.push("--remote-instance-name".into());
+                ret.push(remote_instance_name.into());
+            }
+
+            if let Some(cas_root_ca_cert_file) = &self.cas_root_ca_cert_file {
+                ret.push("--cas-root-ca-cert-file".into());
+                ret.push(cas_root_ca_cert_file.into());
+            }
+
+            if let Some(cas_client_certs_file) = &self.cas_client_certs_file {
+                ret.push("--cas-client-certs-file".into());
+                ret.push(cas_client_certs_file.into());
+            }
+
+            if let Some(cas_client_key_file) = &self.cas_client_key_file {
+                ret.push("--cas-client-key-file".into());
+                ret.push(cas_client_key_file.into());
+            }
+
+            if let Some(cas_oauth_bearer_token_path) = &self.cas_oauth_bearer_token_path {
+                ret.push("--cas-oauth-bearer-token-path".into());
+                ret.push(cas_oauth_bearer_token_path.into());
+            }
+
+            if self.upload_chunk_bytes != 0 {
+                ret.push("--upload-chunk-bytes".into());
+                ret.push(self.upload_chunk_bytes.to_string().into());
+            }
+
+            if self.store_rpc_retries != 0 {
+                ret.push("--store-rpc-retries".into());
+                ret.push(self.store_rpc_retries.to_string().into());
+            }
+
+            if self.store_rpc_concurrency != 0 {
+                ret.push("--store-rpc-concurrency".into());
+                ret.push(self.store_rpc_concurrency.to_string().into());
+            }
+
+            if self.store_batch_api_size_limit != 0 {
+                ret.push("--store-batch-api-size-limit".into());
+                ret.push(self.store_batch_api_size_limit.to_string().into());
+            }
+
+            for header in self.header.iter() {
+                ret.push("--header".into());
+                ret.push(header.into());
+            }
+        }
+
+        ret
+    }
+
     pub fn get_headers(
         &self,
         oauth_bearer_token_path: &Option<PathBuf>,
