@@ -58,6 +58,9 @@ const GIGABYTES: usize = 1024 * MEGABYTES;
 
 mod cli_options;
 
+#[cfg(test)]
+mod cli_options_tests;
+
 mod local;
 #[cfg(test)]
 pub mod local_tests;

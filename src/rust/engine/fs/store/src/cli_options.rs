@@ -8,7 +8,7 @@ use remote_provider::{RemoteProvider, RemoteStoreOptions};
 use task_executor::Executor;
 
 use crate::Store;
-#[derive(Debug, Clone, Parser)]
+#[derive(Debug, Clone, Eq, PartialEq, Parser)]
 pub struct StoreCliOpt {
     ///Path to lmdb directory used for local file storage.
     #[arg(long)]
@@ -83,63 +83,72 @@ impl StoreCliOpt {
 
     pub fn to_cli_args(&self) -> Vec<OsString> {
         let mut ret: Vec<OsString> = vec![];
-        if let Some(local_store_path) = &self.local_store_path {
-            ret.push("--local-store-path".into());
-            ret.push(local_store_path.into());
+
+        fn maybe_push_arg<S: Into<OsString> + std::convert::AsRef<std::ffi::OsStr>>(
+            args: &mut Vec<OsString>,
+            flag: &str,
+            arg: &Option<S>,
+        ) {
+            if let Some(val) = arg {
+                push_arg(args, flag, val);
+            }
         }
-        if let Some(cas_server) = &self.cas_server {
-            ret.push("--cas-server".into());
-            ret.push(cas_server.into());
 
-            if let Some(remote_instance_name) = &self.remote_instance_name {
-                ret.push("--remote-instance-name".into());
-                ret.push(remote_instance_name.into());
+        fn push_arg_if_nz(args: &mut Vec<OsString>, flag: &str, val: usize) {
+            if val != 0 {
+                push_arg(args, flag, &val.to_string());
             }
+        }
 
-            if let Some(cas_root_ca_cert_file) = &self.cas_root_ca_cert_file {
-                ret.push("--cas-root-ca-cert-file".into());
-                ret.push(cas_root_ca_cert_file.into());
-            }
+        fn push_arg<S: Into<OsString> + std::convert::AsRef<std::ffi::OsStr>>(
+            args: &mut Vec<OsString>,
+            flag: &str,
+            val: &S,
+        ) {
+            args.push(flag.into());
+            args.push(val.into());
+        }
 
-            if let Some(cas_client_certs_file) = &self.cas_client_certs_file {
-                ret.push("--cas-client-certs-file".into());
-                ret.push(cas_client_certs_file.into());
-            }
+        maybe_push_arg(&mut ret, "--local-store-path", &self.local_store_path);
+        maybe_push_arg(&mut ret, "--cas-server", &self.cas_server);
+        maybe_push_arg(
+            &mut ret,
+            "--remote-instance-name",
+            &self.remote_instance_name,
+        );
+        maybe_push_arg(
+            &mut ret,
+            "--cas-root-ca-cert-file",
+            &self.cas_root_ca_cert_file,
+        );
+        maybe_push_arg(
+            &mut ret,
+            "--cas-client-certs-file",
+            &self.cas_client_certs_file,
+        );
+        maybe_push_arg(&mut ret, "--cas-client-key-file", &self.cas_client_key_file);
+        maybe_push_arg(
+            &mut ret,
+            "--cas-oauth-bearer-token-path",
+            &self.cas_oauth_bearer_token_path,
+        );
 
-            if let Some(cas_client_key_file) = &self.cas_client_key_file {
-                ret.push("--cas-client-key-file".into());
-                ret.push(cas_client_key_file.into());
-            }
+        push_arg_if_nz(&mut ret, "--upload-chunk-bytes", self.upload_chunk_bytes);
+        push_arg_if_nz(&mut ret, "--store-rpc-retries", self.store_rpc_retries);
+        push_arg_if_nz(
+            &mut ret,
+            "--store-rpc-concurrency",
+            self.store_rpc_concurrency,
+        );
+        push_arg_if_nz(
+            &mut ret,
+            "--store-batch-api-size-limit",
+            self.store_batch_api_size_limit,
+        );
 
-            if let Some(cas_oauth_bearer_token_path) = &self.cas_oauth_bearer_token_path {
-                ret.push("--cas-oauth-bearer-token-path".into());
-                ret.push(cas_oauth_bearer_token_path.into());
-            }
-
-            if self.upload_chunk_bytes != 0 {
-                ret.push("--upload-chunk-bytes".into());
-                ret.push(self.upload_chunk_bytes.to_string().into());
-            }
-
-            if self.store_rpc_retries != 0 {
-                ret.push("--store-rpc-retries".into());
-                ret.push(self.store_rpc_retries.to_string().into());
-            }
-
-            if self.store_rpc_concurrency != 0 {
-                ret.push("--store-rpc-concurrency".into());
-                ret.push(self.store_rpc_concurrency.to_string().into());
-            }
-
-            if self.store_batch_api_size_limit != 0 {
-                ret.push("--store-batch-api-size-limit".into());
-                ret.push(self.store_batch_api_size_limit.to_string().into());
-            }
-
-            for header in self.header.iter() {
-                ret.push("--header".into());
-                ret.push(header.into());
-            }
+        for header in self.header.iter() {
+            ret.push("--header".into());
+            ret.push(header.into());
         }
 
         ret
