@@ -355,10 +355,7 @@ pub enum CapturedWorkdirError {
         timeout: std::time::Duration,
         description: String,
     },
-    Retryable {
-        status: i32,
-        message: String,
-    },
+    Retryable(String),
     Fatal(String),
 }
 
@@ -382,8 +379,8 @@ impl Display for CapturedWorkdirError {
                     description
                 )
             }
-            Self::Retryable { status, message } => {
-                write!(f, "{message} (retryable error status {status})")
+            Self::Retryable(message) => {
+                write!(f, "{message} (retryable error)")
             }
             Self::Fatal(s) => write!(f, "{s}"),
         }

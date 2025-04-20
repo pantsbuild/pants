@@ -10,15 +10,18 @@ use std::sync::Arc;
 use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bollard::auth::DockerCredentials;
-use bollard::container::{CreateContainerOptions, LogOutput, RemoveContainerOptions};
+use bollard::container::{
+    CreateContainerOptions, InspectContainerOptions, LogOutput, RemoveContainerOptions,
+};
 use bollard::exec::StartExecResults;
 use bollard::image::CreateImageOptions;
+use bollard::secret::ContainerStateStatusEnum;
 use bollard::service::CreateImageInfo;
 use bollard::volume::CreateVolumeOptions;
 use bollard::{Docker, errors::Error as DockerError};
 use bytes::{Bytes, BytesMut};
 use futures::stream::BoxStream;
-use futures::{FutureExt, StreamExt};
+use futures::{FutureExt, StreamExt, TryFutureExt};
 use hashing::Digest;
 use itertools::Itertools;
 use log::Level;
@@ -500,12 +503,10 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                 }
             ).await;
             match process_result {
-                Err(CapturedWorkdirError::Retryable { status, message }) => {
+                Err(CapturedWorkdirError::Retryable(message)) => {
                     errors.push(message);
-                    if status == 404 {
-                        self.container_cache
-                            .prune_dead_container(image_name, image_platform);
-                    }
+                    self.container_cache
+                        .prune_container(image_name, image_platform);
                 }
                 _ => {
                     return process_result
@@ -556,10 +557,7 @@ impl CapturedWorkdir for CommandRunner<'_> {
                 match spawn_err.err {
                     DockerError::DockerResponseServerError {
                         status_code: 404, ..
-                    } => CapturedWorkdirError::Retryable {
-                        status: 404,
-                        message: spawn_err.message,
-                    },
+                    } => CapturedWorkdirError::Retryable(spawn_err.message),
                     _ => CapturedWorkdirError::Fatal(spawn_err.message),
                 }
             })
@@ -746,12 +744,9 @@ impl Command {
                 .await
                 .map_err(|cse| match cse.err {
                     DockerError::DockerResponseServerError {
-                        status_code,
+                        status_code: 404,
                         message,
-                    } => CapturedWorkdirError::Retryable {
-                        status: status_code as i32,
-                        message,
-                    },
+                    } => CapturedWorkdirError::Retryable(message),
                     _ => CapturedWorkdirError::Fatal(cse.message),
                 })?;
         let mut stdout = BytesMut::with_capacity(8192);
@@ -965,9 +960,56 @@ impl<'a> ContainerCache<'a> {
     }
 
     /// Remove an old or missing container from the container cache - does not remove the actual container.
-    pub(crate) fn prune_dead_container(&self, image_name: &str, platform: &Platform) {
+    pub(crate) async fn prune_container(
+        &self,
+        image_name: &str,
+        platform: &Platform,
+    ) -> Result<(), String> {
+        let key = (image_name.to_string(), *platform);
+        let container_id = self
+            .containers
+            .lock()
+            .get(&key)
+            .and_then(|container_once_cell| container_once_cell.get())
+            .map(|t| t.0.clone())
+            .ok_or("Container not found in cache")?;
+        let docker = self.docker.get().await?;
+        let remove_container = match docker.inspect_container(&container_id, None).await {
+            Ok(inspect_response) => {
+                if let Some(state) = inspect_response.state {
+                    if let Some(status) = state.status {
+                        match status {
+                            ContainerStateStatusEnum::RUNNING
+                            | ContainerStateStatusEnum::RESTARTING
+                            | ContainerStateStatusEnum::CREATED
+                            | ContainerStateStatusEnum::PAUSED => {
+                                return Err(format!("Cannot prune container with status {status}"));
+                            }
+                            _ => true,
+                        }
+                    } else {
+                        return Err("Cannot prune container with unknown status".to_string());
+                    }
+                } else {
+                    return Err("Cannot prune container, container state was empty".to_string());
+                }
+            }
+            Err(DockerError::DockerResponseServerError {
+                status_code: 404, ..
+            }) => false,
+            Err(err) => {
+                return Err(format!(
+                    "Cannot prune container because the following error occurred when trying to inspect container status:\n\n{}",
+                    err.to_string()
+                ));
+            }
+        };
         let mut containers = self.containers.lock();
-        containers.remove(&(image_name.to_string(), *platform));
+        containers.remove(&key);
+        if remove_container {
+            tokio::spawn(Self::remove_container(docker, container_id.as_str(), None));
+        }
+        Ok(())
     }
 
     /// Return the container ID and NamedCaches for a container running `image_name` for use as a place
