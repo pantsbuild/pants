@@ -8,11 +8,12 @@ from types import SimpleNamespace
 from typing import Any
 from urllib.parse import urlsplit
 
+from pants.backend.url_handlers.s3.subsystem import S3AuthSigning, S3Subsystem
 from pants.engine.download_file import URLDownloadHandler
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import Digest, NativeDownloadFile
-from pants.engine.internals.native_engine import FileDigest
+from pants.engine.internals.native_engine import EMPTY_FILE_DIGEST, FileDigest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -21,13 +22,13 @@ from pants.util.strutil import softwrap
 
 CONTENT_TYPE = "binary/octet-stream"
 
-
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
 class AWSCredentials:
     creds: Any
+    default_region: str | None
 
 
 @rule
@@ -92,8 +93,9 @@ async def access_aws_credentials(
         )
 
     creds = credentials.create_credential_resolver(session).load_credentials()
+    default_region = session.get_config_variable("region")
 
-    return AWSCredentials(creds)
+    return AWSCredentials(creds=creds, default_region=default_region)
 
 
 @dataclass(frozen=True)
@@ -107,39 +109,79 @@ class S3DownloadFile:
 
 @rule
 async def download_from_s3(
-    request: S3DownloadFile, aws_credentials: AWSCredentials, global_options: GlobalOptions
+    request: S3DownloadFile,
+    aws_credentials: AWSCredentials,
+    global_options: GlobalOptions,
+    s3_subsystem: S3Subsystem,
 ) -> Digest:
     from botocore import auth, compat, exceptions  # pants: no-infer-dep
 
-    # NB: The URL for auth is expected to be in path-style
-    path_style_url = "https://s3"
+    virtual_hosted_url = f"https://{request.bucket}.s3.amazonaws.com/{request.key}"
     if request.region:
-        path_style_url += f".{request.region}"
-    path_style_url += f".amazonaws.com/{request.bucket}/{request.key}"
+        virtual_hosted_url = (
+            f"https://{request.bucket}.s3.{request.region}.amazonaws.com/{request.key}"
+        )
     if request.query:
-        path_style_url += f"?{request.query}"
+        virtual_hosted_url += f"?{request.query}"
 
     headers = compat.HTTPHeaders()
-    http_request = SimpleNamespace(
-        url=path_style_url,
-        headers=headers,
-        method="GET",
-        auth_path=None,
-    )
+    signer = None
+    http_request = None
+
+    if s3_subsystem.auth_signing == S3AuthSigning.SIGV4:
+        # sigv4 uses the virtual_hosted_url for the auth request
+        http_request = SimpleNamespace(
+            url=virtual_hosted_url,
+            headers=headers,
+            method="GET",
+            auth_path=None,
+            data=None,
+            params={},
+            context={},
+            body={},
+        )
+
+        # Add x-amz-content-SHA256 as per boto code
+        # ref link - https://github.com/boto/botocore/blob/547b20801770c8ea4255ee9c3b809fea6b9f6bc4/botocore/auth.py#L52C1-L54C2
+        headers.add_header(
+            "X-Amz-Content-SHA256",
+            EMPTY_FILE_DIGEST.fingerprint,
+        )
+
+        # A region is required to sign the request with sigv4. If we don't know where the bucket is,
+        # default to the region from the credentials
+        signing_region = request.region or aws_credentials.default_region
+        if not signing_region:
+            raise Exception(
+                "An aws region is required to sign requests with sigv4. Please specify a region in the url or configure the default region in aws config or environment variables."
+            )
+
+        signer = auth.SigV4Auth(aws_credentials.creds, "s3", signing_region)
+
+    else:
+        assert s3_subsystem.auth_signing == S3AuthSigning.HMACV1
+        # NB: The URL for HmacV1 auth is expected to be in path-style
+        path_style_url = "https://s3"
+        if request.region:
+            path_style_url += f".{request.region}"
+        path_style_url += f".amazonaws.com/{request.bucket}/{request.key}"
+        if request.query:
+            path_style_url += f"?{request.query}"
+
+        http_request = SimpleNamespace(
+            url=path_style_url,
+            headers=headers,
+            method="GET",
+            auth_path=None,
+        )
+        signer = auth.HmacV1Auth(aws_credentials.creds)
+
     # NB: The added Auth header doesn't need to be valid when accessing a public bucket. When
     # hand-testing, you MUST test against a private bucket to ensure it works for private buckets too.
-    signer = auth.HmacV1Auth(aws_credentials.creds)
     try:
         signer.add_auth(http_request)
     except exceptions.NoCredentialsError:
         pass  # The user can still access public S3 buckets without credentials
-
-    virtual_hosted_url = f"https://{request.bucket}.s3"
-    if request.region:
-        virtual_hosted_url += f".{request.region}"
-    virtual_hosted_url += f".amazonaws.com/{request.key}"
-    if request.query:
-        virtual_hosted_url += f"?{request.query}"
 
     return await Get(
         Digest,

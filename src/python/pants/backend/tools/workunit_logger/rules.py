@@ -43,6 +43,16 @@ def just_dump_map(workunits_map):
     ]
 
 
+def pass_through_unserializable_metadata(obj):
+    """Most of the metadata in workunit objects is json serializable, but it is not guaranteed that
+    all of it is.
+
+    This function is intended to be used as a `default` encoder to json.dumps to drop a minimal stub
+    encoding with the name instead of throwing a TypeError and halting the entire workunit logging.
+    """
+    return {"name": obj.__class__.__name__, "json_serializable": False, "str": str(obj)}
+
+
 class WorkunitLoggerCallback(WorkunitsCallback):
     """Configuration for WorkunitLogger."""
 
@@ -68,7 +78,11 @@ class WorkunitLoggerCallback(WorkunitsCallback):
         if finished:
             filepath = f"{self.wulogger.logdir}/{context.run_tracker.run_id}.json"
             with safe_open(filepath, "w") as f:
-                json.dump(just_dump_map(self._completed_workunits), f)
+                json.dump(
+                    just_dump_map(self._completed_workunits),
+                    f,
+                    default=pass_through_unserializable_metadata,
+                )
                 logger.info(f"Wrote log to {filepath}")
 
 

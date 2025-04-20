@@ -178,7 +178,7 @@ impl NailgunPool {
             match Self::try_use(pool_entry)? {
                 TryUse::Usable(process) => return Ok(Some((idx, process))),
                 TryUse::Dead => dead_processes.push(idx),
-                TryUse::Busy => continue,
+                TryUse::Busy => (),
             }
         }
         // NB: We'll only prune dead processes if we don't find a live match, but that's fine.

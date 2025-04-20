@@ -479,7 +479,7 @@ impl<N: Node> Graph<N> {
                         node, self.invalidation_delay
                     );
                     sleep(self.invalidation_delay).await;
-                    continue;
+                    // fall through and retry
                 }
                 res => break res,
             }

@@ -190,16 +190,20 @@ async def find_node_js_projects(
     nodejs: NodeJS,
     resolve_names: UserChosenNodeJSResolveAliases,
 ) -> AllNodeJSProjects:
-    # Note: If pnpm_workspace.yaml is present for an npm-managed project, it will override the package.json["workspaces"] setting, which is not intuitive
-    # pnpm_workspace.yaml should only be used for pnpm projects - see https://github.com/pantsbuild/pants/issues/21134
-    project_paths = (
-        (
-            ProjectPaths(pkg.root_dir, ["", *pkg.workspaces])
-            if pkg not in pnpm_workspaces
-            else ProjectPaths(pkg.root_dir, ["", *pnpm_workspaces[pkg].packages])
-        )
-        for pkg in package_workspaces
-    )
+    project_paths = []
+    for pkg in package_workspaces:
+        package_manager = pkg.package_manager or nodejs.default_package_manager
+        if (
+            package_manager and PackageManager.from_string(package_manager).name == "pnpm"
+        ):  # case for pnpm
+            if pkg in pnpm_workspaces:
+                project_paths.append(
+                    ProjectPaths(pkg.root_dir, ["", *pnpm_workspaces[pkg].packages])
+                )
+            else:
+                project_paths.append(ProjectPaths(pkg.root_dir, [""]))
+        else:  # case for npm, yarn
+            project_paths.append(ProjectPaths(pkg.root_dir, ["", *pkg.workspaces]))
 
     node_js_projects = {
         _TentativeProject(

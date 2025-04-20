@@ -343,7 +343,6 @@ impl CommandRunner {
                 OperationStreamItem::Running(_) => {
                     // The operation has not reached an ExecutionStage that we recognize as
                     // "executing" (likely: it is queued, doing a cache lookup, etc): keep waiting.
-                    continue;
                 }
                 OperationStreamItem::Outcome(outcome) => return outcome,
             }
@@ -378,7 +377,6 @@ impl CommandRunner {
                         }
                         OperationStreamItem::Running(_) => {
                             // The operation is still running.
-                            continue;
                         }
                         OperationStreamItem::Outcome(outcome) => break outcome,
                     }

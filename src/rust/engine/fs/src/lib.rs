@@ -86,7 +86,7 @@ impl RelativePath {
                 Component::RootDir => {
                     return Err(format!("Absolute paths are not allowed: {candidate:?}"));
                 }
-                Component::CurDir => continue,
+                Component::CurDir => (),
                 Component::ParentDir => {
                     if !relative_path.pop() {
                         return Err(format!(

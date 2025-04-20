@@ -8,6 +8,7 @@ import logging
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Literal
 
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.fs import EMPTY_DIGEST, Digest, FileDigest
@@ -51,6 +52,57 @@ class ProcessCacheScope(Enum):
 
 
 @dataclass(frozen=True)
+class ProcessConcurrency:
+    kind: Literal["exactly", "range", "exclusive"]
+    min: int | None = None
+    max: int | None = None
+
+    def __post_init__(self):
+        if self.min is not None and self.min < 1:
+            raise ValueError(f"min concurrency must be >= 1, got {self.min}")
+        if self.max is not None and self.max < 1:
+            raise ValueError(f"max concurrency must be >= 1, got {self.max}")
+        if self.min is not None and self.max is not None and self.min > self.max:
+            raise ValueError(
+                f"min concurrency must be <= max concurrency, got {self.min} and {self.max}"
+            )
+        if self.kind == "exactly" and self.min != self.max:
+            raise ValueError(
+                f"exactly concurrency must have min and max equal, got {self.min} and {self.max}"
+            )
+
+    @staticmethod
+    def range(max: int, min: int = 1):
+        """The amount of parallelism that this process is capable of given its inputs. This value
+        does not directly set the number of cores allocated to the process: that is computed based
+        on availability, and provided as a template value in the arguments of the process.
+
+        When set, a `{pants_concurrency}` variable will be templated into the `argv` of the process.
+
+        Processes which set this value may be preempted (i.e. canceled and restarted) for a short
+        period after starting if available resources have changed (because other processes have
+        started or finished).
+        """
+        return ProcessConcurrency("range", min, max)
+
+    @staticmethod
+    def exactly(count: int):
+        """A specific number of cores required to run the process.
+
+        The process will wait until the specified number of cores are available.
+        """
+        return ProcessConcurrency("exactly", count, count)
+
+    @staticmethod
+    def exclusive():
+        """Exclusive access to all cores.
+
+        No other processes will be scheduled to run while this process is running.
+        """
+        return ProcessConcurrency("exclusive")
+
+
+@dataclass(frozen=True)
 class Process:
     argv: tuple[str, ...]
     description: str = dataclasses.field(compare=False)
@@ -67,6 +119,7 @@ class Process:
     jdk_home: str | None
     execution_slot_variable: str | None
     concurrency_available: int
+    concurrency: ProcessConcurrency | None
     cache_scope: ProcessCacheScope
     remote_cache_speculation_delay_millis: int
     attempt: int
@@ -89,6 +142,7 @@ class Process:
         jdk_home: str | None = None,
         execution_slot_variable: str | None = None,
         concurrency_available: int = 0,
+        concurrency: ProcessConcurrency | None = None,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
         remote_cache_speculation_delay_millis: int = 0,
         attempt: int = 0,
@@ -146,11 +200,19 @@ class Process:
         object.__setattr__(self, "jdk_home", jdk_home)
         object.__setattr__(self, "execution_slot_variable", execution_slot_variable)
         object.__setattr__(self, "concurrency_available", concurrency_available)
+        object.__setattr__(self, "concurrency", concurrency)
         object.__setattr__(self, "cache_scope", cache_scope)
         object.__setattr__(
             self, "remote_cache_speculation_delay_millis", remote_cache_speculation_delay_millis
         )
         object.__setattr__(self, "attempt", attempt)
+
+    def __post_init__(self) -> None:
+        if self.concurrency_available and self.concurrency:
+            raise ValueError(
+                "Cannot specify both concurrency_available and concurrency. "
+                "Only one concurrency setting may be used at a time."
+            )
 
 
 @dataclass(frozen=True)

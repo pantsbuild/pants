@@ -74,6 +74,7 @@ rand = { workspace = true }
 regex = { workspace = true }
 reqwest = { version = "0.12", default-features = false, features = ["stream", "rustls-tls"] }
 rule_graph = { path = "rule_graph" }
+sandboxer = { path = "process_execution/sandboxer" }
 smallvec = { version = "1", features = ["union"] }
 stdio = { path = "stdio" }
 store = { path = "fs/store" }
@@ -237,10 +238,10 @@ deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443f
 derivative = "2.2"
 digest = "0.10"
 dirs-next = "2"
-docker_credential = "1.2"
+docker_credential = "1.3"
 either = "1"
 env_logger = "0.10.2"
-errno = "0.2.8"
+errno = "0.3.6"
 fixedbitset = "0.4"
 fnv = "1.0.5"
 fs-set-times = "0.19"
