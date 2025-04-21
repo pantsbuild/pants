@@ -64,13 +64,15 @@ class GitWorktree(EngineAwareReturnType):
 
     @property
     def commit_id(self):
-        return self._git_binary._invoke_unsandboxed(self._create_git_cmdline(["rev-parse", "HEAD"]))
+        return self._git_binary._invoke_unsandboxed(
+            self._create_git_cmdline(["rev-parse", "HEAD"])
+        ).decode()
 
     @property
     def branch_name(self) -> str | None:
         branch = self._git_binary._invoke_unsandboxed(
             self._create_git_cmdline(["rev-parse", "--abbrev-ref", "HEAD"])
-        )
+        ).decode()
         return None if branch == "HEAD" else branch
 
     def _fix_git_relative_path(self, worktree_path: str, relative_to: PurePath | str) -> str:
@@ -90,7 +92,7 @@ class GitWorktree(EngineAwareReturnType):
             )
         )
 
-        files = set(uncommitted_changes.splitlines())
+        files = set(uncommitted_changes.decode().splitlines())
         if from_commit:
             # Grab the diff from the merge-base to HEAD using ... syntax.  This ensures we have just
             # the changes that have occurred on the current branch.
@@ -102,7 +104,7 @@ class GitWorktree(EngineAwareReturnType):
             committed_changes = self._git_binary._invoke_unsandboxed(
                 self._create_git_cmdline(committed_cmd)
             )
-            files.update(committed_changes.splitlines())
+            files.update(committed_changes.decode().splitlines())
         if include_untracked:
             untracked_cmd = [
                 "ls-files",
@@ -113,7 +115,7 @@ class GitWorktree(EngineAwareReturnType):
             untracked = self._git_binary._invoke_unsandboxed(
                 self._create_git_cmdline(untracked_cmd)
             )
-            files.update(untracked.splitlines())
+            files.update(untracked.decode().splitlines())
         # git will report changed files relative to the worktree: re-relativize to relative_to
         return {self._fix_git_relative_path(f, relative_to) for f in files}
 
@@ -148,12 +150,16 @@ class GitWorktree(EngineAwareReturnType):
             # There is no git diff flag to include untracked files, so we get
             # the list of untracked files and manually create the diff by
             # comparing each file to an empty /dev/null.
-            untracked_files = self._git(
-                "ls-files",
-                "--other",
-                "--exclude-standard",
-                "--full-name",
-            ).splitlines()
+            untracked_files = (
+                self._git(
+                    "ls-files",
+                    "--other",
+                    "--exclude-standard",
+                    "--full-name",
+                )
+                .decode()
+                .splitlines()
+            )
             for file in set(untracked_files).intersection(paths):
                 untracked_diff = self._git_diff("--no-index", "/dev/null", str(relative_to / file))
                 assert len(untracked_diff) == 1
@@ -161,7 +167,7 @@ class GitWorktree(EngineAwareReturnType):
 
         return result
 
-    def _git(self, *args: str) -> str:
+    def _git(self, *args: str) -> bytes:
         """Run unsandboxed git command."""
         return self._git_binary._invoke_unsandboxed(self._create_git_cmdline(args))
 
@@ -172,7 +178,11 @@ class GitWorktree(EngineAwareReturnType):
     def changes_in(self, diffspec: str, relative_to: PurePath | str | None = None) -> set[str]:
         relative_to = PurePath(relative_to) if relative_to is not None else self.worktree
         cmd = ["diff-tree", "--no-commit-id", "--name-only", "-r", diffspec]
-        files = self._git_binary._invoke_unsandboxed(self._create_git_cmdline(cmd)).splitlines()
+        files = (
+            self._git_binary._invoke_unsandboxed(self._create_git_cmdline(cmd))
+            .decode()
+            .splitlines()
+        )
         return {self._fix_git_relative_path(f.strip(), relative_to) for f in files}
 
     def _create_git_cmdline(self, args: Iterable[str]) -> list[str]:
@@ -293,7 +303,7 @@ async def get_git_worktree(
     git_worktree = GitWorktree(
         binary=git_binary,
         gitdir=git_worktree_request.gitdir,
-        worktree=PurePath(output),
+        worktree=PurePath(output.decode()),
     )
 
     logger.debug(
