@@ -17,7 +17,8 @@ use remexec::{ActionResult, Command, Tree};
 use remote_provider::{ActionCacheProvider, choose_action_cache_provider};
 use store::{Store, StoreError};
 use workunit_store::{
-    Level, Metric, ObservationMetric, RunningWorkunit, WorkunitMetadata, in_workunit,
+    Level, Metric, ObservationMetric, RunningWorkunit, UserMetadataItem, WorkunitMetadata,
+    in_workunit,
 };
 
 use process_execution::{
@@ -486,6 +487,27 @@ impl process_execution::CommandRunner for CommandRunner {
         // Ensure the action and command are stored locally.
         let (command_digest, action_digest) =
             crate::remote::ensure_action_stored_locally(&self.store, &command, &action).await?;
+
+        workunit.update_metadata(|initial| {
+            initial.map(|(initial, level)| {
+                let mut user_metadata = initial.user_metadata;
+                user_metadata.push((
+                    "action.digest".to_string(),
+                    UserMetadataItem::String(action_digest.hash.to_string()),
+                ));
+                user_metadata.push((
+                    "command.digest".to_string(),
+                    UserMetadataItem::String(command_digest.hash.to_string()),
+                ));
+                (
+                    WorkunitMetadata {
+                        user_metadata,
+                        ..initial
+                    },
+                    level,
+                )
+            })
+        });
 
         let use_remote_cache = request.cache_scope == ProcessCacheScope::Always
             || request.cache_scope == ProcessCacheScope::Successful;
