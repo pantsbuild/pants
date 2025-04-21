@@ -221,7 +221,9 @@ pub struct SandboxerClient {
 impl SandboxerClient {
     pub async fn connect(socket_path: &Path) -> Result<Self, String> {
         let socket_path_buf = socket_path.to_path_buf();
-        let channel = Endpoint::try_from("http://[::]:50051")
+        // This needs to be some valid URI, but is not actually used. See example at:
+        // https://github.com/hyperium/tonic/blob/50253f1cb236feca3061488d542e37cf60ba4f65/examples/src/uds/client_with_connector.rs#L21
+        let channel = Endpoint::try_from("http://[::]")
             .map_err(|e| e.to_string())?
             .connect_with_connector(service_fn(move |_: Uri| {
                 let socket_path_buf = socket_path_buf.clone();
