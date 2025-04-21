@@ -3,9 +3,11 @@
 
 use ::fs::{DirectoryDigest, Permissions, RelativePath};
 use hashing::Digest;
+use hyper_util::rt::TokioIo;
 use log::{debug, info, warn};
 use protos::gen::pants::sandboxer::{
     MaterializeDirectoryRequest, MaterializeDirectoryResponse,
+    sandboxer_grpc_client::SandboxerGrpcClient,
     sandboxer_grpc_server::{SandboxerGrpc, SandboxerGrpcServer},
 };
 use std::path::{Path, PathBuf};
@@ -15,11 +17,12 @@ use std::time::Duration;
 use std::{collections::BTreeSet, io};
 use std::{fs, thread};
 use store::{Store, StoreCliOpt};
-use tokio::net::UnixListener;
+use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::oneshot;
 use tokio_stream::wrappers::UnixListenerStream;
-use tonic::transport::Server;
+use tonic::transport::{Channel, Endpoint, Server, Uri};
 use tonic::{Request, Response, Status};
+use tower::service_fn;
 
 // The Sandboxer is a solution to the following problem:
 //
@@ -206,5 +209,91 @@ impl SandboxerGrpc for SandboxerGrpcImpl {
             .map_err(Status::failed_precondition);
         debug!("materialize_directory() result: {:#?}", ret);
         ret
+    }
+}
+
+// The client that sends requests to the sandboxer service.
+#[derive(Clone, Debug)]
+pub struct SandboxerClient {
+    grpc_client: SandboxerGrpcClient<Channel>,
+}
+
+impl SandboxerClient {
+    pub async fn connect(socket_path: &Path) -> Result<Self, String> {
+        let socket_path_buf = socket_path.to_path_buf();
+        // This needs to be some valid URI, but is not actually used. See example at:
+        // https://github.com/hyperium/tonic/blob/50253f1cb236feca3061488d542e37cf60ba4f65/examples/src/uds/client_with_connector.rs#L21
+        let channel = Endpoint::try_from("http://[::]")
+            .map_err(|e| e.to_string())?
+            .connect_with_connector(service_fn(move |_: Uri| {
+                let socket_path_buf = socket_path_buf.clone();
+                async {
+                    Ok::<_, std::io::Error>(TokioIo::new(
+                        UnixStream::connect(socket_path_buf).await?,
+                    ))
+                }
+            }))
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(SandboxerClient {
+            grpc_client: SandboxerGrpcClient::new(channel),
+        })
+    }
+
+    pub async fn connect_with_retries(socket_path: &Path) -> Result<Self, String> {
+        // TODO: POLLING_INTERVAL seems to be a good time quantum to use when waiting
+        //  for server startup (since we know the server sleeps that long on startup)
+        //  but this is somewhat arbitrary and could be tuned further.
+        let sleep_time = SandboxerService::POLLING_INTERVAL;
+        let mut slept = Duration::ZERO;
+        let mut maybe_client: Result<Self, String> = Err("Not connected yet".to_string());
+
+        for _ in 0..20 {
+            tokio::time::sleep(sleep_time).await;
+            slept += sleep_time;
+            debug!(
+                "Waited {:?} to connect to sandboxer at {:?}",
+                slept, socket_path
+            );
+            maybe_client = SandboxerClient::connect(socket_path).await;
+            if maybe_client.is_ok() {
+                debug!("Connected to sandboxer at {:?}", socket_path);
+                break;
+            }
+        }
+        maybe_client
+    }
+
+    pub async fn materialize_directory(
+        &mut self,
+        destination: &Path,
+        destination_root: &Path,
+        dir_digest: &DirectoryDigest,
+        mutable_paths: &[String],
+    ) -> Result<(), String> {
+        let request = tonic::Request::new(MaterializeDirectoryRequest {
+            destination: destination
+                .to_str()
+                .ok_or(format!(
+                    "workdir_path is not a valid str: {}",
+                    destination.display()
+                ))?
+                .to_string(),
+            destination_root: destination_root
+                .to_str()
+                .ok_or(format!(
+                    "workdir_root_path is not a valid str: {}",
+                    destination_root.display()
+                ))?
+                .to_string(),
+            digest: Some(dir_digest.as_digest().into()),
+            mutable_paths: mutable_paths.to_vec(),
+        });
+
+        self.grpc_client
+            .materialize_directory(request)
+            .await
+            .map(|_| ())
+            .map_err(|e| e.to_string())
     }
 }
