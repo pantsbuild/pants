@@ -602,5 +602,5 @@ def test_worktree_invalidation(origin: Path) -> None:
 )
 def test_parse_unified_diff(diff, expected):
     wt = DiffParser()
-    actual = wt.parse_unified_diff(diff)
+    actual = wt.parse_unified_diff(diff.encode())
     assert expected == actual

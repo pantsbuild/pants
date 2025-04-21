@@ -11,7 +11,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
-from io import StringIO
+from io import BytesIO
 from os import PathLike
 from pathlib import Path, PurePath
 from typing import Any, DefaultDict
@@ -198,8 +198,8 @@ class ParseError(Exception):
 
 
 class DiffParser:
-    def parse_unified_diff(self, content: str) -> dict[str, tuple[Hunk, ...]]:
-        buf = StringIO(content)
+    def parse_unified_diff(self, content: bytes) -> dict[str, tuple[Hunk, ...]]:
+        buf = BytesIO(content)
         current_file = None
         hunks: DefaultDict[str, list[Hunk]] = defaultdict(list)
         for line in buf:
@@ -213,17 +213,17 @@ class DiffParser:
                     )
                 current_file = self._parse_filename(match)
                 if current_file is None:
-                    raise ValueError(f"failed to parse filename from line: `{line}`")
+                    raise ValueError(f"failed to parse filename from line: `{line!r}`")
                 continue
 
             if match := self._lines_changed_regex.match(line):
                 if current_file is None:
-                    raise ParseError(f"missing filename in the diff:\n{content}")
+                    raise ParseError(f"missing filename in the diff:\n{content!r}")
 
                 try:
                     hunk = self._parse_hunk(match, line)
                 except ValueError as e:
-                    raise ValueError(f"Failed to parse hunk: {line}") from e
+                    raise ValueError(f"Failed to parse hunk: {line!r}") from e
 
                 hunks[current_file].append(hunk)
                 continue
@@ -234,9 +234,9 @@ class DiffParser:
 
     @cached_property
     def _lines_changed_regex(self) -> re.Pattern:
-        return re.compile(r"^@@ -([0-9]+)(,([0-9]+))? \+([0-9]+)(,([0-9]+))? @@.*")
+        return re.compile(rb"^@@ -([0-9]+)(,([0-9]+))? \+([0-9]+)(,([0-9]+))? @@.*")
 
-    def _parse_hunk(self, match: re.Match, line: str) -> Hunk:
+    def _parse_hunk(self, match: re.Match, line: bytes) -> Hunk:
         g = match.groups()
         return Hunk(
             left=TextBlock(
@@ -253,13 +253,15 @@ class DiffParser:
     def _filename_regex(self) -> re.Pattern:
         # This only handles whitespaces. It doesn't work if a filename has something weird
         # in it that needs escaping, e.g. a double quote.
-        a_file = r'(?:a/(?:[^"]+)|"a/(:?(?:[^"]|\\")+)")'
-        b_file = r'(?:b/(?P<unquoted>[^"]+)|"b/(?P<quoted>(?:[^"]|\\")+)")'
-        return re.compile(rf"^diff --git {a_file} {b_file}$")
+        a_file = rb'(?:a/(?:[^"]+)|"a/(:?(?:[^"]|\\")+)")'
+        b_file = rb'(?:b/(?P<unquoted>[^"]+)|"b/(?P<quoted>(?:[^"]|\\")+)")'
+        return re.compile(b"^diff --git " + a_file + b" " + b_file + b"$")
 
     def _parse_filename(self, match: re.Match) -> str | None:
-        unquoted = str(g) if (g := match.group("unquoted")) is not None else None
-        quoted = str(g).replace(r"\"", '"') if (g := match.group("quoted")) is not None else None
+        unquoted = g.decode() if (g := match.group("unquoted")) is not None else None
+        quoted = (
+            g.decode().replace(r"\"", '"') if (g := match.group("quoted")) is not None else None
+        )
         return unquoted or quoted
 
 
