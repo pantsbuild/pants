@@ -10,18 +10,15 @@ use std::sync::Arc;
 use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bollard::auth::DockerCredentials;
-use bollard::container::{
-    CreateContainerOptions, InspectContainerOptions, LogOutput, RemoveContainerOptions,
-};
+use bollard::container::{CreateContainerOptions, LogOutput, RemoveContainerOptions};
 use bollard::exec::StartExecResults;
 use bollard::image::CreateImageOptions;
-use bollard::secret::ContainerStateStatusEnum;
 use bollard::service::CreateImageInfo;
 use bollard::volume::CreateVolumeOptions;
 use bollard::{Docker, errors::Error as DockerError};
 use bytes::{Bytes, BytesMut};
 use futures::stream::BoxStream;
-use futures::{FutureExt, StreamExt, TryFutureExt};
+use futures::{FutureExt, StreamExt};
 use hashing::Digest;
 use itertools::Itertools;
 use log::Level;
@@ -960,56 +957,10 @@ impl<'a> ContainerCache<'a> {
     }
 
     /// Remove an old or missing container from the container cache - does not remove the actual container.
-    pub(crate) async fn prune_container(
-        &self,
-        image_name: &str,
-        platform: &Platform,
-    ) -> Result<(), String> {
+    pub(crate) fn prune_container(&self, image_name: &str, platform: &Platform) {
         let key = (image_name.to_string(), *platform);
-        let container_id = self
-            .containers
-            .lock()
-            .get(&key)
-            .and_then(|container_once_cell| container_once_cell.get())
-            .map(|t| t.0.clone())
-            .ok_or("Container not found in cache")?;
-        let docker = self.docker.get().await?;
-        let remove_container = match docker.inspect_container(&container_id, None).await {
-            Ok(inspect_response) => {
-                if let Some(state) = inspect_response.state {
-                    if let Some(status) = state.status {
-                        match status {
-                            ContainerStateStatusEnum::RUNNING
-                            | ContainerStateStatusEnum::RESTARTING
-                            | ContainerStateStatusEnum::CREATED
-                            | ContainerStateStatusEnum::PAUSED => {
-                                return Err(format!("Cannot prune container with status {status}"));
-                            }
-                            _ => true,
-                        }
-                    } else {
-                        return Err("Cannot prune container with unknown status".to_string());
-                    }
-                } else {
-                    return Err("Cannot prune container, container state was empty".to_string());
-                }
-            }
-            Err(DockerError::DockerResponseServerError {
-                status_code: 404, ..
-            }) => false,
-            Err(err) => {
-                return Err(format!(
-                    "Cannot prune container because the following error occurred when trying to inspect container status:\n\n{}",
-                    err.to_string()
-                ));
-            }
-        };
         let mut containers = self.containers.lock();
         containers.remove(&key);
-        if remove_container {
-            tokio::spawn(Self::remove_container(docker, container_id.as_str(), None));
-        }
-        Ok(())
     }
 
     /// Return the container ID and NamedCaches for a container running `image_name` for use as a place
