@@ -973,7 +973,7 @@ impl<'a> ContainerCache<'a> {
             .and_then(|container_once_cell| container_once_cell.get())
             .map(|t| t.0.clone())
             .ok_or("Container not found in cache")?;
-        let docker = self.docker.get().await?;
+        let docker = self.docker.get().await?.clone();
         let remove_container = match docker.inspect_container(&container_id, None).await {
             Ok(inspect_response) => {
                 if let Some(state) = inspect_response.state {
@@ -1004,10 +1004,14 @@ impl<'a> ContainerCache<'a> {
                 ));
             }
         };
-        let mut containers = self.containers.lock();
-        containers.remove(&key);
+        {
+            let mut containers = self.containers.lock();
+            containers.remove(&key);
+        }
         if remove_container {
-            tokio::spawn(Self::remove_container(docker, container_id.as_str(), None));
+            tokio::spawn(async move {
+                Self::remove_container(&docker, container_id.as_str(), None).await
+            });
         }
         Ok(())
     }
