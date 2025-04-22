@@ -18,8 +18,9 @@ use bollard::volume::CreateVolumeOptions;
 use bollard::{Docker, errors::Error as DockerError};
 use bytes::{Bytes, BytesMut};
 use futures::stream::BoxStream;
-use futures::{FutureExt, StreamExt, TryFutureExt};
+use futures::{FutureExt, StreamExt};
 use hashing::Digest;
+use itertools::Itertools;
 use log::Level;
 use nails::execution::ExitCode;
 use once_cell::sync::Lazy;
@@ -29,8 +30,8 @@ use task_executor::Executor;
 use workunit_store::{Metric, RunningWorkunit, in_workunit};
 
 use process_execution::local::{
-    CapturedWorkdir, ChildOutput, KeepSandboxes, apply_chroot, collect_child_outputs,
-    create_sandbox, prepare_workdir, setup_run_sh_script,
+    CapturedWorkdir, CapturedWorkdirError, ChildOutput, KeepSandboxes, apply_chroot,
+    collect_child_outputs, create_sandbox, prepare_workdir, setup_run_sh_script,
 };
 use process_execution::{
     Context, FallibleProcessResultWithPlatform, NamedCaches, Platform, Process, ProcessError,
@@ -54,9 +55,10 @@ pub struct CommandRunner<'a> {
     docker: &'a DockerOnceCell,
     work_dir_base: PathBuf,
     immutable_inputs: ImmutableInputs,
-    container_cache: ContainerCache<'a>,
+    pub(crate) container_cache: ContainerCache<'a>,
 }
 
+/// Struct for a single-initialization Docker client.
 #[derive(Clone)]
 pub struct DockerOnceCell {
     cell: Arc<OnceCell<Docker>>,
@@ -385,6 +387,8 @@ impl fmt::Debug for CommandRunner<'_> {
     }
 }
 
+const MAX_RUN_ATTEMPTS: usize = 2;
+
 #[async_trait]
 impl process_execution::CommandRunner for CommandRunner<'_> {
     async fn run(
@@ -393,147 +397,129 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
         _workunit: &mut RunningWorkunit,
         req: Process,
     ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
-        let req_debug_repr = format!("{req:#?}");
-        in_workunit!(
-            "run_local_process_via_docker",
-            req.level,
-            // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
-            // renders at the Process's level.
-            desc = Some(req.description.clone()),
-            |workunit| async move {
-                let keep_sandboxes = req.execution_environment.local_keep_sandboxes;
-                let mut workdir = create_sandbox(
-                    self.executor.clone(),
-                    &self.work_dir_base,
-                    &req.description,
-                    keep_sandboxes,
-                )?;
-
-                // Obtain ID of the base container in which to run the execution for this process.
-                let (container_id, named_caches) = {
-                    let ProcessExecutionStrategy::Docker(image) =
-                        &req.execution_environment.strategy
-                    else {
-                        return Err(ProcessError::Unclassified(
-                            "The Docker execution strategy was not set on the Process, but \
-                 the Docker CommandRunner was used."
-                                .to_owned(),
-                        ));
+        let (image_name, image_platform) = {
+            let ProcessExecutionStrategy::Docker(image) = &req.execution_environment.strategy
+            else {
+                return Err(ProcessError::Unclassified(
+                    "The Docker execution strategy was not set on the Process, but \
+                    the Docker CommandRunner was used."
+                        .to_owned(),
+                ));
+            };
+            (image, &req.execution_environment.platform)
+        };
+        let keep_sandboxes = req.execution_environment.local_keep_sandboxes;
+        let mut errors: Vec<String> = vec![];
+        while errors.len() < MAX_RUN_ATTEMPTS {
+            // Make a mutable copy of the process in the closure
+            let mut mreq = req.clone();
+            let context = context.clone();
+            let process_result: Result<FallibleProcessResultWithPlatform, CapturedWorkdirError> = in_workunit!(
+                "run_local_process_via_docker",
+                req.level,
+                // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
+                // renders at the Process's level.
+                desc = Some(req.description.clone()),
+                |workunit| async move {
+                    let mut workdir = create_sandbox(
+                        self.executor.clone(),
+                        &self.work_dir_base,
+                        &mreq.description,
+                        keep_sandboxes,
+                    )?;
+                    // Obtain ID of the base container in which to run the execution for this process.
+                    let (container_id, named_caches) = self.container_cache.container_for_image(
+                        image_name,
+                        image_platform,
+                        &context.build_id,
+                    )
+                    .await?;
+                    // Compute the absolute working directory within the container, and update the env to
+                    // replace `{chroot}` placeholders with the path to the sandbox within the Docker container.
+                    let working_dir = {
+                        let sandbox_relpath = workdir.path()
+                            .strip_prefix(&self.work_dir_base)
+                            .map_err(|err| format!("Internal error - base directory was not prefix of sandbox directory: {err}"))?;
+                        let sandbox_path_in_container = Path::new(&SANDBOX_BASE_PATH_IN_CONTAINER)
+                            .join(sandbox_relpath)
+                            .into_os_string()
+                            .into_string()
+                            .map_err(|s| format!("Unable to convert sandbox path to string due to non UTF-8 characters: {s:?}"))?;
+                        apply_chroot(&sandbox_path_in_container, &mut mreq);
+                        log::trace!("sandbox_path_in_container = {:?}", &sandbox_path_in_container);
+                        mreq.working_directory
+                            .as_ref()
+                            .map(|relpath| Path::new(&sandbox_path_in_container).join(relpath))
+                            .unwrap_or_else(|| Path::new(&sandbox_path_in_container).to_path_buf())
+                            .into_os_string()
+                            .into_string()
+                            .map_err(|s| format!("Unable to convert working directory due to non UTF-8 characters: {s:?}"))?
                     };
+                    // Prepare the workdir.
+                    // DOCKER-NOTE: The input root will be bind mounted into the container.
+                    let exclusive_spawn = prepare_workdir(
+                        workdir.path().to_owned(),
+                        &self.work_dir_base,
+                        &mreq,
+                        mreq.input_digests.inputs.clone(),
+                        &self.store,
+                        &named_caches,
+                        &self.immutable_inputs,
+                        Some(Path::new(NAMED_CACHES_BASE_PATH_IN_CONTAINER)),
+                        Some(Path::new(IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER)),
+                    ).await?;
 
-                    self.container_cache
-                        .container_for_image(
-                            image,
-                            &req.execution_environment.platform,
-                            &context.build_id,
-                        )
-                        .await?
-                };
-
-                // Start working on a mutable version of the process.
-                let mut req = req;
-
-                // Compute the absolute working directory within the container, and update the env to
-                // replace `{chroot}` placeholders with the path to the sandbox within the Docker container.
-                let working_dir = {
-                    let sandbox_relpath = workdir
-                        .path()
-                        .strip_prefix(&self.work_dir_base)
-                        .map_err(|err| {
-                            format!(
-                  "Internal error - base directory was not prefix of sandbox directory: {err}"
-                )
-                        })?;
-                    let sandbox_path_in_container = Path::new(&SANDBOX_BASE_PATH_IN_CONTAINER)
-            .join(sandbox_relpath)
-            .into_os_string()
-            .into_string()
-            .map_err(|s| {
-              format!("Unable to convert sandbox path to string due to non UTF-8 characters: {s:?}")
-            })?;
-                    apply_chroot(&sandbox_path_in_container, &mut req);
-                    log::trace!(
-                        "sandbox_path_in_container = {:?}",
-                        &sandbox_path_in_container
-                    );
-
-                    req
-            .working_directory
-            .as_ref()
-            .map(|relpath| Path::new(&sandbox_path_in_container).join(relpath))
-            .unwrap_or_else(|| Path::new(&sandbox_path_in_container).to_path_buf())
-            .into_os_string()
-            .into_string()
-            .map_err(|s| {
-              format!("Unable to convert working directory due to non UTF-8 characters: {s:?}")
-            })?
-                };
-
-                // Prepare the workdir.
-                // DOCKER-NOTE: The input root will be bind mounted into the container.
-                let exclusive_spawn = prepare_workdir(
-                    workdir.path().to_owned(),
-                    &self.work_dir_base,
-                    &req,
-                    req.input_digests.inputs.clone(),
-                    &self.store,
-                    &named_caches,
-                    &self.immutable_inputs,
-                    Some(Path::new(NAMED_CACHES_BASE_PATH_IN_CONTAINER)),
-                    Some(Path::new(IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER)),
-                )
-                .await?;
-
-                workunit.increment_counter(Metric::DockerExecutionRequests, 1);
-
-                let res = self
-                    .run_and_capture_workdir(
-                        req.clone(),
+                    workunit.increment_counter(Metric::DockerExecutionRequests, 1);
+                    let res = self.run_and_capture_workdir(
+                        mreq.clone(),
                         context,
                         self.store.clone(),
                         self.executor.clone(),
                         workdir.path().to_owned(),
                         (container_id, working_dir),
                         exclusive_spawn,
-                    )
-                    .map_err(|msg| {
-                        // Processes that experience no infrastructure issues should result in an "Ok" return,
-                        // potentially with an exit code that indicates that they failed (with more information
-                        // on stderr). Actually failing at this level indicates a failure to start or otherwise
-                        // interact with the process, which would generally be an infrastructure or implementation
-                        // error (something missing from the sandbox, incorrect permissions, etc).
-                        //
-                        // Given that this is expected to be rare, we dump the entire process definition in the
-                        // error.
-                        ProcessError::Unclassified(format!(
-                            "Failed to execute: {req_debug_repr}\n\n{msg}"
-                        ))
-                    })
-                    .await;
-
-                match &res {
-                    Ok(_) => workunit.increment_counter(Metric::DockerExecutionSuccesses, 1),
-                    Err(_) => workunit.increment_counter(Metric::DockerExecutionErrors, 1),
+                    ).await;
+                    match &res {
+                        Ok(_) => workunit.increment_counter(Metric::DockerExecutionSuccesses, 1),
+                        Err(_) => workunit.increment_counter(Metric::DockerExecutionErrors, 1),
+                    };
+                    if keep_sandboxes == KeepSandboxes::Always || (
+                        keep_sandboxes == KeepSandboxes::OnFailure &&
+                            res.as_ref().map(|r| r.exit_code).unwrap_or(1) != 0
+                    ) {
+                        workdir.keep(&mreq.description);
+                        setup_run_sh_script(
+                            workdir.path(),
+                            &mreq.env,
+                            &mreq.working_directory,
+                            &mreq.argv,
+                            workdir.path(),
+                        )?;
+                    }
+                    res
                 }
-
-                if keep_sandboxes == KeepSandboxes::Always
-                    || keep_sandboxes == KeepSandboxes::OnFailure
-                        && res.as_ref().map(|r| r.exit_code).unwrap_or(1) != 0
-                {
-                    workdir.keep(&req.description);
-                    setup_run_sh_script(
-                        workdir.path(),
-                        &req.env,
-                        &req.working_directory,
-                        &req.argv,
-                        workdir.path(),
-                    )?;
+            ).await;
+            match process_result {
+                Err(CapturedWorkdirError::Retryable(message)) => {
+                    errors.push(message);
+                    self.container_cache
+                        .prune_container(image_name, image_platform);
                 }
-
-                res
-            }
-        )
-        .await
+                _ => {
+                    return process_result
+                        .map_err(|cwe| ProcessError::Unclassified(cwe.to_string()));
+                }
+            };
+        }
+        Err(ProcessError::Unclassified(format!(
+            "Failed to execute due to missing container: {:#?}\n\n{}",
+            req,
+            errors
+                .iter()
+                .enumerate()
+                .map(|(i, s)| format!("Attempt #{} failed due to: {}", i + 1, s))
+                .join("\n")
+        )))
     }
 
     async fn shutdown(&self) -> Result<(), String> {
@@ -556,7 +542,7 @@ impl CapturedWorkdir for CommandRunner<'_> {
         (container_id, working_dir): Self::WorkdirToken,
         req: Process,
         _exclusive_spawn: bool,
-    ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String> {
+    ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, CapturedWorkdirError> {
         let docker = self.docker.get().await?;
 
         Command::new(req.argv)
@@ -564,6 +550,14 @@ impl CapturedWorkdir for CommandRunner<'_> {
             .working_dir(working_dir)
             .spawn(docker, container_id)
             .await
+            .map_err(|spawn_err: CommandSpawnError| -> CapturedWorkdirError {
+                match spawn_err.err {
+                    DockerError::DockerResponseServerError {
+                        status_code: 404, ..
+                    } => CapturedWorkdirError::Retryable(spawn_err.message),
+                    _ => CapturedWorkdirError::Fatal(spawn_err.message),
+                }
+            })
     }
 
     async fn prepare_workdir_for_capture(
@@ -572,7 +566,7 @@ impl CapturedWorkdir for CommandRunner<'_> {
         _workdir_path: &Path,
         (container_id, working_dir): Self::WorkdirToken,
         req: &Process,
-    ) -> Result<(), String> {
+    ) -> Result<(), CapturedWorkdirError> {
         // Docker on Linux will frequently produce root-owned output files in bind mounts, because we
         // do not assume anything about the users that exist in the image. But Docker on macOS (at least
         // version 14.6.2 using gRPC-FUSE filesystem virtualization) creates files in bind mounts as the
@@ -631,6 +625,12 @@ impl CapturedWorkdir for CommandRunner<'_> {
 /// A loose clone of `std::process:Command` for Docker `exec`.
 struct Command(bollard::exec::CreateExecOptions<String>);
 
+/// A struct to propagate errors that can occur during the `Command.spawn` method.
+struct CommandSpawnError {
+    message: String,
+    err: DockerError,
+}
+
 impl Command {
     fn new(argv: Vec<String>) -> Self {
         Self(bollard::exec::CreateExecOptions {
@@ -662,20 +662,27 @@ impl Command {
         &'a mut self,
         docker: &'a Docker,
         container_id: String,
-    ) -> Result<BoxStream<'b, Result<ChildOutput, String>>, String> {
+    ) -> Result<BoxStream<'b, Result<ChildOutput, String>>, CommandSpawnError> {
         log::trace!("creating execution with config: {:?}", self.0);
 
         let exec = docker
             .create_exec::<String>(&container_id, self.0.clone())
             .await
-            .map_err(|err| format!("Failed to create Docker execution in container: {err:?}"))?;
+            .map_err(|err| CommandSpawnError {
+                message: format!("Failed to create Docker execution in container: {err}"),
+                err,
+            })?;
 
         log::trace!("created execution {}", &exec.id);
 
-        let exec_result = docker
-            .start_exec(&exec.id, None)
-            .await
-            .map_err(|err| format!("Failed to start Docker execution `{}`: {:?}", &exec.id, err))?;
+        let exec_result =
+            docker
+                .start_exec(&exec.id, None)
+                .await
+                .map_err(|err| CommandSpawnError {
+                    message: format!("Failed to start Docker execution `{}`: {}", exec.id, err),
+                    err,
+                })?;
         let mut output_stream = if let StartExecResults::Attached { output, .. } = exec_result {
             output.boxed()
         } else {
@@ -728,8 +735,17 @@ impl Command {
         &mut self,
         docker: &Docker,
         container_id: String,
-    ) -> Result<(i32, Bytes, Bytes), String> {
-        let child_outputs = self.spawn(docker, container_id).await?;
+    ) -> Result<(i32, Bytes, Bytes), CapturedWorkdirError> {
+        let child_outputs =
+            self.spawn(docker, container_id)
+                .await
+                .map_err(|cse| match cse.err {
+                    DockerError::DockerResponseServerError {
+                        status_code: 404,
+                        message,
+                    } => CapturedWorkdirError::Retryable(message),
+                    _ => CapturedWorkdirError::Fatal(cse.message),
+                })?;
         let mut stdout = BytesMut::with_capacity(8192);
         let mut stderr = BytesMut::with_capacity(8192);
         let exit_code = collect_child_outputs(&mut stdout, &mut stderr, child_outputs).await?;
@@ -913,7 +929,7 @@ impl<'a> ContainerCache<'a> {
         docker: Docker,
         container_id: String,
         directory: PathBuf,
-    ) -> Result<(), String> {
+    ) -> Result<(), CapturedWorkdirError> {
         let directory = directory.into_os_string().into_string().map_err(|s| {
             format!(
                 "Unable to convert named cache path to string due to non UTF-8 characters: {s:?}"
@@ -930,14 +946,21 @@ impl<'a> ContainerCache<'a> {
         if exit_code == 0 {
             Ok(())
         } else {
-            Err(format!(
+            Err(CapturedWorkdirError::Fatal(format!(
                 "Failed to create parent directory for named cache in Docker container:\n\
          stdout:\n{}\n\
          stderr:\n{}\n",
                 String::from_utf8_lossy(&stdout),
                 String::from_utf8_lossy(&stderr)
-            ))
+            )))
         }
+    }
+
+    /// Remove an old or missing container from the container cache - does not remove the actual container.
+    pub(crate) fn prune_container(&self, image_name: &str, platform: &Platform) {
+        let key = (image_name.to_string(), *platform);
+        let mut containers = self.containers.lock();
+        containers.remove(&key);
     }
 
     /// Return the container ID and NamedCaches for a container running `image_name` for use as a place
@@ -997,6 +1020,14 @@ impl<'a> ContainerCache<'a> {
         Ok(container_id.to_owned())
     }
 
+    pub(crate) async fn remove_container(
+        docker: &Docker,
+        container_id: &str,
+        options: Option<RemoveContainerOptions>,
+    ) -> Result<(), DockerError> {
+        docker.remove_container(container_id, options).await
+    }
+
     pub async fn shutdown(&self) -> Result<(), String> {
         // Skip shutting down if Docker was never used in the first place.
         if self.containers.lock().is_empty() {
@@ -1027,12 +1058,12 @@ impl<'a> ContainerCache<'a> {
                 force: true,
                 ..RemoveContainerOptions::default()
             };
-            docker
-                .remove_container(&id, Some(remove_options))
+            Self::remove_container(docker, id.as_str(), Some(remove_options))
                 .await
-                .map_err(|err| format!("Failed to remove Docker container `{id}`: {err:?}"))
+                .map_err(|err| {
+                    format!("Failed to remove Docker container during shutdown `{id}`: {err:?}")
+                })
         });
-
         futures::future::try_join_all(removal_futures).await?;
         Ok(())
     }

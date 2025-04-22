@@ -13,6 +13,7 @@ bollard = { workspace = true }
 docker_credential = { workspace = true }
 fs = { path = "../../fs" }
 futures = { workspace = true }
+itertools = { workspace = true }
 log = { workspace = true }
 nails = { workspace = true }
 store = { path = "../../fs/store" }
@@ -32,6 +33,7 @@ bytes = { workspace = true }
 env_logger = { workspace = true }
 maplit = { workspace = true }
 mock = { path = "../../testutil/mock" }
+parameterized = { workspace = true }
 parking_lot = { workspace = true }
 sharded_lmdb = { path = "../../sharded_lmdb" }
 tempfile = { workspace = true }
