@@ -115,7 +115,8 @@ pub async fn interactive_process_inner(
         None,
         None,
     )
-    .await?;
+    .await
+    .map_err(|cwe| cwe.to_string())?;
     apply_chroot(tempdir.path().to_str().unwrap(), &mut process);
 
     let p = Path::new(&process.argv[0]);

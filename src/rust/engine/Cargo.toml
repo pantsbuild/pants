@@ -281,6 +281,7 @@ opendal = { version = "0.52.0", default-features = false, features = [
   "services-ghac",
 ] }
 os_pipe = "1.1"
+parameterized = "2.0.0"
 parking_lot = "0.12"
 peg = "0.8"
 petgraph = "0.6"
