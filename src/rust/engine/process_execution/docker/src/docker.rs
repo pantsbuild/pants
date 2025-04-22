@@ -43,6 +43,8 @@ use process_execution::{
 pub(crate) const SANDBOX_BASE_PATH_IN_CONTAINER: &str = "/pants-sandbox";
 pub(crate) const NAMED_CACHES_BASE_PATH_IN_CONTAINER: &str = "/pants-named-caches";
 pub(crate) const IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER: &str = "/pants-immutable-inputs";
+pub(crate) const PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY: &str = "org.pantsbuild.environment";
+pub(crate) const PANTS_CONTAINER_BUILD_ID_LABEL_KEY: &str = "org.pantsbuild.build_id";
 
 /// Process-wide image pull cache.
 pub static IMAGE_PULL_CACHE: Lazy<ImagePullCache> = Lazy::new(ImagePullCache::new);
@@ -434,6 +436,7 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                         image_name,
                         image_platform,
                         &context.build_id,
+                        mreq.execution_environment.name.as_ref().unwrap(),
                     )
                     .await?;
                     // Compute the absolute working directory within the container, and update the env to
@@ -821,6 +824,7 @@ impl<'a> ContainerCache<'a> {
         image_pull_cache: ImagePullCache,
         work_dir_base: String,
         immutable_inputs_base_dir: String,
+        labels: Option<HashMap<String, String>>,
     ) -> Result<String, String> {
         // Pull the image.
         image_pull_cache
@@ -856,6 +860,7 @@ impl<'a> ContainerCache<'a> {
             image: Some(image_name.clone()),
             tty: Some(true),
             open_stdin: Some(true),
+            labels,
             ..bollard::container::Config::default()
         };
 
@@ -1027,6 +1032,7 @@ impl<'a> ContainerCache<'a> {
         image_name: &str,
         platform: &Platform,
         build_generation: &str,
+        environment_name: &str,
     ) -> Result<(String, NamedCaches), String> {
         let docker = self.docker.get().await?.clone();
         let executor = self.executor.clone();
@@ -1054,6 +1060,16 @@ impl<'a> ContainerCache<'a> {
                     self.image_pull_cache.clone(),
                     work_dir_base,
                     immutable_inputs_base_dir,
+                    Some(HashMap::<String, String>::from([
+                        (
+                            PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY.to_string(),
+                            environment_name.to_string(),
+                        ),
+                        (
+                            PANTS_CONTAINER_BUILD_ID_LABEL_KEY.to_string(),
+                            build_generation.to_string(),
+                        ),
+                    ])),
                 )
                 .await?;
 

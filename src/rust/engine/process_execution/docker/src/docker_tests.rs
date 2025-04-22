@@ -250,7 +250,7 @@ impl DockerCommandTestRunner for ExistingContainerTestRunner {
         match self.container_id.set(
             command_runner
                 .container_cache
-                .container_for_image(&self.image_name, &self.platform, "")
+                .container_for_image(&self.image_name, &self.platform, "", "")
                 .await?,
         ) {
             Ok(()) => Ok(command_runner),
