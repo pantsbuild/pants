@@ -16,7 +16,9 @@ use task_executor::Executor;
 use tokio::net::TcpStream;
 use workunit_store::{Metric, RunningWorkunit, in_workunit};
 
-use process_execution::local::{CapturedWorkdir, ChildOutput, prepare_workdir};
+use process_execution::local::{
+    CapturedWorkdir, CapturedWorkdirError, ChildOutput, prepare_workdir,
+};
 use process_execution::{
     Context, FallibleProcessResultWithPlatform, InputDigests, NamedCaches, Process, ProcessError,
 };
@@ -213,8 +215,7 @@ impl process_execution::CommandRunner for CommandRunner {
                 // NB: We explicitly release the BorrowedNailgunProcess, because when it is Dropped without
                 // release, it assumes that it has been canceled and kills the server.
                 nailgun_process.release().await?;
-
-                Ok(res?)
+                res.map_err(|cwe| ProcessError::Unclassified(cwe.to_string()))
             }
         )
         .await
@@ -236,7 +237,7 @@ impl CapturedWorkdir for CommandRunner {
         workdir_token: Self::WorkdirToken,
         req: Process,
         _exclusive_spawn: bool,
-    ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String> {
+    ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, CapturedWorkdirError> {
         let client_workdir = if let Some(working_directory) = &req.working_directory {
             workdir_path.join(working_directory)
         } else {
