@@ -44,7 +44,6 @@ pub(crate) const SANDBOX_BASE_PATH_IN_CONTAINER: &str = "/pants-sandbox";
 pub(crate) const NAMED_CACHES_BASE_PATH_IN_CONTAINER: &str = "/pants-named-caches";
 pub(crate) const IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER: &str = "/pants-immutable-inputs";
 pub(crate) const PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY: &str = "org.pantsbuild.environment";
-pub(crate) const PANTS_CONTAINER_BUILD_ID_LABEL_KEY: &str = "org.pantsbuild.build_id";
 
 /// Process-wide image pull cache.
 pub static IMAGE_PULL_CACHE: Lazy<ImagePullCache> = Lazy::new(ImagePullCache::new);
@@ -1064,11 +1063,7 @@ impl<'a> ContainerCache<'a> {
                         (
                             PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY.to_string(),
                             environment_name.to_string(),
-                        ),
-                        (
-                            PANTS_CONTAINER_BUILD_ID_LABEL_KEY.to_string(),
-                            build_generation.to_string(),
-                        ),
+                        )
                     ])),
                 )
                 .await?;
