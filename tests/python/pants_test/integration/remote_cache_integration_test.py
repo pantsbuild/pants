@@ -390,6 +390,14 @@ def test_remote_cache_workunits() -> None:
     process_unit = run_process()
     assert process_unit["metadata"]["source"] == "Ran"
 
+    # Verify the action and command digests are in the CAS
+    assert cas.contains(
+        Digest("bfaaa5d77f3ec6933f79f241ed91e7e43deb8272ac984020d6b1f1bddb8b0935", 0)
+    )
+    assert cas.contains(
+        Digest("dd44840a5850af35ad2444517b6472e01a30b90af9040cb6375e0061726a6aae", 0)
+    )
+
     # Second run should hit cache
     process_unit = run_process()
     assert process_unit["metadata"]["source"] == "HitRemotely"
