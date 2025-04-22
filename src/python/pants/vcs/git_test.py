@@ -598,9 +598,21 @@ def test_worktree_invalidation(origin: Path) -> None:
             ),
             {"empty": (Hunk(None, TextBlock(0, 0)),)},
         ],
+        [
+            (
+                b"diff --git a/file.txt b/file.txt\n"
+                b"index e69de29..9daeafb 100644\n"
+                b"--- a/file.txt\n"
+                b"+++ b/file.txt\n"
+                b"@@ -1 +1 @@\n"
+                b"-test\n"
+                b"+test\x90\n"
+            ),
+            {"file.txt": (Hunk(TextBlock(1, 1), TextBlock(1, 1)),)},
+        ],
     ],
 )
 def test_parse_unified_diff(diff, expected):
     wt = DiffParser()
-    actual = wt.parse_unified_diff(diff.encode())
+    actual = wt.parse_unified_diff(diff.encode() if isinstance(diff, str) else diff)
     assert expected == actual
