@@ -10,9 +10,7 @@ use std::sync::Arc;
 use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bollard::auth::DockerCredentials;
-use bollard::container::{
-    CreateContainerOptions, InspectContainerOptions, LogOutput, RemoveContainerOptions,
-};
+use bollard::container::{CreateContainerOptions, LogOutput, RemoveContainerOptions};
 use bollard::exec::StartExecResults;
 use bollard::image::CreateImageOptions;
 use bollard::secret::ContainerStateStatusEnum;
@@ -21,7 +19,7 @@ use bollard::volume::CreateVolumeOptions;
 use bollard::{Docker, errors::Error as DockerError};
 use bytes::{Bytes, BytesMut};
 use futures::stream::BoxStream;
-use futures::{FutureExt, StreamExt, TryFutureExt};
+use futures::{FutureExt, StreamExt};
 use hashing::Digest;
 use itertools::Itertools;
 use log::Level;
@@ -30,6 +28,7 @@ use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use store::{ImmutableInputs, Store};
 use task_executor::Executor;
+use tokio::task::JoinHandle;
 use workunit_store::{Metric, RunningWorkunit, in_workunit};
 
 use process_execution::local::{
@@ -506,7 +505,8 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                 Err(CapturedWorkdirError::Retryable(message)) => {
                     errors.push(message);
                     self.container_cache
-                        .prune_container(image_name, image_platform);
+                        .prune_container(image_name.to_string(), image_platform)
+                        .await?;
                 }
                 _ => {
                     return process_result
@@ -962,58 +962,62 @@ impl<'a> ContainerCache<'a> {
     /// Remove an old or missing container from the container cache - does not remove the actual container.
     pub(crate) async fn prune_container(
         &self,
-        image_name: &str,
+        image_name: String,
         platform: &Platform,
-    ) -> Result<(), String> {
-        let key = (image_name.to_string(), *platform);
+    ) -> Result<JoinHandle<Result<(), String>>, String> {
+        let key = (image_name, *platform);
         let container_id = self
             .containers
             .lock()
-            .get(&key)
-            .and_then(|container_once_cell| container_once_cell.get())
-            .map(|t| t.0.clone())
+            .remove(&key)
+            .and_then(|container_once_cell| container_once_cell.get().map(|t| t.0.clone()))
             .ok_or("Container not found in cache")?;
         let docker = self.docker.get().await?.clone();
-        let remove_container = match docker.inspect_container(&container_id, None).await {
-            Ok(inspect_response) => {
-                if let Some(state) = inspect_response.state {
-                    if let Some(status) = state.status {
-                        match status {
-                            ContainerStateStatusEnum::RUNNING
-                            | ContainerStateStatusEnum::RESTARTING
-                            | ContainerStateStatusEnum::CREATED
-                            | ContainerStateStatusEnum::PAUSED => {
-                                return Err(format!("Cannot prune container with status {status}"));
+        Ok(tokio::spawn(async move {
+            let remove_container = match docker.inspect_container(&container_id, None).await {
+                Ok(inspect_response) => {
+                    if let Some(state) = inspect_response.state {
+                        if let Some(status) = state.status {
+                            match status {
+                                ContainerStateStatusEnum::RUNNING
+                                | ContainerStateStatusEnum::RESTARTING
+                                | ContainerStateStatusEnum::CREATED
+                                | ContainerStateStatusEnum::PAUSED => {
+                                    return Err(format!(
+                                        "Cannot prune container {container_id} with status {status}"
+                                    ));
+                                }
+                                _ => true,
                             }
-                            _ => true,
+                        } else {
+                            return Err(format!(
+                                "Cannot prune container {container_id} with unknown status"
+                            ));
                         }
                     } else {
-                        return Err("Cannot prune container with unknown status".to_string());
+                        return Err(format!(
+                            "Cannot prune container {container_id}, container state was empty"
+                        ));
                     }
-                } else {
-                    return Err("Cannot prune container, container state was empty".to_string());
                 }
+                Err(DockerError::DockerResponseServerError {
+                    status_code: 404, ..
+                }) => false,
+                Err(err) => {
+                    return Err(format!(
+                        "Cannot prune container {container_id} because the following error occurred when trying to inspect container status:\n\n{err}"
+                    ));
+                }
+            };
+            if remove_container {
+                Self::remove_container(&docker, &container_id, None)
+                    .await
+                    .map_err(|err| format!(
+                        "An error occurred when trying to remove container {container_id}\n\n{err}"
+                    ))?;
             }
-            Err(DockerError::DockerResponseServerError {
-                status_code: 404, ..
-            }) => false,
-            Err(err) => {
-                return Err(format!(
-                    "Cannot prune container because the following error occurred when trying to inspect container status:\n\n{}",
-                    err.to_string()
-                ));
-            }
-        };
-        {
-            let mut containers = self.containers.lock();
-            containers.remove(&key);
-        }
-        if remove_container {
-            tokio::spawn(async move {
-                Self::remove_container(&docker, container_id.as_str(), None).await
-            });
-        }
-        Ok(())
+            Ok(())
+        }))
     }
 
     /// Return the container ID and NamedCaches for a container running `image_name` for use as a place
