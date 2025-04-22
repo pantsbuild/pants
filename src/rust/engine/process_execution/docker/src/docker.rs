@@ -10,7 +10,9 @@ use std::sync::Arc;
 use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bollard::auth::DockerCredentials;
-use bollard::container::{CreateContainerOptions, LogOutput, RemoveContainerOptions};
+use bollard::container::{
+    CreateContainerOptions, ListContainersOptions, LogOutput, RemoveContainerOptions,
+};
 use bollard::exec::StartExecResults;
 use bollard::image::CreateImageOptions;
 use bollard::secret::ContainerStateStatusEnum;
@@ -18,6 +20,7 @@ use bollard::service::CreateImageInfo;
 use bollard::volume::CreateVolumeOptions;
 use bollard::{Docker, errors::Error as DockerError};
 use bytes::{Bytes, BytesMut};
+use futures::future::join_all;
 use futures::stream::BoxStream;
 use futures::{FutureExt, StreamExt};
 use hashing::Digest;
@@ -76,6 +79,43 @@ impl DockerOnceCell {
 
     pub fn initialized(&self) -> bool {
         self.cell.initialized()
+    }
+
+    async fn check_for_old_images(docker: &Docker) -> Result<(), String> {
+        let removal_tasks = docker
+            .list_containers(Some(ListContainersOptions {
+                filters: HashMap::<String, Vec<String>>::from([
+                    (
+                        "labels".to_string(),
+                        vec![PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY.to_string()],
+                    ),
+                    (
+                        "status".to_string(),
+                        vec!["exited".to_string(), "dead".to_string()],
+                    ),
+                ]),
+                ..ListContainersOptions::default()
+            }))
+            .await
+            .map_err(|err| format!("An error occurred when listing docker containers\n\n{err}"))?
+            .into_iter()
+            .map(|summary| {
+                let docker = docker.clone();
+                tokio::spawn(async move {
+                    docker
+                        .remove_container(
+                            summary.id.unwrap().as_str(),
+                            Some(RemoveContainerOptions {
+                                force: true,
+                                ..RemoveContainerOptions::default()
+                            }),
+                        )
+                        .await
+                })
+            });
+        // TODO: check for errors
+        join_all(removal_tasks).await;
+        Ok(())
     }
 
     pub async fn get(&self) -> Result<&Docker, String> {
@@ -1059,12 +1099,10 @@ impl<'a> ContainerCache<'a> {
                     self.image_pull_cache.clone(),
                     work_dir_base,
                     immutable_inputs_base_dir,
-                    Some(HashMap::<String, String>::from([
-                        (
-                            PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY.to_string(),
-                            environment_name.to_string(),
-                        )
-                    ])),
+                    Some(HashMap::<String, String>::from([(
+                        PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY.to_string(),
+                        environment_name.to_string(),
+                    )])),
                 )
                 .await?;
 
