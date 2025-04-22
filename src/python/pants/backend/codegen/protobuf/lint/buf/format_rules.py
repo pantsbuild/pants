@@ -18,7 +18,7 @@ from pants.core.util_rules.system_binaries import (
 from pants.engine.fs import MergeDigests
 from pants.engine.intrinsics import merge_digests
 from pants.engine.platform import Platform
-from pants.engine.process import Process, fallible_to_exec_result_or_raise
+from pants.engine.process import Process, execute_process_or_raise
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import FieldSet, Target
 from pants.util.logging import LogLevel
@@ -90,7 +90,7 @@ async def run_buf_format(
         "--path",
         ",".join(request.files),
     ]
-    result = await fallible_to_exec_result_or_raise(
+    result = await execute_process_or_raise(
         **implicitly(
             Process(
                 argv=argv,

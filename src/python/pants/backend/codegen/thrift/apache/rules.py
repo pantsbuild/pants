@@ -21,7 +21,7 @@ from pants.engine.internals.graph import transitive_targets as transitive_target
 from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import create_digest, digest_to_snapshot, merge_digests
-from pants.engine.process import Process, fallible_to_exec_result_or_raise
+from pants.engine.process import Process, execute_process_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import TransitiveTargetsRequest
 from pants.source.source_root import SourceRootsRequest, get_source_roots
@@ -107,7 +107,7 @@ async def generate_apache_thrift_sources(
         *target_sources.snapshot.files,
     ]
 
-    result = await fallible_to_exec_result_or_raise(
+    result = await execute_process_or_raise(
         **implicitly(
             Process(
                 args,
@@ -156,7 +156,7 @@ async def setup_thrift_tool(
         )
 
     version_results = await concurrently(
-        fallible_to_exec_result_or_raise(
+        execute_process_or_raise(
             **implicitly(
                 Process(
                     (binary_path.path, "-version"),

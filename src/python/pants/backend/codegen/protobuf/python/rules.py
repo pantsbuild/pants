@@ -30,7 +30,7 @@ from pants.engine.fs import AddPrefix, CreateDigest, Directory, MergeDigests, Re
 from pants.engine.internals.graph import transitive_targets as transitive_targets_get
 from pants.engine.intrinsics import create_digest, digest_to_snapshot, merge_digests, remove_prefix
 from pants.engine.platform import Platform
-from pants.engine.process import Process, fallible_to_exec_result_or_raise
+from pants.engine.process import Process, execute_process_or_raise
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import GeneratedSources, GenerateSourcesRequest, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
@@ -194,7 +194,7 @@ async def generate_python_from_protobuf(
 
     input_digest = await merge_digests(MergeDigests(unmerged_digests))
     protoc_argv.extend(target_sources_stripped.snapshot.files)
-    result = await fallible_to_exec_result_or_raise(
+    result = await execute_process_or_raise(
         **implicitly(
             Process(
                 protoc_argv,
