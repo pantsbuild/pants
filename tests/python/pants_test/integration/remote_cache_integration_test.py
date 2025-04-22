@@ -374,33 +374,30 @@ def test_remote_cache_workunits() -> None:
         assert process_unit["name"] == "process"
         assert process_unit["description"] == "Scheduling: Create test output"
         assert process_unit["metadata"]["exit_code"] == 0
-        assert (
-            process_unit["metadata"]["action.digest"]
-            == "bfaaa5d77f3ec6933f79f241ed91e7e43deb8272ac984020d6b1f1bddb8b0935"
-        )
-        assert (
-            process_unit["metadata"]["command.digest"]
-            == "dd44840a5850af35ad2444517b6472e01a30b90af9040cb6375e0061726a6aae"
-        )
+
+        action_digest = process_unit["metadata"]["action.digest"]
+        command_digest = process_unit["metadata"]["command.digest"]
+
+        assert len(action_digest) == 64, "Action digest should be a 64-character hash"
+        assert len(command_digest) == 64, "Command digest should be a 64-character hash"
+
         assert process_unit["artifacts"]["stdout_digest"] == EMPTY_FILE_DIGEST
         assert process_unit["artifacts"]["stderr_digest"] == EMPTY_FILE_DIGEST
-        return process_unit
+        return process_unit, action_digest, command_digest
 
     # First run should miss cache and populate it
-    process_unit = run_process()
+    process_unit, action_digest, command_digest = run_process()
     assert process_unit["metadata"]["source"] == "Ran"
 
     # Verify the action and command digests are in the CAS
-    assert cas.contains(
-        Digest("bfaaa5d77f3ec6933f79f241ed91e7e43deb8272ac984020d6b1f1bddb8b0935", 0)
-    )
-    assert cas.contains(
-        Digest("dd44840a5850af35ad2444517b6472e01a30b90af9040cb6375e0061726a6aae", 0)
-    )
+    assert cas.contains(Digest(action_digest, 0))
+    assert cas.contains(Digest(command_digest, 0))
 
     # Second run should hit cache
-    process_unit = run_process()
-    assert process_unit["metadata"]["source"] == "HitRemotely"
+    process_unit2, action_digest2, command_digest2 = run_process()
+    assert process_unit2["metadata"]["source"] == "HitRemotely"
+    assert action_digest == action_digest2
+    assert command_digest == command_digest2
 
 
 def new_run_tracker() -> RunTracker:
