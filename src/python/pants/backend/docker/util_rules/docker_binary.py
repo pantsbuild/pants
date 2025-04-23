@@ -18,11 +18,12 @@ from pants.core.util_rules.system_binaries import (
     BinaryPathTest,
     BinaryShims,
     BinaryShimsRequest,
+    find_binary,
 )
 from pants.engine.fs import Digest
-from pants.engine.internals.selectors import MultiGet
+from pants.engine.internals.selectors import concurrently
 from pants.engine.process import Process, ProcessCacheScope
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, implicitly, rule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -147,7 +148,7 @@ async def _get_docker_tools_shims(
             for binary_name in tools
         ]
 
-        tools_paths = await MultiGet(
+        tools_paths = await concurrently(
             Get(BinaryPaths, BinaryPathRequest, tools_request) for tools_request in tools_requests
         )
 
@@ -164,7 +165,7 @@ async def _get_docker_tools_shims(
             for binary_name in optional_tools
         ]
 
-        optional_tools_paths = await MultiGet(
+        optional_tools_paths = await concurrently(
             Get(BinaryPaths, BinaryPathRequest, optional_tools_request)
             for optional_tools_request in optional_tools_requests
         )
@@ -205,7 +206,7 @@ async def get_docker(
             search_path=search_path,
             test=BinaryPathTest(args=["-v"]),
         )
-        paths = await Get(BinaryPaths, BinaryPathRequest, request)
+        paths = await find_binary(request, **implicitly())
         first_path = paths.first_path
         if first_path:
             is_podman = True
@@ -217,7 +218,7 @@ async def get_docker(
             search_path=search_path,
             test=BinaryPathTest(args=["-v"]),
         )
-        paths = await Get(BinaryPaths, BinaryPathRequest, request)
+        paths = await find_binary(request, **implicitly())
         first_path = paths.first_path_or_raise(request, rationale="interact with the docker daemon")
 
     if not docker_options.tools and not docker_options.optional_tools:
