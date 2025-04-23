@@ -467,9 +467,7 @@ async def _get_nvm_root() -> str | None:
     """See https://github.com/nvm-sh/nvm#installing-and-updating."""
 
     env = await environment_vars_subset(
-        **implicitly(
-            {EnvironmentVarsRequest(("NVM_DIR", "XDG_CONFIG_HOME", "HOME")): EnvironmentVarsRequest}
-        )
+        EnvironmentVarsRequest(("NVM_DIR", "XDG_CONFIG_HOME", "HOME")), **implicitly()
     )
     nvm_dir = env.get("NVM_DIR")
     default_dir = env.get("XDG_CONFIG_HOME", env.get("HOME"))
