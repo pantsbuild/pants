@@ -202,19 +202,16 @@ async def run_terraform_init(request: TerraformInitRequest, upgrade: bool):
     )
 
     has_lockfile = invocation_files.lockfile is not None
-    init_response = await Get(
-        TerraformDependenciesResponse,
-        TerraformDependenciesRequest(
-            chdir,
-            backend_config,
-            has_lockfile,
-            source_for_validate,
-            initialise_backend=request.initialise_backend,
-            upgrade=upgrade,
-        ),
-    )
 
-    return source_files, dependencies_files, init_response, chdir
+    terraform_init_cmd = TerraformDependenciesRequest(
+        chdir,
+        backend_config,
+        has_lockfile,
+        source_for_validate,
+        initialise_backend=request.initialise_backend,
+        upgrade=upgrade,
+    )
+    return source_files, dependencies_files, terraform_init_cmd, chdir
 
 
 @rule
@@ -223,8 +220,12 @@ async def terraform_init(request: TerraformInitRequest) -> TerraformInitResponse
 
     Returns all the initialised files, ready for execution of subsequent tasks
     """
-    source_files, dependencies_files, init_response, chdir = await run_terraform_init(
+    source_files, dependencies_files, terraform_init_cmd, chdir = await run_terraform_init(
         request, upgrade=False
+    )
+
+    init_response = await Get(
+        TerraformDependenciesResponse, TerraformDependenciesRequest, terraform_init_cmd
     )
 
     all_terraform_files = await Get(
@@ -250,8 +251,11 @@ async def terraform_upgrade_lockfile(request: TerraformInitRequest) -> Terraform
     This split exists because the new and old lockfile will conflict if merging digests
     """
 
-    source_files, dependencies_files, init_response, chdir = await run_terraform_init(
+    source_files, dependencies_files, terraform_init_cmd, chdir = await run_terraform_init(
         request, upgrade=True
+    )
+    init_response = await Get(
+        TerraformDependenciesResponse, TerraformDependenciesRequest, terraform_init_cmd
     )
 
     updated_lockfile, dependencies_except_lockfile = await MultiGet(
