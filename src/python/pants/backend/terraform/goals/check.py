@@ -10,7 +10,7 @@ from pants.backend.terraform.target_types import (
     TerraformModuleTarget,
     TerraformRootModuleField,
 )
-from pants.backend.terraform.tool import TerraformProcess
+from pants.backend.terraform.tool import TerraformCommand, TerraformProcess
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
@@ -82,7 +82,7 @@ async def terraform_check(
         Get(
             FallibleProcessResult,
             TerraformProcess(
-                args=("validate",),
+                cmds=(TerraformCommand(("validate",)),),
                 input_digest=deployment.sources_and_deps,
                 output_files=tuple(deployment.terraform_files.files),
                 description=f"Run `terraform validate` on module {deployment.chdir} with {pluralize(len(deployment.terraform_files.files), 'file')}.",

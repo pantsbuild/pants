@@ -12,7 +12,7 @@ from pants.backend.terraform.target_types import (
     TerraformModuleTarget,
     TerraformRootModuleField,
 )
-from pants.backend.terraform.tool import TerraformProcess, TerraformTool
+from pants.backend.terraform.tool import TerraformCommand, TerraformProcess, TerraformTool
 from pants.backend.terraform.utils import terraform_arg
 from pants.core.goals.generate_lockfiles import (
     GenerateLockfile,
@@ -127,7 +127,7 @@ async def generate_lockfile_from_sources(
     multiplatform_lockfile = await Get(
         FallibleProcessResult,
         TerraformProcess(
-            args=args,
+            cmds=(TerraformCommand(args),),
             input_digest=initialised_terraform.sources_and_deps,
             output_files=(".terraform.lock.hcl",),
             description=provider_lock_description,

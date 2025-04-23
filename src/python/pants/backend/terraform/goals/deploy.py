@@ -11,7 +11,7 @@ from pants.backend.terraform.dependency_inference import (
     TerraformDeploymentInvocationFilesRequest,
 )
 from pants.backend.terraform.target_types import TerraformDeploymentFieldSet
-from pants.backend.terraform.tool import TerraformProcess, TerraformTool
+from pants.backend.terraform.tool import TerraformCommand, TerraformProcess, TerraformTool
 from pants.backend.terraform.utils import terraform_arg, terraform_relpath
 from pants.core.goals.deploy import DeployFieldSet, DeployProcess, DeploySubsystem
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -81,7 +81,7 @@ async def prepare_terraform_deployment(
     process = await Get(
         Process,
         TerraformProcess(
-            args=tuple(args),
+            cmds=(TerraformCommand(tuple(args)),),
             input_digest=with_vars,
             description=f"Terraform {terraform_command}",
             chdir=initialised_terraform.chdir,

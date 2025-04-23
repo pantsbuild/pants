@@ -18,7 +18,7 @@ from pants.backend.terraform.target_types import (
     TerraformRootModuleField,
     TerraformVarFileSourceField,
 )
-from pants.backend.terraform.tool import TerraformProcess
+from pants.backend.terraform.tool import TerraformCommand, TerraformProcess
 from pants.backend.terraform.utils import terraform_arg, terraform_relpath
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.target_types import FileSourceField, ResourceSourceField
@@ -49,6 +49,27 @@ class TerraformDependenciesRequest:
     initialise_backend: bool = False
     upgrade: bool = False
 
+    def to_args(self) -> TerraformCommand:
+        args = ["init"]
+        if self.backend_config:
+            args.append(
+                terraform_arg(
+                    "-backend-config",
+                    terraform_relpath(self.chdir, self.backend_config),
+                )
+            )
+
+        # If we have a lockfile and aren't regenerating it, don't modify it
+        if self.lockfile and not self.upgrade:
+            args.append("-lockfile=readonly")
+
+        if self.upgrade:
+            args.append("-upgrade")
+
+        args.append(terraform_arg("-backend", str(self.initialise_backend)))
+
+        return TerraformCommand(tuple(args))
+
 
 @dataclass(frozen=True)
 class TerraformDependenciesResponse:
@@ -60,31 +81,13 @@ async def get_terraform_providers(
     req: TerraformDependenciesRequest,
     keep_sandboxes: KeepSandboxes,
 ) -> TerraformDependenciesResponse:
-    args = ["init"]
-    if req.backend_config:
-        args.append(
-            terraform_arg(
-                "-backend-config",
-                terraform_relpath(req.chdir, req.backend_config),
-            )
-        )
-
-    # If we have a lockfile and aren't regenerating it, don't modify it
-    if req.lockfile and not req.upgrade:
-        args.append("-lockfile=readonly")
-
-    if req.upgrade:
-        args.append("-upgrade")
-
-    args.append(terraform_arg("-backend", str(req.initialise_backend)))
-
     init_process_description = (
         f"Running `init` on Terraform module at `{req.chdir}` to fetch dependencies"
     )
     fetched_deps = await Get(
         FallibleProcessResult,
         TerraformProcess(
-            args=tuple(args),
+            cmds=(req.to_args(),),
             input_digest=req.dependencies_files,
             output_files=(".terraform.lock.hcl",),
             output_directories=(".terraform",),
