@@ -129,10 +129,11 @@ class TerraformUpgradeResponse:
 
 @dataclass(frozen=True)
 class TerraformThingsNeededToRun:
-    """The things you need to run a terraform command"""
+    """The things you need to run a terraform command."""
+
     terraform_sources: SourceFiles
     dependencies_files: SourceFiles
-    cmd: TerraformDependenciesRequest
+    init_cmd: TerraformDependenciesRequest
     chdir: str
 
 
@@ -234,7 +235,7 @@ async def terraform_init(request: TerraformInitRequest) -> TerraformInitResponse
     init = await prepare_terraform_invocation(request)
 
     init_response = await Get(
-        TerraformDependenciesResponse, TerraformDependenciesRequest, init.cmd
+        TerraformDependenciesResponse, TerraformDependenciesRequest, init.init_cmd
     )
 
     all_terraform_files = await Get(
@@ -249,7 +250,9 @@ async def terraform_init(request: TerraformInitRequest) -> TerraformInitResponse
     )
 
     return TerraformInitResponse(
-        sources_and_deps=all_terraform_files, terraform_files=init.terraform_sources, chdir=init.chdir
+        sources_and_deps=all_terraform_files,
+        terraform_files=init.terraform_sources,
+        chdir=init.chdir,
     )
 
 
@@ -263,7 +266,7 @@ async def terraform_upgrade_lockfile(request: TerraformInitRequest) -> Terraform
     init = await prepare_terraform_invocation(request)
 
     init_response = await Get(
-        TerraformDependenciesResponse, TerraformDependenciesRequest, init.cmd
+        TerraformDependenciesResponse, TerraformDependenciesRequest, init.init_cmd
     )
 
     updated_lockfile, dependencies_except_lockfile = await MultiGet(

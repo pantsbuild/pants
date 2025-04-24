@@ -1,9 +1,8 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-import asyncio
 from dataclasses import dataclass
 
-from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse, prepare_terraform_invocation
+from pants.backend.terraform.dependencies import TerraformInitRequest, prepare_terraform_invocation
 from pants.backend.terraform.target_types import (
     TerraformDeploymentFieldSet,
     TerraformDeploymentTarget,
@@ -13,7 +12,7 @@ from pants.backend.terraform.target_types import (
 )
 from pants.backend.terraform.tool import TerraformCommand, TerraformProcess
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
-from pants.engine.internals.native_engine import MergeDigests, Digest
+from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -93,7 +92,10 @@ async def terraform_check(
         Get(
             FallibleProcessResult,
             TerraformProcess(
-                cmds=(deployment.cmd.to_args() ,TerraformCommand(("validate",)),),
+                cmds=(
+                    deployment.init_cmd.to_args(),
+                    TerraformCommand(("validate",)),
+                ),
                 input_digest=sources_and_deps,
                 output_files=tuple(deployment.terraform_sources.files),
                 description=f"Run `terraform validate` on module {deployment.chdir} with {pluralize(len(deployment.terraform_sources.files), 'file')}.",

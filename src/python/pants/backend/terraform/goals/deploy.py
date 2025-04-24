@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
+from pants.backend.terraform.dependencies import TerraformInitRequest, prepare_terraform_invocation
 from pants.backend.terraform.dependency_inference import (
     TerraformDeploymentInvocationFiles,
     TerraformDeploymentInvocationFilesRequest,
@@ -45,13 +45,12 @@ async def prepare_terraform_deployment(
     deploy_subsystem: DeploySubsystem,
     keep_sandboxes: KeepSandboxes,
 ) -> InteractiveProcess:
-    initialised_terraform = await Get(
-        TerraformInitResponse,
+    deployment = await prepare_terraform_invocation(
         TerraformInitRequest(
             request.field_set.root_module,
             request.field_set.dependencies,
             initialise_backend=True,
-        ),
+        )
     )
 
     terraform_command = "plan" if deploy_subsystem.dry_run else "apply"
@@ -67,12 +66,17 @@ async def prepare_terraform_deployment(
         SourceFiles, SourceFilesRequest(e.get(SourcesField) for e in invocation_files.vars_files)
     )
     for var_file in var_files.files:
-        args.append(
-            terraform_arg("-var-file", terraform_relpath(initialised_terraform.chdir, var_file))
-        )
+        args.append(terraform_arg("-var-file", terraform_relpath(deployment.chdir, var_file)))
 
     with_vars = await Get(
-        Digest, MergeDigests([var_files.snapshot.digest, initialised_terraform.sources_and_deps])
+        Digest,
+        MergeDigests(
+            [
+                var_files.snapshot.digest,
+                deployment.terraform_sources.snapshot.digest,
+                deployment.dependencies_files.snapshot.digest,
+            ]
+        ),
     )
 
     if terraform_subsystem.args:
@@ -81,10 +85,13 @@ async def prepare_terraform_deployment(
     process = await Get(
         Process,
         TerraformProcess(
-            cmds=(TerraformCommand(tuple(args)),),
+            cmds=(
+                deployment.init_cmd.to_args(),
+                TerraformCommand(tuple(args)),
+            ),
             input_digest=with_vars,
             description=f"Terraform {terraform_command}",
-            chdir=initialised_terraform.chdir,
+            chdir=deployment.chdir,
         ),
     )
     return InteractiveProcess.from_process(process, keep_sandboxes=keep_sandboxes)
