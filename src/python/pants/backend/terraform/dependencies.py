@@ -18,7 +18,6 @@ from pants.backend.terraform.target_types import (
 )
 from pants.backend.terraform.tool import TerraformCommand, TerraformProcess
 from pants.backend.terraform.utils import terraform_arg, terraform_relpath
-from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.internals.native_engine import Address, AddressInput, Digest, MergeDigests
@@ -207,60 +206,6 @@ async def prepare_terraform_invocation(request: TerraformInitRequest) -> Terrafo
         upgrade=request.upgrade,
     )
     return TerraformThingsNeededToRun(source_files, dependencies_files, terraform_init_cmd, chdir)
-
-
-@rule
-async def terraform_upgrade_lockfile(request: TerraformInitRequest) -> TerraformUpgradeResponse:
-    """Run `terraform init -upgrade`. Returns all terraform files with the new lockfile.
-
-    This split exists because the new and old lockfile will conflict if merging digests
-    """
-
-    init = await prepare_terraform_invocation(request)
-
-    init_response = await Get(
-        TerraformDependenciesResponse, TerraformDependenciesRequest, init.init_cmd
-    )
-
-    updated_lockfile, dependencies_except_lockfile = await MultiGet(
-        Get(
-            Digest,
-            DigestSubset(
-                init_response.digest,
-                PathGlobs(
-                    (os.path.join(init.chdir, ".terraform.lock.hcl"),),
-                    glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                    description_of_origin="upgrade terraform lockfile with `terraform init`",
-                ),
-            ),
-        ),
-        Get(
-            Digest,
-            DigestSubset(
-                init.dependencies_files.snapshot.digest,
-                PathGlobs(
-                    (
-                        "**",
-                        "!" + os.path.join(init.chdir, ".terraform.lock.hcl"),
-                    ),
-                ),
-            ),
-        ),
-    )
-
-    all_terraform_files = await Get(
-        Digest,
-        MergeDigests(
-            [
-                init.terraform_sources.snapshot.digest,
-                dependencies_except_lockfile,
-                init_response.digest,
-                updated_lockfile,
-            ]
-        ),
-    )
-
-    return TerraformUpgradeResponse(all_terraform_files, updated_lockfile, init.chdir)
 
 
 def rules():
