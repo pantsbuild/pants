@@ -1,8 +1,9 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+import asyncio
 from dataclasses import dataclass
 
-from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
+from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse, prepare_terraform_invocation
 from pants.backend.terraform.target_types import (
     TerraformDeploymentFieldSet,
     TerraformDeploymentTarget,
@@ -12,6 +13,7 @@ from pants.backend.terraform.target_types import (
 )
 from pants.backend.terraform.tool import TerraformCommand, TerraformProcess
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
+from pants.engine.internals.native_engine import MergeDigests, Digest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -69,31 +71,40 @@ async def terraform_check(
     if subsystem.skip:
         return CheckResults([], checker_name=request.tool_name)
 
-    initialised_terraforms = await MultiGet(
-        Get(
-            TerraformInitResponse,
-            TerraformInitRequest,
-            terraform_fieldset_to_init_request(deployment),
-        )
+    terraform_deployments = await MultiGet(
+        prepare_terraform_invocation(terraform_fieldset_to_init_request(deployment))
         for deployment in request.field_sets
+    )
+
+    all_sources_and_deps = await MultiGet(
+        Get(
+            Digest,
+            MergeDigests(
+                [
+                    deployment.terraform_sources.snapshot.digest,
+                    deployment.dependencies_files.snapshot.digest,
+                ]
+            ),
+        )
+        for deployment in terraform_deployments
     )
 
     results = await MultiGet(
         Get(
             FallibleProcessResult,
             TerraformProcess(
-                cmds=(TerraformCommand(("validate",)),),
-                input_digest=deployment.sources_and_deps,
-                output_files=tuple(deployment.terraform_files.files),
-                description=f"Run `terraform validate` on module {deployment.chdir} with {pluralize(len(deployment.terraform_files.files), 'file')}.",
+                cmds=(deployment.cmd.to_args() ,TerraformCommand(("validate",)),),
+                input_digest=sources_and_deps,
+                output_files=tuple(deployment.terraform_sources.files),
+                description=f"Run `terraform validate` on module {deployment.chdir} with {pluralize(len(deployment.terraform_sources.files), 'file')}.",
                 chdir=deployment.chdir,
             ),
         )
-        for deployment in initialised_terraforms
+        for deployment, sources_and_deps in zip(terraform_deployments, all_sources_and_deps)
     )
 
     check_results = []
-    for deployment, result, field_set in zip(initialised_terraforms, results, request.field_sets):
+    for deployment, result, field_set in zip(terraform_deployments, results, request.field_sets):
         check_results.append(
             CheckResult.from_fallible_process_result(
                 result, partition_description=f"`terraform validate` on `{field_set.address}`"
