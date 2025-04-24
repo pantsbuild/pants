@@ -2,8 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import os
-import os.path
 from dataclasses import dataclass
 
 from pants.backend.terraform.dependency_inference import (
@@ -23,7 +21,6 @@ from pants.backend.terraform.utils import terraform_arg, terraform_relpath
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import DigestSubset, PathGlobs
 from pants.engine.internals.native_engine import Address, AddressInput, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure
@@ -111,20 +108,6 @@ class TerraformInitRequest:
     # Not initialising the backend means we won't access remote state. Useful for `validate`
     initialise_backend: bool = False
     upgrade: bool = False
-
-
-@dataclass(frozen=True)
-class TerraformInitResponse:
-    sources_and_deps: Digest
-    terraform_files: SourceFiles
-    chdir: str
-
-
-@dataclass(frozen=True)
-class TerraformUpgradeResponse:
-    sources_and_deps: Digest
-    lockfile: Digest
-    chdir: str
 
 
 @dataclass(frozen=True)
@@ -224,36 +207,6 @@ async def prepare_terraform_invocation(request: TerraformInitRequest) -> Terrafo
         upgrade=request.upgrade,
     )
     return TerraformThingsNeededToRun(source_files, dependencies_files, terraform_init_cmd, chdir)
-
-
-@rule
-async def terraform_init(request: TerraformInitRequest) -> TerraformInitResponse:
-    """Run `terraform init`.
-
-    Returns all the initialised files, ready for execution of subsequent tasks
-    """
-    init = await prepare_terraform_invocation(request)
-
-    init_response = await Get(
-        TerraformDependenciesResponse, TerraformDependenciesRequest, init.init_cmd
-    )
-
-    all_terraform_files = await Get(
-        Digest,
-        MergeDigests(
-            [
-                init.terraform_sources.snapshot.digest,
-                init.dependencies_files.snapshot.digest,
-                init_response.digest,
-            ]
-        ),
-    )
-
-    return TerraformInitResponse(
-        sources_and_deps=all_terraform_files,
-        terraform_files=init.terraform_sources,
-        chdir=init.chdir,
-    )
 
 
 @rule
