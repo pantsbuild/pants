@@ -31,7 +31,7 @@ use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use store::{ImmutableInputs, Store};
 use task_executor::Executor;
-use tokio::task::JoinHandle;
+use tokio::task::{JoinError, JoinHandle};
 use workunit_store::{Metric, RunningWorkunit, in_workunit};
 
 use process_execution::local::{
@@ -81,7 +81,7 @@ impl DockerOnceCell {
         self.cell.initialized()
     }
 
-    async fn check_for_old_images(docker: &Docker) -> Result<(), String> {
+    async fn check_for_old_images(docker: &Docker) -> Result<(), Vec<String>> {
         let removal_tasks = docker
             .list_containers(Some(ListContainersOptions {
                 filters: HashMap::<String, Vec<String>>::from([
@@ -97,25 +97,48 @@ impl DockerOnceCell {
                 ..ListContainersOptions::default()
             }))
             .await
-            .map_err(|err| format!("An error occurred when listing docker containers\n\n{err}"))?
+            .map_err(|err| {
+                vec![format!(
+                    "An error occurred when listing docker containers\n\n{err}"
+                )]
+            })?
             .into_iter()
             .map(|summary| {
                 let docker = docker.clone();
                 tokio::spawn(async move {
-                    docker
-                        .remove_container(
-                            summary.id.unwrap().as_str(),
-                            Some(RemoveContainerOptions {
-                                force: true,
-                                ..RemoveContainerOptions::default()
+                    match summary.id {
+                        Some(container_id) => docker
+                            .remove_container(
+                                container_id.as_str(),
+                                Some(RemoveContainerOptions {
+                                    force: true,
+                                    ..RemoveContainerOptions::default()
+                                }),
+                            )
+                            .await
+                            .map_err(|err| {
+                                format!("Failed to remove container {container_id}:\n{err}")
                             }),
-                        )
-                        .await
+                        None => Err(format!(
+                            "No container id attached to summary:\n{summary:#?}"
+                        )),
+                    }
                 })
             });
-        // TODO: check for errors
-        join_all(removal_tasks).await;
-        Ok(())
+        let errors: Vec<String> = join_all(removal_tasks)
+            .await
+            .into_iter()
+            .filter_map(|res| match res {
+                Ok(Ok(_)) => None,
+                Ok(Err(s)) => Some(s),
+                Err(je) => Some(je.to_string()),
+            })
+            .collect();
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
     }
 
     pub async fn get(&self) -> Result<&Docker, String> {
@@ -143,6 +166,9 @@ impl DockerOnceCell {
           _ => return Err(format!("Unparseable API version `{}` returned by Docker.", &api_version)),
         }
 
+        if let Err(removal_errors) = Self::check_for_old_images(&docker).await {
+            log::warn!("The following errors occurred when attempting to remove old containers:\n\n{}", removal_errors.join("\n"));
+        }
         Ok(docker)
       })
       .await
