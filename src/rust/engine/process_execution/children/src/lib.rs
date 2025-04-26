@@ -79,7 +79,7 @@ impl ManagedChild {
     /// if the child has not yet exited. An error indicated a system error checking
     /// the result of the child process, and does not necessarily indicate that
     /// has exited or not.
-    fn check_child_has_exited(&mut self) -> Result<bool, String> {
+    pub fn check_child_has_exited(&mut self) -> Result<bool, String> {
         self.child
             .try_wait()
             .map(|o| o.is_some())
