@@ -64,7 +64,7 @@ class RustToolchainProcess:
 
 @rule
 async def find_rustup(rust_subsystem: RustSubsystem) -> RustupBinary:
-    env = await environment_vars_subset(**implicitly(EnvironmentVarsRequest(["PATH"])))
+    env = await environment_vars_subset(EnvironmentVarsRequest(["PATH"]), **implicitly())
     request = BinaryPathRequest(
         binary_name="rustup",
         search_path=rust_subsystem.rustup_search_paths(env),
@@ -84,7 +84,7 @@ class RustBinaryPathRequest:
 async def rust_binary_path(
     request: RustBinaryPathRequest, rustup: RustupBinary, rust_subsystem: RustSubsystem
 ) -> BinaryPath:
-    env = await environment_vars_subset(**implicitly(EnvironmentVarsRequest(["RUSTUP_HOME"])))
+    env = await environment_vars_subset(EnvironmentVarsRequest(["RUSTUP_HOME"]), **implicitly())
     which_result = await execute_process_or_raise(
         **implicitly(
             Process(

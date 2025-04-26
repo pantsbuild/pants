@@ -2,24 +2,33 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use ::fs::{DirectoryDigest, Permissions, RelativePath};
+use children::ManagedChild;
 use hashing::Digest;
+use hyper_util::rt::TokioIo;
 use log::{debug, info, warn};
 use protos::gen::pants::sandboxer::{
     MaterializeDirectoryRequest, MaterializeDirectoryResponse,
+    sandboxer_grpc_client::SandboxerGrpcClient,
     sandboxer_grpc_server::{SandboxerGrpc, SandboxerGrpcServer},
 };
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
+
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use std::{collections::BTreeSet, io};
 use std::{fs, thread};
 use store::{Store, StoreCliOpt};
-use tokio::net::UnixListener;
+use tokio::fs::OpenOptions;
+use tokio::net::{UnixListener, UnixStream};
+use tokio::sync::RwLock;
 use tokio::sync::oneshot;
+use tokio::{process::Command, sync::RwLockWriteGuard};
 use tokio_stream::wrappers::UnixListenerStream;
-use tonic::transport::Server;
+use tonic::transport::{Channel, Endpoint, Server, Uri};
 use tonic::{Request, Response, Status};
+use tower::service_fn;
 
 // The Sandboxer is a solution to the following problem:
 //
@@ -79,7 +88,7 @@ pub struct SandboxerService {
 impl SandboxerService {
     // Note that since we wait one polling interval on startup, increasing
     // this constant will increase our startup time.
-    const POLLING_INTERVAL: Duration = Duration::from_millis(50);
+    pub const POLLING_INTERVAL: Duration = Duration::from_millis(50);
     const ALLOWED_IDLE_TIME: Duration = Duration::from_secs(60 * 15);
     // We count idle beats and not actual elapsed idle time, since we don't need to be very
     // precise. The two will have the same effect unless the shutdown thread is unusually starved.
@@ -98,14 +107,18 @@ impl SandboxerService {
         ensure_socket_file_removed(&self.socket_path)?;
         // Wait a beat, to let any previous sandboxer process notice this removal and exit.
         // There's no great harm in leaving a stray sandboxer process running, it will
-        // receive no requests (since the socket file was pulled out from under it) so eventually
-        // it'll shut down due to idleness. But it's nicer if we can let it go right away.
+        // receive no new connections (since the socket file was pulled out from under it)
+        // so eventually it'll shut down due to idleness. But it's nicer if we can let it
+        // go right away.
         tokio::time::sleep(SandboxerService::POLLING_INTERVAL).await;
 
         ensure_parent_dir(&self.socket_path)?;
         let listener = UnixListener::bind(&self.socket_path)?;
-        // `bind()` creates the socket file, so now we can poll it, in case the
-        // user deletes it.
+        // `bind()` creates the socket file, so now we can poll it to check if it has
+        // been deleted by the user. If it has, existing connections will continue to
+        // work (via the underlying inode) but new connections will not be possible,
+        // so we exit the process and let the caller respawn it.
+        //
         // NB: We can't easily use the notify crate to watch changes to the socket file,
         //  because on MacOS the FSEvent watches are path-based, not inode-based, and they
         //  are batched. So we may get a spurious notification for the removal above, and not
@@ -114,7 +127,8 @@ impl SandboxerService {
         let socket_path = self.socket_path.clone();
         let inactivity_counter = Arc::new(AtomicUsize::new(0));
         let inactivity_counter_ref = inactivity_counter.clone();
-        let (shutdown_tx, shutdown_rx) = oneshot::channel();
+        let (graceful_shutdown_tx, graceful_shutdown_rx) = oneshot::channel();
+        let (abrupt_shutdown_tx, abrupt_shutdown_rx) = oneshot::channel();
 
         thread::spawn(move || {
             loop {
@@ -122,16 +136,24 @@ impl SandboxerService {
                 thread::sleep(SandboxerService::POLLING_INTERVAL);
                 if !fs::exists(&socket_path).unwrap_or(false) {
                     warn!("Socket file {} deleted. Exiting.", &socket_path.display());
-                    let _ = shutdown_tx.send(());
+                    let _ = graceful_shutdown_tx.send(());
                     break;
                 }
                 if inactivity_counter_ref.fetch_add(1, Ordering::Relaxed) > Self::ALLOWED_IDLE_BEATS
                 {
                     warn!("Idle time limit exceeded. Exiting.");
-                    let _ = shutdown_tx.send(());
+                    let _ = graceful_shutdown_tx.send(());
                     break;
                 }
             }
+            // The server has no graceful shutdown timeout and so can block indeterminately if a
+            // client doesn't respond to a shutdown notice. So we implement a timeout here.
+            // If the server does perform a graceful shutdown in time then the main thread will
+            // exit and this thread will not send its signal. Otherwise we'll send the signal
+            // and trigger an abrupt shutdown.
+            // See https://github.com/hyperium/tonic/issues/1820.
+            thread::sleep(SandboxerService::POLLING_INTERVAL);
+            let _ = abrupt_shutdown_tx.send(());
         });
 
         info!(
@@ -146,11 +168,16 @@ impl SandboxerService {
             store,
             inactivity_counter,
         }));
-        router
+
+        tokio::select! {
+            _ = router
             .serve_with_incoming_shutdown(UnixListenerStream::new(listener), async {
-                drop(shutdown_rx.await)
-            })
-            .await?;
+                drop(graceful_shutdown_rx.await);
+            }) => {}
+            _ = abrupt_shutdown_rx => {
+                std::process::exit(22);
+            }
+        }
         Ok(())
     }
 }
@@ -208,3 +235,259 @@ impl SandboxerGrpc for SandboxerGrpcImpl {
         ret
     }
 }
+
+// The client that sends requests to the sandboxer service.
+#[derive(Clone, Debug)]
+pub struct SandboxerClient {
+    grpc_client: SandboxerGrpcClient<Channel>,
+}
+
+impl SandboxerClient {
+    pub async fn connect(socket_path: &Path) -> Result<Self, String> {
+        let socket_path_buf = socket_path.to_path_buf();
+        // This needs to be some valid URI, but is not actually used. See example at:
+        // https://github.com/hyperium/tonic/blob/50253f1cb236feca3061488d542e37cf60ba4f65/examples/src/uds/client_with_connector.rs#L21
+        let channel = Endpoint::try_from("http://[::]")
+            .map_err(|e| e.to_string())?
+            .connect_with_connector(service_fn(move |_: Uri| {
+                let socket_path_buf = socket_path_buf.clone();
+                async {
+                    Ok::<_, std::io::Error>(TokioIo::new(
+                        UnixStream::connect(socket_path_buf).await?,
+                    ))
+                }
+            }))
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(SandboxerClient {
+            grpc_client: SandboxerGrpcClient::new(channel),
+        })
+    }
+
+    pub async fn connect_with_retries(socket_path: &Path) -> Result<Self, String> {
+        // TODO: POLLING_INTERVAL seems to be a good time quantum to use when waiting
+        //  for server startup (since we know the server sleeps that long on startup)
+        //  but this is somewhat arbitrary and could be tuned further.
+        let sleep_time = SandboxerService::POLLING_INTERVAL;
+        let mut slept = Duration::ZERO;
+        let mut maybe_client: Result<Self, String> = Err("Not connected yet".to_string());
+
+        for _ in 0..20 {
+            tokio::time::sleep(sleep_time).await;
+            slept += sleep_time;
+            debug!(
+                "Waited {:?} to connect to sandboxer at {:?}",
+                slept, socket_path
+            );
+            maybe_client = SandboxerClient::connect(socket_path).await;
+            if maybe_client.is_ok() {
+                debug!("Connected to sandboxer at {:?}", socket_path);
+                break;
+            }
+        }
+        maybe_client
+    }
+
+    pub async fn materialize_directory(
+        &mut self,
+        destination: &Path,
+        destination_root: &Path,
+        dir_digest: &DirectoryDigest,
+        mutable_paths: &[String],
+    ) -> Result<(), String> {
+        let request = tonic::Request::new(MaterializeDirectoryRequest {
+            destination: destination
+                .to_str()
+                .ok_or(format!(
+                    "workdir_path is not a valid str: {}",
+                    destination.display()
+                ))?
+                .to_string(),
+            destination_root: destination_root
+                .to_str()
+                .ok_or(format!(
+                    "workdir_root_path is not a valid str: {}",
+                    destination_root.display()
+                ))?
+                .to_string(),
+            digest: Some(dir_digest.as_digest().into()),
+            mutable_paths: mutable_paths.to_vec(),
+        });
+
+        self.grpc_client
+            .materialize_directory(request)
+            .await
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+}
+
+// The spawned sandboxer process and a connection to it.
+pub struct SandboxerProcess {
+    process: ManagedChild,
+    client: SandboxerClient,
+}
+
+// Manages the spawned sandboxer process and communicates with it.
+pub struct Sandboxer {
+    sandboxer_bin: PathBuf,
+    socket_path: PathBuf,
+    log_path: PathBuf,
+    store_cli_opt: StoreCliOpt,
+    process: Arc<RwLock<Option<SandboxerProcess>>>,
+}
+
+type WriteLockedSandboxerProcess<'a> = RwLockWriteGuard<'a, Option<SandboxerProcess>>;
+
+impl Sandboxer {
+    pub async fn new(
+        sandboxer_bin: PathBuf,
+        pants_workdir: PathBuf,
+        store_cli_opt: StoreCliOpt,
+    ) -> Result<Self, String> {
+        let sandboxer_workdir = pants_workdir.join("sandboxer");
+        Ok(Self {
+            sandboxer_bin,
+            socket_path: sandboxer_workdir.join("sandboxer.sock"),
+            log_path: sandboxer_workdir.join("sandboxer.log"),
+            store_cli_opt,
+            process: Arc::new(RwLock::new(None)),
+        })
+    }
+
+    pub fn socket_path(&self) -> &Path {
+        self.socket_path.as_ref()
+    }
+
+    pub async fn is_alive(&self) -> Result<bool, String> {
+        let mut locked_proc = self.process.write().await;
+        if let Some(proc) = locked_proc.as_mut() {
+            proc.process.check_child_has_exited().map(|b| !b)
+        } else {
+            Ok(false)
+        }
+    }
+
+    pub async fn spawn(&self) -> Result<(), String> {
+        let mut locked_proc = self.process.write().await;
+        self.do_spawn(&mut locked_proc).await
+    }
+
+    async fn do_spawn(
+        &self,
+        locked_proc: &mut WriteLockedSandboxerProcess<'_>,
+    ) -> Result<(), String> {
+        ensure_parent_dir(&self.log_path)?;
+        let logfile = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.log_path)
+            .await
+            .map_err(|e| e.to_string())?;
+        let mut cmd = Command::new(&self.sandboxer_bin);
+        cmd.arg("--socket-path");
+        cmd.arg(self.socket_path.as_os_str());
+        cmd.args(self.store_cli_opt.to_cli_args());
+        // Pass the calling code's max log level to the sandboxer process.
+        cmd.env("RUST_LOG", log::max_level().as_str());
+        cmd.stderr(Stdio::from(logfile.into_std().await));
+
+        debug!(
+            "Spawning sandboxer with cmd: {} {}",
+            &self.sandboxer_bin.to_string_lossy(),
+            cmd.as_std()
+                .get_args()
+                .map(|a| a.to_string_lossy())
+                .collect::<Vec<_>>()
+                .join(" ")
+        );
+
+        if locked_proc.is_none() {
+            let process = ManagedChild::spawn(&mut cmd, Some(Duration::from_millis(1000)))
+                .map_err(|e| e.to_string())?;
+            debug!("Spawned sandboxer process {:?}", process.id());
+            let client = SandboxerClient::connect_with_retries(&self.socket_path).await?;
+            let _ = locked_proc.insert(SandboxerProcess { process, client });
+        }
+        Ok(())
+    }
+
+    async fn kill(&self) {
+        let mut locked_proc = self.process.write().await;
+        self.do_kill(&mut locked_proc).await
+    }
+
+    async fn do_kill(&self, locked_proc: &mut RwLockWriteGuard<'_, Option<SandboxerProcess>>) {
+        // Note that we don't want to remove the socket file here, as it may no longer
+        // be under the control of the sandboxer process we're killing.
+        if let Some(ref mut proc) = **locked_proc {
+            // Best effort to shut down, ignoring any errors (which would
+            // typically be due to the process already being dead).
+            let _ = proc.process.attempt_shutdown_sync();
+        }
+        locked_proc.take();
+    }
+
+    async fn client(&self) -> Result<SandboxerClient, String> {
+        {
+            let proc = self.process.read().await;
+            if let Some(proc) = proc.as_ref() {
+                return Ok(proc.client.clone());
+            }
+        }
+        // We've released the read lock, so now we can acquire the write lock.
+        let mut locked_proc = self.process.write().await;
+        Ok(if let Some(proc) = locked_proc.as_mut() {
+            // Some other concurrent task spawned the process while we were
+            // waiting for the write lock, so nothing to do.
+            proc.client.clone()
+        } else {
+            self.do_spawn(&mut locked_proc).await?;
+            locked_proc.as_ref().unwrap().client.clone()
+        })
+    }
+
+    pub async fn materialize_directory(
+        &self,
+        destination: &Path,
+        destination_root: &Path,
+        dir_digest: &DirectoryDigest,
+        mutable_paths: &BTreeSet<RelativePath>,
+    ) -> Result<(), String> {
+        let mutable_paths: Vec<String> = mutable_paths
+            .iter()
+            .map(|rp| {
+                rp.to_str()
+                    .map(str::to_string)
+                    .ok_or_else(|| format!("Path is not valid string: {:?}", rp))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let ret = self
+            .client()
+            .await?
+            .materialize_directory(destination, destination_root, dir_digest, &mutable_paths)
+            .await;
+        if ret.is_err() {
+            // The server might be down for some reason (e.g., it has not been initially started
+            // yet, or the socket file was deleted by the user). If this happens, ensure the
+            // server is properly killed, and retry once.
+            self.kill().await;
+            return self
+                .client()
+                .await?
+                .materialize_directory(destination, destination_root, dir_digest, &mutable_paths)
+                .await;
+        }
+        ret
+    }
+}
+
+// Note that we do NOT want to terminate the process in a Drop implementation.
+// There would be two ways to do this:  One is to kill() the process. But that is async,
+// and so not easily callable in drop(). The other is to delete the socket file. But that
+// might pull the rug out from under another Sandboxer that has preempted the dropped one.
+// However we do set kill_on_drop for the sandboxer process on creation, so tokio will
+// attempt to kill it asynchronously for us. This may leave a zombie process, as tokio doesn't
+// guarantee timely reaping. But since we expect the Sandboxer to be dropped only when pantsd
+// (or any other controlling process) is about to exit, at which point any of its child zombies
+// will be reaped by the system, this should be fine.

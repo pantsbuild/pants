@@ -5,6 +5,14 @@ name = "sandboxer"
 authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
+[[bin]]
+name = "sandboxer"
+path = "bin/server.rs"
+
+[[bin]]
+name = "sandboxer_client"
+path = "bin/client.rs"
+
 [dependencies]
 bytes = { workspace = true }
 children = { path = "../children" }
