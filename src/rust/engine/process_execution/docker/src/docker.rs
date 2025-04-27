@@ -31,7 +31,6 @@ use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use store::{ImmutableInputs, Store};
 use task_executor::Executor;
-use tokio::task::{JoinError, JoinHandle};
 use workunit_store::{Metric, RunningWorkunit, in_workunit};
 
 use process_execution::local::{
@@ -167,7 +166,7 @@ impl DockerOnceCell {
         }
 
         if let Err(removal_errors) = Self::check_for_old_images(&docker).await {
-            log::warn!("The following errors occurred when attempting to remove old containers:\n\n{}", removal_errors.join("\n"));
+            log::warn!("The following errors occurred when attempting to remove old containers:\n\n{}", removal_errors.join("\n\n"));
         }
         Ok(docker)
       })
@@ -479,7 +478,6 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
         };
         let keep_sandboxes = req.execution_environment.local_keep_sandboxes;
         let mut errors: Vec<String> = vec![];
-        let mut join_handles: Vec<JoinHandle<Result<(), String>>> = vec![];
         while errors.len() < MAX_RUN_ATTEMPTS {
             // Make a mutable copy of the process in the closure
             let mut mreq = req.clone();
@@ -573,9 +571,9 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
             match process_result {
                 Err(CapturedWorkdirError::Retryable(message)) => {
                     errors.push(message);
-                    join_handles.push(self.container_cache
-                        .prune_container(image_name.to_string(), image_platform)
-                        .await?);
+                    self.container_cache
+                        .prune_container(image_name, image_platform)
+                        .await;
                 }
                 _ => {
                     return process_result
@@ -1031,58 +1029,75 @@ impl<'a> ContainerCache<'a> {
     }
 
     /// Remove an old or missing container from the container cache. Removes the actual container if it still exists.
-    pub(crate) async fn prune_container(
-        &self,
-        image_name: String,
-        platform: &Platform,
-    ) -> Result<JoinHandle<Result<(), String>>, String> {
-        let key = (image_name, *platform);
-        let container_id = self
-            .containers
-            .lock()
-            .remove(&key)
-            .and_then(|container_once_cell| container_once_cell.get().map(|t| t.0.clone()))
-            .ok_or("Container not found in cache")?;
-        let docker = self.docker.get().await?.clone();
-        Ok(tokio::spawn(async move {
-            match docker.inspect_container(&container_id, None).await {
-                Ok(inspect_response) => {
-                    if let Some(state) = inspect_response.state {
-                        if let Some(status) = state.status {
-                            match status {
-                                ContainerStateStatusEnum::RUNNING
-                                | ContainerStateStatusEnum::RESTARTING
-                                | ContainerStateStatusEnum::CREATED
-                                | ContainerStateStatusEnum::PAUSED => {
+    pub(crate) async fn prune_container(&self, image_name: &str, platform: &Platform) {
+        let maybe_arc = {
+            self.containers
+                .lock()
+                .remove(&(image_name.to_string(), *platform))
+        };
+        if let Some(container_id) =
+            maybe_arc.and_then(|container_once_cell| container_once_cell.get().map(|t| t.0.clone()))
+        {
+            match self.docker.get().await.map(&Docker::clone) {
+                Ok(docker) => {
+                    let _ = tokio::spawn(async move {
+                        match docker.inspect_container(&container_id, None).await {
+                            Ok(inspect_response) => {
+                                if let Some(state) = inspect_response.state {
+                                    if let Some(status) = state.status {
+                                        match status {
+                                        ContainerStateStatusEnum::RUNNING
+                                        | ContainerStateStatusEnum::RESTARTING
+                                        | ContainerStateStatusEnum::CREATED
+                                        | ContainerStateStatusEnum::PAUSED => {
+                                            Err(format!(
+                                                "Cannot prune container {container_id} with status {status}"
+                                            ))
+                                        }
+                                        _ => Self::remove_container(&docker, &container_id, None)
+                                            .await
+                                            .map_err(|err| format!(
+                                                "An error occurred when trying to remove container {container_id}\n\n{err}"
+                                            )),
+                                    }
+                                    } else {
+                                        Err(format!(
+                                            "Cannot prune container {container_id} with unknown status"
+                                        ))
+                                    }
+                                } else {
                                     Err(format!(
-                                        "Cannot prune container {container_id} with status {status}"
+                                        "Cannot prune container {container_id}, container state was empty"
                                     ))
                                 }
-                                _ => Self::remove_container(&docker, &container_id, None)
-                                    .await
-                                    .map_err(|err| format!(
-                                        "An error occurred when trying to remove container {container_id}\n\n{err}"
-                                    )),
                             }
-                        } else {
-                            Err(format!(
-                                "Cannot prune container {container_id} with unknown status"
-                            ))
+                            Err(DockerError::DockerResponseServerError {
+                                status_code: 404,
+                                ..
+                            }) => Ok(()),
+                            Err(err) => Err(format!(
+                                "Cannot prune container {container_id} because the following error occurred when trying to inspect container status:\n\n{err}"
+                            )),
                         }
-                    } else {
-                        Err(format!(
-                            "Cannot prune container {container_id}, container state was empty"
-                        ))
-                    }
+                    }).then(async |res| {
+                        match res {
+                            Ok(Err(msg)) => log::warn!("{}", msg),
+                            Err(join_error) => log::warn!("Failed to remove container due to an error when starting task:\n{join_error}"),
+                            _ => (),
+                        };
+                    });
                 }
-                Err(DockerError::DockerResponseServerError {
-                    status_code: 404, ..
-                }) => Ok(()),
-                Err(err) => Err(format!(
-                    "Cannot prune container {container_id} because the following error occurred when trying to inspect container status:\n\n{err}"
-                )),
+                Err(err) => {
+                    log::warn!("Failed to remove container {container_id} due to error:\n\n{err}")
+                }
             }
-        }))
+        } else {
+            log::warn!(
+                "Container for image `{}` and platform `{:#?}` not found",
+                image_name,
+                platform
+            );
+        }
     }
 
     /// Return the container ID and NamedCaches for a container running `image_name` for use as a place
