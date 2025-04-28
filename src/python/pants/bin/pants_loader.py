@@ -71,6 +71,20 @@ class PantsLoader:
             )
 
     @staticmethod
+    def sandboxer_bin() -> str | None:
+        # In theory as_file could return a temporary file and clean it up, so we'd be returning
+        # an invalid path. But in practice we know that we're running either in a venv with all
+        # resources expanded on disk, or from sources, and either way we will get a persistent
+        # valid path that will not be cleaned up.
+        with importlib.resources.as_file(
+            importlib.resources.files("pants.bin").joinpath("sandboxer")
+        ) as sandboxer_bin:
+            if os.path.isfile(sandboxer_bin):
+                os.chmod(sandboxer_bin, 0o755)
+                return str(sandboxer_bin)
+        return None
+
+    @staticmethod
     def run_alternate_entrypoint(entrypoint: str) -> None:
         try:
             module_path, func_name = entrypoint.split(":", 1)
@@ -103,6 +117,7 @@ class PantsLoader:
 
         sys.setrecursionlimit(int(os.environ.get(RECURSION_LIMIT, "10000")))
 
+        os.environ["PANTS_SANDBOXER_BINARY_PATH"] = cls.sandboxer_bin() or ""
         entrypoint = os.environ.pop(DAEMON_ENTRYPOINT, None)
         if entrypoint:
             cls.run_alternate_entrypoint(entrypoint)
