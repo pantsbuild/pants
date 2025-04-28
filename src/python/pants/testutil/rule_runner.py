@@ -6,6 +6,7 @@ from __future__ import annotations
 import atexit
 import dataclasses
 import functools
+import logging as logginglib
 import os
 import re
 import sys
@@ -58,6 +59,8 @@ from pants.util.dirutil import recursive_dirname, safe_mkdir, safe_mkdtemp, safe
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import softwrap
+
+logger = logginglib.getLogger(__name__)
 
 
 def logging(original_function=None, *, level: LogLevel = LogLevel.INFO):
@@ -656,64 +659,117 @@ class MockGet(Generic[_O]):
 
 @dataclass(frozen=True)
 class MockRequestExceptionComparable:
-    category: Literal["Get"] | Literal["Effect"] | str
-    output_type: str | None
-    input_types: tuple[str, ...]
+    category: Literal["Get", "Effect"]
+    output_type: type | None
+    input_types: tuple[type, ...]
 
     def __str__(self):
-        inputs = ",".join(str(e) for e in self.input_types)
-        return f"{self.category}({self.output_type}, ({inputs},))"
+        inputs = ", ".join(e.__name__ for e in self.input_types)
+        return f"{self.category}({self.output_type.__name__}, ({inputs}))"
 
 
 def _compare_expected_mocks(
-    expected: Sequence[Get | Effect | AwaitableConstraints],
-    actual: Sequence[MockGet | MockEffect],
-) -> str:
-    """Try to be helpful with identifying the problem with supplied mocks."""
+    expected: Sequence[AwaitableConstraints],
+    actual_calls: Mapping[str, Callable[..., _O]],
+    actual_gets: Sequence[MockGet | MockEffect],
+    union_membership: UnionMembership | None,
+) -> tuple[str, str]:
+    """Try to be helpful with identifying the problem with supplied mocks.
+
+    Returns a string with errors (or empty if none), and a string with warnings (or empty if none).
+    """
+
+    expected_calls: list[AwaitableConstraints] = []
+    expected_gets: list[AwaitableConstraints] = []
+    for e in expected:
+        (expected_calls if e.rule_id else expected_gets).append(e)
+
+    expected_call_names = {str(e.rule_id) for e in expected_calls}
+    actual_call_names = set(actual_calls.keys())
+
+    missing_call_names = expected_call_names - actual_call_names
+    surplus_call_names = actual_call_names - expected_call_names
 
     def as_comparable(
-        o: Get | Effect | MockGet | MockEffect | AwaitableConstraints | type,
+        o: MockGet | MockEffect | AwaitableConstraints,
     ) -> MockRequestExceptionComparable:
-        if isinstance(o, MockGet) or isinstance(o, Get):
+        category: Literal["Get", "Effect"]
+
+        if isinstance(o, MockGet):
             category = "Get"
-        elif isinstance(o, MockEffect) or isinstance(o, Effect):
+        elif isinstance(o, MockEffect):
             category = "Effect"
         elif isinstance(o, AwaitableConstraints):
             category = "Effect" if o.is_effect else "Get"
         else:
-            # If we don't know of this class, try to give something meaningful
-            # This happened with AwaitableContraints
-            maybe_output_type = getattr(o, "output_type", None)
-            maybe_input_types = getattr(o, "input_types", None)
-            return MockRequestExceptionComparable(
-                category=f"Uncategorised of type {type(o).__qualname__}",
-                output_type=maybe_output_type.__name__ if maybe_output_type is not None else None,
-                input_types=(
-                    tuple(e.__name__ for e in maybe_input_types)
-                    if maybe_input_types is not None
-                    else tuple()
-                ),
+            raise ValueError(
+                f"Unsupported object {o} of type {type(o)} passed where a "
+                "MockGet, MockEffect or AwaitableConstraints was expected"
             )
-
-        output_type = o.output_type.__name__
-        input_types = tuple(e.__name__ for e in o.input_types)
 
         return MockRequestExceptionComparable(
             category=category,
-            output_type=output_type,
-            input_types=input_types,
+            output_type=o.output_type,
+            input_types=o.input_types,
         )
 
-    expected_as_comparable = {as_comparable(e) for e in expected}
-    actual_as_comparable = {as_comparable(e) for e in actual}
+    expected_gets_as_comparable = {as_comparable(e) for e in expected_gets}
+    actual_gets_as_comparable = {as_comparable(e) for e in actual_gets}
 
-    missing = expected_as_comparable - actual_as_comparable
-    additional = actual_as_comparable - expected_as_comparable
+    missing_gets = expected_gets_as_comparable - actual_gets_as_comparable
+    surplus_gets = actual_gets_as_comparable - expected_gets_as_comparable
 
-    return (
-        f"HINT: missing : {[str(e) for e in missing]}\n"
-        f"HINT: additional : {[str(e) for e in additional]}\n"
-    )
+    if union_membership:
+        for mg in list(missing_gets):
+            for sg in list(actual_gets_as_comparable):
+                if all(
+                    (
+                        input_type in sg.input_types
+                        or (
+                            input_type in union_membership
+                            and any(
+                                union_membership.is_member(input_type, sgit)
+                                for sgit in sg.input_types
+                            )
+                        )
+                    )
+                    for input_type in mg.input_types
+                ):
+                    missing_gets.remove(mg)
+                    surplus_gets.remove(sg)
+                    break
+
+    errors = []
+    warnings = []
+
+    # See if missing calls can be satisfied by a MockGet.
+    for missing_call_name in list(missing_call_names):
+        missing_call = next(ec for ec in expected_calls if ec.rule_id == missing_call_name)
+        # NB: We don't have input types for by-name calls, so we can't use the "as_comparable"
+        #  to compare the missing call to actual gets. We heuristically compare just output types
+        #  instead. In some rare cases (where we have multiple mocked rules with the same
+        #  output type) this might warn when it should error, but it won't error when it shouldn't
+        #  (and of course the test will still fail as it should, we just won't have as obvious
+        #  an error message to show).
+        for ag in actual_gets_as_comparable:
+            if missing_call.output_type == ag.output_type:
+                warnings.append(
+                    f"A call to {missing_call} was provided by a mock_get and not by a "
+                    "mock_call. This works for now but will be deprecated soon."
+                )
+                missing_call_names.remove(missing_call_name)
+                surplus_gets = {sg for sg in surplus_gets if sg != ag}
+
+    if missing_call_names:
+        errors.append(f"Missing mocks for calls: {', '.join(missing_call_names)}")
+    if surplus_call_names:
+        errors.append(f"Surplus mocks for calls: {', '.join(surplus_call_names)}")
+    if missing_gets:
+        errors.append(f"Missing mocks for gets: {', '.join(str(e) for e in missing_gets)}")
+    if surplus_gets:
+        errors.append(f"Surplus mocks for gets: {', '.join(str(e) for e in surplus_gets)}")
+
+    return "\n".join(errors), "\n".join(warnings)
 
 
 def run_rule_with_mocks(
@@ -721,24 +777,44 @@ def run_rule_with_mocks(
     *,
     rule_args: Sequence[Any] = (),
     mock_gets: Sequence[MockGet | MockEffect] = (),
+    mock_calls: Mapping[str, Callable] | None = None,
     union_membership: UnionMembership | None = None,
 ) -> _O:
-    """A test helper function that runs an @rule with a set of arguments and mocked Get providers.
+    """A test helper that runs an @rule with a set of args and mocked underlying @rule invocations.
 
-    An @rule named `my_rule` that takes one argument and makes no `Get` requests can be invoked
-    like so:
+    An @rule named `my_rule` that takes one argument and invokes no other @rules (by-name  or via
+    `Get` requests) can be invoked like so:
 
     ```
     return_value = run_rule_with_mocks(my_rule, rule_args=[arg1])
     ```
 
-    In the case of an @rule that makes Get requests, things get more interesting: the
-    `mock_gets` argument must be provided as a sequence of `MockGet`s and `MockEffect`s. Each
-    MockGet takes the Product and Subject type, along with a one-argument function that takes a
-    subject value and returns a product value.
+    In the case of an @rule that invokes other @rules, either by name or via `Get` requests, things
+    get more interesting: either or both of the `mock_calls` and `mock_gets` arguments must be
+    provided.
 
-    So in the case of an @rule named `my_co_rule` that takes one argument and makes Get requests
-    for a product type `Listing` with subject type `Dir`, the invoke might look like:
+    - `mock_calls` is a mapping of fully-qualified rule name to the function that mocks that rule,
+      and mocks out calls by name to the corresponding rules.
+    - `mock_gets` is a sequence of `MockGet`s and `MockEffect`s. Each MockGet takes the Product and
+      Subject type, along with a one-argument function that takes a subject value and returns a
+      product value.
+
+    So in the case of an @rule named `my_co_rule` that takes one argument and calls the @rule
+    `path.to.module.list_dir` by name to produce a `Listing` from a `Dir`, the invoke might look
+    like:
+
+    ```
+    return_value = run_rule_with_mocks(
+      my_co_rule,
+      rule_args=[arg1],
+      mock_calls={
+        "path.to.module.list_dir": lambda dir_subject: Listing(..),
+      },
+    )
+    ```
+
+    And if that same rule uses a Get request for a product type `Listing` with subject type `Dir`,
+    the invoke might look like:
 
     ```
     return_value = run_rule_with_mocks(
@@ -761,6 +837,7 @@ def run_rule_with_mocks(
 
     :returns: The return value of the completed @rule.
     """
+    mock_calls = mock_calls or {}
 
     task_rule = getattr(rule, "rule", None)
 
@@ -772,16 +849,22 @@ def run_rule_with_mocks(
         if len(rule_args) != len(task_rule.parameters):
             raise ValueError(
                 "Error running rule with mocks:\n"
-                f"Rule {task_rule.func.__qualname__} expected to receive arguments of the form: {task_rule.parameters}; got: {rule_args}"
+                f"Rule {task_rule.func.__qualname__} expected to receive arguments of the "
+                f"form: {task_rule.parameters}; got: {rule_args}"
             )
 
-        hints = _compare_expected_mocks(task_rule.awaitables, mock_gets)
-        if len(mock_gets) != len(task_rule.awaitables):
+        errors, warnings = _compare_expected_mocks(
+            task_rule.awaitables, mock_calls, mock_gets, union_membership
+        )
+        if warnings:
+            logger.warning(warnings)
+        if errors:
             raise ValueError(
                 "Error running rule with mocks:\n"
-                f"Rule {task_rule.func.__qualname__} expected to receive Get providers for:\n"
+                f"Rule {task_rule.func.__qualname__} expected to receive providers for:\n"
                 f"{pformat(list(task_rule.awaitables))}\ngot:\n"
-                f"{pformat(mock_gets)}\n" + hints
+                f"Mock calls: {pformat(mock_calls)}\n"
+                f"Mock gets: {pformat(mock_gets)}\n" + errors
             )
         # Access the original function, rather than the trampoline that we would get by calling
         # it directly.
@@ -793,7 +876,28 @@ def run_rule_with_mocks(
     if not isinstance(res, (Coroutine, Generator)):
         return res
 
-    def get(res: Get | Effect | Call):
+    def get(res: Get | Effect | Call | Coroutine):
+        if isinstance(res, Coroutine):
+            # A call-by-name element in a concurrently() is a Coroutine whose frame is
+            # the trampoline wrapper that creates and immediately awaits the Call.
+            assert res.cr_frame is not None
+            rule_id = res.cr_frame.f_locals["rule_id"]
+            args = res.cr_frame.f_locals["args"]
+            mock_call = mock_calls.get(rule_id)
+            if mock_call:
+                return mock_call(*args)
+            raise AssertionError(f"No mock_call provided for {rule_id}.")
+        elif isinstance(res, Call):
+            mock_call = mock_calls.get(res.rule_id)
+            if mock_call:
+                return mock_call(*res.inputs)
+            # For now we fall through, to allow an old-style MockGet to mock a call-by-name, for
+            # legacy reasons. But we will deprecate and then remove this in the future, at which
+            # point we should error here, e.g.,:
+            # raise AssertionError(f"No mock_call provided for {res.rule_id}.")
+            # Note that this fallthrough only works for single call-by-names. When wrapped in a
+            # concurrently() call, mock_calls *must* be used.
+
         provider = next(
             (
                 mock_get.mock
