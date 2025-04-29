@@ -9,6 +9,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use bollard::Docker;
 use bollard::container::RemoveContainerOptions;
+use bollard::exec::CreateExecOptions;
 use fs::{EMPTY_DIRECTORY_DIGEST, RelativePath};
 use maplit::hashset;
 use parameterized::parameterized;
@@ -259,6 +260,48 @@ impl DockerCommandTestRunner for ExistingContainerTestRunner {
     }
 }
 
+#[async_trait]
+trait UnavailableContainerTestRunner: DockerCommandTestRunner {
+    async fn get_command_runner<'a>(
+        &self,
+        store: Store,
+        executor: task_executor::Executor,
+        docker: &'a DockerOnceCell,
+        image_pull_cache: &'a ImagePullCache,
+        work_dir_base: PathBuf,
+        immutable_inputs: ImmutableInputs,
+    ) -> Result<crate::docker::CommandRunner<'a>, String>;
+
+    async fn make_container_unavailable(&self, docker: &Docker) -> Result<(), String>;
+}
+
+#[async_trait]
+impl<T: UnavailableContainerTestRunner> DockerCommandTestRunner for T {
+    async fn setup<'a>(
+        &self,
+        store: Store,
+        executor: task_executor::Executor,
+        docker: &'a DockerOnceCell,
+        image_pull_cache: &'a ImagePullCache,
+        work_dir_base: PathBuf,
+        immutable_inputs: ImmutableInputs,
+    ) -> Result<crate::docker::CommandRunner<'a>, String> {
+        let command_runner = self
+            .get_command_runner(
+                store,
+                executor,
+                docker,
+                image_pull_cache,
+                work_dir_base,
+                immutable_inputs,
+            )
+            .await?;
+        let docker_ref = docker.get().await?;
+        self.make_container_unavailable(docker_ref).await?;
+        Ok(command_runner)
+    }
+}
+
 struct MissingContainerTestRunner {
     inner: ExistingContainerTestRunner,
 }
@@ -272,8 +315,8 @@ impl MissingContainerTestRunner {
 }
 
 #[async_trait]
-impl DockerCommandTestRunner for MissingContainerTestRunner {
-    async fn setup<'a>(
+impl UnavailableContainerTestRunner for MissingContainerTestRunner {
+    async fn get_command_runner<'a>(
         &self,
         store: Store,
         executor: task_executor::Executor,
@@ -282,8 +325,7 @@ impl DockerCommandTestRunner for MissingContainerTestRunner {
         work_dir_base: PathBuf,
         immutable_inputs: ImmutableInputs,
     ) -> Result<crate::docker::CommandRunner<'a>, String> {
-        let command_runner = self
-            .inner
+        self.inner
             .setup(
                 store,
                 executor,
@@ -292,10 +334,13 @@ impl DockerCommandTestRunner for MissingContainerTestRunner {
                 work_dir_base,
                 immutable_inputs,
             )
-            .await?;
+            .await
+    }
+
+    async fn make_container_unavailable(&self, docker: &Docker) -> Result<(), String> {
         let container_id = self.inner.container_id.get().unwrap().0.as_str();
         ContainerCache::remove_container(
-            docker.get().await?,
+            docker,
             container_id,
             Some(RemoveContainerOptions {
                 force: true,
@@ -305,12 +350,58 @@ impl DockerCommandTestRunner for MissingContainerTestRunner {
         .await
         .map_err(|err| {
             format!("Failed to remove Docker container during missing container test setup `{container_id}`: {err:?}")
-        })?;
-        Ok(command_runner)
+        })
     }
 }
 
-#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+struct ExitedContainerTestRunner {
+    inner: ExistingContainerTestRunner,
+}
+
+impl ExitedContainerTestRunner {
+    fn new(image_name: &str) -> Self {
+        ExitedContainerTestRunner {
+            inner: ExistingContainerTestRunner::new(image_name),
+        }
+    }
+}
+
+#[async_trait]
+impl UnavailableContainerTestRunner for ExitedContainerTestRunner {
+    async fn get_command_runner<'a>(
+        &self,
+        store: Store,
+        executor: task_executor::Executor,
+        docker: &'a DockerOnceCell,
+        image_pull_cache: &'a ImagePullCache,
+        work_dir_base: PathBuf,
+        immutable_inputs: ImmutableInputs,
+    ) -> Result<crate::docker::CommandRunner<'a>, String> {
+        self.inner
+            .setup(
+                store,
+                executor,
+                docker,
+                image_pull_cache,
+                work_dir_base,
+                immutable_inputs,
+            )
+            .await
+    }
+
+    async fn make_container_unavailable(&self, docker: &Docker) -> Result<(), String> {
+        let container_id = self.inner.container_id.get().unwrap().0.as_str();
+        docker.create_exec(container_id, CreateExecOptions {
+            cmd: Some(vec!["kill", "-TERM", "1"]),
+            ..CreateExecOptions::default()
+        })
+        .await
+        .map_err(|err| format!("An error occurred when trying to kill running container {container_id}:\n\n{err}"))?;
+        Ok(())
+    }
+}
+
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE), &ExitedContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing", "exited"})]
 #[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
 #[cfg(unix)]
 async fn stdout(runner: &dyn DockerCommandTestRunner) {
@@ -328,7 +419,7 @@ async fn stdout(runner: &dyn DockerCommandTestRunner) {
     assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
 }
 
-#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE), &ExitedContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing", "exited"})]
 #[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
 #[cfg(unix)]
 async fn stdout_and_stderr_and_exit_code(runner: &dyn DockerCommandTestRunner) {
@@ -351,7 +442,7 @@ async fn stdout_and_stderr_and_exit_code(runner: &dyn DockerCommandTestRunner) {
     assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
 }
 
-#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE), &ExitedContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing", "exited"})]
 #[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
 #[cfg(unix)]
 async fn capture_exit_code_signal(runner: &dyn DockerCommandTestRunner) {
@@ -447,7 +538,7 @@ async fn env_is_deterministic() {
     assert_eq!(env1, env2);
 }
 
-#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE), &ExitedContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing", "exited"})]
 #[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
 async fn binary_not_found(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
@@ -463,7 +554,7 @@ async fn binary_not_found(runner: &dyn DockerCommandTestRunner) {
     assert!(stdout.contains("exec failed"));
 }
 
-#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE), &ExitedContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing", "exited"})]
 #[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
 async fn output_files_none(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
@@ -481,7 +572,7 @@ async fn output_files_none(runner: &dyn DockerCommandTestRunner) {
     assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
 }
 
-#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE), &ExitedContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing", "exited"})]
 #[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
 async fn output_files_one(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
@@ -508,7 +599,7 @@ async fn output_files_one(runner: &dyn DockerCommandTestRunner) {
     );
 }
 
-#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE), &ExitedContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing", "exited"})]
 #[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
 async fn output_dirs(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
@@ -540,7 +631,7 @@ async fn output_dirs(runner: &dyn DockerCommandTestRunner) {
     );
 }
 
-#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE), &ExitedContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing", "exited"})]
 #[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
 async fn output_files_many(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
@@ -571,7 +662,7 @@ async fn output_files_many(runner: &dyn DockerCommandTestRunner) {
     );
 }
 
-#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE), &ExitedContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing", "exited"})]
 #[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
 async fn output_files_execution_failure(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
@@ -601,7 +692,7 @@ async fn output_files_execution_failure(runner: &dyn DockerCommandTestRunner) {
     );
 }
 
-#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE), &ExitedContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing", "exited"})]
 #[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
 async fn output_files_partial_output(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
@@ -628,7 +719,7 @@ async fn output_files_partial_output(runner: &dyn DockerCommandTestRunner) {
     );
 }
 
-#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE), &ExitedContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing", "exited"})]
 #[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
 async fn output_overlapping_file_and_dir(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
@@ -656,7 +747,7 @@ async fn output_overlapping_file_and_dir(runner: &dyn DockerCommandTestRunner) {
     );
 }
 
-#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE), &ExitedContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing", "exited"})]
 #[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
 async fn append_only_cache_created(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
@@ -728,7 +819,7 @@ async fn test_chroot_placeholder() {
     assert!(got_env.get(&"PATH".to_string()).unwrap().ends_with("/bin"));
 }
 
-#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE), &ExitedContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing", "exited"})]
 #[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
 async fn all_containing_directories_for_outputs_are_created(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
@@ -762,7 +853,7 @@ async fn all_containing_directories_for_outputs_are_created(runner: &dyn DockerC
     );
 }
 
-#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE), &ExitedContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing", "exited"})]
 #[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
 async fn outputs_readable_only_by_container_user_are_captured(
     runner: &dyn DockerCommandTestRunner,
@@ -796,7 +887,7 @@ async fn outputs_readable_only_by_container_user_are_captured(
     );
 }
 
-#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE), &ExitedContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing", "exited"})]
 #[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
 async fn output_empty_dir(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
@@ -823,7 +914,7 @@ async fn output_empty_dir(runner: &dyn DockerCommandTestRunner) {
     );
 }
 
-#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE), &ExitedContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing", "exited"})]
 #[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
 async fn timeout(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
@@ -848,7 +939,7 @@ async fn timeout(runner: &dyn DockerCommandTestRunner) {
     assert!(&stderr.contains("sleepy-cat"));
 }
 
-#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE), &ExitedContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing", "exited"})]
 #[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
 async fn working_directory(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
@@ -908,7 +999,7 @@ async fn working_directory(runner: &dyn DockerCommandTestRunner) {
     );
 }
 
-#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
+#[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE), &ExitedContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing", "exited"})]
 #[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
 async fn immutable_inputs(runner: &dyn DockerCommandTestRunner) {
     skip_if_no_docker_available_in_macos_ci!();
