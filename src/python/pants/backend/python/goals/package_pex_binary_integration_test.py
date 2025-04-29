@@ -480,7 +480,8 @@ def test_package_with_python_provider() -> None:
             [
                 "--backend-packages=pants.backend.python",
                 "--backend-packages=pants.backend.python.providers.experimental.python_build_standalone",
-                # a "random" old version of Python, that seems unlikely to be installed on most systems, by default
+                # a random (https://xkcd.com/221/) old version of Python, that seems unlikely to be
+                # installed on most systems, by default
                 "--python-interpreter-constraints=CPython==3.10.2",
                 "package",
                 f"{tmpdir}:target",
