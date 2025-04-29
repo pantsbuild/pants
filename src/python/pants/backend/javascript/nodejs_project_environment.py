@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from pants.backend.javascript import package_json, resolve
 from pants.backend.javascript.nodejs_project import NodeJSProject
 from pants.backend.javascript.package_json import (
+    NodePackageExtraEnvVarsField,
     NodePackageNameField,
     OwningNodePackage,
     OwningNodePackageRequest,
@@ -17,6 +18,7 @@ from pants.backend.javascript.resolve import ChosenNodeResolve, RequestNodeResol
 from pants.backend.javascript.subsystems import nodejs
 from pants.backend.javascript.subsystems.nodejs import NodeJSToolProcess
 from pants.build_graph.address import Address
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import PathGlobs
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
@@ -122,10 +124,19 @@ async def get_nodejs_environment(req: NodeJSProjectEnvironmentRequest) -> NodeJs
 
 
 @rule
-async def setup_nodejs_project_environment_process(req: NodeJsProjectEnvironmentProcess) -> Process:
-    lockfile_digest, project_digest = await MultiGet(
+async def setup_nodejs_project_environment_process(
+    req: NodeJsProjectEnvironmentProcess,
+    nodejs: nodejs.NodeJS,
+) -> Process:
+    target_env_vars = (
+        req.env.target.get(NodePackageExtraEnvVarsField).value or () if req.env.target else ()
+    )
+
+    lockfile_digest, project_digest, subsystem_env_vars, env_vars = await MultiGet(
         Get(Digest, PathGlobs, req.env.resolve.get_lockfile_glob()),
         Get(Digest, MergeDigests, req.env.project.get_project_digest()),
+        Get(EnvironmentVars, EnvironmentVarsRequest(nodejs.package_manager_extra_env_vars)),
+        Get(EnvironmentVars, EnvironmentVarsRequest(target_env_vars)),
     )
     merged = await Get(Digest, MergeDigests((req.input_digest, lockfile_digest, project_digest)))
 
@@ -154,7 +165,12 @@ async def setup_nodejs_project_environment_process(req: NodeJsProjectEnvironment
             append_only_caches=FrozenDict(**per_package_caches, **req.env.project.extra_caches()),
             timeout_seconds=req.timeout_seconds,
             project_digest=project_digest,
-            extra_env=FrozenDict(**req.extra_env, **req.env.project.extra_env()),
+            extra_env=FrozenDict(
+                **subsystem_env_vars,
+                **env_vars,
+                **req.extra_env,
+                **req.env.project.extra_env(),
+            ),
         ),
     )
 

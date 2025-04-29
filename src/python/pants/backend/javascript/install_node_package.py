@@ -14,7 +14,6 @@ from pants.backend.javascript.nodejs_project_environment import (
     NodeJSProjectEnvironmentRequest,
 )
 from pants.backend.javascript.package_json import (
-    NodePackageExtraEnvVarsField,
     NodePackageNameField,
     NodePackageVersionField,
     PackageJsonSourceField,
@@ -25,14 +24,12 @@ from pants.backend.javascript.target_types import JSRuntimeSourceField
 from pants.build_graph.address import Address
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import SourcesField, Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.util.frozendict import FrozenDict
 
 
 @dataclass(frozen=True)
@@ -96,14 +93,6 @@ async def install_node_packages_for_address(
     )
     package_digest = source_files.snapshot.digest
 
-    subsystem_env_vars, target_env_vars = await MultiGet(
-        Get(EnvironmentVars, EnvironmentVarsRequest(nodejs.package_manager_extra_env_vars)),
-        Get(
-            EnvironmentVars,
-            EnvironmentVarsRequest(target.get(NodePackageExtraEnvVarsField).value or ()),
-        ),
-    )
-
     install_result = await Get(
         ProcessResult,
         NodeJsProjectEnvironmentProcess(
@@ -112,7 +101,6 @@ async def install_node_packages_for_address(
             description=f"Installing {target[NodePackageNameField].value}@{target[NodePackageVersionField].value}.",
             input_digest=package_digest,
             output_directories=tuple(project_env.node_modules_directories),
-            extra_env=FrozenDict(**subsystem_env_vars, **target_env_vars),
         ),
     )
     node_modules = await Get(Digest, AddPrefix(install_result.output_digest, project_env.root_dir))
