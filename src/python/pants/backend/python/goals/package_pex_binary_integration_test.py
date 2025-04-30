@@ -20,6 +20,7 @@ from pants.backend.python.goals.package_pex_binary import (
     PexFromTargetsRequestForBuiltPackage,
 )
 from pants.backend.python.macros.python_artifact import PythonArtifact
+from pants.backend.python.providers.python_build_standalone import rules as pbs
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import (
     PexBinary,
@@ -38,7 +39,6 @@ from pants.core.target_types import (
     ResourcesGeneratorTarget,
 )
 from pants.core.target_types import rules as core_target_types_rules
-from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
 from pants.testutil.python_interpreter_selection import skip_unless_python38_present
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import QueryRule
@@ -465,27 +465,40 @@ def test_package_with_python_provider() -> None:
     # binary when using a Python that isn't automatically visible on $PATH (using the PBS provider
     # as just one way to get such a Python)
 
-    sources = {
-        "app.py": "",
-        "BUILD": dedent(
-            """\
-            python_sources()
-            pex_binary(name="target", entry_point="./app.py")
-            """
-        ),
-    }
+    rule_runner = PythonRuleRunner(
+        rules=[
+            *package_pex_binary.rules(),
+            *pex_from_targets.rules(),
+            *target_types_rules.rules(),
+            *core_target_types_rules(),
+            *pbs.rules(),
+            QueryRule(BuiltPackage, [PexBinaryFieldSet]),
+        ],
+        target_types=[
+            PexBinary,
+            PythonSourcesGeneratorTarget,
+        ],
+    )
 
-    with setup_tmpdir(sources) as tmpdir:
-        run_pants(
-            [
-                "--backend-packages=pants.backend.python",
-                "--backend-packages=pants.backend.python.providers.experimental.python_build_standalone",
-                # a random (https://xkcd.com/221/) old version of Python, that seems unlikely to be
-                # installed on most systems, by default
-                "--python-interpreter-constraints=CPython==3.10.2",
-                "package",
-                f"{tmpdir}:target",
-            ],
-        ).assert_success()
+    rule_runner.write_files(
+        {
+            "app.py": "",
+            "BUILD": dedent(
+                """\
+                python_sources(name="src")
+                pex_binary(name="target", entry_point="./app.py")
+                """
+            ),
+        }
+    )
 
-        assert os.path.isfile(f"dist/{tmpdir}/target.pex")
+    tgt = rule_runner.get_target(Address("", target_name="target"))
+    field_set = PexBinaryFieldSet.create(tgt)
+
+    # a random (https://xkcd.com/221/) old version of Python, that seems unlikely to be installed on
+    # most systems, by default
+    rule_runner.set_options(["--python-interpreter-constraints=CPython==3.10.2"])
+
+    result = rule_runner.request(BuiltPackage, [field_set])
+    assert len(result.artifacts) == 1
+    assert result.artifacts[0].relpath == "target.pex"
