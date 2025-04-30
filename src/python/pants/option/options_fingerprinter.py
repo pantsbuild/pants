@@ -6,9 +6,11 @@ import os
 from collections import defaultdict
 from enum import Enum
 from hashlib import sha1
+from typing import Any, cast
 
 from pants.base.build_environment import get_buildroot
 from pants.option.custom_types import UnsetBool, dict_with_files_option, dir_option, file_option
+from pants.option.options import Options
 from pants.util.strutil import softwrap
 
 
@@ -61,6 +63,21 @@ class OptionsFingerprinter:
                 fingerprint = "None"
             hasher.update(fingerprint.encode())
         return hasher.hexdigest()
+
+    @staticmethod
+    def options_map_for_scope(scope: str, options: Options) -> dict[str, Any]:
+        """Given options and a scope, create a JSON-serializable map of all fingerprintable options
+        in scope to their values."""
+        options_map = {}
+        option_items = options.get_fingerprintable_for_scope(scope, daemon_only=False)
+        for option_name, _, option_value in option_items:
+            options_map[option_name] = option_value
+
+        serializable_map = cast(
+            dict[str, Any], json.loads(json.dumps(options_map, cls=OptionEncoder))
+        )
+
+        return serializable_map
 
     def fingerprint(self, option_type, option_val):
         """Returns a hash of the given option_val based on the option_type.
