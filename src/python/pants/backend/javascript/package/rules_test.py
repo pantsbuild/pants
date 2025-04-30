@@ -246,7 +246,7 @@ def test_packages_files_as_resource_in_workspace(
 def test_extra_envs(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         [
-            "--nodejs-package-manager-extra-env-vars=['FROM_SUBSYSTEM=FIZZ']",
+            "--nodejs-extra-env-vars=['FROM_SUBSYSTEM=FIZZ']",
         ],
         env_inherit={"PATH"},
     )

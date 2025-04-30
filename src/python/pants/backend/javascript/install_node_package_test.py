@@ -38,7 +38,7 @@ def test_install_node_package_with_extra_env_vars(rule_runner: RuleRunner) -> No
     # Test both subsystem and target-level environment variables
     rule_runner.set_options(
         [
-            "--nodejs-package-manager-extra-env-vars=['GLOBAL_VAR=global_value']",
+            "--nodejs-extra-env-vars=['GLOBAL_VAR=global_value', 'TARGET_VAR=will_be_overridden']",
             "--nodejs-tools=['env']",
         ],
         env_inherit={"PATH"},

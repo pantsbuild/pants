@@ -135,7 +135,7 @@ async def setup_nodejs_project_environment_process(
     lockfile_digest, project_digest, subsystem_env_vars, env_vars = await MultiGet(
         Get(Digest, PathGlobs, req.env.resolve.get_lockfile_glob()),
         Get(Digest, MergeDigests, req.env.project.get_project_digest()),
-        Get(EnvironmentVars, EnvironmentVarsRequest(nodejs.package_manager_extra_env_vars)),
+        Get(EnvironmentVars, EnvironmentVarsRequest(nodejs.extra_env_vars)),
         Get(EnvironmentVars, EnvironmentVarsRequest(target_env_vars)),
     )
     merged = await Get(Digest, MergeDigests((req.input_digest, lockfile_digest, project_digest)))
@@ -166,10 +166,12 @@ async def setup_nodejs_project_environment_process(
             timeout_seconds=req.timeout_seconds,
             project_digest=project_digest,
             extra_env=FrozenDict(
-                **subsystem_env_vars,
-                **env_vars,
-                **req.extra_env,
-                **req.env.project.extra_env(),
+                {
+                    **subsystem_env_vars,
+                    **env_vars,
+                    **req.extra_env,
+                    **req.env.project.extra_env(),
+                }
             ),
         ),
     )

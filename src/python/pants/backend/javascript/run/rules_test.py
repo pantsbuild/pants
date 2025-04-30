@@ -123,7 +123,7 @@ def test_creates_yarn_run_requests_package_json_scripts(rule_runner: RuleRunner)
 def test_extra_envs(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         [
-            "--nodejs-package-manager-extra-env-vars=['FROM_SUBSYSTEM=FIZZ']",
+            "--nodejs-extra-env-vars=['FROM_SUBSYSTEM=FIZZ']",
         ],
         env_inherit={"PATH"},
     )

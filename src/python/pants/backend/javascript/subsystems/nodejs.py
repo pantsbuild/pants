@@ -159,7 +159,7 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
         ),
     )
 
-    package_manager_extra_env_vars = StrListOption(
+    extra_env_vars = StrListOption(
         help=softwrap(
             f"""
             Environment variables to set during package manager operations.
