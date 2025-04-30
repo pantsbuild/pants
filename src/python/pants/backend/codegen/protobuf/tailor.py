@@ -13,8 +13,7 @@ from pants.core.goals.tailor import (
     PutativeTargets,
     PutativeTargetsRequest,
 )
-from pants.engine.fs import PathGlobs, Paths
-from pants.engine.internals.selectors import Get
+from pants.engine.intrinsics import path_globs_to_paths
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.dirutil import group_by_dir
@@ -33,7 +32,7 @@ async def find_putative_targets(
     if not protoc.tailor:
         return PutativeTargets()
 
-    all_proto_files = await Get(Paths, PathGlobs, req.path_globs("*.proto"))
+    all_proto_files = await path_globs_to_paths(req.path_globs("*.proto"))
     unowned_proto_files = set(all_proto_files.files) - set(all_owned_sources)
     pts = [
         PutativeTarget.for_target_type(

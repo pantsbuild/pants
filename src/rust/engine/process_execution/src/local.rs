@@ -1,7 +1,7 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::fmt::{self, Debug};
+use std::fmt::{self, Debug, Display};
 use std::io::Write;
 use std::ops::Neg;
 use std::os::unix::{fs::OpenOptionsExt, process::ExitStatusExt};
@@ -26,8 +26,7 @@ use nails::execution::ExitCode;
 use serde::Serialize;
 use shell_quote::Bash;
 use store::{
-    ImmutableInputs, OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, StoreError,
-    WorkdirSymlink,
+    ImmutableInputs, OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, WorkdirSymlink,
 };
 use task_executor::Executor;
 use tempfile::TempDir;
@@ -241,7 +240,7 @@ impl super::CommandRunner for CommandRunner {
                         (),
                         exclusive_spawn,
                     )
-                    .map_err(|msg| {
+                    .map_err(|cwe| {
                         // Processes that experience no infrastructure issues should result in an "Ok" return,
                         // potentially with an exit code that indicates that they failed (with more information
                         // on stderr). Actually failing at this level indicates a failure to start or otherwise
@@ -251,7 +250,7 @@ impl super::CommandRunner for CommandRunner {
                         // Given that this is expected to be rare, we dump the entire process definition in the
                         // error.
                         ProcessError::Unclassified(format!(
-                            "Failed to execute: {req_debug_repr}\n\n{msg}"
+                            "Failed to execute: {req_debug_repr}\n\n{cwe}"
                         ))
                     })
                     .await;
@@ -292,7 +291,7 @@ impl CapturedWorkdir for CommandRunner {
         _workdir_token: (),
         req: Process,
         exclusive_spawn: bool,
-    ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String> {
+    ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, CapturedWorkdirError> {
         let cwd = if let Some(ref working_directory) = req.working_directory {
             workdir_path.join(working_directory)
         } else {
@@ -349,6 +348,45 @@ impl CapturedWorkdir for CommandRunner {
     }
 }
 
+/// Variations of errors that can occur when setting up the work directory for process execution.
+#[derive(Debug)]
+pub enum CapturedWorkdirError {
+    Timeout {
+        timeout: std::time::Duration,
+        description: String,
+    },
+    Retryable(String),
+    Fatal(String),
+}
+
+impl From<String> for CapturedWorkdirError {
+    fn from(value: String) -> Self {
+        Self::Fatal(value)
+    }
+}
+
+impl Display for CapturedWorkdirError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Timeout {
+                timeout,
+                description,
+            } => {
+                write!(
+                    f,
+                    "Exceeded timeout of {:.1} seconds when executing local process: {}",
+                    timeout.as_secs_f32(),
+                    description
+                )
+            }
+            Self::Retryable(message) => {
+                write!(f, "{message} (retryable error)")
+            }
+            Self::Fatal(s) => write!(f, "{s}"),
+        }
+    }
+}
+
 #[async_trait]
 pub trait CapturedWorkdir {
     type WorkdirToken: Clone + Send;
@@ -366,7 +404,7 @@ pub trait CapturedWorkdir {
         workdir_path: PathBuf,
         workdir_token: Self::WorkdirToken,
         exclusive_spawn: bool,
-    ) -> Result<FallibleProcessResultWithPlatform, String> {
+    ) -> Result<FallibleProcessResultWithPlatform, CapturedWorkdirError> {
         let start_time = Instant::now();
         let mut stdout = BytesMut::with_capacity(8192);
         let mut stderr = BytesMut::with_capacity(8192);
@@ -389,13 +427,17 @@ pub trait CapturedWorkdir {
                 )
                 .await?,
             );
+
             if let Some(req_timeout) = req.timeout {
-                timeout(req_timeout, exit_code_future)
-                    .await
-                    .map_err(|e| e.to_string())
-                    .and_then(|r| r)
+                match timeout(req_timeout, exit_code_future).await {
+                    Ok(Ok(exit_code)) => Ok(exit_code),
+                    _ => Err(CapturedWorkdirError::Timeout {
+                        timeout: req_timeout,
+                        description: req.description.clone(),
+                    }),
+                }
             } else {
-                exit_code_future.await
+                exit_code_future.await.map_err(CapturedWorkdirError::from)
             }
         };
 
@@ -437,45 +479,25 @@ pub trait CapturedWorkdir {
             context.run_id,
         );
 
-        match exit_code_result {
-            Ok(exit_code) => {
-                let (stdout_digest, stderr_digest) = try_join!(
-                    store.store_file_bytes(stdout.into(), true),
-                    store.store_file_bytes(stderr.into(), true),
-                )?;
-                Ok(FallibleProcessResultWithPlatform {
-                    stdout_digest,
-                    stderr_digest,
-                    exit_code,
-                    output_directory: output_snapshot.into(),
-                    metadata: result_metadata,
-                })
+        let (exit_code, output_directory) = match exit_code_result {
+            Ok(exit_code) => (exit_code, output_snapshot.into()),
+            Err(timeout @ CapturedWorkdirError::Timeout { .. }) => {
+                stderr.extend_from_slice(format!("\n\n{timeout}").as_bytes());
+                (-libc::SIGTERM, EMPTY_DIRECTORY_DIGEST.clone())
             }
-            Err(msg) if msg == "deadline has elapsed" => {
-                stderr.extend_from_slice(
-                    format!(
-                        "\n\nExceeded timeout of {:.1} seconds when executing local process: {}",
-                        req.timeout.map(|dur| dur.as_secs_f32()).unwrap_or(-1.0),
-                        req.description
-                    )
-                    .as_bytes(),
-                );
-
-                let (stdout_digest, stderr_digest) = try_join!(
-                    store.store_file_bytes(stdout.into(), true),
-                    store.store_file_bytes(stderr.into(), true),
-                )?;
-
-                Ok(FallibleProcessResultWithPlatform {
-                    stdout_digest,
-                    stderr_digest,
-                    exit_code: -libc::SIGTERM,
-                    output_directory: EMPTY_DIRECTORY_DIGEST.clone(),
-                    metadata: result_metadata,
-                })
-            }
-            Err(msg) => Err(msg),
-        }
+            Err(err) => return Err(err),
+        };
+        let (stdout_digest, stderr_digest) = try_join!(
+            store.store_file_bytes(stdout.into(), true),
+            store.store_file_bytes(stderr.into(), true),
+        )?;
+        Ok(FallibleProcessResultWithPlatform {
+            stdout_digest,
+            stderr_digest,
+            exit_code,
+            output_directory: output_directory,
+            metadata: result_metadata,
+        })
     }
 
     ///
@@ -508,7 +530,7 @@ pub trait CapturedWorkdir {
         workdir_token: Self::WorkdirToken,
         req: Process,
         exclusive_spawn: bool,
-    ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String>;
+    ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, CapturedWorkdirError>;
 
     ///
     /// An optionally-implemented method which is called after the child process has completed, but
@@ -520,7 +542,7 @@ pub trait CapturedWorkdir {
         _workdir_path: &Path,
         _workdir_token: Self::WorkdirToken,
         _req: &Process,
-    ) -> Result<(), String> {
+    ) -> Result<(), CapturedWorkdirError> {
         Ok(())
     }
 }
@@ -551,7 +573,7 @@ pub async fn prepare_workdir_digest(
     immutable_inputs: Option<&ImmutableInputs>,
     named_caches_prefix: Option<&Path>,
     immutable_inputs_prefix: Option<&Path>,
-) -> Result<DirectoryDigest, StoreError> {
+) -> Result<DirectoryDigest, CapturedWorkdirError> {
     let mut paths = Vec::new();
 
     // Symlinks for immutable inputs and named caches.
@@ -560,7 +582,13 @@ pub async fn prepare_workdir_digest(
         if let Some(immutable_inputs) = immutable_inputs {
             let symlinks = immutable_inputs
                 .local_paths(&req.input_digests.immutable_inputs)
-                .await?;
+                .await
+                .map_err(|se| {
+                    CapturedWorkdirError::Fatal(
+                        se.enrich("An error occurred when creating symlinks to immutable inputs")
+                            .to_string(),
+                    )
+                })?;
 
             match immutable_inputs_prefix {
                 Some(prefix) => workdir_symlinks.extend(symlinks.into_iter().map(|symlink| {
@@ -578,14 +606,7 @@ pub async fn prepare_workdir_digest(
             }
         }
 
-        let symlinks = named_caches
-            .paths(&req.append_only_caches)
-            .await
-            .map_err(|err| {
-                StoreError::Unclassified(format!(
-                    "Failed to make named cache(s) for local execution: {err:?}"
-                ))
-            })?;
+        let symlinks = named_caches.paths(&req.append_only_caches).await?;
         match named_caches_prefix {
             Some(prefix) => {
                 workdir_symlinks.extend(symlinks.into_iter().map(|symlink| WorkdirSymlink {
@@ -624,7 +645,15 @@ pub async fn prepare_workdir_digest(
     // Digest.
     let additions = DigestTrie::from_unique_paths(paths, &HashMap::new())?;
 
-    store.merge(vec![input_digest, additions.into()]).await
+    store
+        .merge(vec![input_digest, additions.into()])
+        .await
+        .map_err(|se| {
+            CapturedWorkdirError::Fatal(
+                se.enrich("An error occurred when merging digests")
+                    .to_string(),
+            )
+        })
 }
 
 /// Prepares the given workdir for use by the given Process.
@@ -642,7 +671,7 @@ pub async fn prepare_workdir(
     immutable_inputs: &ImmutableInputs,
     named_caches_prefix: Option<&Path>,
     immutable_inputs_prefix: Option<&Path>,
-) -> Result<bool, StoreError> {
+) -> Result<bool, CapturedWorkdirError> {
     // Capture argv0 as the executable path so that we can test whether we have created it in the
     // sandbox.
     let maybe_executable_path = {
@@ -674,14 +703,15 @@ pub async fn prepare_workdir(
         mutable_paths.extend(req.output_directories.clone());
         store
             .materialize_directory(
-                workdir_path,
+                workdir_path.clone(),
                 workdir_root_path,
                 complete_input_digest,
                 false,
                 &mutable_paths,
                 Permissions::Writable,
             )
-            .await?;
+            .await
+            .map_err(|se| se.enrich(format!("An error occurred when attempting to materialize a working directory at {workdir_path:#?}").as_str()).to_string())?;
 
         if let Some(executable_path) = maybe_executable_path {
             Ok(tokio::fs::metadata(executable_path).await.is_ok())

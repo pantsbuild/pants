@@ -549,7 +549,7 @@ class GitBinaryException(Exception):
 
 
 class GitBinary(BinaryPath):
-    def _invoke_unsandboxed(self, cmd: list[str]) -> str:
+    def _invoke_unsandboxed(self, cmd: list[str]) -> bytes:
         """Invoke the given git command, _without_ the sandboxing provided by the `Process` API.
 
         This API is for internal use only: users should prefer to consume methods of the
@@ -569,7 +569,7 @@ class GitBinary(BinaryPath):
 
         self._check_result(cmd, process.returncode, err.decode())
 
-        return out.decode().strip()
+        return out.strip()
 
     def _check_result(self, cmd: list[str], result: int, failure_msg: str | None = None) -> None:
         # git diff --exit-code exits with 1 if there were differences.

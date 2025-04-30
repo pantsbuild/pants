@@ -12,7 +12,7 @@ hdrhistogram==0.10.3
 ijson==3.2.3
 libcst==1.4.0
 packaging==24.2
-pex==2.33.7
+pex==2.36.0
 psutil==5.9.8
 # This should be compatible with pytest.py, although it can be looser so that we don't
 # over-constrain pantsbuild.pants.testutil

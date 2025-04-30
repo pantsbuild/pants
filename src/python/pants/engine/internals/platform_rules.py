@@ -93,7 +93,8 @@ async def complete_environment_vars(
 
 @rule
 def environment_vars_subset(
-    complete_env_vars: CompleteEnvironmentVars, request: EnvironmentVarsRequest
+    request: EnvironmentVarsRequest,
+    complete_env_vars: CompleteEnvironmentVars,
 ) -> EnvironmentVars:
     return EnvironmentVars(
         complete_env_vars.get_subset(

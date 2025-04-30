@@ -58,6 +58,9 @@ const GIGABYTES: usize = 1024 * MEGABYTES;
 
 mod cli_options;
 
+#[cfg(test)]
+mod cli_options_tests;
+
 mod local;
 #[cfg(test)]
 pub mod local_tests;
@@ -1599,7 +1602,8 @@ impl Store {
         let res = async move {
             let directory = store.load_directory(digest).await.map_err(|e| {
                 e.enrich(&format!(
-                    "Could not walk unknown directory at {path_so_far:?}"
+                    "Could not walk unknown directory at {}",
+                    path_so_far.display()
                 ))
             })?;
             let result_for_directory = f(&store, &path_so_far, digest, &directory).await?;

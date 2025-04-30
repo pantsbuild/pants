@@ -23,11 +23,12 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSLayoutField,
     PythonFaaSPex3VenvCreateExtraArgsField,
     PythonFaaSPexBuildExtraArgs,
+    build_python_faas,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
 from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
 from pants.core.util_rules.environments import EnvironmentField
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
@@ -66,8 +67,7 @@ class PythonAwsLambdaLayerFieldSet(_BaseFieldSet):
 async def package_python_aws_lambda_function(
     field_set: PythonAwsLambdaFieldSet,
 ) -> BuiltPackage:
-    return await Get(
-        BuiltPackage,
+    return await build_python_faas(
         BuildPythonFaaSRequest(
             address=field_set.address,
             target_name=PythonAWSLambda.alias,
@@ -82,7 +82,7 @@ async def package_python_aws_lambda_function(
             pex_build_extra_args=field_set.pex_build_extra_args,
             layout=field_set.layout,
             reexported_handler_module=PythonAwsLambdaHandlerField.reexported_handler_module,
-        ),
+        )
     )
 
 
@@ -90,8 +90,7 @@ async def package_python_aws_lambda_function(
 async def package_python_aws_lambda_layer(
     field_set: PythonAwsLambdaLayerFieldSet,
 ) -> BuiltPackage:
-    return await Get(
-        BuiltPackage,
+    return await build_python_faas(
         BuildPythonFaaSRequest(
             address=field_set.address,
             target_name=PythonAWSLambdaLayer.alias,
@@ -118,7 +117,7 @@ async def package_python_aws_lambda_layer(
             # a layer doesn't have a handler, just pulls in things via `dependencies`
             handler=None,
             reexported_handler_module=None,
-        ),
+        )
     )
 
 

@@ -74,6 +74,7 @@ rand = { workspace = true }
 regex = { workspace = true }
 reqwest = { version = "0.12", default-features = false, features = ["stream", "rustls-tls"] }
 rule_graph = { path = "rule_graph" }
+sandboxer = { path = "process_execution/sandboxer" }
 smallvec = { version = "1", features = ["union"] }
 stdio = { path = "stdio" }
 store = { path = "fs/store" }
@@ -280,6 +281,7 @@ opendal = { version = "0.52.0", default-features = false, features = [
   "services-ghac",
 ] }
 os_pipe = "1.1"
+parameterized = "2.0.0"
 parking_lot = "0.12"
 peg = "0.8"
 petgraph = "0.6"

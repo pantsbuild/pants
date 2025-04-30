@@ -24,6 +24,7 @@ use futures::try_join;
 use grpc_util::prost::MessageExt;
 use hashing::Digest;
 use itertools::Itertools;
+use local::CapturedWorkdirError;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 use remexec::ExecutedActionMetadata;
@@ -121,6 +122,12 @@ impl From<StoreError> for ProcessError {
             StoreError::MissingDigest(s, d) => Self::MissingDigest(s, d),
             StoreError::Unclassified(s) => Self::Unclassified(s),
         }
+    }
+}
+
+impl From<CapturedWorkdirError> for ProcessError {
+    fn from(err: CapturedWorkdirError) -> Self {
+        ProcessError::Unclassified(err.to_string())
     }
 }
 
