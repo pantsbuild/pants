@@ -131,7 +131,7 @@ async def setup_thrift_tool(
     apache_thrift_env_aware: ApacheThriftSubsystem.EnvironmentAware,
     env_target: EnvironmentTarget,
 ) -> ApacheThriftSetup:
-    env = await environment_vars_subset(**implicitly(EnvironmentVarsRequest(["PATH"])))
+    env = await environment_vars_subset(EnvironmentVarsRequest(["PATH"]), **implicitly())
     search_paths = apache_thrift_env_aware.thrift_search_paths(env)
     all_thrift_binary_paths = await find_binary(
         BinaryPathRequest(
