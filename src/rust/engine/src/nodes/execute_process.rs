@@ -230,9 +230,7 @@ impl ExecuteProcess {
             .map_err(|e| throw(format!("Failed to serialize process: {e}")))?;
         workunit.update_metadata(|initial| {
             initial.map(|(initial, level)| {
-                let mut user_metadata = initial.user_metadata;
-                user_metadata.reserve(7);
-
+                let mut user_metadata = Vec::with_capacity(7);
                 user_metadata.push((
                     "definition".to_string(),
                     UserMetadataItem::String(definition),

@@ -375,11 +375,13 @@ def test_remote_cache_workunits() -> None:
         assert process_unit["description"] == "Scheduling: Create test output"
         assert process_unit["metadata"]["exit_code"] == 0
 
-        action_digest = process_unit["metadata"]["action.digest"]
-        command_digest = process_unit["metadata"]["command.digest"]
+        action_digest = process_unit["artifacts"]["action_digest"]
+        command_digest = process_unit["artifacts"]["command_digest"]
 
-        assert len(action_digest) == 64, "Action digest should be a 64-character hash"
-        assert len(command_digest) == 64, "Command digest should be a 64-character hash"
+        assert isinstance(action_digest, FileDigest)
+        assert len(action_digest.fingerprint) == 64, "Action digest should be a 64-character hash"
+        assert isinstance(command_digest, FileDigest)
+        assert len(command_digest.fingerprint) == 64, "Command digest should be a 64-character hash"
 
         assert process_unit["artifacts"]["stdout_digest"] == EMPTY_FILE_DIGEST
         assert process_unit["artifacts"]["stderr_digest"] == EMPTY_FILE_DIGEST
@@ -390,8 +392,8 @@ def test_remote_cache_workunits() -> None:
     assert process_unit["metadata"]["source"] == "Ran"
 
     # Verify the action and command digests are in the CAS
-    assert cas.contains(Digest(action_digest, 0))
-    assert cas.contains(Digest(command_digest, 0))
+    assert cas.contains(action_digest)
+    assert cas.contains(command_digest)
 
     # Second run should hit cache
     process_unit2, action_digest2, command_digest2 = run_process()

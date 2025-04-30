@@ -985,6 +985,22 @@ async fn workunit_to_py_value(
             ));
         }
 
+        if let Some(command_digest) = metadata.command {
+            artifact_entries.push((
+                externs::store_utf8(py, "command_digest"),
+                crate::nodes::Snapshot::store_file_digest(py, command_digest)
+                    .map_err(PyException::new_err)?,
+            ));
+        }
+
+        if let Some(action_digest) = metadata.action {
+            artifact_entries.push((
+                externs::store_utf8(py, "action_digest"),
+                crate::nodes::Snapshot::store_file_digest(py, action_digest)
+                    .map_err(PyException::new_err)?,
+            ));
+        }
+
         dict_entries.push((
             externs::store_utf8(py, "artifacts"),
             externs::store_dict(py, artifact_entries)?,

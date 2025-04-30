@@ -332,6 +332,8 @@ pub struct WorkunitMetadata {
     pub message: Option<String>,
     pub stdout: Option<hashing::Digest>,
     pub stderr: Option<hashing::Digest>,
+    pub command: Option<hashing::Digest>,
+    pub action: Option<hashing::Digest>,
     pub artifacts: Vec<(String, ArtifactOutput)>,
     pub user_metadata: Vec<(String, UserMetadataItem)>,
 }
