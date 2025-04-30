@@ -375,17 +375,21 @@ def test_remote_cache_workunits() -> None:
         assert process_unit["description"] == "Scheduling: Create test output"
         assert process_unit["metadata"]["exit_code"] == 0
 
-        action_digest = process_unit["artifacts"]["action_digest"]
-        command_digest = process_unit["artifacts"]["command_digest"]
+        remote_action_digest = process_unit["artifacts"]["remote_action_digest"]
+        remote_command_digest = process_unit["artifacts"]["remote_command_digest"]
 
-        assert isinstance(action_digest, FileDigest)
-        assert len(action_digest.fingerprint) == 64, "Action digest should be a 64-character hash"
-        assert isinstance(command_digest, FileDigest)
-        assert len(command_digest.fingerprint) == 64, "Command digest should be a 64-character hash"
+        assert isinstance(remote_action_digest, FileDigest)
+        assert len(remote_action_digest.fingerprint) == 64, (
+            "Action digest should be a 64-character hash"
+        )
+        assert isinstance(remote_command_digest, FileDigest)
+        assert len(remote_command_digest.fingerprint) == 64, (
+            "Command digest should be a 64-character hash"
+        )
 
         assert process_unit["artifacts"]["stdout_digest"] == EMPTY_FILE_DIGEST
         assert process_unit["artifacts"]["stderr_digest"] == EMPTY_FILE_DIGEST
-        return process_unit, action_digest, command_digest
+        return process_unit, remote_action_digest, remote_command_digest
 
     # First run should miss cache and populate it
     process_unit, action_digest, command_digest = run_process()

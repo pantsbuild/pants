@@ -491,8 +491,8 @@ impl process_execution::CommandRunner for CommandRunner {
             initial.map(|(initial, level)| {
                 (
                     WorkunitMetadata {
-                        command: Some(command_digest),
-                        action: Some(action_digest),
+                        remote_command: Some(command_digest),
+                        remote_action: Some(action_digest),
                         ..initial
                     },
                     level,
