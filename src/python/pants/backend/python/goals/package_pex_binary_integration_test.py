@@ -495,7 +495,10 @@ def test_package_with_python_provider() -> None:
     field_set = PexBinaryFieldSet.create(tgt)
 
     # a random (https://xkcd.com/221/) old version of Python, that seems unlikely to be installed on
-    # most systems, by default
+    # most systems, by default... but also, we don't propagate PATH (etc.) for this rule_runner, so
+    # the test shouldn't be able to find system interpreters anyway.
+    #
+    # (Thus we have two layers of "assurance" the test is doing what is intended.)
     rule_runner.set_options(["--python-interpreter-constraints=CPython==3.10.2"])
 
     result = rule_runner.request(BuiltPackage, [field_set])
