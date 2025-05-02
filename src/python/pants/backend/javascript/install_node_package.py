@@ -79,7 +79,9 @@ async def _get_relevant_source_files(
 
 @rule
 async def install_node_packages_for_address(
-    req: InstalledNodePackageRequest, union_membership: UnionMembership
+    req: InstalledNodePackageRequest,
+    union_membership: UnionMembership,
+    nodejs: nodejs.NodeJS,
 ) -> InstalledNodePackage:
     project_env = await Get(NodeJsProjectEnvironment, NodeJSProjectEnvironmentRequest(req.address))
     target = project_env.ensure_target()
