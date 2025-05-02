@@ -487,6 +487,19 @@ impl process_execution::CommandRunner for CommandRunner {
         let (command_digest, action_digest) =
             crate::remote::ensure_action_stored_locally(&self.store, &command, &action).await?;
 
+        workunit.update_metadata(|initial| {
+            initial.map(|(initial, level)| {
+                (
+                    WorkunitMetadata {
+                        remote_command: Some(command_digest),
+                        remote_action: Some(action_digest),
+                        ..initial
+                    },
+                    level,
+                )
+            })
+        });
+
         let use_remote_cache = request.cache_scope == ProcessCacheScope::Always
             || request.cache_scope == ProcessCacheScope::Successful;
 

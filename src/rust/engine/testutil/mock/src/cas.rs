@@ -263,4 +263,8 @@ impl StubCAS {
     pub fn remove(&self, fingerprint: Fingerprint) -> bool {
         self.blobs.lock().remove(&fingerprint).is_some()
     }
+
+    pub fn contains(&self, fingerprint: Fingerprint) -> bool {
+        self.blobs.lock().contains_key(&fingerprint)
+    }
 }

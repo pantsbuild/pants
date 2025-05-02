@@ -78,20 +78,33 @@ impl crate::CommandRunner for CommandRunner {
     ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
         let write_failures_to_cache = req.cache_scope == ProcessCacheScope::Always
             || req.cache_scope == ProcessCacheScope::LocalAlways;
+
+        let (action_digest, command_digest) = crate::get_digest(
+            &req,
+            None,
+            self.process_cache_namespace.clone(),
+            &self.file_store,
+            None,
+        )
+        .await;
+
         let key = CacheKey {
-            digest: Some(
-                crate::get_digest(
-                    &req,
-                    None,
-                    self.process_cache_namespace.clone(),
-                    &self.file_store,
-                    None,
-                )
-                .await
-                .into(),
-            ),
+            digest: Some(action_digest.into()),
             key_type: CacheKeyType::Process.into(),
         };
+
+        workunit.update_metadata(|initial| {
+            initial.map(|(initial, _)| {
+                (
+                    WorkunitMetadata {
+                        local_command: Some(command_digest),
+                        local_action: Some(action_digest),
+                        ..initial
+                    },
+                    Level::Info,
+                )
+            })
+        });
 
         if self.cache_read {
             let context2 = context.clone();

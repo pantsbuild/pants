@@ -434,7 +434,7 @@ struct NailgunProcessFingerprint {
 
 impl NailgunProcessFingerprint {
     pub async fn new(name: String, nailgun_req: &Process, store: &Store) -> Result<Self, String> {
-        let nailgun_req_digest =
+        let (nailgun_req_digest, _command_digest) =
             process_execution::get_digest(nailgun_req, None, None, store, None).await;
         Ok(NailgunProcessFingerprint {
             name,
