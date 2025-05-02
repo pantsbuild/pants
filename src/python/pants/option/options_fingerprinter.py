@@ -41,29 +41,6 @@ class OptionsFingerprinter:
     :API: public
     """
 
-    @classmethod
-    def combined_options_fingerprint_for_scope(cls, scope, options, daemon_only=False) -> str:
-        """Given options and a scope, compute a combined fingerprint for the scope.
-
-        :param string scope: The scope to fingerprint.
-        :param Options options: The `Options` object to fingerprint.
-        :param daemon_only: Whether to fingerprint only daemon=True options.
-        :return: Hexadecimal string representing the fingerprint for all `options`
-                 values in `scope`.
-        """
-        fingerprinter = cls()
-        hasher = sha1()
-        option_items = options.get_fingerprintable_for_scope(scope, daemon_only)
-        for _, option_type, option_value in option_items:
-            fingerprint = fingerprinter.fingerprint(option_type, option_value)
-            if fingerprint is None:
-                # This isn't necessarily a good value to be using here, but it preserves behavior from
-                # before the commit which added it. I suspect that using the empty string would be
-                # reasonable too, but haven't done any archaeology to check.
-                fingerprint = "None"
-            hasher.update(fingerprint.encode())
-        return hasher.hexdigest()
-
     @staticmethod
     def options_map_for_scope(scope: str, options: Options) -> dict[str, Any]:
         """Given options and a scope, create a JSON-serializable map of all fingerprintable options
