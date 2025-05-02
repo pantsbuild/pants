@@ -39,7 +39,12 @@ from pants.core.util_rules.system_binaries import (
     BinaryShims,
     BinaryShimsRequest,
 )
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest, PathEnvironmentVariable
+from pants.engine.env_vars import (
+    EXTRA_ENV_VARS_USAGE_HELP,
+    EnvironmentVars,
+    EnvironmentVarsRequest,
+    PathEnvironmentVariable,
+)
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, DownloadFile
 from pants.engine.internals.native_engine import FileDigest, MergeDigests
 from pants.engine.internals.platform_rules import environment_vars_subset
@@ -152,6 +157,17 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
             the `--activate` flag.
             """
         ),
+    )
+
+    extra_env_vars = StrListOption(
+        help=softwrap(
+            f"""
+            Environment variables to set during package manager operations.
+
+            {EXTRA_ENV_VARS_USAGE_HELP}
+            """
+        ),
+        advanced=True,
     )
 
     @property
