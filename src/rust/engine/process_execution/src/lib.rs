@@ -1089,9 +1089,11 @@ pub async fn get_digest(
     process_cache_namespace: Option<String>,
     store: &Store,
     append_only_caches_base_path: Option<&str>,
-) -> Digest {
+) -> (Digest, Digest) {
     let EntireExecuteRequest {
-        execute_request, ..
+        execute_request,
+        action,
+        ..
     } = make_execute_request(
         process,
         instance_name,
@@ -1101,7 +1103,11 @@ pub async fn get_digest(
     )
     .await
     .unwrap();
-    execute_request.action_digest.unwrap().try_into().unwrap()
+
+    (
+        execute_request.action_digest.unwrap().try_into().unwrap(),
+        action.command_digest.unwrap().try_into().unwrap(),
+    )
 }
 
 pub fn digest<T: prost::Message>(message: &T) -> Result<Digest, String> {

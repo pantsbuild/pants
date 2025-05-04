@@ -308,6 +308,18 @@ class NodeThirdPartyPackageTarget(Target):
     )
 
 
+class NodePackageExtraEnvVarsField(StringSequenceField):
+    alias = "extra_env_vars"
+    help = help_text(
+        f"""
+        Environment variables to set when running package manager operations.
+
+        {EXTRA_ENV_VARS_USAGE_HELP}
+        """
+    )
+    required = False
+
+
 class NodePackageTarget(Target):
     alias = "node_package"
 
@@ -320,6 +332,7 @@ class NodePackageTarget(Target):
         NodePackageVersionField,
         NodePackageDependenciesField,
         NodePackageTestScriptField,
+        NodePackageExtraEnvVarsField,
     )
 
 
@@ -348,6 +361,7 @@ class PackageJsonTarget(TargetGenerator):
         *COMMON_TARGET_FIELDS,
         PackageJsonSourceField,
         NodePackageScriptsField,
+        NodePackageExtraEnvVarsField,
     )
     help = help_text(
         f"""
@@ -878,6 +892,9 @@ async def generate_node_package_targets(
             **request.template,
             NodePackageNameField.alias: pkg_json.name,
             NodePackageVersionField.alias: pkg_json.version,
+            NodePackageExtraEnvVarsField.alias: request.generator[
+                NodePackageExtraEnvVarsField
+            ].value,
             NodePackageDependenciesField.alias: [
                 file_tgt.address.spec,
                 *(tgt.address.spec for tgt in third_party_tgts),

@@ -121,6 +121,12 @@ def test_creates_yarn_run_requests_package_json_scripts(rule_runner: RuleRunner)
 
 
 def test_extra_envs(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        [
+            "--nodejs-extra-env-vars=['FROM_SUBSYSTEM=FIZZ']",
+        ],
+        env_inherit={"PATH"},
+    )
     rule_runner.write_files(
         {
             "src/js/BUILD": dedent(
@@ -128,7 +134,8 @@ def test_extra_envs(rule_runner: RuleRunner) -> None:
                 package_json(
                     scripts=[
                         node_build_script(entry_point="build", extra_env_vars=["FOO=BAR"], output_files=["dist/index.cjs"])
-                    ]
+                    ],
+                    extra_env_vars=["FROM_PACKAGE_JSON=BUZZ"]
                 )
                 """
             ),
@@ -153,3 +160,5 @@ def test_extra_envs(rule_runner: RuleRunner) -> None:
 
     result = rule_runner.request(RunRequest, [RunNodeBuildScriptFieldSet.create(tgt)])
     assert result.extra_env.get("FOO") == "BAR"
+    assert result.extra_env.get("FROM_SUBSYSTEM") == "FIZZ"
+    assert result.extra_env.get("FROM_PACKAGE_JSON") == "BUZZ"

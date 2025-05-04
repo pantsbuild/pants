@@ -4,7 +4,7 @@ import os.path
 from dataclasses import dataclass
 from pathlib import Path
 
-from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformUpgradeResponse
+from pants.backend.terraform.dependencies import TerraformInitRequest, prepare_terraform_invocation
 from pants.backend.terraform.target_types import (
     TerraformDependenciesField,
     TerraformLockfileTarget,
@@ -12,7 +12,7 @@ from pants.backend.terraform.target_types import (
     TerraformModuleTarget,
     TerraformRootModuleField,
 )
-from pants.backend.terraform.tool import TerraformProcess, TerraformTool
+from pants.backend.terraform.tool import TerraformCommand, TerraformProcess, TerraformTool
 from pants.backend.terraform.utils import terraform_arg
 from pants.core.goals.generate_lockfiles import (
     GenerateLockfile,
@@ -24,7 +24,13 @@ from pants.core.goals.generate_lockfiles import (
 )
 from pants.engine.addresses import Addresses
 from pants.engine.fs import PathGlobs
-from pants.engine.internals.native_engine import Address, AddressInput, Snapshot
+from pants.engine.internals.native_engine import (
+    Address,
+    AddressInput,
+    Digest,
+    MergeDigests,
+    Snapshot,
+)
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
 from pants.engine.internals.target_adaptor import TargetAdaptor
@@ -106,14 +112,24 @@ async def generate_lockfile_from_sources(
     keep_sandboxes: KeepSandboxes,
 ) -> GenerateLockfileResult:
     """Generate a Terraform lockfile by running `terraform providers lock` on the sources."""
-    initialised_terraform = await Get(
-        TerraformUpgradeResponse,
+    initialised_terraform = await prepare_terraform_invocation(
         TerraformInitRequest(
             TerraformRootModuleField(
                 lockfile_request.target.address.spec, lockfile_request.target.address
             ),
             lockfile_request.target[TerraformDependenciesField],
             initialise_backend=False,
+            upgrade=True,
+        )
+    )
+
+    sources_and_deps = await Get(
+        Digest,
+        MergeDigests(
+            [
+                initialised_terraform.terraform_sources.snapshot.digest,
+                initialised_terraform.dependencies_files.snapshot.digest,
+            ]
         ),
     )
 
@@ -127,8 +143,11 @@ async def generate_lockfile_from_sources(
     multiplatform_lockfile = await Get(
         FallibleProcessResult,
         TerraformProcess(
-            args=args,
-            input_digest=initialised_terraform.sources_and_deps,
+            cmds=(
+                initialised_terraform.init_cmd.to_args(),
+                TerraformCommand(args),
+            ),
+            input_digest=sources_and_deps,
             output_files=(".terraform.lock.hcl",),
             description=provider_lock_description,
             chdir=initialised_terraform.chdir,

@@ -121,4 +121,9 @@ resources(
     sources=["native_client"],
 )
 
+resources(
+    name="sandboxer",
+    sources=["sandboxer"],
+)
+
 python_tests(name="tests")

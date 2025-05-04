@@ -7,7 +7,11 @@ import json
 import textwrap
 from pathlib import Path
 
-from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
+from pants.backend.terraform.dependencies import (
+    TerraformDependenciesResponse,
+    TerraformInitRequest,
+    TerraformInvocationRequirements,
+)
 from pants.backend.terraform.goals.deploy import DeployTerraformFieldSet
 from pants.backend.terraform.testutil import (
     StandardDeployment,
@@ -29,8 +33,9 @@ def _do_init_terraform(
     rule_runner.write_files(standard_deployment.files)
     target = rule_runner.get_target(standard_deployment.target)
     field_set = DeployTerraformFieldSet.create(target)
-    result = rule_runner.request(
-        TerraformInitResponse,
+
+    init = rule_runner.request(
+        TerraformInvocationRequirements,
         [
             TerraformInitRequest(
                 field_set.root_module,
@@ -39,8 +44,13 @@ def _do_init_terraform(
             )
         ],
     )
-    initialised_files = rule_runner.request(DigestContents, [result.sources_and_deps])
-    initialised_entries = rule_runner.request(DigestEntries, [result.sources_and_deps])
+
+    result = rule_runner.request(
+        TerraformDependenciesResponse,
+        [init.init_cmd],
+    )
+    initialised_files = rule_runner.request(DigestContents, [result.digest])
+    initialised_entries = rule_runner.request(DigestEntries, [result.digest])
     assert isinstance(initialised_files, DigestContents)
     return initialised_files, initialised_entries
 

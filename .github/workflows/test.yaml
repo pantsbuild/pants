@@ -63,6 +63,8 @@ jobs:
         key: Linux-ARM64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
         path: 'src/python/pants/bin/native_client
 
+          src/python/pants/bin/sandboxer
+
           src/python/pants/engine/internals/native_engine.so
 
           src/python/pants/engine/internals/native_engine.so.metadata'
@@ -93,6 +95,8 @@ jobs:
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
         path: 'src/python/pants/bin/native_client
+
+          src/python/pants/bin/sandboxer
 
           src/python/pants/engine/internals/native_engine.so
 
@@ -168,6 +172,8 @@ jobs:
         key: Linux-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
         path: 'src/python/pants/bin/native_client
 
+          src/python/pants/bin/sandboxer
+
           src/python/pants/engine/internals/native_engine.so
 
           src/python/pants/engine/internals/native_engine.so.metadata'
@@ -198,6 +204,8 @@ jobs:
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: 'src/python/pants/bin/native_client
+
+          src/python/pants/bin/sandboxer
 
           src/python/pants/engine/internals/native_engine.so
 
@@ -283,6 +291,8 @@ jobs:
         key: macOS13-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
         path: 'src/python/pants/bin/native_client
 
+          src/python/pants/bin/sandboxer
+
           src/python/pants/engine/internals/native_engine.so
 
           src/python/pants/engine/internals/native_engine.so.metadata'
@@ -313,6 +323,8 @@ jobs:
       with:
         name: native_binaries.${{ matrix.python-version }}.macOS13-x86_64
         path: 'src/python/pants/bin/native_client
+
+          src/python/pants/bin/sandboxer
 
           src/python/pants/engine/internals/native_engine.so
 
