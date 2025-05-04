@@ -8,7 +8,7 @@ from typing import cast
 
 from pants.backend.terraform.partition import partition_files_by_directory
 from pants.backend.terraform.target_types import TerraformFieldSet
-from pants.backend.terraform.tool import TerraformProcess
+from pants.backend.terraform.tool import TerraformCommand, TerraformProcess
 from pants.backend.terraform.tool import rules as tool_rules
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
 from pants.core.util_rules import external_tool
@@ -69,7 +69,14 @@ async def tffmt_fmt(request: TffmtRequest.Batch, tffmt: TfFmtSubsystem) -> FmtRe
     result = await Get(
         ProcessResult,
         TerraformProcess(
-            args=("fmt", directory),
+            cmds=(
+                TerraformCommand(
+                    (
+                        "fmt",
+                        directory,
+                    )
+                ),
+            ),
             input_digest=request.snapshot.digest,
             output_files=request.files,
             description=f"Run `terraform fmt` on {pluralize(len(request.files), 'file')}.",

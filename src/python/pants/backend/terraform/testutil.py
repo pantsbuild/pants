@@ -7,7 +7,12 @@ from textwrap import dedent  # noqa: PNT20
 import pytest
 
 from pants.backend.terraform import dependencies, dependency_inference, tool
-from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
+from pants.backend.terraform.dependencies import (
+    TerraformDependenciesRequest,
+    TerraformDependenciesResponse,
+    TerraformInitRequest,
+    TerraformInvocationRequirements,
+)
 from pants.backend.terraform.goals.deploy import DeployTerraformFieldSet
 from pants.backend.terraform.goals.deploy import rules as terraform_deploy_rules
 from pants.backend.terraform.goals.lockfiles import rules as terraform_lockfile_rules
@@ -50,8 +55,9 @@ def rule_runner_with_auto_approve() -> RuleRunner:
             *core_rules(),
             *process.rules(),
             QueryRule(DeployProcess, (DeployTerraformFieldSet,)),
-            QueryRule(TerraformInitResponse, (TerraformInitRequest,)),
             QueryRule(DigestEntries, (Digest,)),
+            QueryRule(TerraformInvocationRequirements, (TerraformInitRequest,)),
+            QueryRule(TerraformDependenciesResponse, (TerraformDependenciesRequest,)),
         ],
         preserve_tmpdirs=True,
     )
