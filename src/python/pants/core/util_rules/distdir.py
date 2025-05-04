@@ -7,7 +7,6 @@ from pathlib import Path
 from pants.base.build_root import BuildRoot
 from pants.engine.rules import collect_rules, rule
 from pants.option.global_options import GlobalOptions
-from pants.util.strutil import softwrap
 
 
 def is_child_of(path: Path, directory: Path) -> bool:
