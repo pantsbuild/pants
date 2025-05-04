@@ -15,35 +15,34 @@ def is_child_of(path: Path, directory: Path) -> bool:
     return directory == abs_path or directory in abs_path.parents
 
 
-class InvalidDistDir(Exception):
-    pass
-
-
+# for backward compatibility -- to prevent extensive patching across the codebase
+# we we preserve the old relpath attribute and alias path to it in normalize_distdir()
 @dataclass(frozen=True)
 class DistDir:
     """The directory to which we write distributable files."""
 
+    path: Path
+    """
+    The absolutized path for the dist dir
+    """
+
     relpath: Path
+    """
+    Deprecated property from when DistDir was forced to be a relative path; use path instead
+    """
 
 
 @rule
 async def get_distdir(global_options: GlobalOptions, buildroot: BuildRoot) -> DistDir:
-    return validate_distdir(Path(global_options.pants_distdir), buildroot.pathlib_path)
+    return normalize_distdir(Path(global_options.pants_distdir), buildroot.pathlib_path)
 
 
-def validate_distdir(distdir: Path, buildroot: Path) -> DistDir:
-    if not is_child_of(distdir, buildroot):
-        raise InvalidDistDir(
-            softwrap(
-                f"""
-            When set to an absolute path, `--pants-distdir` must be relative to the build root.
-            You set it to {distdir}. Instead, use a relative path or an absolute path relative
-            to the build root.
-            """
-            )
-        )
-    relpath = distdir.relative_to(buildroot) if distdir.is_absolute() else distdir
-    return DistDir(relpath)
+def normalize_distdir(distdir: Path, buildroot: Path) -> DistDir:
+    if distdir.is_absolute():
+        path = distdir
+    else:
+        path = buildroot / distdir
+    return DistDir(path=path, relpath=path)
 
 
 def rules():

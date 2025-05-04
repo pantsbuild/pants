@@ -5,15 +5,14 @@ from pathlib import Path
 
 import pytest
 
-from pants.core.util_rules.distdir import DistDir, InvalidDistDir, is_child_of, validate_distdir
+from pants.core.util_rules.distdir import DistDir, is_child_of, normalize_distdir
 
 
 def test_distdir() -> None:
     buildroot = Path("/buildroot")
-    assert DistDir(relpath=Path("dist")) == validate_distdir(Path("dist"), buildroot)
-    assert DistDir(relpath=Path("dist")) == validate_distdir(Path("/buildroot/dist"), buildroot)
-    with pytest.raises(InvalidDistDir):
-        validate_distdir(Path("/other/dist"), buildroot)
+    assert DistDir(path=Path("/buildroot/dist")) == normalize_distdir(Path("dist"), buildroot)
+    assert DistDir(path=Path("/buildroot/dist")) == normalize_distdir(Path("/buildroot/dist"), buildroot)
+    assert DistDir(path=Path("/other/dist")) == normalize_distdir(Path("/other/dist"), buildroot)
 
 
 def test_is_child_of() -> None:
