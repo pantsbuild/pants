@@ -16,20 +16,13 @@ def is_child_of(path: Path, directory: Path) -> bool:
 
 
 # for backward compatibility -- to prevent extensive patching across the codebase
-# we we preserve the old relpath attribute and alias path to it in normalize_distdir()
+# we we preserve the old relpath attribute, but note that the Path held inside
+# is always absolute now; see normalize_distdir()
 @dataclass(frozen=True)
 class DistDir:
     """The directory to which we write distributable files."""
 
-    path: Path
-    """
-    The absolutized path for the dist dir
-    """
-
     relpath: Path
-    """
-    Deprecated property from when DistDir was forced to be a relative path; use path instead
-    """
 
 
 @rule
@@ -42,7 +35,7 @@ def normalize_distdir(distdir: Path, buildroot: Path) -> DistDir:
         path = distdir
     else:
         path = buildroot / distdir
-    return DistDir(path=path, relpath=path)
+    return DistDir(relpath=path)
 
 
 def rules():

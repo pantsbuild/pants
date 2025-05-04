@@ -10,9 +10,9 @@ from pants.core.util_rules.distdir import DistDir, is_child_of, normalize_distdi
 
 def test_distdir() -> None:
     buildroot = Path("/buildroot")
-    assert DistDir(path=Path("/buildroot/dist")) == normalize_distdir(Path("dist"), buildroot)
-    assert DistDir(path=Path("/buildroot/dist")) == normalize_distdir(Path("/buildroot/dist"), buildroot)
-    assert DistDir(path=Path("/other/dist")) == normalize_distdir(Path("/other/dist"), buildroot)
+    assert DistDir(relpath=Path("/buildroot/dist")) == normalize_distdir(Path("dist"), buildroot)
+    assert DistDir(relpath=Path("/buildroot/dist")) == normalize_distdir(Path("/buildroot/dist"), buildroot)
+    assert DistDir(relpath=Path("/other/dist")) == normalize_distdir(Path("/other/dist"), buildroot)
 
 
 def test_is_child_of() -> None:
