@@ -837,7 +837,7 @@ pub(crate) struct ContainerCache<'a> {
     work_dir_base: String,
     immutable_inputs_base_dir: String,
     /// Cache that maps image name / platform to a cached container.
-    containers: Mutex<BTreeMap<(String, Platform), CachedContainer>>,
+    pub(crate) containers: Mutex<BTreeMap<(String, Platform), CachedContainer>>,
 }
 
 impl<'a> ContainerCache<'a> {

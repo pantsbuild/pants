@@ -25,7 +25,7 @@ use crate::docker::{
 use process_execution::local::KeepSandboxes;
 use process_execution::{
     CacheName, CommandRunner, Context, FallibleProcessResultWithPlatform, InputDigests,
-    NamedCaches, Platform, Process, ProcessError, local,
+    NamedCaches, Platform, Process, ProcessError, ProcessExecutionStrategy, local,
 };
 
 /// Docker image to use for most tests in this file.
@@ -94,6 +94,8 @@ trait DockerCommandTestRunner: Send + Sync {
         immutable_inputs: ImmutableInputs,
     ) -> Result<crate::docker::CommandRunner<'a>, String>;
 
+    fn assert_correct_container(&self, actual_container_id: String);
+
     async fn run_command_via_docker_in_dir(
         &self,
         mut req: Process,
@@ -102,8 +104,15 @@ trait DockerCommandTestRunner: Send + Sync {
         store: Option<Store>,
         executor: Option<task_executor::Executor>,
     ) -> Result<LocalTestResult, ProcessError> {
-        req.execution_environment.platform =
-            platform_for_tests().map_err(ProcessError::Unclassified)?;
+        let image =
+            if let ProcessExecutionStrategy::Docker(image) = &req.execution_environment.strategy {
+                image.clone()
+            } else {
+                unreachable!("must be docker")
+            };
+        let platform = platform_for_tests().map_err(ProcessError::Unclassified)?;
+        req.execution_environment.platform = platform;
+        req.execution_environment.name = Some("test".to_string());
         let store_dir = TempDir::new().unwrap();
         let executor = executor.unwrap_or_else(task_executor::Executor::new);
         let store =
@@ -138,6 +147,20 @@ trait DockerCommandTestRunner: Send + Sync {
         }
         .await;
         let (original, stdout_bytes, stderr_bytes) = result?;
+        let container_id = {
+            let containers = runner.container_cache.containers.lock();
+            assert_eq!(containers.len(), 1);
+            if let Some(((actual_image, actual_platform), value_arc)) = containers.first_key_value()
+            {
+                assert_eq!(*actual_image, image);
+                assert_eq!(*actual_platform, platform);
+                assert!(value_arc.initialized());
+                value_arc.get().unwrap().0.clone()
+            } else {
+                unreachable!("we know we have the entry")
+            }
+        };
+        self.assert_correct_container(container_id);
         runner.shutdown().await?;
         Ok(LocalTestResult {
             original,
@@ -177,6 +200,8 @@ impl DockerCommandTestRunner for DefaultTestRunner {
             immutable_inputs,
         )
     }
+
+    fn assert_correct_container(&self, _actual_container_id: String) {}
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -227,6 +252,10 @@ impl ExistingContainerTestRunner {
             container_id: OnceLock::new(),
         }
     }
+
+    fn get_container_id(&self) -> String {
+        self.container_id.get().unwrap().0.clone()
+    }
 }
 
 #[async_trait]
@@ -258,6 +287,10 @@ impl DockerCommandTestRunner for ExistingContainerTestRunner {
             Err(_) => Err("An error occurred when attempting to save container ID".to_string()),
         }
     }
+
+    fn assert_correct_container(&self, actual_container_id: String) {
+        assert_eq!(self.get_container_id(), actual_container_id);
+    }
 }
 
 #[async_trait]
@@ -273,6 +306,8 @@ trait UnavailableContainerTestRunner: DockerCommandTestRunner {
     ) -> Result<crate::docker::CommandRunner<'a>, String>;
 
     async fn make_container_unavailable(&self, docker: &Docker) -> Result<(), String>;
+
+    fn get_initial_container_id(&self) -> String;
 }
 
 #[async_trait]
@@ -299,6 +334,10 @@ impl<T: UnavailableContainerTestRunner> DockerCommandTestRunner for T {
         let docker_ref = docker.get().await?;
         self.make_container_unavailable(docker_ref).await?;
         Ok(command_runner)
+    }
+
+    fn assert_correct_container(&self, actual_container_id: String) {
+        assert_ne!(self.get_initial_container_id(), actual_container_id);
     }
 }
 
@@ -352,6 +391,10 @@ impl UnavailableContainerTestRunner for MissingContainerTestRunner {
             format!("Failed to remove Docker container during missing container test setup `{container_id}`: {err:?}")
         })
     }
+
+    fn get_initial_container_id(&self) -> String {
+        self.inner.get_container_id()
+    }
 }
 
 struct ExitedContainerTestRunner {
@@ -392,12 +435,16 @@ impl UnavailableContainerTestRunner for ExitedContainerTestRunner {
     async fn make_container_unavailable(&self, docker: &Docker) -> Result<(), String> {
         let container_id = self.inner.container_id.get().unwrap().0.as_str();
         docker.create_exec(container_id, CreateExecOptions {
-            cmd: Some(vec!["kill", "-TERM", "1"]),
+            cmd: Some(vec!["exit", "1"]),
             ..CreateExecOptions::default()
         })
         .await
         .map_err(|err| format!("An error occurred when trying to kill running container {container_id}:\n\n{err}"))?;
         Ok(())
+    }
+
+    fn get_initial_container_id(&self) -> String {
+        self.inner.get_container_id()
     }
 }
 
