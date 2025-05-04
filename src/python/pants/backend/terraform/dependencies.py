@@ -110,7 +110,7 @@ class TerraformInitRequest:
 
 
 @dataclass(frozen=True)
-class TerraformThingsNeededToRun:
+class TerraformInvocationRequirements:
     """The things you need to run a terraform command."""
 
     terraform_sources: SourceFiles
@@ -120,7 +120,9 @@ class TerraformThingsNeededToRun:
 
 
 @rule
-async def prepare_terraform_invocation(request: TerraformInitRequest) -> TerraformThingsNeededToRun:
+async def prepare_terraform_invocation(
+    request: TerraformInitRequest,
+) -> TerraformInvocationRequirements:
     """Prepare a terraform module or deployment to be operated on."""
     this_targets_dependencies = await Get(
         TransitiveTargets, TransitiveTargetsRequest((request.dependencies.address,))
@@ -205,7 +207,9 @@ async def prepare_terraform_invocation(request: TerraformInitRequest) -> Terrafo
         initialise_backend=request.initialise_backend,
         upgrade=request.upgrade,
     )
-    return TerraformThingsNeededToRun(source_files, dependencies_files, terraform_init_cmd, chdir)
+    return TerraformInvocationRequirements(
+        source_files, dependencies_files, terraform_init_cmd, chdir
+    )
 
 
 def rules():

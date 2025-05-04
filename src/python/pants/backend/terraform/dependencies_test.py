@@ -10,7 +10,7 @@ from pathlib import Path
 from pants.backend.terraform.dependencies import (
     TerraformDependenciesResponse,
     TerraformInitRequest,
-    TerraformThingsNeededToRun,
+    TerraformInvocationRequirements,
 )
 from pants.backend.terraform.goals.deploy import DeployTerraformFieldSet
 from pants.backend.terraform.testutil import (
@@ -35,7 +35,7 @@ def _do_init_terraform(
     field_set = DeployTerraformFieldSet.create(target)
 
     init = rule_runner.request(
-        TerraformThingsNeededToRun,
+        TerraformInvocationRequirements,
         [
             TerraformInitRequest(
                 field_set.root_module,

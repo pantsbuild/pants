@@ -11,7 +11,7 @@ from pants.backend.terraform.dependencies import (
     TerraformDependenciesRequest,
     TerraformDependenciesResponse,
     TerraformInitRequest,
-    TerraformThingsNeededToRun,
+    TerraformInvocationRequirements,
 )
 from pants.backend.terraform.goals.deploy import DeployTerraformFieldSet
 from pants.backend.terraform.goals.deploy import rules as terraform_deploy_rules
@@ -56,7 +56,7 @@ def rule_runner_with_auto_approve() -> RuleRunner:
             *process.rules(),
             QueryRule(DeployProcess, (DeployTerraformFieldSet,)),
             QueryRule(DigestEntries, (Digest,)),
-            QueryRule(TerraformThingsNeededToRun, (TerraformInitRequest,)),
+            QueryRule(TerraformInvocationRequirements, (TerraformInitRequest,)),
             QueryRule(TerraformDependenciesResponse, (TerraformDependenciesRequest,)),
         ],
         preserve_tmpdirs=True,
