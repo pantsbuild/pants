@@ -766,7 +766,7 @@ impl Process {
     ///
     pub fn docker(mut self, image: String) -> Process {
         self.execution_environment = ProcessExecutionEnvironment {
-            name: None,
+            name: Some("test".to_string()),
             platform: Platform::current().unwrap(),
             strategy: ProcessExecutionStrategy::Docker(image),
             local_keep_sandboxes: local::KeepSandboxes::Never,
