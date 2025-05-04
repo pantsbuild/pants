@@ -13,7 +13,7 @@ from pants.backend.terraform.target_types import (
 from pants.backend.terraform.tool import TerraformCommand, TerraformProcess
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.engine.internals.native_engine import Digest, MergeDigests
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.selectors import Get, MultiGet, concurrently
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import BoolField, Target
@@ -70,7 +70,7 @@ async def terraform_check(
     if subsystem.skip:
         return CheckResults([], checker_name=request.tool_name)
 
-    terraform_deployments = await MultiGet(
+    terraform_deployments = await concurrently(
         prepare_terraform_invocation(terraform_fieldset_to_init_request(deployment))
         for deployment in request.field_sets
     )
