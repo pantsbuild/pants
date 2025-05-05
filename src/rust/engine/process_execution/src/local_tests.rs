@@ -732,6 +732,7 @@ async fn prepare_workdir_exclusive_relative() {
         &process,
         TestDirectory::recursive().directory_digest(),
         &store,
+        None,
         &named_caches,
         &immutable_inputs,
         None,
@@ -779,6 +780,7 @@ async fn run_command_locally_in_dir(
         named_caches_and_immutable_inputs(store.clone());
     let runner = crate::local::CommandRunner::new(
         store.clone(),
+        None,
         executor.clone(),
         dir.clone(),
         named_caches,

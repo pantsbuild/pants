@@ -343,6 +343,7 @@ class RuleRunner:
                 local_store_options=local_store_options,
                 local_execution_root_dir=local_execution_root_dir,
                 named_caches_dir=named_caches_dir,
+                pants_workdir=self.pants_workdir,
                 build_root=self.build_root,
                 build_configuration=self.build_config,
                 # Each Scheduler that is created borrows the global executor, which is shut down `atexit`.

@@ -335,6 +335,7 @@ pub struct SandboxerProcess {
 }
 
 // Manages the spawned sandboxer process and communicates with it.
+#[derive(Clone)]
 pub struct Sandboxer {
     sandboxer_bin: PathBuf,
     socket_path: PathBuf,

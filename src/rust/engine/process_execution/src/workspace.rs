@@ -15,6 +15,7 @@ use futures::stream::BoxStream;
 use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use log::debug;
 use nails::execution::ExitCode;
+use sandboxer::Sandboxer;
 use store::{ImmutableInputs, Store};
 use task_executor::Executor;
 use tokio::process::Command;
@@ -33,6 +34,7 @@ use crate::{
 
 pub struct CommandRunner {
     store: Store,
+    sandboxer: Option<Sandboxer>,
     executor: Executor,
     build_root: PathBuf,
     work_dir_base: PathBuf,
@@ -44,6 +46,7 @@ pub struct CommandRunner {
 impl CommandRunner {
     pub fn new(
         store: Store,
+        sandboxer: Option<Sandboxer>,
         executor: Executor,
         build_root: PathBuf,
         work_dir_base: PathBuf,
@@ -53,6 +56,7 @@ impl CommandRunner {
     ) -> Self {
         Self {
             store,
+            sandboxer,
             executor,
             build_root,
             work_dir_base,
@@ -95,6 +99,7 @@ impl super::CommandRunner for CommandRunner {
                     &req,
                     req.input_digests.inputs.clone(),
                     &self.store,
+                    self.sandboxer.as_ref(),
                     &self.named_caches,
                     &self.immutable_inputs,
                     None,

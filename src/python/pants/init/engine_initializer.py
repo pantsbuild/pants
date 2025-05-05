@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
@@ -194,6 +195,13 @@ class EngineInitializer:
         build_root = get_buildroot()
         executor = executor or GlobalOptions.create_py_executor(bootstrap_options)
         execution_options = ExecutionOptions.from_options(bootstrap_options, dynamic_remote_options)
+        if is_bootstrap:
+            # Don't spawn a single-use sandboxer process that will then get preempted by a
+            # post-bootstrap one created by pantsd. This is fine: our plugin resolving sequence
+            # isn't susceptible to the race condition that the sandboxer solves.
+            # TODO: Are we sure? In any case we plan to replace the plugin resolver and
+            #  get rid of the bootstrap scheduler, so this should be moot soon enough.
+            execution_options = dataclasses.replace(execution_options, use_sandboxer=False)
         local_store_options = LocalStoreOptions.from_options(bootstrap_options)
         return EngineInitializer.setup_graph_extended(
             build_configuration,
@@ -206,6 +214,7 @@ class EngineInitializer:
             named_caches_dir=bootstrap_options.named_caches_dir,
             ca_certs_path=bootstrap_options.ca_certs_path,
             build_root=build_root,
+            pants_workdir=bootstrap_options.pants_workdir,
             include_trace_on_error=bootstrap_options.print_stacktrace,
             engine_visualize_to=bootstrap_options.engine_visualize_to,
             watch_filesystem=bootstrap_options.watch_filesystem,
@@ -223,6 +232,7 @@ class EngineInitializer:
         local_store_options: LocalStoreOptions,
         local_execution_root_dir: str,
         named_caches_dir: str,
+        pants_workdir: str,
         ca_certs_path: str | None = None,
         build_root: str | None = None,
         include_trace_on_error: bool = True,
@@ -342,6 +352,7 @@ class EngineInitializer:
             ignore_patterns=pants_ignore_patterns,
             use_gitignore=use_gitignore,
             build_root=build_root_path,
+            pants_workdir=pants_workdir,
             local_execution_root_dir=ensure_absolute_path(local_execution_root_dir),
             named_caches_dir=ensure_absolute_path(named_caches_dir),
             ca_certs_path=ensure_optional_absolute_path(ca_certs_path),

@@ -616,6 +616,7 @@ class ExecutionOptions:
     remote_client_certs_path: str | None
     remote_client_key_path: str | None
 
+    use_sandboxer: bool
     local_cache: bool
     process_execution_local_parallelism: int
     process_execution_local_enable_nailgun: bool
@@ -664,6 +665,7 @@ class ExecutionOptions:
             remote_client_certs_path=bootstrap_options.remote_client_certs_path,
             remote_client_key_path=bootstrap_options.remote_client_key_path,
             # Process execution setup.
+            use_sandboxer=bootstrap_options.sandboxer,
             local_cache=bootstrap_options.local_cache,
             process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
             process_execution_remote_parallelism=dynamic_remote_options.parallelism,
@@ -762,6 +764,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_local_parallelism=CPU_COUNT,
     process_execution_remote_parallelism=128,
     process_execution_cache_namespace=None,
+    use_sandboxer=False,
     local_cache=True,
     cache_content_behavior=CacheContentBehavior.fetch,
     process_execution_local_enable_nailgun=True,
@@ -941,7 +944,7 @@ class BootstrapOptions:
         help=softwrap(
             """
             When set, a base directory in which to store `--pants-workdir` contents.
-            If this option is a set, the workdir will be created as symlink into a
+            If this option is set, the workdir will be created as a symlink into a
             per-workspace subdirectory.
             """
         ),
@@ -1080,6 +1083,22 @@ class BootstrapOptions:
             Enables use of the Pants daemon (pantsd). pantsd can significantly improve
             runtime performance by lowering per-run startup cost, and by memoizing filesystem
             operations and rule execution.
+            """
+        ),
+    )
+    sandboxer = BoolOption(
+        default=False,
+        daemon=False,
+        help=softwrap(
+            """
+            Enables use of the sandboxer process. The sandboxer materializes files into the sandbox
+            on behalf of the main process (either pantsd or the pants client process if running
+            without pantsd). This works around a well-known race condition when a multithreaded
+            program writes executable files and then spawns subprocesses to execute them, which
+            can lead to ETXTBSY errors.
+
+            This is a new feature so it is off by default. In the future, once this is stable,
+            it will likely default to True.
             """
         ),
     )

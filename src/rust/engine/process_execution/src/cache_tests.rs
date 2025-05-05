@@ -32,6 +32,7 @@ fn create_local_runner() -> (Box<dyn CommandRunnerTrait>, Store, TempDir) {
     let store = Store::local_only(runtime.clone(), store_dir).unwrap();
     let runner = Box::new(crate::local::CommandRunner::new(
         store.clone(),
+        None,
         runtime,
         base_dir.path().to_owned(),
         NamedCaches::new_local(named_cache_dir),

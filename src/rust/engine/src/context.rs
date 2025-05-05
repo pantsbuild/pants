@@ -4,6 +4,7 @@
 use std::cmp::max;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::convert::Into;
+use std::env;
 use std::io::Read;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -17,14 +18,13 @@ use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 
 use cache::PersistentCache;
+use docker::docker;
 use fs::{GitignoreStyleExcludes, PosixFS};
 use futures::FutureExt;
 use graph::{Graph, InvalidationResult};
 use hashing::Digest;
-use log::{Level, log};
+use log::{Level, debug, log};
 use parking_lot::Mutex;
-// use docker::docker::{self, DOCKER, IMAGE_PULL_CACHE};
-use docker::docker;
 use process_execution::switched::SwitchedCommandRunner;
 use process_execution::{
     self, CacheContentBehavior, CommandRunner, NamedCaches, ProcessExecutionStrategy, bounded,
@@ -34,7 +34,8 @@ use regex::Regex;
 use remote::remote_cache::{RemoteCacheRunnerOptions, RemoteCacheWarningsBehavior};
 use remote::{self, remote_cache};
 use rule_graph::RuleGraph;
-use store::{self, ImmutableInputs, RemoteProvider, RemoteStoreOptions, Store};
+use sandboxer::Sandboxer;
+use store::{self, ImmutableInputs, RemoteProvider, RemoteStoreOptions, Store, StoreCliOpt};
 use task_executor::Executor;
 use tokio::sync::RwLock;
 use watch::{Invalidatable, InvalidateCaller, InvalidationWatcher};
@@ -52,6 +53,13 @@ use workunit_store::{Metric, RunningWorkunit};
 const PEM_RE_STR: &str =
     r"(?s)-----BEGIN (?P<begin>.*?)-----\s*(?P<data>.*?)-----END (?P<end>.*?)-----\s*";
 
+fn get_sandboxer_binary() -> Result<PathBuf, String> {
+    let sandboxer_path_str = env::var("PANTS_SANDBOXER_BINARY_PATH").map_err(|e| e.to_string())?;
+    if sandboxer_path_str.is_empty() {
+        return Err("$PANTS_SANDBOXER_BINARY_PATH is empty".to_string());
+    }
+    Ok(PathBuf::from(sandboxer_path_str))
+}
 ///
 /// The core context shared (via Arc) between the Scheduler and the Context objects of
 /// all running Nodes.
@@ -63,6 +71,7 @@ pub struct Core {
     pub types: Types,
     pub executor: Executor,
     store: Store,
+    sandboxer: Option<Sandboxer>,
     /// The CommandRunners to use for execution, in ascending order of reliability (for the purposes
     /// of backtracking). For performance reasons, caching `CommandRunners` might skip validation of
     /// their outputs, and so should be listed before uncached `CommandRunners`.
@@ -138,6 +147,7 @@ impl RemotingOptions {
 pub struct ExecutionStrategyOptions {
     pub local_parallelism: usize,
     pub remote_parallelism: usize,
+    pub use_sandboxer: bool,
     pub local_cache: bool,
     pub local_enable_nailgun: bool,
     pub remote_cache_read: bool,
@@ -199,6 +209,7 @@ impl Core {
     async fn make_leaf_runner(
         full_store: &Store,
         local_runner_store: &Store,
+        sandboxer: &Option<Sandboxer>,
         executor: &Executor,
         build_root: &Path,
         local_execution_root_dir: &Path,
@@ -216,6 +227,7 @@ impl Core {
 
         let local_sandbox_command_runner = local::CommandRunner::new(
             local_runner_store.clone(),
+            sandboxer.clone(),
             executor.clone(),
             local_execution_root_dir.to_path_buf(),
             named_caches.clone(),
@@ -228,6 +240,7 @@ impl Core {
         // workspace executions, but is not the only solution.)
         let local_workspace_command_runner = process_execution::workspace::CommandRunner::new(
             local_runner_store.clone(),
+            sandboxer.clone(),
             executor.clone(),
             build_root.to_path_buf(),
             local_execution_root_dir.to_path_buf(),
@@ -259,6 +272,7 @@ impl Core {
             let nailgun_runner = pe_nailgun::CommandRunner::new(
                 local_execution_root_dir.to_path_buf(),
                 local_runner_store.clone(),
+                sandboxer.clone(),
                 executor.clone(),
                 named_caches.clone(),
                 immutable_inputs.clone(),
@@ -401,6 +415,7 @@ impl Core {
     async fn make_command_runners(
         full_store: &Store,
         local_runner_store: &Store,
+        sandboxer: &Option<Sandboxer>,
         executor: &Executor,
         local_cache: &PersistentCache,
         build_root: &Path,
@@ -416,6 +431,7 @@ impl Core {
         let leaf_runner = Self::make_leaf_runner(
             full_store,
             local_runner_store,
+            sandboxer,
             executor,
             build_root,
             local_execution_root_dir,
@@ -516,6 +532,7 @@ impl Core {
         tasks: Tasks,
         types: Types,
         build_root: PathBuf,
+        pants_workdir: PathBuf,
         ignore_patterns: Vec<String>,
         use_gitignore: bool,
         watch_filesystem: bool,
@@ -617,11 +634,53 @@ impl Core {
             full_store.clone()
         };
 
+        // Create the CLI opts to pass to the sandboxer process so it can create an
+        // appropriately-configured Store.
+        let store_cli_opt = if store.is_local_only() {
+            StoreCliOpt::new_local_only(local_store_options.store_dir.to_owned())
+        } else {
+            StoreCliOpt {
+                local_store_path: Some(local_store_options.store_dir.clone()),
+                remote_instance_name: remoting_opts.instance_name.clone(),
+                cas_server: remoting_opts.store_address.clone(),
+                cas_root_ca_cert_file: remoting_opts.root_ca_certs_path.clone(),
+                cas_client_certs_file: remoting_opts.client_certs_path.clone(),
+                cas_client_key_file: remoting_opts.client_key_path.clone(),
+                cas_oauth_bearer_token_path: None, // This has already been injected into a header.
+                upload_chunk_bytes: remoting_opts.store_chunk_bytes,
+                store_rpc_retries: remoting_opts.store_rpc_retries,
+                store_rpc_concurrency: remoting_opts.store_rpc_concurrency,
+                store_batch_api_size_limit: remoting_opts.store_batch_api_size_limit,
+                header: remoting_opts
+                    .store_headers
+                    .iter()
+                    .map(|(k, v)| format!("{k}={v}"))
+                    .collect(),
+            }
+        };
+
+        let sandboxer_bin = get_sandboxer_binary()?;
+        let sandboxer = if exec_strategy_opts.use_sandboxer {
+            debug!("Running against sandboxer at {:?}", &sandboxer_bin);
+            Some(
+                Sandboxer::new(
+                    sandboxer_bin,
+                    pants_workdir.to_path_buf(),
+                    store_cli_opt.clone(),
+                )
+                .await?,
+            )
+        } else {
+            debug!("No sandboxer configured.");
+            None
+        };
+
         let immutable_inputs = ImmutableInputs::new(store.clone(), &local_execution_root_dir)?;
         let named_caches = NamedCaches::new_local(named_caches_dir);
         let command_runners = Self::make_command_runners(
             &full_store,
             &store,
+            &sandboxer,
             &executor,
             &local_cache,
             &build_root,
@@ -682,6 +741,7 @@ impl Core {
             types,
             executor: executor.clone(),
             store,
+            sandboxer,
             command_runners,
             http_client,
             local_cache,
@@ -702,6 +762,10 @@ impl Core {
 
     pub fn store(&self) -> Store {
         self.store.clone()
+    }
+
+    pub fn sandboxer(&self) -> Option<Sandboxer> {
+        self.sandboxer.clone()
     }
 
     ///
