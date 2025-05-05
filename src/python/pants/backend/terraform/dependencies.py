@@ -121,7 +121,6 @@ class TerraformInvocationRequirements:
     chdir: str
 
 
-@rule
 def terraform_fieldset_to_init_request(
     terraform_fieldset: TerraformDeploymentFieldSet | TerraformFieldSet,
 ) -> TerraformInitRequest:
@@ -141,6 +140,7 @@ def terraform_fieldset_to_init_request(
         )
 
 
+@rule
 async def prepare_terraform_invocation(
     request: TerraformInitRequest,
 ) -> TerraformInvocationRequirements:

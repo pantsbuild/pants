@@ -4,7 +4,10 @@ from abc import ABCMeta
 from dataclasses import dataclass
 from typing import Any
 
-from pants.backend.terraform.dependencies import terraform_fieldset_to_init_request
+from pants.backend.terraform.dependencies import (
+    prepare_terraform_invocation,
+    terraform_fieldset_to_init_request,
+)
 from pants.backend.terraform.dependency_inference import (
     TerraformDeploymentInvocationFilesRequest,
     get_terraform_backend_and_vars,
@@ -48,7 +51,7 @@ class RunTrivyOnTerraformRequest:
 async def run_trivy_on_terraform(req: RunTrivyOnTerraformRequest) -> FallibleProcessResult:
     fs = req.field_set
     # Each subclass of TrivyTerraformFieldSet is a subclass of either TerraformDeploymentFieldSet or TerraformFieldSet
-    tf = await terraform_init(terraform_fieldset_to_init_request(fs))  # type: ignore
+    tf = await prepare_terraform_invocation(terraform_fieldset_to_init_request(fs))  # type: ignore
     command_args = []
 
     if isinstance(fs, TerraformDeploymentFieldSet):
@@ -64,10 +67,20 @@ async def run_trivy_on_terraform(req: RunTrivyOnTerraformRequest) -> FalliblePro
         command_args.extend(["--tf-vars", ",".join(var_file for var_file in var_files.files)])
 
         input_digest = await merge_digests(
-            MergeDigests([var_files.snapshot.digest, tf.sources_and_deps])
+            MergeDigests(
+                [
+                    var_files.snapshot.digest,
+                    tf.terraform_sources.snapshot.digest,
+                    tf.dependencies_files.snapshot.digest,
+                ]
+            ),
         )
     else:
-        input_digest = tf.sources_and_deps
+        input_digest = await merge_digests(
+            MergeDigests(
+                [tf.terraform_sources.snapshot.digest, tf.dependencies_files.snapshot.digest]
+            ),
+        )
 
     return await run_trivy(
         RunTrivyRequest(
