@@ -30,6 +30,12 @@ use tonic::transport::{Channel, Endpoint, Server, Uri};
 use tonic::{Request, Response, Status};
 use tower::service_fn;
 
+#[cfg(test)]
+mod tests;
+
+#[cfg(test)]
+mod test_util;
+
 // The Sandboxer is a solution to the following problem:
 //
 // For isolation, Pants executes subprocesses in "sandbox directories". Just before executing a
