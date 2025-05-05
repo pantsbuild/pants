@@ -39,6 +39,7 @@ class SchedulerTestBase:
             ignore_patterns=[],
             use_gitignore=False,
             build_root=build_root.as_posix(),
+            pants_workdir=build_root / ".pants.d" / "workdir",
             local_execution_root_dir=local_execution_root_dir,
             named_caches_dir=named_caches_dir,
             ca_certs_path=None,
