@@ -7,9 +7,8 @@ use std::sync::OnceLock;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use bollard::Docker;
 use bollard::container::RemoveContainerOptions;
-use bollard::exec::CreateExecOptions;
+use bollard::{Docker, errors::Error as DockerError};
 use fs::{EMPTY_DIRECTORY_DIGEST, RelativePath};
 use maplit::hashset;
 use parameterized::parameterized;
@@ -94,7 +93,7 @@ trait DockerCommandTestRunner: Send + Sync {
         immutable_inputs: ImmutableInputs,
     ) -> Result<crate::docker::CommandRunner<'a>, String>;
 
-    fn assert_correct_container(&self, actual_container_id: String);
+    async fn assert_correct_container(&self, docker: &Docker, actual_container_id: String);
 
     async fn run_command_via_docker_in_dir(
         &self,
@@ -106,9 +105,9 @@ trait DockerCommandTestRunner: Send + Sync {
     ) -> Result<LocalTestResult, ProcessError> {
         let image =
             if let ProcessExecutionStrategy::Docker(image) = &req.execution_environment.strategy {
-                image.clone()
+                Some(image.clone())
             } else {
-                unreachable!("must be docker")
+                None
             };
         let platform = platform_for_tests().map_err(ProcessError::Unclassified)?;
         req.execution_environment.platform = platform;
@@ -152,7 +151,7 @@ trait DockerCommandTestRunner: Send + Sync {
             assert_eq!(containers.len(), 1);
             if let Some(((actual_image, actual_platform), value_arc)) = containers.first_key_value()
             {
-                assert_eq!(*actual_image, image);
+                assert_eq!(*actual_image, image.unwrap());
                 assert_eq!(*actual_platform, platform);
                 assert!(value_arc.initialized());
                 value_arc.get().unwrap().0.clone()
@@ -160,7 +159,8 @@ trait DockerCommandTestRunner: Send + Sync {
                 unreachable!("we know we have the entry")
             }
         };
-        self.assert_correct_container(container_id);
+        self.assert_correct_container(docker.get().await?, container_id)
+            .await;
         runner.shutdown().await?;
         Ok(LocalTestResult {
             original,
@@ -201,7 +201,7 @@ impl DockerCommandTestRunner for DefaultTestRunner {
         )
     }
 
-    fn assert_correct_container(&self, _actual_container_id: String) {}
+    async fn assert_correct_container(&self, _docker: &Docker, _actual_container_id: String) {}
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -288,7 +288,7 @@ impl DockerCommandTestRunner for ExistingContainerTestRunner {
         }
     }
 
-    fn assert_correct_container(&self, actual_container_id: String) {
+    async fn assert_correct_container(&self, _docker: &Docker, actual_container_id: String) {
         assert_eq!(self.get_container_id(), actual_container_id);
     }
 }
@@ -336,8 +336,19 @@ impl<T: UnavailableContainerTestRunner> DockerCommandTestRunner for T {
         Ok(command_runner)
     }
 
-    fn assert_correct_container(&self, actual_container_id: String) {
-        assert_ne!(self.get_initial_container_id(), actual_container_id);
+    async fn assert_correct_container(&self, docker: &Docker, actual_container_id: String) {
+        let initial_container_id = self.get_initial_container_id();
+        assert_ne!(initial_container_id, actual_container_id);
+        // Check and ensure initial container was cleaned up
+        match docker.inspect_container(&initial_container_id, None).await {
+            Ok(_) => panic!("Container {initial_container_id} exists when it should not"),
+            Err(DockerError::DockerResponseServerError {
+                status_code: 404, ..
+            }) => (),
+            Err(err) => panic!(
+                "An unexpected error {err} occurred when inspecting container {initial_container_id}, which should not exist"
+            ),
+        }
     }
 }
 
@@ -434,12 +445,9 @@ impl UnavailableContainerTestRunner for ExitedContainerTestRunner {
 
     async fn make_container_unavailable(&self, docker: &Docker) -> Result<(), String> {
         let container_id = self.inner.container_id.get().unwrap().0.as_str();
-        docker.create_exec(container_id, CreateExecOptions {
-            cmd: Some(vec!["exit", "1"]),
-            ..CreateExecOptions::default()
-        })
-        .await
-        .map_err(|err| format!("An error occurred when trying to kill running container {container_id}:\n\n{err}"))?;
+        docker.stop_container(container_id, None)
+            .await
+            .map_err(|err| format!("An error occurred when trying to kill running container {container_id}:\n\n{err}"))?;
         Ok(())
     }
 

@@ -622,9 +622,9 @@ impl CapturedWorkdir for CommandRunner<'_> {
             .await
             .map_err(|spawn_err: CommandSpawnError| -> CapturedWorkdirError {
                 match spawn_err.err {
-                    DockerError::DockerResponseServerError {
-                        status_code: 404, ..
-                    } => CapturedWorkdirError::Retryable(spawn_err.message),
+                    DockerError::DockerResponseServerError { .. } => {
+                        CapturedWorkdirError::Retryable(spawn_err.message)
+                    }
                     _ => CapturedWorkdirError::Fatal(spawn_err.message),
                 }
             })
@@ -810,10 +810,9 @@ impl Command {
             self.spawn(docker, container_id)
                 .await
                 .map_err(|cse| match cse.err {
-                    DockerError::DockerResponseServerError {
-                        status_code: 404,
-                        message,
-                    } => CapturedWorkdirError::Retryable(message),
+                    DockerError::DockerResponseServerError { message, .. } => {
+                        CapturedWorkdirError::Retryable(message)
+                    }
                     _ => CapturedWorkdirError::Fatal(cse.message),
                 })?;
         let mut stdout = BytesMut::with_capacity(8192);
