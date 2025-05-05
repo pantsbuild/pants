@@ -11,13 +11,13 @@ from pants.core.util_rules.config_files import find_config_file
 from pants.core.util_rules.external_tool import download_external_tool
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.native_engine import Digest, MergeDigests
-from pants.engine.internals.selectors import Get
+from pants.engine.internals.selectors import Get, concurrently
 from pants.engine.intrinsics import execute_process, merge_digests
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
-from pants.option.global_options import KeepSandboxes, BootstrapOptions, GlobalOptions
+from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
 
 
@@ -68,15 +68,13 @@ async def run_trivy(
     if global_options.level > LogLevel.INFO:
         argv.append("-d")
 
-    download_trivy = await download_external_tool(trivy.get_request(platform))
-
-    env = await Get(EnvironmentVars, EnvironmentVarsRequest(trivy.extra_env_vars))
+    download_trivy, env, input_digest = await concurrently(
+        download_external_tool(trivy.get_request(platform)),
+        Get(EnvironmentVars, EnvironmentVarsRequest(trivy.extra_env_vars)),
+        merge_digests(MergeDigests((request.input_digest, config_file.snapshot.digest))),
+    )
 
     immutable_input_digests = {"__trivy": download_trivy.digest}
-
-    input_digest = await merge_digests(
-        MergeDigests((request.input_digest, config_file.snapshot.digest))
-    )
 
     result = await execute_process(
         Process(
