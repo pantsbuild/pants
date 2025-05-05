@@ -19,7 +19,8 @@ use testutil::{owned_string_vec, relative_paths};
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::docker::{
-    ContainerCache, DockerOnceCell, ImagePullCache, SANDBOX_BASE_PATH_IN_CONTAINER,
+    ContainerCache, DockerOnceCell, ImagePullCache, PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY,
+    SANDBOX_BASE_PATH_IN_CONTAINER,
 };
 use process_execution::local::KeepSandboxes;
 use process_execution::{
@@ -81,6 +82,20 @@ fn platform_for_tests() -> Result<Platform, String> {
     })
 }
 
+async fn assert_container_not_exists(docker: &Docker, container_id: &str) -> Result<(), String> {
+    match docker.inspect_container(container_id, None).await {
+        Ok(_) => Err(format!(
+            "Container {container_id} exists when it should not"
+        )),
+        Err(DockerError::DockerResponseServerError {
+            status_code: 404, ..
+        }) => Ok(()),
+        Err(err) => Err(format!(
+            "An unexpected error {err} occurred when inspecting container {container_id}, which should not exist"
+        )),
+    }
+}
+
 #[async_trait]
 trait DockerCommandTestRunner: Send + Sync {
     async fn setup<'a>(
@@ -93,7 +108,11 @@ trait DockerCommandTestRunner: Send + Sync {
         immutable_inputs: ImmutableInputs,
     ) -> Result<crate::docker::CommandRunner<'a>, String>;
 
-    async fn assert_correct_container(&self, docker: &Docker, actual_container_id: String);
+    async fn assert_correct_container(
+        &self,
+        docker: &Docker,
+        actual_container_id: &str,
+    ) -> Result<(), String>;
 
     async fn run_command_via_docker_in_dir(
         &self,
@@ -159,9 +178,22 @@ trait DockerCommandTestRunner: Send + Sync {
                 unreachable!("we know we have the entry")
             }
         };
-        self.assert_correct_container(docker.get().await?, container_id)
-            .await;
+        let docker_ref = docker.get().await?;
+        self.assert_correct_container(docker_ref, &container_id)
+            .await?;
+        match docker_ref
+            .inspect_container(&container_id, None)
+            .await
+            .map_err(|err| ProcessError::Unclassified(err.to_string()))?
+            .config
+            .unwrap()
+            .labels
+        {
+            Some(labels) => assert_eq!(labels[PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY], "test"),
+            None => panic!("No labels found for container {container_id}"),
+        }
         runner.shutdown().await?;
+        assert_container_not_exists(docker_ref, &container_id).await?;
         Ok(LocalTestResult {
             original,
             stdout_bytes,
@@ -201,7 +233,13 @@ impl DockerCommandTestRunner for DefaultTestRunner {
         )
     }
 
-    async fn assert_correct_container(&self, _docker: &Docker, _actual_container_id: String) {}
+    async fn assert_correct_container(
+        &self,
+        _docker: &Docker,
+        _actual_container_id: &str,
+    ) -> Result<(), String> {
+        Ok(())
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -280,7 +318,7 @@ impl DockerCommandTestRunner for ExistingContainerTestRunner {
         match self.container_id.set(
             command_runner
                 .container_cache
-                .container_for_image(&self.image_name, &self.platform, "", "")
+                .container_for_image(&self.image_name, &self.platform, "", "test")
                 .await?,
         ) {
             Ok(()) => Ok(command_runner),
@@ -288,8 +326,13 @@ impl DockerCommandTestRunner for ExistingContainerTestRunner {
         }
     }
 
-    async fn assert_correct_container(&self, _docker: &Docker, actual_container_id: String) {
+    async fn assert_correct_container(
+        &self,
+        _docker: &Docker,
+        actual_container_id: &str,
+    ) -> Result<(), String> {
         assert_eq!(self.get_container_id(), actual_container_id);
+        Ok(())
     }
 }
 
@@ -336,19 +379,15 @@ impl<T: UnavailableContainerTestRunner> DockerCommandTestRunner for T {
         Ok(command_runner)
     }
 
-    async fn assert_correct_container(&self, docker: &Docker, actual_container_id: String) {
+    async fn assert_correct_container(
+        &self,
+        docker: &Docker,
+        actual_container_id: &str,
+    ) -> Result<(), String> {
         let initial_container_id = self.get_initial_container_id();
         assert_ne!(initial_container_id, actual_container_id);
         // Check and ensure initial container was cleaned up
-        match docker.inspect_container(&initial_container_id, None).await {
-            Ok(_) => panic!("Container {initial_container_id} exists when it should not"),
-            Err(DockerError::DockerResponseServerError {
-                status_code: 404, ..
-            }) => (),
-            Err(err) => panic!(
-                "An unexpected error {err} occurred when inspecting container {initial_container_id}, which should not exist"
-            ),
-        }
+        assert_container_not_exists(docker, &initial_container_id).await
     }
 }
 

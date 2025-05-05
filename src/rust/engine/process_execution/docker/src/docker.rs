@@ -26,6 +26,7 @@ use futures::{FutureExt, StreamExt};
 use hashing::Digest;
 use itertools::Itertools;
 use log::Level;
+use maplit::hashmap;
 use nails::execution::ExitCode;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
@@ -83,16 +84,7 @@ impl DockerOnceCell {
     async fn check_for_old_images(docker: &Docker) -> Result<(), Vec<String>> {
         let removal_tasks = docker
             .list_containers(Some(ListContainersOptions {
-                filters: HashMap::<String, Vec<String>>::from([
-                    (
-                        "labels".to_string(),
-                        vec![PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY.to_string()],
-                    ),
-                    (
-                        "status".to_string(),
-                        vec!["exited".to_string(), "dead".to_string()],
-                    ),
-                ]),
+                filters: hashmap!{"labels".to_string() => vec![PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY.to_string()], "status".to_string() => vec!["exited".to_string(), "dead".to_string()]},
                 ..ListContainersOptions::default()
             }))
             .await
@@ -1134,10 +1126,7 @@ impl<'a> ContainerCache<'a> {
                     self.image_pull_cache.clone(),
                     work_dir_base,
                     immutable_inputs_base_dir,
-                    Some(HashMap::<String, String>::from([(
-                        PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY.to_string(),
-                        environment_name.to_string(),
-                    )])),
+                    Some(hashmap! {PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY.to_string() => environment_name.to_string()}),
                 )
                 .await?;
 
