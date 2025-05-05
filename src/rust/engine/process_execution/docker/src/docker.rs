@@ -81,7 +81,7 @@ impl DockerOnceCell {
         self.cell.initialized()
     }
 
-    async fn check_for_old_images(docker: &Docker) -> Result<(), Vec<String>> {
+    async fn remove_old_images(docker: &Docker) -> Result<(), Vec<String>> {
         let removal_tasks = docker
             .list_containers(Some(ListContainersOptions::<&str> {
                 filters: hashmap!{"label" => vec![PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY], "status" => vec!["exited", "dead"]},
@@ -157,7 +157,7 @@ impl DockerOnceCell {
           _ => return Err(format!("Unparseable API version `{}` returned by Docker.", &api_version)),
         }
 
-        if let Err(removal_errors) = Self::check_for_old_images(&docker).await {
+        if let Err(removal_errors) = Self::remove_old_images(&docker).await {
             log::warn!("The following errors occurred when attempting to remove old containers:\n\n{}", removal_errors.join("\n\n"));
         }
         Ok(docker)
