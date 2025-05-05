@@ -41,7 +41,6 @@ async def run_trivy(
     request: RunTrivyRequest,
     trivy: Trivy,
     platform: Platform,
-    keep_sandboxes: KeepSandboxes,
 ) -> FallibleProcessResult:
     """Run Trivy."""
     argv = ["__trivy/trivy", "--exit-code=1"]
