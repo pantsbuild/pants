@@ -17,7 +17,7 @@ from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
-from pants.option.global_options import KeepSandboxes
+from pants.option.global_options import KeepSandboxes, BootstrapOptions, GlobalOptions
 from pants.util.logging import LogLevel
 
 
@@ -33,14 +33,12 @@ class RunTrivyRequest:
     description: str
 
 
-# TODO: set debug flag if debugging
-
-
 @rule
 async def run_trivy(
     request: RunTrivyRequest,
     trivy: Trivy,
     platform: Platform,
+    global_options: GlobalOptions,
 ) -> FallibleProcessResult:
     """Run Trivy."""
     argv = ["__trivy/trivy", "--exit-code=1"]
@@ -66,6 +64,9 @@ async def run_trivy(
     argv.extend(request.command_args)
 
     argv.extend(trivy.args)
+
+    if global_options.level > LogLevel.INFO:
+        argv.append("-d")
 
     download_trivy = await download_external_tool(trivy.get_request(platform))
 
