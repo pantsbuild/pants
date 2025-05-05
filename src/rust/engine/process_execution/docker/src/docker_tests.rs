@@ -7,10 +7,10 @@ use std::sync::OnceLock;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use bollard::container::RemoveContainerOptions;
+use bollard::container::{Config, RemoveContainerOptions};
 use bollard::{Docker, errors::Error as DockerError};
 use fs::{EMPTY_DIRECTORY_DIGEST, RelativePath};
-use maplit::hashset;
+use maplit::{hashmap, hashset};
 use parameterized::parameterized;
 use store::{ImmutableInputs, Store};
 use tempfile::TempDir;
@@ -72,6 +72,36 @@ macro_rules! skip_if_no_docker_available_in_macos_ci {
             }
         }
     }};
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+#[cfg(unix)]
+async fn test_old_container_cleanup_on_init() {
+    skip_if_no_docker_available_in_macos_ci!();
+
+    let docker = Docker::connect_with_local_defaults().unwrap();
+    let container_id = docker
+        .create_container::<&str, &str>(
+            None,
+            Config {
+                image: Some(IMAGE),
+                labels: Some(hashmap! {PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY => "old"}),
+                ..Config::default()
+            },
+        )
+        .await
+        .unwrap()
+        .id;
+    docker
+        .start_container::<&str>(&container_id, None)
+        .await
+        .unwrap();
+    docker.stop_container(&container_id, None).await.unwrap();
+    let docker_cell = DockerOnceCell::new();
+    docker_cell.get().await.unwrap();
+    assert_container_not_exists(&docker, &container_id)
+        .await
+        .unwrap();
 }
 
 fn platform_for_tests() -> Result<Platform, String> {

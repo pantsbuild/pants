@@ -83,8 +83,8 @@ impl DockerOnceCell {
 
     async fn check_for_old_images(docker: &Docker) -> Result<(), Vec<String>> {
         let removal_tasks = docker
-            .list_containers(Some(ListContainersOptions {
-                filters: hashmap!{"labels".to_string() => vec![PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY.to_string()], "status".to_string() => vec!["exited".to_string(), "dead".to_string()]},
+            .list_containers(Some(ListContainersOptions::<&str> {
+                filters: hashmap!{"label" => vec![PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY], "status" => vec!["exited", "dead"]},
                 ..ListContainersOptions::default()
             }))
             .await
