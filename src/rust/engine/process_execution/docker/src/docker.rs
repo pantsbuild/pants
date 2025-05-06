@@ -98,7 +98,9 @@ impl DockerOnceCell {
                 let docker = docker.clone();
                 tokio::spawn(async move {
                     match summary.id {
-                        Some(container_id) => docker
+                        Some(container_id) => {
+                            log::debug!("Removing stale container {container_id} with {PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY} label");
+                            docker
                             .remove_container(
                                 container_id.as_str(),
                                 Some(RemoveContainerOptions {
@@ -109,7 +111,8 @@ impl DockerOnceCell {
                             .await
                             .map_err(|err| {
                                 format!("Failed to remove container {container_id}:\n{err}")
-                            }),
+                            })
+                        },
                         None => Err(format!(
                             "No container id attached to summary:\n{summary:#?}"
                         )),
