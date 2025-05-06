@@ -15,7 +15,8 @@ use bollard::container::{
 };
 use bollard::exec::StartExecResults;
 use bollard::image::CreateImageOptions;
-use bollard::secret::ContainerStateStatusEnum;
+use bollard::models::ContainerState;
+use bollard::secret::{ContainerInspectResponse, ContainerStateStatusEnum};
 use bollard::service::CreateImageInfo;
 use bollard::volume::CreateVolumeOptions;
 use bollard::{Docker, errors::Error as DockerError};
@@ -1036,35 +1037,29 @@ impl<'a> ContainerCache<'a> {
                 Ok(docker) => {
                     let _ = tokio::spawn(async move {
                         match docker.inspect_container(&container_id, None).await {
-                            Ok(inspect_response) => {
-                                if let Some(state) = inspect_response.state {
-                                    if let Some(status) = state.status {
-                                        match status {
-                                        ContainerStateStatusEnum::RUNNING
+                            Ok(ContainerInspectResponse {
+                                state: Some(ContainerState {
+                                    status: Some(status @ (ContainerStateStatusEnum::RUNNING
                                         | ContainerStateStatusEnum::RESTARTING
                                         | ContainerStateStatusEnum::CREATED
-                                        | ContainerStateStatusEnum::PAUSED => {
-                                            Err(format!(
-                                                "Cannot prune container {container_id} with status {status}"
-                                            ))
-                                        }
-                                        _ => Self::remove_container(&docker, &container_id, None)
-                                            .await
-                                            .map_err(|err| format!(
-                                                "An error occurred when trying to remove container {container_id}\n\n{err}"
-                                            )),
-                                    }
-                                    } else {
-                                        Err(format!(
-                                            "Cannot prune container {container_id} with unknown status"
-                                        ))
-                                    }
-                                } else {
-                                    Err(format!(
-                                        "Cannot prune container {container_id}, container state was empty"
-                                    ))
-                                }
-                            }
+                                        | ContainerStateStatusEnum::PAUSED)),
+                                        ..
+                                }),
+                                ..
+                            }) => Err(format!(
+                                "Cannot prune container {container_id} with status {status}"
+                            )),
+                            Ok(ContainerInspectResponse { state: Some(ContainerState { status: Some(_), .. }), .. }) => Self::remove_container(&docker, &container_id, None)
+                                .await
+                                .map_err(|err| format!(
+                                    "An error occurred when trying to remove container {container_id}\n\n{err}"
+                                )),
+                            Ok(ContainerInspectResponse { state: Some(ContainerState { status: None, .. }), .. }) => Err(format!(
+                                "Cannot prune container {container_id} with unknown status"
+                            )),
+                            Ok(ContainerInspectResponse { state: None, .. }) => Err(format!(
+                                "Cannot prune container {container_id}, container state was empty"
+                            )),
                             Err(DockerError::DockerResponseServerError {
                                 status_code: 404,
                                 ..
