@@ -149,7 +149,7 @@ emit_warnings = true
 interpreter_constraints = ["==3.11.*"]
 macos_big_sur_compatibility = true
 enable_resolves = true
-pip_version = "latest"
+pip_version = "25.0"
 
 [python.resolves]
 python-default = "3rdparty/python/user_reqs.lock"
