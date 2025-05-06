@@ -195,6 +195,8 @@ trait DockerCommandTestRunner: Send + Sync {
         }
         .await;
         let (original, stdout_bytes, stderr_bytes) = result?;
+        // Assert the container cache contains one entry and ensure the image and platform are as expected and that the arc is initialized
+        // Then return the container ID from the container cache, so we can assert it is the correct container
         let container_id = {
             let containers = runner.container_cache.containers.lock();
             assert_eq!(containers.len(), 1);
@@ -209,6 +211,8 @@ trait DockerCommandTestRunner: Send + Sync {
             }
         };
         let docker_ref = docker.get().await?;
+        // For the existing container tests, we want to ensure the container ID matches the one created by the command test runner
+        // For missing/exited container tests, ensure that the container IDs do NOT match
         self.assert_correct_container(docker_ref, &container_id)
             .await?;
         match docker_ref
