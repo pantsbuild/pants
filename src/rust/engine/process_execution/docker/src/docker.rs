@@ -1033,47 +1033,46 @@ impl<'a> ContainerCache<'a> {
         if let Some(container_id) =
             maybe_arc.and_then(|container_once_cell| container_once_cell.get().map(|t| t.0.clone()))
         {
-            match self.docker.get().await.map(&Docker::clone) {
+            match self.docker.get().await.cloned() {
                 Ok(docker) => {
-                    let _ = tokio::spawn(async move {
-                        match docker.inspect_container(&container_id, None).await {
-                            Ok(ContainerInspectResponse {
-                                state: Some(ContainerState {
-                                    status: Some(status @ (ContainerStateStatusEnum::RUNNING
-                                        | ContainerStateStatusEnum::RESTARTING
-                                        | ContainerStateStatusEnum::CREATED
-                                        | ContainerStateStatusEnum::PAUSED)),
-                                        ..
-                                }),
-                                ..
-                            }) => Err(format!(
-                                "Cannot prune container {container_id} with status {status}"
-                            )),
-                            Ok(ContainerInspectResponse { state: Some(ContainerState { status: Some(_), .. }), .. }) => Self::remove_container(&docker, &container_id, None)
-                                .await
-                                .map_err(|err| format!(
-                                    "An error occurred when trying to remove container {container_id}\n\n{err}"
+                    tokio::spawn(async move {
+                        let check_state = async {
+                            match docker.inspect_container(&container_id, None).await {
+                                Ok(ContainerInspectResponse {
+                                    state: Some(ContainerState {
+                                        status: Some(status @ (ContainerStateStatusEnum::RUNNING
+                                            | ContainerStateStatusEnum::RESTARTING
+                                            | ContainerStateStatusEnum::CREATED
+                                            | ContainerStateStatusEnum::PAUSED)),
+                                            ..
+                                    }),
+                                    ..
+                                }) => Err(format!(
+                                    "Cannot prune container {container_id} with status {status}"
                                 )),
-                            Ok(ContainerInspectResponse { state: Some(ContainerState { status: None, .. }), .. }) => Err(format!(
-                                "Cannot prune container {container_id} with unknown status"
-                            )),
-                            Ok(ContainerInspectResponse { state: None, .. }) => Err(format!(
-                                "Cannot prune container {container_id}, container state was empty"
-                            )),
-                            Err(DockerError::DockerResponseServerError {
-                                status_code: 404,
-                                ..
-                            }) => Ok(()),
-                            Err(err) => Err(format!(
-                                "Cannot prune container {container_id} because the following error occurred when trying to inspect container status:\n\n{err}"
-                            )),
-                        }
-                    }).then(async |res| {
-                        match res {
-                            Ok(Err(msg)) => log::warn!("{}", msg),
-                            Err(join_error) => log::warn!("Failed to remove container due to an error when starting task:\n{join_error}"),
-                            _ => (),
+                                Ok(ContainerInspectResponse { state: Some(ContainerState { status: Some(_), .. }), .. }) => Self::remove_container(&docker, &container_id, None)
+                                    .await
+                                    .map_err(|err| format!(
+                                        "An error occurred when trying to remove container {container_id}\n\n{err}"
+                                    )),
+                                Ok(ContainerInspectResponse { state: Some(ContainerState { status: None, .. }), .. }) => Err(format!(
+                                    "Cannot prune container {container_id} with unknown status"
+                                )),
+                                Ok(ContainerInspectResponse { state: None, .. }) => Err(format!(
+                                    "Cannot prune container {container_id}, container state was empty"
+                                )),
+                                Err(DockerError::DockerResponseServerError {
+                                    status_code: 404,
+                                    ..
+                                }) => Ok(()),
+                                Err(err) => Err(format!(
+                                    "Cannot prune container {container_id} because the following error occurred when trying to inspect container status:\n\n{err}"
+                                )),
+                            }
                         };
+                        if let Err(msg) = check_state.await {
+                            log::warn!("{}", msg);
+                        }
                     });
                 }
                 Err(err) => {
