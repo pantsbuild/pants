@@ -30,6 +30,7 @@ from pants.backend.python.util_rules.pex import (
     PexRequest,
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
+from pants.backend.python.util_rules.pex_environment import PexSubsystem
 from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
     LoadedLockfile,
@@ -782,8 +783,10 @@ class RequirementsPexRequest:
 @rule
 async def generalize_requirements_pex_request(
     request: RequirementsPexRequest,
+    pex_subsystem: PexSubsystem,
 ) -> PexFromTargetsRequest:
     return PexFromTargetsRequest(
+        include_requirements=pex_subsystem.include_requirements,
         addresses=sorted(request.addresses),
         output_filename="requirements.pex",
         internal_only=True,
