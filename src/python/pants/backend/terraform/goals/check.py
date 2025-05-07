@@ -2,13 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from dataclasses import dataclass
 
-from pants.backend.terraform.dependencies import TerraformInitRequest, prepare_terraform_invocation
+from pants.backend.terraform.dependencies import (
+    prepare_terraform_invocation,
+    terraform_fieldset_to_init_request,
+)
 from pants.backend.terraform.target_types import (
-    TerraformDeploymentFieldSet,
     TerraformDeploymentTarget,
     TerraformFieldSet,
     TerraformModuleTarget,
-    TerraformRootModuleField,
 )
 from pants.backend.terraform.tool import TerraformCommand, TerraformProcess
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
@@ -47,20 +48,6 @@ class TerraformValidateFieldSet(TerraformFieldSet):
 class TerraformCheckRequest(CheckRequest):
     field_set_type = TerraformValidateFieldSet
     tool_name = TerraformValidateSubsystem.options_scope
-
-
-def terraform_fieldset_to_init_request(
-    terraform_fieldset: TerraformDeploymentFieldSet | TerraformFieldSet,
-) -> TerraformInitRequest:
-    if isinstance(terraform_fieldset, TerraformDeploymentFieldSet):
-        deployment = terraform_fieldset
-        return TerraformInitRequest(deployment.root_module, deployment.dependencies)
-    if isinstance(terraform_fieldset, TerraformFieldSet):
-        module = terraform_fieldset
-        return TerraformInitRequest(
-            TerraformRootModuleField(module.address.spec, module.address),
-            module.dependencies,
-        )
 
 
 @rule

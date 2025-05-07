@@ -65,11 +65,11 @@ Created src/helm/example/BUILD:
 
 If your workspace contains any Helm unit tests (under a `tests` folder), Pants will also idenfity them and create `helm_unittest_tests` targets for them. Additionally, if your unit tests also have snapshots (under a `tests/__snapshot__` folder), `tailor` will identify those files as test snapshots and will create `resources` targets for them. See "Snapshot testing" below for more info.
 
-### Basic operations
+## Basic operations
 
 The given setup is enough to now do some common operations on our Helm chart source code.
 
-#### Linting
+### Linting
 
 The Helm backend has an implementation of the Pants' `lint` goal which hooks it with the `helm lint` command:
 
@@ -100,7 +100,19 @@ Likewise, in a similar way you could enable strict linting globally and then cho
 
 You can set the field `skip_lint=True` on each `helm_chart` target to avoid linting it.
 
-#### Package
+#### Trivy
+
+Pants can run [Trivy](https://github.com/aquasecurity/trivy) on your Helm Charts and deployments. When run on a deployment, Pants run Trivy on the rendered Helm Chart with the specified values.
+
+This must first be enabled by activating the Trivy backend:
+
+```toml title="pants.toml"
+[GLOBAL]
+backend_packages = ["pants.backend.experimental.helm.lint.trivy"]
+```
+
+### Package
+### Package
 
 Packing helm charts is supported out of the box via the Pants' `package` goal. The final package will be saved as a `.tgz` file under the `dist` folder at your source root.
 
@@ -201,7 +213,7 @@ pants test ::
 ✓ testprojects/src/helm/example/tests/env-configmap_test.yaml succeeded in 0.75s.
 ```
 
-#### Feeding additional files to unit tests
+### Feeding additional files to unit tests
 
 In some cases we may want our tests to have access to additional files which are not part of the chart. This can be achieved by setting a dependency between our unit test targets and a `resources` target as follows:
 
@@ -304,7 +316,7 @@ not affected by the source roots setting. When using `relocated_files`, the file
 to the value set in the `dest` field.
 :::
 
-#### Snapshot testing
+### Snapshot testing
 
 Unit test snapshots are supported by Pants by wrapping the snapshots in resources targets, as shown in the previous section. Snapshot resources will be automatically inferred as dependencies of the tests where they reside, so there is no need to add a explicit `dependencies` relationship in your `helm_unittest_tests` targets.
 
@@ -318,7 +330,7 @@ This will generate test snapshots for tests that require them, with out-of-date 
 
 If new `__snapshot__` folders are created after running the `generate-snapshots` target, we recommend running the `tailor` goal again so that Pants can detect these new folders and create `resources` targets as appropriate.
 
-#### Timeouts
+### Timeouts
 
 Pants can cancel tests that take too long, which is useful to prevent tests from hanging indefinitely.
 
@@ -352,7 +364,7 @@ If a target sets its `timeout` higher than `[test].timeout_maximum`, Pants will 
 
 Use the option `pants test --no-timeouts` to temporarily disable timeouts, e.g. when debugging.
 
-#### Retries
+### Retries
 
 Pants can automatically retry failed tests. This can help keep your builds passing even with flaky tests, like integration tests.
 
