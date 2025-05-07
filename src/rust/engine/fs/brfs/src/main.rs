@@ -780,6 +780,7 @@ async fn main() {
                 retries: 1,
                 concurrency_limit: *args.get_one("rpc-concurrency-limit").unwrap(),
                 batch_api_size_limit: *args.get_one("batch-api-size-limit").unwrap(),
+                batch_load_enabled: false,
             })
             .await
             .expect("Error making remote store"),

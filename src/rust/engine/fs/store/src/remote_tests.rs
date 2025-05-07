@@ -40,6 +40,7 @@ async fn smoke_test_from_options_reapi_provider() {
         retries: 1,
         concurrency_limit: 256,
         batch_api_size_limit: crate::tests::STORE_BATCH_API_SIZE_LIMIT,
+        batch_load_enabled: false,
     })
     .await
     .unwrap();
@@ -89,6 +90,7 @@ async fn smoke_test_from_options_file_provider() {
         retries: 1,
         concurrency_limit: 256,
         batch_api_size_limit: crate::tests::STORE_BATCH_API_SIZE_LIMIT,
+        batch_load_enabled: false,
     })
     .await
     .unwrap();
@@ -382,6 +384,21 @@ impl ByteStoreProvider for TestProvider {
         }
     }
 
+    async fn load_batch(&self, digests: Vec<Digest>) -> Result<Vec<Bytes>, String> {
+        let mut results = Vec::new();
+        for digest in digests {
+            let mut destination = Vec::with_capacity(digest.size_bytes);
+            // TODO if this is false, what is the behavior?
+            let _result = self.load(digest, &mut destination).await?;
+            results.push(destination.into());
+        }
+        Ok(results)
+    }
+
+    fn batch_load_supported(&self) -> bool {
+        true
+    }
+
     async fn list_missing_digests(
         &self,
         digests: &mut (dyn Iterator<Item = Digest> + Send),
@@ -409,6 +426,14 @@ impl ByteStoreProvider for AlwaysErrorProvider {
 
     async fn load(&self, _: Digest, _: &mut dyn LoadDestination) -> Result<bool, String> {
         Err("AlwaysErrorProvider always fails".to_owned())
+    }
+
+    async fn load_batch(&self, _: Vec<Digest>) -> Result<Vec<Bytes>, String> {
+        Err("AlwaysErrorProvider always fails".to_owned())
+    }
+
+    fn batch_load_supported(&self) -> bool {
+        false
     }
 
     async fn list_missing_digests(
