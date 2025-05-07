@@ -16,12 +16,12 @@ class UvSubsystem(TemplatedExternalTool):
     name = "uv"
     help = "UV, An extremely fast Python package and project manager, written in Rust  (https://docs.astral.sh/uv/)"
 
-    default_version = "0.6.12"
+    default_version = "0.7.2"
     default_known_versions = [
-        "0.6.12|linux_arm64|d867553e5ea19f9cea08e564179d909c69ecfce5e7e382099d1844dbf1c9878c|15675948",
-        "0.6.12|linux_x86_64|eec3ccf53616e00905279a302bc043451bd96ca71a159a2ac3199452ac914c26|16790841",
-        "0.6.12|macos_arm64|fab8db5b62da1e945524b8d1a9d4946fcc6d9b77ec0cab423d953e82159967ac|14966335",
-        "0.6.12|macos_x86_64|5b6ee08766de11dc49ee9e292333e8b46ef2ceaaa3ebb0388467e114fca2ed8c|16124245",
+        "0.7.2|linux_arm64|2872fdf4785666575d129ba90590c44e6508e22584735f3e7e8a30d773dfc3db|16239004",
+        "0.7.2|linux_x86_64|cfaab1b5166a6439ff66f020333d3a12bbdf622deee3b510718283e8f06c9de7|17399523",
+        "0.7.2|macos_arm64|8edc0bea8a9e35409f970b352036326393e79a6039577d8cc9ef63872c178a99|15536108",
+        "0.7.2|macos_x86_64|7d30b59d54900c97c492f3c07ff21cc3387a9e5bd8ca6db2d502462eaaeefd68|16757236",
     ]
     default_url_template = (
         "https://github.com/astral-sh/uv/releases/download/{version}/uv-{platform}.tar.gz"
