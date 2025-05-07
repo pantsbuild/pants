@@ -13,6 +13,8 @@ use serde::Serialize;
 use fs::{RelativePath, default_cache_path};
 use store::WorkdirSymlink;
 
+use crate::local::CapturedWorkdirError;
+
 #[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize)]
 pub struct CacheName(String);
 
@@ -47,7 +49,9 @@ struct Inner {
     /// An initializer function used to initialize a named cache at the given absolute path, once per
     /// NamedCaches instance.
     #[allow(clippy::type_complexity)]
-    initializer: Box<dyn Fn(&Path) -> futures::future::BoxFuture<Result<(), String>> + Send + Sync>,
+    initializer: Box<
+        dyn Fn(&Path) -> futures::future::BoxFuture<Result<(), CapturedWorkdirError>> + Send + Sync,
+    >,
     /// Caches which have been initialized.
     initialized: Mutex<HashMap<PathBuf, Arc<OnceCell<()>>>>,
 }
@@ -60,7 +64,7 @@ impl NamedCaches {
     /// using the given initializer function.
     pub fn new(
         base_path: PathBuf,
-        initializer: impl Fn(&Path) -> futures::future::BoxFuture<Result<(), String>>
+        initializer: impl Fn(&Path) -> futures::future::BoxFuture<Result<(), CapturedWorkdirError>>
         + Send
         + Sync
         + 'static,
@@ -76,7 +80,12 @@ impl NamedCaches {
     pub fn new_local(base_path: PathBuf) -> Self {
         Self::new(base_path, |dst| {
             tokio::fs::create_dir_all(dst)
-                .map_err(|e| format!("Failed to create path {}: {e}", dst.display()))
+                .map_err(|e| {
+                    CapturedWorkdirError::Fatal(format!(
+                        "Failed to create path {}: {e}",
+                        dst.display()
+                    ))
+                })
                 .boxed()
         })
     }
@@ -107,7 +116,7 @@ impl NamedCaches {
     pub async fn paths<'a>(
         &'a self,
         caches: &'a BTreeMap<CacheName, RelativePath>,
-    ) -> Result<Vec<WorkdirSymlink>, String> {
+    ) -> Result<Vec<WorkdirSymlink>, CapturedWorkdirError> {
         // Collect the symlinks to create, and their destination cache cells.
         let (symlinks, initialization_futures): (Vec<_>, Vec<_>) = {
             caches
@@ -128,7 +137,7 @@ impl NamedCaches {
                                 async move { (named_caches.0.initializer)(&dst).await },
                             )
                             .await?;
-                        Ok::<_, String>(())
+                        Ok::<_, CapturedWorkdirError>(())
                     };
 
                     (symlink, initialization_future)

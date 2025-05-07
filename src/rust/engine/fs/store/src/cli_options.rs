@@ -1,26 +1,25 @@
 // Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::{collections::BTreeMap, path::PathBuf, time::Duration};
+use std::{collections::BTreeMap, ffi::OsString, path::PathBuf, time::Duration};
 
 use clap::Parser;
 use remote_provider::{RemoteProvider, RemoteStoreOptions};
 use task_executor::Executor;
 
 use crate::Store;
-
-#[derive(Parser)]
+#[derive(Debug, Clone, Eq, PartialEq, Parser)]
 pub struct StoreCliOpt {
     ///Path to lmdb directory used for local file storage.
     #[arg(long)]
-    local_store_path: Option<PathBuf>,
-
-    #[arg(long)]
-    pub remote_instance_name: Option<String>,
+    pub local_store_path: Option<PathBuf>,
 
     /// The host:port of the gRPC CAS server to connect to.
     #[arg(long)]
     pub cas_server: Option<String>,
+
+    #[arg(long)]
+    pub remote_instance_name: Option<String>,
 
     /// Path to file containing root certificate authority certificates for the CAS server.
     /// If not set, TLS will not be used when connecting to the CAS server.
@@ -65,6 +64,96 @@ pub struct StoreCliOpt {
 }
 
 impl StoreCliOpt {
+    pub fn new_local_only(local_store_path: PathBuf) -> Self {
+        Self {
+            local_store_path: Some(local_store_path),
+            cas_server: None,
+            remote_instance_name: None,
+            cas_root_ca_cert_file: None,
+            cas_client_certs_file: None,
+            cas_client_key_file: None,
+            cas_oauth_bearer_token_path: None,
+            upload_chunk_bytes: 0,
+            store_rpc_retries: 0,
+            store_rpc_concurrency: 0,
+            store_batch_api_size_limit: 0,
+            header: vec![],
+        }
+    }
+
+    pub fn to_cli_args(&self) -> Vec<OsString> {
+        let mut ret: Vec<OsString> = vec![];
+
+        fn maybe_push_arg<S: Into<OsString> + std::convert::AsRef<std::ffi::OsStr>>(
+            args: &mut Vec<OsString>,
+            flag: &str,
+            arg: &Option<S>,
+        ) {
+            if let Some(val) = arg {
+                push_arg(args, flag, val);
+            }
+        }
+
+        fn push_arg_if_nz(args: &mut Vec<OsString>, flag: &str, val: usize) {
+            if val != 0 {
+                push_arg(args, flag, &val.to_string());
+            }
+        }
+
+        fn push_arg<S: Into<OsString> + std::convert::AsRef<std::ffi::OsStr>>(
+            args: &mut Vec<OsString>,
+            flag: &str,
+            val: &S,
+        ) {
+            args.push(flag.into());
+            args.push(val.into());
+        }
+
+        maybe_push_arg(&mut ret, "--local-store-path", &self.local_store_path);
+        maybe_push_arg(&mut ret, "--cas-server", &self.cas_server);
+        maybe_push_arg(
+            &mut ret,
+            "--remote-instance-name",
+            &self.remote_instance_name,
+        );
+        maybe_push_arg(
+            &mut ret,
+            "--cas-root-ca-cert-file",
+            &self.cas_root_ca_cert_file,
+        );
+        maybe_push_arg(
+            &mut ret,
+            "--cas-client-certs-file",
+            &self.cas_client_certs_file,
+        );
+        maybe_push_arg(&mut ret, "--cas-client-key-file", &self.cas_client_key_file);
+        maybe_push_arg(
+            &mut ret,
+            "--cas-oauth-bearer-token-path",
+            &self.cas_oauth_bearer_token_path,
+        );
+
+        push_arg_if_nz(&mut ret, "--upload-chunk-bytes", self.upload_chunk_bytes);
+        push_arg_if_nz(&mut ret, "--store-rpc-retries", self.store_rpc_retries);
+        push_arg_if_nz(
+            &mut ret,
+            "--store-rpc-concurrency",
+            self.store_rpc_concurrency,
+        );
+        push_arg_if_nz(
+            &mut ret,
+            "--store-batch-api-size-limit",
+            self.store_batch_api_size_limit,
+        );
+
+        for header in self.header.iter() {
+            ret.push("--header".into());
+            ret.push(header.into());
+        }
+
+        ret
+    }
+
     pub fn get_headers(
         &self,
         oauth_bearer_token_path: &Option<PathBuf>,

@@ -24,6 +24,7 @@ use futures::try_join;
 use grpc_util::prost::MessageExt;
 use hashing::Digest;
 use itertools::Itertools;
+use local::CapturedWorkdirError;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 use remexec::ExecutedActionMetadata;
@@ -121,6 +122,12 @@ impl From<StoreError> for ProcessError {
             StoreError::MissingDigest(s, d) => Self::MissingDigest(s, d),
             StoreError::Unclassified(s) => Self::Unclassified(s),
         }
+    }
+}
+
+impl From<CapturedWorkdirError> for ProcessError {
+    fn from(err: CapturedWorkdirError) -> Self {
+        ProcessError::Unclassified(err.to_string())
     }
 }
 
@@ -1082,9 +1089,11 @@ pub async fn get_digest(
     process_cache_namespace: Option<String>,
     store: &Store,
     append_only_caches_base_path: Option<&str>,
-) -> Digest {
+) -> (Digest, Digest) {
     let EntireExecuteRequest {
-        execute_request, ..
+        execute_request,
+        action,
+        ..
     } = make_execute_request(
         process,
         instance_name,
@@ -1094,7 +1103,11 @@ pub async fn get_digest(
     )
     .await
     .unwrap();
-    execute_request.action_digest.unwrap().try_into().unwrap()
+
+    (
+        execute_request.action_digest.unwrap().try_into().unwrap(),
+        action.command_digest.unwrap().try_into().unwrap(),
+    )
 }
 
 pub fn digest<T: prost::Message>(message: &T) -> Result<Digest, String> {

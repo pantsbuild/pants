@@ -1,0 +1,35 @@
+[package]
+version = "0.0.1"
+edition = "2021"
+name = "sandboxer"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[[bin]]
+name = "sandboxer"
+path = "bin/server.rs"
+
+[[bin]]
+name = "sandboxer_client"
+path = "bin/client.rs"
+
+[dependencies]
+bytes = { workspace = true }
+children = { path = "../children" }
+clap = { workspace = true, features = ["derive"] }
+env_logger = { workspace = true }
+fs = { path = "../../fs" }
+hashing = { path = "../../hashing" }
+hyper-util = { workspace = true }
+log = { workspace = true }
+protos = { path = "../../protos" }                                # TODO: Split up protos and only depend on ours.
+store = { path = "../../fs/store" }
+task_executor = { path = "../../task_executor" }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["process"] }
+tokio-stream = { workspace = true }
+tonic = { workspace = true, features = ["transport", "codegen"] }
+tower = { workspace = true }
+
+[lints]
+workspace = true

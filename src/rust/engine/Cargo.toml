@@ -74,6 +74,7 @@ rand = { workspace = true }
 regex = { workspace = true }
 reqwest = { version = "0.12", default-features = false, features = ["stream", "rustls-tls"] }
 rule_graph = { path = "rule_graph" }
+sandboxer = { path = "process_execution/sandboxer" }
 smallvec = { version = "1", features = ["union"] }
 stdio = { path = "stdio" }
 store = { path = "fs/store" }
@@ -139,6 +140,7 @@ members = [
   "process_execution/docker",
   "process_execution/pe_nailgun",
   "process_execution/remote",
+  "process_execution/sandboxer",
   "process_executor",
   "protos",
   "remote_provider",
@@ -190,6 +192,7 @@ default-members = [
   "process_execution/docker",
   "process_execution/pe_nailgun",
   "process_execution/remote",
+  "process_execution/sandboxer",
   "process_executor",
   "protos",
   "remote_provider",
@@ -237,7 +240,7 @@ deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443f
 derivative = "2.2"
 digest = "0.10"
 dirs-next = "2"
-docker_credential = "1.2"
+docker_credential = "1.3"
 either = "1"
 env_logger = "0.10.2"
 errno = "0.3.6"
@@ -280,6 +283,7 @@ opendal = { version = "0.52.0", default-features = false, features = [
   "services-ghac",
 ] }
 os_pipe = "1.1"
+parameterized = "2.0.0"
 parking_lot = "0.12"
 peg = "0.8"
 petgraph = "0.6"
@@ -325,7 +329,7 @@ tokio-util = "0.7"
 toml = "0.5"
 tonic = "0.12"
 tonic-build = "0.12"
-tower = "0.4"
+tower = "0.5"
 tower-layer = "0.3"
 tower-service = "0.3"
 uname = "0.1.1"

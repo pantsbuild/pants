@@ -407,10 +407,26 @@ class TerraformTool(TemplatedExternalTool):
 
 
 @dataclass(frozen=True)
-class TerraformProcess:
-    """A request to invoke Terraform."""
+class TerraformCommand:
+    """A single Terraform command to invoke (eg `terraform init`)"""
 
     args: tuple[str, ...]
+
+    def to_args(self, chdir):
+        return (
+            "__terraform/terraform",
+            f"-chdir={shlex.quote(chdir)}",
+        ) + self.args
+
+
+@dataclass(frozen=True)
+class TerraformProcess:
+    """A request to invoke Terraform.
+
+    Accepts multiple commands
+    """
+
+    cmds: tuple[TerraformCommand, ...]
     description: str
     input_digest: Digest = EMPTY_DIGEST
     output_files: tuple[str, ...] = ()
@@ -461,17 +477,13 @@ async def setup_terraform_process(
 
     # Initialise the Terraform provider cache, since Terraform expects the directory to already exist.
     initialize_provider_cache_cmd = (mkdir.path, "-p", tf_plugin_cache_dir)
-    run_terraform_cmd = (
-        "__terraform/terraform",
-        f"-chdir={shlex.quote(request.chdir)}",
-    ) + request.args
 
     return Process(
         argv=_make_launcher_script(
             bash,
             (
                 initialize_provider_cache_cmd,
-                run_terraform_cmd,
+                *[cmd.to_args(request.chdir) for cmd in request.cmds],
             ),
         ),
         input_digest=request.input_digest,

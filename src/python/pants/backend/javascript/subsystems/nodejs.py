@@ -39,7 +39,12 @@ from pants.core.util_rules.system_binaries import (
     BinaryShims,
     BinaryShimsRequest,
 )
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest, PathEnvironmentVariable
+from pants.engine.env_vars import (
+    EXTRA_ENV_VARS_USAGE_HELP,
+    EnvironmentVars,
+    EnvironmentVarsRequest,
+    PathEnvironmentVariable,
+)
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, DownloadFile
 from pants.engine.internals.native_engine import FileDigest, MergeDigests
 from pants.engine.internals.platform_rules import environment_vars_subset
@@ -152,6 +157,17 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
             the `--activate` flag.
             """
         ),
+    )
+
+    extra_env_vars = StrListOption(
+        help=softwrap(
+            f"""
+            Environment variables to set during package manager operations.
+
+            {EXTRA_ENV_VARS_USAGE_HELP}
+            """
+        ),
+        advanced=True,
     )
 
     @property
@@ -467,9 +483,7 @@ async def _get_nvm_root() -> str | None:
     """See https://github.com/nvm-sh/nvm#installing-and-updating."""
 
     env = await environment_vars_subset(
-        **implicitly(
-            {EnvironmentVarsRequest(("NVM_DIR", "XDG_CONFIG_HOME", "HOME")): EnvironmentVarsRequest}
-        )
+        EnvironmentVarsRequest(("NVM_DIR", "XDG_CONFIG_HOME", "HOME")), **implicitly()
     )
     nvm_dir = env.get("NVM_DIR")
     default_dir = env.get("XDG_CONFIG_HOME", env.get("HOME"))

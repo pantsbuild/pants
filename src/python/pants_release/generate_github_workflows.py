@@ -114,6 +114,7 @@ def hash_files(path: str) -> str:
 NATIVE_FILES_COMMON_PREFIX = "src/python/pants"
 NATIVE_FILES = [
     f"{NATIVE_FILES_COMMON_PREFIX}/bin/native_client",
+    f"{NATIVE_FILES_COMMON_PREFIX}/bin/sandboxer",
     f"{NATIVE_FILES_COMMON_PREFIX}/engine/internals/native_engine.so",
     f"{NATIVE_FILES_COMMON_PREFIX}/engine/internals/native_engine.so.metadata",
 ]
