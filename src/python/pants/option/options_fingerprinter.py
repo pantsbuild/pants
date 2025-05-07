@@ -41,14 +41,25 @@ class OptionsFingerprinter:
     :API: public
     """
 
-    @staticmethod
-    def options_map_for_scope(scope: str, options: Options) -> dict[str, Any]:
+    @classmethod
+    def options_map_for_scope(cls, scope: str, options: Options) -> dict[str, Any]:
         """Given options and a scope, create a JSON-serializable map of all fingerprintable options
         in scope to their values."""
         options_map = {}
         option_items = options.get_fingerprintable_for_scope(scope, daemon_only=False)
-        for option_name, _, option_value in option_items:
-            options_map[option_name] = option_value
+        fingerprinter = cls()
+
+        for option_name, option_type, option_value in option_items:
+            value = option_value
+            if option_type in (dir_option, file_option, dict_with_files_option):
+                fingerprint = fingerprinter.fingerprint(option_type, option_value)
+                if fingerprint is None:
+                    # This isn't necessarily a good value to be using here, but it preserves behavior from
+                    # before the commit which added it. I suspect that using the empty string would be
+                    # reasonable too, but haven't done any archaeology to check.
+                    fingerprint = "None"
+                value = f"{option_value} (hash: {fingerprint})"
+            options_map[option_name] = value
 
         serializable_map = cast(
             dict[str, Any], json.loads(json.dumps(options_map, cls=OptionEncoder))
