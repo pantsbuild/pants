@@ -35,6 +35,7 @@ fn remote_options(
         retries: 1,
         concurrency_limit: 256,
         batch_api_size_limit,
+        batch_load_enabled: false,
     }
 }
 

@@ -430,6 +430,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
                             batch_api_size_limit: *top_match
                                 .get_one("batch-api-size-limit")
                                 .unwrap(),
+                            batch_load_enabled: false,
                         })
                         .await,
                     true,

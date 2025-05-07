@@ -37,6 +37,7 @@ pub struct RemoteStoreOptions {
     pub retries: usize,
     pub concurrency_limit: usize,
     pub batch_api_size_limit: usize,
+    pub batch_load_enabled: bool,
 }
 
 #[async_trait]
@@ -62,6 +63,10 @@ pub trait ByteStoreProvider: Sync + Send + 'static {
         digest: Digest,
         destination: &mut dyn LoadDestination,
     ) -> Result<bool, String>;
+
+    async fn load_batch(&self, digests: Vec<Digest>) -> Result<Vec<Bytes>, String>;
+
+    fn batch_load_supported(&self) -> bool;
 
     /// Return any digests from `digests` that are not (currently) available in the remote store.
     ///

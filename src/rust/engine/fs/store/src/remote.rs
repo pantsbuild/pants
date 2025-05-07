@@ -159,6 +159,54 @@ impl ByteStore {
         Ok(result.map(Bytes::from))
     }
 
+    pub async fn load_bytes_batch(&self, digests: Vec<Digest>) -> Result<Vec<Bytes>, String> {
+        let start = Instant::now();
+        let workunit_desc = format!(
+            "Loading batch at {} of {} digets ({} bytes)",
+            self.instance_name.as_ref().map_or("", |s| s),
+            digests.len(),
+            digests.iter().map(|d| d.size_bytes).sum::<usize>()
+        );
+
+        in_workunit!(
+            "load_bytes_batch",
+            Level::Trace,
+            desc = Some(workunit_desc),
+            |workunit| async move {
+                workunit.increment_counter(Metric::RemoteStoreReadAttempts, 1);
+                let result = self.provider.load_batch(digests).await;
+
+                workunit.record_observation(
+                    ObservationMetric::RemoteStoreReadBlobTimeMicros,
+                    start.elapsed().as_micros() as u64,
+                );
+
+                match result {
+                    Ok(vec) => {
+                        let total_bytes = vec.iter().map(|d| d.len()).sum::<usize>();
+                        workunit.record_observation(
+                            ObservationMetric::RemoteStoreBlobBytesDownloaded,
+                            total_bytes as u64,
+                        );
+                        workunit.increment_counter(Metric::RemoteStoreReadCached, 1);
+                        Ok(vec)
+                    }
+                    // TODO: Chris we need to loop over every digest and count the number of hits/misses
+                    // Ok(false) => Metric::RemoteStoreReadUncached,
+                    Err(_) => {
+                        workunit.increment_counter(Metric::RemoteStoreReadErrors, 1);
+                        Err("Error loading batch".to_string())
+                    }
+                }
+            },
+        )
+        .await
+    }
+
+    pub fn batch_load_supported(&self) -> bool {
+        self.provider.batch_load_supported()
+    }
+
     /// Write the data for `digest` (if it exists in the remote store) into `file`.
     pub async fn load_file(
         &self,

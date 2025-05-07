@@ -41,6 +41,7 @@ pub struct Provider {
     capabilities_cell: Arc<OnceCell<ServerCapabilities>>,
     capabilities_client: Arc<CapabilitiesClient<LayeredService>>,
     batch_api_size_limit: usize,
+    batch_load_enabled: bool,
 }
 
 /// Represents an error from accessing a remote bytestore.
@@ -108,6 +109,7 @@ impl Provider {
             capabilities_cell: Arc::new(OnceCell::new()),
             capabilities_client,
             batch_api_size_limit: options.batch_api_size_limit,
+            batch_load_enabled: options.batch_load_enabled,
         })
     }
 
@@ -388,6 +390,28 @@ impl ByteStoreProvider for Provider {
         )
         .await
         .map_err(|e| e.to_string())
+    }
+
+    fn batch_load_supported(&self) -> bool {
+        self.batch_load_enabled
+    }
+
+    async fn load_batch(&self, digests: Vec<Digest>) -> Result<Vec<Bytes>, String> {
+        let request = remexec::BatchReadBlobsRequest {
+            instance_name: self.instance_name.as_ref().cloned().unwrap_or_default(),
+            digests: digests.into_iter().map(|d| d.into()).collect(),
+            acceptable_compressors: vec![],
+        };
+        let mut client = self.cas_client.as_ref().clone();
+        let response = client
+            .batch_read_blobs(request)
+            .await
+            .map_err(|e| e.to_string())?;
+        let response = response.into_inner();
+        // Why is digest optional?
+        // ordering?
+        // How to handle individual errors?
+        Ok(response.responses.iter().map(|r| r.data.clone()).collect())
     }
 
     async fn list_missing_digests(

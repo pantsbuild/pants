@@ -1296,6 +1296,7 @@ fn remote_options_for_cas(cas: &mock::StubCAS) -> RemoteStoreOptions {
         retries: 1,
         concurrency_limit: STORE_CONCURRENCY_LIMIT,
         batch_api_size_limit: STORE_BATCH_API_SIZE_LIMIT,
+        batch_load_enabled: false,
     }
 }
 

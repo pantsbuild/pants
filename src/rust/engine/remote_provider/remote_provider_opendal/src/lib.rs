@@ -294,6 +294,14 @@ impl ByteStoreProvider for Provider {
 
         Ok(existences.into_iter().flatten().collect())
     }
+
+    fn batch_load_supported(&self) -> bool {
+        false
+    }
+
+    async fn load_batch(&self, _digests: Vec<Digest>) -> Result<Vec<Bytes>, String> {
+        Err("load_batch not implemented for remote opendal provider".to_string())
+    }
 }
 
 #[async_trait]
