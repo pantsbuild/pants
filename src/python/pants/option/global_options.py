@@ -319,6 +319,7 @@ class DynamicRemoteOptions:
     execution_headers: dict[str, str]
     parallelism: int
     store_rpc_concurrency: int
+    store_batch_load_enabled: bool
     cache_rpc_concurrency: int
     execution_rpc_concurrency: int
 
@@ -384,6 +385,7 @@ class DynamicRemoteOptions:
             execution_headers={},
             parallelism=DEFAULT_EXECUTION_OPTIONS.process_execution_remote_parallelism,
             store_rpc_concurrency=DEFAULT_EXECUTION_OPTIONS.remote_store_rpc_concurrency,
+            store_batch_load_enabled=DEFAULT_EXECUTION_OPTIONS.remote_store_batch_load_enabled,
             cache_rpc_concurrency=DEFAULT_EXECUTION_OPTIONS.remote_cache_rpc_concurrency,
             execution_rpc_concurrency=DEFAULT_EXECUTION_OPTIONS.remote_execution_rpc_concurrency,
         )
@@ -409,6 +411,7 @@ class DynamicRemoteOptions:
         store_headers = cast("dict[str, str]", bootstrap_options.remote_store_headers)
         parallelism = cast(int, bootstrap_options.process_execution_remote_parallelism)
         store_rpc_concurrency = cast(int, bootstrap_options.remote_store_rpc_concurrency)
+        store_batch_load_enabled = cast(bool, bootstrap_options.remote_store_batch_load_enabled)
         cache_rpc_concurrency = cast(int, bootstrap_options.remote_cache_rpc_concurrency)
         execution_rpc_concurrency = cast(int, bootstrap_options.remote_execution_rpc_concurrency)
         execution_headers.update(token_header)
@@ -425,6 +428,7 @@ class DynamicRemoteOptions:
             execution_headers=execution_headers,
             parallelism=parallelism,
             store_rpc_concurrency=store_rpc_concurrency,
+            store_batch_load_enabled=store_batch_load_enabled,
             cache_rpc_concurrency=cache_rpc_concurrency,
             execution_rpc_concurrency=execution_rpc_concurrency,
         )
@@ -484,6 +488,7 @@ class DynamicRemoteOptions:
         store_headers = cast("dict[str, str]", bootstrap_options.remote_store_headers)
         parallelism = cast(int, bootstrap_options.process_execution_remote_parallelism)
         store_rpc_concurrency = cast(int, bootstrap_options.remote_store_rpc_concurrency)
+        store_batch_load_enabled = cast(bool, bootstrap_options.remote_store_batch_load_enabled)
         cache_rpc_concurrency = cast(int, bootstrap_options.remote_cache_rpc_concurrency)
         execution_rpc_concurrency = cast(int, bootstrap_options.remote_execution_rpc_concurrency)
         return cls(
@@ -498,6 +503,7 @@ class DynamicRemoteOptions:
             execution_headers=execution_headers,
             parallelism=parallelism,
             store_rpc_concurrency=store_rpc_concurrency,
+            store_batch_load_enabled=store_batch_load_enabled,
             cache_rpc_concurrency=cache_rpc_concurrency,
             execution_rpc_concurrency=execution_rpc_concurrency,
         )
@@ -522,6 +528,7 @@ class DynamicRemoteOptions:
         store_headers = cast("dict[str, str]", bootstrap_options.remote_store_headers)
         parallelism = cast(int, bootstrap_options.process_execution_remote_parallelism)
         store_rpc_concurrency = cast(int, bootstrap_options.remote_store_rpc_concurrency)
+        store_batch_load_enabled = cast(bool, bootstrap_options.remote_store_batch_load_enabled)
         cache_rpc_concurrency = cast(int, bootstrap_options.remote_cache_rpc_concurrency)
         execution_rpc_concurrency = cast(int, bootstrap_options.remote_execution_rpc_concurrency)
         auth_plugin_result = cast(
@@ -583,6 +590,7 @@ class DynamicRemoteOptions:
             execution_headers=execution_headers,
             parallelism=parallelism,
             store_rpc_concurrency=store_rpc_concurrency,
+            store_batch_load_enabled=store_batch_load_enabled,
             cache_rpc_concurrency=cache_rpc_concurrency,
             execution_rpc_concurrency=execution_rpc_concurrency,
         )
@@ -634,6 +642,7 @@ class ExecutionOptions:
     remote_store_rpc_retries: int
     remote_store_rpc_concurrency: int
     remote_store_batch_api_size_limit: int
+    remote_store_batch_load_enabled: bool
     remote_store_rpc_timeout_millis: int
 
     remote_cache_warnings: RemoteCacheWarningsBehavior
@@ -682,6 +691,7 @@ class ExecutionOptions:
             remote_store_rpc_retries=bootstrap_options.remote_store_rpc_retries,
             remote_store_rpc_concurrency=dynamic_remote_options.store_rpc_concurrency,
             remote_store_batch_api_size_limit=bootstrap_options.remote_store_batch_api_size_limit,
+            remote_store_batch_load_enabled=bootstrap_options.remote_store_batch_load_enabled,
             remote_store_rpc_timeout_millis=bootstrap_options.remote_store_rpc_timeout_millis,
             # Remote cache setup.
             remote_cache_warnings=bootstrap_options.remote_cache_warnings,
@@ -777,6 +787,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_rpc_concurrency=128,
     remote_store_batch_api_size_limit=4194304,
     remote_store_rpc_timeout_millis=30000,
+    remote_store_batch_load_enabled=False,
     # Remote cache setup.
     remote_cache_warnings=RemoteCacheWarningsBehavior.backoff,
     remote_cache_rpc_concurrency=128,
@@ -1632,6 +1643,11 @@ class BootstrapOptions:
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_store_batch_api_size_limit,
         help="The maximum total size of blobs allowed to be sent in a single batch API call to the remote store.",
+    )
+    remote_store_batch_load_enabled = BoolOption(
+        default=DEFAULT_EXECUTION_OPTIONS.remote_store_batch_load_enabled,
+        advanced=True,
+        help="Whether to enable batch load requests to the remote store.",
     )
     remote_cache_warnings = EnumOption(
         default=DEFAULT_EXECUTION_OPTIONS.remote_cache_warnings,

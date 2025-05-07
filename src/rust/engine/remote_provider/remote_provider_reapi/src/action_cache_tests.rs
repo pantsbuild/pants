@@ -21,6 +21,7 @@ async fn new_provider(cas: &StubCAS) -> Provider {
         retries: 0,
         batch_api_size_limit: 0,
         chunk_size_bytes: 0,
+        batch_load_enabled: false,
     })
     .await
     .unwrap()

@@ -197,6 +197,7 @@ impl StoreCliOpt {
                     retries: self.store_rpc_retries,
                     concurrency_limit: self.store_rpc_concurrency,
                     batch_api_size_limit: self.store_batch_api_size_limit,
+                    batch_load_enabled: false,
                 })
                 .await
         } else {
