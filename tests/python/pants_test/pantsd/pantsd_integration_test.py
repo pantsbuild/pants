@@ -183,16 +183,37 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             first_stderr, first_pid = run_auth_plugin()
             assert (
                 "Initializing scheduler" in first_stderr
-                or "reinitializing scheduler" in first_stderr
+                or "Reinitializing scheduler" in first_stderr
             )
 
             second_stderr, second_pid = run_auth_plugin()
-            assert "reinitializing scheduler" not in second_stderr
+            assert "Reinitializing scheduler" not in second_stderr
             assert first_pid == second_pid
 
             third_stderr, third_pid = run_auth_plugin()
-            assert "reinitializing scheduler" in third_stderr
+            assert "Remote cache/execution options updated" in third_stderr
+            assert "execution_headers: {}" in third_stderr and "'custom': 'foo'" in third_stderr
+            assert "Reinitializing scheduler" in third_stderr
             assert second_pid == third_pid
+
+    def test_pantsd_lifecycle_invalidation_bootstrap_options(self) -> None:
+        """Test that changing bootstrap options triggers scheduler reinitialization with diff
+        logs."""
+        with self.pantsd_successful_run_context() as ctx:
+            ctx.runner(["help"])
+            first_pid = ctx.checker.assert_started()
+
+            second_result = ctx.runner(["help"])
+            second_pid = ctx.checker.assert_running()
+            assert first_pid == second_pid
+            assert "Reinitializing scheduler" not in second_result.stderr
+
+            third_result = ctx.runner(["--pantsd-max-memory-usage=1000000", "help"])
+            third_pid = ctx.checker.assert_running()
+            assert second_pid == third_pid
+            assert "Initialization options changed" in third_result.stderr
+            assert "pantsd_max_memory_usage" in third_result.stderr
+            assert "Reinitializing scheduler" in third_result.stderr
 
     def test_pantsd_lifecycle_non_invalidation(self):
         with self.pantsd_successful_run_context() as ctx:
