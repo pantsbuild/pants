@@ -135,7 +135,7 @@ _UV_PLUGIN_RESOLVE_SCRIPT = r"""\
 import os
 from pathlib import Path
 import shutil
-import subprocess
+from subprocess import run
 import sys
 
 
@@ -149,10 +149,6 @@ def pyproject_changed(current_path: Path, previous_path: Path) -> bool:
     return current_pyproject != previous_pyproject
 
 
-def run(args):
-    return subprocess.run(args, check=True)
-
-
 inputs_dir = Path(sys.argv[1])
 uv_path = inputs_dir / sys.argv[2]
 pyproject_path = inputs_dir / sys.argv[3]
@@ -161,19 +157,10 @@ plugins_path = Path(".pants.d/plugins")
 plugins_path.mkdir(parents=True, exist_ok=True)
 os.chdir(plugins_path)
 
-reinstall = (
-    not os.path.exists("pyproject.toml")
-    or not os.path.exists("uv.lock")
-    or pyproject_changed(pyproject_path, "./pyproject.toml")
-)
+shutil.copy(pyproject_path, ".")
 
-if reinstall:
-    shutil.copy(pyproject_path, ".")
-    run([uv_path, "sync", f"--python={sys.executable}"])
-else:
-    run([uv_path, "sync", "--frozen", f"--python={sys.executable}"])
-
-run(["./.venv/bin/python", "-c", "import os, site; print(os.linesep.join(site.getsitepackages()))"])
+run([uv_path, "sync", f"--python={sys.executable}"], check=True)
+run(["./.venv/bin/python", "-c", "import os, site; print(os.linesep.join(site.getsitepackages()))"], check=True)
 """
 
 
@@ -197,6 +184,7 @@ requires-python = "==3.11.*"
 dependencies = [{requirements_formatted}]
 [tool.uv]
 package = false
+fork-strategy = "requires-python"
 environments = ["sys_platform == '{platform}'"]
 constraint-dependencies = [{constraints_formatted}]
 find-links = [{find_links_formatted}]
@@ -305,6 +293,8 @@ async def resolve_plugins_via_uv(
     )
 
     result = await execute_process(process, workspace_process_execution_environment)
+    print(f"uv result stdout:\n{result.stdout.decode()}")
+    print(f"uv result stderr:\n{result.stderr.decode()}")
     if result.exit_code != 0:
         raise ValueError(f"Plugin resolution failed: stderr={result.stderr.decode()}")
 

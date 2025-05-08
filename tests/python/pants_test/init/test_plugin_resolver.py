@@ -215,7 +215,7 @@ def plugin_resolution(
         )
         working_set = plugin_resolver.resolve(options_bootstrapper, complete_env, requirements)
         print(f"working_set: {working_set}")
-        import pdb ; pdb.set_trace()
+        # import pdb ; pdb.set_trace()
         for dist in working_set:
             if use_uv:
                 assert ".pants.d/plugins" in os.path.realpath(dist.location)
@@ -314,8 +314,16 @@ def test_exact_requirements_interpreter_change(
         sdist=sdist,
     ) as results:
         working_set, chroot, repo_dir = results
-
+        print(f"chdoot: {chroot}")
+        print(f"repo_dir: {repo_dir}")
         safe_rmtree(repo_dir)
+        
+        plugins_venv = os.path.join(chroot, ".pants.d", "plugins", "venv", "lib", "python3.11", "site-packages", "jane")
+        print(f"chroot files: {os.listdir(chroot)}")
+        print(f"repo_dir files: {os.listdir(repo_dir)}")
+        # print(f"site-packages: {os.listdir(os.path.dirname(plugins_venv))}")
+        safe_rmtree(plugins_venv)
+        
         with pytest.raises(ExecutionError):
             with plugin_resolution(
                 rule_runner,
