@@ -6,6 +6,7 @@ use children::ManagedChild;
 use hashing::Digest;
 use hyper_util::rt::TokioIo;
 use log::{debug, info, warn};
+use logging::logger::PANTS_LOGGER;
 use protos::gen::pants::sandboxer::{
     MaterializeDirectoryRequest, MaterializeDirectoryResponse,
     sandboxer_grpc_client::SandboxerGrpcClient,
@@ -395,8 +396,9 @@ impl Sandboxer {
         cmd.arg("--socket-path");
         cmd.arg(self.socket_path.as_os_str());
         cmd.args(self.store_cli_opt.to_cli_args());
-        // Pass the calling code's max log level to the sandboxer process.
-        cmd.env("RUST_LOG", log::max_level().as_str());
+        // Pass the calling code's global log level to the sandboxer process.
+        // TODO: Check for a relevant per-target log level?
+        cmd.env("RUST_LOG", PANTS_LOGGER.global_level().as_str());
         cmd.stderr(Stdio::from(logfile.into_std().await));
 
         debug!(

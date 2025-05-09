@@ -3865,6 +3865,7 @@ dependencies = [
  "hashing",
  "hyper-util",
  "log",
+ "logging",
  "protos",
  "store",
  "task_executor",
