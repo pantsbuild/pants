@@ -267,11 +267,84 @@ impl RemoteStore {
           }
           local_store
             .store_bytes(entry_type, digest.hash, bytes, true)
-            .await?;
+                .await?;
+            }
+            Ok(())
+        })
+        .await
+    }
+
+    async fn download_digest_to_local_batch(
+        &self,
+        local_store: local::ByteStore,
+        digests: Vec<Digest>,
+    ) -> Result<(), StoreError> {
+        let mut large_files: Vec<Digest> = Vec::new();
+        let mut chunks: Vec<Vec<Digest>> = Vec::new();
+        let mut current_chunk: Vec<Digest> = Vec::new();
+        let mut current_size = 0;
+
+        for digest in digests {
+            let store_into_fsdb = ByteStore::should_use_fsdb(EntryType::File, digest.size_bytes);
+            if store_into_fsdb {
+                large_files.push(digest);
+            } else {
+                if current_size + digest.size_bytes >= 3000000 {
+                    chunks.push(std::mem::take(&mut current_chunk));
+                    current_size = 0;
+                }
+                current_chunk.push(digest);
+                current_size += digest.size_bytes;
+            }
         }
+
+        if !current_chunk.is_empty() {
+            chunks.push(current_chunk);
+        }
+
+        let mut large_file_futures = Vec::new();
+
+        for large_file in large_files {
+            let local_store = local_store.clone();
+            let remote_store = self.store.clone();
+
+            large_file_futures.push(async move {
+                local_store
+                    .get_file_fsdb()
+                    .write_using(large_file.hash, |file| {
+                        Self::remote_writer(&remote_store, large_file, file)
+                    })
+                    .await
+            });
+        }
+
+        let mut batch_futures = Vec::new();
+        for chunk in chunks {
+            let local_store = local_store.clone();
+            let remote_store = self.store.clone();
+
+            batch_futures.push(async move {
+                let bytes = remote_store
+                    .load_bytes_batch(chunk.clone())
+                    .await
+                    .map_err(|e| StoreError::Unclassified(e.to_string()))?;
+
+                let digest_bytes = chunk
+                    .into_iter()
+                    .map(|d| d.hash)
+                    .zip(bytes.into_iter())
+                    .collect::<Vec<_>>();
+
+                local_store
+                    .store_bytes_batch(EntryType::File, digest_bytes, true)
+                    .map_err(|e| StoreError::Unclassified(e.to_string()))
+                    .await
+            });
+        }
+
+        let _ = future::try_join_all(large_file_futures).await?;
+        let _ = future::try_join_all(batch_futures).await?;
         Ok(())
-      })
-      .await
     }
 }
 
@@ -969,32 +1042,43 @@ impl Store {
                 *missing_file_digests.iter().next().unwrap(),
             )
         })?;
-        let _ = future::try_join_all(missing_file_digests.into_iter().map(
-            |file_digest| async move {
-                if let Err(e) = remote
-                    .download_digest_to_local(
-                        self.local.clone(),
-                        file_digest,
-                        EntryType::File,
-                        None,
-                    )
-                    .await
-                {
-                    log::debug!("Missing file digest from remote store: {:?}", file_digest);
-                    in_workunit!(
-                        "missing_file_counter",
-                        Level::Trace,
-                        |workunit| async move {
-                            workunit.increment_counter(Metric::RemoteStoreMissingDigest, 1);
-                        },
-                    )
-                    .await;
-                    return Err(e);
-                }
-                Ok(())
-            },
-        ))
-        .await?;
+
+        if remote.store.batch_load_supported() {
+            remote
+                .download_digest_to_local_batch(
+                    self.local.clone(),
+                    missing_file_digests.into_iter().collect(),
+                )
+                .await?;
+        } else {
+            let _ = future::try_join_all(missing_file_digests.into_iter().map(
+                |file_digest| async move {
+                    if let Err(e) = remote
+                        .download_digest_to_local(
+                            self.local.clone(),
+                            file_digest,
+                            EntryType::File,
+                            None,
+                        )
+                        .await
+                    {
+                        log::debug!("Missing file digest from remote store: {:?}", file_digest);
+                        in_workunit!(
+                            "missing_file_counter",
+                            Level::Trace,
+                            |workunit| async move {
+                                workunit.increment_counter(Metric::RemoteStoreMissingDigest, 1);
+                            },
+                        )
+                        .await;
+                        return Err(e);
+                    }
+                    Ok(())
+                },
+            ))
+            .await?;
+        }
+
         Ok(())
     }
 

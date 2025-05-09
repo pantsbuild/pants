@@ -107,6 +107,7 @@ pub struct RemotingOptions {
     pub store_rpc_concurrency: usize,
     pub store_rpc_timeout: Duration,
     pub store_batch_api_size_limit: usize,
+    pub store_batch_load_enabled: bool,
     pub cache_warnings_behavior: RemoteCacheWarningsBehavior,
     pub cache_content_behavior: CacheContentBehavior,
     pub cache_rpc_concurrency: usize,
@@ -139,6 +140,7 @@ impl RemotingOptions {
             retries: self.store_rpc_retries,
             concurrency_limit: self.store_rpc_concurrency,
             batch_api_size_limit: self.store_batch_api_size_limit,
+            batch_load_enabled: self.store_batch_load_enabled,
         })
     }
 }
