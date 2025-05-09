@@ -854,6 +854,7 @@ def scheduler_create(
     tasks: PyTasks,
     types: PyTypes,
     build_root: str,
+    pants_workdir: str,
     local_execution_root_dir: str,
     named_caches_dir: str,
     ignore_patterns: Sequence[str],

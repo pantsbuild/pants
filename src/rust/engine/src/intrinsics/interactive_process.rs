@@ -110,6 +110,7 @@ pub async fn interactive_process_inner(
         &process,
         process.input_digests.inputs.clone(),
         &context.core.store(),
+        context.core.sandboxer().as_ref(),
         &context.core.named_caches,
         &context.core.immutable_inputs,
         None,

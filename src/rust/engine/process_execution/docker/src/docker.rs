@@ -463,6 +463,9 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                         &mreq,
                         mreq.input_digests.inputs.clone(),
                         &self.store,
+                        // Sandboxer is not needed for docker execution, since the executing
+                        // process is not a subprocess of ours, but a process in a docker container.
+                        None,
                         &named_caches,
                         &self.immutable_inputs,
                         Some(Path::new(NAMED_CACHES_BASE_PATH_IN_CONTAINER)),

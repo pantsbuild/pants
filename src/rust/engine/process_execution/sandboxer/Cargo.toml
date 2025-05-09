@@ -22,6 +22,7 @@ fs = { path = "../../fs" }
 hashing = { path = "../../hashing" }
 hyper-util = { workspace = true }
 log = { workspace = true }
+logging = { path = "../../logging" }
 protos = { path = "../../protos" }                                # TODO: Split up protos and only depend on ours.
 store = { path = "../../fs/store" }
 task_executor = { path = "../../task_executor" }
