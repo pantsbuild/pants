@@ -1,6 +1,6 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::fmt;
 use std::io::Cursor;
@@ -16,6 +16,7 @@ use grpc_util::{
     LayeredService, headers_to_http_header_map, layered_service, status_ref_to_str, status_to_str,
 };
 use hashing::{Digest, Hasher};
+use protos::gen::google::rpc;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::gen::google::bytestream::byte_stream_client::ByteStreamClient;
 use remexec::{
@@ -396,10 +397,11 @@ impl ByteStoreProvider for Provider {
         self.batch_load_enabled
     }
 
-    async fn load_batch(&self, digests: Vec<Digest>) -> Result<Vec<Bytes>, String> {
+    async fn load_batch(&self, digests: Vec<Digest>) -> Result<HashMap<Digest, Result<Bytes, String>>, String> {
+        let bazel_digests = digests.iter().map(|d| d.into()).collect::<Vec<_>>();
         let request = remexec::BatchReadBlobsRequest {
             instance_name: self.instance_name.as_ref().cloned().unwrap_or_default(),
-            digests: digests.into_iter().map(|d| d.into()).collect(),
+            digests: bazel_digests,
             acceptable_compressors: vec![],
         };
         let mut client = self.cas_client.as_ref().clone();
@@ -408,10 +410,26 @@ impl ByteStoreProvider for Provider {
             .await
             .map_err(|e| e.to_string())?;
         let response = response.into_inner();
-        // Why is digest optional?
-        // ordering?
-        // How to handle individual errors?
-        Ok(response.responses.iter().map(|r| r.data.clone()).collect())
+
+        let mut results = HashMap::with_capacity(digests.len());
+        digests.iter().for_each(|d| {
+            results.insert(d.clone(), Err("Missing digest".to_string()));
+        });
+        
+        for r in response.responses.iter() {
+            if let Some(digest) = r.digest.as_ref() {
+                let digest = digest.try_into().unwrap();
+                let status = r.status.as_ref().map_or(-1, |s| s.code);
+
+                if status == rpc::Code::Ok as i32 {
+                    results.insert(digest, Ok(r.data.clone()));
+                } else {
+                    let status_str = r.status.as_ref().map_or("unknown".to_string(), |s| s.message.clone());
+                    results.insert(digest, Err(format!("{:?}: {:?}", status, status_str)));
+                }
+            }
+        }
+        Ok(results)
     }
 
     async fn list_missing_digests(
