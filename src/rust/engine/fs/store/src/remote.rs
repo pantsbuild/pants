@@ -1,6 +1,6 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
 use std::time::Instant;
@@ -159,7 +159,7 @@ impl ByteStore {
         Ok(result.map(Bytes::from))
     }
 
-    pub async fn load_bytes_batch(&self, digests: Vec<Digest>) -> Result<Vec<Bytes>, String> {
+    pub async fn load_bytes_batch(&self, digests: Vec<Digest>) -> Result<HashMap<Digest, Result<Bytes, String>>, String> {
         let start = Instant::now();
         let workunit_desc = format!(
             "Loading batch at {} of {} digets ({} bytes)",
@@ -183,7 +183,7 @@ impl ByteStore {
 
                 match result {
                     Ok(vec) => {
-                        let total_bytes = vec.iter().map(|d| d.len()).sum::<usize>();
+                        let total_bytes = vec.iter().map(|d| d.1.as_ref().map_or(0, |b| b.len())).sum::<usize>();
                         workunit.record_observation(
                             ObservationMetric::RemoteStoreBlobBytesDownloaded,
                             total_bytes as u64,
