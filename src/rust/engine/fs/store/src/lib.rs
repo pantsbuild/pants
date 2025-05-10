@@ -51,6 +51,7 @@ use tokio::fs::hard_link;
 use tokio::fs::symlink;
 use tryfuture::try_future;
 use workunit_store::{Level, Metric, in_workunit};
+use remote_provider::BatchLoadDestination;
 
 const KILOBYTES: usize = 1024;
 const MEGABYTES: usize = 1024 * KILOBYTES;
@@ -279,73 +280,38 @@ impl RemoteStore {
         local_store: local::ByteStore,
         digests: Vec<Digest>,
     ) -> Result<(), StoreError> {
-        let mut large_files: Vec<Digest> = Vec::new();
-        let mut chunks: Vec<Vec<Digest>> = Vec::new();
-        let mut current_chunk: Vec<Digest> = Vec::new();
-        let mut current_size = 0;
+        
+        let (large_files, small_files): (Vec<Digest>, Vec<Digest>) = digests
+            .into_iter()
+            .partition(|d| ByteStore::should_use_fsdb(EntryType::File, d.size_bytes));
 
-        for digest in digests {
-            let store_into_fsdb = ByteStore::should_use_fsdb(EntryType::File, digest.size_bytes);
-            if store_into_fsdb {
-                large_files.push(digest);
-            } else {
-                if current_size + digest.size_bytes >= 3000000 {
-                    chunks.push(std::mem::take(&mut current_chunk));
-                    current_size = 0;
-                }
-                current_chunk.push(digest);
-                current_size += digest.size_bytes;
-            }
-        }
-
-        if !current_chunk.is_empty() {
-            chunks.push(current_chunk);
-        }
-
-        let mut large_file_futures = Vec::new();
-
-        for large_file in large_files {
+        let large_file_futures = large_files.into_iter().map(|digest| {
             let local_store = local_store.clone();
             let remote_store = self.store.clone();
 
-            large_file_futures.push(async move {
+            async move {
                 local_store
                     .get_file_fsdb()
-                    .write_using(large_file.hash, |file| {
-                        Self::remote_writer(&remote_store, large_file, file)
+                    .write_using(digest.hash, |file| {
+                        Self::remote_writer(&remote_store, digest, file)
                     })
                     .await
-            });
-        }
+            }
+        });
 
-        let mut batch_futures = Vec::new();
-        for chunk in chunks {
-            let local_store = local_store.clone();
-            let remote_store = self.store.clone();
+        let mut local_store = local_store.clone();
+        let small_file_future = async move {
+            self.store
+            .load_bytes_batch(small_files, &mut local_store)
+            .await
+            .map_err(|e| StoreError::Unclassified(e.to_string()))
+        };
 
-            batch_futures.push(async move {
-                let response = remote_store
-                    .load_bytes_batch(chunk.clone())
-                    .await
-                    .map_err(|e| StoreError::Unclassified(e.to_string()))?;
+        let _ = future::try_join(
+            small_file_future,
+            future::try_join_all(large_file_futures)
+        ).await?;
 
-                let mut digest_bytes = Vec::with_capacity(response.len());
-                for (digest, bytes) in response.iter() {
-                    match bytes {
-                        Ok(bytes) => digest_bytes.push((digest.hash, bytes.clone())),
-                        Err(e) => return Err(StoreError::MissingDigest(format!("Failed to load digest: {:?} {:?}", digest, e), digest.clone())),
-                    }
-                }
-
-                local_store
-                    .store_bytes_batch(EntryType::File, digest_bytes, true)
-                    .map_err(|e| StoreError::Unclassified(e.to_string()))
-                    .await
-            });
-        }
-
-        let _ = future::try_join_all(large_file_futures).await?;
-        let _ = future::try_join_all(batch_futures).await?;
         Ok(())
     }
 }
@@ -1736,6 +1702,19 @@ impl SnapshotOps for Store {
 
     async fn load_digest_trie(&self, digest: DirectoryDigest) -> Result<DigestTrie, StoreError> {
         Store::load_digest_trie(self, digest).await
+    }
+}
+
+#[async_trait]
+impl BatchLoadDestination for local::ByteStore {
+    
+    async fn write(&mut self, digests: Vec<(Digest, Bytes)>) -> Result<(), String>
+    {   
+        let items = digests.into_iter()
+            .map(|(digest, bytes)| (digest.hash, bytes))
+            .collect::<Vec<_>>();
+
+        self.store_bytes_batch(EntryType::File, items, true).await
     }
 }
 

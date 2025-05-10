@@ -21,7 +21,7 @@ use tokio_util::compat::{FuturesAsyncReadCompatExt, FuturesAsyncWriteCompatExt};
 use workunit_store::{Metric, ObservationMetric};
 
 use remote_provider_traits::{
-    ActionCacheProvider, ByteStoreProvider, LoadDestination, RemoteStoreOptions,
+    ActionCacheProvider, BatchLoadDestination, ByteStoreProvider, LoadDestination, RemoteStoreOptions
 };
 
 #[cfg(test)]
@@ -299,7 +299,10 @@ impl ByteStoreProvider for Provider {
         false
     }
 
-    async fn load_batch(&self, _digests: Vec<Digest>) -> Result<HashMap<Digest, Result<Bytes, String>>, String> {
+    async fn load_batch(
+        &self, 
+        _digests: Vec<Digest>, 
+        _destination: &mut dyn BatchLoadDestination) -> Result<HashMap<Digest, Result<bool, String>>, String> {
         Err("load_batch not implemented for remote opendal provider".to_string())
     }
 }

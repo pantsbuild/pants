@@ -10,7 +10,7 @@ use futures::Future;
 use hashing::Digest;
 use log::Level;
 use remote_provider::{
-    ByteStoreProvider, LoadDestination, RemoteStoreOptions, choose_byte_store_provider,
+    ByteStoreProvider, LoadDestination, BatchLoadDestination, RemoteStoreOptions, choose_byte_store_provider,
 };
 use tokio::fs::File;
 use workunit_store::{Metric, ObservationMetric, in_workunit};
@@ -159,7 +159,12 @@ impl ByteStore {
         Ok(result.map(Bytes::from))
     }
 
-    pub async fn load_bytes_batch(&self, digests: Vec<Digest>) -> Result<HashMap<Digest, Result<Bytes, String>>, String> {
+    pub async fn load_bytes_batch(
+        &self, 
+        digests: Vec<Digest>,
+        destination: &mut dyn BatchLoadDestination
+    ) -> Result<HashMap<Digest, Result<bool, String>>, String> 
+    {
         let start = Instant::now();
         let workunit_desc = format!(
             "Loading batch at {} of {} digets ({} bytes)",
@@ -167,14 +172,14 @@ impl ByteStore {
             digests.len(),
             digests.iter().map(|d| d.size_bytes).sum::<usize>()
         );
-
+        
         in_workunit!(
             "load_bytes_batch",
             Level::Trace,
             desc = Some(workunit_desc),
             |workunit| async move {
                 workunit.increment_counter(Metric::RemoteStoreReadAttempts, 1);
-                let result = self.provider.load_batch(digests).await;
+                let result = self.provider.load_batch(digests, destination).await;
 
                 workunit.record_observation(
                     ObservationMetric::RemoteStoreReadBlobTimeMicros,
@@ -183,19 +188,19 @@ impl ByteStore {
 
                 match result {
                     Ok(vec) => {
-                        let total_bytes = vec.iter().map(|d| d.1.as_ref().map_or(0, |b| b.len())).sum::<usize>();
-                        workunit.record_observation(
-                            ObservationMetric::RemoteStoreBlobBytesDownloaded,
-                            total_bytes as u64,
-                        );
-                        workunit.increment_counter(Metric::RemoteStoreReadCached, 1);
+                        // let total_bytes = vec.iter().map(|d| d.1.as_ref().map_or(0, |b| b.len())).sum::<usize>();
+                        // workunit.record_observation(
+                        //     ObservationMetric::RemoteStoreBlobBytesDownloaded,
+                        //     total_bytes as u64,
+                        // );
+                        // workunit.increment_counter(Metric::RemoteStoreReadCached, 1);
                         Ok(vec)
                     }
                     // TODO: Chris we need to loop over every digest and count the number of hits/misses
                     // Ok(false) => Metric::RemoteStoreReadUncached,
-                    Err(_) => {
+                    Err(e) => {
                         workunit.increment_counter(Metric::RemoteStoreReadErrors, 1);
-                        Err("Error loading batch".to_string())
+                        Err(e)
                     }
                 }
             },

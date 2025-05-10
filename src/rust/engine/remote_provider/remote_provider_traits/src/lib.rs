@@ -64,7 +64,10 @@ pub trait ByteStoreProvider: Sync + Send + 'static {
         destination: &mut dyn LoadDestination,
     ) -> Result<bool, String>;
 
-    async fn load_batch(&self, digests: Vec<Digest>) -> Result<HashMap<Digest, Result<Bytes, String>>, String>;
+    async fn load_batch(&self, 
+        digests: Vec<Digest>,
+        destination: &mut dyn BatchLoadDestination,
+    ) -> Result<HashMap<Digest, Result<bool, String>>, String>;
 
     fn batch_load_supported(&self) -> bool;
 
@@ -99,6 +102,11 @@ impl LoadDestination for Vec<u8> {
         self.clear();
         Ok(())
     }
+}
+
+#[async_trait]
+pub trait BatchLoadDestination: Send + Sync + Unpin + 'static {
+    async fn write(&mut self, digests: Vec<(Digest, Bytes)>) -> Result<(), String>;
 }
 
 /// This `ActionCacheProvider` trait captures the operations required to be able to cache command

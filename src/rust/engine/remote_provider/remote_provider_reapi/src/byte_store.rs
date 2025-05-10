@@ -29,7 +29,7 @@ use tokio::sync::Mutex;
 use tonic::{Code, Request, Status};
 use workunit_store::{Metric, ObservationMetric};
 
-use remote_provider_traits::{ByteStoreProvider, LoadDestination, RemoteStoreOptions};
+use remote_provider_traits::{BatchLoadDestination, ByteStoreProvider, LoadDestination, RemoteStoreOptions};
 
 const RPC_DIGEST_SIZE: usize = 78;
 
@@ -249,6 +249,36 @@ impl Provider {
             .get_or_try_init(capabilities_fut)
             .await
     }
+
+    fn validate_batch_response(digests: Vec<Digest>, response: remexec::BatchReadBlobsResponse) -> Result<Vec<(Digest, Bytes)>, String> {
+        let mut expected = digests.into_iter().collect::<HashSet<Digest>>();
+        let mut results = Vec::new();
+        
+        for r in response.responses {
+            if let Some(digest) = r.digest {
+                let digest = digest.try_into().unwrap();
+                let status = r.status.as_ref().map_or(-1, |s| s.code);
+
+                if status == rpc::Code::Ok as i32 {
+                    results.push((digest, r.data.clone()));
+                } else {
+                    let status_str = r.status.as_ref().map_or("unknown".to_string(), |s| s.message.clone());
+                    return Err(format!("Batch read of digest {:?} returned status {:?}: {:?}", digest, status, status_str));
+                }
+            
+                if !expected.contains(&digest) {
+                    return Err(format!("Batch read returned unexpected digest {:?} in batch response", digest));
+                }
+                expected.remove(&digest);
+            }
+        }
+
+        if !expected.is_empty() {
+            return Err(format!("Batch read missing digests: {:?}", expected));
+        }
+
+        Ok(results)
+    }
 }
 
 #[async_trait]
@@ -397,39 +427,75 @@ impl ByteStoreProvider for Provider {
         self.batch_load_enabled
     }
 
-    async fn load_batch(&self, digests: Vec<Digest>) -> Result<HashMap<Digest, Result<Bytes, String>>, String> {
-        let bazel_digests = digests.iter().map(|d| d.into()).collect::<Vec<_>>();
-        let request = remexec::BatchReadBlobsRequest {
-            instance_name: self.instance_name.as_ref().cloned().unwrap_or_default(),
-            digests: bazel_digests,
-            acceptable_compressors: vec![],
-        };
-        let mut client = self.cas_client.as_ref().clone();
-        let response = client
-            .batch_read_blobs(request)
-            .await
-            .map_err(|e| e.to_string())?;
-        let response = response.into_inner();
+    async fn load_batch(
+        &self, 
+        digests: Vec<Digest>,
+        destination: &mut dyn BatchLoadDestination
+    ) -> Result<HashMap<Digest, Result<bool, String>>, String> {
 
-        let mut results = HashMap::with_capacity(digests.len());
-        digests.iter().for_each(|d| {
-            results.insert(d.clone(), Err("Missing digest".to_string()));
-        });
-        
-        for r in response.responses.iter() {
-            if let Some(digest) = r.digest.as_ref() {
-                let digest = digest.try_into().unwrap();
-                let status = r.status.as_ref().map_or(-1, |s| s.code);
+        let mut chunks: Vec<Vec<Digest>> = Vec::new();
+        let mut current_chunk: Vec<Digest> = Vec::new();
+        let mut current_size = 0;
 
-                if status == rpc::Code::Ok as i32 {
-                    results.insert(digest, Ok(r.data.clone()));
-                } else {
-                    let status_str = r.status.as_ref().map_or("unknown".to_string(), |s| s.message.clone());
-                    results.insert(digest, Err(format!("{:?}: {:?}", status, status_str)));
-                }
+        for digest in digests.iter() {
+            if current_size + digest.size_bytes >= 3000000 {
+                chunks.push(std::mem::take(&mut current_chunk));
+                current_size = 0;
             }
+            current_chunk.push(digest.clone());
+            current_size += digest.size_bytes;
         }
-        Ok(results)
+
+        if !current_chunk.is_empty() {
+            chunks.push(current_chunk);
+        }
+
+        let client = self.cas_client.as_ref();
+        let destination = Arc::new(Mutex::new(destination));
+        
+        let futures = chunks.into_iter().map(|chunk| {
+                let digests = chunk.iter().map(|d| d.into()).collect::<Vec<remexec::Digest>>();
+                let request = remexec::BatchReadBlobsRequest {
+                    instance_name: self.instance_name.as_ref().cloned().unwrap_or_default(),
+                    digests: digests,
+                    acceptable_compressors: vec![],
+                };
+
+                let client = client.clone();
+                let destination = destination.clone();
+                
+                retry_call(
+                    client,
+                    move |mut client, _| {
+                        let request = request.clone();
+                        let chunk = chunk.clone();
+                        let destination = destination.clone();
+
+                        async move { 
+                            let response = client.batch_read_blobs(request).await?;
+                            let responses = Provider::validate_batch_response(chunk, response.into_inner())
+                                .map_err(|e| Status::unknown(e))?;
+                            
+                            destination.lock().await.write(responses.clone()).await.map_err(|e| Status::unknown(e))?;
+                            Ok(responses.into_iter().map(|(d, _)| d).collect::<Vec<_>>())
+                        }
+                    },
+                    status_is_retryable,
+                )
+        }).collect::<Vec<_>>();
+        
+        let result = futures::future::join_all(futures)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(status_to_str)?;
+
+        let responses = result
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
+
+        Ok(responses.into_iter().map(|d| (d, Ok(true))).collect::<HashMap<_, _>>())
     }
 
     async fn list_missing_digests(
