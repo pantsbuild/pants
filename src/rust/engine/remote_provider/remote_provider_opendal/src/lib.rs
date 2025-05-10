@@ -1,7 +1,7 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 use async_trait::async_trait;
@@ -299,7 +299,7 @@ impl ByteStoreProvider for Provider {
         false
     }
 
-    async fn load_batch(&self, _digests: Vec<Digest>) -> Result<Vec<Bytes>, String> {
+    async fn load_batch(&self, _digests: Vec<Digest>) -> Result<HashMap<Digest, Result<Bytes, String>>, String> {
         Err("load_batch not implemented for remote opendal provider".to_string())
     }
 }

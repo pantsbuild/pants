@@ -384,7 +384,7 @@ impl ByteStoreProvider for TestProvider {
         }
     }
 
-    async fn load_batch(&self, digests: Vec<Digest>) -> Result<Vec<Bytes>, String> {
+    async fn load_batch(&self, digests: Vec<Digest>) -> Result<HashMap<Digest, Result<Bytes, String>>, String> {
         let mut results = Vec::new();
         for digest in digests {
             let mut destination = Vec::with_capacity(digest.size_bytes);
@@ -428,7 +428,7 @@ impl ByteStoreProvider for AlwaysErrorProvider {
         Err("AlwaysErrorProvider always fails".to_owned())
     }
 
-    async fn load_batch(&self, _: Vec<Digest>) -> Result<Vec<Bytes>, String> {
+    async fn load_batch(&self, _: Vec<Digest>) -> Result<HashMap<Digest, Result<Bytes, String>>, String> {
         Err("AlwaysErrorProvider always fails".to_owned())
     }
 

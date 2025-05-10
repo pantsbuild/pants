@@ -324,16 +324,18 @@ impl RemoteStore {
             let remote_store = self.store.clone();
 
             batch_futures.push(async move {
-                let bytes = remote_store
+                let response = remote_store
                     .load_bytes_batch(chunk.clone())
                     .await
                     .map_err(|e| StoreError::Unclassified(e.to_string()))?;
 
-                let digest_bytes = chunk
-                    .into_iter()
-                    .map(|d| d.hash)
-                    .zip(bytes.into_iter())
-                    .collect::<Vec<_>>();
+                let mut digest_bytes = Vec::with_capacity(response.len());
+                for (digest, bytes) in response.iter() {
+                    match bytes {
+                        Ok(bytes) => digest_bytes.push((digest.hash, bytes.clone())),
+                        Err(e) => return Err(StoreError::MissingDigest(format!("Failed to load digest: {:?} {:?}", digest, e), digest.clone())),
+                    }
+                }
 
                 local_store
                     .store_bytes_batch(EntryType::File, digest_bytes, true)
