@@ -10,7 +10,8 @@ use futures::Future;
 use hashing::Digest;
 use log::Level;
 use remote_provider::{
-    ByteStoreProvider, LoadDestination, BatchLoadDestination, RemoteStoreOptions, choose_byte_store_provider,
+    BatchLoadDestination, ByteStoreProvider, LoadDestination, RemoteStoreOptions,
+    choose_byte_store_provider,
 };
 use tokio::fs::File;
 use workunit_store::{Metric, ObservationMetric, in_workunit};
@@ -160,11 +161,10 @@ impl ByteStore {
     }
 
     pub async fn load_bytes_batch(
-        &self, 
+        &self,
         digests: Vec<Digest>,
-        destination: &mut dyn BatchLoadDestination
-    ) -> Result<HashMap<Digest, Result<bool, String>>, String> 
-    {
+        destination: &mut dyn BatchLoadDestination,
+    ) -> Result<HashMap<Digest, Result<bool, String>>, String> {
         let start = Instant::now();
         let workunit_desc = format!(
             "Loading batch at {} of {} digets ({} bytes)",
@@ -172,7 +172,7 @@ impl ByteStore {
             digests.len(),
             digests.iter().map(|d| d.size_bytes).sum::<usize>()
         );
-        
+
         in_workunit!(
             "load_bytes_batch",
             Level::Trace,
