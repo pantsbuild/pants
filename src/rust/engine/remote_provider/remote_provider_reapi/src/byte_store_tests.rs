@@ -13,7 +13,9 @@ use testutil::file::mk_tempfile;
 use tokio::fs::File;
 use workunit_store::WorkunitStore;
 
-use remote_provider_traits::{BatchLoadDestination, ByteStoreProvider, RemoteProvider, RemoteStoreOptions};
+use remote_provider_traits::{
+    BatchLoadDestination, ByteStoreProvider, RemoteProvider, RemoteStoreOptions,
+};
 
 use crate::byte_store::Provider;
 
@@ -162,13 +164,17 @@ async fn load_bytes_batch_existing() {
     let cas = StubCAS::builder()
         .file(&TestData::roland())
         .file(&TestData::catnip())
-        .build().await;
+        .build()
+        .await;
 
     let provider = new_provider(&cas).await;
-    let mut destination = TestLocalStore{};
-    
+    let mut destination = TestLocalStore {};
+
     let digests = vec![TestData::roland().digest(), TestData::catnip().digest()];
-    let results = provider.load_batch(digests, &mut destination).await.unwrap();
+    let results = provider
+        .load_batch(digests, &mut destination)
+        .await
+        .unwrap();
     assert_eq!(results.len(), 2);
     assert_eq!(results[&TestData::roland().digest()], Ok(true));
     assert_eq!(results[&TestData::catnip().digest()], Ok(true));
@@ -177,18 +183,21 @@ async fn load_bytes_batch_existing() {
 #[tokio::test]
 async fn load_bytes_batch_missing() {
     let _ = WorkunitStore::setup_for_tests();
-    let cas = StubCAS::builder()
-        .file(&TestData::roland())
-        .build().await;
-    
-    let provider = new_provider(&cas).await;
-    let mut destination = TestLocalStore{};
-    
-    let digests = vec![TestData::roland().digest(), TestData::catnip().digest()];
-    let results = provider.load_batch(digests, &mut destination).await.unwrap_err();
-    assert_eq!(results, "Unknown: \"Batch read of digest Digest { hash: Fingerprint<eb1b94cfd6971df4a73991580e1664cfbd8d830c5bd784e92ead3d7de9a9c874>, size_bytes: 6 } returned status 5: \\\"\\\"\"");
-}
+    let cas = StubCAS::builder().file(&TestData::roland()).build().await;
 
+    let provider = new_provider(&cas).await;
+    let mut destination = TestLocalStore {};
+
+    let digests = vec![TestData::roland().digest(), TestData::catnip().digest()];
+    let results = provider
+        .load_batch(digests, &mut destination)
+        .await
+        .unwrap_err();
+    assert_eq!(
+        results,
+        "Unknown: \"Batch read of digest Digest { hash: Fingerprint<eb1b94cfd6971df4a73991580e1664cfbd8d830c5bd784e92ead3d7de9a9c874>, size_bytes: 6 } returned status 5: \\\"\\\"\""
+    );
+}
 
 fn assert_cas_store(cas: &StubCAS, testdata: &TestData, chunks: usize, chunk_size: usize) {
     let blobs = cas.blobs.lock();
