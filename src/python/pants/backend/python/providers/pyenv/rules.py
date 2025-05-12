@@ -238,13 +238,14 @@ async def get_python(
 
     # Find the highest patch version given the major/minor version that is known to our version of pyenv.
     pyenv_latest_known_result = await fallible_to_exec_result_or_raise(
-        Process(
-            [pyenv.exe, "latest", "--known", major_minor_to_use_str],
-            input_digest=pyenv.digest,
-            description=f"Choose specific version for Python {major_minor_to_use_str}",
-            env={"PATH": env_vars.get("PATH", "")},
+        **implicitly(
+            Process(
+                [pyenv.exe, "latest", "--known", major_minor_to_use_str],
+                input_digest=pyenv.digest,
+                description=f"Choose specific version for Python {major_minor_to_use_str}",
+                env={"PATH": env_vars.get("PATH", "")},
+            )
         ),
-        **implicitly(),
     )
     major_to_use, minor_to_use, latest_known_patch = _major_minor_patch_to_int(
         pyenv_latest_known_result.stdout.decode().strip()
@@ -285,19 +286,20 @@ async def get_python(
     #   modules. Therefore caching the compiled Python is somewhat unsafe (especially for a remote
     #   cache). See also https://github.com/pantsbuild/pants/issues/10769.
     result = await fallible_to_exec_result_or_raise(
-        Process(
-            pyenv_install.args + (major_minor_patch_to_use_str,),
-            level=LogLevel.DEBUG,
-            input_digest=pyenv_install.digest,
-            description=f"Install Python {major_minor_patch_to_use_str}",
-            append_only_caches=pyenv_install.append_only_caches,
-            env=pyenv_install.extra_env,
-            # Don't cache, we want this to always be run so that we can assume for the rest of the
-            # session the named_cache destination for this Python is valid, as the Python ecosystem
-            # mainly assumes absolute paths for Python interpreters.
-            cache_scope=ProcessCacheScope.PER_SESSION,
+        **implicitly(
+            Process(
+                pyenv_install.args + (major_minor_patch_to_use_str,),
+                level=LogLevel.DEBUG,
+                input_digest=pyenv_install.digest,
+                description=f"Install Python {major_minor_patch_to_use_str}",
+                append_only_caches=pyenv_install.append_only_caches,
+                env=pyenv_install.extra_env,
+                # Don't cache, we want this to always be run so that we can assume for the rest of the
+                # session the named_cache destination for this Python is valid, as the Python ecosystem
+                # mainly assumes absolute paths for Python interpreters.
+                cache_scope=ProcessCacheScope.PER_SESSION,
+            )
         ),
-        **implicitly(),
     )
 
     return PythonExecutable(
