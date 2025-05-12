@@ -32,6 +32,8 @@ use workunit_store::{Metric, ObservationMetric};
 use remote_provider_traits::{BatchLoadDestination, ByteStoreProvider, LoadDestination, RemoteStoreOptions};
 
 const RPC_DIGEST_SIZE: usize = 78;
+const RPC_RESPONSE_PER_ITEM_SIZE: usize = 88;
+const DEFAULT_MAX_GRPC_MESSAGE_SIZE: usize = 4 * 1024 * 1024;
 
 pub struct Provider {
     instance_name: Option<String>,
@@ -432,18 +434,40 @@ impl ByteStoreProvider for Provider {
         digests: Vec<Digest>,
         destination: &mut dyn BatchLoadDestination
     ) -> Result<HashMap<Digest, Result<bool, String>>, String> {
+        let mut max_batch_total_size_bytes = {
+            let capabilities = self.get_capabilities().await.map_err(|e| e.to_string())?;
+
+            capabilities
+                .cache_capabilities
+                .as_ref()
+                .map(|c| c.max_batch_total_size_bytes as usize)
+                .unwrap_or_default()
+        };
+        if max_batch_total_size_bytes == 0 || self.batch_api_size_limit < max_batch_total_size_bytes {
+            max_batch_total_size_bytes = self.batch_api_size_limit;
+        }
+        if max_batch_total_size_bytes == 0 {
+            max_batch_total_size_bytes = DEFAULT_MAX_GRPC_MESSAGE_SIZE;
+        }
+        max_batch_total_size_bytes = max_batch_total_size_bytes - self
+            .instance_name
+            .as_ref()
+            .cloned()
+            .unwrap_or_default()
+            .len() - 10;
 
         let mut chunks: Vec<Vec<Digest>> = Vec::new();
         let mut current_chunk: Vec<Digest> = Vec::new();
         let mut current_size = 0;
 
         for digest in digests.iter() {
-            if current_size + digest.size_bytes >= 3000000 {
+            let message_size = digest.size_bytes + RPC_RESPONSE_PER_ITEM_SIZE;
+            if current_size + message_size >= max_batch_total_size_bytes {
                 chunks.push(std::mem::take(&mut current_chunk));
                 current_size = 0;
             }
             current_chunk.push(digest.clone());
-            current_size += digest.size_bytes;
+            current_size += message_size;
         }
 
         if !current_chunk.is_empty() {
@@ -575,9 +599,11 @@ impl ByteStoreProvider for Provider {
 mod tests {
 
     use super::RPC_DIGEST_SIZE;
+    use super::RPC_RESPONSE_PER_ITEM_SIZE;
     use crate::remexec::FindMissingBlobsRequest;
     use prost::Message;
     use protos::gen::build::bazel::remote::execution::v2;
+    use protos::r#gen::google::rpc;
     use testutil::data::TestData;
 
     #[test]
@@ -614,6 +640,72 @@ mod tests {
         };
         assert_eq!(max_request.encoded_len(), 78);
     }
+
+    #[test]
+    fn test_variable_size_of_batch_read_blobs_response() {
+
+        fn ok(digest: v2::Digest, data: bytes::Bytes) -> v2::batch_read_blobs_response::Response {
+            v2::batch_read_blobs_response::Response {
+                digest: Some(digest),
+                data,
+                status: Some(rpc::Status {
+                    code: rpc::Code::Ok as i32,
+                    message: "".to_string(),
+                    details: vec![],
+                }),
+                compressor: v2::compressor::Value::Identity as i32,
+            }
+        }
+        
+        let catnip = v2::Digest {
+            hash: TestData::catnip().digest().hash.to_string(),
+            size_bytes: TestData::catnip().digest().size_bytes as i64,
+        };
+
+        let small_request = v2::BatchReadBlobsResponse {
+            responses: vec![ok(catnip.clone(), TestData::catnip().bytes())],
+        };
+        assert_eq!(small_request.encoded_len() as i64 - catnip.size_bytes, 76);
+
+        let two_small_request = v2::BatchReadBlobsResponse {
+            responses: vec![
+                ok(catnip.clone(), TestData::catnip().bytes()),
+                ok(catnip.clone(), TestData::catnip().bytes())
+            ],
+        };
+        assert_eq!(two_small_request.encoded_len() as i64 - catnip.size_bytes * 2, 76*2);
+
+        let all_the_henries = v2::Digest {
+            hash: TestData::all_the_henries().digest().hash.to_string(),
+            size_bytes: TestData::all_the_henries().digest().size_bytes as i64,
+        };
+        let medium_request = v2::BatchReadBlobsResponse {
+            responses: vec![ok(all_the_henries.clone(), TestData::all_the_henries().bytes())],
+        };
+        assert_eq!(medium_request.encoded_len() as i64 - all_the_henries.size_bytes, 82);
+
+        let two_medium_request = v2::BatchReadBlobsResponse {
+            responses: vec![
+                ok(all_the_henries.clone(), TestData::all_the_henries().bytes()),
+                ok(all_the_henries.clone(), TestData::all_the_henries().bytes())
+            ],
+        };
+        assert_eq!(two_medium_request.encoded_len() as i64 - all_the_henries.size_bytes * 2, 82*2);
+
+
+        let input_data = "a".repeat(i32::MAX as usize);
+        let big_blob = TestData::new(&input_data).digest();
+        
+        let large_blob = v2::Digest {
+            hash: big_blob.hash.to_string(),
+            size_bytes: input_data.len() as i64,
+        };
+        let large_request = v2::BatchReadBlobsResponse {
+            responses: vec![ok(large_blob.clone(), TestData::new(&input_data).bytes())],
+        };
+        assert_eq!(large_request.encoded_len() as i64 - large_blob.size_bytes, RPC_RESPONSE_PER_ITEM_SIZE as i64);
+    }
+
 
     #[test]
     fn test_size_of_find_missing_blobs_request() {
