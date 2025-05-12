@@ -64,7 +64,8 @@ pub trait ByteStoreProvider: Sync + Send + 'static {
         destination: &mut dyn LoadDestination,
     ) -> Result<bool, String>;
 
-    async fn load_batch(&self, 
+    async fn load_batch(
+        &self,
         digests: Vec<Digest>,
         destination: &mut dyn BatchLoadDestination,
     ) -> Result<HashMap<Digest, Result<bool, String>>, String>;

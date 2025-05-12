@@ -8,7 +8,9 @@ use bytes::Bytes;
 use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
-use remote_provider::{BatchLoadDestination, ByteStoreProvider, LoadDestination, RemoteProvider, RemoteStoreOptions};
+use remote_provider::{
+    BatchLoadDestination, ByteStoreProvider, LoadDestination, RemoteProvider, RemoteStoreOptions,
+};
 use tempfile::TempDir;
 use testutil::data::TestData;
 use testutil::file::mk_tempfile;
@@ -155,11 +157,15 @@ async fn load_bytes_provider_error() {
 #[tokio::test]
 async fn load_bytes_batch_existing() {
     let _ = WorkunitStore::setup_for_tests();
-    let store = new_byte_store_with_blobs(&[TestData::roland().bytes(), TestData::catnip().bytes()]);
-    
-    let mut destination = TestLocalStore{};
+    let store =
+        new_byte_store_with_blobs(&[TestData::roland().bytes(), TestData::catnip().bytes()]);
+
+    let mut destination = TestLocalStore {};
     let digests = vec![TestData::roland().digest(), TestData::catnip().digest()];
-    let results = store.load_bytes_batch(digests, &mut destination).await.unwrap();
+    let results = store
+        .load_bytes_batch(digests, &mut destination)
+        .await
+        .unwrap();
     assert_eq!(results.len(), 2);
     assert_eq!(results[&TestData::roland().digest()], Ok(true));
     assert_eq!(results[&TestData::catnip().digest()], Ok(true));
@@ -169,11 +175,17 @@ async fn load_bytes_batch_existing() {
 async fn load_bytes_batch_missing() {
     let _ = WorkunitStore::setup_for_tests();
     let store = new_byte_store_with_blobs(&[TestData::roland().bytes()]);
-    let mut destination = TestLocalStore{};
+    let mut destination = TestLocalStore {};
 
     let digests = vec![TestData::roland().digest(), TestData::catnip().digest()];
-    let results = store.load_bytes_batch(digests, &mut destination).await.unwrap_err();
-    assert_eq!(results, "Batch read of digest Digest { hash: Fingerprint<eb1b94cfd6971df4a73991580e1664cfbd8d830c5bd784e92ead3d7de9a9c874>, size_bytes: 6 } returned status \"Not found\"");
+    let results = store
+        .load_bytes_batch(digests, &mut destination)
+        .await
+        .unwrap_err();
+    assert_eq!(
+        results,
+        "Batch read of digest Digest { hash: Fingerprint<eb1b94cfd6971df4a73991580e1664cfbd8d830c5bd784e92ead3d7de9a9c874>, size_bytes: 6 } returned status \"Not found\""
+    );
 }
 
 #[tokio::test]
@@ -340,7 +352,6 @@ fn new_byte_store_with_blobs(blobs: &[Bytes]) -> ByteStore {
     ByteStore::new(None, provider)
 }
 
-
 fn empty_byte_store() -> (ByteStore, Arc<TestProvider>) {
     let provider = TestProvider::new();
     (ByteStore::new(None, provider.clone()), provider)
@@ -417,11 +428,11 @@ impl ByteStoreProvider for TestProvider {
         }
     }
 
-    async fn load_batch(&self, 
+    async fn load_batch(
+        &self,
         digests: Vec<Digest>,
         destination: &mut dyn BatchLoadDestination,
-    ) -> Result<HashMap<Digest, Result<bool, String>>, String>
-    {
+    ) -> Result<HashMap<Digest, Result<bool, String>>, String> {
         let mut results = HashMap::new();
         let mut digests_to_write = Vec::new();
         for digest in digests {
@@ -430,7 +441,10 @@ impl ByteStoreProvider for TestProvider {
                 digests_to_write.push((digest, bytes));
                 results.insert(digest, Ok(true));
             } else {
-                return Err(format!("Batch read of digest {:?} returned status {:?}", digest, "Not found"));
+                return Err(format!(
+                    "Batch read of digest {:?} returned status {:?}",
+                    digest, "Not found"
+                ));
             }
         }
         destination.write(digests_to_write).await?;
@@ -470,7 +484,11 @@ impl ByteStoreProvider for AlwaysErrorProvider {
         Err("AlwaysErrorProvider always fails".to_owned())
     }
 
-    async fn load_batch(&self, _: Vec<Digest>, _: &mut dyn BatchLoadDestination) -> Result<HashMap<Digest, Result<bool, String>>, String> {
+    async fn load_batch(
+        &self,
+        _: Vec<Digest>,
+        _: &mut dyn BatchLoadDestination,
+    ) -> Result<HashMap<Digest, Result<bool, String>>, String> {
         Err("AlwaysErrorProvider always fails".to_owned())
     }
 

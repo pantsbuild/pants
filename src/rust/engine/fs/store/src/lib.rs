@@ -42,6 +42,7 @@ use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 use remexec::Tree;
+use remote_provider::BatchLoadDestination;
 use serde_derive::Serialize;
 use sharded_lmdb::DEFAULT_LEASE_TIME;
 #[cfg(target_os = "macos")]
@@ -51,7 +52,6 @@ use tokio::fs::hard_link;
 use tokio::fs::symlink;
 use tryfuture::try_future;
 use workunit_store::{Level, Metric, in_workunit};
-use remote_provider::BatchLoadDestination;
 
 const KILOBYTES: usize = 1024;
 const MEGABYTES: usize = 1024 * KILOBYTES;
@@ -280,7 +280,6 @@ impl RemoteStore {
         local_store: local::ByteStore,
         digests: Vec<Digest>,
     ) -> Result<(), StoreError> {
-        
         let (large_files, small_files): (Vec<Digest>, Vec<Digest>) = digests
             .into_iter()
             .partition(|d| ByteStore::should_use_fsdb(EntryType::File, d.size_bytes));
@@ -302,15 +301,13 @@ impl RemoteStore {
         let mut local_store = local_store.clone();
         let small_file_future = async move {
             self.store
-            .load_bytes_batch(small_files, &mut local_store)
-            .await
-            .map_err(|e| StoreError::Unclassified(e.to_string()))
+                .load_bytes_batch(small_files, &mut local_store)
+                .await
+                .map_err(|e| StoreError::Unclassified(e.to_string()))
         };
 
-        let _ = future::try_join(
-            small_file_future,
-            future::try_join_all(large_file_futures)
-        ).await?;
+        let _ =
+            future::try_join(small_file_future, future::try_join_all(large_file_futures)).await?;
 
         Ok(())
     }
@@ -1707,10 +1704,9 @@ impl SnapshotOps for Store {
 
 #[async_trait]
 impl BatchLoadDestination for local::ByteStore {
-    
-    async fn write(&mut self, digests: Vec<(Digest, Bytes)>) -> Result<(), String>
-    {   
-        let items = digests.into_iter()
+    async fn write(&mut self, digests: Vec<(Digest, Bytes)>) -> Result<(), String> {
+        let items = digests
+            .into_iter()
             .map(|(digest, bytes)| (digest.hash, bytes))
             .collect::<Vec<_>>();
 
