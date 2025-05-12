@@ -11,6 +11,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 from pants.backend.docker.package_types import BuiltDockerImage
+from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo, DockerfileInfoRequest
 from pants.backend.docker.target_types import DockerImageSourceField
 from pants.backend.docker.util_rules.docker_build_args import (
@@ -114,6 +115,7 @@ class DockerBuildContext:
         build_env: DockerBuildEnvironment,
         upstream_image_ids: Iterable[str],
         dockerfile_info: DockerfileInfo,
+        should_suggest_renames: bool = True,
     ) -> DockerBuildContext:
         interpolation_context: dict[str, dict[str, str] | InterpolationValue] = {}
 
@@ -139,14 +141,8 @@ class DockerBuildContext:
         )
         interpolation_context["tags"] = tags_values
 
-        return cls(
-            build_args=build_args,
-            digest=snapshot.digest,
-            dockerfile=dockerfile_info.source,
-            build_env=build_env,
-            upstream_image_ids=tuple(sorted(upstream_image_ids)),
-            interpolation_context=InterpolationContext.from_dict(interpolation_context),
-            copy_source_vs_context_source=tuple(
+        copy_source_vs_context_source = (
+            tuple(
                 suggest_renames(
                     tentative_paths=(
                         # We don't want to include the Dockerfile as a suggested rename
@@ -156,7 +152,19 @@ class DockerBuildContext:
                     actual_files=snapshot.files,
                     actual_dirs=snapshot.dirs,
                 )
-            ),
+            )
+            if should_suggest_renames
+            else ()
+        )
+
+        return cls(
+            build_args=build_args,
+            digest=snapshot.digest,
+            dockerfile=dockerfile_info.source,
+            build_env=build_env,
+            upstream_image_ids=tuple(sorted(upstream_image_ids)),
+            interpolation_context=InterpolationContext.from_dict(interpolation_context),
+            copy_source_vs_context_source=copy_source_vs_context_source,
             stages=tuple(sorted(stage_names)),
         )
 
@@ -241,7 +249,10 @@ class DockerBuildContext:
 
 
 @rule
-async def create_docker_build_context(request: DockerBuildContextRequest) -> DockerBuildContext:
+async def create_docker_build_context(
+    request: DockerBuildContextRequest,
+    options: DockerOptions,
+) -> DockerBuildContext:
     # Get all targets to include in context.
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([request.address]))
     docker_image = transitive_targets.roots[0]
@@ -387,6 +398,7 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
         upstream_image_ids=upstream_image_ids,
         dockerfile_info=dockerfile_info,
         build_env=build_env,
+        should_suggest_renames=options.suggest_renames,
     )
 
 
