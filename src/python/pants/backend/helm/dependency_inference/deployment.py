@@ -33,11 +33,11 @@ from pants.build_graph.address import MaybeAddress
 from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import FileEntry
-from pants.engine.internals.build_files import resolve_address
+from pants.engine.internals.build_files import maybe_resolve_address, resolve_address
 from pants.engine.internals.graph import determine_explicitly_provided_dependencies
 from pants.engine.internals.native_engine import AddressInput, AddressParseException
 from pants.engine.intrinsics import get_digest_entries
-from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import DependenciesRequest, InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -171,7 +171,7 @@ async def _first_party_helm_deployment_mapping(
         image_ref_to_address_input
     )
     maybe_addresses = await concurrently(
-        Get(MaybeAddress, AddressInput, ai) for _, ai in indexed_address_inputs.values()
+        maybe_resolve_address(ai) for _, ai in indexed_address_inputs.values()
     )
 
     docker_target_addresses = {tgt.address for tgt in docker_targets}

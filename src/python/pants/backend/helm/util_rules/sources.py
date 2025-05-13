@@ -19,11 +19,11 @@ from pants.core.util_rules.source_files import (
     determine_source_files,
 )
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
+from pants.engine.fs import DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.internals.graph import hydrate_sources, resolve_targets
 from pants.engine.internals.native_engine import RemovePrefix
-from pants.engine.intrinsics import digest_to_snapshot
-from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.intrinsics import digest_subset_to_digest, digest_to_snapshot
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import DependenciesRequest, HydrateSourcesRequest, SourcesField, Target
 
 
@@ -128,23 +128,22 @@ async def _strip_chart_source_root(
 
     if source_files.unrooted_files:
         rooted_files = set(source_files.snapshot.files) - set(source_files.unrooted_files)
-        rooted_files_snapshot = await Get(
-            Snapshot, DigestSubset(source_files.snapshot.digest, PathGlobs(rooted_files))
+        rooted_files_snapshot = await digest_to_snapshot(
+            **implicitly(DigestSubset(source_files.snapshot.digest, PathGlobs(rooted_files)))
         )
     else:
         rooted_files_snapshot = source_files.snapshot
 
-    resulting_snapshot = await Get(
-        Snapshot, RemovePrefix(rooted_files_snapshot.digest, chart_root.path)
+    resulting_snapshot = await digest_to_snapshot(
+        **implicitly(RemovePrefix(rooted_files_snapshot.digest, chart_root.path))
     )
     if source_files.unrooted_files:
         # Add unrooted files back in
-        unrooted_digest = await Get(
-            Digest,
+        unrooted_digest = await digest_subset_to_digest(
             DigestSubset(source_files.snapshot.digest, PathGlobs(source_files.unrooted_files)),
         )
-        resulting_snapshot = await Get(
-            Snapshot, MergeDigests([resulting_snapshot.digest, unrooted_digest])
+        resulting_snapshot = await digest_to_snapshot(
+            **implicitly(MergeDigests([resulting_snapshot.digest, unrooted_digest]))
         )
 
     return resulting_snapshot

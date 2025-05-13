@@ -54,7 +54,7 @@ from pants.engine.process import (
     ProcessResult,
     execute_process_or_raise,
 )
-from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize, softwrap
 
@@ -225,11 +225,13 @@ async def _sort_value_file_names_for_evaluation(
     else:
         # Break the list of filenames in subsets that follow the order given in the `sources` field
         subset_snapshots = await concurrently(
-            Get(
-                Snapshot,
-                DigestSubset(
-                    value_files_snapshot.digest, PathGlobs([os.path.join(base_path, glob_pattern)])
-                ),
+            digest_to_snapshot(
+                **implicitly(
+                    DigestSubset(
+                        value_files_snapshot.digest,
+                        PathGlobs([os.path.join(base_path, glob_pattern)]),
+                    )
+                )
             )
             for glob_pattern in sources_field.globs
         )
