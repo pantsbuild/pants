@@ -20,9 +20,9 @@ from pants.backend.scala.bsp.spec import (
     ScalaTestClassesResult,
 )
 from pants.backend.scala.compile.scalac_plugins import (
-    ScalaPlugins,
     ScalaPluginsForTargetRequest,
     ScalaPluginsRequest,
+    fetch_plugins,
     resolve_scala_plugins_for_target,
 )
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
@@ -30,8 +30,8 @@ from pants.backend.scala.subsystems.scalac import Scalac
 from pants.backend.scala.target_types import ScalaFieldSet, ScalaSourceField
 from pants.backend.scala.util_rules.versions import (
     ScalaArtifactsForVersionRequest,
-    ScalaArtifactsForVersionResult,
     ScalaVersion,
+    resolve_scala_artifacts_for_version,
 )
 from pants.base.build_root import BuildRoot
 from pants.bsp.protocol import BSPHandlerMapping
@@ -56,7 +56,7 @@ from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeD
 from pants.engine.internals.graph import coarsened_targets as coarsened_targets_get
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get, concurrently
-from pants.engine.intrinsics import add_prefix, create_digest, merge_digests
+from pants.engine.intrinsics import add_prefix, create_digest, digest_to_snapshot, merge_digests
 from pants.engine.process import Process, execute_process_or_raise
 from pants.engine.rules import _uncacheable_rule, collect_rules, implicitly, rule
 from pants.engine.target import CoarsenedTarget, FieldSet
@@ -73,9 +73,9 @@ from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.resolve.coursier_fetch import (
     CoursierLockfileEntry,
     CoursierResolvedLockfile,
-    ToolClasspath,
     ToolClasspathRequest,
     get_coursier_lockfile_for_resolve,
+    materialize_classpath_for_tool,
     select_coursier_resolve_for_targets,
 )
 from pants.jvm.resolve.key import CoursierResolveKey
@@ -167,12 +167,11 @@ async def collect_thirdparty_modules(
 
 
 async def _materialize_scala_runtime_jars(scala_version: ScalaVersion) -> Snapshot:
-    scala_artifacts = await Get(
-        ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(scala_version)
+    scala_artifacts = await resolve_scala_artifacts_for_version(
+        ScalaArtifactsForVersionRequest(scala_version)
     )
 
-    tool_classpath = await Get(
-        ToolClasspath,
+    tool_classpath = await materialize_classpath_for_tool(
         ToolClasspathRequest(
             artifact_requirements=ArtifactRequirements.from_coordinates(
                 scala_artifacts.all_coordinates
@@ -180,9 +179,8 @@ async def _materialize_scala_runtime_jars(scala_version: ScalaVersion) -> Snapsh
         ),
     )
 
-    return await Get(
-        Snapshot,
-        AddPrefix(tool_classpath.content.digest, f"jvm/scala-runtime/{scala_version}"),
+    return await digest_to_snapshot(
+        **implicitly(AddPrefix(tool_classpath.content.digest, f"jvm/scala-runtime/{scala_version}"))
     )
 
 
@@ -364,8 +362,8 @@ async def handle_bsp_scalac_options_request(
     )
 
     local_plugins_prefix = f"jvm/resolves/{resolve.name}/plugins"
-    local_plugins = await Get(
-        ScalaPlugins, ScalaPluginsRequest.from_target_plugins(scalac_plugin_targets, resolve)
+    local_plugins = await fetch_plugins(
+        ScalaPluginsRequest.from_target_plugins(scalac_plugin_targets, resolve)
     )
 
     thirdparty_modules_prefix = f"jvm/resolves/{resolve.name}/lib"
