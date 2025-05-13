@@ -6,6 +6,7 @@ use std::fmt;
 use std::net::ToSocketAddrs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 
 use async_oncecell::OnceCell;
 use async_trait::async_trait;
@@ -48,6 +49,7 @@ pub(crate) const SANDBOX_BASE_PATH_IN_CONTAINER: &str = "/pants-sandbox";
 pub(crate) const NAMED_CACHES_BASE_PATH_IN_CONTAINER: &str = "/pants-named-caches";
 pub(crate) const IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER: &str = "/pants-immutable-inputs";
 pub(crate) const PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY: &str = "org.pantsbuild.environment";
+pub(crate) const CONTAINER_CLEANUP_TIMEOUT_SECONDS: u64 = 60;
 
 /// Process-wide image pull cache.
 pub static IMAGE_PULL_CACHE: Lazy<ImagePullCache> = Lazy::new(ImagePullCache::new);
@@ -161,9 +163,15 @@ impl DockerOnceCell {
           _ => return Err(format!("Unparseable API version `{}` returned by Docker.", &api_version)),
         }
 
-        if let Err(removal_errors) = Self::remove_old_images(&docker).await {
-            log::warn!("The following errors occurred when attempting to remove old containers:\n\n{}", removal_errors.join("\n\n"));
-        }
+        let cleanup_docker = docker.clone();
+        tokio::spawn(async move {
+            let message = match tokio::time::timeout(Duration::from_secs(CONTAINER_CLEANUP_TIMEOUT_SECONDS), Self::remove_old_images(&cleanup_docker)).await {
+                Ok(Ok(_)) => return,
+                Ok(Err(removal_errors)) => format!("The following errors occurred when attempting to remove old containers:\n\n{}", removal_errors.join("\n\n")),
+                Err(_) => format!("Attempt to clean up old containers timed out after {CONTAINER_CLEANUP_TIMEOUT_SECONDS} seconds"),
+            };
+            log::warn!("{}", message)
+        });
         Ok(docker)
       })
       .await
@@ -618,6 +626,7 @@ impl CapturedWorkdir for CommandRunner<'_> {
             .await
             .map_err(|spawn_err: CommandSpawnError| -> CapturedWorkdirError {
                 match spawn_err.err {
+                    // Rather than trying to handle every possible error code, we just restart the container and retry any DockerResponseServerErrors
                     DockerError::DockerResponseServerError { .. } => {
                         CapturedWorkdirError::Retryable(spawn_err.message)
                     }
@@ -806,6 +815,7 @@ impl Command {
             self.spawn(docker, container_id)
                 .await
                 .map_err(|cse| match cse.err {
+                    // Rather than trying to handle every possible error code, we just restart the container and retry any DockerResponseServerErrors
                     DockerError::DockerResponseServerError { message, .. } => {
                         CapturedWorkdirError::Retryable(message)
                     }
