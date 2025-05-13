@@ -50,23 +50,6 @@ class _BundleOpenApiDocument:
 
 
 @rule
-async def generate_openapi_bundle_sources(
-    request: GenerateOpenApiBundleRequest,
-) -> GeneratedSources:
-    bundle_source_root = request.protocol_target[OpenApiBundleSourceRootField].value
-    openapi_document_targets = await resolve_targets(
-        **implicitly(DependenciesRequest(request.protocol_target[Dependencies]))
-    )
-    bundled_documents_digests = await concurrently(
-        bundle_openapi_document(_BundleOpenApiDocument(tgt, bundle_source_root), **implicitly())
-        for tgt in openapi_document_targets
-        if tgt.has_field(OpenApiDocumentField)
-    )
-    snapshot = await digest_to_snapshot(**implicitly(MergeDigests(bundled_documents_digests)))
-    return GeneratedSources(snapshot)
-
-
-@rule
 async def bundle_openapi_document(request: _BundleOpenApiDocument, redocly: Redocly) -> Digest:
     transitive_targets = await transitive_targets_get(
         TransitiveTargetsRequest([request.target.address]), **implicitly()
@@ -122,6 +105,23 @@ async def bundle_openapi_document(request: _BundleOpenApiDocument, redocly: Redo
         else result.output_digest
     )
     return source_root_restored
+
+
+@rule
+async def generate_openapi_bundle_sources(
+    request: GenerateOpenApiBundleRequest,
+) -> GeneratedSources:
+    bundle_source_root = request.protocol_target[OpenApiBundleSourceRootField].value
+    openapi_document_targets = await resolve_targets(
+        **implicitly(DependenciesRequest(request.protocol_target[Dependencies]))
+    )
+    bundled_documents_digests = await concurrently(
+        bundle_openapi_document(_BundleOpenApiDocument(tgt, bundle_source_root), **implicitly())
+        for tgt in openapi_document_targets
+        if tgt.has_field(OpenApiDocumentField)
+    )
+    snapshot = await digest_to_snapshot(**implicitly(MergeDigests(bundled_documents_digests)))
+    return GeneratedSources(snapshot)
 
 
 def rules():
