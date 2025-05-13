@@ -133,23 +133,6 @@ class _FirstPartyHelmDeploymentMappingRequest(EngineAwareParameter):
 
 
 @rule
-async def first_party_helm_deployment_mapping(
-    request: FirstPartyHelmDeploymentMappingRequest,
-    helm_infer: HelmInferSubsystem,
-) -> FirstPartyHelmDeploymentMapping:
-    if not helm_infer.deployment_dependencies:
-        return FirstPartyHelmDeploymentMapping(
-            request.field_set.address,
-            FrozenYamlIndex.empty(),
-        )
-    # Use a small proxy rule to make sure we don't calculate AllDockerImageTargets
-    # if `[helm-infer].deployment_dependencies` is set to true.
-    return await _first_party_helm_deployment_mapping(
-        _FirstPartyHelmDeploymentMappingRequest(field_set=request.field_set), **implicitly()
-    )
-
-
-@rule
 async def _first_party_helm_deployment_mapping(
     request: _FirstPartyHelmDeploymentMappingRequest,
     docker_targets: AllDockerImageTargets,
@@ -190,6 +173,23 @@ async def _first_party_helm_deployment_mapping(
     return FirstPartyHelmDeploymentMapping(
         address=request.field_set.address,
         indexed_docker_addresses=indexed_docker_addresses,
+    )
+
+
+@rule
+async def first_party_helm_deployment_mapping(
+    request: FirstPartyHelmDeploymentMappingRequest,
+    helm_infer: HelmInferSubsystem,
+) -> FirstPartyHelmDeploymentMapping:
+    if not helm_infer.deployment_dependencies:
+        return FirstPartyHelmDeploymentMapping(
+            request.field_set.address,
+            FrozenYamlIndex.empty(),
+        )
+    # Use a small proxy rule to make sure we don't calculate AllDockerImageTargets
+    # if `[helm-infer].deployment_dependencies` is set to true.
+    return await _first_party_helm_deployment_mapping(
+        _FirstPartyHelmDeploymentMappingRequest(field_set=request.field_set), **implicitly()
     )
 
 
