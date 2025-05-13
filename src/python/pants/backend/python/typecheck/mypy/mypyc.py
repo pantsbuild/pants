@@ -16,9 +16,9 @@ from pants.backend.python.util_rules.package_dists import (
     DistBuildEnvironment,
     DistBuildEnvironmentRequest,
 )
-from pants.backend.python.util_rules.pex import Pex, PexRequest
+from pants.backend.python.util_rules.pex import create_pex
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import BoolField, Target
 from pants.engine.unions import UnionRule
 from pants.util.strutil import help_text
@@ -56,22 +56,21 @@ async def get_mypyc_build_environment(
     mypy_config_file: MyPyConfigFile,
     mypy: MyPy,
 ) -> DistBuildEnvironment:
-    mypy_pex_get = Get(
-        Pex,
-        PexRequest,
+    mypy_pex_get = create_pex(
         mypy.to_pex_request(
             interpreter_constraints=request.interpreter_constraints,
             extra_requirements=first_party_plugins.requirement_strings,
-        ),
+        )
     )
-    requirements_pex_get = Get(
-        Pex,
-        RequirementsPexRequest(
-            addresses=request.target_addresses,
-            hardcoded_interpreter_constraints=request.interpreter_constraints,
-        ),
+    requirements_pex_get = create_pex(
+        **implicitly(
+            RequirementsPexRequest(
+                addresses=request.target_addresses,
+                hardcoded_interpreter_constraints=request.interpreter_constraints,
+            )
+        )
     )
-    mypy_pex, requirements_pex = await MultiGet(mypy_pex_get, requirements_pex_get)
+    mypy_pex, requirements_pex = await concurrently(mypy_pex_get, requirements_pex_get)
     return DistBuildEnvironment(
         extra_build_time_requirements=(mypy_pex, requirements_pex),
         extra_build_time_inputs=mypy_config_file.digest,
