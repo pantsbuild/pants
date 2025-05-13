@@ -56,20 +56,20 @@ async def access_aws_credentials(
         raise
 
     env_vars = await environment_vars_subset(
+        EnvironmentVarsRequest(
+            [
+                "AWS_PROFILE",
+                "AWS_REGION",
+                "AWS_ACCESS_KEY_ID",
+                "AWS_SECRET_ACCESS_KEY",
+                "AWS_SESSION_TOKEN",
+            ]
+        ),
         **implicitly(
             {
-                EnvironmentVarsRequest(
-                    [
-                        "AWS_PROFILE",
-                        "AWS_REGION",
-                        "AWS_ACCESS_KEY_ID",
-                        "AWS_SECRET_ACCESS_KEY",
-                        "AWS_SESSION_TOKEN",
-                    ]
-                ): EnvironmentVarsRequest,
                 local_environment_name.val: EnvironmentName,
             }
-        )
+        ),
     )
 
     session = boto_session.Session()
