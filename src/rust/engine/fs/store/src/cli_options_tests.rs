@@ -23,6 +23,7 @@ fn test_to_cli_args() {
         store_rpc_retries: 1002,
         store_rpc_concurrency: 1004,
         store_batch_api_size_limit: 1005,
+        store_batch_load_enabled: true,
         header: vec!["Header 1".to_string(), "Header 2".to_string()],
     };
 
