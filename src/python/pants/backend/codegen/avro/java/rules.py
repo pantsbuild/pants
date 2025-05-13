@@ -30,14 +30,15 @@ from pants.engine.fs import (
     RemovePrefix,
 )
 from pants.engine.internals.graph import hydrate_sources
-from pants.engine.internals.selectors import Get, concurrently
+from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import (
     create_digest,
     digest_subset_to_digest,
     digest_to_snapshot,
     merge_digests,
+    remove_prefix,
 )
-from pants.engine.process import ProcessResult
+from pants.engine.process import execute_process_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
     FieldSet,
@@ -147,51 +148,55 @@ async def compile_avro_source(
 
     path = PurePath(request.path)
     if path.suffix == ".avsc":
-        result = await Get(
-            ProcessResult,
-            JvmProcess,
-            make_avro_process(["compile", "schema", request.path, output_dir]),
+        result = await execute_process_or_raise(
+            **implicitly(
+                {make_avro_process(["compile", "schema", request.path, output_dir]): JvmProcess}
+            )
         )
     elif path.suffix == ".avpr":
-        result = await Get(
-            ProcessResult,
-            JvmProcess,
-            make_avro_process(["compile", "protocol", request.path, output_dir]),
+        result = await execute_process_or_raise(
+            **implicitly(
+                {make_avro_process(["compile", "protocol", request.path, output_dir]): JvmProcess}
+            )
         )
     elif path.suffix == ".avdl":
         idl_output_dir = "__idl"
         avpr_path = os.path.join(idl_output_dir, str(path.with_suffix(".avpr")))
-        idl_output_dir_digest = await Get(
-            Digest, CreateDigest([Directory(os.path.dirname(avpr_path))])
+        idl_output_dir_digest = await create_digest(
+            CreateDigest([Directory(os.path.dirname(avpr_path))])
         )
-        idl_input_digest = await Get(Digest, MergeDigests([input_digest, idl_output_dir_digest]))
-        idl_result = await Get(
-            ProcessResult,
-            JvmProcess,
-            make_avro_process(
-                ["idl", request.path, avpr_path],
-                overridden_input_digest=idl_input_digest,
-                overridden_output_dir=idl_output_dir,
-            ),
+        idl_input_digest = await merge_digests(MergeDigests([input_digest, idl_output_dir_digest]))
+        idl_result = await execute_process_or_raise(
+            **implicitly(
+                {
+                    make_avro_process(
+                        ["idl", request.path, avpr_path],
+                        overridden_input_digest=idl_input_digest,
+                        overridden_output_dir=idl_output_dir,
+                    ): JvmProcess
+                }
+            )
         )
-        generated_files_dir = await Get(Digest, CreateDigest([Directory(output_dir)]))
-        protocol_input_digest = await Get(
-            Digest, MergeDigests([idl_result.output_digest, generated_files_dir])
+        generated_files_dir = await create_digest(CreateDigest([Directory(output_dir)]))
+        protocol_input_digest = await merge_digests(
+            MergeDigests([idl_result.output_digest, generated_files_dir])
         )
-        result = await Get(
-            ProcessResult,
-            JvmProcess,
-            make_avro_process(
-                ["compile", "protocol", avpr_path, output_dir],
-                overridden_input_digest=protocol_input_digest,
-            ),
+        result = await execute_process_or_raise(
+            **implicitly(
+                {
+                    make_avro_process(
+                        ["compile", "protocol", avpr_path, output_dir],
+                        overridden_input_digest=protocol_input_digest,
+                    ): JvmProcess
+                }
+            )
         )
     else:
         raise AssertionError(
             f"Avro backend does not support files with extension `{path.suffix}`: {path}"
         )
 
-    normalized_digest = await Get(Digest, RemovePrefix(result.output_digest, output_dir))
+    normalized_digest = await remove_prefix(RemovePrefix(result.output_digest, output_dir))
     return CompiledAvroSource(normalized_digest)
 
 
