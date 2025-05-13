@@ -268,6 +268,15 @@ impl Provider {
 
                 if status == rpc::Code::Ok as i32 {
                     results.push((digest, r.data.clone()));
+
+                    let mut hasher = Hasher::new();
+                    hasher.update(&r.data);
+                    let actual_digest = hasher.finish();
+                    if actual_digest != digest {
+                        return Err(format!(
+                            "Batch read Remote CAS gave wrong digest: expected {digest:?}, got {actual_digest:?}"
+                        ));
+                    }
                 } else {
                     let status_str = r
                         .status
