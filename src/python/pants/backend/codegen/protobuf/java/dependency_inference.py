@@ -9,8 +9,7 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufGrpcToggleField,
 )
 from pants.build_graph.address import Address
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference.artifact_mapper import (
@@ -130,14 +129,14 @@ async def infer_protobuf_java_runtime_dependency(
 ) -> InferredDependencies:
     resolve = request.field_set.resolve.normalized_value(jvm)
 
-    protobuf_java_runtime_target_info = await Get(
-        ProtobufJavaRuntimeForResolve, ProtobufJavaRuntimeForResolveRequest(resolve)
+    protobuf_java_runtime_target_info = await resolve_protobuf_java_runtime_for_resolve(
+        **implicitly(ProtobufJavaRuntimeForResolveRequest(resolve))
     )
     addresses: set[Address] = set(protobuf_java_runtime_target_info.addresses)
 
     if request.field_set.grpc.value:
-        grpc_runtime_info = await Get(
-            ProtobufJavaGrpcRuntimeForResolve, ProtobufJavaGrpcRuntimeForResolveRequest(resolve)
+        grpc_runtime_info = await resolve_protobuf_java_grpc_runtime_for_resolve(
+            **implicitly(ProtobufJavaGrpcRuntimeForResolveRequest(resolve))
         )
         addresses.update(grpc_runtime_info.addresses)
 
