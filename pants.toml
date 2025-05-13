@@ -4,6 +4,7 @@ print_stacktrace = true
 # Enable our custom loose-source plugins.
 pythonpath = ["%(buildroot)s/pants-plugins"]
 backend_packages.add = [
+  "pants.backend.experimental.codegen.protobuf.scala",
   "pants.backend.build_files.fix.deprecations",
   "pants.backend.build_files.fmt.ruff",
   "pants.backend.python",
