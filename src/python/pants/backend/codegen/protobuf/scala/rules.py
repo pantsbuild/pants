@@ -110,6 +110,34 @@ class MaterializedJvmPlugins:
         return tuple(p.setup_arg(os.path.join(plugins_relpath, p.name)) for p in self.plugins)
 
 
+@rule
+async def materialize_jvm_plugin(request: MaterializeJvmPluginRequest) -> MaterializedJvmPlugin:
+    requirements = await gather_coordinates_for_jvm_lockfile(
+        GatherJvmCoordinatesRequest(
+            artifact_inputs=FrozenOrderedSet([request.plugin.artifact]),
+            option_name="[scalapb].jvm_plugins",
+        )
+    )
+    classpath = await materialize_classpath_for_tool(
+        ToolClasspathRequest(artifact_requirements=requirements)
+    )
+    return MaterializedJvmPlugin(name=request.plugin.name, classpath=classpath)
+
+
+@rule
+async def materialize_jvm_plugins(
+    request: MaterializeJvmPluginsRequest,
+) -> MaterializedJvmPlugins:
+    materialized_plugins = await concurrently(
+        materialize_jvm_plugin(MaterializeJvmPluginRequest(plugin)) for plugin in request.plugins
+    )
+    plugin_digests = await concurrently(
+        add_prefix(AddPrefix(p.classpath.digest, p.name)) for p in materialized_plugins
+    )
+    merged_plugins_digest = await merge_digests(MergeDigests(plugin_digests))
+    return MaterializedJvmPlugins(merged_plugins_digest, materialized_plugins)
+
+
 @rule(desc="Generate Scala from Protobuf", level=LogLevel.DEBUG)
 async def generate_scala_from_protobuf(
     request: GenerateScalaFromProtobufRequest,
@@ -223,34 +251,6 @@ async def generate_scala_from_protobuf(
         else await digest_to_snapshot(normalized_digest)
     )
     return GeneratedSources(source_root_restored)
-
-
-@rule
-async def materialize_jvm_plugin(request: MaterializeJvmPluginRequest) -> MaterializedJvmPlugin:
-    requirements = await gather_coordinates_for_jvm_lockfile(
-        GatherJvmCoordinatesRequest(
-            artifact_inputs=FrozenOrderedSet([request.plugin.artifact]),
-            option_name="[scalapb].jvm_plugins",
-        )
-    )
-    classpath = await materialize_classpath_for_tool(
-        ToolClasspathRequest(artifact_requirements=requirements)
-    )
-    return MaterializedJvmPlugin(name=request.plugin.name, classpath=classpath)
-
-
-@rule
-async def materialize_jvm_plugins(
-    request: MaterializeJvmPluginsRequest,
-) -> MaterializedJvmPlugins:
-    materialized_plugins = await concurrently(
-        materialize_jvm_plugin(MaterializeJvmPluginRequest(plugin)) for plugin in request.plugins
-    )
-    plugin_digests = await concurrently(
-        add_prefix(AddPrefix(p.classpath.digest, p.name)) for p in materialized_plugins
-    )
-    merged_plugins_digest = await merge_digests(MergeDigests(plugin_digests))
-    return MaterializedJvmPlugins(merged_plugins_digest, materialized_plugins)
 
 
 SHIM_SCALA_VERSION = ScalaVersion.parse("2.13.7")
