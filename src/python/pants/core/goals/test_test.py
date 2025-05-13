@@ -385,11 +385,6 @@ def run_test_rule(
                     input_types=(TestRequest.Batch, EnvironmentName),
                     mock=mock_debug_request,
                 ),
-                MockGet(
-                    output_type=TestDebugAdapterRequest,
-                    input_types=(TestFieldSet,),
-                    mock=mock_debug_adapter_request,
-                ),
                 # Merge XML results.
                 MockGet(
                     output_type=Digest,
@@ -413,6 +408,7 @@ def run_test_rule(
                 ),
             ],
             union_membership=union_membership,
+            warn_on_calls_satisfied_by_gets=False,  # So we don't contaminate the expected output.
         )
         assert not stdio_reader.get_stdout()
         return result.exit_code, stdio_reader.get_stderr()
