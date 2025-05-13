@@ -82,32 +82,6 @@ class CompiledAvroSource:
     output_digest: Digest
 
 
-@rule(desc="Generate Java from Avro", level=LogLevel.DEBUG)
-async def generate_java_from_avro(
-    request: GenerateJavaFromAvroRequest,
-) -> GeneratedSources:
-    sources = await hydrate_sources(
-        HydrateSourcesRequest(request.protocol_target[AvroSourceField]), **implicitly()
-    )
-
-    compile_results = await concurrently(
-        compile_avro_source(CompileAvroSourceRequest(sources.snapshot.digest, path), **implicitly())
-        for path in sources.snapshot.files
-    )
-
-    merged_output_digest, source_root = await concurrently(
-        merge_digests(MergeDigests([r.output_digest for r in compile_results])),
-        get_source_root(SourceRootRequest.for_target(request.protocol_target)),
-    )
-
-    source_root_restored = (
-        await digest_to_snapshot(**implicitly(AddPrefix(merged_output_digest, source_root.path)))
-        if source_root.path != "."
-        else await digest_to_snapshot(merged_output_digest)
-    )
-    return GeneratedSources(source_root_restored)
-
-
 @rule
 async def compile_avro_source(
     request: CompileAvroSourceRequest,
@@ -219,6 +193,32 @@ async def compile_avro_source(
 
     normalized_digest = await Get(Digest, RemovePrefix(result.output_digest, output_dir))
     return CompiledAvroSource(normalized_digest)
+
+
+@rule(desc="Generate Java from Avro", level=LogLevel.DEBUG)
+async def generate_java_from_avro(
+    request: GenerateJavaFromAvroRequest,
+) -> GeneratedSources:
+    sources = await hydrate_sources(
+        HydrateSourcesRequest(request.protocol_target[AvroSourceField]), **implicitly()
+    )
+
+    compile_results = await concurrently(
+        compile_avro_source(CompileAvroSourceRequest(sources.snapshot.digest, path), **implicitly())
+        for path in sources.snapshot.files
+    )
+
+    merged_output_digest, source_root = await concurrently(
+        merge_digests(MergeDigests([r.output_digest for r in compile_results])),
+        get_source_root(SourceRootRequest.for_target(request.protocol_target)),
+    )
+
+    source_root_restored = (
+        await digest_to_snapshot(**implicitly(AddPrefix(merged_output_digest, source_root.path)))
+        if source_root.path != "."
+        else await digest_to_snapshot(merged_output_digest)
+    )
+    return GeneratedSources(source_root_restored)
 
 
 @dataclass(frozen=True)
