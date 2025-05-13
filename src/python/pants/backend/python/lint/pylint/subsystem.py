@@ -166,7 +166,9 @@ async def pylint_first_party_plugins(pylint: Pylint) -> PylintFirstPartyPlugins:
     if not pylint.source_plugins:
         return PylintFirstPartyPlugins(FrozenOrderedSet(), FrozenOrderedSet(), EMPTY_DIGEST)
 
-    plugin_target_addresses = await resolve_unparsed_address_inputs(pylint.source_plugins)
+    plugin_target_addresses = await resolve_unparsed_address_inputs(
+        pylint.source_plugins, **implicitly()
+    )
     transitive_targets = await transitive_targets_get(
         TransitiveTargetsRequest(plugin_target_addresses), **implicitly()
     )
