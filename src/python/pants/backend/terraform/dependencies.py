@@ -12,6 +12,8 @@ from pants.backend.terraform.target_types import (
     LockfileSourceField,
     TerraformBackendConfigField,
     TerraformDependenciesField,
+    TerraformDeploymentFieldSet,
+    TerraformFieldSet,
     TerraformModuleSourcesField,
     TerraformRootModuleField,
     TerraformVarFileSourceField,
@@ -117,6 +119,25 @@ class TerraformInvocationRequirements:
     dependencies_files: SourceFiles
     init_cmd: TerraformDependenciesRequest
     chdir: str
+
+
+def terraform_fieldset_to_init_request(
+    terraform_fieldset: TerraformDeploymentFieldSet | TerraformFieldSet,
+) -> TerraformInitRequest:
+    """Create a TerraformInitRequest from both Terraform Modules and Deployments."""
+    if isinstance(terraform_fieldset, TerraformDeploymentFieldSet):
+        deployment = terraform_fieldset
+        return TerraformInitRequest(deployment.root_module, deployment.dependencies)
+    elif isinstance(terraform_fieldset, TerraformFieldSet):
+        module = terraform_fieldset
+        return TerraformInitRequest(
+            TerraformRootModuleField(module.address.spec, module.address),
+            module.dependencies,
+        )
+    else:
+        raise TypeError(
+            f"Invalid type passed to initialise terraform tpye={type(terraform_fieldset)}"
+        )
 
 
 @rule

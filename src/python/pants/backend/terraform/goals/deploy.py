@@ -7,8 +7,8 @@ from dataclasses import dataclass
 
 from pants.backend.terraform.dependencies import TerraformInitRequest, prepare_terraform_invocation
 from pants.backend.terraform.dependency_inference import (
-    TerraformDeploymentInvocationFiles,
     TerraformDeploymentInvocationFilesRequest,
+    get_terraform_backend_and_vars,
 )
 from pants.backend.terraform.target_types import TerraformDeploymentFieldSet
 from pants.backend.terraform.tool import TerraformCommand, TerraformProcess, TerraformTool
@@ -56,11 +56,10 @@ async def prepare_terraform_deployment(
     terraform_command = "plan" if deploy_subsystem.dry_run else "apply"
     args = [terraform_command]
 
-    invocation_files = await Get(
-        TerraformDeploymentInvocationFiles,
+    invocation_files = await get_terraform_backend_and_vars(
         TerraformDeploymentInvocationFilesRequest(
             request.field_set.dependencies.address, request.field_set.dependencies
-        ),
+        )
     )
     var_files = await Get(
         SourceFiles, SourceFilesRequest(e.get(SourcesField) for e in invocation_files.vars_files)
