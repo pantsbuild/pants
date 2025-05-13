@@ -905,16 +905,15 @@ def run_rule_with_mocks(
                 for mock_get in mock_gets
                 if mock_get.output_type == res.output_type
                 and all(
-                    val in mock_get.input_types
+                    input_type in mock_get.input_types
                     or (
                         union_membership
+                        and input_type in union_membership
                         and any(
-                            input_type in union_membership
-                            and union_membership.is_member(input_type, val)
-                            for input_type in mock_get.input_types
+                            union_membership.is_member(input_type, t) for t in mock_get.input_types
                         )
                     )
-                    for val in res.input_types
+                    for input_type in res.input_types
                 )
             ),
             None,
