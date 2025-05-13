@@ -136,7 +136,8 @@ async def resolve_kotlinc_plugins_for_target(
         plugin[KotlincPluginArtifactField].to_address_input() for plugin in candidate_plugins
     ]
     artifact_addresses = await concurrently(
-        resolve_address(**implicitly(address_input)) for address_input in address_inputs
+        resolve_address(**implicitly({address_input: AddressInput}))
+        for address_input in address_inputs
     )
     candidate_artifacts = await resolve_targets(**implicitly(Addresses(artifact_addresses)))
 
