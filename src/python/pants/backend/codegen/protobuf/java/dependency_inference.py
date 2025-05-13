@@ -54,9 +54,9 @@ class ProtobufJavaRuntimeForResolve:
 
 @rule
 async def resolve_protobuf_java_runtime_for_resolve(
+    request: ProtobufJavaRuntimeForResolveRequest,
     jvm_artifact_targets: AllJvmArtifactTargets,
     jvm: JvmSubsystem,
-    request: ProtobufJavaRuntimeForResolveRequest,
 ) -> ProtobufJavaRuntimeForResolve:
     addresses = find_jvm_artifacts_or_raise(
         required_coordinates=[
@@ -86,9 +86,9 @@ class ProtobufJavaGrpcRuntimeForResolve:
 
 @rule
 async def resolve_protobuf_java_grpc_runtime_for_resolve(
+    request: ProtobufJavaGrpcRuntimeForResolveRequest,
     jvm_artifact_targets: AllJvmArtifactTargets,
     jvm: JvmSubsystem,
-    request: ProtobufJavaGrpcRuntimeForResolveRequest,
 ) -> ProtobufJavaGrpcRuntimeForResolve:
     addresses = find_jvm_artifacts_or_raise(
         required_coordinates=[
@@ -130,13 +130,13 @@ async def infer_protobuf_java_runtime_dependency(
     resolve = request.field_set.resolve.normalized_value(jvm)
 
     protobuf_java_runtime_target_info = await resolve_protobuf_java_runtime_for_resolve(
-        **implicitly(ProtobufJavaRuntimeForResolveRequest(resolve))
+        ProtobufJavaRuntimeForResolveRequest(resolve), **implicitly()
     )
     addresses: set[Address] = set(protobuf_java_runtime_target_info.addresses)
 
     if request.field_set.grpc.value:
         grpc_runtime_info = await resolve_protobuf_java_grpc_runtime_for_resolve(
-            **implicitly(ProtobufJavaGrpcRuntimeForResolveRequest(resolve))
+            ProtobufJavaGrpcRuntimeForResolveRequest(resolve), **implicitly()
         )
         addresses.update(grpc_runtime_info.addresses)
 
