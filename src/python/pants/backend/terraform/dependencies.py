@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.terraform.dependency_inference import (
-    TerraformDeploymentInvocationFiles,
     TerraformDeploymentInvocationFilesRequest,
+    get_terraform_backend_and_vars,
 )
 from pants.backend.terraform.target_types import (
     LockfileSourceField,
@@ -21,18 +21,19 @@ from pants.backend.terraform.target_types import (
 from pants.backend.terraform.tool import TerraformCommand, TerraformProcess
 from pants.backend.terraform.utils import terraform_arg, terraform_relpath
 from pants.core.target_types import FileSourceField, ResourceSourceField
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.internals.native_engine import Address, AddressInput, Digest, MergeDigests
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import (
-    SourcesField,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-    WrappedTarget,
-    WrappedTargetRequest,
+from pants.core.util_rules.source_files import (
+    SourceFiles,
+    SourceFilesRequest,
+    determine_source_files,
 )
+from pants.engine.internals.build_files import resolve_address
+from pants.engine.internals.graph import resolve_target, transitive_targets
+from pants.engine.internals.native_engine import Digest, MergeDigests
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import execute_process, merge_digests
+from pants.engine.process import ProcessExecutionFailure
+from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.target import SourcesField, TransitiveTargetsRequest, WrappedTargetRequest
 from pants.option.global_options import KeepSandboxes
 
 
@@ -82,16 +83,17 @@ async def get_terraform_providers(
     init_process_description = (
         f"Running `init` on Terraform module at `{req.chdir}` to fetch dependencies"
     )
-    fetched_deps = await Get(
-        FallibleProcessResult,
-        TerraformProcess(
-            cmds=(req.to_args(),),
-            input_digest=req.dependencies_files,
-            output_files=(".terraform.lock.hcl",),
-            output_directories=(".terraform",),
-            description=init_process_description,
-            chdir=req.chdir,
-        ),
+    fetched_deps = await execute_process(
+        **implicitly(
+            TerraformProcess(
+                cmds=(req.to_args(),),
+                input_digest=req.dependencies_files,
+                output_files=(".terraform.lock.hcl",),
+                output_directories=(".terraform",),
+                description=init_process_description,
+                chdir=req.chdir,
+            )
+        )
     )
     if fetched_deps.exit_code != 0:
         raise ProcessExecutionFailure.from_result(
@@ -145,12 +147,12 @@ async def prepare_terraform_invocation(
     request: TerraformInitRequest,
 ) -> TerraformInvocationRequirements:
     """Prepare a terraform module or deployment to be operated on."""
-    this_targets_dependencies = await Get(
-        TransitiveTargets, TransitiveTargetsRequest((request.dependencies.address,))
+    this_targets_dependencies = await transitive_targets(
+        TransitiveTargetsRequest((request.dependencies.address,)), **implicitly()
     )
 
     address_input = request.root_module.to_address_input()
-    module_address = await Get(Address, AddressInput, address_input)
+    module_address = await resolve_address(**implicitly(address_input))
 
     chdir = module_address.spec_path  # TODO: spec_path is wrong, that's to the build file
     # if the Terraform module is in the root, chdir will be "". Terraform needs a valid dir to change to
@@ -158,19 +160,18 @@ async def prepare_terraform_invocation(
         chdir = "."
 
     # TODO: is this still necessary, or do we pull it in with (transitive) dependencies?
-    module = await Get(
-        WrappedTarget,
+    module = await resolve_target(
         WrappedTargetRequest(
             module_address, description_of_origin=address_input.description_of_origin
         ),
+        **implicitly(),
     )
 
-    source_files, dependencies_files = await MultiGet(
-        Get(
-            SourceFiles, SourceFilesRequest([module.target.get(SourcesField)])
+    source_files, dependencies_files = await concurrently(
+        determine_source_files(
+            SourceFilesRequest([module.target.get(SourcesField)])
         ),  # TODO: get through transitive deps???
-        Get(
-            SourceFiles,
+        determine_source_files(
             SourceFilesRequest(
                 [tgt.get(SourcesField) for tgt in this_targets_dependencies.dependencies],
                 for_sources_types=(
@@ -182,21 +183,20 @@ async def prepare_terraform_invocation(
                     ResourceSourceField,
                 ),
                 enable_codegen=True,
-            ),
+            )
         ),
     )
-    invocation_files = await Get(
-        TerraformDeploymentInvocationFiles,
+    invocation_files = await get_terraform_backend_and_vars(
         TerraformDeploymentInvocationFilesRequest(
             request.dependencies.address, request.dependencies
-        ),
+        )
     )
     backend_config_tgts = invocation_files.backend_configs
     if len(backend_config_tgts) == 0:
         backend_config = None
     elif len(backend_config_tgts) == 1:
-        backend_config_sources = await Get(
-            SourceFiles, SourceFilesRequest([backend_config_tgts[0].get(SourcesField)])
+        backend_config_sources = await determine_source_files(
+            SourceFilesRequest([backend_config_tgts[0].get(SourcesField)])
         )
         backend_config = backend_config_sources.snapshot.files[0]
     else:
@@ -213,9 +213,8 @@ async def prepare_terraform_invocation(
         else:
             backend_config = None
 
-    source_for_validate = await Get(
-        Digest,
-        MergeDigests([source_files.snapshot.digest, dependencies_files.snapshot.digest]),
+    source_for_validate = await merge_digests(
+        MergeDigests([source_files.snapshot.digest, dependencies_files.snapshot.digest])
     )
 
     has_lockfile = invocation_files.lockfile is not None

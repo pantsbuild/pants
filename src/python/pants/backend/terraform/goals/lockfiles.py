@@ -24,19 +24,16 @@ from pants.core.goals.generate_lockfiles import (
 )
 from pants.engine.addresses import Addresses
 from pants.engine.fs import PathGlobs
-from pants.engine.internals.native_engine import (
-    Address,
-    AddressInput,
-    Digest,
-    MergeDigests,
-    Snapshot,
-)
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.build_files import resolve_address
+from pants.engine.internals.graph import resolve_targets
+from pants.engine.internals.native_engine import AddressInput, MergeDigests
+from pants.engine.internals.selectors import concurrently
 from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import AllTargets, Targets
+from pants.engine.intrinsics import digest_to_snapshot, execute_process, merge_digests
+from pants.engine.process import ProcessExecutionFailure
+from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.target import AllTargets
 from pants.engine.unions import UnionRule
 from pants.option.global_options import KeepSandboxes
 
@@ -80,16 +77,20 @@ async def setup_user_lockfile_requests(
     requested: RequestedTerraformResolveNames,
     terraform: TerraformTool,
 ) -> UserGenerateLockfiles:
-    addrs = await MultiGet(
-        Get(
-            Address,
-            AddressInput,
-            AddressInput.parse(m, description_of_origin="setup Terraform lockfiles"),
+    addrs = await concurrently(
+        resolve_address(
+            **implicitly(
+                {
+                    AddressInput.parse(
+                        m, description_of_origin="setup Terraform lockfiles"
+                    ): AddressInput
+                }
+            )
         )
         for m in requested
     )
 
-    targets = await Get(Targets, Addresses, Addresses(addrs))
+    targets = await resolve_targets(**implicitly(Addresses(addrs)))
     deployment_targets = [t for t in targets if isinstance(t, TerraformModuleTarget)]
 
     return UserGenerateLockfiles(
@@ -123,14 +124,13 @@ async def generate_lockfile_from_sources(
         )
     )
 
-    sources_and_deps = await Get(
-        Digest,
+    sources_and_deps = await merge_digests(
         MergeDigests(
             [
                 initialised_terraform.terraform_sources.snapshot.digest,
                 initialised_terraform.dependencies_files.snapshot.digest,
             ]
-        ),
+        )
     )
 
     args = (
@@ -140,18 +140,19 @@ async def generate_lockfile_from_sources(
     )
 
     provider_lock_description = f"Update terraform lockfile for {lockfile_request.resolve_name}"
-    multiplatform_lockfile = await Get(
-        FallibleProcessResult,
-        TerraformProcess(
-            cmds=(
-                initialised_terraform.init_cmd.to_args(),
-                TerraformCommand(args),
-            ),
-            input_digest=sources_and_deps,
-            output_files=(".terraform.lock.hcl",),
-            description=provider_lock_description,
-            chdir=initialised_terraform.chdir,
-        ),
+    multiplatform_lockfile = await execute_process(
+        **implicitly(
+            TerraformProcess(
+                cmds=(
+                    initialised_terraform.init_cmd.to_args(),
+                    TerraformCommand(args),
+                ),
+                input_digest=sources_and_deps,
+                output_files=(".terraform.lock.hcl",),
+                description=provider_lock_description,
+                chdir=initialised_terraform.chdir,
+            )
+        )
     )
     if multiplatform_lockfile.exit_code != 0:
         raise ProcessExecutionFailure(
@@ -179,7 +180,9 @@ async def terraform_lockfile_synthetic_targets(
     request: TerraformSyntheticLockfileTargetsRequest,
 ) -> SyntheticAddressMaps:
     path = request.path
-    lockfile = await Get(Snapshot, PathGlobs([Path(path, ".terraform.lock.hcl").as_posix()]))
+    lockfile = await digest_to_snapshot(
+        **implicitly(PathGlobs([Path(path, ".terraform.lock.hcl").as_posix()]))
+    )
     if not lockfile.files:
         return SyntheticAddressMaps(tuple())
 
