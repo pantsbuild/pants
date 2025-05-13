@@ -306,9 +306,15 @@ impl RemoteStore {
                 .await
                 .map_err(|e| StoreError::Unclassified(e.to_string()))?;
 
-            let results = hashmap.into_values().collect::<Result<Vec<_>, _>>()?;
+            let missing_digests = hashmap.iter().find(|(_, r)| r.is_err());
+            if let Some((d, r)) = missing_digests {
+                return Err(StoreError::MissingDigest(
+                    r.as_ref().unwrap_err().to_string(),
+                    *d,
+                ));
+            }
 
-            Ok(results)
+            Ok(())
         };
 
         let _ =
