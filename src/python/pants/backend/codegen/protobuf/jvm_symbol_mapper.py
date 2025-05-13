@@ -11,11 +11,11 @@ from typing import DefaultDict
 
 from pants.backend.codegen.protobuf.target_types import AllProtobufTargets, ProtobufSourceField
 from pants.engine.addresses import Address
-from pants.engine.fs import Digest, DigestContents, FileContent
+from pants.engine.fs import FileContent
 from pants.engine.internals.graph import hydrate_sources
 from pants.engine.intrinsics import get_digest_contents
-from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
-from pants.engine.target import HydratedSources, HydrateSourcesRequest
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
+from pants.engine.target import HydrateSourcesRequest
 from pants.jvm.dependency_inference.artifact_mapper import MutableTrieNode
 from pants.jvm.dependency_inference.symbol_mapper import SymbolMap
 from pants.jvm.subsystems import JvmSubsystem
