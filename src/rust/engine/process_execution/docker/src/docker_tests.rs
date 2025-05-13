@@ -99,7 +99,7 @@ async fn test_old_container_cleanup_on_init() {
     docker.stop_container(&container_id, None).await.unwrap();
     let docker_cell = DockerOnceCell::new();
     docker_cell.get().await.unwrap();
-    assert_container_not_exists(&docker, &container_id)
+    check_container_not_exists(&docker, &container_id)
         .await
         .unwrap();
 }
@@ -112,7 +112,8 @@ fn platform_for_tests() -> Result<Platform, String> {
     })
 }
 
-async fn assert_container_not_exists(docker: &Docker, container_id: &str) -> Result<(), String> {
+#[must_use = "message"]
+async fn check_container_not_exists(docker: &Docker, container_id: &str) -> Result<(), String> {
     match docker.inspect_container(container_id, None).await {
         Ok(_) => Err(format!(
             "Container {container_id} exists when it should not"
@@ -138,7 +139,8 @@ trait DockerCommandTestRunner: Send + Sync {
         immutable_inputs: ImmutableInputs,
     ) -> Result<crate::docker::CommandRunner<'a>, String>;
 
-    async fn assert_correct_container(
+    #[must_use = "message"]
+    async fn check_correct_container(
         &self,
         docker: &Docker,
         actual_container_id: &str,
@@ -213,7 +215,7 @@ trait DockerCommandTestRunner: Send + Sync {
         let docker_ref = docker.get().await?;
         // For the existing container tests, we want to ensure the container ID matches the one created by the command test runner
         // For missing/exited container tests, ensure that the container IDs do NOT match
-        self.assert_correct_container(docker_ref, &container_id)
+        self.check_correct_container(docker_ref, &container_id)
             .await?;
         match docker_ref
             .inspect_container(&container_id, None)
@@ -227,7 +229,7 @@ trait DockerCommandTestRunner: Send + Sync {
             None => panic!("No labels found for container {container_id}"),
         }
         runner.shutdown().await?;
-        assert_container_not_exists(docker_ref, &container_id).await?;
+        check_container_not_exists(docker_ref, &container_id).await?;
         Ok(LocalTestResult {
             original,
             stdout_bytes,
@@ -267,7 +269,7 @@ impl DockerCommandTestRunner for DefaultTestRunner {
         )
     }
 
-    async fn assert_correct_container(
+    async fn check_correct_container(
         &self,
         _docker: &Docker,
         _actual_container_id: &str,
@@ -360,7 +362,7 @@ impl DockerCommandTestRunner for ExistingContainerTestRunner {
         }
     }
 
-    async fn assert_correct_container(
+    async fn check_correct_container(
         &self,
         _docker: &Docker,
         actual_container_id: &str,
@@ -413,7 +415,7 @@ impl<T: UnavailableContainerTestRunner> DockerCommandTestRunner for T {
         Ok(command_runner)
     }
 
-    async fn assert_correct_container(
+    async fn check_correct_container(
         &self,
         docker: &Docker,
         actual_container_id: &str,
@@ -421,7 +423,7 @@ impl<T: UnavailableContainerTestRunner> DockerCommandTestRunner for T {
         let initial_container_id = self.get_initial_container_id();
         assert_ne!(initial_container_id, actual_container_id);
         // Check and ensure initial container was cleaned up
-        assert_container_not_exists(docker, &initial_container_id).await
+        check_container_not_exists(docker, &initial_container_id).await
     }
 }
 
