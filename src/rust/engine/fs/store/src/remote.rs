@@ -179,25 +179,40 @@ impl ByteStore {
             desc = Some(workunit_desc),
             |workunit| async move {
                 workunit.increment_counter(Metric::RemoteStoreReadAttempts, 1);
-                let result = self.provider.load_batch(digests, destination).await;
+                let batch_result = self.provider.load_batch(digests, destination).await;
 
                 workunit.record_observation(
                     ObservationMetric::RemoteStoreReadBlobTimeMicros,
                     start.elapsed().as_micros() as u64,
                 );
 
-                match result {
-                    Ok(vec) => {
-                        // let total_bytes = vec.iter().map(|d| d.1.as_ref().map_or(0, |b| b.len())).sum::<usize>();
-                        // workunit.record_observation(
-                        //     ObservationMetric::RemoteStoreBlobBytesDownloaded,
-                        //     total_bytes as u64,
-                        // );
-                        // workunit.increment_counter(Metric::RemoteStoreReadCached, 1);
-                        Ok(vec)
+                match batch_result {
+                    Ok(results) => {
+                        let mut total_bytes = 0;
+                        let mut misses = 0;
+
+                        results.iter().for_each(|(digest, result)| match result {
+                            Ok(_) => {
+                                total_bytes += digest.size_bytes;
+                            }
+                            Err(_) => {
+                                misses += 1;
+                            }
+                        });
+                        let hits = results.len() - misses;
+                        workunit.record_observation(
+                            ObservationMetric::RemoteStoreBlobBytesDownloaded,
+                            total_bytes as u64,
+                        );
+                        if hits > 0 {
+                            workunit.increment_counter(Metric::RemoteStoreReadCached, hits as u64);
+                        }
+                        if misses > 0 {
+                            workunit
+                                .increment_counter(Metric::RemoteStoreReadUncached, misses as u64);
+                        }
+                        Ok(results)
                     }
-                    // TODO: Chris we need to loop over every digest and count the number of hits/misses
-                    // Ok(false) => Metric::RemoteStoreReadUncached,
                     Err(e) => {
                         workunit.increment_counter(Metric::RemoteStoreReadErrors, 1);
                         Err(e)

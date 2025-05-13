@@ -18,7 +18,6 @@ use grpc_util::{
 use hashing::{Digest, Hasher};
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::gen::google::bytestream::byte_stream_client::ByteStreamClient;
-use protos::gen::google::rpc;
 use remexec::{
     BatchUpdateBlobsRequest, ServerCapabilities, capabilities_client::CapabilitiesClient,
     content_addressable_storage_client::ContentAddressableStorageClient,
@@ -257,49 +256,46 @@ impl Provider {
     fn validate_batch_response(
         digests: Vec<Digest>,
         response: remexec::BatchReadBlobsResponse,
-    ) -> Result<Vec<(Digest, Bytes)>, String> {
-        let mut expected = digests.into_iter().collect::<HashSet<Digest>>();
-        let mut results = Vec::new();
+    ) -> Result<HashMap<Digest, Result<Bytes, Status>>, String> {
+        let mut results = HashMap::with_capacity(digests.len());
+
+        for digest in digests {
+            results.insert(
+                digest,
+                Err(Status::not_found("Digest not found in response")),
+            );
+        }
 
         for r in response.responses {
             if let Some(digest) = r.digest {
                 let digest = digest.try_into().unwrap();
-                let status = r.status.as_ref().map_or(-1, |s| s.code);
 
-                if status == rpc::Code::Ok as i32 {
-                    results.push((digest, r.data.clone()));
-
-                    let mut hasher = Hasher::new();
-                    hasher.update(&r.data);
-                    let actual_digest = hasher.finish();
-                    if actual_digest != digest {
-                        return Err(format!(
-                            "Batch read Remote CAS gave wrong digest: expected {digest:?}, got {actual_digest:?}"
-                        ));
-                    }
-                } else {
-                    let status_str = r
-                        .status
-                        .as_ref()
-                        .map_or("unknown".to_string(), |s| s.message.clone());
-                    return Err(format!(
-                        "Batch read of digest {:?} returned status {:?}: {:?}",
-                        digest, status, status_str
-                    ));
-                }
-
-                if !expected.contains(&digest) {
+                if !results.contains_key(&digest) {
                     return Err(format!(
                         "Batch read returned unexpected digest {:?} in batch response",
                         digest
                     ));
                 }
-                expected.remove(&digest);
-            }
-        }
 
-        if !expected.is_empty() {
-            return Err(format!("Batch read missing digests: {:?}", expected));
+                let status = r.status.map_or_else(
+                    || Status::unknown("unknown error"),
+                    |s| Status::new(Code::from_i32(s.code), s.message),
+                );
+
+                if status.code() == Code::Ok {
+                    let mut hasher = Hasher::new();
+                    hasher.update(&r.data);
+                    let actual_digest = hasher.finish();
+
+                    if actual_digest == digest {
+                        results.insert(digest, Ok(r.data));
+                    } else {
+                        results.insert(digest, Err(Status::unknown(format!("Remote CAS gave wrong digest: expected {digest:?}, got {actual_digest:?}"))));
+                    }
+                } else {
+                    results.insert(digest, Err(status));
+                }
+            }
         }
 
         Ok(results)
@@ -503,7 +499,8 @@ impl ByteStoreProvider for Provider {
         let client = self.cas_client.as_ref();
         let destination = Arc::new(Mutex::new(destination));
 
-        let futures = chunks
+        let chunk_futures = chunks
+            .clone()
             .into_iter()
             .map(|chunk| {
                 let digests = chunk
@@ -532,13 +529,26 @@ impl ByteStoreProvider for Provider {
                                 Provider::validate_batch_response(chunk, response.into_inner())
                                     .map_err(Status::unknown)?;
 
+                            if let Some(err) = responses.values().find_map(|res| res.as_ref().err())
+                            {
+                                return Err(err.clone());
+                            }
+
+                            let to_write = responses
+                                .into_iter()
+                                .map(|(d, res)| (d, res.unwrap()))
+                                .collect::<Vec<_>>();
+
+                            let digests = to_write.iter().map(|(d, _)| (*d)).collect::<Vec<_>>();
+
                             destination
                                 .lock()
                                 .await
-                                .write(responses.clone())
+                                .write(to_write)
                                 .await
                                 .map_err(Status::unknown)?;
-                            Ok(responses.into_iter().map(|(d, _)| d).collect::<Vec<_>>())
+
+                            Ok(digests)
                         }
                     },
                     status_is_retryable,
@@ -546,18 +556,25 @@ impl ByteStoreProvider for Provider {
             })
             .collect::<Vec<_>>();
 
-        let result = futures::future::join_all(futures)
-            .await
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(status_to_str)?;
+        let chunk_results = futures::future::join_all(chunk_futures).await;
 
-        let responses = result.into_iter().flatten().collect::<Vec<_>>();
+        let mut result = HashMap::new();
 
-        Ok(responses
-            .into_iter()
-            .map(|d| (d, Ok(true)))
-            .collect::<HashMap<_, _>>())
+        for (response, digests) in chunk_results.into_iter().zip(chunks) {
+            match response {
+                Ok(digests) => {
+                    for digest in digests {
+                        result.insert(digest, Ok(true));
+                    }
+                }
+                Err(err) => {
+                    for digest in digests {
+                        result.insert(digest, Err(err.to_string()));
+                    }
+                }
+            }
+        }
+        Ok(result)
     }
 
     async fn list_missing_digests(

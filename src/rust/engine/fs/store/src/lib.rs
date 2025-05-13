@@ -300,10 +300,15 @@ impl RemoteStore {
 
         let mut local_store = local_store.clone();
         let small_file_future = async move {
-            self.store
+            let hashmap = self
+                .store
                 .load_bytes_batch(small_files, &mut local_store)
                 .await
-                .map_err(|e| StoreError::Unclassified(e.to_string()))
+                .map_err(|e| StoreError::Unclassified(e.to_string()))?;
+
+            let results = hashmap.into_values().collect::<Result<Vec<_>, _>>()?;
+
+            Ok(results)
         };
 
         let _ =
