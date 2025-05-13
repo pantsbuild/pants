@@ -13,11 +13,12 @@ from pants.backend.javascript.subsystems import nodejs_tool
 from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolRequest
 from pants.backend.javascript.target_types import JSRuntimeSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
-from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.core.util_rules.config_files import find_config_file
 from pants.core.util_rules.partitions import PartitionerType
-from pants.engine.fs import Digest, MergeDigests
-from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, Rule, collect_rules, rule
+from pants.engine.fs import MergeDigests
+from pants.engine.intrinsics import merge_digests
+from pants.engine.process import execute_process_or_raise
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -42,33 +43,30 @@ class PrettierFmtRequest(FmtTargetsRequest):
 @rule(level=LogLevel.DEBUG)
 async def prettier_fmt(request: PrettierFmtRequest.Batch, prettier: Prettier) -> FmtResult:
     # Look for any/all of the Prettier configuration files
-    config_files = await Get(
-        ConfigFiles,
-        ConfigFilesRequest,
-        prettier.config_request(request.snapshot.dirs),
-    )
+    config_files = await find_config_file(prettier.config_request(request.snapshot.dirs))
 
     # Merge source files, config files, and prettier_tool process
-    input_digest = await Get(
-        Digest,
+    input_digest = await merge_digests(
         MergeDigests(
             (
                 request.snapshot.digest,
                 config_files.snapshot.digest,
             )
-        ),
+        )
     )
 
-    result = await Get(
-        ProcessResult,
-        NodeJSToolRequest,
-        prettier.request(
-            args=("--write", *(os.path.join("{chroot}", file) for file in request.files)),
-            input_digest=input_digest,
-            output_files=request.files,
-            description=f"Run Prettier on {pluralize(len(request.files), 'file')}.",
-            level=LogLevel.DEBUG,
-        ),
+    result = await execute_process_or_raise(
+        **implicitly(
+            {
+                prettier.request(
+                    args=("--write", *(os.path.join("{chroot}", file) for file in request.files)),
+                    input_digest=input_digest,
+                    output_files=request.files,
+                    description=f"Run Prettier on {pluralize(len(request.files), 'file')}.",
+                    level=LogLevel.DEBUG,
+                ): NodeJSToolRequest
+            }
+        )
     )
     return await FmtResult.create(request, result)
 
