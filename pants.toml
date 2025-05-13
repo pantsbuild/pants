@@ -41,9 +41,6 @@ backend_packages.add = [
   "pants_explorer.server",
   "internal_plugins.releases",
   "internal_plugins.test_lockfile_fixtures",
-  "pants.backend.experimental.codegen.protobuf.go",
-  "pants.backend.experimental.codegen.protobuf.java",
-  "pants.backend.experimental.codegen.protobuf.scala",
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
