@@ -14,12 +14,14 @@ from pants.backend.helm.check.kubeconform.subsystem import KubeconformSubsystem
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.util_rules.renderer import RenderedHelmFiles
 from pants.core.goals.check import CheckRequest, CheckResult
-from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import CreateDigest, Digest, FileEntry
+from pants.core.util_rules.external_tool import DownloadedExternalTool, download_external_tool
+from pants.engine.env_vars import EnvironmentVarsRequest
+from pants.engine.fs import CreateDigest, FileEntry
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.intrinsics import create_digest, execute_process
 from pants.engine.platform import Platform
-from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.process import Process, ProcessCacheScope
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
@@ -56,9 +58,9 @@ async def setup_kube_conform(
     kubeconform: KubeconformSubsystem,
     platform: Platform,
 ) -> KubeconformSetup:
-    downloaded_tool, env = await MultiGet(
-        Get(DownloadedExternalTool, ExternalToolRequest, kubeconform.get_request(platform)),
-        Get(EnvironmentVars, EnvironmentVarsRequest(helm.extra_env_vars)),
+    downloaded_tool, env = await concurrently(
+        download_external_tool(kubeconform.get_request(platform)),
+        environment_vars_subset(EnvironmentVarsRequest(helm.extra_env_vars), **implicitly()),
     )
     return KubeconformSetup(downloaded_tool, env)
 
@@ -77,8 +79,7 @@ async def run_kubeconform(
     debug_requested = 0 < logger.getEffectiveLevel() <= LogLevel.DEBUG.level
     ignore_sources = request.field_set.ignore_sources.value or ()
 
-    result = await Get(
-        FallibleProcessResult,
+    result = await execute_process(
         Process(
             argv=[
                 os.path.join(tool_relpath, setup.binary.exe),
@@ -127,10 +128,10 @@ async def run_kubeconform(
             level=LogLevel.DEBUG,
             cache_scope=ProcessCacheScope.SUCCESSFUL,
         ),
+        **implicitly(),
     )
 
-    report_digest = await Get(
-        Digest,
+    report_digest = await create_digest(
         CreateDigest(
             [
                 FileEntry(
@@ -138,7 +139,7 @@ async def run_kubeconform(
                     file_digest=result.stdout_digest,
                 )
             ]
-        ),
+        )
     )
 
     return CheckResult.from_fallible_process_result(

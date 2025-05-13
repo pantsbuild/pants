@@ -11,23 +11,29 @@ from typing import Any, cast
 import yaml
 
 from pants.backend.helm.target_types import HelmChartMetaSourceField
-from pants.backend.helm.util_rules.sources import HelmChartRoot, HelmChartRootRequest
+from pants.backend.helm.util_rules.sources import HelmChartRootRequest, find_chart_source_root
 from pants.backend.helm.utils.yaml import snake_case_attr_dict
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
     CreateDigest,
     Digest,
-    DigestContents,
     DigestSubset,
     FileContent,
     GlobExpansionConjunction,
     PathGlobs,
 )
+from pants.engine.internals.graph import hydrate_sources
 from pants.engine.internals.native_engine import RemovePrefix
-from pants.engine.internals.selectors import MultiGet
-from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import HydratedSources, HydrateSourcesRequest
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import (
+    create_digest,
+    digest_subset_to_digest,
+    get_digest_contents,
+    remove_prefix,
+)
+from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.target import HydrateSourcesRequest
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import bullet_list
 
@@ -226,8 +232,7 @@ class ParseHelmChartMetadataDigest(EngineAwareParameter):
 async def parse_chart_metadata_from_digest(
     request: ParseHelmChartMetadataDigest,
 ) -> HelmChartMetadata:
-    subset = await Get(
-        Digest,
+    subset = await digest_subset_to_digest(
         DigestSubset(
             request.digest,
             PathGlobs(
@@ -236,10 +241,10 @@ async def parse_chart_metadata_from_digest(
                 conjunction=GlobExpansionConjunction.any_match,
                 description_of_origin=request.description_of_origin,
             ),
-        ),
+        )
     )
 
-    file_contents = await Get(DigestContents, Digest, subset)
+    file_contents = await get_digest_contents(subset)
 
     if len(file_contents) == 0:
         raise MissingChartMetadataException(
@@ -255,33 +260,33 @@ async def parse_chart_metadata_from_digest(
 
 @rule
 async def parse_chart_metadata_from_field(field: HelmChartMetaSourceField) -> HelmChartMetadata:
-    chart_root, source_files = await MultiGet(
-        Get(HelmChartRoot, HelmChartRootRequest(field)),
-        Get(
-            HydratedSources,
+    chart_root, source_files = await concurrently(
+        find_chart_source_root(HelmChartRootRequest(field)),
+        hydrate_sources(
             HydrateSourcesRequest(
                 field, for_sources_types=(HelmChartMetaSourceField,), enable_codegen=True
             ),
+            **implicitly(),
         ),
     )
 
-    metadata_digest = await Get(Digest, RemovePrefix(source_files.snapshot.digest, chart_root.path))
+    metadata_digest = await remove_prefix(
+        RemovePrefix(source_files.snapshot.digest, chart_root.path)
+    )
 
-    return await Get(
-        HelmChartMetadata,
+    return await parse_chart_metadata_from_digest(
         ParseHelmChartMetadataDigest(
             metadata_digest,
             description_of_origin=f"the `helm_chart` {field.address.spec}",
-        ),
+        )
     )
 
 
 @rule
 async def render_chart_metadata(metadata: HelmChartMetadata) -> Digest:
     yaml_contents = bytes(metadata.to_yaml(), "utf-8")
-    return await Get(
-        Digest,
-        CreateDigest([FileContent(HELM_CHART_METADATA_FILENAMES[0], yaml_contents)]),
+    return await create_digest(
+        CreateDigest([FileContent(HELM_CHART_METADATA_FILENAMES[0], yaml_contents)])
     )
 
 

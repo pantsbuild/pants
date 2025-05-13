@@ -13,12 +13,17 @@ from pants.backend.helm.utils.yaml import YamlPath
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import VenvPex, VenvPexProcess, VenvPexRequest
+from pants.backend.python.util_rules.pex import (
+    VenvPex,
+    VenvPexProcess,
+    VenvPexRequest,
+    create_venv_pex,
+)
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
-from pants.engine.fs import CreateDigest, Digest, FileContent, FileEntry
-from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.fs import CreateDigest, FileContent, FileEntry
+from pants.engine.intrinsics import create_digest, execute_process
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize, softwrap
 
@@ -66,7 +71,7 @@ async def build_k8s_parser_tool(
     parser_file_content = FileContent(
         path="__k8s_parser.py", content=parser_sources, is_executable=True
     )
-    parser_digest = await Get(Digest, CreateDigest([parser_file_content]))
+    parser_digest = await create_digest(CreateDigest([parser_file_content]))
 
     # We use copies of site packages because hikaru gets confused with symlinked packages
     # The core hikaru package tries to load the packages containing the kubernetes-versioned models
@@ -74,8 +79,7 @@ async def build_k8s_parser_tool(
     # which doesn't work when the packages are symlinked from inside the namespace-handling dirs in the PEX
     use_site_packages_copies = True
 
-    parser_pex = await Get(
-        VenvPex,
+    parser_pex = await create_venv_pex(
         VenvPexRequest(
             k8s_parser.to_pex_request(
                 main=EntryPoint(PurePath(parser_file_content.path).stem),
@@ -84,6 +88,7 @@ async def build_k8s_parser_tool(
             pex_environment.in_sandbox(working_directory=None),
             site_packages_copies=use_site_packages_copies,
         ),
+        **implicitly(),
     )
     return _HelmKubeParserTool(parser_pex)
 
@@ -128,17 +133,18 @@ class ParsedKubeManifest(EngineAwareReturnType):
 async def parse_kube_manifest(
     request: ParseKubeManifestRequest, tool: _HelmKubeParserTool
 ) -> ParsedKubeManifest:
-    file_digest = await Get(Digest, CreateDigest([request.file]))
+    file_digest = await create_digest(CreateDigest([request.file]))
 
-    result = await Get(
-        FallibleProcessResult,
-        VenvPexProcess(
-            tool.pex,
-            argv=[request.file.path],
-            input_digest=file_digest,
-            description=f"Analyzing Kubernetes manifest {request.file.path}",
-            level=LogLevel.DEBUG,
-        ),
+    result = await execute_process(
+        **implicitly(
+            VenvPexProcess(
+                tool.pex,
+                argv=[request.file.path],
+                input_digest=file_digest,
+                description=f"Analyzing Kubernetes manifest {request.file.path}",
+                level=LogLevel.DEBUG,
+            )
+        )
     )
 
     if result.exit_code == 0:

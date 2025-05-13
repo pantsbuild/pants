@@ -18,21 +18,20 @@ from pants.backend.helm.utils.yaml import snake_case_attr_dict
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import (
-    DownloadedExternalTool,
     ExternalToolRequest,
     TemplatedExternalTool,
+    download_external_tool,
 )
 from pants.engine import process
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,
     CreateDigest,
     Digest,
-    DigestContents,
     DigestSubset,
     Directory,
     FileDigest,
@@ -41,9 +40,19 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.intrinsics import (
+    add_prefix,
+    create_digest,
+    digest_subset_to_digest,
+    digest_to_snapshot,
+    get_digest_contents,
+    merge_digests,
+    remove_prefix,
+)
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
 from pants.engine.unions import UnionMembership, union
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
@@ -241,7 +250,7 @@ class HelmPlugins(Collection[HelmPlugin]):
 @rule
 async def all_helm_plugins(union_membership: UnionMembership) -> HelmPlugins:
     bindings = union_membership.get(ExternalHelmPluginBinding)
-    external_plugins = await MultiGet(
+    external_plugins = await concurrently(
         Get(HelmPlugin, ExternalHelmPluginBinding, binding.create()) for binding in bindings
     )
     if logger.isEnabledFor(LogLevel.DEBUG.level):
@@ -254,10 +263,9 @@ async def all_helm_plugins(union_membership: UnionMembership) -> HelmPlugins:
 
 @rule(desc="Download external Helm plugin", level=LogLevel.DEBUG)
 async def download_external_helm_plugin(request: ExternalHelmPluginRequest) -> HelmPlugin:
-    downloaded_tool = await Get(DownloadedExternalTool, ExternalToolRequest, request._tool_request)
+    downloaded_tool = await download_external_tool(request._tool_request)
 
-    plugin_info_file = await Get(
-        Digest,
+    plugin_info_file = await digest_subset_to_digest(
         DigestSubset(
             downloaded_tool.digest,
             PathGlobs(
@@ -265,9 +273,9 @@ async def download_external_helm_plugin(request: ExternalHelmPluginRequest) -> H
                 glob_match_error_behavior=GlobMatchErrorBehavior.error,
                 description_of_origin=request.plugin_name,
             ),
-        ),
+        )
     )
-    plugin_info_contents = await Get(DigestContents, Digest, plugin_info_file)
+    plugin_info_contents = await get_digest_contents(plugin_info_file)
     if len(plugin_info_contents) == 0:
         raise HelmPluginMetadataFileNotFound(request.plugin_name)
 
@@ -275,7 +283,7 @@ async def download_external_helm_plugin(request: ExternalHelmPluginRequest) -> H
     if not plugin_info.command and not plugin_info.platform_command:
         raise HelmPluginMissingCommand(request.plugin_name)
 
-    plugin_snapshot = await Get(Snapshot, Digest, downloaded_tool.digest)
+    plugin_snapshot = await digest_to_snapshot(downloaded_tool.digest)
     return HelmPlugin(info=plugin_info, platform=request.platform, snapshot=plugin_snapshot)
 
 
@@ -366,16 +374,15 @@ class HelmProcess:
 async def setup_helm(
     helm_subsytem: HelmSubsystem, global_plugins: HelmPlugins, platform: Platform
 ) -> HelmBinary:
-    downloaded_binary, empty_dirs_digest = await MultiGet(
-        Get(DownloadedExternalTool, ExternalToolRequest, helm_subsytem.get_request(platform)),
-        Get(
-            Digest,
+    downloaded_binary, empty_dirs_digest = await concurrently(
+        download_external_tool(helm_subsytem.get_request(platform)),
+        create_digest(
             CreateDigest(
                 [
                     Directory(_HELM_CONFIG_DIR),
                     Directory(_HELM_DATA_DIR),
                 ]
-            ),
+            )
         ),
     )
 
@@ -395,32 +402,29 @@ async def setup_helm(
     # Install all global Helm plugins
     if global_plugins:
         logger.debug(f"Installing {pluralize(len(global_plugins), 'global Helm plugin')}.")
-        prefixed_plugins_digests = await MultiGet(
-            Get(
-                Digest,
+        prefixed_plugins_digests = await concurrently(
+            add_prefix(
                 AddPrefix(
                     plugin.snapshot.digest, os.path.join(_HELM_DATA_DIR, "plugins", plugin.name)
-                ),
+                )
             )
             for plugin in global_plugins
         )
-        mutable_input_digest = await Get(
-            Digest, MergeDigests([mutable_input_digest, *prefixed_plugins_digests])
+        mutable_input_digest = await merge_digests(
+            MergeDigests([mutable_input_digest, *prefixed_plugins_digests])
         )
 
-    updated_config_digest, updated_data_digest = await MultiGet(
-        Get(
-            Digest,
-            DigestSubset(mutable_input_digest, PathGlobs([os.path.join(_HELM_CONFIG_DIR, "**")])),
+    updated_config_digest, updated_data_digest = await concurrently(
+        digest_subset_to_digest(
+            DigestSubset(mutable_input_digest, PathGlobs([os.path.join(_HELM_CONFIG_DIR, "**")]))
         ),
-        Get(
-            Digest,
-            DigestSubset(mutable_input_digest, PathGlobs([os.path.join(_HELM_DATA_DIR, "**")])),
+        digest_subset_to_digest(
+            DigestSubset(mutable_input_digest, PathGlobs([os.path.join(_HELM_DATA_DIR, "**")]))
         ),
     )
-    config_subset_digest, data_subset_digest = await MultiGet(
-        Get(Digest, RemovePrefix(updated_config_digest, _HELM_CONFIG_DIR)),
-        Get(Digest, RemovePrefix(updated_data_digest, _HELM_DATA_DIR)),
+    config_subset_digest, data_subset_digest = await concurrently(
+        remove_prefix(RemovePrefix(updated_config_digest, _HELM_CONFIG_DIR)),
+        remove_prefix(RemovePrefix(updated_data_digest, _HELM_DATA_DIR)),
     )
 
     setup_immutable_digests = {
@@ -429,7 +433,9 @@ async def setup_helm(
         _HELM_DATA_DIR: data_subset_digest,
     }
 
-    local_env = await Get(EnvironmentVars, EnvironmentVarsRequest(["HOME", "PATH"]))
+    local_env = await environment_vars_subset(
+        EnvironmentVarsRequest(["HOME", "PATH"]), **implicitly()
+    )
     return HelmBinary(
         path=helm_path,
         helm_env=helm_env,
@@ -444,8 +450,8 @@ async def helm_process(
     helm_binary: HelmBinary,
     helm_subsystem: HelmSubsystem,
 ) -> Process:
-    global_extra_env = await Get(
-        EnvironmentVars, EnvironmentVarsRequest(helm_subsystem.extra_env_vars)
+    global_extra_env = await environment_vars_subset(
+        EnvironmentVarsRequest(helm_subsystem.extra_env_vars), **implicitly()
     )
 
     # Helm binary's setup parameters go last to prevent end users overriding any of its values.
