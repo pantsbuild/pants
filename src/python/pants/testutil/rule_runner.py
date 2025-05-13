@@ -736,7 +736,7 @@ def _compare_expected_mocks(
                     for input_type in mg.input_types
                 ):
                     missing_gets.remove(mg)
-                    surplus_gets.remove(sg)
+                    surplus_gets.discard(sg)
                     break
 
     errors = []
@@ -779,6 +779,7 @@ def run_rule_with_mocks(
     mock_gets: Sequence[MockGet | MockEffect] = (),
     mock_calls: Mapping[str, Callable] | None = None,
     union_membership: UnionMembership | None = None,
+    warn_on_calls_satisfied_by_gets: bool = True,
 ) -> _O:
     """A test helper that runs an @rule with a set of args and mocked underlying @rule invocations.
 
@@ -856,7 +857,7 @@ def run_rule_with_mocks(
         errors, warnings = _compare_expected_mocks(
             task_rule.awaitables, mock_calls, mock_gets, union_membership
         )
-        if warnings:
+        if warnings and warn_on_calls_satisfied_by_gets:
             logger.warning(warnings)
         if errors:
             raise ValueError(
@@ -904,7 +905,7 @@ def run_rule_with_mocks(
                 for mock_get in mock_gets
                 if mock_get.output_type == res.output_type
                 and all(
-                    type(val) in mock_get.input_types
+                    val in mock_get.input_types
                     or (
                         union_membership
                         and any(
@@ -913,7 +914,7 @@ def run_rule_with_mocks(
                             for input_type in mock_get.input_types
                         )
                     )
-                    for val in res.inputs
+                    for val in res.input_types
                 )
             ),
             None,
