@@ -12,11 +12,7 @@ from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.graph import hydrate_sources
 from pants.engine.intrinsics import digest_to_snapshot, get_digest_contents
 from pants.engine.rules import collect_rules, implicitly, rule
-from pants.engine.target import (
-    GeneratedSources,
-    GenerateSourcesRequest,
-    HydrateSourcesRequest,
-)
+from pants.engine.target import GeneratedSources, GenerateSourcesRequest, HydrateSourcesRequest
 from pants.engine.unions import UnionRule
 
 
