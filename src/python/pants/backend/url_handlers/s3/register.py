@@ -211,6 +211,7 @@ async def download_file_from_s3_scheme(request: DownloadS3SchemeURL) -> Digest:
             query=split.query,
             expected_digest=request.expected_digest,
         ),
+        **implicitly(),
     )
 
 
@@ -232,6 +233,7 @@ async def download_file_from_virtual_hosted_s3_authority(
             query=split.query,
             expected_digest=request.expected_digest,
         ),
+        **implicitly(),
     )
 
 
@@ -251,6 +253,7 @@ async def download_file_from_path_s3_authority(request: DownloadS3AuthorityPathS
             query=split.query,
             expected_digest=request.expected_digest,
         ),
+        **implicitly(),
     )
 
 
