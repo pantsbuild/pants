@@ -112,6 +112,7 @@ Created as part of the release process.
 + Facetoe
 + Fatin H
 + Fedor Korotkov
++ Felix Scherz
 + Filip Nikolovski
 + Fiona Condone
 + Flo
@@ -196,6 +197,7 @@ Created as part of the release process.
 + Julio Batista Silva
 + Justin Trobec
 + Kacper
++ Kacper Krylowicz
 + KadenAgrey
 + Karin Lundberg
 + Kaushik Srenevasan
