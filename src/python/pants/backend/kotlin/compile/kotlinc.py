@@ -7,10 +7,10 @@ import logging
 
 from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet
 from pants.backend.kotlin.compile.kotlinc_plugins import (
-    KotlincPlugins,
     KotlincPluginsForTargetRequest,
     KotlincPluginsRequest,
-    KotlincPluginTargetsForTarget,
+    fetch_kotlinc_plugins,
+    resolve_kotlinc_plugins_for_target,
 )
 from pants.backend.kotlin.subsystems.kotlin import KotlinSubsystem
 from pants.backend.kotlin.subsystems.kotlinc import KotlincSubsystem
@@ -19,11 +19,11 @@ from pants.backend.kotlin.target_types import (
     KotlinGeneratorFieldSet,
     KotlinSourceField,
 )
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
+from pants.engine.internals.native_engine import EMPTY_DIGEST, MergeDigests
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import execute_process, merge_digests
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import CoarsenedTarget, SourcesField
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
@@ -32,14 +32,14 @@ from pants.jvm.compile import (
     ClasspathEntry,
     ClasspathEntryRequest,
     CompileResult,
-    FallibleClasspathEntries,
     FallibleClasspathEntry,
+    compile_classpath_entries,
 )
 from pants.jvm.compile import rules as jvm_compile_rules
-from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
+from pants.jvm.jdk_rules import JdkRequest, JvmProcess, prepare_jdk_environment
 from pants.jvm.resolve.common import ArtifactRequirements
 from pants.jvm.resolve.coordinate import Coordinate
-from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.coursier_fetch import ToolClasspathRequest, materialize_classpath_for_tool
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -61,7 +61,9 @@ async def compile_kotlin_source(
     request: CompileKotlinSourceRequest,
 ) -> FallibleClasspathEntry:
     # Request classpath entries for our direct dependencies.
-    dependency_cpers = await Get(FallibleClasspathEntries, ClasspathDependenciesRequest(request))
+    dependency_cpers = await compile_classpath_entries(
+        **implicitly(ClasspathDependenciesRequest(request))
+    )
     direct_dependency_classpath_entries = dependency_cpers.if_all_succeeded()
 
     if direct_dependency_classpath_entries is None:
@@ -79,28 +81,26 @@ async def compile_kotlin_source(
     )
     component_members_and_source_files = zip(
         component_members_with_sources,
-        await MultiGet(
-            Get(
-                SourceFiles,
+        await concurrently(
+            determine_source_files(
                 SourceFilesRequest(
                     (t.get(SourcesField),),
                     for_sources_types=(KotlinSourceField,),
                     enable_codegen=True,
-                ),
+                )
             )
             for t in component_members_with_sources
         ),
     )
 
-    plugins_ = await MultiGet(
-        Get(
-            KotlincPluginTargetsForTarget,
-            KotlincPluginsForTargetRequest(target, request.resolve.name),
+    plugins_ = await concurrently(
+        resolve_kotlinc_plugins_for_target(
+            KotlincPluginsForTargetRequest(target, request.resolve.name), **implicitly()
         )
         for target in request.component.members
     )
     plugins_request = KotlincPluginsRequest.from_target_plugins(plugins_, request.resolve)
-    local_plugins = await Get(KotlincPlugins, KotlincPluginsRequest, plugins_request)
+    local_plugins = await fetch_kotlinc_plugins(plugins_request)
 
     component_members_and_kotlin_source_files = [
         (target, sources)
@@ -110,8 +110,8 @@ async def compile_kotlin_source(
 
     if not component_members_and_kotlin_source_files:
         # Is a generator, and so exports all of its direct deps.
-        exported_digest = await Get(
-            Digest, MergeDigests(cpe.digest for cpe in direct_dependency_classpath_entries)
+        exported_digest = await merge_digests(
+            MergeDigests(cpe.digest for cpe in direct_dependency_classpath_entries)
         )
         classpath_entry = ClasspathEntry.merge(exported_digest, direct_dependency_classpath_entries)
         return FallibleClasspathEntry(
@@ -127,9 +127,8 @@ async def compile_kotlin_source(
 
     user_classpath = Classpath(direct_dependency_classpath_entries, request.resolve)
 
-    tool_classpath, sources_digest, jdk = await MultiGet(
-        Get(
-            ToolClasspath,
+    tool_classpath, sources_digest, jdk = await concurrently(
+        materialize_classpath_for_tool(
             ToolClasspathRequest(
                 artifact_requirements=ArtifactRequirements.from_coordinates(
                     [
@@ -145,18 +144,17 @@ async def compile_kotlin_source(
                         ),
                     ]
                 ),
-            ),
+            )
         ),
-        Get(
-            Digest,
+        merge_digests(
             MergeDigests(
                 (
                     sources.snapshot.digest
                     for _, sources in component_members_and_kotlin_source_files
                 )
-            ),
+            )
         ),
-        Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(request.component)),
+        prepare_jdk_environment(**implicitly(JdkRequest.from_target(request.component))),
     )
 
     extra_immutable_input_digests = {
@@ -169,32 +167,33 @@ async def compile_kotlin_source(
     classpath_arg = ":".join(user_classpath.immutable_inputs_args(prefix=usercp))
 
     output_file = compute_output_jar_filename(request.component)
-    process_result = await Get(
-        FallibleProcessResult,
-        JvmProcess(
-            jdk=jdk,
-            classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
-            argv=[
-                "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler",
-                *(("-classpath", classpath_arg) if classpath_arg else ()),
-                "-d",
-                output_file,
-                *(local_plugins.args(local_kotlinc_plugins_relpath)),
-                *kotlinc.args,
-                *sorted(
-                    itertools.chain.from_iterable(
-                        sources.snapshot.files
-                        for _, sources in component_members_and_kotlin_source_files
-                    )
-                ),
-            ],
-            input_digest=sources_digest,
-            extra_immutable_input_digests=extra_immutable_input_digests,
-            extra_nailgun_keys=extra_nailgun_keys,
-            output_files=(output_file,),
-            description=f"Compile {request.component} with kotlinc",
-            level=LogLevel.DEBUG,
-        ),
+    process_result = await execute_process(
+        **implicitly(
+            JvmProcess(
+                jdk=jdk,
+                classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
+                argv=[
+                    "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler",
+                    *(("-classpath", classpath_arg) if classpath_arg else ()),
+                    "-d",
+                    output_file,
+                    *(local_plugins.args(local_kotlinc_plugins_relpath)),
+                    *kotlinc.args,
+                    *sorted(
+                        itertools.chain.from_iterable(
+                            sources.snapshot.files
+                            for _, sources in component_members_and_kotlin_source_files
+                        )
+                    ),
+                ],
+                input_digest=sources_digest,
+                extra_immutable_input_digests=extra_immutable_input_digests,
+                extra_nailgun_keys=extra_nailgun_keys,
+                output_files=(output_file,),
+                description=f"Compile {request.component} with kotlinc",
+                level=LogLevel.DEBUG,
+            )
+        )
     )
     output: ClasspathEntry | None = None
     if process_result.exit_code == 0:

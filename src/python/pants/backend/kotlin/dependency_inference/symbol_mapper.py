@@ -4,11 +4,13 @@
 from collections import defaultdict
 from collections.abc import Mapping
 
-from pants.backend.kotlin.dependency_inference.kotlin_parser import KotlinSourceDependencyAnalysis
+from pants.backend.kotlin.dependency_inference.kotlin_parser import (
+    resolve_fallible_result_to_analysis,
+)
 from pants.backend.kotlin.target_types import KotlinSourceField
 from pants.core.util_rules.source_files import SourceFilesRequest
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
+from pants.engine.internals.selectors import concurrently
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import AllTargets, Targets
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference.artifact_mapper import MutableTrieNode
@@ -39,8 +41,10 @@ async def map_first_party_kotlin_targets_to_symbols(
     kotlin_targets: AllKotlinTargets,
     jvm: JvmSubsystem,
 ) -> SymbolMap:
-    source_analysis = await MultiGet(
-        Get(KotlinSourceDependencyAnalysis, SourceFilesRequest([target[KotlinSourceField]]))
+    source_analysis = await concurrently(
+        resolve_fallible_result_to_analysis(
+            **implicitly(SourceFilesRequest([target[KotlinSourceField]]))
+        )
         for target in kotlin_targets
     )
     address_and_analysis = zip(
