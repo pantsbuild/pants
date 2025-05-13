@@ -28,9 +28,9 @@ from pants.backend.python.util_rules.pex import PythonProvider
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.core.util_rules.external_tool import (
-    DownloadedExternalTool,
     ExternalToolError,
     ExternalToolRequest,
+    download_external_tool,
 )
 from pants.core.util_rules.external_tool import rules as external_tools_rules
 from pants.core.util_rules.system_binaries import (
@@ -43,13 +43,9 @@ from pants.core.util_rules.system_binaries import (
 )
 from pants.engine.fs import DownloadFile
 from pants.engine.internals.native_engine import FileDigest
-from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessCacheScope, ProcessResult
-from pants.engine.rules import collect_rules, rule
-from pants.core.util_rules.external_tool import download_external_tool
-from pants.engine.process import fallible_to_exec_result_or_raise
-from pants.engine.rules import implicitly
+from pants.engine.process import Process, ProcessCacheScope, fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.option.errors import OptionsError
 from pants.option.global_options import NamedCachesDirOption
@@ -541,7 +537,8 @@ async def get_python(
         pbs_subsystem.release_constraints,
     )
 
-    downloaded_python = await download_external_tool(ExternalToolRequest(
+    downloaded_python = await download_external_tool(
+        ExternalToolRequest(
             DownloadFile(
                 pbs_py_info["url"],
                 FileDigest(
@@ -550,7 +547,8 @@ async def get_python(
                 ),
             ),
             "python/bin/python3",
-        ))
+        )
+    )
 
     sandbox_cache_dir = PurePath(PBS_SANDBOX_NAME)
 
@@ -562,7 +560,8 @@ async def get_python(
     temp_dir = sandbox_cache_dir / "tmp" / f"pbs-copier-{uuid.uuid4()}"
     copy_target = temp_dir / python_version
 
-    await fallible_to_exec_result_or_raise(Process(
+    await fallible_to_exec_result_or_raise(
+        Process(
             [
                 sh.path,
                 "-euc",
@@ -629,7 +628,9 @@ async def get_python(
             # session the named_cache destination for this Python is valid, as the Python ecosystem
             # mainly assumes absolute paths for Python interpreters.
             cache_scope=ProcessCacheScope.PER_SESSION,
-        ), **implicitly())
+        ),
+        **implicitly(),
+    )
 
     python_path = named_caches_dir.val / PBS_NAMED_CACHE_NAME / python_version / "bin" / "python3"
     return PythonExecutable(
