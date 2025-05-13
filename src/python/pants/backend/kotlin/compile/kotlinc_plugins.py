@@ -13,8 +13,9 @@ from pants.backend.kotlin.target_types import (
     KotlincPluginArtifactField,
     KotlincPluginIdField,
 )
+from pants.build_graph.address import AddressInput
 from pants.engine.addresses import Addresses
-from pants.engine.internals.build_files import maybe_resolve_address, resolve_address
+from pants.engine.internals.build_files import resolve_address
 from pants.engine.internals.graph import coarsened_targets as coarsened_targets_get
 from pants.engine.internals.graph import resolve_targets
 from pants.engine.internals.native_engine import MergeDigests
@@ -126,16 +127,17 @@ async def resolve_kotlinc_plugins_for_target(
         plugin_ids = tuple(plugin_names_by_resolve.get(resolve, ()))
 
     candidate_plugins = []
-    artifact_address_gets = []
     for plugin in all_kotlinc_plugins:
         if _plugin_id(plugin) not in plugin_ids:
             continue
         candidate_plugins.append(plugin)
-        artifact_field = plugin[KotlincPluginArtifactField]
-        address_input = await maybe_resolve_address(artifact_field.to_address_input())
-        artifact_address_gets.append(resolve_address(address_input))
 
-    artifact_addresses = await concurrently(artifact_address_gets)
+    address_inputs: list[AddressInput] = [
+        plugin[KotlincPluginArtifactField].to_address_input() for plugin in candidate_plugins
+    ]
+    artifact_addresses = await concurrently(
+        resolve_address(**implicitly(address_input)) for address_input in address_inputs
+    )
     candidate_artifacts = await resolve_targets(**implicitly(Addresses(artifact_addresses)))
 
     plugins: dict[str, tuple[Target, Target]] = {}  # Maps plugin ID to relevant JVM artifact
