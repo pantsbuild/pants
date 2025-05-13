@@ -10,12 +10,13 @@ from urllib.parse import urlsplit
 
 from pants.backend.url_handlers.s3.subsystem import S3AuthSigning, S3Subsystem
 from pants.engine.download_file import URLDownloadHandler
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import Digest, NativeDownloadFile
 from pants.engine.internals.native_engine import EMPTY_FILE_DIGEST, FileDigest
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import collect_rules, rule
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.intrinsics import download_file
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.util.strutil import softwrap
@@ -54,20 +55,21 @@ async def access_aws_credentials(
         )
         raise
 
-    env_vars = await Get(
-        EnvironmentVars,
-        {
-            EnvironmentVarsRequest(
-                [
-                    "AWS_PROFILE",
-                    "AWS_REGION",
-                    "AWS_ACCESS_KEY_ID",
-                    "AWS_SECRET_ACCESS_KEY",
-                    "AWS_SESSION_TOKEN",
-                ]
-            ): EnvironmentVarsRequest,
-            local_environment_name.val: EnvironmentName,
-        },
+    env_vars = await environment_vars_subset(
+        **implicitly(
+            {
+                EnvironmentVarsRequest(
+                    [
+                        "AWS_PROFILE",
+                        "AWS_REGION",
+                        "AWS_ACCESS_KEY_ID",
+                        "AWS_SECRET_ACCESS_KEY",
+                        "AWS_SESSION_TOKEN",
+                    ]
+                ): EnvironmentVarsRequest,
+                local_environment_name.val: EnvironmentName,
+            }
+        )
     )
 
     session = boto_session.Session()
@@ -183,15 +185,14 @@ async def download_from_s3(
     except exceptions.NoCredentialsError:
         pass  # The user can still access public S3 buckets without credentials
 
-    return await Get(
-        Digest,
+    return await download_file(
         NativeDownloadFile(
             url=virtual_hosted_url,
             expected_digest=request.expected_digest,
             auth_headers=http_request.headers,
             retry_delay_duration=global_options.file_downloads_retry_delay,
             max_attempts=global_options.file_downloads_max_attempts,
-        ),
+        )
     )
 
 
@@ -202,8 +203,7 @@ class DownloadS3SchemeURL(URLDownloadHandler):
 @rule
 async def download_file_from_s3_scheme(request: DownloadS3SchemeURL) -> Digest:
     split = urlsplit(request.url)
-    return await Get(
-        Digest,
+    return await download_from_s3(
         S3DownloadFile(
             region="",
             bucket=split.netloc,
@@ -211,6 +211,7 @@ async def download_file_from_s3_scheme(request: DownloadS3SchemeURL) -> Digest:
             query=split.query,
             expected_digest=request.expected_digest,
         ),
+        **implicitly(),
     )
 
 
@@ -224,8 +225,7 @@ async def download_file_from_virtual_hosted_s3_authority(
 ) -> Digest:
     split = urlsplit(request.url)
     bucket, aws_netloc = split.netloc.split(".", 1)
-    return await Get(
-        Digest,
+    return await download_from_s3(
         S3DownloadFile(
             region=aws_netloc.split(".")[1] if aws_netloc.count(".") == 3 else "",
             bucket=bucket,
@@ -233,6 +233,7 @@ async def download_file_from_virtual_hosted_s3_authority(
             query=split.query,
             expected_digest=request.expected_digest,
         ),
+        **implicitly(),
     )
 
 
@@ -244,8 +245,7 @@ class DownloadS3AuthorityPathStyleURL(URLDownloadHandler):
 async def download_file_from_path_s3_authority(request: DownloadS3AuthorityPathStyleURL) -> Digest:
     split = urlsplit(request.url)
     _, bucket, key = split.path.split("/", 2)
-    return await Get(
-        Digest,
+    return await download_from_s3(
         S3DownloadFile(
             region=split.netloc.split(".")[1] if split.netloc.count(".") == 3 else "",
             bucket=bucket,
@@ -253,6 +253,7 @@ async def download_file_from_path_s3_authority(request: DownloadS3AuthorityPathS
             query=split.query,
             expected_digest=request.expected_digest,
         ),
+        **implicitly(),
     )
 
 
