@@ -542,44 +542,6 @@ async def get_coursier_lockfile_for_resolve(
     return CoursierResolvedLockfile.from_serialized(lockfile_contents)
 
 
-@rule(desc="Fetch with coursier")
-async def fetch_with_coursier(request: CoursierFetchRequest) -> FallibleClasspathEntry:
-    # TODO: Loading this per JvmArtifact.
-    lockfile = await get_coursier_lockfile_for_resolve(request.resolve)
-
-    requirement = ArtifactRequirement.from_jvm_artifact_target(request.component.representative)
-
-    if lockfile.metadata and not lockfile.metadata.is_valid_for(
-        [requirement], LockfileContext.USER
-    ):
-        raise ValueError(
-            f"Requirement `{requirement.to_coord_arg_str()}` has changed since the lockfile "
-            f"for {request.resolve.path} was generated. Run `{bin_name()} generate-lockfiles` to update your "
-            "lockfile based on the new requirements."
-        )
-
-    # All of the transitive dependencies are exported.
-    # TODO: Expose an option to control whether this exports only the root, direct dependencies,
-    # transitive dependencies, etc.
-    assert len(request.component.members) == 1, "JvmArtifact does not have dependencies."
-    root_entry, transitive_entries = lockfile.dependencies(
-        request.resolve,
-        requirement.coordinate,
-    )
-
-    classpath_entries = await concurrently(
-        coursier_fetch_one_coord(entry) for entry in (root_entry, *transitive_entries)
-    )
-    exported_digest = await merge_digests(MergeDigests(cpe.digest for cpe in classpath_entries))
-
-    return FallibleClasspathEntry(
-        description=str(request.component),
-        result=CompileResult.SUCCEEDED,
-        output=ClasspathEntry.merge(exported_digest, classpath_entries),
-        exit_code=0,
-    )
-
-
 class ResolvedClasspathEntries(Collection[ClasspathEntry]):
     """A collection of resolved classpath entries."""
 
@@ -676,6 +638,44 @@ async def coursier_fetch_one_coord(
             f"Coursier fetch for '{resolved_coord}' succeeded, but fetched artifact {file_digest} did not match the expected artifact: {request.file_digest}."
         )
     return ClasspathEntry(digest=stripped_digest, filenames=(classpath_dest_name,))
+
+
+@rule(desc="Fetch with coursier")
+async def fetch_with_coursier(request: CoursierFetchRequest) -> FallibleClasspathEntry:
+    # TODO: Loading this per JvmArtifact.
+    lockfile = await get_coursier_lockfile_for_resolve(request.resolve)
+
+    requirement = ArtifactRequirement.from_jvm_artifact_target(request.component.representative)
+
+    if lockfile.metadata and not lockfile.metadata.is_valid_for(
+        [requirement], LockfileContext.USER
+    ):
+        raise ValueError(
+            f"Requirement `{requirement.to_coord_arg_str()}` has changed since the lockfile "
+            f"for {request.resolve.path} was generated. Run `{bin_name()} generate-lockfiles` to update your "
+            "lockfile based on the new requirements."
+        )
+
+    # All of the transitive dependencies are exported.
+    # TODO: Expose an option to control whether this exports only the root, direct dependencies,
+    # transitive dependencies, etc.
+    assert len(request.component.members) == 1, "JvmArtifact does not have dependencies."
+    root_entry, transitive_entries = lockfile.dependencies(
+        request.resolve,
+        requirement.coordinate,
+    )
+
+    classpath_entries = await concurrently(
+        coursier_fetch_one_coord(entry) for entry in (root_entry, *transitive_entries)
+    )
+    exported_digest = await merge_digests(MergeDigests(cpe.digest for cpe in classpath_entries))
+
+    return FallibleClasspathEntry(
+        description=str(request.component),
+        result=CompileResult.SUCCEEDED,
+        output=ClasspathEntry.merge(exported_digest, classpath_entries),
+        exit_code=0,
+    )
 
 
 @rule(level=LogLevel.DEBUG)
