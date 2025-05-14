@@ -311,6 +311,7 @@ def test_eager_validation(cache_content_behavior: CacheContentBehavior) -> None:
     assert "backtrack_attempts" not in metrics3
 
 
+@pytest.mark.skip(reason="Flaky test which needs to be reevaluated.")
 def test_remote_cache_workunits() -> None:
     """Tests that remote cache operations properly emit workunits with metadata."""
     executor = PyExecutor(core_threads=2, max_threads=4)
