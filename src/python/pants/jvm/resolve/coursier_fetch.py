@@ -19,14 +19,13 @@ import toml
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateLockfilesSubsystem
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
     Digest,
-    DigestContents,
     DigestSubset,
     FileContent,
     FileDigest,
@@ -35,10 +34,20 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
+from pants.engine.internals.graph import resolve_targets
 from pants.engine.internals.native_engine import EMPTY_DIGEST
-from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import CoarsenedTargets, Target, Targets
+from pants.engine.intrinsics import (
+    create_digest,
+    digest_subset_to_digest,
+    digest_to_snapshot,
+    get_digest_contents,
+    merge_digests,
+    path_globs_to_digest,
+    remove_prefix,
+)
+from pants.engine.process import fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
+from pants.engine.target import CoarsenedTargets, Target
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import (
     ClasspathEntry,
@@ -54,6 +63,7 @@ from pants.jvm.resolve.common import (
 )
 from pants.jvm.resolve.coordinate import Coordinate, Coordinates
 from pants.jvm.resolve.coursier_setup import Coursier, CoursierFetchProcess
+from pants.jvm.resolve.jvm_tool import gather_coordinates_for_jvm_lockfile
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata, LockfileContext
 from pants.jvm.subsystems import JvmSubsystem
@@ -63,7 +73,7 @@ from pants.jvm.target_types import (
     JvmArtifactTarget,
     JvmResolveField,
 )
-from pants.jvm.util_rules import ExtractFileDigest
+from pants.jvm.util_rules import ExtractFileDigest, digest_to_file_digest
 from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -357,11 +367,12 @@ async def prepare_coursier_resolve_info(
                 f"{coord.group}:{coord.artifact}--{exclude}" for (coord, exclude) in excludes
             ).encode("utf-8"),
         )
-        excludes_digest = await Get(Digest, CreateDigest([excludes_file_content]))
+        excludes_digest = await create_digest(CreateDigest([excludes_file_content]))
         extra_args += ["--local-exclude-file", LOCAL_EXCLUDE_FILE]
 
-    jar_file_sources = await MultiGet(
-        Get(SourceFiles, SourceFilesRequest([jar_source_field])) for _, jar_source_field in jars
+    jar_file_sources = await concurrently(
+        determine_source_files(SourceFilesRequest([jar_source_field]))
+        for _, jar_source_field in jars
     )
     jar_file_paths = [jar_file_source.snapshot.files[0] for jar_file_source in jar_file_sources]
 
@@ -386,14 +397,13 @@ async def prepare_coursier_resolve_info(
 
     to_resolve = chain(no_jars, resolvable_jar_requirements)
 
-    digest = await Get(
-        Digest,
+    digest = await merge_digests(
         MergeDigests(
             [
                 *(jar_file_source.snapshot.digest for jar_file_source in jar_file_sources),
                 excludes_digest,
             ]
-        ),
+        )
     )
 
     coord_arg_strings: OrderedSet[str] = OrderedSet()
@@ -443,50 +453,51 @@ async def coursier_resolve_lockfile(
     if len(artifact_requirements) == 0:
         return CoursierResolvedLockfile(entries=())
 
-    coursier_resolve_info = await Get(
-        CoursierResolveInfo, ArtifactRequirements, artifact_requirements
-    )
+    coursier_resolve_info = await prepare_coursier_resolve_info(artifact_requirements)
 
     coursier_report_file_name = "coursier_report.json"
 
-    process_result = await Get(
-        ProcessResult,
-        CoursierFetchProcess(
-            args=(
-                coursier_report_file_name,
-                *coursier_resolve_info.argv,
-            ),
-            input_digest=coursier_resolve_info.digest,
-            output_directories=("classpath",),
-            output_files=(coursier_report_file_name,),
-            description=(
-                "Running `coursier fetch` against "
-                f"{pluralize(len(artifact_requirements), 'requirement')}: "
-                f"{', '.join(req.to_coord_arg_str() for req in artifact_requirements)}"
-            ),
-        ),
+    process_result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            CoursierFetchProcess(
+                args=(
+                    coursier_report_file_name,
+                    *coursier_resolve_info.argv,
+                ),
+                input_digest=coursier_resolve_info.digest,
+                output_directories=("classpath",),
+                output_files=(coursier_report_file_name,),
+                description=(
+                    "Running `coursier fetch` against "
+                    f"{pluralize(len(artifact_requirements), 'requirement')}: "
+                    f"{', '.join(req.to_coord_arg_str() for req in artifact_requirements)}"
+                ),
+            )
+        )
     )
 
-    report_digest = await Get(
-        Digest, DigestSubset(process_result.output_digest, PathGlobs([coursier_report_file_name]))
+    report_digest = await digest_subset_to_digest(
+        DigestSubset(process_result.output_digest, PathGlobs([coursier_report_file_name]))
     )
-    report_contents = await Get(DigestContents, Digest, report_digest)
+    report_contents = await get_digest_contents(report_digest)
     report = json.loads(report_contents[0].content)
 
     artifact_file_names = tuple(
         classpath_dest_filename(dep["coord"], dep["file"]) for dep in report["dependencies"]
     )
     artifact_output_paths = tuple(f"classpath/{file_name}" for file_name in artifact_file_names)
-    artifact_digests = await MultiGet(
-        Get(Digest, DigestSubset(process_result.output_digest, PathGlobs([output_path])))
+    artifact_digests = await concurrently(
+        digest_subset_to_digest(
+            DigestSubset(process_result.output_digest, PathGlobs([output_path]))
+        )
         for output_path in artifact_output_paths
     )
-    stripped_artifact_digests = await MultiGet(
-        Get(Digest, RemovePrefix(artifact_digest, "classpath"))
+    stripped_artifact_digests = await concurrently(
+        remove_prefix(RemovePrefix(artifact_digest, "classpath"))
         for artifact_digest in artifact_digests
     )
-    artifact_file_digests = await MultiGet(
-        Get(FileDigest, ExtractFileDigest(stripped_artifact_digest, file_name))
+    artifact_file_digests = await concurrently(
+        digest_to_file_digest(ExtractFileDigest(stripped_artifact_digest, file_name))
         for stripped_artifact_digest, file_name in zip(
             stripped_artifact_digests, artifact_file_names
         )
@@ -525,7 +536,7 @@ async def coursier_resolve_lockfile(
 @rule(desc="Fetch with coursier")
 async def fetch_with_coursier(request: CoursierFetchRequest) -> FallibleClasspathEntry:
     # TODO: Loading this per JvmArtifact.
-    lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, request.resolve)
+    lockfile = await get_coursier_lockfile_for_resolve(request.resolve)
 
     requirement = ArtifactRequirement.from_jvm_artifact_target(request.component.representative)
 
@@ -547,11 +558,10 @@ async def fetch_with_coursier(request: CoursierFetchRequest) -> FallibleClasspat
         requirement.coordinate,
     )
 
-    classpath_entries = await MultiGet(
-        Get(ClasspathEntry, CoursierLockfileEntry, entry)
-        for entry in (root_entry, *transitive_entries)
+    classpath_entries = await concurrently(
+        coursier_fetch_one_coord(entry) for entry in (root_entry, *transitive_entries)
     )
-    exported_digest = await Get(Digest, MergeDigests(cpe.digest for cpe in classpath_entries))
+    exported_digest = await merge_digests(MergeDigests(cpe.digest for cpe in classpath_entries))
 
     return FallibleClasspathEntry(
         description=str(request.component),
@@ -589,43 +599,42 @@ async def coursier_fetch_one_coord(
     # Prepare any URL- or JAR-specifying entries for use with Coursier
     req: ArtifactRequirement
     if request.pants_address:
-        targets = await Get(
-            Targets,
-            UnparsedAddressInputs(
-                [request.pants_address],
-                owning_address=None,
-                description_of_origin="<infallible - coursier fetch>",
-            ),
+        targets = await resolve_targets(
+            **implicitly(
+                UnparsedAddressInputs(
+                    [request.pants_address],
+                    owning_address=None,
+                    description_of_origin="<infallible - coursier fetch>",
+                )
+            )
         )
         req = ArtifactRequirement(request.coord, jar=targets[0][JvmArtifactJarSourceField])
     else:
         req = ArtifactRequirement(request.coord, url=request.remote_url)
 
-    coursier_resolve_info = await Get(
-        CoursierResolveInfo,
-        ArtifactRequirements([req]),
-    )
+    coursier_resolve_info = await prepare_coursier_resolve_info(ArtifactRequirements([req]))
 
     coursier_report_file_name = "coursier_report.json"
 
-    process_result = await Get(
-        ProcessResult,
-        CoursierFetchProcess(
-            args=(
-                coursier_report_file_name,
-                "--intransitive",
-                *coursier_resolve_info.argv,
-            ),
-            input_digest=coursier_resolve_info.digest,
-            output_directories=("classpath",),
-            output_files=(coursier_report_file_name,),
-            description=f"Fetching with coursier: {request.coord.to_coord_str()}",
-        ),
+    process_result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            CoursierFetchProcess(
+                args=(
+                    coursier_report_file_name,
+                    "--intransitive",
+                    *coursier_resolve_info.argv,
+                ),
+                input_digest=coursier_resolve_info.digest,
+                output_directories=("classpath",),
+                output_files=(coursier_report_file_name,),
+                description=f"Fetching with coursier: {request.coord.to_coord_str()}",
+            )
+        )
     )
-    report_digest = await Get(
-        Digest, DigestSubset(process_result.output_digest, PathGlobs([coursier_report_file_name]))
+    report_digest = await digest_subset_to_digest(
+        DigestSubset(process_result.output_digest, PathGlobs([coursier_report_file_name]))
     )
-    report_contents = await Get(DigestContents, Digest, report_digest)
+    report_contents = await get_digest_contents(report_digest)
     report = json.loads(report_contents[0].content)
 
     report_deps = report["dependencies"]
@@ -646,13 +655,12 @@ async def coursier_fetch_one_coord(
     classpath_dest_name = classpath_dest_filename(dep["coord"], dep["file"])
     classpath_dest = f"classpath/{classpath_dest_name}"
 
-    resolved_file_digest = await Get(
-        Digest, DigestSubset(process_result.output_digest, PathGlobs([classpath_dest]))
+    resolved_file_digest = await digest_subset_to_digest(
+        DigestSubset(process_result.output_digest, PathGlobs([classpath_dest]))
     )
-    stripped_digest = await Get(Digest, RemovePrefix(resolved_file_digest, "classpath"))
-    file_digest = await Get(
-        FileDigest,
-        ExtractFileDigest(stripped_digest, classpath_dest_name),
+    stripped_digest = await remove_prefix(RemovePrefix(resolved_file_digest, "classpath"))
+    file_digest = await digest_to_file_digest(
+        ExtractFileDigest(stripped_digest, classpath_dest_name)
     )
     if file_digest != request.file_digest:
         raise CoursierError(
@@ -664,8 +672,8 @@ async def coursier_fetch_one_coord(
 @rule(level=LogLevel.DEBUG)
 async def coursier_fetch_lockfile(lockfile: CoursierResolvedLockfile) -> ResolvedClasspathEntries:
     """Fetch every artifact in a lockfile."""
-    classpath_entries = await MultiGet(
-        Get(ClasspathEntry, CoursierLockfileEntry, entry) for entry in lockfile.entries
+    classpath_entries = await concurrently(
+        coursier_fetch_one_coord(entry) for entry in lockfile.entries
     )
     return ResolvedClasspathEntries(classpath_entries)
 
@@ -708,7 +716,7 @@ async def select_coursier_resolve_for_targets(
         glob_match_error_behavior=GlobMatchErrorBehavior.error,
         description_of_origin=f"The resolve `{resolve}` from `[jvm].resolves`",
     )
-    resolve_digest = await Get(Digest, PathGlobs, lockfile_source)
+    resolve_digest = await path_globs_to_digest(lockfile_source)
     return CoursierResolveKey(resolve, resolve_path, resolve_digest)
 
 
@@ -716,7 +724,7 @@ async def select_coursier_resolve_for_targets(
 async def get_coursier_lockfile_for_resolve(
     coursier_resolve: CoursierResolveKey,
 ) -> CoursierResolvedLockfile:
-    lockfile_digest_contents = await Get(DigestContents, Digest, coursier_resolve.digest)
+    lockfile_digest_contents = await get_digest_contents(coursier_resolve.digest)
     lockfile_contents = lockfile_digest_contents[0].content
     return CoursierResolvedLockfile.from_serialized(lockfile_contents)
 
@@ -773,9 +781,7 @@ class ToolClasspath:
 @rule(level=LogLevel.DEBUG)
 async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolClasspath:
     if request.artifact_requirements:
-        resolution = await Get(
-            CoursierResolvedLockfile, ArtifactRequirements, request.artifact_requirements
-        )
+        resolution = await coursier_resolve_lockfile(request.artifact_requirements)
     else:
         lockfile_req = request.lockfile
         assert lockfile_req is not None
@@ -788,7 +794,9 @@ async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolC
             )
             resolution = CoursierResolvedLockfile.from_serialized(lockfile_bytes)
         else:
-            lockfile_snapshot = await Get(Snapshot, PathGlobs([lockfile_req.lockfile]))
+            lockfile_snapshot = await digest_to_snapshot(
+                **implicitly(PathGlobs([lockfile_req.lockfile]))
+            )
             if not lockfile_snapshot.files:
                 raise ValueError(
                     f"No lockfile found at {lockfile_req.lockfile}, which is configured "
@@ -796,21 +804,19 @@ async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolC
                     f"Run {regen_command} to generate it."
                 )
 
-            resolution = await Get(
-                CoursierResolvedLockfile,
+            resolution = await get_coursier_lockfile_for_resolve(
                 CoursierResolveKey(
                     name=lockfile_req.resolve_name,
                     path=lockfile_req.lockfile,
                     digest=lockfile_snapshot.digest,
-                ),
+                )
             )
 
         # Validate that the lockfile is correct.
-        lockfile_inputs = await Get(
-            ArtifactRequirements,
+        lockfile_inputs = await gather_coordinates_for_jvm_lockfile(
             GatherJvmCoordinatesRequest(
                 lockfile_req.artifact_inputs, lockfile_req.artifact_option_name
-            ),
+            )
         )
         if resolution.metadata and not resolution.metadata.is_valid_for(
             lockfile_inputs, LockfileContext.TOOL
@@ -822,12 +828,14 @@ async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolC
                 f"{regen_command} to regenerate the lockfile."
             )
 
-    classpath_entries = await Get(ResolvedClasspathEntries, CoursierResolvedLockfile, resolution)
-    merged_snapshot = await Get(
-        Snapshot, MergeDigests(classpath_entry.digest for classpath_entry in classpath_entries)
+    classpath_entries = await coursier_fetch_lockfile(resolution)
+    merged_snapshot = await digest_to_snapshot(
+        **implicitly(MergeDigests(classpath_entry.digest for classpath_entry in classpath_entries))
     )
     if request.prefix is not None:
-        merged_snapshot = await Get(Snapshot, AddPrefix(merged_snapshot.digest, request.prefix))
+        merged_snapshot = await digest_to_snapshot(
+            **implicitly(AddPrefix(merged_snapshot.digest, request.prefix))
+        )
     return ToolClasspath(merged_snapshot)
 
 
