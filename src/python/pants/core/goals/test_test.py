@@ -385,6 +385,11 @@ def run_test_rule(
                     input_types=(TestRequest.Batch, EnvironmentName),
                     mock=mock_debug_request,
                 ),
+                MockGet(
+                    output_type=TestDebugAdapterRequest,
+                    input_types=(TestRequest.Batch, EnvironmentName),
+                    mock=mock_debug_request,
+                ),
                 # Merge XML results.
                 MockGet(
                     output_type=Digest,
