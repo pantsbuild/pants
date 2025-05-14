@@ -189,6 +189,9 @@ def assert_build(
 
     global_options = rule_runner.request(GlobalOptions, [])
 
+    union_membership = UnionMembership.from_rules(
+        [UnionRule(DockerImageTagsRequest, DockerImageTagsRequestPlugin)]
+    )
     result = run_rule_with_mocks(
         build_docker_image,
         rule_args=[
@@ -197,9 +200,7 @@ def assert_build(
             global_options,
             DockerBinary("/dummy/docker"),
             KeepSandboxes.never,
-            UnionMembership.from_rules(
-                [UnionRule(DockerImageTagsRequest, DockerImageTagsRequestPlugin)]
-            ),
+            union_membership,
         ],
         mock_gets=[
             MockGet(
@@ -228,6 +229,7 @@ def assert_build(
                 mock=mock_get_info_file,
             ),
         ],
+        union_membership=union_membership,
     )
 
     assert result.digest == EMPTY_DIGEST

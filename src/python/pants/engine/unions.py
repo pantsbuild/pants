@@ -148,7 +148,7 @@ class UnionMembership:
         members = self.union_rules.get(union_type)
         if members is None:
             raise TypeError(f"Not a registered union type: {union_type}")
-        return type(putative_member) in members
+        return putative_member in members
 
     def has_members(self, union_type: type) -> bool:
         """Check whether the union has an implementation or not."""

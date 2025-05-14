@@ -38,6 +38,10 @@ impl RuleId {
     pub fn from_string(s: String) -> Self {
         Self(s)
     }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 impl Display for RuleId {
