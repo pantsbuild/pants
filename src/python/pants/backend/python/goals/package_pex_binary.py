@@ -29,10 +29,10 @@ from pants.backend.python.target_types import (
     PexStripEnvField,
     PexVenvHermeticScripts,
     PexVenvSitePackagesCopies,
-    ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
 )
-from pants.backend.python.util_rules.pex import CompletePlatforms, Pex
+from pants.backend.python.target_types_rules import resolve_pex_entry_point
+from pants.backend.python.util_rules.pex import create_pex, digest_complete_platforms
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.core.goals.package import (
     BuiltPackage,
@@ -42,7 +42,7 @@ from pants.core.goals.package import (
 )
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior
 from pants.core.util_rules.environments import EnvironmentField
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -133,15 +133,13 @@ async def package_pex_binary(
     field_set: PexBinaryFieldSet,
     pex_binary_defaults: PexBinaryDefaults,
 ) -> PexFromTargetsRequestForBuiltPackage:
-    resolved_entry_point = await Get(
-        ResolvedPexEntryPoint, ResolvePexEntryPointRequest(field_set.entry_point)
+    resolved_entry_point = await resolve_pex_entry_point(
+        ResolvePexEntryPointRequest(field_set.entry_point)
     )
 
     output_filename = field_set.output_path.value_or_default(file_ending="pex")
 
-    complete_platforms = await Get(
-        CompletePlatforms, PexCompletePlatformsField, field_set.complete_platforms
-    )
+    complete_platforms = await digest_complete_platforms(field_set.complete_platforms)
 
     request = PexFromTargetsRequest(
         addresses=[field_set.address],
@@ -167,7 +165,7 @@ async def built_pacakge_for_pex_from_targets_request(
     request: PexFromTargetsRequestForBuiltPackage,
 ) -> BuiltPackage:
     pft_request = request.request
-    pex = await Get(Pex, PexFromTargetsRequest, pft_request)
+    pex = await create_pex(**implicitly(pft_request))
     return BuiltPackage(pex.digest, (BuiltPackageArtifact(pft_request.output_filename),))
 
 
