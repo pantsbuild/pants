@@ -15,15 +15,16 @@ from pants.backend.scala.target_types import (
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.addresses import Addresses
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
-from pants.engine.internals.native_engine import Digest, MergeDigests
+from pants.engine.internals.graph import coarsened_targets as coarsened_targets_get
+from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.internals.parametrize import (
     _TargetParametrizations,
     _TargetParametrizationsRequest,
 )
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.intrinsics import merge_digests
+from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     AllTargets,
-    CoarsenedTargets,
     FieldDefaults,
     Target,
     Targets,
@@ -32,7 +33,7 @@ from pants.engine.target import (
 )
 from pants.jvm.compile import ClasspathEntry, FallibleClasspathEntry
 from pants.jvm.goals import lockfile
-from pants.jvm.resolve.coursier_fetch import CoursierFetchRequest
+from pants.jvm.resolve.coursier_fetch import CoursierFetchRequest, fetch_with_coursier
 from pants.jvm.resolve.jvm_tool import rules as jvm_tool_rules
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
@@ -225,14 +226,11 @@ def _plugin_name(target: Target) -> str:
 @rule
 async def fetch_plugins(request: ScalaPluginsRequest) -> ScalaPlugins:
     # Fetch all the artifacts
-    coarsened_targets = await Get(
-        CoarsenedTargets, Addresses(target.address for target in request.artifacts)
+    coarsened_targets = await coarsened_targets_get(
+        **implicitly(Addresses(target.address for target in request.artifacts))
     )
-    fallible_artifacts = await MultiGet(
-        Get(
-            FallibleClasspathEntry,
-            CoursierFetchRequest(ct, resolve=request.resolve),
-        )
+    fallible_artifacts = await concurrently(
+        fetch_with_coursier(CoursierFetchRequest(ct, resolve=request.resolve))
         for ct in coarsened_targets
     )
 
@@ -241,7 +239,7 @@ async def fetch_plugins(request: ScalaPluginsRequest) -> ScalaPlugins:
         failed = [i for i in fallible_artifacts if i.exit_code != 0]
         raise Exception(f"Fetching local scala plugins failed: {failed}")
 
-    merged_classpath_digest = await Get(Digest, MergeDigests(i.digest for i in artifacts))
+    merged_classpath_digest = await merge_digests(MergeDigests(i.digest for i in artifacts))
     merged = ClasspathEntry.merge(merged_classpath_digest, artifacts)
 
     names = tuple(_plugin_name(target) for target in request.plugins)
