@@ -6,24 +6,26 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 from pants.backend.java.dependency_inference import symbol_mapper
-from pants.backend.java.dependency_inference.java_parser import JavaSourceDependencyAnalysisRequest
+from pants.backend.java.dependency_inference.java_parser import (
+    JavaSourceDependencyAnalysisRequest,
+    resolve_fallible_result_to_analysis,
+)
 from pants.backend.java.dependency_inference.java_parser import rules as java_parser_rules
-from pants.backend.java.dependency_inference.types import JavaImport, JavaSourceDependencyAnalysis
+from pants.backend.java.dependency_inference.types import JavaImport
 from pants.backend.java.subsystems.java_infer import JavaInferSubsystem
 from pants.backend.java.target_types import JavaSourceField
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.internals.graph import determine_explicitly_provided_dependencies, resolve_target
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
-    ExplicitlyProvidedDependencies,
     FieldSet,
     InferDependenciesRequest,
     InferredDependencies,
     SourcesField,
-    WrappedTarget,
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
@@ -56,17 +58,6 @@ class JavaInferredDependenciesAndExportsRequest:
     source: SourcesField
 
 
-@rule(desc="Inferring Java dependencies by source analysis")
-async def infer_java_dependencies_via_source_analysis(
-    request: InferJavaSourceDependencies,
-) -> InferredDependencies:
-    jids = await Get(
-        JavaInferredDependencies,
-        JavaInferredDependenciesAndExportsRequest(request.field_set.source),
-    )
-    return InferredDependencies(jids.dependencies)
-
-
 @rule(desc="Inferring Java dependencies and exports by source analysis")
 async def infer_java_dependencies_and_exports_via_source_analysis(
     request: JavaInferredDependenciesAndExportsRequest,
@@ -79,17 +70,18 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
 
     address = request.source.address
 
-    wrapped_tgt = await Get(
-        WrappedTarget, WrappedTargetRequest(address, description_of_origin="<infallible>")
+    wrapped_tgt = await resolve_target(
+        WrappedTargetRequest(address, description_of_origin="<infallible>"), **implicitly()
     )
     tgt = wrapped_tgt.target
-    source_files = await Get(SourceFiles, SourceFilesRequest([tgt[JavaSourceField]]))
+    source_files = await determine_source_files(SourceFilesRequest([tgt[JavaSourceField]]))
 
-    explicitly_provided_deps, analysis = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(tgt[Dependencies])),
-        Get(
-            JavaSourceDependencyAnalysis,
-            JavaSourceDependencyAnalysisRequest(source_files=source_files),
+    explicitly_provided_deps, analysis = await concurrently(
+        determine_explicitly_provided_dependencies(
+            **implicitly(DependenciesRequest(tgt[Dependencies]))
+        ),
+        resolve_fallible_result_to_analysis(
+            **implicitly(JavaSourceDependencyAnalysisRequest(source_files=source_files))
         ),
     )
 
@@ -153,6 +145,16 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
         exports.remove(address)
 
     return JavaInferredDependencies(FrozenOrderedSet(dependencies), FrozenOrderedSet(exports))
+
+
+@rule(desc="Inferring Java dependencies by source analysis")
+async def infer_java_dependencies_via_source_analysis(
+    request: InferJavaSourceDependencies,
+) -> InferredDependencies:
+    jids = await infer_java_dependencies_and_exports_via_source_analysis(
+        JavaInferredDependenciesAndExportsRequest(request.field_set.source), **implicitly()
+    )
+    return InferredDependencies(jids.dependencies)
 
 
 def dependency_name(imp: JavaImport):
