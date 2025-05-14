@@ -84,7 +84,7 @@ class Dependents(DeduplicatedCollection[Address]):
 
 
 @rule(level=LogLevel.DEBUG)
-def find_dependents(
+async def find_dependents(
     request: DependentsRequest, address_to_dependents: AddressToDependents
 ) -> Dependents:
     check = set(request.addresses)
