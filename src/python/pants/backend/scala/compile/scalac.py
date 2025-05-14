@@ -105,6 +105,8 @@ async def compile_scala_source(
     component_members_and_source_files = zip(
         component_members_with_sources,
         await concurrently(
+            # Some Scalac plugins (i.e. SemanticDB) require us to use stripped source files so the plugin
+            # would emit compilation output that correlates with the appropiate paths in the input files.
             strip_source_roots(
                 **implicitly(
                     SourceFilesRequest(
