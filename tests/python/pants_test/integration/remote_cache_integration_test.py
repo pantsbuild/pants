@@ -312,6 +312,7 @@ def test_eager_validation(cache_content_behavior: CacheContentBehavior) -> None:
 
 
 @pytest.mark.skip(reason="Flaky test which needs to be reevaluated.")
+@pytest.mark.no_error_if_skipped
 def test_remote_cache_workunits() -> None:
     """Tests that remote cache operations properly emit workunits with metadata."""
     executor = PyExecutor(core_threads=2, max_threads=4)
