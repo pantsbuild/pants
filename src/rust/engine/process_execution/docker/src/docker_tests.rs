@@ -19,8 +19,8 @@ use testutil::{owned_string_vec, relative_paths};
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::docker::{
-    ContainerCache, DockerOnceCell, ImagePullCache, PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY,
-    SANDBOX_BASE_PATH_IN_CONTAINER,
+    CONTAINER_CLEANUP_TIMEOUT_SECONDS, ContainerCache, DockerOnceCell, ImagePullCache,
+    PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY, SANDBOX_BASE_PATH_IN_CONTAINER,
 };
 use process_execution::local::KeepSandboxes;
 use process_execution::{
@@ -99,6 +99,8 @@ async fn test_old_container_cleanup_on_init() {
     docker.stop_container(&container_id, None).await.unwrap();
     let docker_cell = DockerOnceCell::new();
     docker_cell.get().await.unwrap();
+    // We have a 60 second timeout but cleanup up one container shouldn't take that long
+    tokio::time::sleep(Duration::from_secs(CONTAINER_CLEANUP_TIMEOUT_SECONDS / 4)).await;
     check_container_not_exists(&docker, &container_id)
         .await
         .unwrap();
