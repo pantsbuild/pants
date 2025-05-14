@@ -678,6 +678,8 @@ def _compare_expected_mocks(
 
     Returns a string with errors (or empty if none), and a string with warnings (or empty if none).
     """
+    # TODO: Much of this validation function's logic overlaps with the code below that actually
+    # finds and runs the appropriate mocks, and they could probably be merged into a single pass.
 
     expected_calls: list[AwaitableConstraints] = []
     expected_gets: list[AwaitableConstraints] = []
@@ -720,23 +722,28 @@ def _compare_expected_mocks(
     surplus_gets = actual_gets_as_comparable - expected_gets_as_comparable
 
     if union_membership:
+        # For each unmocked Get, check if it is actually provided via union membership.
         for mg in list(missing_gets):
-            for sg in list(actual_gets_as_comparable):
-                if all(
+            # Compare to each actual mock one by one.
+            for ag in list(actual_gets_as_comparable):
+                if mg.output_type == ag.output_type and all(
                     (
-                        input_type in sg.input_types
+                        # Either the input type is directly provided.
+                        input_type in ag.input_types
                         or (
+                            # Or the input type is a union and the actual mock has an input whose
+                            # type is one of the union members.
                             input_type in union_membership
                             and any(
-                                union_membership.is_member(input_type, sgit)
-                                for sgit in sg.input_types
+                                union_membership.is_member(input_type, agit)
+                                for agit in ag.input_types
                             )
                         )
                     )
                     for input_type in mg.input_types
                 ):
                     missing_gets.remove(mg)
-                    surplus_gets.discard(sg)
+                    surplus_gets.discard(ag)
                     break
 
     errors = []
@@ -905,8 +912,11 @@ def run_rule_with_mocks(
                 for mock_get in mock_gets
                 if mock_get.output_type == res.output_type
                 and all(
+                    # Either the input type is directly provided.
                     input_type in mock_get.input_types
                     or (
+                        # Or the input type is a union and the mock has an input whose
+                        # type is one of the union members.
                         union_membership
                         and input_type in union_membership
                         and any(
