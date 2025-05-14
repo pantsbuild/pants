@@ -47,7 +47,7 @@ from pants.engine.internals.graph import hydrate_sources
 from pants.engine.internals.native_engine import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, concurrently
 from pants.engine.intrinsics import add_prefix, create_digest, digest_to_snapshot, merge_digests
-from pants.engine.process import Process, ProcessCacheScope, ProcessResult
+from pants.engine.process import Process, ProcessCacheScope, execute_process_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import AllTargets, HydrateSourcesRequest, SourcesField
 from pants.engine.unions import UnionMembership, UnionRule
@@ -156,7 +156,9 @@ async def _get_full_python_version(python: PythonExecutable) -> str:
         "-c",
         "import sys; print('.'.join(str(x) for x in sys.version_info[0:3]))",
     ]
-    res = await Get(ProcessResult, Process(argv, description="Get interpreter version"))
+    res = await execute_process_or_raise(
+        **implicitly(Process(argv, description="Get interpreter version"))
+    )
     return res.stdout.strip().decode()
 
 
@@ -455,13 +457,11 @@ async def add_codegen_to_export_result(
     if codegen_result.digest == EMPTY_DIGEST:
         return export_result
 
-    codegen_digest = await Get(
-        Digest, AddPrefix(codegen_result.digest, _ExportPythonCodegenSetup.PKG_DIR)
+    codegen_digest = await add_prefix(
+        AddPrefix(codegen_result.digest, _ExportPythonCodegenSetup.PKG_DIR)
     )
-
-    export_digest_with_codegen = await Get(
-        Digest,
-        MergeDigests([export_result.digest, codegen_digest, codegen_setup.setup_script_digest]),
+    export_digest_with_codegen = await merge_digests(
+        MergeDigests([export_result.digest, codegen_digest, codegen_setup.setup_script_digest])
     )
 
     pkg_dir_path = os.path.join(
