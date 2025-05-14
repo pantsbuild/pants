@@ -224,6 +224,7 @@ def assert_build(
             ),
         ],
         union_membership=union_membership,
+        warn_on_calls_satisfied_by_gets=False,
     )
 
     assert result.digest == EMPTY_DIGEST
