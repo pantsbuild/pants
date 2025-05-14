@@ -6,20 +6,21 @@ from __future__ import annotations
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.util_rules.versions import (
     ScalaArtifactsForVersionRequest,
-    ScalaArtifactsForVersionResult,
+    resolve_scala_artifacts_for_version,
 )
 from pants.core.goals.repl import ReplImplementation, ReplRequest
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import Addresses
-from pants.engine.fs import AddPrefix, Digest, MergeDigests
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import CoarsenedTargets
+from pants.engine.fs import AddPrefix, MergeDigests
+from pants.engine.internals.graph import coarsened_targets
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import add_prefix, merge_digests
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
-from pants.jvm.classpath import Classpath
-from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest
+from pants.jvm.classpath import classpath
+from pants.jvm.jdk_rules import JdkRequest, prepare_jdk_environment
 from pants.jvm.resolve.common import ArtifactRequirements
-from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.coursier_fetch import ToolClasspathRequest, materialize_classpath_for_tool
 from pants.util.logging import LogLevel
 
 
@@ -32,36 +33,35 @@ class ScalaRepl(ReplImplementation):
 async def create_scala_repl_request(
     request: ScalaRepl, bash: BashBinary, scala_subsystem: ScalaSubsystem
 ) -> ReplRequest:
-    user_classpath = await Get(Classpath, Addresses, request.addresses)
+    user_classpath = await classpath(**implicitly({request.addresses: Addresses}))
 
-    roots = await Get(CoarsenedTargets, Addresses, request.addresses)
-    environs = await MultiGet(
-        Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(target)) for target in roots
+    roots = await coarsened_targets(**implicitly({request.addresses: Addresses}))
+    environs = await concurrently(
+        prepare_jdk_environment(**implicitly({JdkRequest.from_target(target): JdkRequest}))
+        for target in roots
     )
     jdk = max(environs, key=lambda j: j.jre_major_version)
 
     scala_version = scala_subsystem.version_for_resolve(user_classpath.resolve.name)
-    scala_artifacts = await Get(
-        ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(scala_version)
+    scala_artifacts = await resolve_scala_artifacts_for_version(
+        ScalaArtifactsForVersionRequest(scala_version)
     )
-    tool_classpath = await Get(
-        ToolClasspath,
+    tool_classpath = await materialize_classpath_for_tool(
         ToolClasspathRequest(
             prefix="__toolcp",
             artifact_requirements=ArtifactRequirements.from_coordinates(
                 scala_artifacts.all_coordinates
             ),
-        ),
+        )
     )
 
     user_classpath_prefix = "__cp"
-    prefixed_user_classpath = await MultiGet(
-        Get(Digest, AddPrefix(d, user_classpath_prefix)) for d in user_classpath.digests()
+    prefixed_user_classpath = await concurrently(
+        add_prefix(AddPrefix(d, user_classpath_prefix)) for d in user_classpath.digests()
     )
 
-    repl_digest = await Get(
-        Digest,
-        MergeDigests([*prefixed_user_classpath, tool_classpath.content.digest]),
+    repl_digest = await merge_digests(
+        MergeDigests([*prefixed_user_classpath, tool_classpath.content.digest])
     )
 
     return ReplRequest(

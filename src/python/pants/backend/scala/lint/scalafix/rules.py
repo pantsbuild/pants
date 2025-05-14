@@ -35,7 +35,7 @@ from pants.engine.intrinsics import (
     merge_digests,
 )
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
@@ -122,7 +122,7 @@ async def _resolve_scalafix_rule_classpath(
     if not scalafix.rule_targets:
         return _MaybeClasspath(classpath=None)
 
-    classpath = await Get(Classpath, UnparsedAddressInputs, scalafix.rule_targets)
+    classpath = await classpath_get(**implicitly({scalafix.rule_targets: UnparsedAddressInputs}))
     return _MaybeClasspath(classpath)
 
 
