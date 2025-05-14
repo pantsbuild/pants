@@ -29,6 +29,7 @@ from pants.engine.internals.build_files import (
 )
 from pants.engine.internals.dep_rules import DependencyRuleApplication, DependencyRuleSet
 from pants.engine.internals.graph import hydrate_sources, resolve_targets
+from pants.engine.internals.specs_rules import find_valid_field_sets_for_target_roots
 from pants.engine.rules import Get, Rule, collect_rules, concurrently, goal_rule, implicitly, rule
 from pants.engine.target import (
     AlwaysTraverseDeps,
@@ -42,7 +43,6 @@ from pants.engine.target import (
     NoApplicableTargetsBehavior,
     SourcesField,
     Target,
-    TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
     UnexpandedTargets,
 )
@@ -250,13 +250,13 @@ async def _create_target_alias_to_goals_map() -> dict[str, tuple[str, ...]]:
     peekable_goals = [field_set_to_goal_map[fs] for fs in peekable_field_sets]
 
     target_roots_to_field_sets_get = [
-        Get(
-            TargetRootsToFieldSets,
+        find_valid_field_sets_for_target_roots(
             TargetRootsToFieldSetsRequest(
                 field_set_superclass=fs,
                 goal_description="",
                 no_applicable_targets_behavior=NoApplicableTargetsBehavior.ignore,
             ),
+            **implicitly(),
         )
         for fs in peekable_field_sets
     ]
