@@ -22,7 +22,6 @@ from pants.backend.scala.target_types import ScalaFieldSet, ScalaGeneratorFieldS
 from pants.backend.scala.util_rules import versions
 from pants.backend.scala.util_rules.versions import (
     ScalaArtifactsForVersionRequest,
-    ScalaArtifactsForVersionResult,
     ScalaVersion,
     resolve_scala_artifacts_for_version,
 )
@@ -32,7 +31,7 @@ from pants.core.util_rules.system_binaries import BashBinary, ZipBinary
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Directory, MergeDigests
 from pants.engine.intrinsics import create_digest, execute_process, merge_digests
 from pants.engine.process import Process, ProcessCacheScope, execute_process_or_raise
-from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import CoarsenedTarget, SourcesField
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
@@ -47,11 +46,7 @@ from pants.jvm.compile import (
 from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import JdkRequest, JvmProcess, prepare_jdk_environment
 from pants.jvm.resolve.common import ArtifactRequirements
-from pants.jvm.resolve.coursier_fetch import (
-    ToolClasspath,
-    ToolClasspathRequest,
-    materialize_classpath_for_tool,
-)
+from pants.jvm.resolve.coursier_fetch import ToolClasspathRequest, materialize_classpath_for_tool
 from pants.jvm.strip_jar import strip_jar
 from pants.jvm.strip_jar.strip_jar import StripJarRequest
 from pants.jvm.strip_jar.strip_jar import strip_jar as strip_jar_get
@@ -268,18 +263,17 @@ async def compile_scala_source(
 
 @rule
 async def fetch_scala_library(request: ScalaLibraryRequest) -> ClasspathEntry:
-    scala_artifacts = await Get(
-        ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(request.version)
+    scala_artifacts = await resolve_scala_artifacts_for_version(
+        ScalaArtifactsForVersionRequest(request.version)
     )
-    tcp = await Get(
-        ToolClasspath,
+    tcp = await materialize_classpath_for_tool(
         ToolClasspathRequest(
             artifact_requirements=ArtifactRequirements.from_coordinates(
                 [
                     scala_artifacts.library_coordinate,
                 ]
             ),
-        ),
+        )
     )
 
     return ClasspathEntry(tcp.digest, tcp.content.files)

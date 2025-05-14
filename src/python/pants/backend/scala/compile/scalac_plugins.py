@@ -12,17 +12,16 @@ from pants.backend.scala.target_types import (
     ScalacPluginArtifactField,
     ScalacPluginNameField,
 )
-from pants.build_graph.address import Address, AddressInput
+from pants.build_graph.address import AddressInput
 from pants.engine.addresses import Addresses
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
+from pants.engine.internals.build_files import resolve_address
 from pants.engine.internals.graph import coarsened_targets as coarsened_targets_get
+from pants.engine.internals.graph import resolve_target_parametrizations
 from pants.engine.internals.native_engine import MergeDigests
-from pants.engine.internals.parametrize import (
-    _TargetParametrizations,
-    _TargetParametrizationsRequest,
-)
+from pants.engine.internals.parametrize import _TargetParametrizationsRequest
 from pants.engine.intrinsics import merge_digests
-from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     AllTargets,
     FieldDefaults,
@@ -127,19 +126,20 @@ async def _resolve_scalac_plugin_artifact(
 
     environment_name = local_environment_name.val
 
-    address = await Get(Address, AddressInput, field.to_address_input())
+    address = await resolve_address(**implicitly({field.to_address_input(): AddressInput}))
 
-    parametrizations = await Get(
-        _TargetParametrizations,
-        {
-            _TargetParametrizationsRequest(
-                address.maybe_convert_to_target_generator(),
-                description_of_origin=(
-                    f"the target generator {address.maybe_convert_to_target_generator()}"
-                ),
-            ): _TargetParametrizationsRequest,
-            environment_name: EnvironmentName,
-        },
+    parametrizations = await resolve_target_parametrizations(
+        **implicitly(
+            {
+                _TargetParametrizationsRequest(
+                    address.maybe_convert_to_target_generator(),
+                    description_of_origin=(
+                        f"the target generator {address.maybe_convert_to_target_generator()}"
+                    ),
+                ): _TargetParametrizationsRequest,
+                environment_name: EnvironmentName,
+            }
+        )
     )
 
     target = parametrizations.get_subset(
