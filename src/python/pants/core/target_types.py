@@ -678,7 +678,7 @@ class AllAssetTargetsByPath:
 
 
 @rule(desc="Mapping assets by path")
-def map_assets_by_path(
+async def map_assets_by_path(
     all_asset_targets: AllAssetTargets,
 ) -> AllAssetTargetsByPath:
     resources_by_path: defaultdict[PurePath, set[Target]] = defaultdict(set)

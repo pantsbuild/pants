@@ -24,11 +24,13 @@ from pants.backend.python.util_rules.pex_requirements import (
     Lockfile,
     PexRequirements,
     Resolve,
+    get_lockfile_for_resolve,
+    load_lockfile,
     strip_comments_from_pex_json_lockfile,
 )
 from pants.core.goals.resolves import ExportableTool
 from pants.engine.fs import Digest
-from pants.engine.internals.selectors import Get
+from pants.engine.rules import implicitly
 from pants.option.errors import OptionsError
 from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
@@ -394,8 +396,8 @@ async def get_loaded_lockfile(subsystem: PythonToolBase) -> LoadedLockfile:
     else:
         assert isinstance(requirements, PexRequirements)
         assert isinstance(requirements.from_superset, Resolve)
-        lockfile = await Get(Lockfile, Resolve, requirements.from_superset)
-    loaded_lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(lockfile))
+        lockfile = await get_lockfile_for_resolve(requirements.from_superset, **implicitly())
+    loaded_lockfile = await load_lockfile(LoadedLockfileRequest(lockfile), **implicitly())
     return loaded_lockfile
 
 
