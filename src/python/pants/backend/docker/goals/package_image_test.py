@@ -67,7 +67,7 @@ from pants.engine.process import (
     ProcessExecutionFailure,
     ProcessResultMetadata,
 )
-from pants.engine.target import InvalidFieldException, WrappedTarget, WrappedTargetRequest
+from pants.engine.target import InvalidFieldException, WrappedTarget
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.testutil.option_util import create_subsystem
@@ -202,17 +202,11 @@ def assert_build(
             KeepSandboxes.never,
             union_membership,
         ],
+        mock_calls={
+            "pants.backend.docker.util_rules.docker_build_context.create_docker_build_context": build_context_mock,
+            "pants.engine.internals.graph.resolve_target": lambda _: WrappedTarget(tgt),
+        },
         mock_gets=[
-            MockGet(
-                output_type=DockerBuildContext,
-                input_types=(DockerBuildContextRequest,),
-                mock=build_context_mock,
-            ),
-            MockGet(
-                output_type=WrappedTarget,
-                input_types=(WrappedTargetRequest,),
-                mock=lambda _: WrappedTarget(tgt),
-            ),
             MockGet(
                 output_type=DockerImageTags,
                 input_types=(DockerImageTagsRequestPlugin,),
