@@ -447,10 +447,7 @@ async def _determine_pex_python_and_platforms(request: PexRequest) -> _BuildPexP
     if request.python:
         python = request.python
     else:
-        python = await Get(
-            PythonExecutable, InterpreterConstraints, request.interpreter_constraints
-        )
-        # python = await find_interpreter(request.interpreter_constraints, **implicitly())
+        python = await find_interpreter(request.interpreter_constraints, **implicitly())
 
     if request.python or request.internal_only:
         # Sometimes we want to build and run with a specific interpreter (either because request
