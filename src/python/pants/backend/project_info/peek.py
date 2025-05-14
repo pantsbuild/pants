@@ -23,18 +23,20 @@ from pants.engine.console import Console
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Snapshot
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
-from pants.engine.internals.build_files import _get_target_family_and_adaptor_for_dep_rules
+from pants.engine.internals.build_files import (
+    _get_target_family_and_adaptor_for_dep_rules,
+    get_dependencies_rule_application,
+)
 from pants.engine.internals.dep_rules import DependencyRuleApplication, DependencyRuleSet
-from pants.engine.rules import Get, MultiGet, Rule, collect_rules, goal_rule, rule
+from pants.engine.internals.graph import hydrate_sources, resolve_targets
+from pants.engine.rules import Get, Rule, collect_rules, concurrently, goal_rule, implicitly, rule
 from pants.engine.target import (
     AlwaysTraverseDeps,
     Dependencies,
     DependenciesRequest,
-    DependenciesRuleApplication,
     DependenciesRuleApplicationRequest,
     Field,
     FieldSet,
-    HydratedSources,
     HydrateSourcesRequest,
     ImmutableValue,
     NoApplicableTargetsBehavior,
@@ -42,7 +44,6 @@ from pants.engine.target import (
     Target,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
-    Targets,
     UnexpandedTargets,
 )
 from pants.engine.unions import UnionMembership, union
@@ -260,7 +261,7 @@ async def _create_target_alias_to_goals_map() -> dict[str, tuple[str, ...]]:
         for fs in peekable_field_sets
     ]
 
-    target_roots_to_field_sets = await MultiGet(target_roots_to_field_sets_get)
+    target_roots_to_field_sets = await concurrently(target_roots_to_field_sets_get)
 
     # Create a collection of target aliases per target roots: e.g. [frozenset(), frozenset({'pyoxidizer_binary', 'pex_binary'}), ...]
     aliases_per_target_root: Iterable[frozenset[str]] = [
@@ -303,17 +304,18 @@ async def get_target_data(
     targets_with_sources = [tgt for tgt in sorted_targets if tgt.has_field(SourcesField)]
 
     # When determining dependencies, we replace target generators with their generated targets.
-    dependencies_per_target = await MultiGet(
-        Get(
-            Targets,
-            DependenciesRequest(
-                tgt.get(Dependencies), should_traverse_deps_predicate=AlwaysTraverseDeps()
-            ),
+    dependencies_per_target = await concurrently(
+        resolve_targets(
+            **implicitly(
+                DependenciesRequest(
+                    tgt.get(Dependencies), should_traverse_deps_predicate=AlwaysTraverseDeps()
+                )
+            )
         )
         for tgt in sorted_targets
     )
-    hydrated_sources_per_target = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(tgt[SourcesField]))
+    hydrated_sources_per_target = await concurrently(
+        hydrate_sources(HydrateSourcesRequest(tgt[SourcesField]), **implicitly())
         for tgt in targets_with_sources
     )
     if subsys.include_additional_info:
@@ -323,7 +325,7 @@ async def get_target_data(
             for field_set_type in union_membership[HasAdditionalTargetDataFieldSet]
             if field_set_type.is_applicable(tgt)
         ]
-        additional_infos = await MultiGet(
+        additional_infos = await concurrently(
             Get(AdditionalTargetData, HasAdditionalTargetDataFieldSet, field_set)
             for field_set in additional_info_field_sets
         )
@@ -373,14 +375,14 @@ async def get_target_data(
             if family.dependents_rules is not None
         }
 
-        all_applicable_dep_rules = await MultiGet(
-            Get(
-                DependenciesRuleApplication,
+        all_applicable_dep_rules = await concurrently(
+            get_dependencies_rule_application(
                 DependenciesRuleApplicationRequest(
                     tgt.address,
                     Addresses(dep.address for dep in deps),
                     description_of_origin="`peek` goal",
                 ),
+                **implicitly(),
             )
             for tgt, deps in zip(sorted_targets, dependencies_per_target)
         )
@@ -423,7 +425,7 @@ async def peek(
     :return: The `Peek` goal.
     """
 
-    tds = await Get(TargetDatas, UnexpandedTargets, targets)
+    tds = await get_target_data(targets, **implicitly())
     # This method needs to be called in a @goal_rule, otherwise it fails out with Rule errors (when called in an @rule)
     target_alias_to_goals_map = await _create_target_alias_to_goals_map()
 
