@@ -13,8 +13,8 @@ from pants.backend.openapi.lint.openapi_format.subsystem import (
 )
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.partitions import PartitionerType
-from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.process import fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -30,21 +30,23 @@ async def run_openapi_format(
     request: OpenApiFormatRequest.Batch,
     openapi_format: OpenApiFormatSubsystem,
 ) -> FmtResult:
-    result = await Get(
-        ProcessResult,
-        NodeJSToolRequest,
-        openapi_format.request(
-            args=(
-                *openapi_format.args,
-                os.path.join("{chroot}", request.snapshot.files[0]),
-                "--output",
-                os.path.join("{chroot}", request.snapshot.files[0]),
-            ),
-            input_digest=request.snapshot.digest,
-            output_files=request.snapshot.files,
-            description=f"Run openapi-format on {pluralize(len(request.snapshot.files), 'file')}.",
-            level=LogLevel.DEBUG,
-        ),
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            {
+                openapi_format.request(
+                    args=(
+                        *openapi_format.args,
+                        os.path.join("{chroot}", request.snapshot.files[0]),
+                        "--output",
+                        os.path.join("{chroot}", request.snapshot.files[0]),
+                    ),
+                    input_digest=request.snapshot.digest,
+                    output_files=request.snapshot.files,
+                    description=f"Run openapi-format on {pluralize(len(request.snapshot.files), 'file')}.",
+                    level=LogLevel.DEBUG,
+                ): NodeJSToolRequest
+            }
+        )
     )
 
     return await FmtResult.create(request, result)

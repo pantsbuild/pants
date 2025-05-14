@@ -11,15 +11,20 @@ from pants.backend.terraform.dependency_inference import (
     get_terraform_backend_and_vars,
 )
 from pants.backend.terraform.target_types import TerraformDeploymentFieldSet
-from pants.backend.terraform.tool import TerraformCommand, TerraformProcess, TerraformTool
+from pants.backend.terraform.tool import (
+    TerraformCommand,
+    TerraformProcess,
+    TerraformTool,
+    setup_terraform_process,
+)
 from pants.backend.terraform.utils import terraform_arg, terraform_relpath
 from pants.core.goals.deploy import DeployFieldSet, DeployProcess, DeploySubsystem
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.internals.native_engine import Digest, MergeDigests
-from pants.engine.internals.selectors import Get
-from pants.engine.process import InteractiveProcess, Process
-from pants.engine.rules import collect_rules, rule
+from pants.engine.internals.native_engine import MergeDigests
+from pants.engine.intrinsics import merge_digests
+from pants.engine.process import InteractiveProcess
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import SourcesField
 from pants.engine.unions import UnionRule
 from pants.option.global_options import KeepSandboxes
@@ -61,28 +66,26 @@ async def prepare_terraform_deployment(
             request.field_set.dependencies.address, request.field_set.dependencies
         )
     )
-    var_files = await Get(
-        SourceFiles, SourceFilesRequest(e.get(SourcesField) for e in invocation_files.vars_files)
+    var_files = await determine_source_files(
+        SourceFilesRequest(e.get(SourcesField) for e in invocation_files.vars_files)
     )
     for var_file in var_files.files:
         args.append(terraform_arg("-var-file", terraform_relpath(deployment.chdir, var_file)))
 
-    with_vars = await Get(
-        Digest,
+    with_vars = await merge_digests(
         MergeDigests(
             [
                 var_files.snapshot.digest,
                 deployment.terraform_sources.snapshot.digest,
                 deployment.dependencies_files.snapshot.digest,
             ]
-        ),
+        )
     )
 
     if terraform_subsystem.args:
         args.extend(terraform_subsystem.args)
 
-    process = await Get(
-        Process,
+    process = await setup_terraform_process(
         TerraformProcess(
             cmds=(
                 deployment.init_cmd.to_args(),
@@ -92,14 +95,15 @@ async def prepare_terraform_deployment(
             description=f"Terraform {terraform_command}",
             chdir=deployment.chdir,
         ),
+        **implicitly(),
     )
     return InteractiveProcess.from_process(process, keep_sandboxes=keep_sandboxes)
 
 
 @rule(desc="Run Terraform deploy process", level=LogLevel.DEBUG)
 async def run_terraform_deploy(field_set: DeployTerraformFieldSet) -> DeployProcess:
-    interactive_process = await Get(
-        InteractiveProcess, TerraformDeploymentRequest(field_set=field_set)
+    interactive_process = await prepare_terraform_deployment(
+        TerraformDeploymentRequest(field_set=field_set), **implicitly()
     )
 
     return DeployProcess(

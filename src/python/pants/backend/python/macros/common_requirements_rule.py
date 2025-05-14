@@ -29,9 +29,11 @@ from pants.core.target_types import (
     TargetGeneratorSourcesHelperTarget,
 )
 from pants.engine.addresses import Address
-from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
-from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
-from pants.engine.rules import Get
+from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs
+from pants.engine.internals.build_files import find_target_adaptor
+from pants.engine.internals.target_adaptor import TargetAdaptorRequest
+from pants.engine.intrinsics import get_digest_contents
+from pants.engine.rules import implicitly
 from pants.engine.target import (
     Dependencies,
     GenerateTargetsRequest,
@@ -87,8 +89,7 @@ async def _generate_requirements(
             os.path.dirname(lockfile),
             target_name=synthetic_lockfile_target_name(resolve),
         )
-        target_adaptor = await Get(
-            TargetAdaptor,
+        target_adaptor = await find_target_adaptor(
             TargetAdaptorRequest(
                 description_of_origin=f"{generator.alias} lockfile dep for the {resolve} resolve",
                 address=lockfile_address,
@@ -111,13 +112,14 @@ async def _generate_requirements(
                 )
             )
 
-    digest_contents = await Get(
-        DigestContents,
-        PathGlobs(
-            [requirements_full_path],
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin=f"{generator}'s field `{SingleSourceField.alias}`",
-        ),
+    digest_contents = await get_digest_contents(
+        **implicitly(
+            PathGlobs(
+                [requirements_full_path],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                description_of_origin=f"{generator}'s field `{SingleSourceField.alias}`",
+            )
+        )
     )
 
     module_mapping = generator[ModuleMappingField].value

@@ -13,10 +13,10 @@ from pants.backend.terraform.target_types import (
 )
 from pants.backend.terraform.tool import TerraformCommand, TerraformProcess
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
-from pants.engine.internals.native_engine import Digest, MergeDigests
-from pants.engine.internals.selectors import Get, MultiGet, concurrently
-from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.internals.native_engine import MergeDigests
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import execute_process, merge_digests
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import BoolField, Target
 from pants.engine.unions import UnionRule
 from pants.option.option_types import SkipOption
@@ -62,32 +62,32 @@ async def terraform_check(
         for deployment in request.field_sets
     )
 
-    all_sources_and_deps = await MultiGet(
-        Get(
-            Digest,
+    all_sources_and_deps = await concurrently(
+        merge_digests(
             MergeDigests(
                 [
                     deployment.terraform_sources.snapshot.digest,
                     deployment.dependencies_files.snapshot.digest,
                 ]
-            ),
+            )
         )
         for deployment in terraform_deployments
     )
 
-    results = await MultiGet(
-        Get(
-            FallibleProcessResult,
-            TerraformProcess(
-                cmds=(
-                    deployment.init_cmd.to_args(),
-                    TerraformCommand(("validate",)),
-                ),
-                input_digest=sources_and_deps,
-                output_files=tuple(deployment.terraform_sources.files),
-                description=f"Run `terraform validate` on module {deployment.chdir} with {pluralize(len(deployment.terraform_sources.files), 'file')}.",
-                chdir=deployment.chdir,
-            ),
+    results = await concurrently(
+        execute_process(
+            **implicitly(
+                TerraformProcess(
+                    cmds=(
+                        deployment.init_cmd.to_args(),
+                        TerraformCommand(("validate",)),
+                    ),
+                    input_digest=sources_and_deps,
+                    output_files=tuple(deployment.terraform_sources.files),
+                    description=f"Run `terraform validate` on module {deployment.chdir} with {pluralize(len(deployment.terraform_sources.files), 'file')}.",
+                    chdir=deployment.chdir,
+                )
+            )
         )
         for deployment, sources_and_deps in zip(terraform_deployments, all_sources_and_deps)
     )
