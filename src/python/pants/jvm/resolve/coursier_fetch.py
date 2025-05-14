@@ -533,6 +533,15 @@ async def coursier_resolve_lockfile(
     return CoursierResolvedLockfile(entries=tuple(new_entries))
 
 
+@rule
+async def get_coursier_lockfile_for_resolve(
+    coursier_resolve: CoursierResolveKey,
+) -> CoursierResolvedLockfile:
+    lockfile_digest_contents = await get_digest_contents(coursier_resolve.digest)
+    lockfile_contents = lockfile_digest_contents[0].content
+    return CoursierResolvedLockfile.from_serialized(lockfile_contents)
+
+
 @rule(desc="Fetch with coursier")
 async def fetch_with_coursier(request: CoursierFetchRequest) -> FallibleClasspathEntry:
     # TODO: Loading this per JvmArtifact.
@@ -718,15 +727,6 @@ async def select_coursier_resolve_for_targets(
     )
     resolve_digest = await path_globs_to_digest(lockfile_source)
     return CoursierResolveKey(resolve, resolve_path, resolve_digest)
-
-
-@rule
-async def get_coursier_lockfile_for_resolve(
-    coursier_resolve: CoursierResolveKey,
-) -> CoursierResolvedLockfile:
-    lockfile_digest_contents = await get_digest_contents(coursier_resolve.digest)
-    lockfile_contents = lockfile_digest_contents[0].content
-    return CoursierResolvedLockfile.from_serialized(lockfile_contents)
 
 
 @dataclass(frozen=True)
