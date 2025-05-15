@@ -17,9 +17,8 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.target_types import FileSourceField, ResourceSourceField
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.core.util_rules.system_binaries import BashBinary, ZipBinary
-from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,
@@ -33,18 +32,19 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
 )
-from pants.engine.internals.selectors import MultiGet
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import (
-    DependenciesRequest,
-    HydratedSources,
-    HydrateSourcesRequest,
-    SourcesField,
-    Targets,
+from pants.engine.internals.graph import (
+    hydrate_sources,
+    resolve_targets,
+    resolve_unparsed_address_inputs,
 )
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import add_prefix, create_digest, get_digest_entries, merge_digests
+from pants.engine.process import Process, execute_process_or_raise
+from pants.engine.rules import Get, collect_rules, implicitly, rule
+from pants.engine.target import DependenciesRequest, HydrateSourcesRequest, SourcesField
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
+from pants.jvm.classpath import classpath as classpath_get
 from pants.jvm.shading.rules import ShadedJar, ShadeJarRequest
 from pants.jvm.target_types import (
     JvmShadingRule,
@@ -105,8 +105,8 @@ async def _apply_shading_rules_to_classpath(
     if len(jar_entries) == 0:
         return EMPTY_DIGEST
 
-    jar_digests = await MultiGet(Get(Digest, CreateDigest([entry])) for entry in jar_entries)
-    shaded_jars = await MultiGet(
+    jar_digests = await concurrently(Get(Digest, CreateDigest([entry])) for entry in jar_entries)
+    shaded_jars = await concurrently(
         Get(ShadedJar, ShadeJarRequest(path=entry.path, digest=digest, rules=shading_rules))
         for entry, digest in zip(jar_entries, jar_digests)
     )
@@ -119,20 +119,18 @@ async def package_war(
     bash: BashBinary,
     zip: ZipBinary,
 ) -> BuiltPackage:
-    classpath = await Get(Classpath, DependenciesRequest(field_set.dependencies))
+    classpath = await classpath_get(**implicitly(DependenciesRequest(field_set.dependencies)))
     all_jar_files_digest = await _apply_shading_rules_to_classpath(
         classpath, field_set.shading_rules.value
     )
 
-    prefixed_jars_digest, content, descriptor, input_setup_digest = await MultiGet(
-        Get(Digest, AddPrefix(all_jar_files_digest, "__war__/WEB-INF/lib")),
-        Get(RenderedWarContent, RenderWarContentRequest(field_set.content)),
-        Get(
-            RenderedWarDeploymentDescriptor,
-            RenderWarDeploymentDescriptorRequest(field_set.descriptor, field_set.address),
+    prefixed_jars_digest, content, descriptor, input_setup_digest = await concurrently(
+        add_prefix(AddPrefix(all_jar_files_digest, "__war__/WEB-INF/lib")),
+        render_war_content(RenderWarContentRequest(field_set.content)),
+        render_war_deployment_descriptor(
+            RenderWarDeploymentDescriptorRequest(field_set.descriptor, field_set.address)
         ),
-        Get(
-            Digest,
+        create_digest(
             CreateDigest(
                 [
                     FileContent(
@@ -148,12 +146,11 @@ async def package_war(
                     Directory("__war__/WEB-INF/classes"),
                     Directory("__war__/WEB-INF/lib"),
                 ]
-            ),
+            )
         ),
     )
 
-    input_digest = await Get(
-        Digest,
+    input_digest = await merge_digests(
         MergeDigests(
             [
                 prefixed_jars_digest,
@@ -161,28 +158,29 @@ async def package_war(
                 content.digest,
                 input_setup_digest,
             ]
-        ),
+        )
     )
 
-    result = await Get(
-        ProcessResult,
-        Process(
-            [bash.path, "make_war.sh"],
-            input_digest=input_digest,
-            output_files=("output.war",),
-            description=f"Assemble WAR file for {field_set.address}",
-        ),
+    result = await execute_process_or_raise(
+        **implicitly(
+            Process(
+                [bash.path, "make_war.sh"],
+                input_digest=input_digest,
+                output_files=("output.war",),
+                description=f"Assemble WAR file for {field_set.address}",
+            )
+        )
     )
 
-    output_entries = await Get(DigestEntries, Digest, result.output_digest)
+    output_entries = await get_digest_entries(result.output_digest)
     if len(output_entries) != 1:
         raise AssertionError("No output from war assembly step.")
     output_entry = output_entries[0]
     if not isinstance(output_entry, FileEntry):
         raise AssertionError("Unexpected digest entry")
     output_filename = PurePath(field_set.output_path.value_or_default(file_ending="war"))
-    package_digest = await Get(
-        Digest, CreateDigest([FileEntry(str(output_filename), output_entry.file_digest)])
+    package_digest = await create_digest(
+        CreateDigest([FileEntry(str(output_filename), output_entry.file_digest)])
     )
     artifact = BuiltPackageArtifact(relpath=str(output_filename))
     return BuiltPackage(digest=package_digest, artifacts=(artifact,))
@@ -192,14 +190,11 @@ async def package_war(
 async def render_war_deployment_descriptor(
     request: RenderWarDeploymentDescriptorRequest,
 ) -> RenderedWarDeploymentDescriptor:
-    descriptor_sources = await Get(
-        HydratedSources,
-        HydrateSourcesRequest(request.descriptor),
+    descriptor_sources = await hydrate_sources(
+        HydrateSourcesRequest(request.descriptor), **implicitly()
     )
 
-    descriptor_sources_entries = await Get(
-        DigestEntries, Digest, descriptor_sources.snapshot.digest
-    )
+    descriptor_sources_entries = await get_digest_entries(descriptor_sources.snapshot.digest)
     if len(descriptor_sources_entries) != 1:
         raise AssertionError(
             f"Expected `descriptor` field for {request.descriptor.address} to only refer to one file."
@@ -210,9 +205,8 @@ async def render_war_deployment_descriptor(
             f"Expected `descriptor` field for {request.descriptor.address} to produce a file."
         )
 
-    descriptor_digest = await Get(
-        Digest,
-        CreateDigest([FileEntry("__war__/WEB-INF/web.xml", descriptor_entry.file_digest)]),
+    descriptor_digest = await create_digest(
+        CreateDigest([FileEntry("__war__/WEB-INF/web.xml", descriptor_entry.file_digest)])
     )
 
     return RenderedWarDeploymentDescriptor(descriptor_digest)
@@ -220,19 +214,18 @@ async def render_war_deployment_descriptor(
 
 @rule
 async def render_war_content(request: RenderWarContentRequest) -> RenderedWarContent:
-    addresses = await Get(
-        Addresses, UnparsedAddressInputs, request.content.to_unparsed_address_inputs()
+    addresses = await resolve_unparsed_address_inputs(
+        request.content.to_unparsed_address_inputs(), **implicitly()
     )
-    targets = await Get(Targets, Addresses, addresses)
-    sources = await Get(
-        SourceFiles,
+    targets = await resolve_targets(**implicitly(addresses))
+    sources = await determine_source_files(
         SourceFilesRequest(
             [tgt[SourcesField] for tgt in targets if tgt.has_field(SourcesField)],
             for_sources_types=(ResourceSourceField, FileSourceField),
             enable_codegen=True,
-        ),
+        )
     )
-    digest = await Get(Digest, AddPrefix(sources.snapshot.digest, "__war__"))
+    digest = await add_prefix(AddPrefix(sources.snapshot.digest, "__war__"))
     return RenderedWarContent(digest)
 
 

@@ -13,25 +13,28 @@ from pants.core.goals.package import (
 )
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior
 from pants.engine.addresses import Addresses
-from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.fs import EMPTY_DIGEST, AddPrefix, MergeDigests
+from pants.engine.intrinsics import add_prefix, merge_digests
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import Dependencies
 from pants.engine.unions import UnionRule
 from pants.jvm import classpath
-from pants.jvm.classpath import Classpath
+from pants.jvm.classpath import classpath as classpath_get
 from pants.jvm.compile import (
     ClasspathDependenciesRequest,
     ClasspathEntry,
     ClasspathEntryRequest,
     CompileResult,
-    FallibleClasspathEntries,
     FallibleClasspathEntry,
+    compile_classpath_entries,
 )
 from pants.jvm.jar_tool.jar_tool import JarToolRequest
 from pants.jvm.jar_tool.jar_tool import rules as jar_tool_rules
-from pants.jvm.shading.rules import ShadedJar, ShadeJarRequest
+from pants.jvm.jar_tool.jar_tool import run_jar_tool
+from pants.jvm.shading.rules import ShadeJarRequest
 from pants.jvm.shading.rules import rules as shaded_jar_rules
-from pants.jvm.strip_jar.strip_jar import StripJarRequest
+from pants.jvm.shading.rules import shade_jar
+from pants.jvm.strip_jar.strip_jar import StripJarRequest, strip_jar
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
     DeployJarDuplicatePolicyField,
@@ -82,7 +85,9 @@ async def deploy_jar_classpath(
             "`deploy_jar` targets should not depend on one another:\n"
             f"{request.component.bullet_list()}"
         )
-    fallible_entries = await Get(FallibleClasspathEntries, ClasspathDependenciesRequest(request))
+    fallible_entries = await compile_classpath_entries(
+        **implicitly(ClasspathDependenciesRequest(request))
+    )
     classpath_entries = fallible_entries.if_all_succeeded()
     if classpath_entries is None:
         return FallibleClasspathEntry(
@@ -119,16 +124,15 @@ async def package_deploy_jar(
     # 1. Produce thin JARs containing the transitive classpath
     #
 
-    classpath = await Get(Classpath, Addresses([field_set.address]))
-    classpath_digest = await Get(Digest, MergeDigests(classpath.digests()))
+    classpath = await classpath_get(**implicitly(Addresses([field_set.address])))
+    classpath_digest = await merge_digests(MergeDigests(classpath.digests()))
 
     #
     # 2. Use Pants' JAR tool to build a runnable fat JAR
     #
 
     output_filename = PurePath(field_set.output_path.value_or_default(file_ending="jar"))
-    jar_digest = await Get(
-        Digest,
+    jar_digest = await run_jar_tool(
         JarToolRequest(
             jar_name=output_filename.name,
             digest=classpath_digest,
@@ -141,34 +145,36 @@ async def package_deploy_jar(
             skip=[*(jvm.deploy_jar_exclude_files or []), *(field_set.exclude_files.value or [])],
             compress=True,
         ),
+        **implicitly(),
     )
 
     #
     # 3. Strip the JAR from  all non-reproducible metadata if requested so
     #
     if jvm.reproducible_jars:
-        jar_digest = await Get(
-            Digest,
-            StripJarRequest(
-                digest=jar_digest,
-                filenames=(output_filename.name,),
-            ),
+        jar_digest = await strip_jar(
+            **implicitly(
+                StripJarRequest(
+                    digest=jar_digest,
+                    filenames=(output_filename.name,),
+                )
+            )
         )
 
-    jar_digest = await Get(Digest, AddPrefix(jar_digest, str(output_filename.parent)))
+    jar_digest = await add_prefix(AddPrefix(jar_digest, str(output_filename.parent)))
 
     #
     # 4. Apply shading rules
     #
     if field_set.shading_rules.value:
-        shaded_jar = await Get(
-            ShadedJar,
+        shaded_jar = await shade_jar(
             ShadeJarRequest(
                 path=output_filename,
                 digest=jar_digest,
                 rules=field_set.shading_rules.value,
                 skip_manifest=False,
             ),
+            **implicitly(),
         )
         jar_digest = shaded_jar.digest
 
