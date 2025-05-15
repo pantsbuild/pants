@@ -24,7 +24,6 @@ from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
     Digest,
-    DigestEntries,
     DigestSubset,
     Directory,
     FileContent,
@@ -38,14 +37,20 @@ from pants.engine.internals.graph import (
     resolve_unparsed_address_inputs,
 )
 from pants.engine.internals.selectors import concurrently
-from pants.engine.intrinsics import add_prefix, create_digest, get_digest_entries, merge_digests
+from pants.engine.intrinsics import (
+    add_prefix,
+    create_digest,
+    digest_subset_to_digest,
+    get_digest_entries,
+    merge_digests,
+)
 from pants.engine.process import Process, execute_process_or_raise
-from pants.engine.rules import Get, collect_rules, implicitly, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import DependenciesRequest, HydrateSourcesRequest, SourcesField
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.classpath import classpath as classpath_get
-from pants.jvm.shading.rules import ShadedJar, ShadeJarRequest
+from pants.jvm.shading.rules import ShadeJarRequest, shade_jar
 from pants.jvm.target_types import (
     JvmShadingRule,
     JvmWarContentField,
@@ -95,22 +100,24 @@ class RenderedWarContent:
 async def _apply_shading_rules_to_classpath(
     classpath: Classpath, shading_rules: Iterable[JvmShadingRule] | None
 ) -> Digest:
-    input_digest = await Get(Digest, MergeDigests(classpath.digests()))
+    input_digest = await merge_digests(MergeDigests(classpath.digests()))
     if not shading_rules:
         return input_digest
 
-    jars_digest = await Get(Digest, DigestSubset(input_digest, PathGlobs(["**/*.jar"])))
-    digest_entries = await Get(DigestEntries, Digest, jars_digest)
+    jars_digest = await digest_subset_to_digest(DigestSubset(input_digest, PathGlobs(["**/*.jar"])))
+    digest_entries = await get_digest_entries(jars_digest)
     jar_entries = [entry for entry in digest_entries if isinstance(entry, FileEntry)]
     if len(jar_entries) == 0:
         return EMPTY_DIGEST
 
-    jar_digests = await concurrently(Get(Digest, CreateDigest([entry])) for entry in jar_entries)
+    jar_digests = await concurrently(create_digest(CreateDigest([entry])) for entry in jar_entries)
     shaded_jars = await concurrently(
-        Get(ShadedJar, ShadeJarRequest(path=entry.path, digest=digest, rules=shading_rules))
+        shade_jar(
+            ShadeJarRequest(path=entry.path, digest=digest, rules=shading_rules), **implicitly()
+        )
         for entry, digest in zip(jar_entries, jar_digests)
     )
-    return await Get(Digest, MergeDigests([shaded.digest for shaded in shaded_jars]))
+    return await merge_digests(MergeDigests([shaded.digest for shaded in shaded_jars]))
 
 
 @rule
