@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import Pex, PexRequest
+from pants.backend.python.util_rules.pex import Pex, PexRequest, create_pex
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.python_sources import PythonSourceFiles
@@ -20,15 +20,13 @@ from pants.core.util_rules import system_binaries
 from pants.core.util_rules.source_files import SourceFiles
 from pants.core.util_rules.system_binaries import BashBinary, UnzipBinary
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import (
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-    WrappedTarget,
-    WrappedTargetRequest,
-)
+from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs
+from pants.engine.internals.graph import resolve_target
+from pants.engine.internals.graph import transitive_targets as transitive_targets_get
+from pants.engine.intrinsics import digest_to_snapshot, merge_digests
+from pants.engine.process import Process, fallible_to_exec_result_or_raise
+from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.target import TransitiveTargetsRequest, WrappedTargetRequest
 from pants.util.dirutil import fast_relpath_optional
 from pants.util.docutil import doc_url
 from pants.util.strutil import softwrap
@@ -52,7 +50,9 @@ async def isolate_local_dist_wheels(
     unzip_binary: UnzipBinary,
 ) -> LocalDistWheels:
     dist = await Get(BuiltPackage, PackageFieldSet, dist_field_set)
-    wheels_snapshot = await Get(Snapshot, DigestSubset(dist.digest, PathGlobs(["**/*.whl"])))
+    wheels_snapshot = await digest_to_snapshot(
+        **implicitly(DigestSubset(dist.digest, PathGlobs(["**/*.whl"])))
+    )
 
     # A given local dist might build a wheel and an sdist (and maybe other artifacts -
     # we don't know what setup command was run...)
@@ -61,9 +61,9 @@ async def isolate_local_dist_wheels(
     wheels = [wheel for wheel in wheels_snapshot.files if wheel in artifacts]
 
     if not wheels:
-        tgt = await Get(
-            WrappedTarget,
+        tgt = await resolve_target(
             WrappedTargetRequest(dist_field_set.address, description_of_origin="<infallible>"),
+            **implicitly(),
         )
         logger.warning(
             softwrap(
@@ -79,22 +79,23 @@ async def isolate_local_dist_wheels(
             )
         )
 
-    wheels_listing_result = await Get(
-        ProcessResult,
-        Process(
-            argv=[
-                bash.path,
-                "-c",
-                f"""
+    wheels_listing_result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            Process(
+                argv=[
+                    bash.path,
+                    "-c",
+                    f"""
                 set -ex
                 for f in {" ".join(shlex.quote(f) for f in wheels)}; do
                   {unzip_binary.path} -Z1 "$f"
                 done
                 """,
-            ],
-            input_digest=wheels_snapshot.digest,
-            description=f"List contents of artifacts produced by {dist_field_set.address}",
-        ),
+                ],
+                input_digest=wheels_snapshot.digest,
+                description=f"List contents of artifacts produced by {dist_field_set.address}",
+            )
+        )
     )
     provided_files = set(wheels_listing_result.stdout.decode().splitlines())
 
@@ -151,13 +152,15 @@ class LocalDistsPex:
 async def build_local_dists(
     request: LocalDistsPexRequest,
 ) -> LocalDistsPex:
-    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses))
+    transitive_targets = await transitive_targets_get(
+        TransitiveTargetsRequest(request.addresses), **implicitly()
+    )
     applicable_targets = [
         tgt for tgt in transitive_targets.closure if PythonDistributionFieldSet.is_applicable(tgt)
     ]
 
-    local_dists_wheels = await MultiGet(
-        Get(LocalDistWheels, PythonDistributionFieldSet, PythonDistributionFieldSet.create(target))
+    local_dists_wheels = await concurrently(
+        isolate_local_dist_wheels(PythonDistributionFieldSet.create(target), **implicitly())
         for target in applicable_targets
     )
 
@@ -175,10 +178,9 @@ async def build_local_dists(
         wheels_digests.append(local_dist_wheels.wheels_digest)
         provided_files.update(local_dist_wheels.provided_files)
 
-    wheels_digest = await Get(Digest, MergeDigests(wheels_digests))
+    wheels_digest = await merge_digests(MergeDigests(wheels_digests))
 
-    dists_pex = await Get(
-        Pex,
+    dists_pex = await create_pex(
         PexRequest(
             output_filename="local_dists.pex",
             requirements=PexRequirements(wheels),
@@ -188,7 +190,7 @@ async def build_local_dists(
             # i.e. internal
             internal_only=True,
             additional_args=["--intransitive"],
-        ),
+        )
     )
 
     if not wheels:
@@ -208,11 +210,12 @@ async def build_local_dists(
                 source_relpath = fast_relpath_optional(source, source_root)
                 if source_relpath is not None and source_relpath in provided_files:
                     remaining_sources.remove(source)
-    remaining_sources_snapshot = await Get(
-        Snapshot,
-        DigestSubset(
-            request.sources.source_files.snapshot.digest, PathGlobs(sorted(remaining_sources))
-        ),
+    remaining_sources_snapshot = await digest_to_snapshot(
+        **implicitly(
+            DigestSubset(
+                request.sources.source_files.snapshot.digest, PathGlobs(sorted(remaining_sources))
+            )
+        )
     )
     subtracted_sources = PythonSourceFiles(
         SourceFiles(remaining_sources_snapshot, request.sources.source_files.unrooted_files),
