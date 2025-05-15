@@ -23,11 +23,11 @@ from pants.backend.python.util_rules.local_dists import LocalDistsPexRequest, bu
 from pants.backend.python.util_rules.local_dists import rules as local_dists_rules
 from pants.backend.python.util_rules.pex import (
     CompletePlatforms,
-    OptionalPex,
     OptionalPexRequest,
     Pex,
     PexPlatforms,
     PexRequest,
+    create_optional_pex,
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.pex_requirements import (
@@ -58,7 +58,6 @@ from pants.engine.intrinsics import get_digest_contents, merge_digests
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     Target,
-    Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
     targets_with_sources_types,
@@ -423,7 +422,9 @@ async def _determine_requirements_for_pex_from_targets(
     if not request.include_requirements:
         return PexRequirements(), ()
 
-    requirements = await Get(PexRequirements, _PexRequirementsRequest(request.addresses))
+    requirements = await determine_requirement_strings_in_closure(
+        _PexRequirementsRequest(request.addresses), **implicitly()
+    )
     pex_native_subsetting_supported = False
     if python_setup.enable_resolves:
         # TODO: Once `requirement_constraints` is removed in favor of `enable_resolves`,
@@ -470,6 +471,8 @@ async def _determine_requirements_for_pex_from_targets(
         )
 
     # Else, request the repository PEX and possibly subset it.
+    # TODO: Call by name fails with "@rule body at rule compile time", but moving it causes
+    # another failure in a different part of this function
     repository_pex_request = await Get(
         OptionalPexRequest,
         _RepositoryPexRequest(
@@ -493,7 +496,7 @@ async def _determine_requirements_for_pex_from_targets(
                 )
             )
 
-    repository_pex = await Get(OptionalPex, OptionalPexRequest, repository_pex_request)
+    repository_pex = await create_optional_pex(repository_pex_request)
     if should_return_entire_lockfile:
         assert repository_pex_request.maybe_pex_request is not None
         assert repository_pex.maybe_pex is not None
@@ -512,7 +515,7 @@ async def _warn_about_any_files_targets(
     )
     if file_tgts:
         # make it easier for the user to find which targets are problematic by including the alias
-        targets = await Get(Targets, Addresses, addresses)
+        targets = await resolve_targets(**implicitly(addresses))
         # targets = await resolve_targets(**implicitly(addresses))
         formatted_addresses = ", ".join(
             f"{a} (`{tgt.alias}`)" for a, tgt in zip(addresses, targets)
@@ -632,50 +635,6 @@ async def create_pex_from_targets(
 
 
 @rule
-async def get_repository_pex(
-    request: _RepositoryPexRequest, python_setup: PythonSetup
-) -> OptionalPexRequest:
-    # NB: It isn't safe to resolve against an entire lockfile or constraints file if
-    # platforms are in use. See https://github.com/pantsbuild/pants/issues/12222.
-    if request.platforms or request.complete_platforms:
-        return OptionalPexRequest(None)
-
-    if python_setup.requirement_constraints:
-        constraints_repository_pex_request = await Get(
-            OptionalPexRequest, _ConstraintsRepositoryPexRequest(request)
-        )
-        return OptionalPexRequest(constraints_repository_pex_request.maybe_pex_request)
-
-    if not python_setup.enable_resolves:
-        return OptionalPexRequest(None)
-
-    chosen_resolve, interpreter_constraints = await concurrently(
-        choose_python_resolve(ChosenPythonResolveRequest(request.addresses), **implicitly()),
-        interpreter_constraints_for_targets(
-            request.to_interpreter_constraints_request(), **implicitly()
-        ),
-    )
-    return OptionalPexRequest(
-        PexRequest(
-            description=softwrap(
-                f"""
-                Installing {chosen_resolve.lockfile.url} for the resolve
-                `{chosen_resolve.name}`
-                """
-            ),
-            output_filename=f"{path_safe(chosen_resolve.name)}_lockfile.pex",
-            internal_only=request.internal_only,
-            requirements=EntireLockfile(chosen_resolve.lockfile),
-            interpreter_constraints=interpreter_constraints,
-            layout=PexLayout.PACKED,
-            platforms=request.platforms,
-            complete_platforms=request.complete_platforms,
-            additional_args=request.additional_lockfile_args,
-        )
-    )
-
-
-@rule
 async def _setup_constraints_repository_pex(
     constraints_request: _ConstraintsRepositoryPexRequest,
     python_setup: PythonSetup,
@@ -763,6 +722,51 @@ async def _setup_constraints_repository_pex(
         additional_args=request.additional_lockfile_args,
     )
     return OptionalPexRequest(repository_pex)
+
+
+@rule
+async def get_repository_pex(
+    request: _RepositoryPexRequest, python_setup: PythonSetup
+) -> OptionalPexRequest:
+    # NB: It isn't safe to resolve against an entire lockfile or constraints file if
+    # platforms are in use. See https://github.com/pantsbuild/pants/issues/12222.
+    if request.platforms or request.complete_platforms:
+        return OptionalPexRequest(None)
+
+    if python_setup.requirement_constraints:
+        constraints_repository_pex_request = await _setup_constraints_repository_pex(
+            _ConstraintsRepositoryPexRequest(request), **implicitly()
+        )
+        # TODO: ... Not really sure why we've just re-wrapped an object with the same object ... Leaving alone in case it causes some crazy obscure bug
+        return OptionalPexRequest(constraints_repository_pex_request.maybe_pex_request)
+
+    if not python_setup.enable_resolves:
+        return OptionalPexRequest(None)
+
+    chosen_resolve, interpreter_constraints = await concurrently(
+        choose_python_resolve(ChosenPythonResolveRequest(request.addresses), **implicitly()),
+        interpreter_constraints_for_targets(
+            request.to_interpreter_constraints_request(), **implicitly()
+        ),
+    )
+    return OptionalPexRequest(
+        PexRequest(
+            description=softwrap(
+                f"""
+                Installing {chosen_resolve.lockfile.url} for the resolve
+                `{chosen_resolve.name}`
+                """
+            ),
+            output_filename=f"{path_safe(chosen_resolve.name)}_lockfile.pex",
+            internal_only=request.internal_only,
+            requirements=EntireLockfile(chosen_resolve.lockfile),
+            interpreter_constraints=interpreter_constraints,
+            layout=PexLayout.PACKED,
+            platforms=request.platforms,
+            complete_platforms=request.complete_platforms,
+            additional_args=request.additional_lockfile_args,
+        )
+    )
 
 
 @dataclass(frozen=True)
