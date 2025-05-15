@@ -23,25 +23,33 @@ from pants.backend.go.target_types import (
     GoThirdPartyPackageTarget,
 )
 from pants.backend.go.util_rules import build_opts, first_party_pkg, import_analysis
-from pants.backend.go.util_rules.build_opts import GoBuildOptions, GoBuildOptionsFromTargetRequest
+from pants.backend.go.util_rules.build_opts import (
+    GoBuildOptions,
+    GoBuildOptionsFromTargetRequest,
+    go_extract_build_options_from_target,
+)
 from pants.backend.go.util_rules.first_party_pkg import (
-    FallibleFirstPartyPkgAnalysis,
     FirstPartyPkgAnalysisRequest,
-    FirstPartyPkgImportPath,
     FirstPartyPkgImportPathRequest,
+    analyze_first_party_package,
+    compute_first_party_package_import_path,
 )
 from pants.backend.go.util_rules.go_mod import (
-    GoModInfo,
     GoModInfoRequest,
-    OwningGoMod,
     OwningGoModRequest,
+    determine_go_mod_info,
+    find_owning_go_mod,
 )
-from pants.backend.go.util_rules.import_analysis import GoStdLibPackages, GoStdLibPackagesRequest
+from pants.backend.go.util_rules.import_analysis import (
+    GoStdLibPackagesRequest,
+    analyze_go_stdlib_packages,
+)
 from pants.backend.go.util_rules.third_party_pkg import (
-    AllThirdPartyPackages,
     AllThirdPartyPackagesRequest,
     ThirdPartyPkgAnalysis,
     ThirdPartyPkgAnalysisRequest,
+    download_and_analyze_third_party_packages,
+    extract_package_info,
 )
 from pants.core.target_types import (
     TargetGeneratorSourcesHelperSourcesField,
@@ -49,8 +57,8 @@ from pants.core.target_types import (
 )
 from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import Digest, Snapshot
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.intrinsics import digest_to_snapshot
+from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     AllTargets,
     Dependencies,
@@ -94,8 +102,9 @@ async def go_map_import_paths_by_module(
         if (tgt.has_field(GoImportPathField) or tgt.has_field(GoPackageSourcesField))
     ]
 
-    owning_go_mod_targets = await MultiGet(
-        Get(OwningGoMod, OwningGoModRequest(tgt.address)) for tgt in candidate_go_source_targets
+    owning_go_mod_targets = await concurrently(
+        find_owning_go_mod(OwningGoModRequest(tgt.address), **implicitly())
+        for tgt in candidate_go_source_targets
     )
 
     first_party_gets_metadata = []
@@ -108,10 +117,10 @@ async def go_map_import_paths_by_module(
         elif tgt.has_field(GoPackageSourcesField):
             first_party_gets_metadata.append((tgt.address, owning_go_mod))
             first_party_gets.append(
-                Get(FirstPartyPkgImportPath, FirstPartyPkgImportPathRequest(tgt.address))
+                compute_first_party_package_import_path(FirstPartyPkgImportPathRequest(tgt.address))
             )
 
-    first_party_import_paths = await MultiGet(first_party_gets)
+    first_party_import_paths = await concurrently(first_party_gets)
     for import_path_info, (addr, owning_go_mod) in zip(
         first_party_import_paths, first_party_gets_metadata
     ):
@@ -148,7 +157,7 @@ async def go_merge_import_paths_analysis(
     union_membership: UnionMembership,
 ) -> AllGoModuleImportPathsMappings:
     import_path_mappers = union_membership.get(GoModuleImportPathsMappingsHook)
-    all_results = await MultiGet(
+    all_results = await concurrently(
         Get(GoModuleImportPathsMappings, GoModuleImportPathsMappingsHook, impl())
         for impl in import_path_mappers
     )
@@ -218,20 +227,25 @@ class InferGoPackageDependenciesRequest(InferDependenciesRequest):
 async def infer_go_dependencies(
     request: InferGoPackageDependenciesRequest,
 ) -> InferredDependencies:
-    go_mod_addr = await Get(OwningGoMod, OwningGoModRequest(request.field_set.address))
-    package_mapping, build_opts = await MultiGet(
-        Get(GoModuleImportPathsMapping, GoImportPathMappingRequest(go_mod_addr.address)),
-        Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(go_mod_addr.address)),
+    go_mod_addr = await find_owning_go_mod(
+        OwningGoModRequest(request.field_set.address), **implicitly()
+    )
+    package_mapping, build_opts = await concurrently(
+        map_import_paths_to_packages(
+            GoImportPathMappingRequest(go_mod_addr.address), **implicitly()
+        ),
+        go_extract_build_options_from_target(
+            GoBuildOptionsFromTargetRequest(go_mod_addr.address), **implicitly()
+        ),
     )
 
     addr = request.field_set.address
-    maybe_pkg_analysis, stdlib_packages = await MultiGet(
-        Get(
-            FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(addr, build_opts=build_opts)
+    maybe_pkg_analysis, stdlib_packages = await concurrently(
+        analyze_first_party_package(
+            FirstPartyPkgAnalysisRequest(addr, build_opts=build_opts), **implicitly()
         ),
-        Get(
-            GoStdLibPackages,
-            GoStdLibPackagesRequest(with_race_detector=build_opts.with_race_detector),
+        analyze_go_stdlib_packages(
+            GoStdLibPackagesRequest(with_race_detector=build_opts.with_race_detector)
         ),
     )
 
@@ -297,26 +311,26 @@ async def infer_go_third_party_package_dependencies(
     addr = request.field_set.address
     go_mod_address = addr.maybe_convert_to_target_generator()
 
-    package_mapping, go_mod_info, build_opts = await MultiGet(
-        Get(GoModuleImportPathsMapping, GoImportPathMappingRequest(go_mod_address)),
-        Get(GoModInfo, GoModInfoRequest(go_mod_address)),
-        Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(go_mod_address)),
+    package_mapping, go_mod_info, build_opts = await concurrently(
+        map_import_paths_to_packages(GoImportPathMappingRequest(go_mod_address), **implicitly()),
+        determine_go_mod_info(GoModInfoRequest(go_mod_address)),
+        go_extract_build_options_from_target(
+            GoBuildOptionsFromTargetRequest(go_mod_address), **implicitly()
+        ),
     )
 
-    pkg_info, stdlib_packages = await MultiGet(
-        Get(
-            ThirdPartyPkgAnalysis,
+    pkg_info, stdlib_packages = await concurrently(
+        extract_package_info(
             ThirdPartyPkgAnalysisRequest(
                 request.field_set.import_path.value,
                 go_mod_address,
                 go_mod_info.digest,
                 go_mod_info.mod_path,
                 build_opts=build_opts,
-            ),
+            )
         ),
-        Get(
-            GoStdLibPackages,
-            GoStdLibPackagesRequest(with_race_detector=build_opts.with_race_detector),
+        analyze_go_stdlib_packages(
+            GoStdLibPackagesRequest(with_race_detector=build_opts.with_race_detector)
         ),
     )
 
@@ -364,10 +378,9 @@ async def generate_targets_from_go_mod(
 ) -> GeneratedTargets:
     generator_addr = request.generator.address
     go_mod_sources = request.generator[GoModSourcesField]
-    go_mod_info = await Get(GoModInfo, GoModInfoRequest(go_mod_sources))
-    go_mod_snapshot = await Get(Snapshot, Digest, go_mod_info.digest)
-    all_packages = await Get(
-        AllThirdPartyPackages,
+    go_mod_info = await determine_go_mod_info(GoModInfoRequest(go_mod_sources))
+    go_mod_snapshot = await digest_to_snapshot(go_mod_info.digest)
+    all_packages = await download_and_analyze_third_party_packages(
         AllThirdPartyPackagesRequest(
             generator_addr,
             go_mod_info.digest,
@@ -376,7 +389,7 @@ async def generate_targets_from_go_mod(
             # For now, just use a default set of options to facilitate analyzing third-party dependencies and
             # generating targets.
             build_opts=GoBuildOptions(),
-        ),
+        )
     )
 
     def gen_file_tgt(fp: str) -> TargetGeneratorSourcesHelperTarget:
