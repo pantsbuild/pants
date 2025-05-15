@@ -41,15 +41,14 @@ from pants.backend.go.util_rules.build_pkg_target import (
     GoCodegenBuildRequest,
     setup_build_go_package_target_request,
 )
-from pants.backend.go.util_rules.go_mod import OwningGoMod, OwningGoModRequest
+from pants.backend.go.util_rules.go_mod import OwningGoModRequest, find_owning_go_mod
 from pants.backend.go.util_rules.import_analysis import GoStdLibPackages, GoStdLibPackagesRequest
 from pants.core.target_types import FilesGeneratorTarget, FileSourceField, FileTarget
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, FileContent, Snapshot
 from pants.engine.internals.graph import resolve_dependencies
-from pants.engine.internals.selectors import MultiGet
 from pants.engine.intrinsics import create_digest
-from pants.engine.rules import Get, QueryRule, implicitly, rule
+from pants.engine.rules import QueryRule, concurrently, implicitly, rule
 from pants.engine.target import AllTargets, Dependencies, DependenciesRequest
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner
@@ -76,8 +75,8 @@ async def map_import_paths(
 ) -> GoModuleImportPathsMappings:
     file_targets = [tgt for tgt in all_targets if tgt.has_field(FileSourceField)]
 
-    owning_go_mod_targets = await MultiGet(
-        Get(OwningGoMod, OwningGoModRequest(tgt.address)) for tgt in file_targets
+    owning_go_mod_targets = await concurrently(
+        find_owning_go_mod(OwningGoModRequest(tgt.address), **implicitly()) for tgt in file_targets
     )
 
     import_paths_by_module: dict[Address, dict[str, set[Address]]] = defaultdict(
