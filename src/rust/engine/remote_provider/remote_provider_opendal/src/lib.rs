@@ -1,7 +1,7 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 use async_trait::async_trait;
@@ -21,7 +21,8 @@ use tokio_util::compat::{FuturesAsyncReadCompatExt, FuturesAsyncWriteCompatExt};
 use workunit_store::{Metric, ObservationMetric};
 
 use remote_provider_traits::{
-    ActionCacheProvider, ByteStoreProvider, LoadDestination, RemoteStoreOptions,
+    ActionCacheProvider, BatchLoadDestination, ByteStoreProvider, LoadDestination,
+    RemoteStoreOptions,
 };
 
 #[cfg(test)]
@@ -293,6 +294,18 @@ impl ByteStoreProvider for Provider {
         .await?;
 
         Ok(existences.into_iter().flatten().collect())
+    }
+
+    fn batch_load_supported(&self) -> bool {
+        false
+    }
+
+    async fn load_batch(
+        &self,
+        _digests: Vec<Digest>,
+        _destination: &mut dyn BatchLoadDestination,
+    ) -> Result<HashMap<Digest, Result<bool, String>>, String> {
+        Err("load_batch not implemented for remote opendal provider".to_string())
     }
 }
 

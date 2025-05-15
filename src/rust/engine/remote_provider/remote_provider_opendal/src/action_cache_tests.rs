@@ -39,6 +39,7 @@ fn remote_options() -> RemoteStoreOptions {
         retries: 1,
         concurrency_limit: 256,
         batch_api_size_limit: 10000,
+        batch_load_enabled: false,
     }
 }
 
