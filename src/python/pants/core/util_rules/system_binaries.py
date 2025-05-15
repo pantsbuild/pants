@@ -23,12 +23,10 @@ from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import CreateDigest, FileContent, PathMetadataRequest
 from pants.engine.internals.native_engine import Digest, PathMetadataKind, PathNamespace
 from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import create_digest, execute_process, path_metadata_request
 from pants.engine.platform import Platform
 from pants.engine.process import Process, execute_process_or_raise
-from pants.engine.rules import collect_rules, rule
-from pants.engine.intrinsics import create_digest, path_metadata_request
-from pants.engine.intrinsics import execute_process
-from pants.engine.rules import implicitly
+from pants.engine.rules import Get, collect_rules, implicitly, rule
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
@@ -589,16 +587,6 @@ class GitBinary(BinaryPath):
 # -------------------------------------------------------------------------------------------
 
 
-def _create_shim(bash: str, binary: str) -> bytes:
-    """The binary shim script to be placed in the output directory for the digest."""
-    return dedent(
-        f"""\
-        #!{bash}
-        exec "{binary}" "$@"
-        """
-    ).encode()
-
-
 @rule(desc="Finding the `bash` binary", level=LogLevel.DEBUG)
 async def get_bash(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> BashBinary:
     search_path = system_binaries.system_binary_paths
@@ -608,7 +596,8 @@ async def get_bash(system_binaries: SystemBinariesSubsystem.EnvironmentAware) ->
         search_path=search_path,
         test=BinaryPathTest(args=["--version"]),
     )
-    paths = await find_binary(request, **implicitly())
+    # Note: This Get is still necxessary to avoid a circular reference to `find_binary`` rule.
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path
     if not first_path:
         raise BinaryNotFoundError.from_request(request)
@@ -675,7 +664,7 @@ async def _find_candidate_paths_via_subprocess_helper(
     if request.binary_name == "bash":
         shebang = "#!/usr/bin/env bash"
     else:
-        bash = await get_bash()
+        bash = await get_bash(**implicitly())
         shebang = f"#!{bash.path}"
 
     # HACK: For workspace environments, the `find_binary.sh` will be mounted in the "chroot" directory
@@ -725,16 +714,18 @@ async def _find_candidate_paths_via_subprocess_helper(
     #  - We run the script with `ProcessResult` instead of `FallibleProcessResult` so that we
     #      can catch bugs in the script itself, given an earlier silent failure.
     search_path = os.pathsep.join(request.search_path)
-    result = await execute_process_or_raise(**implicitly(
-        Process(
-            description=f"Searching for `{request.binary_name}` on PATH={search_path}",
-            level=LogLevel.DEBUG,
-            input_digest=script_digest,
-            argv=[script_exec_path, request.binary_name],
-            env={"PATH": search_path},
-            cache_scope=env_target.executable_search_path_cache_scope(),
-        ),
-    ))
+    result = await execute_process_or_raise(
+        **implicitly(
+            Process(
+                description=f"Searching for `{request.binary_name}` on PATH={search_path}",
+                level=LogLevel.DEBUG,
+                input_digest=script_digest,
+                argv=[script_exec_path, request.binary_name],
+                env={"PATH": search_path},
+                cache_scope=env_target.executable_search_path_cache_scope(),
+            ),
+        )
+    )
     return tuple(result.stdout.decode().splitlines())
 
 
@@ -756,14 +747,17 @@ async def find_binary(
         )
 
     results = await concurrently(
-        execute_process(Process(
+        execute_process(
+            Process(
                 description=f"Test binary {path}.",
                 level=LogLevel.DEBUG,
                 argv=[path, *request.test.args],
                 # NB: Since a failure is a valid result for this script, we always cache it,
                 # regardless of success or failure.
                 cache_scope=env_target.executable_search_path_cache_scope(cache_failures=True),
-            ), **implicitly())
+            ),
+            **implicitly(),
+        )
         for path in found_paths
     )
     return BinaryPaths(
@@ -802,6 +796,15 @@ async def create_binary_shims(
             for binary_paths, request in zip(all_binary_paths, requests)
         )
         paths += first_paths
+
+    def _create_shim(bash: str, binary: str) -> bytes:
+        """The binary shim script to be placed in the output directory for the digest."""
+        return dedent(
+            f"""\
+            #!{bash}
+            exec "{binary}" "$@"
+            """
+        ).encode()
 
     scripts = [
         FileContent(
@@ -1296,7 +1299,7 @@ async def maybe_find_git(
     system_binaries: SystemBinariesSubsystem.EnvironmentAware,
 ) -> MaybeGitBinary:
     request = BinaryPathRequest(binary_name="git", search_path=system_binaries.system_binary_paths)
-    paths = await find_binary(request)
+    paths = await find_binary(request, **implicitly())
     first_path = paths.first_path
     if not first_path:
         return MaybeGitBinary()
