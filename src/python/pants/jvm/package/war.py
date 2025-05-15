@@ -121,6 +121,49 @@ async def _apply_shading_rules_to_classpath(
 
 
 @rule
+async def render_war_deployment_descriptor(
+    request: RenderWarDeploymentDescriptorRequest,
+) -> RenderedWarDeploymentDescriptor:
+    descriptor_sources = await hydrate_sources(
+        HydrateSourcesRequest(request.descriptor), **implicitly()
+    )
+
+    descriptor_sources_entries = await get_digest_entries(descriptor_sources.snapshot.digest)
+    if len(descriptor_sources_entries) != 1:
+        raise AssertionError(
+            f"Expected `descriptor` field for {request.descriptor.address} to only refer to one file."
+        )
+    descriptor_entry = descriptor_sources_entries[0]
+    if not isinstance(descriptor_entry, FileEntry):
+        raise AssertionError(
+            f"Expected `descriptor` field for {request.descriptor.address} to produce a file."
+        )
+
+    descriptor_digest = await create_digest(
+        CreateDigest([FileEntry("__war__/WEB-INF/web.xml", descriptor_entry.file_digest)])
+    )
+
+    return RenderedWarDeploymentDescriptor(descriptor_digest)
+
+
+@rule
+async def render_war_content(request: RenderWarContentRequest) -> RenderedWarContent:
+    addresses = await resolve_unparsed_address_inputs(
+        request.content.to_unparsed_address_inputs(), **implicitly()
+    )
+    targets = await resolve_targets(**implicitly(addresses))
+    sources = await determine_source_files(
+        SourceFilesRequest(
+            [tgt[SourcesField] for tgt in targets if tgt.has_field(SourcesField)],
+            for_sources_types=(ResourceSourceField, FileSourceField),
+            enable_codegen=True,
+        )
+    )
+    digest = await add_prefix(AddPrefix(sources.snapshot.digest, "__war__"))
+    return RenderedWarContent(digest)
+
+
+@rule
 async def package_war(
     field_set: PackageWarFileFieldSet,
     bash: BashBinary,
@@ -191,49 +234,6 @@ async def package_war(
     )
     artifact = BuiltPackageArtifact(relpath=str(output_filename))
     return BuiltPackage(digest=package_digest, artifacts=(artifact,))
-
-
-@rule
-async def render_war_deployment_descriptor(
-    request: RenderWarDeploymentDescriptorRequest,
-) -> RenderedWarDeploymentDescriptor:
-    descriptor_sources = await hydrate_sources(
-        HydrateSourcesRequest(request.descriptor), **implicitly()
-    )
-
-    descriptor_sources_entries = await get_digest_entries(descriptor_sources.snapshot.digest)
-    if len(descriptor_sources_entries) != 1:
-        raise AssertionError(
-            f"Expected `descriptor` field for {request.descriptor.address} to only refer to one file."
-        )
-    descriptor_entry = descriptor_sources_entries[0]
-    if not isinstance(descriptor_entry, FileEntry):
-        raise AssertionError(
-            f"Expected `descriptor` field for {request.descriptor.address} to produce a file."
-        )
-
-    descriptor_digest = await create_digest(
-        CreateDigest([FileEntry("__war__/WEB-INF/web.xml", descriptor_entry.file_digest)])
-    )
-
-    return RenderedWarDeploymentDescriptor(descriptor_digest)
-
-
-@rule
-async def render_war_content(request: RenderWarContentRequest) -> RenderedWarContent:
-    addresses = await resolve_unparsed_address_inputs(
-        request.content.to_unparsed_address_inputs(), **implicitly()
-    )
-    targets = await resolve_targets(**implicitly(addresses))
-    sources = await determine_source_files(
-        SourceFilesRequest(
-            [tgt[SourcesField] for tgt in targets if tgt.has_field(SourcesField)],
-            for_sources_types=(ResourceSourceField, FileSourceField),
-            enable_codegen=True,
-        )
-    )
-    digest = await add_prefix(AddPrefix(sources.snapshot.digest, "__war__"))
-    return RenderedWarContent(digest)
 
 
 def rules():
