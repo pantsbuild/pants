@@ -60,7 +60,7 @@ from pants.engine.internals.graph import (
     find_owners,
     resolve_targets,
 )
-from pants.engine.rules import Get, concurrently, implicitly, rule
+from pants.engine.rules import concurrently, implicitly, rule
 from pants.engine.target import (
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
@@ -268,7 +268,9 @@ async def _find_other_owners_for_unowned_imports(
     req: UnownedImportsPossibleOwnersRequest,
 ) -> UnownedImportsPossibleOwners:
     individual_possible_owners = await concurrently(
-        find_other_owners_for_unowned_import(UnownedImportPossibleOwnerRequest(r, req.original_resolve), **implicitly())
+        find_other_owners_for_unowned_import(
+            UnownedImportPossibleOwnerRequest(r, req.original_resolve), **implicitly()
+        )
         for r in req.unowned_imports
     )
 
