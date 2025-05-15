@@ -341,6 +341,15 @@ def test_resolve_environment_name_local_and_docker_fallbacks(monkeypatch) -> Non
     def get_env_name(
         env_tgt: Target, platform: Platform, *, docker_execution: bool = True
     ) -> str | None:
+        def mock_determine_local_environment() -> ChosenLocalEnvironmentName:
+            return ChosenLocalEnvironmentName(EnvironmentName(None))
+
+        def mock_determine_local_workspace_environment() -> ChosenLocalWorkspaceEnvironmentName:
+            return ChosenLocalWorkspaceEnvironmentName(EnvironmentName(None))
+
+        def mock_get_target_for_environment_name(name: EnvironmentName) -> EnvironmentTarget:
+            return EnvironmentTarget(name.val or "__local__", env_tgt)
+
         monkeypatch.setattr(Platform, "create_for_localhost", lambda: platform)
         result = run_rule_with_mocks(
             resolve_environment_name,
@@ -352,9 +361,9 @@ def test_resolve_environment_name_local_and_docker_fallbacks(monkeypatch) -> Non
                 ),
             ],
             mock_calls={
-                "pants.core.util_rules.environments.determine_local_environment": lambda _: ChosenLocalEnvironmentName(EnvironmentName(None)),
-                "pants.core.util_rules.environments.determine_local_workspace_environment": lambda _: ChosenLocalEnvironmentName(EnvironmentName(None)),
-                # "pants.core.util_rules.environments.get_target_for_environment_name": lambda name: EnvironmentTarget(name.val or "__local__", env_tgt),
+                "pants.core.util_rules.environments.determine_local_environment": mock_determine_local_environment,
+                "pants.core.util_rules.environments.determine_local_workspace_environment": mock_determine_local_workspace_environment,
+                "pants.core.util_rules.environments.get_target_for_environment_name": mock_get_target_for_environment_name,
             },
             mock_gets=[
                 MockGet(
