@@ -38,7 +38,6 @@ from pants.backend.python.util_rules.pex_environment import (
 )
 from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
-    LoadedLockfile,
     LoadedLockfileRequest,
     Lockfile,
 )
@@ -47,34 +46,40 @@ from pants.backend.python.util_rules.pex_requirements import (
 )
 from pants.backend.python.util_rules.pex_requirements import (
     Resolve,
-    ResolvePexConfig,
     ResolvePexConfigRequest,
+    determine_resolve_pex_config,
+    get_lockfile_for_resolve,
+    load_lockfile,
     validate_metadata,
 )
 from pants.build_graph.address import Address
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.environments import EnvironmentTarget
-from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
+from pants.core.util_rules.stripped_source_files import StrippedFileNameRequest
 from pants.core.util_rules.stripped_source_files import rules as stripped_source_rules
+from pants.core.util_rules.stripped_source_files import strip_file_name
 from pants.core.util_rules.system_binaries import BashBinary
-from pants.engine.addresses import Addresses, UnparsedAddressInputs
+from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.internals.native_engine import Snapshot
-from pants.engine.internals.selectors import MultiGet
-from pants.engine.intrinsics import add_prefix
-from pants.engine.process import Process, ProcessCacheScope, ProcessResult
-from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
-from pants.engine.target import (
-    HydratedSources,
-    HydrateSourcesRequest,
-    SourcesField,
-    Targets,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
+from pants.engine.internals.graph import (
+    hydrate_sources,
+    resolve_targets,
+    resolve_unparsed_address_inputs,
 )
+from pants.engine.internals.graph import transitive_targets as transitive_targets_get
+from pants.engine.internals.native_engine import Snapshot
+from pants.engine.intrinsics import add_prefix, create_digest, digest_to_snapshot, merge_digests
+from pants.engine.process import (
+    Process,
+    ProcessCacheScope,
+    ProcessResult,
+    fallible_to_exec_result_or_raise,
+)
+from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.target import HydrateSourcesRequest, SourcesField, TransitiveTargetsRequest
 from pants.engine.unions import UnionMembership, union
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -129,14 +134,9 @@ class CompletePlatforms(DeduplicatedCollection[str]):
 async def digest_complete_platform_addresses(
     addresses: UnparsedAddressInputs,
 ) -> CompletePlatforms:
-    original_file_targets = await Get(
-        Targets,
-        UnparsedAddressInputs,
-        addresses,
-    )
-    original_files_sources = await MultiGet(
-        Get(
-            HydratedSources,
+    original_file_targets = await resolve_targets(**implicitly(addresses))
+    original_files_sources = await concurrently(
+        hydrate_sources(
             HydrateSourcesRequest(
                 tgt.get(SourcesField),
                 for_sources_types=(
@@ -145,11 +145,12 @@ async def digest_complete_platform_addresses(
                 ),
                 enable_codegen=True,
             ),
+            **implicitly(),
         )
         for tgt in original_file_targets
     )
-    snapshot = await Get(
-        Snapshot, MergeDigests(sources.snapshot.digest for sources in original_files_sources)
+    snapshot = await digest_to_snapshot(
+        **implicitly(MergeDigests(sources.snapshot.digest for sources in original_files_sources))
     )
     return CompletePlatforms.from_snapshot(snapshot)
 
@@ -158,9 +159,7 @@ async def digest_complete_platform_addresses(
 async def digest_complete_platforms(
     complete_platforms: PexCompletePlatformsField,
 ) -> CompletePlatforms:
-    return await Get(
-        CompletePlatforms, UnparsedAddressInputs, complete_platforms.to_unparsed_address_inputs()
-    )
+    return await digest_complete_platform_addresses(complete_platforms.to_unparsed_address_inputs())
 
 
 @dataclass(frozen=True)
@@ -364,28 +363,28 @@ async def find_interpreter(
         return python
 
     formatted_constraints = " OR ".join(str(constraint) for constraint in interpreter_constraints)
-    result = await Get(
-        ProcessResult,
-        PexCliProcess(
-            description=f"Find interpreter for constraints: {formatted_constraints}",
-            subcommand=(),
-            # Here, we run the Pex CLI with no requirements, which just selects an interpreter.
-            # Normally, this would start an isolated repl. By passing `--`, we force the repl to
-            # instead act as an interpreter (the selected one) and tell us about itself. The upshot
-            # is we run the Pex interpreter selection logic unperturbed but without resolving any
-            # distributions.
-            extra_args=(
-                *interpreter_constraints.generate_pex_arg_list(),
-                "--",
-                "-c",
-                # N.B.: The following code snippet must be compatible with Python 2.7 and
-                # Python 3.5+.
-                #
-                # When hashing, we pick 8192 for efficiency of reads and fingerprint updates
-                # (writes) since it's a common OS buffer size and an even multiple of the
-                # hash block size.
-                dedent(
-                    """\
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            PexCliProcess(
+                description=f"Find interpreter for constraints: {formatted_constraints}",
+                subcommand=(),
+                # Here, we run the Pex CLI with no requirements, which just selects an interpreter.
+                # Normally, this would start an isolated repl. By passing `--`, we force the repl to
+                # instead act as an interpreter (the selected one) and tell us about itself. The upshot
+                # is we run the Pex interpreter selection logic unperturbed but without resolving any
+                # distributions.
+                extra_args=(
+                    *interpreter_constraints.generate_pex_arg_list(),
+                    "--",
+                    "-c",
+                    # N.B.: The following code snippet must be compatible with Python 2.7 and
+                    # Python 3.5+.
+                    #
+                    # When hashing, we pick 8192 for efficiency of reads and fingerprint updates
+                    # (writes) since it's a common OS buffer size and an even multiple of the
+                    # hash block size.
+                    dedent(
+                        """\
                     import hashlib, os, sys
 
                     python = os.path.realpath(sys.executable)
@@ -397,11 +396,12 @@ async def find_interpreter(
                           hasher.update(chunk)
                     print(hasher.hexdigest())
                     """
+                    ),
                 ),
-            ),
-            level=LogLevel.DEBUG,
-            cache_scope=env_target.executable_search_path_cache_scope(),
-        ),
+                level=LogLevel.DEBUG,
+                cache_scope=env_target.executable_search_path_cache_scope(),
+            )
+        )
     )
     path, fingerprint = result.stdout.decode().strip().splitlines()
 
@@ -447,9 +447,7 @@ async def _determine_pex_python_and_platforms(request: PexRequest) -> _BuildPexP
     if request.python:
         python = request.python
     else:
-        python = await Get(
-            PythonExecutable, InterpreterConstraints, request.interpreter_constraints
-        )
+        python = await find_interpreter(request.interpreter_constraints, **implicitly())
 
     if request.python or request.internal_only:
         # Sometimes we want to build and run with a specific interpreter (either because request
@@ -505,17 +503,19 @@ async def get_req_strings(pex_reqs: PexRequirements) -> PexRequirementsInfo:
             else:
                 req_strings.append(req_str_or_addr)
     if specs:
-        addrs_from_specs = await Get(
-            Addresses,
+        addrs_from_specs = await resolve_unparsed_address_inputs(
             UnparsedAddressInputs(
                 specs,
                 owning_address=None,
                 description_of_origin=pex_reqs.description_of_origin,
             ),
+            **implicitly(),
         )
         addrs.extend(addrs_from_specs)
     if addrs:
-        transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(addrs))
+        transitive_targets = await transitive_targets_get(
+            TransitiveTargetsRequest(addrs), **implicitly()
+        )
         req_strings.extend(
             PexRequirements.req_strings_from_requirement_fields(
                 tgt[PythonRequirementsField]
@@ -546,7 +546,9 @@ async def _setup_pex_requirements(
         # However, if no resolve is specified, we will still load options that apply to every
         # resolve, like `[python-repos].indexes`.
         resolve_name = None
-    resolve_config = await Get(ResolvePexConfig, ResolvePexConfigRequest(resolve_name))
+    resolve_config = await determine_resolve_pex_config(
+        ResolvePexConfigRequest(resolve_name), **implicitly()
+    )
 
     pex_lock_resolver_args = list(resolve_config.pex_args())
     pip_resolver_args = [*resolve_config.pex_args(), "--resolver-version", "pip-2020-resolver"]
@@ -563,7 +565,7 @@ async def _setup_pex_requirements(
         else:
             complete_req_strings = None
             lockfile = await Get(Lockfile, Resolve, request.requirements.from_superset)
-        loaded_lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(lockfile))
+        loaded_lockfile = await load_lockfile(LoadedLockfileRequest(lockfile), **implicitly())
         argv = (
             ["--lock", loaded_lockfile.lockfile_path, *pex_lock_resolver_args]
             if loaded_lockfile.is_pex_native
@@ -594,7 +596,7 @@ async def _setup_pex_requirements(
         )
 
     assert isinstance(request.requirements, PexRequirements)
-    reqs_info = await Get(PexRequirementsInfo, PexRequirements, request.requirements)
+    reqs_info = await get_req_strings(request.requirements)
 
     # TODO: This is not the best heuristic for available concurrency, since the
     # requirements almost certainly have transitive deps which also need building, but it
@@ -610,8 +612,10 @@ async def _setup_pex_requirements(
         )
 
     elif isinstance(request.requirements.from_superset, Resolve):
-        lockfile = await Get(Lockfile, Resolve, request.requirements.from_superset)
-        loaded_lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(lockfile))
+        lockfile = await get_lockfile_for_resolve(
+            request.requirements.from_superset, **implicitly()
+        )
+        loaded_lockfile = await load_lockfile(LoadedLockfileRequest(lockfile), **implicitly())
 
         # NB: This is also validated in the constructor.
         assert loaded_lockfile.is_pex_native
@@ -656,9 +660,8 @@ async def _setup_pex_requirements(
         constraints_file = "__constraints.txt"
         constraints_content = "\n".join(request.requirements.constraints_strings)
         digests.append(
-            await Get(
-                Digest,
-                CreateDigest([FileContent(constraints_file, constraints_content.encode())]),
+            await create_digest(
+                CreateDigest([FileContent(constraints_file, constraints_content.encode())])
             )
         )
         argv.extend(["--constraints", constraints_file])
@@ -737,7 +740,7 @@ async def build_pex(
             # request.main.spec is a python source file including its spec_path.
             # To make it relative to the sandbox, we strip the source root
             # and add the source_dir_name (sources get prefixed with that below).
-            stripped = await Get(StrippedFileName, StrippedFileNameRequest(request.main.spec))
+            stripped = await strip_file_name(StrippedFileNameRequest(request.main.spec))
             argv.append(os.path.join(source_dir_name, stripped.value))
 
     argv.extend(
@@ -762,8 +765,7 @@ async def build_pex(
     # Include any additional arguments and input digests required by the requirements.
     argv.extend(requirements_setup.argv)
 
-    merged_digest = await Get(
-        Digest,
+    merged_digest = await merge_digests(
         MergeDigests(
             (
                 request.complete_platforms.digest,
@@ -772,7 +774,7 @@ async def build_pex(
                 *requirements_setup.digests,
                 *(pex.digest for pex in request.pex_path),
             )
-        ),
+        )
     )
 
     argv.extend(["--layout", request.layout.value])
@@ -783,25 +785,26 @@ async def build_pex(
     else:
         output_directories = [request.output_filename]
 
-    result = await Get(
-        ProcessResult,
-        PexCliProcess(
-            subcommand=(),
-            extra_args=argv,
-            additional_input_digest=merged_digest,
-            description=_build_pex_description(request, req_strings, python_setup.resolves),
-            output_files=output_files,
-            output_directories=output_directories,
-            concurrency_available=requirements_setup.concurrency_available,
-            cache_scope=request.cache_scope,
-        ),
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            PexCliProcess(
+                subcommand=(),
+                extra_args=argv,
+                additional_input_digest=merged_digest,
+                description=_build_pex_description(request, req_strings, python_setup.resolves),
+                output_files=output_files,
+                output_directories=output_directories,
+                concurrency_available=requirements_setup.concurrency_available,
+                cache_scope=request.cache_scope,
+            )
+        )
     )
 
     maybe_log_pex_stderr(result.stderr, pex_subsystem.verbosity)
 
     digest = (
-        await Get(
-            Digest, MergeDigests((result.output_digest, *(pex.digest for pex in request.pex_path)))
+        await merge_digests(
+            MergeDigests((result.output_digest, *(pex.digest for pex in request.pex_path)))
         )
         if request.pex_path
         else result.output_digest
@@ -860,7 +863,7 @@ def _build_pex_description(
 
 @rule
 async def create_pex(request: PexRequest) -> Pex:
-    result = await Get(BuildPexResult, PexRequest, request)
+    result = await build_pex(request, **implicitly())
     return result.create_pex()
 
 
@@ -868,7 +871,7 @@ async def create_pex(request: PexRequest) -> Pex:
 async def create_optional_pex(request: OptionalPexRequest) -> OptionalPex:
     if request.maybe_pex_request is None:
         return OptionalPex(None)
-    result = await Get(Pex, PexRequest, request.maybe_pex_request)
+    result = await create_pex(request.maybe_pex_request)
     return OptionalPex(result)
 
 
@@ -1101,7 +1104,7 @@ async def create_venv_pex(
             ),
         ),
     )
-    venv_pex_result = await Get(BuildPexResult, PexRequest, seeded_venv_request)
+    venv_pex_result = await build_pex(seeded_venv_request, **implicitly())
     # Pex verbose --seed mode outputs the absolute path of the PEX executable as well as the
     # absolute path of the PEX_ROOT.  In the --venv case this is the `pex` script in the venv root
     # directory.
@@ -1118,17 +1121,18 @@ async def create_venv_pex(
     pex = venv_script_writer.exe(bash)
     python = venv_script_writer.python(bash)
     scripts = {bin_name: venv_script_writer.bin(bash, bin_name) for bin_name in request.bin_names}
-    scripts_digest = await Get(
-        Digest,
+    scripts_digest = await create_digest(
         CreateDigest(
             (
                 pex.content,
                 python.content,
                 *(venv_script.content for venv_script in scripts.values()),
             )
-        ),
+        )
     )
-    input_digest = await Get(Digest, MergeDigests((venv_script_writer.pex.digest, scripts_digest)))
+    input_digest = await merge_digests(
+        MergeDigests((venv_script_writer.pex.digest, scripts_digest))
+    )
     append_only_caches = (
         venv_pex_result.python.append_only_caches if venv_pex_result.python else None
     )
@@ -1204,7 +1208,7 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
         **request.extra_env,
     }
     input_digest = (
-        await Get(Digest, MergeDigests((pex.digest, request.input_digest)))
+        await merge_digests(MergeDigests((pex.digest, request.input_digest)))
         if request.input_digest
         else pex.digest
     )
@@ -1296,7 +1300,7 @@ async def setup_venv_pex_process(
     )
     argv = (pex_bin, *request.argv)
     input_digest = (
-        await Get(Digest, MergeDigests((venv_pex.digest, request.input_digest)))
+        await merge_digests(MergeDigests((venv_pex.digest, request.input_digest)))
         if request.input_digest
         else venv_pex.digest
     )
@@ -1375,32 +1379,34 @@ def parse_repository_info(repository_info: str) -> PexResolveInfo:
 
 @rule
 async def determine_venv_pex_resolve_info(venv_pex: VenvPex) -> PexResolveInfo:
-    process_result = await Get(
-        ProcessResult,
-        VenvPexProcess(
-            venv_pex,
-            argv=["repository", "info", "-v"],
-            extra_env={"PEX_TOOLS": "1"},
-            input_digest=venv_pex.digest,
-            description=f"Determine distributions found in {venv_pex.pex_filename}",
-            level=LogLevel.DEBUG,
-        ),
+    process_result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            VenvPexProcess(
+                venv_pex,
+                argv=["repository", "info", "-v"],
+                extra_env={"PEX_TOOLS": "1"},
+                input_digest=venv_pex.digest,
+                description=f"Determine distributions found in {venv_pex.pex_filename}",
+                level=LogLevel.DEBUG,
+            )
+        )
     )
     return parse_repository_info(process_result.stdout.decode())
 
 
 @rule
 async def determine_pex_resolve_info(pex_pex: PexPEX, pex: Pex) -> PexResolveInfo:
-    process_result = await Get(
-        ProcessResult,
-        PexProcess(
-            pex=Pex(digest=pex_pex.digest, name=pex_pex.exe, python=pex.python),
-            argv=[pex.name, "repository", "info", "-v"],
-            input_digest=pex.digest,
-            extra_env={"PEX_MODULE": "pex.tools"},
-            description=f"Determine distributions found in {pex.name}",
-            level=LogLevel.DEBUG,
-        ),
+    process_result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            PexProcess(
+                pex=Pex(digest=pex_pex.digest, name=pex_pex.exe, python=pex.python),
+                argv=[pex.name, "repository", "info", "-v"],
+                input_digest=pex.digest,
+                extra_env={"PEX_MODULE": "pex.tools"},
+                description=f"Determine distributions found in {pex.name}",
+                level=LogLevel.DEBUG,
+            )
+        )
     )
     return parse_repository_info(process_result.stdout.decode())
 

@@ -26,15 +26,9 @@ from pants.core.util_rules.lockfile_metadata import (
     NoLockfileMetadataBlock,
 )
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import (
-    CreateDigest,
-    Digest,
-    DigestContents,
-    FileContent,
-    GlobMatchErrorBehavior,
-    PathGlobs,
-)
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.fs import CreateDigest, Digest, FileContent, GlobMatchErrorBehavior, PathGlobs
+from pants.engine.intrinsics import create_digest, get_digest_contents, path_globs_to_digest
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.unions import UnionMembership
 from pants.util.docutil import bin_name, doc_url
 from pants.util.ordered_set import FrozenOrderedSet
@@ -196,15 +190,14 @@ async def load_lockfile(
     lockfile_path = parts.path[1:] if parts.path.startswith("/") else parts.path
     if parts.scheme in {"", "file"}:
         synthetic_lock = False
-        lockfile_digest = await Get(
-            Digest,
+        lockfile_digest = await path_globs_to_digest(
             PathGlobs(
                 [lockfile_path],
                 glob_match_error_behavior=GlobMatchErrorBehavior.error,
                 description_of_origin=lockfile.url_description_of_origin,
-            ),
+            )
         )
-        _digest_contents = await Get(DigestContents, Digest, lockfile_digest)
+        _digest_contents = await get_digest_contents(lockfile_digest)
         lock_bytes = _digest_contents[0].content
     elif parts.scheme == "resource":
         synthetic_lock = True
@@ -214,7 +207,7 @@ async def load_lockfile(
             importlib.resources.files(parts.netloc).joinpath(lockfile_path).read_bytes(),
         )
         lockfile_path, lock_bytes = (_fc.path, _fc.content)
-        lockfile_digest = await Get(Digest, CreateDigest([_fc]))
+        lockfile_digest = await create_digest(CreateDigest([_fc]))
     else:
         raise ValueError(
             f"Unsupported scheme {parts.scheme} for lockfile URL: {lockfile.url} "
@@ -225,9 +218,8 @@ async def load_lockfile(
     if is_pex_native:
         header_delimiter = "//"
         stripped_lock_bytes = strip_comments_from_pex_json_lockfile(lock_bytes)
-        lockfile_digest = await Get(
-            Digest,
-            CreateDigest([FileContent(lockfile_path, stripped_lock_bytes)]),
+        lockfile_digest = await create_digest(
+            CreateDigest([FileContent(lockfile_path, stripped_lock_bytes)])
         )
         requirement_estimate = _pex_lockfile_requirement_count(lock_bytes)
         constraints_strings = None
@@ -444,9 +436,10 @@ async def determine_resolve_pex_config(
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             description_of_origin=_constraints_origin,
         )
-        _constraints_digest, _constraints_digest_contents = await MultiGet(
-            Get(Digest, PathGlobs, _constraints_path_globs),
-            Get(DigestContents, PathGlobs, _constraints_path_globs),
+        # TODO: Probably re-doing work here - instead of just calling one, then the next
+        _constraints_digest, _constraints_digest_contents = await concurrently(
+            path_globs_to_digest(_constraints_path_globs),
+            get_digest_contents(**implicitly({_constraints_path_globs: PathGlobs})),
         )
 
         if len(_constraints_digest_contents) != 1:
