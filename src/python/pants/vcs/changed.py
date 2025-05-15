@@ -8,14 +8,17 @@ from dataclasses import dataclass
 from enum import Enum
 
 from pants.backend.project_info import dependents
-from pants.backend.project_info.dependents import Dependents, DependentsRequest
+from pants.backend.project_info.dependents import DependentsRequest, find_dependents
 from pants.base.build_environment import get_buildroot
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import Collection
-from pants.engine.internals.graph import Owners, OwnersRequest
+from pants.engine.internals.graph import (
+    OwnersRequest,
+    find_owners,
+    resolve_unexpanded_targets,
+)
 from pants.engine.internals.mapper import SpecsFilter
-from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import UnexpandedTargets
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.option.option_types import EnumOption, StrOption
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
@@ -50,8 +53,7 @@ async def find_changed_owners(
     specs_filter: SpecsFilter,
 ) -> ChangedAddresses:
     no_dependents = request.dependents == DependentsOption.NONE
-    owners = await Get(
-        Owners,
+    owners = await find_owners(
         OwnersRequest(
             request.sources,
             # If `--changed-dependents` is used, we cannot eagerly filter out root targets. We
@@ -62,6 +64,7 @@ async def find_changed_owners(
             match_if_owning_build_file_included_in_sources=True,
             sources_blocks=request.sources_blocks,
         ),
+        **implicitly(),
     )
 
     if no_dependents:
@@ -77,13 +80,13 @@ async def find_changed_owners(
     owner_target_generators = FrozenOrderedSet(
         addr.maybe_convert_to_target_generator() for addr in owners if addr.is_generated_target
     )
-    dependents = await Get(
-        Dependents,
+    dependents = await find_dependents(
         DependentsRequest(
             owners,
             transitive=request.dependents == DependentsOption.TRANSITIVE,
             include_roots=False,
         ),
+        **implicitly(),
     )
     result = FrozenOrderedSet(owners) | (dependents - owner_target_generators)
     if specs_filter.is_specified:
@@ -92,7 +95,7 @@ async def find_changed_owners(
         #
         # Note that we use `UnexpandedTargets` rather than `Targets` or `FilteredTargets` so that
         # we preserve target generators.
-        result_as_tgts = await Get(UnexpandedTargets, Addresses(result))
+        result_as_tgts = await resolve_unexpanded_targets(Addresses(result))
         result = FrozenOrderedSet(
             tgt.address for tgt in result_as_tgts if specs_filter.matches(tgt)
         )
