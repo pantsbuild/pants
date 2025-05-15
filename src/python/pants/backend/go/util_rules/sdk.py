@@ -11,12 +11,18 @@ from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.util_rules import goroot
 from pants.backend.go.util_rules.go_bootstrap import GoBootstrap
 from pants.backend.go.util_rules.goroot import GoRoot
-from pants.core.util_rules.system_binaries import BashBinary, BinaryShims, BinaryShimsRequest
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.core.util_rules.system_binaries import (
+    BashBinary,
+    BinaryShimsRequest,
+    create_binary_shims,
+)
+from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import create_digest, merge_digests
+from pants.engine.process import Process, fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
@@ -99,7 +105,7 @@ async def go_sdk_invoke_setup(goroot: GoRoot) -> GoSdkRunSetup:
         ).encode("utf-8"),
     )
 
-    digest = await Get(Digest, CreateDigest([go_run_script]))
+    digest = await create_digest(CreateDigest([go_run_script]))
     return GoSdkRunSetup(digest, go_run_script)
 
 
@@ -115,11 +121,11 @@ async def setup_go_sdk_process(
     # Use go search path to find extra tools
     search_path = go_bootstrap.go_search_paths
 
-    input_digest, env_vars = await MultiGet(
-        Get(Digest, MergeDigests([go_sdk_run.digest, request.input_digest])),
-        Get(
-            EnvironmentVars,
+    input_digest, env_vars = await concurrently(
+        merge_digests(MergeDigests([go_sdk_run.digest, request.input_digest])),
+        environment_vars_subset(
             EnvironmentVarsRequest(golang_env_aware.env_vars_to_pass_to_subprocesses),
+            **implicitly(),
         ),
     )
 
@@ -134,14 +140,13 @@ async def setup_go_sdk_process(
 
     # Add path to additional tools, such as git, that may be needed by the go tool
     if golang_env_aware.extra_tools:
-        extra_tools = await Get(
-            BinaryShims,
-            BinaryShimsRequest,
+        extra_tools = await create_binary_shims(
             BinaryShimsRequest.for_binaries(
                 *golang_env_aware.extra_tools,
                 rationale="allow additional tools for go tools",
                 search_path=search_path,
             ),
+            bash,
         )
         # Prepend path to additional tools
         if "PATH" in env:
@@ -187,12 +192,13 @@ class GoSdkToolIDResult:
 
 @rule
 async def compute_go_tool_id(request: GoSdkToolIDRequest) -> GoSdkToolIDResult:
-    result = await Get(
-        ProcessResult,
-        GoSdkProcess(
-            ["tool", request.tool_name, "-V=full"],
-            description=f"Obtain tool ID for Go tool `{request.tool_name}`.",
-        ),
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            GoSdkProcess(
+                ["tool", request.tool_name, "-V=full"],
+                description=f"Obtain tool ID for Go tool `{request.tool_name}`.",
+            )
+        )
     )
     return GoSdkToolIDResult(tool_name=request.tool_name, tool_id=result.stdout.decode().strip())
 
