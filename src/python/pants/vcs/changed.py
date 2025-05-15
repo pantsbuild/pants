@@ -12,11 +12,7 @@ from pants.backend.project_info.dependents import DependentsRequest, find_depend
 from pants.base.build_environment import get_buildroot
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import Collection
-from pants.engine.internals.graph import (
-    OwnersRequest,
-    find_owners,
-    resolve_unexpanded_targets,
-)
+from pants.engine.internals.graph import OwnersRequest, find_owners, resolve_unexpanded_targets
 from pants.engine.internals.mapper import SpecsFilter
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.option.option_types import EnumOption, StrOption
