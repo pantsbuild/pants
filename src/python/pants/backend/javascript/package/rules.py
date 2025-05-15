@@ -10,7 +10,7 @@ from typing import ClassVar
 from pants.backend.javascript import install_node_package
 from pants.backend.javascript.install_node_package import (
     InstalledNodePackageRequest,
-    InstalledNodePackageWithSource,
+    add_sources_to_installed_node_package,
 )
 from pants.backend.javascript.nodejs_project_environment import NodeJsProjectEnvironmentProcess
 from pants.backend.javascript.package_json import (
@@ -34,11 +34,12 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.target_types import ResourceSourceField
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.internals.native_engine import AddPrefix, Digest, Snapshot
-from pants.engine.internals.selectors import Get
-from pants.engine.process import ProcessResult
-from pants.engine.rules import Rule, collect_rules, rule
+from pants.engine.env_vars import EnvironmentVarsRequest
+from pants.engine.internals.native_engine import AddPrefix
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.intrinsics import add_prefix, digest_to_snapshot
+from pants.engine.process import ProcessResult, fallible_to_exec_result_or_raise
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.target import GeneratedSources, GenerateSourcesRequest
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
@@ -84,8 +85,8 @@ class GenerateResourcesFromNodeBuildScriptRequest(GenerateSourcesRequest):
 async def pack_node_package_into_tgz_for_publication(
     field_set: NodePackageTarFieldSet,
 ) -> BuiltPackage:
-    installation = await Get(
-        InstalledNodePackageWithSource, InstalledNodePackageRequest(field_set.address)
+    installation = await add_sources_to_installed_node_package(
+        InstalledNodePackageRequest(field_set.address)
     )
     node_package = installation.project_env.ensure_target()
     name = node_package.get(NodePackageNameField).value
@@ -95,20 +96,21 @@ async def pack_node_package_into_tgz_for_publication(
             f"{field_set.source.file_path}#version must be set in order to package a {NPMDistributionTarget.alias}."
         )
     archive_file = installation.project_env.project.pack_archive_format.format(name, version)
-    result = await Get(
-        ProcessResult,
-        NodeJsProjectEnvironmentProcess(
-            installation.project_env,
-            args=("pack",),
-            description=f"Packaging .tgz archive for {name}@{version}",
-            input_digest=installation.digest,
-            output_files=(installation.join_relative_workspace_directory(archive_file),),
-            level=LogLevel.INFO,
-        ),
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            NodeJsProjectEnvironmentProcess(
+                installation.project_env,
+                args=("pack",),
+                description=f"Packaging .tgz archive for {name}@{version}",
+                input_digest=installation.digest,
+                output_files=(installation.join_relative_workspace_directory(archive_file),),
+                level=LogLevel.INFO,
+            )
+        )
     )
     if field_set.output_path.value:
         output_path = field_set.output_path.value_or_default(file_ending=None)
-        digest = await Get(Digest, AddPrefix(result.output_digest, output_path))
+        digest = await add_prefix(AddPrefix(result.output_digest, output_path))
     else:
         digest = result.output_digest
 
@@ -181,8 +183,8 @@ class NodeBuildScriptRequest:
 
 @rule
 async def run_node_build_script(req: NodeBuildScriptRequest) -> NodeBuildScriptResult:
-    installation = await Get(
-        InstalledNodePackageWithSource, InstalledNodePackageRequest(req.address)
+    installation = await add_sources_to_installed_node_package(
+        InstalledNodePackageRequest(req.address)
     )
     output_files = req.output_files
     output_dirs = req.output_directories
@@ -195,27 +197,31 @@ async def run_node_build_script(req: NodeBuildScriptRequest) -> NodeBuildScriptR
         return "_".join(_NOT_ALPHANUMERIC.sub("_", part) for part in parts if part)
 
     args = ("run", script_name)
-    target_env_vars = await Get(EnvironmentVars, EnvironmentVarsRequest(extra_env_vars))
-    result = await Get(
-        ProcessResult,
-        NodeJsProjectEnvironmentProcess(
-            installation.project_env,
-            args=filter(None, args),
-            description=f"Running node build script '{script_name}'.",
-            input_digest=installation.digest,
-            output_files=tuple(
-                installation.join_relative_workspace_directory(file) for file in output_files or ()
-            ),
-            output_directories=tuple(
-                installation.join_relative_workspace_directory(directory)
-                for directory in output_dirs or ()
-            ),
-            level=LogLevel.INFO,
-            per_package_caches=FrozenDict(
-                {cache_name(extra_cache): extra_cache for extra_cache in extra_caches or ()}
-            ),
-            extra_env=target_env_vars,
-        ),
+    target_env_vars = await environment_vars_subset(
+        EnvironmentVarsRequest(extra_env_vars), **implicitly()
+    )
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            NodeJsProjectEnvironmentProcess(
+                installation.project_env,
+                args=filter(None, args),
+                description=f"Running node build script '{script_name}'.",
+                input_digest=installation.digest,
+                output_files=tuple(
+                    installation.join_relative_workspace_directory(file)
+                    for file in output_files or ()
+                ),
+                output_directories=tuple(
+                    installation.join_relative_workspace_directory(directory)
+                    for directory in output_dirs or ()
+                ),
+                level=LogLevel.INFO,
+                per_package_caches=FrozenDict(
+                    {cache_name(extra_cache): extra_cache for extra_cache in extra_caches or ()}
+                ),
+                extra_env=target_env_vars,
+            )
+        )
     )
 
     return NodeBuildScriptResult(result, installation.project_dir)
@@ -225,9 +231,11 @@ async def run_node_build_script(req: NodeBuildScriptRequest) -> NodeBuildScriptR
 async def generate_resources_from_node_build_script(
     req: GenerateResourcesFromNodeBuildScriptRequest,
 ) -> GeneratedSources:
-    result = await Get(NodeBuildScriptResult, NodeBuildScriptRequest.from_generate_request(req))
+    result = await run_node_build_script(NodeBuildScriptRequest.from_generate_request(req))
     return GeneratedSources(
-        await Get(Snapshot, AddPrefix(result.process.output_digest, result.project_directory))
+        await digest_to_snapshot(
+            **implicitly(AddPrefix(result.process.output_digest, result.project_directory))
+        )
     )
 
 
@@ -236,10 +244,10 @@ async def generate_package_artifact_from_node_build_script(
     req: NodeBuildScriptPackageFieldSet,
 ) -> BuiltPackage:
     request = NodeBuildScriptRequest.from_package_request(req)
-    result = await Get(NodeBuildScriptResult, NodeBuildScriptRequest, request)
+    result = await run_node_build_script(request)
     if req.output_path.value:
         output_path = req.output_path.value_or_default(file_ending=None)
-        digest = await Get(Digest, AddPrefix(result.process.output_digest, output_path))
+        digest = await add_prefix(AddPrefix(result.process.output_digest, output_path))
     else:
         digest = result.process.output_digest
     artifacts = tuple(BuiltPackageArtifact(path) for path in request.get_paths())

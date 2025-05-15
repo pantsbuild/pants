@@ -9,17 +9,28 @@ from typing import ClassVar
 
 from pants.backend.javascript import install_node_package, nodejs_project_environment
 from pants.backend.javascript.install_node_package import (
-    InstalledNodePackage,
     InstalledNodePackageRequest,
+    install_node_packages_for_address,
 )
-from pants.backend.javascript.nodejs_project_environment import NodeJsProjectEnvironmentProcess
+from pants.backend.javascript.nodejs_project_environment import (
+    NodeJsProjectEnvironmentProcess,
+    setup_nodejs_project_environment_process,
+)
 from pants.backend.javascript.package_manager import PackageManager
-from pants.backend.javascript.resolve import FirstPartyNodePackageResolves, NodeJSProjectResolves
-from pants.backend.javascript.subsystems.nodejs import NodeJS, NodeJSToolProcess
+from pants.backend.javascript.resolve import (
+    resolve_to_first_party_node_package,
+    resolve_to_projects,
+)
+from pants.backend.javascript.subsystems.nodejs import (
+    NodeJS,
+    NodeJSToolProcess,
+    setup_node_tool_process,
+)
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import Get
+from pants.engine.intrinsics import merge_digests
 from pants.engine.process import Process
-from pants.engine.rules import Rule, collect_rules, rule
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import StrOption
 from pants.option.subsystem import Subsystem
@@ -99,7 +110,6 @@ class NodeJSToolRequest:
 
 async def _run_tool_without_resolve(request: NodeJSToolRequest) -> Process:
     nodejs = await Get(NodeJS)
-
     pkg_manager_version = nodejs.package_managers.get(nodejs.package_manager)
     pkg_manager_and_version = nodejs.default_package_manager
     if pkg_manager_version is None or pkg_manager_and_version is None:
@@ -116,8 +126,7 @@ async def _run_tool_without_resolve(request: NodeJSToolRequest) -> Process:
         )
     pkg_manager = PackageManager.from_string(pkg_manager_and_version)
 
-    return await Get(
-        Process,
+    return await setup_node_tool_process(
         NodeJSToolProcess(
             pkg_manager.name,
             pkg_manager.version,
@@ -130,11 +139,12 @@ async def _run_tool_without_resolve(request: NodeJSToolRequest) -> Process:
             timeout_seconds=request.timeout_seconds,
             extra_env=FrozenDict({**pkg_manager.extra_env, **request.extra_env}),
         ),
+        **implicitly(),
     )
 
 
 async def _run_tool_with_resolve(request: NodeJSToolRequest, resolve: str) -> Process:
-    resolves = await Get(NodeJSProjectResolves)
+    resolves = await resolve_to_projects(**implicitly())
 
     if request.resolve not in resolves:
         reason = (
@@ -144,15 +154,14 @@ async def _run_tool_with_resolve(request: NodeJSToolRequest, resolve: str) -> Pr
         )
         raise ValueError(f"{resolve} is not a named NodeJS resolve. {reason}")
 
-    all_first_party = await Get(FirstPartyNodePackageResolves)
+    all_first_party = await resolve_to_first_party_node_package(**implicitly())
     package_for_resolve = all_first_party[resolve]
     project = resolves[resolve]
-    installed = await Get(
-        InstalledNodePackage, InstalledNodePackageRequest(package_for_resolve.address)
+    installed = await install_node_packages_for_address(
+        InstalledNodePackageRequest(package_for_resolve.address), **implicitly()
     )
     request_tool_without_version = request.tool.partition("@")[0]
-    return await Get(
-        Process,
+    return await setup_nodejs_project_environment_process(
         NodeJsProjectEnvironmentProcess(
             env=installed.project_env,
             args=(
@@ -161,13 +170,16 @@ async def _run_tool_with_resolve(request: NodeJSToolRequest, resolve: str) -> Pr
                 *request.args,
             ),
             description=request.description,
-            input_digest=await Get(Digest, MergeDigests([request.input_digest, installed.digest])),
+            input_digest=await merge_digests(
+                MergeDigests([request.input_digest, installed.digest])
+            ),
             output_files=request.output_files,
             output_directories=request.output_directories,
             per_package_caches=request.append_only_caches,
             timeout_seconds=request.timeout_seconds,
             extra_env=FrozenDict(request.extra_env),
         ),
+        **implicitly(),
     )
 
 

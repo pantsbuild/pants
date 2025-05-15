@@ -6,16 +6,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.javascript.install_node_package import (
-    InstalledNodePackage,
     InstalledNodePackageRequest,
+    install_node_packages_for_address,
 )
 from pants.backend.javascript.resolve import FirstPartyNodePackageResolves
 from pants.backend.javascript.subsystems.nodejs import NodeJS
 from pants.core.goals.export import ExportRequest, ExportResult, ExportResults, ExportSubsystem
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.internals.native_engine import Digest, RemovePrefix
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
+from pants.engine.internals.native_engine import RemovePrefix
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import remove_prefix
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionMembership, UnionRule
 
 
@@ -48,15 +49,15 @@ async def export_node_modules_for_resolve(
     if not requested_resolve:
         return MaybeExportResult(None)
 
-    installation = await Get(
-        InstalledNodePackage, InstalledNodePackageRequest(requested_resolve.address)
+    installation = await install_node_packages_for_address(
+        InstalledNodePackageRequest(requested_resolve.address), **implicitly()
     )
 
     return MaybeExportResult(
         ExportResult(
             description=f"generated node_modules for {resolve} (using NodeJS {nodejs.version})",
             reldir=f"nodejs/modules/{resolve}",
-            digest=await Get(Digest, RemovePrefix(installation.digest, installation.project_dir)),
+            digest=await remove_prefix(RemovePrefix(installation.digest, installation.project_dir)),
             resolve=resolve,
         )
     )
@@ -67,8 +68,10 @@ async def export_node_modules(
     request: ExportNodeModulesRequest,
     export_subsys: ExportSubsystem,
 ) -> ExportResults:
-    maybe_packages = await MultiGet(
-        Get(MaybeExportResult, _ExportNodeModulesForResolveRequest(resolve))
+    maybe_packages = await concurrently(
+        export_node_modules_for_resolve(
+            _ExportNodeModulesForResolveRequest(resolve), **implicitly()
+        )
         for resolve in export_subsys.options.resolve
     )
     return ExportResults(pkg.result for pkg in maybe_packages if pkg.result is not None)
