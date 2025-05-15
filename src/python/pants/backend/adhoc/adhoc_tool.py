@@ -29,16 +29,21 @@ from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.adhoc_process_support import (
     AdhocProcessRequest,
-    AdhocProcessResult,
-    ToolRunner,
     ToolRunnerRequest,
+    convert_fallible_adhoc_process_result,
+    create_tool_runner,
     prepare_env_vars,
 )
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
-from pants.core.util_rules.environments import EnvironmentNameRequest, EnvironmentTarget
+from pants.core.util_rules.environments import (
+    EnvironmentNameRequest,
+    get_target_for_environment_name,
+    resolve_environment_name,
+)
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import Digest, PathGlobs, Snapshot
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.fs import PathGlobs
+from pants.engine.intrinsics import digest_to_snapshot
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import GeneratedSources, GenerateSourcesRequest
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
@@ -59,18 +64,16 @@ async def run_in_sandbox_request(
     target = request.protocol_target
     description = f"the `{target.alias}` at {target.address}"
 
-    environment_name = await Get(
-        EnvironmentName, EnvironmentNameRequest, EnvironmentNameRequest.from_target(target)
+    environment_name = await resolve_environment_name(
+        EnvironmentNameRequest.from_target(target), **implicitly()
     )
-
-    environment_target = await Get(EnvironmentTarget, EnvironmentName, environment_name)
+    environment_target = await get_target_for_environment_name(environment_name, **implicitly())
 
     runnable_address_str = target[AdhocToolRunnableField].value
     if not runnable_address_str:
         raise Exception(f"Must supply a value for `runnable` for {description}.")
 
-    tool_runner = await Get(
-        ToolRunner,
+    tool_runner = await create_tool_runner(
         ToolRunnerRequest(
             runnable_address_str=runnable_address_str,
             args=target.get(AdhocToolArgumentsField).value or (),
@@ -78,7 +81,7 @@ async def run_in_sandbox_request(
             runnable_dependencies=target.get(AdhocToolRunnableDependenciesField).value or (),
             target=request.protocol_target,
             named_caches=FrozenDict(target.get(AdhocToolNamedCachesField).value or {}),
-        ),
+        )
     )
 
     working_directory = target[AdhocToolWorkdirField].value or ""
@@ -138,15 +141,16 @@ async def run_in_sandbox_request(
         outputs_match_conjunction=outputs_match_mode.glob_expansion_conjunction,
     )
 
-    adhoc_result = await Get(
-        AdhocProcessResult,
-        {
-            environment_name: EnvironmentName,
-            process_request: AdhocProcessRequest,
-        },
+    adhoc_result = await convert_fallible_adhoc_process_result(
+        **implicitly(
+            {
+                environment_name: EnvironmentName,
+                process_request: AdhocProcessRequest,
+            }
+        )
     )
 
-    output = await Get(Snapshot, Digest, adhoc_result.adjusted_digest)
+    output = await digest_to_snapshot(adhoc_result.adjusted_digest)
     return GeneratedSources(output)
 
 
