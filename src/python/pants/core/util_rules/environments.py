@@ -808,27 +808,6 @@ async def determine_local_workspace_environment(
     )
 
 
-@rule
-async def resolve_single_environment_name(
-    request: SingleEnvironmentNameRequest,
-) -> EnvironmentName:
-    environment_names = await concurrently(
-        resolve_environment_name(
-            EnvironmentNameRequest(name, request.description_of_origin), **implicitly()
-        )
-        for name in request.raw_values
-    )
-
-    unique_environments = sorted({name.val or "<None>" for name in environment_names})
-    if len(unique_environments) != 1:
-        raise AssertionError(
-            f"Needed 1 unique environment, but {request.description_of_origin} contained "
-            f"{len(unique_environments)}:\n\n"
-            f"{bullet_list(unique_environments)}"
-        )
-    return environment_names[0]
-
-
 async def _apply_fallback_environment(env_tgt: Target, error_msg: str) -> EnvironmentName:
     fallback_field = env_tgt[FallbackEnvironmentField]
     if fallback_field.value is None:
@@ -956,6 +935,27 @@ async def resolve_environment_name(
         )
 
     return EnvironmentName(request.raw_value)
+
+
+@rule
+async def resolve_single_environment_name(
+    request: SingleEnvironmentNameRequest,
+) -> EnvironmentName:
+    environment_names = await concurrently(
+        resolve_environment_name(
+            EnvironmentNameRequest(name, request.description_of_origin), **implicitly()
+        )
+        for name in request.raw_values
+    )
+
+    unique_environments = sorted({name.val or "<None>" for name in environment_names})
+    if len(unique_environments) != 1:
+        raise AssertionError(
+            f"Needed 1 unique environment, but {request.description_of_origin} contained "
+            f"{len(unique_environments)}:\n\n"
+            f"{bullet_list(unique_environments)}"
+        )
+    return environment_names[0]
 
 
 @rule

@@ -351,22 +351,12 @@ def test_resolve_environment_name_local_and_docker_fallbacks(monkeypatch) -> Non
                     GlobalOptions, remote_execution=False, docker_execution=docker_execution
                 ),
             ],
+            mock_calls={
+                "pants.core.util_rules.environments.determine_local_environment": lambda _: ChosenLocalEnvironmentName(EnvironmentName(None)),
+                "pants.core.util_rules.environments.determine_local_workspace_environment": lambda _: ChosenLocalEnvironmentName(EnvironmentName(None)),
+                # "pants.core.util_rules.environments.get_target_for_environment_name": lambda name: EnvironmentTarget(name.val or "__local__", env_tgt),
+            },
             mock_gets=[
-                MockGet(
-                    output_type=ChosenLocalEnvironmentName,
-                    input_types=(),
-                    mock=lambda: ChosenLocalEnvironmentName(EnvironmentName(None)),
-                ),
-                MockGet(
-                    output_type=ChosenLocalWorkspaceEnvironmentName,
-                    input_types=(),
-                    mock=lambda: ChosenLocalEnvironmentName(EnvironmentName(None)),
-                ),
-                MockGet(
-                    output_type=EnvironmentTarget,
-                    input_types=(EnvironmentName,),
-                    mock=lambda name: EnvironmentTarget(name.val or "__local__", env_tgt),
-                ),
                 MockGet(
                     output_type=EnvironmentName,
                     input_types=(EnvironmentNameRequest,),
