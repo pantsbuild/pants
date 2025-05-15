@@ -10,6 +10,7 @@ from pants.core.goals.lint import Lint, LintFilesRequest, LintResult
 from pants.core.util_rules.adhoc_process_support import (
     ToolRunner,
     ToolRunnerRequest,
+    create_tool_runner,
     prepare_env_vars,
 )
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
@@ -17,24 +18,24 @@ from pants.core.util_rules.partitions import Partitions
 from pants.engine.addresses import Addresses
 from pants.engine.fs import PathGlobs
 from pants.engine.goal import Goal
+from pants.engine.internals.build_files import resolve_address
+from pants.engine.internals.graph import resolve_targets
 from pants.engine.internals.native_engine import (
-    Address,
     AddressInput,
-    Digest,
     FilespecMatcher,
     MergeDigests,
     Snapshot,
 )
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import digest_to_snapshot, execute_process, merge_digests
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import Rule, collect_rules, rule
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     SpecialCasedDependencies,
     StringField,
     StringSequenceField,
     Target,
-    Targets,
 )
 from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
@@ -167,16 +168,19 @@ class CodeQualityTool:
 
 @rule
 async def find_code_quality_tool(request: CodeQualityToolAddressString) -> CodeQualityTool:
-    tool_address = await Get(
-        Address,
-        AddressInput,
-        AddressInput.parse(request.address, description_of_origin="code quality tool target"),
+    tool_address = await resolve_address(
+        **implicitly(
+            {
+                AddressInput.parse(
+                    request.address, description_of_origin="code quality tool target"
+                ): AddressInput
+            }
+        )
     )
-
     addresses = Addresses((tool_address,))
     addresses.expect_single()
 
-    tool_targets = await Get(Targets, Addresses, addresses)
+    tool_targets = await resolve_targets(**implicitly({addresses: Addresses}))
     target = tool_targets[0]
     runnable_address_str = target[CodeQualityToolRunnableField].value
     if not runnable_address_str:
@@ -204,7 +208,7 @@ class CodeQualityToolBatch:
 async def process_files(batch: CodeQualityToolBatch) -> FallibleProcessResult:
     runner = batch.runner
 
-    input_digest = await Get(Digest, MergeDigests((runner.digest, batch.sources_snapshot.digest)))
+    input_digest = await merge_digests(MergeDigests((runner.digest, batch.sources_snapshot.digest)))
 
     env_vars = await prepare_env_vars(
         runner.extra_env,
@@ -213,17 +217,18 @@ async def process_files(batch: CodeQualityToolBatch) -> FallibleProcessResult:
         description_of_origin="code quality tool",
     )
 
-    result = await Get(
-        FallibleProcessResult,
-        Process(
-            argv=tuple(runner.args + batch.sources_snapshot.files),
-            description="Running code quality tool",
-            input_digest=input_digest,
-            append_only_caches=runner.append_only_caches,
-            immutable_input_digests=FrozenDict.frozen(runner.immutable_input_digests),
-            env=env_vars,
-            output_files=batch.output_files,
-        ),
+    result = await execute_process(
+        **implicitly(
+            Process(
+                argv=tuple(runner.args + batch.sources_snapshot.files),
+                description="Running code quality tool",
+                input_digest=input_digest,
+                append_only_caches=runner.append_only_caches,
+                immutable_input_digests=FrozenDict.frozen(runner.immutable_input_digests),
+                env=env_vars,
+                output_files=batch.output_files,
+            )
+        )
     )
     return result
 
@@ -294,7 +299,7 @@ class CodeQualityToolRuleBuilder:
             if subsystem.skip:
                 return Partitions()
 
-            cqt = await Get(CodeQualityTool, CodeQualityToolAddressString(address=self.target))
+            cqt = await find_code_quality_tool(CodeQualityToolAddressString(address=self.target))
 
             matching_filepaths = FilespecMatcher(
                 includes=cqt.file_glob_include,
@@ -305,18 +310,19 @@ class CodeQualityToolRuleBuilder:
 
         @rule(canonical_name_suffix=self.scope)
         async def run_code_quality(request: CodeQualityProcessingRequest.Batch) -> LintResult:
-            sources_snapshot, code_quality_tool_runner = await MultiGet(
-                Get(Snapshot, PathGlobs(request.elements)),
-                Get(ToolRunner, CodeQualityToolAddressString(address=self.target)),
+            sources_snapshot, code_quality_tool_runner = await concurrently(
+                digest_to_snapshot(**implicitly(PathGlobs(request.elements))),
+                create_tool_runner(**implicitly(CodeQualityToolAddressString(address=self.target))),
             )
 
-            proc_result = await Get(
-                FallibleProcessResult,
-                CodeQualityToolBatch(
-                    runner=code_quality_tool_runner,
-                    sources_snapshot=sources_snapshot,
-                    output_files=(),
-                ),
+            proc_result = await execute_process(
+                **implicitly(
+                    CodeQualityToolBatch(
+                        runner=code_quality_tool_runner,
+                        sources_snapshot=sources_snapshot,
+                        output_files=(),
+                    )
+                )
             )
 
             return LintResult.create(request, process_result=proc_result)
@@ -347,7 +353,7 @@ class CodeQualityToolRuleBuilder:
             if subsystem.skip:
                 return Partitions()
 
-            cqt = await Get(CodeQualityTool, CodeQualityToolAddressString(address=self.target))
+            cqt = await find_code_quality_tool(CodeQualityToolAddressString(address=self.target))
 
             matching_filepaths = FilespecMatcher(
                 includes=cqt.file_glob_include,
@@ -359,21 +365,21 @@ class CodeQualityToolRuleBuilder:
         @rule(canonical_name_suffix=self.scope)
         async def run_code_quality(request: CodeQualityProcessingRequest.Batch) -> FmtResult:
             sources_snapshot = request.snapshot
-
-            code_quality_tool_runner = await Get(
-                ToolRunner, CodeQualityToolAddressString(address=self.target)
+            code_quality_tool_runner = await create_tool_runner(
+                **implicitly(CodeQualityToolAddressString(address=self.target))
             )
 
-            proc_result = await Get(
-                FallibleProcessResult,
-                CodeQualityToolBatch(
-                    runner=code_quality_tool_runner,
-                    sources_snapshot=sources_snapshot,
-                    output_files=request.files,
-                ),
+            proc_result = await execute_process(
+                **implicitly(
+                    CodeQualityToolBatch(
+                        runner=code_quality_tool_runner,
+                        sources_snapshot=sources_snapshot,
+                        output_files=request.files,
+                    )
+                )
             )
 
-            output = await Get(Snapshot, Digest, proc_result.output_digest)
+            output = await digest_to_snapshot(proc_result.output_digest)
 
             return FmtResult(
                 input=request.snapshot,
@@ -409,7 +415,7 @@ class CodeQualityToolRuleBuilder:
             if subsystem.skip:
                 return Partitions()
 
-            cqt = await Get(CodeQualityTool, CodeQualityToolAddressString(address=self.target))
+            cqt = await find_code_quality_tool(CodeQualityToolAddressString(address=self.target))
 
             matching_filepaths = FilespecMatcher(
                 includes=cqt.file_glob_include,
@@ -422,20 +428,21 @@ class CodeQualityToolRuleBuilder:
         async def run_code_quality(request: CodeQualityProcessingRequest.Batch) -> FixResult:
             sources_snapshot = request.snapshot
 
-            code_quality_tool_runner = await Get(
-                ToolRunner, CodeQualityToolAddressString(address=self.target)
+            code_quality_tool_runner = await create_tool_runner(
+                **implicitly(CodeQualityToolAddressString(address=self.target))
             )
 
-            proc_result = await Get(
-                FallibleProcessResult,
-                CodeQualityToolBatch(
-                    runner=code_quality_tool_runner,
-                    sources_snapshot=sources_snapshot,
-                    output_files=request.files,
-                ),
+            proc_result = await execute_process(
+                **implicitly(
+                    CodeQualityToolBatch(
+                        runner=code_quality_tool_runner,
+                        sources_snapshot=sources_snapshot,
+                        output_files=request.files,
+                    )
+                )
             )
 
-            output = await Get(Snapshot, Digest, proc_result.output_digest)
+            output = await digest_to_snapshot(proc_result.output_digest)
 
             return FixResult(
                 input=request.snapshot,
