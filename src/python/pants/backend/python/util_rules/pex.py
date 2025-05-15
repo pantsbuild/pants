@@ -564,6 +564,7 @@ async def _setup_pex_requirements(
             lockfile = request.requirements.lockfile
         else:
             complete_req_strings = None
+            # TODO: Call-by-name fails with "get_lockfile_for_resolve" has incompatible type "Pex | Resolve | None"; expected "Resolve" - need to narrow this (later)
             lockfile = await Get(Lockfile, Resolve, request.requirements.from_superset)
         loaded_lockfile = await load_lockfile(LoadedLockfileRequest(lockfile), **implicitly())
         argv = (

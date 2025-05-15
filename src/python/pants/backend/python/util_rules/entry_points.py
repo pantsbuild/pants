@@ -25,7 +25,7 @@ from pants.backend.python.target_types import (
 )
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import CreateDigest, FileContent, PathGlobs, Paths
-from pants.engine.internals.graph import determine_explicitly_provided_dependencies
+from pants.engine.internals.graph import determine_explicitly_provided_dependencies, resolve_targets
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Address, Digest
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import create_digest, path_globs_to_paths
@@ -173,13 +173,14 @@ async def _get_entry_point_deps_targets_and_predicates(
             "Please file an issue if you see this error. This rule helper must not "
             "be called with an empty entry_point_dependencies field."
         )
-    targets = await Get(
-        Targets,
-        UnparsedAddressInputs(
-            entry_point_deps.value.keys(),
-            owning_address=owning_address,
-            description_of_origin=f"{PythonTestsEntryPointDependenciesField.alias} from {owning_address}",
-        ),
+    targets = await resolve_targets(
+        **implicitly(
+            UnparsedAddressInputs(
+                entry_point_deps.value.keys(),
+                owning_address=owning_address,
+                description_of_origin=f"{PythonTestsEntryPointDependenciesField.alias} from {owning_address}",
+            )
+        )
     )
 
     requested_entry_points: dict[Target, set[str]] = {}
