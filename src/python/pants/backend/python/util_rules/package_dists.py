@@ -407,7 +407,7 @@ async def create_dist_build_request(
     sdist_config_settings = dist_tgt.get(SDistConfigSettingsField).value or FrozenDict()
     backend_env_vars = dist_tgt.get(BuildBackendEnvVarsField).value
     if backend_env_vars:
-        await environment_vars_subset(
+        extra_build_time_env = await environment_vars_subset(
             EnvironmentVarsRequest(sorted(backend_env_vars)), **implicitly()
         )
     else:
