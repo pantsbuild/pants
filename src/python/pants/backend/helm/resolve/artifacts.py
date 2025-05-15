@@ -19,7 +19,7 @@ from pants.backend.helm.target_types import (
 from pants.backend.helm.util_rules.chart_metadata import rules as metadata_rules
 from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import Target
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import bullet_list
@@ -172,8 +172,8 @@ class ThirdPartyHelmArtifactMapping(FrozenDict[str, Address]):
 async def third_party_helm_artifact_mapping(
     all_helm_artifact_tgts: AllHelmArtifactTargets,
 ) -> ThirdPartyHelmArtifactMapping:
-    artifacts = await MultiGet(
-        Get(ResolvedHelmArtifact, HelmArtifact, HelmArtifact.from_target(tgt))
+    artifacts = await concurrently(
+        resolved_helm_artifact(**implicitly({HelmArtifact.from_target(tgt): HelmArtifact}))
         for tgt in all_helm_artifact_tgts
     )
     return ThirdPartyHelmArtifactMapping(

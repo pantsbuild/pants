@@ -19,16 +19,22 @@ from pants.backend.helm.utils.yaml import FrozenYamlIndex
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import (
+    VenvPex,
+    VenvPexProcess,
+    create_venv_pex,
+    setup_venv_pex_process,
+)
 from pants.core.goals.run import RunFieldSet, RunRequest
 from pants.core.util_rules.system_binaries import CatBinary
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import CreateDigest, Digest, FileContent
+from pants.engine.internals.graph import resolve_targets
 from pants.engine.internals.native_engine import MergeDigests
-from pants.engine.process import Process
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import FieldSetsPerTarget, FieldSetsPerTargetRequest, Targets
+from pants.engine.intrinsics import create_digest, merge_digests
+from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.target import FieldSetsPerTarget, FieldSetsPerTargetRequest
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import bullet_list, pluralize, softwrap
@@ -75,14 +81,15 @@ async def setup_post_renderer_tool(
     post_renderer_content = FileContent(
         path=_HELM_POST_RENDERER_TOOL, content=post_renderer_sources, is_executable=True
     )
-    post_renderer_digest = await Get(Digest, CreateDigest([post_renderer_content]))
+    post_renderer_digest = await create_digest(CreateDigest([post_renderer_content]))
 
-    post_renderer_pex = await Get(
-        VenvPex,
-        PexRequest,
-        post_renderer.to_pex_request(
-            main=EntryPoint(PurePath(post_renderer_content.path).stem), sources=post_renderer_digest
-        ),
+    post_renderer_pex = await create_venv_pex(
+        **implicitly(
+            post_renderer.to_pex_request(
+                main=EntryPoint(PurePath(post_renderer_content.path).stem),
+                sources=post_renderer_digest,
+            )
+        )
     )
     return _HelmPostRendererTool(post_renderer_pex)
 
@@ -160,11 +167,11 @@ async def _resolve_post_renderers(
         )
     )
 
-    targets = await Get(Targets, UnparsedAddressInputs, address_inputs)
+    targets = await resolve_targets(**implicitly({address_inputs: UnparsedAddressInputs}))
     field_sets_per_target = await Get(
         FieldSetsPerTarget, FieldSetsPerTargetRequest(RunFieldSet, targets)
     )
-    return await MultiGet(
+    return await concurrently(
         Get(RunRequest, RunFieldSet, field_set) for field_set in field_sets_per_target.field_sets
     )
 
@@ -179,26 +186,25 @@ async def setup_post_renderer_launcher(
     post_renderer_config = yaml.safe_dump(
         request.replacements.to_json_dict(), explicit_start=True, sort_keys=True
     )
-    post_renderer_cfg_digest = await Get(
-        Digest,
+    post_renderer_cfg_digest = await create_digest(
         CreateDigest(
             [
                 FileContent(HELM_POST_RENDERER_CFG_FILENAME, post_renderer_config.encode("utf-8")),
             ]
-        ),
+        )
     )
 
     # Generate a temporary PEX process that uses the previously created configuration file.
     post_renderer_cfg_file = os.path.join(".", HELM_POST_RENDERER_CFG_FILENAME)
     post_renderer_input_file = os.path.join(".", "__helm_stdout.yaml")
-    post_renderer_process = await Get(
-        Process,
+    post_renderer_process = await setup_venv_pex_process(
         VenvPexProcess(
             post_renderer_tool.pex,
             argv=[post_renderer_cfg_file, post_renderer_input_file],
             input_digest=post_renderer_cfg_digest,
             description="",
         ),
+        **implicitly(),
     )
 
     def shell_cmd(args: Iterable[str]) -> str:
@@ -232,8 +238,7 @@ async def setup_post_renderer_launcher(
         {post_renderer_process_cli}
         """
     )
-    wrapper_digest = await Get(
-        Digest,
+    wrapper_digest = await create_digest(
         CreateDigest(
             [
                 FileContent(
@@ -246,8 +251,7 @@ async def setup_post_renderer_launcher(
     )
 
     # Combine all required settings for the internal and extra post-renderers
-    launcher_digest = await Get(
-        Digest,
+    launcher_digest = await merge_digests(
         MergeDigests(
             [
                 wrapper_digest,
