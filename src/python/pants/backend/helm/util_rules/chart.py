@@ -51,7 +51,7 @@ from pants.engine.intrinsics import (
     digest_to_snapshot,
     merge_digests,
 )
-from pants.engine.rules import collect_rules, concurrently, implicitly, rule
+from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import DependenciesRequest, Target, WrappedTargetRequest
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -148,29 +148,28 @@ async def _merge_subchart_digests(charts: Iterable[HelmChart]) -> Digest:
 async def _find_charts_by_targets(
     targets: Iterable[Target], *, description_of_origin: str
 ) -> tuple[HelmChart, ...]:
-    return await concurrently(
-        [
-            *(
-                get_helm_chart(HelmChartRequest.from_target(target), **implicitly())
-                for target in targets
-                if HelmChartFieldSet.is_applicable(target)
-            ),
-            *(
-                get_helm_chart(
-                    **implicitly(
-                        {
-                            FetchHelmArtifactRequest.from_target(
-                                target,
-                                description_of_origin=description_of_origin,
-                            ): FetchHelmArtifactRequest
-                        }
-                    )
-                )
-                for target in targets
-                if HelmArtifactFieldSet.is_applicable(target)
-            ),
-        ]
-    )
+    # These `Get`s are not ported yet to call-by-name due to the rule cycle with`get_helm_chart`
+    # which calls this function.
+    requests = [
+        *(
+            Get(HelmChart, HelmChartRequest, HelmChartRequest.from_target(target))
+            for target in targets
+            if HelmChartFieldSet.is_applicable(target)
+        ),
+        *(
+            Get(
+                HelmChart,
+                FetchHelmArtifactRequest,
+                FetchHelmArtifactRequest.from_target(
+                    target,
+                    description_of_origin=description_of_origin,
+                ),
+            )
+            for target in targets
+            if HelmArtifactFieldSet.is_applicable(target)
+        ),
+    ]
+    return await concurrently(requests)
 
 
 @rule(desc="Compile Helm chart", level=LogLevel.DEBUG)
