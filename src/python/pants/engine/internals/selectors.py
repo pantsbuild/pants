@@ -53,15 +53,19 @@ class AwaitableConstraints:
     is_effect: bool
 
     def __repr__(self) -> str:
-        name = "Effect" if self.is_effect else "Get"
-        if len(self.input_types) == 0:
-            inputs = ""
-        elif len(self.input_types) == 1:
-            inputs = f", {self.input_types[0].__name__}, .."
+        if self.rule_id:
+            inputs = ", ".join(f"{t.__name__}" for t in self.input_types)
+            return f"{self.rule_id}({inputs}) -> {self.output_type.__name__}"
         else:
-            input_items = ", ".join(f"{t.__name__}: .." for t in self.input_types)
-            inputs = f", {{{input_items}}}"
-        return f"{name}({self.output_type.__name__}{inputs})"
+            name = "Effect" if self.is_effect else "Get"
+            if len(self.input_types) == 0:
+                inputs = ""
+            elif len(self.input_types) == 1:
+                inputs = f", {self.input_types[0].__name__}, .."
+            else:
+                input_items = ", ".join(f"{t.__name__}: .." for t in self.input_types)
+                inputs = f", {{{input_items}}}"
+            return f"{name}({self.output_type.__name__}{inputs})"
 
     def __str__(self) -> str:
         return repr(self)

@@ -11,36 +11,51 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 from pants.backend.docker.package_types import BuiltDockerImage
-from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo, DockerfileInfoRequest
+from pants.backend.docker.subsystems.dockerfile_parser import (
+    DockerfileInfo,
+    DockerfileInfoRequest,
+    parse_dockerfile,
+)
 from pants.backend.docker.target_types import DockerImageSourceField
 from pants.backend.docker.util_rules.docker_build_args import (
     DockerBuildArgs,
     DockerBuildArgsRequest,
+    docker_build_args,
 )
 from pants.backend.docker.util_rules.docker_build_env import (
     DockerBuildEnvironment,
     DockerBuildEnvironmentError,
     DockerBuildEnvironmentRequest,
+    docker_build_environment_vars,
 )
 from pants.backend.docker.utils import image_ref_regexp, suggest_renames
 from pants.backend.docker.value_interpolation import DockerBuildArgsInterpolationValue
 from pants.backend.shell.target_types import ShellSourceField
-from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
+from pants.core.goals.package import (
+    BuiltPackage,
+    EnvironmentAwarePackageRequest,
+    PackageFieldSet,
+    environment_aware_package,
+)
 from pants.core.target_types import FileSourceField
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
+from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.fs import Digest, MergeDigests, Snapshot
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.internals.graph import (
+    find_valid_field_sets,
+    resolve_targets,
+    resolve_unparsed_address_inputs,
+)
+from pants.engine.internals.graph import transitive_targets as transitive_targets_get
+from pants.engine.intrinsics import digest_to_snapshot
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
-    FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     GeneratedSources,
     GenerateSourcesRequest,
     SourcesField,
-    Targets,
-    TransitiveTargets,
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
@@ -243,16 +258,19 @@ class DockerBuildContext:
 @rule
 async def create_docker_build_context(request: DockerBuildContextRequest) -> DockerBuildContext:
     # Get all targets to include in context.
-    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([request.address]))
+    transitive_targets = await transitive_targets_get(
+        TransitiveTargetsRequest([request.address]), **implicitly()
+    )
     docker_image = transitive_targets.roots[0]
 
     # Get all dependencies for the root target.
-    root_dependencies = await Get(Targets, DependenciesRequest(docker_image.get(Dependencies)))
+    root_dependencies = await resolve_targets(
+        **implicitly(DependenciesRequest(docker_image.get(Dependencies)))
+    )
 
     # Get all file sources from the root dependencies. That includes any non-file sources that can
     # be "codegen"ed into a file source.
-    sources_request = Get(
-        SourceFiles,
+    sources_request = determine_source_files(
         SourceFilesRequest(
             sources_fields=[tgt.get(SourcesField) for tgt in root_dependencies],
             for_sources_types=(
@@ -260,18 +278,17 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
                 FileSourceField,
             ),
             enable_codegen=True,
-        ),
+        )
     )
 
-    embedded_pkgs_per_target_request = Get(
-        FieldSetsPerTarget,
-        FieldSetsPerTargetRequest(PackageFieldSet, transitive_targets.dependencies),
+    embedded_pkgs_per_target_request = find_valid_field_sets(
+        FieldSetsPerTargetRequest(PackageFieldSet, transitive_targets.dependencies), **implicitly()
     )
 
-    sources, embedded_pkgs_per_target, dockerfile_info = await MultiGet(
+    sources, embedded_pkgs_per_target, dockerfile_info = await concurrently(
         sources_request,
         embedded_pkgs_per_target_request,
-        Get(DockerfileInfo, DockerfileInfoRequest(docker_image.address)),
+        parse_dockerfile(DockerfileInfoRequest(docker_image.address), **implicitly()),
     )
 
     # Package binary dependencies for build context.
@@ -284,8 +301,8 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
             or not isinstance(getattr(field_set, "source", None), DockerImageSourceField)
         )
     ]
-    embedded_pkgs = await MultiGet(
-        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
+    embedded_pkgs = await concurrently(
+        environment_aware_package(EnvironmentAwarePackageRequest(field_set))
         for field_set in pkgs_wanting_embedding
     )
 
@@ -308,12 +325,14 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
     all_digests = (dockerfile_info.digest, sources.snapshot.digest, *embedded_pkgs_digest)
 
     # Merge all digests to get the final docker build context digest.
-    context_request = Get(Snapshot, MergeDigests(d for d in all_digests if d))
+    context_request = digest_to_snapshot(**implicitly(MergeDigests(d for d in all_digests if d)))
 
     # Requests for build args and env
-    build_args_request = Get(DockerBuildArgs, DockerBuildArgsRequest(docker_image))
-    build_env_request = Get(DockerBuildEnvironment, DockerBuildEnvironmentRequest(docker_image))
-    context, supplied_build_args, build_env = await MultiGet(
+    build_args_request = docker_build_args(DockerBuildArgsRequest(docker_image), **implicitly())
+    build_env_request = docker_build_environment_vars(
+        DockerBuildEnvironmentRequest(docker_image), **implicitly()
+    )
+    context, supplied_build_args, build_env = await concurrently(
         context_request, build_args_request, build_env_request
     )
 
@@ -328,8 +347,7 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
             supplied_build_args
         ).nonempty()
         # Parse the build args values into Address instances.
-        from_image_addresses = await Get(
-            Addresses,
+        from_image_addresses = await resolve_unparsed_address_inputs(
             UnparsedAddressInputs(
                 dockerfile_build_args.values(),
                 owning_address=dockerfile_info.address,
@@ -341,6 +359,7 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
                 ),
                 skip_invalid_addresses=True,
             ),
+            **implicitly(),
         )
         # Map those addresses to the corresponding built image ref (tag).
         address_to_built_image_tag = {
@@ -393,8 +412,7 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
 async def fill_args_from_copy(
     dockerfile_copy_args: dict[str, str], dockerfile_info, addrs_to_paths
 ):
-    copy_arg_addresses = await Get(
-        Addresses,
+    copy_arg_addresses = await resolve_unparsed_address_inputs(
         UnparsedAddressInputs(
             dockerfile_info.copy_build_args.to_dict().values(),
             owning_address=dockerfile_info.address,
@@ -406,6 +424,7 @@ async def fill_args_from_copy(
             ),
             skip_invalid_addresses=True,
         ),
+        **implicitly(),
     )
 
     def resolve_arg(arg_name, maybe_addr) -> str:

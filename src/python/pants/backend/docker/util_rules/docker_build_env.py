@@ -9,12 +9,13 @@ from dataclasses import dataclass
 
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.util_rules.docker_build_args import (
-    DockerBuildArgs,
     DockerBuildArgsRequest,
+    docker_build_args,
 )
 from pants.backend.docker.utils import KeyValueSequenceUtil
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import Target
 
 logger = logging.getLogger(__name__)
@@ -64,12 +65,12 @@ async def docker_build_environment_vars(
     docker_options: DockerOptions,
     docker_env_aware: DockerOptions.EnvironmentAware,
 ) -> DockerBuildEnvironment:
-    build_args = await Get(DockerBuildArgs, DockerBuildArgsRequest(request.target))
+    build_args = await docker_build_args(DockerBuildArgsRequest(request.target), **implicitly())
     env_vars = KeyValueSequenceUtil.from_strings(
         *{build_arg for build_arg in build_args if "=" not in build_arg},
         *docker_env_aware.env_vars,
     )
-    env = await Get(EnvironmentVars, EnvironmentVarsRequest(tuple(env_vars)))
+    env = await environment_vars_subset(EnvironmentVarsRequest(tuple(env_vars)), **implicitly())
     return DockerBuildEnvironment.create(env)
 
 

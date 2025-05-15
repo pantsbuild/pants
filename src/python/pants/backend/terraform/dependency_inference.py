@@ -8,8 +8,9 @@ from pathlib import PurePath
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import VenvPex, VenvPexProcess, create_venv_pex
 from pants.backend.python.util_rules.pex import rules as pex_rules
+from pants.backend.python.util_rules.pex import setup_venv_pex_process
 from pants.backend.terraform.target_types import (
     TerraformBackendTarget,
     TerraformDependenciesField,
@@ -23,20 +24,24 @@ from pants.base.specs import DirGlobSpec, DirLiteralSpec, RawSpecs
 from pants.core.target_types import LockfileTarget
 from pants.engine.addresses import Addresses
 from pants.engine.fs import CreateDigest, Digest, FileContent
+from pants.engine.internals.build_files import resolve_address
+from pants.engine.internals.graph import (
+    determine_explicitly_provided_dependencies,
+    hydrate_sources,
+    resolve_targets,
+)
 from pants.engine.internals.native_engine import Address, AddressInput
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import create_digest
+from pants.engine.process import Process, execute_process_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
     DependenciesRequest,
-    ExplicitlyProvidedDependencies,
     FieldSet,
-    HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
     Target,
-    Targets,
 )
 from pants.engine.unions import UnionRule
 from pants.util.dirutil import group_by_dir
@@ -72,14 +77,14 @@ async def setup_parser(hcl2_parser: TerraformHcl2Parser) -> ParserSetup:
     parser_content = FileContent(
         path="__pants_tf_parser.py", content=parser_script_content, is_executable=True
     )
-    parser_digest = await Get(Digest, CreateDigest([parser_content]))
+    parser_digest = await create_digest(CreateDigest([parser_content]))
 
-    parser_pex = await Get(
-        VenvPex,
-        PexRequest,
-        hcl2_parser.to_pex_request(
-            main=EntryPoint(PurePath(parser_content.path).stem), sources=parser_digest
-        ),
+    parser_pex = await create_venv_pex(
+        **implicitly(
+            hcl2_parser.to_pex_request(
+                main=EntryPoint(PurePath(parser_content.path).stem), sources=parser_digest
+            )
+        )
     )
     return ParserSetup(parser_pex)
 
@@ -96,8 +101,7 @@ async def setup_process_for_parse_terraform_module_sources(
 ) -> Process:
     dir_paths = ", ".join(sorted(group_by_dir(request.paths).keys()))
 
-    process = await Get(
-        Process,
+    process = await setup_venv_pex_process(
         VenvPexProcess(
             parser.pex,
             argv=request.paths,
@@ -105,6 +109,7 @@ async def setup_process_for_parse_terraform_module_sources(
             description=f"Parse Terraform module sources: {dir_paths}",
             level=LogLevel.DEBUG,
         ),
+        **implicitly(),
     )
     return process
 
@@ -160,18 +165,19 @@ async def get_terraform_backend_and_vars(
 ) -> TerraformDeploymentInvocationFiles:
     this_address = field_set.address
 
-    explicit_deps = await Get(
-        ExplicitlyProvidedDependencies, DependenciesRequest(field_set.dependencies)
+    explicit_deps = await determine_explicitly_provided_dependencies(
+        **implicitly(DependenciesRequest(field_set.dependencies))
     )
-    tgts_in_dir, explicit_deps_tgt = await MultiGet(
-        Get(
-            Targets,
-            RawSpecs(
-                description_of_origin="terraform infer deployment dependencies",
-                dir_literals=(DirLiteralSpec(this_address.spec_path),),
-            ),
+    tgts_in_dir, explicit_deps_tgt = await concurrently(
+        resolve_targets(
+            **implicitly(
+                RawSpecs(
+                    description_of_origin="terraform infer deployment dependencies",
+                    dir_literals=(DirLiteralSpec(this_address.spec_path),),
+                )
+            )
         ),
-        Get(Targets, Addresses(explicit_deps.includes)),
+        resolve_targets(**implicitly(Addresses(explicit_deps.includes))),
     )
     return identify_terraform_backend_and_vars(explicit_deps_tgt, tgts_in_dir)
 
@@ -231,26 +237,30 @@ async def _infer_dependencies_from_sources(
     request: InferTerraformModuleDependenciesRequest,
 ) -> list[Address]:
     """Parse the source code for references to other modules."""
-    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.field_set.sources))
+    hydrated_sources = await hydrate_sources(
+        HydrateSourcesRequest(request.field_set.sources), **implicitly()
+    )
     paths = OrderedSet(
         filename for filename in hydrated_sources.snapshot.files if filename.endswith(".tf")
     )
-    result = await Get(
-        ProcessResult,
-        ParseTerraformModuleSources(
-            sources_digest=hydrated_sources.snapshot.digest,
-            paths=tuple(paths),
-        ),
+    result = await execute_process_or_raise(
+        **implicitly(
+            ParseTerraformModuleSources(
+                sources_digest=hydrated_sources.snapshot.digest,
+                paths=tuple(paths),
+            )
+        )
     )
     candidate_spec_paths = [line for line in result.stdout.decode("utf-8").split("\n") if line]
     # For each path, see if there is a `terraform_module` target at the specified spec_path.
-    candidate_targets = await Get(
-        Targets,
-        RawSpecs(
-            dir_globs=tuple(DirGlobSpec(path) for path in candidate_spec_paths),
-            unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
-            description_of_origin="the `terraform_module` dependency inference rule",
-        ),
+    candidate_targets = await resolve_targets(
+        **implicitly(
+            RawSpecs(
+                dir_globs=tuple(DirGlobSpec(path) for path in candidate_spec_paths),
+                unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
+                description_of_origin="the `terraform_module` dependency inference rule",
+            )
+        )
     )
     # TODO: Need to either implement the standard ambiguous dependency logic or ban >1 terraform_module
     # per directory.
@@ -265,11 +275,10 @@ async def _infer_lockfile(request: InferTerraformModuleDependenciesRequest) -> l
 
     This is necessary for `terraform validate`.
     """
-    invocation_files = await Get(
-        TerraformDeploymentInvocationFiles,
+    invocation_files = await get_terraform_backend_and_vars(
         TerraformDeploymentInvocationFilesRequest(
             request.field_set.address, request.field_set.dependencies
-        ),
+        )
     )
     if invocation_files.lockfile:
         return [invocation_files.lockfile.address]
@@ -292,14 +301,13 @@ async def infer_terraform_deployment_dependencies(
     request: InferTerraformDeploymentDependenciesRequest,
 ) -> InferredDependencies:
     root_module_address_input = request.field_set.root_module.to_address_input()
-    root_module = await Get(Address, AddressInput, root_module_address_input)
+    root_module = await resolve_address(**implicitly({root_module_address_input: AddressInput}))
     deps = [root_module]
 
-    invocation_files = await Get(
-        TerraformDeploymentInvocationFiles,
+    invocation_files = await get_terraform_backend_and_vars(
         TerraformDeploymentInvocationFilesRequest(
             request.field_set.address, request.field_set.dependencies
-        ),
+        )
     )
     deps.extend(e.address for e in invocation_files.backend_configs)
     deps.extend(e.address for e in invocation_files.vars_files)

@@ -8,19 +8,17 @@ from pants.backend.docker.target_types import DockerImageSourceField, DockerImag
 from pants.backend.tools.trivy.rules import RunTrivyRequest, run_trivy
 from pants.backend.tools.trivy.subsystem import SkipTrivyField, Trivy
 from pants.core.goals.lint import LintResult, LintTargetsRequest
-from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
+from pants.core.goals.package import (
+    EnvironmentAwarePackageRequest,
+    PackageFieldSet,
+    environment_aware_package,
+)
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.addresses import Addresses
+from pants.engine.internals.graph import find_valid_field_sets, resolve_targets
 from pants.engine.internals.native_engine import EMPTY_DIGEST
-from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, implicitly, rule
-from pants.engine.target import (
-    FieldSet,
-    FieldSetsPerTarget,
-    FieldSetsPerTargetRequest,
-    Target,
-    Targets,
-)
+from pants.engine.target import FieldSet, FieldSetsPerTargetRequest, Target
 from pants.util.logging import LogLevel
 
 
@@ -56,14 +54,14 @@ async def run_trivy_docker(
     request: TrivyDockerRequest.Batch[TrivyDockerFieldSet, Any],
 ) -> LintResult:
     addrs = tuple(e.address for e in request.elements)
-    tgts = await Get(Targets, Addresses(addrs))
+    tgts = await resolve_targets(**implicitly(Addresses(addrs)))
 
-    field_sets_per_tgt = await Get(
-        FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, tgts)
+    field_sets_per_tgt = await find_valid_field_sets(
+        FieldSetsPerTargetRequest(PackageFieldSet, tgts), **implicitly()
     )
     [field_set] = field_sets_per_tgt.field_sets
 
-    package = await Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
+    package = await environment_aware_package(EnvironmentAwarePackageRequest(field_set))
     built_image: BuiltDockerImage = cast(BuiltDockerImage, package.artifacts[0])
     r = await run_trivy(
         RunTrivyRequest(

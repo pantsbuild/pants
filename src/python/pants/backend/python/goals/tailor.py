@@ -25,9 +25,9 @@ from pants.backend.python.target_types import (
     PythonTestsGeneratorTarget,
     PythonTestUtilsGeneratingSourcesField,
     PythonTestUtilsGeneratorTarget,
-    ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
 )
+from pants.backend.python.target_types_rules import resolve_pex_entry_point
 from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -36,13 +36,15 @@ from pants.core.goals.tailor import (
     PutativeTargetsRequest,
 )
 from pants.core.target_types import ResourceTarget
-from pants.engine.fs import DigestContents, FileContent, PathGlobs, Paths
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import Target, UnexpandedTargets
+from pants.engine.fs import FileContent, PathGlobs
+from pants.engine.internals.graph import resolve_unexpanded_targets
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import get_digest_contents, path_globs_to_paths
+from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.target import Target
 from pants.engine.unions import UnionRule
 from pants.source.filespec import FilespecMatcher
-from pants.source.source_root import SourceRootsRequest, SourceRootsResult
+from pants.source.source_root import SourceRootsRequest, get_source_roots
 from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel
 from pants.util.requirements import parse_requirements_file
@@ -98,7 +100,7 @@ async def _find_resource_py_typed_targets(
     py_typed_files_globs: PathGlobs, all_owned_sources: AllOwnedSources
 ) -> list[PutativeTarget]:
     """Find resource targets that may be created after discovering any `py.typed` files."""
-    all_py_typed_files = await Get(Paths, PathGlobs, py_typed_files_globs)
+    all_py_typed_files = await path_globs_to_paths(py_typed_files_globs)
     unowned_py_typed_files = set(all_py_typed_files.files) - set(all_owned_sources)
 
     putative_targets = []
@@ -121,7 +123,7 @@ async def _find_source_targets(
     result = []
     check_if_init_file_empty: dict[str, tuple[str, str]] = {}  # full_path: (dirname, filename)
 
-    all_py_files = await Get(Paths, PathGlobs, py_files_globs)
+    all_py_files = await path_globs_to_paths(py_files_globs)
     unowned_py_files = set(all_py_files.files) - set(all_owned_sources)
     classified_unowned_py_files = classify_source_files(unowned_py_files)
     for tgt_type, paths in classified_unowned_py_files.items():
@@ -148,7 +150,9 @@ async def _find_source_targets(
                 )
 
     if check_if_init_file_empty:
-        init_contents = await Get(DigestContents, PathGlobs(check_if_init_file_empty.keys()))
+        init_contents = await get_digest_contents(
+            **implicitly(PathGlobs(check_if_init_file_empty.keys()))
+        )
         for file_content in init_contents:
             if not file_content.content.strip():
                 continue
@@ -190,10 +194,10 @@ async def find_putative_targets(
             all_requirements_files,
             all_pipenv_lockfile_files,
             all_pyproject_toml_contents,
-        ) = await MultiGet(
-            Get(DigestContents, PathGlobs, req.path_globs("*requirements*.txt")),
-            Get(DigestContents, PathGlobs, req.path_globs("Pipfile.lock")),
-            Get(DigestContents, PathGlobs, req.path_globs("pyproject.toml")),
+        ) = await concurrently(
+            get_digest_contents(**implicitly(req.path_globs("*requirements*.txt"))),
+            get_digest_contents(**implicitly(req.path_globs("Pipfile.lock"))),
+            get_digest_contents(**implicitly(req.path_globs("pyproject.toml"))),
         )
 
         def add_req_targets(files: Iterable[FileContent], alias: str, target_name: str) -> None:
@@ -279,8 +283,8 @@ async def find_putative_targets(
         # Find binary targets.
 
         # Get all files whose content indicates that they are entry points or are __main__.py files.
-        digest_contents = await Get(DigestContents, PathGlobs, all_py_files_globs)
-        all_main_py = await Get(Paths, PathGlobs, req.path_globs("__main__.py"))
+        digest_contents = await get_digest_contents(**implicitly({all_py_files_globs: PathGlobs}))
+        all_main_py = await path_globs_to_paths(req.path_globs("__main__.py"))
         entry_points = [
             file_content.path
             for file_content in digest_contents
@@ -288,9 +292,7 @@ async def find_putative_targets(
         ] + list(all_main_py.files)
 
         # Get the modules for these entry points.
-        src_roots = await Get(
-            SourceRootsResult, SourceRootsRequest, SourceRootsRequest.for_files(entry_points)
-        )
+        src_roots = await get_source_roots(SourceRootsRequest.for_files(entry_points))
         module_to_entry_point = {}
         for entry_point in entry_points:
             entry_point_path = PurePath(entry_point)
@@ -301,15 +303,17 @@ async def find_putative_targets(
 
         # Get existing binary targets for these entry points.
         entry_point_dirs = {os.path.dirname(entry_point) for entry_point in entry_points}
-        possible_existing_binary_targets = await Get(
-            UnexpandedTargets,
-            RawSpecs(
-                ancestor_globs=tuple(AncestorGlobSpec(d) for d in entry_point_dirs),
-                description_of_origin="the `pex_binary` tailor rule",
-            ),
+        possible_existing_binary_targets = await resolve_unexpanded_targets(
+            **implicitly(
+                RawSpecs(
+                    ancestor_globs=tuple(AncestorGlobSpec(d) for d in entry_point_dirs),
+                    description_of_origin="the `pex_binary` tailor rule",
+                )
+            )
         )
-        possible_existing_binary_entry_points = await MultiGet(
-            Get(ResolvedPexEntryPoint, ResolvePexEntryPointRequest(t[PexEntryPointField]))
+
+        possible_existing_binary_entry_points = await concurrently(
+            resolve_pex_entry_point(ResolvePexEntryPointRequest(t[PexEntryPointField]))
             for t in possible_existing_binary_targets
             if t.has_field(PexEntryPointField)
         )

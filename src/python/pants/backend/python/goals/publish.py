@@ -8,7 +8,11 @@ from dataclasses import dataclass
 
 from pants.backend.python.subsystems.twine import TwineSubsystem
 from pants.backend.python.target_types import PythonDistribution
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import (
+    VenvPexProcess,
+    create_venv_pex,
+    setup_venv_pex_process,
+)
 from pants.core.goals.publish import (
     PublishFieldSet,
     PublishOutputData,
@@ -16,11 +20,13 @@ from pants.core.goals.publish import (
     PublishProcesses,
     PublishRequest,
 )
-from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.core.util_rules.config_files import ConfigFiles, find_config_file
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import CreateDigest, Digest, MergeDigests, Snapshot
-from pants.engine.process import InteractiveProcess, Process
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.fs import CreateDigest, MergeDigests, Snapshot
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.intrinsics import digest_to_snapshot, merge_digests
+from pants.engine.process import InteractiveProcess
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import BoolField, StringSequenceField
 from pants.option.global_options import GlobalOptions
 from pants.util.strutil import help_text
@@ -165,22 +171,26 @@ async def twine_upload(
             ]
         )
 
-    twine_pex, packages_digest, config_files = await MultiGet(
-        Get(VenvPex, PexRequest, twine_subsystem.to_pex_request()),
-        Get(Digest, MergeDigests(pkg.digest for pkg in request.packages)),
-        Get(ConfigFiles, ConfigFilesRequest, twine_subsystem.config_request()),
+    twine_pex, packages_digest, config_files = await concurrently(
+        create_venv_pex(**implicitly(twine_subsystem.to_pex_request())),
+        merge_digests(MergeDigests(pkg.digest for pkg in request.packages)),
+        find_config_file(twine_subsystem.config_request()),
     )
 
     ca_cert_request = twine_subsystem.ca_certs_digest_request(global_options.ca_certs_path)
-    ca_cert = await Get(Snapshot, CreateDigest, ca_cert_request) if ca_cert_request else None
+    ca_cert = (
+        await digest_to_snapshot(**implicitly({ca_cert_request: CreateDigest}))
+        if ca_cert_request
+        else None
+    )
     ca_cert_digest = (ca_cert.digest,) if ca_cert else ()
 
-    input_digest = await Get(
-        Digest, MergeDigests((packages_digest, config_files.snapshot.digest, *ca_cert_digest))
+    input_digest = await merge_digests(
+        MergeDigests((packages_digest, config_files.snapshot.digest, *ca_cert_digest))
     )
-    pex_proc_requests = []
-    twine_envs = await MultiGet(
-        Get(EnvironmentVars, EnvironmentVarsRequest, twine_env_request(repo))
+    pex_proc_requests: list[VenvPexProcess] = []
+    twine_envs = await concurrently(
+        environment_vars_subset(**implicitly({twine_env_request(repo): EnvironmentVarsRequest}))
         for repo in request.field_set.repositories.value
     )
 
@@ -195,8 +205,8 @@ async def twine_upload(
             )
         )
 
-    processes = await MultiGet(
-        Get(Process, VenvPexProcess, request) for request in pex_proc_requests
+    processes = await concurrently(
+        setup_venv_pex_process(request, **implicitly()) for request in pex_proc_requests
     )
 
     return PublishProcesses(

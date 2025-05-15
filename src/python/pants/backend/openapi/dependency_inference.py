@@ -20,18 +20,21 @@ from pants.backend.openapi.target_types import (
 )
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import FileLiteralSpec, RawSpecs
-from pants.engine.fs import Digest, DigestContents
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
+from pants.engine.fs import Digest
+from pants.engine.internals.graph import (
+    determine_explicitly_provided_dependencies,
+    hydrate_sources,
+    resolve_targets,
+)
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import get_digest_contents
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
     DependenciesRequest,
-    ExplicitlyProvidedDependencies,
     FieldSet,
-    HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
-    Targets,
 )
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
@@ -50,7 +53,7 @@ class OpenApiDependencies:
 
 @rule
 async def parse_openapi_sources(request: ParseOpenApiSources) -> OpenApiDependencies:
-    digest_contents = await Get(DigestContents, Digest, request.sources_digest)
+    digest_contents = await get_digest_contents(request.sources_digest)
     dependencies: dict[str, frozenset[str]] = {}
 
     for digest_content in digest_contents:
@@ -114,16 +117,19 @@ class InferOpenApiDocumentDependenciesRequest(InferDependenciesRequest):
 async def infer_openapi_document_dependencies(
     request: InferOpenApiDocumentDependenciesRequest,
 ) -> InferredDependencies:
-    explicitly_provided_deps, hydrated_sources = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
-        Get(HydratedSources, HydrateSourcesRequest(request.field_set.sources)),
-    )
-    candidate_targets = await Get(
-        Targets,
-        RawSpecs(
-            file_literals=(FileLiteralSpec(*hydrated_sources.snapshot.files),),
-            description_of_origin="the `openapi_document` dependency inference",
+    explicitly_provided_deps, hydrated_sources = await concurrently(
+        determine_explicitly_provided_dependencies(
+            **implicitly(DependenciesRequest(request.field_set.dependencies))
         ),
+        hydrate_sources(HydrateSourcesRequest(request.field_set.sources), **implicitly()),
+    )
+    candidate_targets = await resolve_targets(
+        **implicitly(
+            RawSpecs(
+                file_literals=(FileLiteralSpec(*hydrated_sources.snapshot.files),),
+                description_of_origin="the `openapi_document` dependency inference",
+            )
+        )
     )
 
     addresses = frozenset(
@@ -158,16 +164,17 @@ class InferOpenApiSourceDependenciesRequest(InferDependenciesRequest):
 async def infer_openapi_module_dependencies(
     request: InferOpenApiSourceDependenciesRequest,
 ) -> InferredDependencies:
-    explicitly_provided_deps, hydrated_sources = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
-        Get(HydratedSources, HydrateSourcesRequest(request.field_set.sources)),
+    explicitly_provided_deps, hydrated_sources = await concurrently(
+        determine_explicitly_provided_dependencies(
+            **implicitly(DependenciesRequest(request.field_set.dependencies))
+        ),
+        hydrate_sources(HydrateSourcesRequest(request.field_set.sources), **implicitly()),
     )
-    result = await Get(
-        OpenApiDependencies,
+    result = await parse_openapi_sources(
         ParseOpenApiSources(
             sources_digest=hydrated_sources.snapshot.digest,
             paths=hydrated_sources.snapshot.files,
-        ),
+        )
     )
 
     paths: set[str] = set()
@@ -175,13 +182,14 @@ async def infer_openapi_module_dependencies(
     for source_file in hydrated_sources.snapshot.files:
         paths.update(result.dependencies[source_file])
 
-    candidate_targets = await Get(
-        Targets,
-        RawSpecs(
-            file_literals=tuple(FileLiteralSpec(path) for path in paths),
-            unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
-            description_of_origin="the `openapi_source` dependency inference",
-        ),
+    candidate_targets = await resolve_targets(
+        **implicitly(
+            RawSpecs(
+                file_literals=tuple(FileLiteralSpec(path) for path in paths),
+                unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
+                description_of_origin="the `openapi_source` dependency inference",
+            )
+        )
     )
 
     addresses = frozenset(

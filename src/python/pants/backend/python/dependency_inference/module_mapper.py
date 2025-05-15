@@ -32,10 +32,10 @@ from pants.backend.python.target_types import (
     PythonResolveField,
     PythonSourceField,
 )
-from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
+from pants.core.util_rules.stripped_source_files import StrippedFileNameRequest, strip_file_name
 from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, concurrently, rule
 from pants.engine.target import AllTargets, Target
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.frozendict import FrozenDict
@@ -202,7 +202,7 @@ class FirstPartyPythonModuleMapping:
 async def merge_first_party_module_mappings(
     union_membership: UnionMembership,
 ) -> FirstPartyPythonModuleMapping:
-    all_mappings = await MultiGet(
+    all_mappings = await concurrently(
         Get(
             FirstPartyPythonMappingImpl,
             FirstPartyPythonMappingImplMarker,
@@ -245,8 +245,8 @@ async def map_first_party_python_targets_to_modules(
     all_python_targets: AllPythonTargets,
     python_setup: PythonSetup,
 ) -> FirstPartyPythonMappingImpl:
-    stripped_file_per_target = await MultiGet(
-        Get(StrippedFileName, StrippedFileNameRequest(tgt[PythonSourceField].file_path))
+    stripped_file_per_target = await concurrently(
+        strip_file_name(StrippedFileNameRequest(tgt[PythonSourceField].file_path))
         for tgt in all_python_targets.first_party
     )
 
