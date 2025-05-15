@@ -47,18 +47,6 @@ class _DownloadPythonBuildStandaloneBinaryRequest:
     pass
 
 
-@rule
-async def get_python_for_scripts(env_tgt: EnvironmentTarget) -> PythonBuildStandaloneBinary:
-    if env_tgt.can_access_local_system_paths:
-        return PythonBuildStandaloneBinary(sys.executable)
-
-    result = await download_python_binary(
-        _DownloadPythonBuildStandaloneBinaryRequest(), **implicitly()
-    )
-
-    return PythonBuildStandaloneBinary(result.path)
-
-
 @rule(desc="Downloading Python for scripts", level=LogLevel.TRACE)
 async def download_python_binary(
     _: _DownloadPythonBuildStandaloneBinaryRequest,
@@ -129,6 +117,18 @@ async def download_python_binary(
     )
 
     return _PythonBuildStandaloneBinary(result.stdout.decode().splitlines()[-1].strip())
+
+
+@rule
+async def get_python_for_scripts(env_tgt: EnvironmentTarget) -> PythonBuildStandaloneBinary:
+    if env_tgt.can_access_local_system_paths:
+        return PythonBuildStandaloneBinary(sys.executable)
+
+    result = await download_python_binary(
+        _DownloadPythonBuildStandaloneBinaryRequest(), **implicitly()
+    )
+
+    return PythonBuildStandaloneBinary(result.path)
 
 
 @dataclass(frozen=True)
