@@ -16,6 +16,7 @@ from pants.core.util_rules.environments import (
     EnvironmentsSubsystem,
     EnvironmentTarget,
     LocalEnvironmentTarget,
+    PassThroughEnvVars,
     RemoteEnvironmentTarget,
     RemotePlatformField,
 )
@@ -103,7 +104,7 @@ def test_complete_env_vars() -> None:
         envs_enabled: bool = True,
         env_tgt: LocalEnvironmentTarget | RemoteEnvironmentTarget | DockerEnvironmentTarget | None,
         remote_execution: bool,
-        expected_env: str,
+        expected_env: dict,
     ) -> None:
         global_options = create_subsystem(GlobalOptions, remote_execution=remote_execution)
         name = "name"
@@ -114,15 +115,22 @@ def test_complete_env_vars() -> None:
 
         def mock_env_process(process: Process) -> ProcessResult:
             return Mock(
-                stdout=b"DOCKER=true" if "Docker" in process.description else b"REMOTE=true"
+                stdout=(
+                    b"CONTAINER_VAR=container_val\0COMMON_VAR=docker"
+                    if "Docker" in process.description
+                    else b"REMOTE_VAR=remote_val\0COMMON_VAR=remote"
+                )
             )
+
+        local_env = {
+            "USER_SHELL_VAR": "user_val",
+            "COMMON_VAR": "local",
+        }
 
         result = run_rule_with_mocks(
             complete_environment_vars,
             rule_args=[
-                SessionValues(
-                    {CompleteEnvironmentVars: CompleteEnvironmentVars({"LOCAL": "true"})}
-                ),
+                SessionValues({CompleteEnvironmentVars: CompleteEnvironmentVars(local_env)}),
                 EnvironmentTarget(name, env_tgt),
                 global_options,
                 env_subsystem,
@@ -131,31 +139,73 @@ def test_complete_env_vars() -> None:
                 MockGet(output_type=ProcessResult, input_types=(Process,), mock=mock_env_process)
             ],
         )
-        assert dict(result) == {expected_env: "true"}
+        assert dict(result) == expected_env
 
-    assert_env_vars(env_tgt=None, remote_execution=False, expected_env="LOCAL")
-    assert_env_vars(env_tgt=None, envs_enabled=False, remote_execution=True, expected_env="REMOTE")
-    assert_env_vars(env_tgt=None, envs_enabled=True, remote_execution=True, expected_env="LOCAL")
+    assert_env_vars(
+        env_tgt=None,
+        remote_execution=False,
+        expected_env={"USER_SHELL_VAR": "user_val", "COMMON_VAR": "local"},
+    )
+    assert_env_vars(
+        env_tgt=None,
+        envs_enabled=False,
+        remote_execution=True,
+        expected_env={
+            "REMOTE_VAR": "remote_val",
+            "COMMON_VAR": "remote",
+        },
+    )
+    assert_env_vars(
+        env_tgt=None,
+        envs_enabled=True,
+        remote_execution=True,
+        expected_env={
+            "USER_SHELL_VAR": "user_val",
+            "COMMON_VAR": "local",
+        },
+    )
 
     for re in (False, True):
         assert_env_vars(
             env_tgt=LocalEnvironmentTarget({}, Address("dir")),
             remote_execution=re,
-            expected_env="LOCAL",
+            expected_env={
+                "USER_SHELL_VAR": "user_val",
+                "COMMON_VAR": "local",
+            },
         )
 
     for re in (False, True):
         assert_env_vars(
-            env_tgt=DockerEnvironmentTarget({DockerImageField.alias: "my_img"}, Address("dir")),
+            env_tgt=DockerEnvironmentTarget(
+                {
+                    DockerImageField.alias: "my_img",
+                    PassThroughEnvVars.alias: ["COMMON_VAR", "USER_SHELL_VAR"],
+                },
+                Address("dir"),
+            ),
             remote_execution=re,
-            expected_env="DOCKER",
+            expected_env={
+                "USER_SHELL_VAR": "user_val",
+                "CONTAINER_VAR": "container_val",
+                "COMMON_VAR": "local",
+            },
         )
 
     for re in (False, True):
         assert_env_vars(
-            env_tgt=RemoteEnvironmentTarget({}, Address("dir")),
+            env_tgt=RemoteEnvironmentTarget(
+                {
+                    PassThroughEnvVars.alias: ["COMMON_VAR", "USER_SHELL_VAR"],
+                },
+                Address("dir"),
+            ),
             remote_execution=re,
-            expected_env="REMOTE",
+            expected_env={
+                "USER_SHELL_VAR": "user_val",
+                "REMOTE_VAR": "remote_val",
+                "COMMON_VAR": "local",
+            },
         )
 
 
