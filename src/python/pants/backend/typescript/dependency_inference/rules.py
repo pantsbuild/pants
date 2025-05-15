@@ -34,13 +34,13 @@ from pants.backend.typescript.target_types import (
 )
 from pants.backend.typescript.tsconfig import ParentTSConfigRequest, TSConfig, find_parent_ts_config
 from pants.build_graph.address import Address
+from pants.engine.internals.graph import hydrate_sources
 from pants.engine.internals.native_engine import InferenceMetadata, NativeDependenciesRequest
-from pants.engine.internals.selectors import Get, concurrently
+from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import parse_javascript_deps
 from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.target import (
     FieldSet,
-    HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
@@ -110,8 +110,8 @@ async def infer_typescript_source_dependencies(
     if not nodejs_infer.imports:
         return InferredDependencies(())
 
-    sources = await Get(
-        HydratedSources, HydrateSourcesRequest(source, for_sources_types=[TypeScriptSourceField])
+    sources = await hydrate_sources(
+        HydrateSourcesRequest(source, for_sources_types=[TypeScriptSourceField]), **implicitly()
     )
     metadata = await _prepare_inference_metadata(request.field_set.address, source.file_path)
 

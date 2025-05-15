@@ -7,17 +7,22 @@ from typing import Any
 
 from pants.backend.docker.lint.hadolint.skip_field import SkipHadolintField
 from pants.backend.docker.lint.hadolint.subsystem import Hadolint
-from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo, DockerfileInfoRequest
+from pants.backend.docker.subsystems.dockerfile_parser import (
+    DockerfileInfo,
+    DockerfileInfoRequest,
+    parse_dockerfile,
+)
 from pants.backend.docker.target_types import DockerImageSourceField
 from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.goals.resolves import ExportableTool
-from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
-from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
+from pants.core.util_rules.config_files import find_config_file
+from pants.core.util_rules.external_tool import download_external_tool
 from pants.core.util_rules.partitions import PartitionerType
-from pants.engine.fs import Digest, MergeDigests
+from pants.engine.fs import MergeDigests
+from pants.engine.intrinsics import execute_process, merge_digests
 from pants.engine.platform import Platform
-from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.process import Process
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -58,28 +63,26 @@ async def run_hadolint(
     hadolint: Hadolint,
     platform: Platform,
 ) -> LintResult:
-    downloaded_hadolint, config_files = await MultiGet(
-        Get(DownloadedExternalTool, ExternalToolRequest, hadolint.get_request(platform)),
-        Get(ConfigFiles, ConfigFilesRequest, hadolint.config_request()),
+    downloaded_hadolint, config_files = await concurrently(
+        download_external_tool(hadolint.get_request(platform)),
+        find_config_file(hadolint.config_request()),
     )
 
-    dockerfile_infos = await MultiGet(
-        Get(DockerfileInfo, DockerfileInfoRequest(field_set.address))
+    dockerfile_infos = await concurrently(
+        parse_dockerfile(DockerfileInfoRequest(field_set.address), **implicitly())
         for field_set in request.elements
     )
 
-    input_digest = await Get(
-        Digest,
+    input_digest = await merge_digests(
         MergeDigests(
             (
                 downloaded_hadolint.digest,
                 config_files.snapshot.digest,
                 *(info.digest for info in dockerfile_infos),
             )
-        ),
+        )
     )
-    process_result = await Get(
-        FallibleProcessResult,
+    process_result = await execute_process(
         Process(
             argv=[downloaded_hadolint.exe, *generate_argv(dockerfile_infos, hadolint)],
             # Hadolint tries to read a configuration file from a few locations on the system:
@@ -99,6 +102,7 @@ async def run_hadolint(
             description=f"Run `hadolint` on {pluralize(len(dockerfile_infos), 'Dockerfile')}.",
             level=LogLevel.DEBUG,
         ),
+        **implicitly(),
     )
 
     return LintResult.create(request, process_result)

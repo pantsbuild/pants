@@ -5,12 +5,12 @@ from __future__ import annotations
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
-from pants.backend.python.util_rules.dists import DistBuildRequest, DistBuildResult
+from pants.backend.python.util_rules.dists import run_pep517_build
 from pants.backend.python.util_rules.package_dists import create_dist_build_request
 from pants.backend.python.util_rules.package_dists import rules as package_dists_rules
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
-from pants.engine.fs import Digest, Snapshot
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.intrinsics import digest_to_snapshot
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionMembership, UnionRule
 
 
@@ -27,8 +27,8 @@ async def package_python_dist(
         # raises an error if both dist_tgt.wheel and dist_tgt.sdist are False
         validate_wheel_sdist=True,
     )
-    setup_py_result = await Get(DistBuildResult, DistBuildRequest, dist_build_request)
-    dist_snapshot = await Get(Snapshot, Digest, setup_py_result.output)
+    setup_py_result = await run_pep517_build(dist_build_request, **implicitly())
+    dist_snapshot = await digest_to_snapshot(setup_py_result.output)
     return BuiltPackage(
         setup_py_result.output,
         tuple(BuiltPackageArtifact(path) for path in dist_snapshot.files),

@@ -7,16 +7,12 @@ from enum import Enum
 from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
+from pants.engine.internals.graph import resolve_targets, resolve_unexpanded_targets
+from pants.engine.internals.graph import transitive_targets as transitive_targets_get
+from pants.engine.rules import collect_rules, concurrently, goal_rule, implicitly
 from pants.engine.target import AlwaysTraverseDeps
 from pants.engine.target import Dependencies as DependenciesField
-from pants.engine.target import (
-    DependenciesRequest,
-    Targets,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-    UnexpandedTargets,
-)
+from pants.engine.target import DependenciesRequest, Targets, TransitiveTargetsRequest
 from pants.option.option_types import BoolOption, EnumOption
 
 
@@ -60,16 +56,16 @@ async def list_dependencies_as_json(
     """Get dependencies for given addresses and list them in the console in JSON."""
     # NB: We must preserve target generators for the roots, i.e. not replace with their
     # generated targets.
-    target_roots = await Get(UnexpandedTargets, Addresses, addresses)
+    target_roots = await resolve_unexpanded_targets(addresses)
     # NB: When determining dependencies, though, we replace target generators with their
     # generated targets.
     if dependencies_subsystem.transitive:
-        transitive_targets_group = await MultiGet(
-            Get(
-                TransitiveTargets,
+        transitive_targets_group = await concurrently(
+            transitive_targets_get(
                 TransitiveTargetsRequest(
                     (address,), should_traverse_deps_predicate=AlwaysTraverseDeps()
                 ),
+                **implicitly(),
             )
             for address in addresses
         )
@@ -87,13 +83,14 @@ async def list_dependencies_as_json(
             iterated_targets.append(sorted(targets_collection))
 
     else:
-        dependencies_per_target_root = await MultiGet(
-            Get(
-                Targets,
-                DependenciesRequest(
-                    tgt.get(DependenciesField),
-                    should_traverse_deps_predicate=AlwaysTraverseDeps(),
-                ),
+        dependencies_per_target_root = await concurrently(
+            resolve_targets(
+                **implicitly(
+                    DependenciesRequest(
+                        tgt.get(DependenciesField),
+                        should_traverse_deps_predicate=AlwaysTraverseDeps(),
+                    )
+                )
             )
             for tgt in target_roots
         )
@@ -119,26 +116,27 @@ async def list_dependencies_as_plain_text(
 ) -> None:
     """Get dependencies for given addresses and list them in the console as a single list."""
     if dependencies_subsystem.transitive:
-        transitive_targets = await Get(
-            TransitiveTargets,
+        transitive_targets = await transitive_targets_get(
             TransitiveTargetsRequest(
                 addresses, should_traverse_deps_predicate=AlwaysTraverseDeps()
             ),
+            **implicitly(),
         )
         targets = Targets(transitive_targets.dependencies)
     else:
         # NB: We must preserve target generators for the roots, i.e. not replace with their
         # generated targets.
-        target_roots = await Get(UnexpandedTargets, Addresses, addresses)
+        target_roots = await resolve_unexpanded_targets(addresses)
         # NB: When determining dependencies, though, we replace target generators with their
         # generated targets.
-        dependencies_per_target_root = await MultiGet(
-            Get(
-                Targets,
-                DependenciesRequest(
-                    tgt.get(DependenciesField),
-                    should_traverse_deps_predicate=AlwaysTraverseDeps(),
-                ),
+        dependencies_per_target_root = await concurrently(
+            resolve_targets(
+                **implicitly(
+                    DependenciesRequest(
+                        tgt.get(DependenciesField),
+                        should_traverse_deps_predicate=AlwaysTraverseDeps(),
+                    )
+                )
             )
             for tgt in target_roots
         )

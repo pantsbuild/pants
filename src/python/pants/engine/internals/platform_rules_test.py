@@ -178,7 +178,7 @@ def test_get_environment_paths(env: dict[str, str], expected_entries: list[str])
         mock_gets=[
             MockGet(
                 output_type=EnvironmentVars,
-                input_types=(CompleteEnvironmentVars, EnvironmentVarsRequest),
+                input_types=(EnvironmentVarsRequest,),
                 mock=mock_environment_vars_subset,
             )
         ],

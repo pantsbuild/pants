@@ -7,10 +7,10 @@ import logging
 from collections import defaultdict
 from collections.abc import Mapping
 
-from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
+from pants.backend.java.dependency_inference.java_parser import resolve_fallible_result_to_analysis
 from pants.backend.java.target_types import JavaSourceField
 from pants.core.util_rules.source_files import SourceFilesRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import AllTargets, Targets
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import symbol_mapper
@@ -42,8 +42,10 @@ async def map_first_party_java_targets_to_symbols(
     java_targets: AllJavaTargets,
     jvm: JvmSubsystem,
 ) -> SymbolMap:
-    source_analysis = await MultiGet(
-        Get(JavaSourceDependencyAnalysis, SourceFilesRequest([target[JavaSourceField]]))
+    source_analysis = await concurrently(
+        resolve_fallible_result_to_analysis(
+            **implicitly(SourceFilesRequest([target[JavaSourceField]]))
+        )
         for target in java_targets
     )
     address_and_analysis = zip(
