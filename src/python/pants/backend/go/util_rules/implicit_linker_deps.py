@@ -3,15 +3,16 @@
 
 from __future__ import annotations
 
-from pants.backend.go.util_rules.build_pkg import BuiltGoPackage
+from pants.backend.go.util_rules.build_pkg import required_built_go_package
 from pants.backend.go.util_rules.build_pkg_target import BuildGoPackageRequestForStdlibRequest
 from pants.backend.go.util_rules.link_defs import (
     ImplicitLinkerDependencies,
     ImplicitLinkerDependenciesHook,
 )
-from pants.engine.internals.native_engine import Digest, MergeDigests
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
+from pants.engine.internals.native_engine import MergeDigests
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import merge_digests
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 
@@ -37,10 +38,13 @@ async def provide_sdk_implicit_linker_dependencies(
         implicit_deps_import_paths.add("runtime/asan")
     # TODO: Building for coverage in Go 1.20+ forces an import of runtime/coverage.
 
-    built_implicit_linker_deps = await MultiGet(
-        Get(
-            BuiltGoPackage,
-            BuildGoPackageRequestForStdlibRequest(dep_import_path, build_opts=request.build_opts),
+    built_implicit_linker_deps = await concurrently(
+        required_built_go_package(
+            **implicitly(
+                BuildGoPackageRequestForStdlibRequest(
+                    dep_import_path, build_opts=request.build_opts
+                )
+            ),
         )
         for dep_import_path in implicit_deps_import_paths
     )
@@ -51,7 +55,7 @@ async def provide_sdk_implicit_linker_dependencies(
         import_paths_to_pkg_a_files.update(built_implicit_linker_dep.import_paths_to_pkg_a_files)
         implicit_dep_digests.append(built_implicit_linker_dep.digest)
 
-    digest = await Get(Digest, MergeDigests(implicit_dep_digests))
+    digest = await merge_digests(MergeDigests(implicit_dep_digests))
 
     return ImplicitLinkerDependencies(
         digest=digest,
