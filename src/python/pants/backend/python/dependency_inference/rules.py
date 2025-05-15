@@ -268,7 +268,7 @@ async def _find_other_owners_for_unowned_imports(
     req: UnownedImportsPossibleOwnersRequest,
 ) -> UnownedImportsPossibleOwners:
     individual_possible_owners = await concurrently(
-        Get(UnownedImportPossibleOwners, UnownedImportPossibleOwnerRequest(r, req.original_resolve))
+        find_other_owners_for_unowned_import(UnownedImportPossibleOwnerRequest(r, req.original_resolve), **implicitly())
         for r in req.unowned_imports
     )
 
