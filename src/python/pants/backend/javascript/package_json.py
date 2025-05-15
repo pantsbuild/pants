@@ -27,21 +27,17 @@ from pants.core.util_rules import stripped_source_files
 from pants.engine import fs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP
-from pants.engine.fs import (
-    CreateDigest,
-    DigestContents,
-    FileContent,
-    GlobExpansionConjunction,
-    PathGlobs,
-)
+from pants.engine.fs import CreateDigest, FileContent, GlobExpansionConjunction, PathGlobs
 from pants.engine.internals import graph
 from pants.engine.internals.graph import (
     ResolveAllTargetGeneratorRequests,
-    ResolvedTargetGeneratorRequests,
+    resolve_all_generator_target_requests,
+    resolve_targets,
 )
 from pants.engine.internals.native_engine import Digest, Snapshot
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import Rule, collect_rules, rule
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import create_digest, digest_to_snapshot, get_digest_contents
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AllTargets,
@@ -670,12 +666,13 @@ class OwningNodePackage:
 
 @rule
 async def find_owning_package(request: OwningNodePackageRequest) -> OwningNodePackage:
-    candidate_targets = await Get(
-        Targets,
-        RawSpecs(
-            ancestor_globs=(AncestorGlobSpec(request.address.spec_path),),
-            description_of_origin=f"the `{OwningNodePackage.__name__}` rule",
-        ),
+    candidate_targets = await resolve_targets(
+        **implicitly(
+            RawSpecs(
+                ancestor_globs=(AncestorGlobSpec(request.address.spec_path),),
+                description_of_origin=f"the `{OwningNodePackage.__name__}` rule",
+            )
+        )
     )
     package_json_tgts = sorted(
         (
@@ -688,7 +685,7 @@ async def find_owning_package(request: OwningNodePackageRequest) -> OwningNodePa
     )
     tgt = package_json_tgts[0] if package_json_tgts else None
     if tgt:
-        deps = await Get(Targets, DependenciesRequest(tgt[Dependencies]))
+        deps = await resolve_targets(**implicitly(DependenciesRequest(tgt[Dependencies])))
         return OwningNodePackage(
             tgt, tuple(dep for dep in deps if dep.has_field(NodeThirdPartyPackageNameField))
         )
@@ -706,7 +703,7 @@ async def parse_package_json(content: FileContent) -> PackageJson:
         content=parsed_package_json,
         name=package_name,
         version=parsed_package_json.get("version"),
-        snapshot=await Get(Snapshot, PathGlobs([content.path])),
+        snapshot=await digest_to_snapshot(**implicitly(PathGlobs([content.path]))),
         module=parsed_package_json.get("type"),
         workspaces=tuple(parsed_package_json.get("workspaces", ())),
         dependencies=FrozenDict.deep_freeze(
@@ -722,12 +719,10 @@ async def parse_package_json(content: FileContent) -> PackageJson:
 
 @rule
 async def read_package_jsons(globs: PathGlobs) -> PackageJsonForGlobs:
-    snapshot = await Get(Snapshot, PathGlobs, globs)
-    digest_contents = await Get(DigestContents, Digest, snapshot.digest)
+    snapshot = await digest_to_snapshot(**implicitly(globs))
+    digest_contents = await get_digest_contents(snapshot.digest)
     return PackageJsonForGlobs(
-        await MultiGet(
-            Get(PackageJson, FileContent, digest_content) for digest_content in digest_contents
-        )
+        await concurrently(parse_package_json(digest_content) for digest_content in digest_contents)
     )
 
 
@@ -737,11 +732,10 @@ async def all_package_json() -> AllPackageJson:
     # `generate_node_package_targets` requires knowledge of all
     # first party package names.
     description_of_origin = "The `AllPackageJson` rule"
-    requests = await Get(
-        ResolvedTargetGeneratorRequests,
+    requests = await resolve_all_generator_target_requests(
         ResolveAllTargetGeneratorRequests(
             description_of_origin=description_of_origin, of_type=PackageJsonTarget
-        ),
+        )
     )
     globs = [
         glob
@@ -751,11 +745,10 @@ async def all_package_json() -> AllPackageJson:
         .globs
     ]
     return AllPackageJson(
-        await Get(
-            PackageJsonForGlobs,
+        await read_package_jsons(
             PathGlobs(
                 globs, GlobMatchErrorBehavior.error, description_of_origin=description_of_origin
-            ),
+            )
         )
     )
 
@@ -776,16 +769,16 @@ class PnpmWorkspaces(FrozenDict[PackageJson, PnpmWorkspaceGlobs]):
 
 @rule
 async def pnpm_workspace_files(pkgs: AllPackageJson) -> PnpmWorkspaces:
-    snapshot = await Get(
-        Snapshot, PathGlobs(os.path.join(pkg.root_dir, "pnpm-workspace.yaml") for pkg in pkgs)
+    snapshot = await digest_to_snapshot(
+        **implicitly(PathGlobs(os.path.join(pkg.root_dir, "pnpm-workspace.yaml") for pkg in pkgs))
     )
-    digest_contents = await Get(DigestContents, Digest, snapshot.digest)
+    digest_contents = await get_digest_contents(snapshot.digest)
 
     async def parse_package_globs(content: FileContent) -> PnpmWorkspaceGlobs:
         parsed = yaml.safe_load(content.content) or {"packages": ("**",)}
         return PnpmWorkspaceGlobs(
             tuple(parsed.get("packages", ("**",)) or ("**",)),
-            await Get(Digest, CreateDigest([content])),
+            await create_digest(CreateDigest([content])),
         )
 
     globs_per_root = {
@@ -810,9 +803,7 @@ async def all_package_json_names(all_pkg_jsons: AllPackageJson) -> AllPackageJso
 
 @rule
 async def package_json_for_source(source_field: PackageJsonSourceField) -> PackageJson:
-    [pkg_json] = await Get(
-        PackageJsonForGlobs, PathGlobs, source_field.path_globs(UnmatchedBuildFileGlobs.error())
-    )
+    [pkg_json] = await read_package_jsons(source_field.path_globs(UnmatchedBuildFileGlobs.error()))
     return pkg_json
 
 
@@ -820,18 +811,14 @@ async def package_json_for_source(source_field: PackageJsonSourceField) -> Packa
 async def script_entrypoints_for_source(
     source_field: PackageJsonSourceField,
 ) -> PackageJsonEntryPoints:
-    return PackageJsonEntryPoints.from_package_json(
-        await Get(PackageJson, PackageJsonSourceField, source_field)
-    )
+    return PackageJsonEntryPoints.from_package_json(await package_json_for_source(source_field))
 
 
 @rule
 async def subpath_imports_for_source(
     source_field: PackageJsonSourceField,
 ) -> PackageJsonImports:
-    return PackageJsonImports.from_package_json(
-        await Get(PackageJson, PackageJsonSourceField, source_field)
-    )
+    return PackageJsonImports.from_package_json(await package_json_for_source(source_field))
 
 
 class GenerateNodePackageTargets(GenerateTargetsRequest):
@@ -864,9 +851,7 @@ async def generate_node_package_targets(
         union_membership,
     )
 
-    pkg_json = await Get(
-        PackageJson, PackageJsonSourceField, request.generator[PackageJsonSourceField]
-    )
+    pkg_json = await package_json_for_source(request.generator[PackageJsonSourceField])
 
     third_party_tgts = [
         NodeThirdPartyPackageTarget(
