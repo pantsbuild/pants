@@ -17,8 +17,9 @@ from pants.core.util_rules.partitions import Partitions
 from pants.engine.addresses import Addresses
 from pants.engine.fs import PathGlobs
 from pants.engine.goal import Goal
+from pants.engine.internals.build_files import resolve_address
+from pants.engine.internals.graph import resolve_targets
 from pants.engine.internals.native_engine import (
-    Address,
     AddressInput,
     Digest,
     FilespecMatcher,
@@ -26,15 +27,15 @@ from pants.engine.internals.native_engine import (
     Snapshot,
 )
 from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.intrinsics import execute_process, merge_digests
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import Rule, collect_rules, rule
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     SpecialCasedDependencies,
     StringField,
     StringSequenceField,
     Target,
-    Targets,
 )
 from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
@@ -167,16 +168,20 @@ class CodeQualityTool:
 
 @rule
 async def find_code_quality_tool(request: CodeQualityToolAddressString) -> CodeQualityTool:
-    tool_address = await Get(
-        Address,
-        AddressInput,
-        AddressInput.parse(request.address, description_of_origin="code quality tool target"),
+    tool_address = await resolve_address(
+        **implicitly(
+            {
+                AddressInput.parse(
+                    request.address, description_of_origin="code quality tool target"
+                ): AddressInput
+            }
+        )
     )
 
     addresses = Addresses((tool_address,))
     addresses.expect_single()
 
-    tool_targets = await Get(Targets, Addresses, addresses)
+    tool_targets = await resolve_targets(**implicitly({addresses: Addresses}))
     target = tool_targets[0]
     runnable_address_str = target[CodeQualityToolRunnableField].value
     if not runnable_address_str:
@@ -204,7 +209,7 @@ class CodeQualityToolBatch:
 async def process_files(batch: CodeQualityToolBatch) -> FallibleProcessResult:
     runner = batch.runner
 
-    input_digest = await Get(Digest, MergeDigests((runner.digest, batch.sources_snapshot.digest)))
+    input_digest = await merge_digests(MergeDigests((runner.digest, batch.sources_snapshot.digest)))
 
     env_vars = await prepare_env_vars(
         runner.extra_env,
@@ -213,17 +218,18 @@ async def process_files(batch: CodeQualityToolBatch) -> FallibleProcessResult:
         description_of_origin="code quality tool",
     )
 
-    result = await Get(
-        FallibleProcessResult,
-        Process(
-            argv=tuple(runner.args + batch.sources_snapshot.files),
-            description="Running code quality tool",
-            input_digest=input_digest,
-            append_only_caches=runner.append_only_caches,
-            immutable_input_digests=FrozenDict.frozen(runner.immutable_input_digests),
-            env=env_vars,
-            output_files=batch.output_files,
-        ),
+    result = await execute_process(
+        **implicitly(
+            Process(
+                argv=tuple(runner.args + batch.sources_snapshot.files),
+                description="Running code quality tool",
+                input_digest=input_digest,
+                append_only_caches=runner.append_only_caches,
+                immutable_input_digests=FrozenDict.frozen(runner.immutable_input_digests),
+                env=env_vars,
+                output_files=batch.output_files,
+            )
+        )
     )
     return result
 
