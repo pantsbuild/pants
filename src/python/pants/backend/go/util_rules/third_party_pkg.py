@@ -339,119 +339,6 @@ async def _check_go_sum_has_not_changed(
 
 
 @rule
-async def analyze_go_third_party_module(
-    request: AnalyzeThirdPartyModuleRequest,
-    analyzer: PackageAnalyzerSetup,
-) -> AnalyzedThirdPartyModule:
-    # Download the module.
-    download_result = await fallible_to_exec_result_or_raise(
-        **implicitly(
-            GoSdkProcess(
-                ("mod", "download", "-json", f"{request.name}@{request.version}"),
-                input_digest=request.go_mod_digest,  # for go.sum
-                working_dir=os.path.dirname(request.go_mod_path),
-                # Allow downloads of the module sources.
-                allow_downloads=True,
-                output_directories=("gopath",),
-                output_files=(os.path.join(os.path.dirname(request.go_mod_path), "go.sum"),),
-                description=f"Download Go module {request.name}@{request.version}.",
-            )
-        )
-    )
-
-    if len(download_result.stdout) == 0:
-        raise AssertionError(
-            f"Expected output from `go mod download` for {request.name}@{request.version}."
-        )
-
-    # Make sure go.sum has not changed.
-    await _check_go_sum_has_not_changed(
-        input_digest=request.go_mod_digest,
-        output_digest=download_result.output_digest,
-        dir_path=os.path.dirname(request.go_mod_path),
-        import_path=request.import_path,
-        go_mod_address=request.go_mod_address,
-    )
-
-    module_metadata = json.loads(download_result.stdout)
-    module_sources_relpath = strip_sandbox_prefix(module_metadata["Dir"], "gopath/")
-    go_mod_relpath = strip_sandbox_prefix(module_metadata["GoMod"], "gopath/")
-
-    # Subset the output directory to just the module sources and go.mod (which may be generated).
-    module_sources_snapshot = await digest_to_snapshot(
-        **implicitly(
-            DigestSubset(
-                download_result.output_digest,
-                PathGlobs(
-                    [f"{module_sources_relpath}/**", go_mod_relpath],
-                    glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                    conjunction=GlobExpansionConjunction.all_match,
-                    description_of_origin=f"the download of Go module {request.name}@{request.version}",
-                ),
-            )
-        )
-    )
-
-    # Determine directories with potential Go packages in them.
-    candidate_package_dirs = []
-    files_by_dir = group_by_dir(
-        p for p in module_sources_snapshot.files if p.startswith(module_sources_relpath)
-    )
-    for maybe_pkg_dir, files in files_by_dir.items():
-        # Skip directories where "testdata" would end up in the import path.
-        # See https://github.com/golang/go/blob/f005df8b582658d54e63d59953201299d6fee880/src/go/build/build.go#L580-L585
-        if "testdata" in maybe_pkg_dir.split("/"):
-            continue
-
-        # Consider directories with at least one `.go` file as package candidates.
-        if any(f for f in files if f.endswith(".go")):
-            candidate_package_dirs.append(maybe_pkg_dir)
-    candidate_package_dirs.sort()
-
-    # Analyze all of the packages in this module.
-    analyzer_relpath = "__analyzer"
-    analysis_result = await fallible_to_exec_result_or_raise(
-        **implicitly(
-            Process(
-                [os.path.join(analyzer_relpath, analyzer.path), *candidate_package_dirs],
-                input_digest=module_sources_snapshot.digest,
-                immutable_input_digests={
-                    analyzer_relpath: analyzer.digest,
-                },
-                description=f"Analyze metadata for Go third-party module: {request.name}@{request.version}",
-                level=LogLevel.DEBUG,
-                env={"CGO_ENABLED": "1" if request.build_opts.cgo_enabled else "0"},
-            )
-        )
-    )
-
-    if len(analysis_result.stdout) == 0:
-        return AnalyzedThirdPartyModule(FrozenOrderedSet())
-
-    package_analysis_gets = []
-    for pkg_path, pkg_json in zip(
-        candidate_package_dirs, ijson.items(analysis_result.stdout, "", multiple_values=True)
-    ):
-        package_analysis_gets.append(
-            analyze_go_third_party_package(
-                AnalyzeThirdPartyPackageRequest(
-                    pkg_json=_freeze_json_dict(pkg_json),
-                    module_sources_digest=module_sources_snapshot.digest,
-                    module_sources_path=module_sources_relpath,
-                    module_import_path=request.name,
-                    package_path=pkg_path,
-                    minimum_go_version=request.minimum_go_version,
-                )
-            )
-        )
-    analyzed_packages_fallible = await concurrently(package_analysis_gets)
-    analyzed_packages = [
-        pkg.analysis for pkg in analyzed_packages_fallible if pkg.analysis and pkg.exit_code == 0
-    ]
-    return AnalyzedThirdPartyModule(FrozenOrderedSet(analyzed_packages))
-
-
-@rule
 async def analyze_go_third_party_package(
     request: AnalyzeThirdPartyPackageRequest,
 ) -> FallibleThirdPartyPkgAnalysis:
@@ -582,6 +469,119 @@ async def analyze_go_third_party_package(
         exit_code=0,
         stderr=None,
     )
+
+
+@rule
+async def analyze_go_third_party_module(
+    request: AnalyzeThirdPartyModuleRequest,
+    analyzer: PackageAnalyzerSetup,
+) -> AnalyzedThirdPartyModule:
+    # Download the module.
+    download_result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            GoSdkProcess(
+                ("mod", "download", "-json", f"{request.name}@{request.version}"),
+                input_digest=request.go_mod_digest,  # for go.sum
+                working_dir=os.path.dirname(request.go_mod_path),
+                # Allow downloads of the module sources.
+                allow_downloads=True,
+                output_directories=("gopath",),
+                output_files=(os.path.join(os.path.dirname(request.go_mod_path), "go.sum"),),
+                description=f"Download Go module {request.name}@{request.version}.",
+            )
+        )
+    )
+
+    if len(download_result.stdout) == 0:
+        raise AssertionError(
+            f"Expected output from `go mod download` for {request.name}@{request.version}."
+        )
+
+    # Make sure go.sum has not changed.
+    await _check_go_sum_has_not_changed(
+        input_digest=request.go_mod_digest,
+        output_digest=download_result.output_digest,
+        dir_path=os.path.dirname(request.go_mod_path),
+        import_path=request.import_path,
+        go_mod_address=request.go_mod_address,
+    )
+
+    module_metadata = json.loads(download_result.stdout)
+    module_sources_relpath = strip_sandbox_prefix(module_metadata["Dir"], "gopath/")
+    go_mod_relpath = strip_sandbox_prefix(module_metadata["GoMod"], "gopath/")
+
+    # Subset the output directory to just the module sources and go.mod (which may be generated).
+    module_sources_snapshot = await digest_to_snapshot(
+        **implicitly(
+            DigestSubset(
+                download_result.output_digest,
+                PathGlobs(
+                    [f"{module_sources_relpath}/**", go_mod_relpath],
+                    glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                    conjunction=GlobExpansionConjunction.all_match,
+                    description_of_origin=f"the download of Go module {request.name}@{request.version}",
+                ),
+            )
+        )
+    )
+
+    # Determine directories with potential Go packages in them.
+    candidate_package_dirs = []
+    files_by_dir = group_by_dir(
+        p for p in module_sources_snapshot.files if p.startswith(module_sources_relpath)
+    )
+    for maybe_pkg_dir, files in files_by_dir.items():
+        # Skip directories where "testdata" would end up in the import path.
+        # See https://github.com/golang/go/blob/f005df8b582658d54e63d59953201299d6fee880/src/go/build/build.go#L580-L585
+        if "testdata" in maybe_pkg_dir.split("/"):
+            continue
+
+        # Consider directories with at least one `.go` file as package candidates.
+        if any(f for f in files if f.endswith(".go")):
+            candidate_package_dirs.append(maybe_pkg_dir)
+    candidate_package_dirs.sort()
+
+    # Analyze all of the packages in this module.
+    analyzer_relpath = "__analyzer"
+    analysis_result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            Process(
+                [os.path.join(analyzer_relpath, analyzer.path), *candidate_package_dirs],
+                input_digest=module_sources_snapshot.digest,
+                immutable_input_digests={
+                    analyzer_relpath: analyzer.digest,
+                },
+                description=f"Analyze metadata for Go third-party module: {request.name}@{request.version}",
+                level=LogLevel.DEBUG,
+                env={"CGO_ENABLED": "1" if request.build_opts.cgo_enabled else "0"},
+            )
+        )
+    )
+
+    if len(analysis_result.stdout) == 0:
+        return AnalyzedThirdPartyModule(FrozenOrderedSet())
+
+    package_analysis_gets = []
+    for pkg_path, pkg_json in zip(
+        candidate_package_dirs, ijson.items(analysis_result.stdout, "", multiple_values=True)
+    ):
+        package_analysis_gets.append(
+            analyze_go_third_party_package(
+                AnalyzeThirdPartyPackageRequest(
+                    pkg_json=_freeze_json_dict(pkg_json),
+                    module_sources_digest=module_sources_snapshot.digest,
+                    module_sources_path=module_sources_relpath,
+                    module_import_path=request.name,
+                    package_path=pkg_path,
+                    minimum_go_version=request.minimum_go_version,
+                )
+            )
+        )
+    analyzed_packages_fallible = await concurrently(package_analysis_gets)
+    analyzed_packages = [
+        pkg.analysis for pkg in analyzed_packages_fallible if pkg.analysis and pkg.exit_code == 0
+    ]
+    return AnalyzedThirdPartyModule(FrozenOrderedSet(analyzed_packages))
 
 
 @rule(desc="Download and analyze all third-party Go packages", level=LogLevel.DEBUG)
