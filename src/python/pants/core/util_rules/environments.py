@@ -19,14 +19,16 @@ from pants.engine.environment import (
     ChosenLocalWorkspaceEnvironmentName as ChosenLocalWorkspaceEnvironmentName,
 )
 from pants.engine.environment import EnvironmentName as EnvironmentName
-from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
-from pants.engine.internals.graph import WrappedTargetForBootstrap
+from pants.engine.internals.build_files import resolve_address
+from pants.engine.internals.docker import DockerResolveImageRequest
+from pants.engine.internals.graph import resolve_target_for_bootstrapping
 from pants.engine.internals.native_engine import ProcessExecutionEnvironment
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
+from pants.engine.intrinsics import docker_resolve_image
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessCacheScope
-from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
+from pants.engine.rules import Get, QueryRule, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
@@ -466,7 +468,7 @@ async def _warn_on_non_local_environments(specified_targets: Iterable[Target], s
         for env_name, group in groupby(sorted_env_names, lambda x: x[0])
     ]
 
-    env_tgts = await MultiGet(
+    env_tgts = await concurrently(
         Get(
             EnvironmentTarget,
             EnvironmentNameRequest(
@@ -641,10 +643,9 @@ class EnvironmentNameRequest(EngineAwareParameter):
         If the FieldSet includes `EnvironmentField` in its class definition, then this method will
         use the value of that field. Otherwise, it will fall back to `{LOCAL_ENVIRONMENT_MATCHER}`.
 
-        Rules can then use `Get(EnvironmentName, EnvironmentNameRequest,
-        field_set.environment_name_request())` to normalize the environment value, and
-        then pass `{{resulting_environment_name: EnvironmentName}}` into a `Get` to change which
-        environment is used for the subgraph.
+        Rules can then use `resolve_environment_name({{field_set.environment_name_request(): EnvironmentNameRequest}},
+        **implicitly())` to normalize the environment value, and then pass `{{resulting_environment_name: EnvironmentName}}`
+        into a subgraph using the `implicitly` helper to change the `EnvironmentName` used for the.
         """
         env_field = _compute_env_field(field_set)
         return cls._from_field(env_field, field_set.address)
@@ -684,20 +685,6 @@ class SingleEnvironmentNameRequest(EngineAwareParameter):
 
     def debug_hint(self) -> str:
         return ", ".join(self.raw_values)
-
-
-@rule
-async def determine_all_environments(
-    environments_subsystem: EnvironmentsSubsystem,
-) -> AllEnvironmentTargets:
-    resolved_tgts = await MultiGet(
-        Get(EnvironmentTarget, EnvironmentName(name)) for name in environments_subsystem.names
-    )
-    return AllEnvironmentTargets(
-        (name, resolved_tgt.val)
-        for name, resolved_tgt in zip(environments_subsystem.names.keys(), resolved_tgts)
-        if resolved_tgt.val is not None
-    )
 
 
 @rule
@@ -822,22 +809,54 @@ async def determine_local_workspace_environment(
 
 
 @rule
-async def resolve_single_environment_name(
-    request: SingleEnvironmentNameRequest,
-) -> EnvironmentName:
-    environment_names = await MultiGet(
-        Get(EnvironmentName, EnvironmentNameRequest(name, request.description_of_origin))
-        for name in request.raw_values
-    )
-
-    unique_environments = sorted({name.val or "<None>" for name in environment_names})
-    if len(unique_environments) != 1:
+async def get_target_for_environment_name(
+    env_name: EnvironmentName, environments_subsystem: EnvironmentsSubsystem
+) -> EnvironmentTarget:
+    if env_name.val is None:
+        return EnvironmentTarget(None, None)
+    if env_name.val not in environments_subsystem.names:
         raise AssertionError(
-            f"Needed 1 unique environment, but {request.description_of_origin} contained "
-            f"{len(unique_environments)}:\n\n"
-            f"{bullet_list(unique_environments)}"
+            softwrap(
+                f"""
+                The name `{env_name.val}` is not defined. The name should have been normalized and
+                validated in the rule `EnvironmentNameRequest -> EnvironmentName`
+                already. If you directly wrote
+                `Get(EnvironmentTarget, EnvironmentName(my_name))`, refactor to
+                `Get(EnvironmentTarget, EnvironmentNameRequest(my_name, ...))`.
+                """
+            )
         )
-    return environment_names[0]
+    _description_of_origin = "the option [environments-preview].names"
+    address = await resolve_address(
+        **implicitly(
+            {
+                AddressInput.parse(
+                    environments_subsystem.names[env_name.val],
+                    description_of_origin=_description_of_origin,
+                ): AddressInput
+            }
+        )
+    )
+    wrapped_target = await resolve_target_for_bootstrapping(
+        WrappedTargetRequest(address, description_of_origin=_description_of_origin), **implicitly()
+    )
+    tgt = wrapped_target.val
+    if (
+        not tgt.has_field(CompatiblePlatformsField)
+        and not tgt.has_field(DockerImageField)
+        and not tgt.has_field(RemotePlatformField)
+    ):
+        raise ValueError(
+            softwrap(
+                f"""
+                Expected to use the address to a `local_environment`, `docker_environment`,
+                `remote_environment`, or `experimental_workspace_environment` target in the option `[environments-preview].names`,
+                but the name `{env_name.val}` was set to the target {address.spec} with the target type
+                `{tgt.alias}`.
+                """
+            )
+        )
+    return EnvironmentTarget(env_name.val, tgt)
 
 
 async def _apply_fallback_environment(env_tgt: Target, error_msg: str) -> EnvironmentName:
@@ -862,10 +881,10 @@ async def resolve_environment_name(
     global_options: GlobalOptions,
 ) -> EnvironmentName:
     if request.raw_value == LOCAL_ENVIRONMENT_MATCHER:
-        local_env_name = await Get(ChosenLocalEnvironmentName)
+        local_env_name = await determine_local_environment(**implicitly())
         return local_env_name.val
     if request.raw_value == LOCAL_WORKSPACE_ENVIRONMENT_MATCHER:
-        local_workspace_env_name = await Get(ChosenLocalWorkspaceEnvironmentName)
+        local_workspace_env_name = await determine_local_workspace_environment(**implicitly())
         return local_workspace_env_name.val
     if request.raw_value not in environments_subsystem.names:
         raise UnrecognizedEnvironmentError(
@@ -881,7 +900,9 @@ async def resolve_environment_name(
         )
 
     # Get the target so that we can apply the environment_fallback field, if relevant.
-    env_tgt = await Get(EnvironmentTarget, EnvironmentName(request.raw_value))
+    env_tgt = await get_target_for_environment_name(
+        EnvironmentName(request.raw_value), **implicitly()
+    )
     if env_tgt.val is None:
         raise AssertionError(f"EnvironmentTarget.val is None for the name `{request.raw_value}`")
 
@@ -968,52 +989,39 @@ async def resolve_environment_name(
 
 
 @rule
-async def get_target_for_environment_name(
-    env_name: EnvironmentName, environments_subsystem: EnvironmentsSubsystem
-) -> EnvironmentTarget:
-    if env_name.val is None:
-        return EnvironmentTarget(None, None)
-    if env_name.val not in environments_subsystem.names:
+async def resolve_single_environment_name(
+    request: SingleEnvironmentNameRequest,
+) -> EnvironmentName:
+    environment_names = await concurrently(
+        resolve_environment_name(
+            EnvironmentNameRequest(name, request.description_of_origin), **implicitly()
+        )
+        for name in request.raw_values
+    )
+
+    unique_environments = sorted({name.val or "<None>" for name in environment_names})
+    if len(unique_environments) != 1:
         raise AssertionError(
-            softwrap(
-                f"""
-                The name `{env_name.val}` is not defined. The name should have been normalized and
-                validated in the rule `EnvironmentNameRequest -> EnvironmentName`
-                already. If you directly wrote
-                `Get(EnvironmentTarget, EnvironmentName(my_name))`, refactor to
-                `Get(EnvironmentTarget, EnvironmentNameRequest(my_name, ...))`.
-                """
-            )
+            f"Needed 1 unique environment, but {request.description_of_origin} contained "
+            f"{len(unique_environments)}:\n\n"
+            f"{bullet_list(unique_environments)}"
         )
-    _description_of_origin = "the option [environments-preview].names"
-    address = await Get(
-        Address,
-        AddressInput,
-        AddressInput.parse(
-            environments_subsystem.names[env_name.val], description_of_origin=_description_of_origin
-        ),
+    return environment_names[0]
+
+
+@rule
+async def determine_all_environments(
+    environments_subsystem: EnvironmentsSubsystem,
+) -> AllEnvironmentTargets:
+    resolved_tgts = await concurrently(
+        get_target_for_environment_name(EnvironmentName(name), **implicitly())
+        for name in environments_subsystem.names
     )
-    wrapped_target = await Get(
-        WrappedTargetForBootstrap,
-        WrappedTargetRequest(address, description_of_origin=_description_of_origin),
+    return AllEnvironmentTargets(
+        (name, resolved_tgt.val)
+        for name, resolved_tgt in zip(environments_subsystem.names.keys(), resolved_tgts)
+        if resolved_tgt.val is not None
     )
-    tgt = wrapped_target.val
-    if (
-        not tgt.has_field(CompatiblePlatformsField)
-        and not tgt.has_field(DockerImageField)
-        and not tgt.has_field(RemotePlatformField)
-    ):
-        raise ValueError(
-            softwrap(
-                f"""
-                Expected to use the address to a `local_environment`, `docker_environment`,
-                `remote_environment`, or `experimental_workspace_environment` target in the option `[environments-preview].names`,
-                but the name `{env_name.val}` was set to the target {address.spec} with the target type
-                `{tgt.alias}`.
-                """
-            )
-        )
-    return EnvironmentTarget(env_name.val, tgt)
 
 
 async def _maybe_add_docker_image_id(image_name: str, platform: Platform, address: Address) -> str:
@@ -1033,12 +1041,11 @@ async def _maybe_add_docker_image_id(image_name: str, platform: Platform, addres
         return image_name
 
     # Otherwise, resolve the image name to an image ID and append the applicable component to the image name.
-    resolve_result = await Get(
-        DockerResolveImageResult,
+    resolve_result = await docker_resolve_image(
         DockerResolveImageRequest(
             image_name=image_name,
             platform=platform.name,
-        ),
+        )
     )
 
     # TODO(17104): Consider appending the correct image ID to the existing image name so error messages about the
