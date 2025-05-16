@@ -766,6 +766,7 @@ def _compare_expected_mocks(
                 )
                 missing_call_names.remove(missing_call_name)
                 surplus_gets.discard(ag)
+                break
 
     if missing_call_names:
         errors.append(f"Missing mocks for calls: {', '.join(missing_call_names)}")

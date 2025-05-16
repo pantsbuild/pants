@@ -22,14 +22,14 @@ from pants.backend.go.target_types import (
 )
 from pants.backend.go.util_rules import go_mod, goroot
 from pants.backend.go.util_rules.coverage import GoCoverageConfig
-from pants.backend.go.util_rules.go_mod import OwningGoMod, OwningGoModRequest
+from pants.backend.go.util_rules.go_mod import OwningGoModRequest, find_owning_go_mod
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.internals import graph
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import FieldSet, WrappedTarget, WrappedTargetRequest
+from pants.engine.internals.graph import resolve_target
+from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.target import FieldSet, WrappedTargetRequest
 
 logger = logging.getLogger(__name__)
 
@@ -166,11 +166,11 @@ async def go_extract_build_options_from_target(
     golang: GolangSubsystem,
     go_test_subsystem: GoTestSubsystem,
 ) -> GoBuildOptions:
-    wrapped_target = await Get(
-        WrappedTarget,
+    wrapped_target = await resolve_target(
         WrappedTargetRequest(
             request.address, description_of_origin="the `go_extract_build_options_from_target` rule"
         ),
+        **implicitly(),
     )
     target = wrapped_target.target
     target_fields: GoBuildOptionsFieldSet | None = None
@@ -184,13 +184,13 @@ async def go_extract_build_options_from_target(
     # Find the owning `go_mod` target so any unspecified fields on a target like `go_binary` will then
     # fallback to the `go_mod`. If the target does not have build option fields, then only the `go_mod`
     # will be used.
-    owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(request.address))
-    wrapped_target_go_mod = await Get(
-        WrappedTarget,
+    owning_go_mod = await find_owning_go_mod(OwningGoModRequest(request.address), **implicitly())
+    wrapped_target_go_mod = await resolve_target(
         WrappedTargetRequest(
             owning_go_mod.address,
             description_of_origin="the `go_extract_build_options_from_target` rule",
         ),
+        **implicitly(),
     )
     go_mod_target = wrapped_target_go_mod.target
     go_mod_target_fields = GoBuildOptionsFieldSet.create(go_mod_target)

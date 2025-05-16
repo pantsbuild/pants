@@ -14,7 +14,7 @@ from pants.backend.helm.target_types import (
     HelmRegistriesField,
     HelmSkipPushField,
 )
-from pants.backend.helm.util_rules.tool import HelmProcess
+from pants.backend.helm.util_rules.tool import HelmProcess, helm_process
 from pants.core.goals.publish import (
     PublishFieldSet,
     PublishOutputData,
@@ -22,8 +22,8 @@ from pants.core.goals.publish import (
     PublishProcesses,
     PublishRequest,
 )
-from pants.engine.process import InteractiveProcess, Process
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.process import InteractiveProcess
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -92,14 +92,14 @@ async def publish_helm_chart(
             ]
         )
 
-    processes = await MultiGet(
-        Get(
-            Process,
+    processes = await concurrently(
+        helm_process(
             HelmProcess(
                 ["push", artifact.relpath, registry.repository_ref(push_repository)],
                 input_digest=pkg.digest,
                 description=f"Pushing Helm chart '{metadata.name}' with version '{metadata.version}' into OCI registry: {registry.address}",
             ),
+            **implicitly(),
         )
         for pkg, artifact, metadata in built_artifacts
         if artifact.relpath

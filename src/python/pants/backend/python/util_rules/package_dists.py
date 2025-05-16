@@ -37,21 +37,21 @@ from pants.backend.python.target_types import (
     WheelField,
 )
 from pants.backend.python.util_rules.dists import (
-    BuildSystem,
     BuildSystemRequest,
     DistBuildRequest,
     distutils_repr,
+    find_build_system,
 )
 from pants.backend.python.util_rules.dists import rules as dists_rules
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import Pex
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.python_sources import (
-    PythonSourceFiles,
     PythonSourceFilesRequest,
-    StrippedPythonSourceFiles,
+    prepare_python_sources,
 )
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
+from pants.backend.python.util_rules.python_sources import strip_python_sources
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.core.target_types import FileSourceField, ResourceSourceField
@@ -69,7 +69,11 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
 )
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.internals.graph import resolve_targets
+from pants.engine.internals.graph import transitive_targets as transitive_targets_get
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.intrinsics import add_prefix, create_digest, get_digest_contents, merge_digests
+from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
@@ -77,16 +81,15 @@ from pants.engine.target import (
     SourcesField,
     Target,
     Targets,
-    TransitiveTargets,
     TransitiveTargetsRequest,
     targets_with_sources_types,
 )
 from pants.engine.unions import UnionMembership, union
 from pants.source.source_root import (
-    OptionalSourceRoot,
     SourceRootRequest,
     SourceRootsRequest,
-    SourceRootsResult,
+    get_optional_source_root,
+    get_source_roots,
 )
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -382,7 +385,9 @@ async def create_dist_build_request(
     standard wheel/sdist builds.
     """
 
-    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
+    transitive_targets = await transitive_targets_get(
+        TransitiveTargetsRequest([field_set.address]), **implicitly()
+    )
     exported_target = ExportedTarget(transitive_targets.roots[0])
 
     dist_tgt = exported_target.target
@@ -402,8 +407,8 @@ async def create_dist_build_request(
     sdist_config_settings = dist_tgt.get(SDistConfigSettingsField).value or FrozenDict()
     backend_env_vars = dist_tgt.get(BuildBackendEnvVarsField).value
     if backend_env_vars:
-        extra_build_time_env = await Get(
-            EnvironmentVars, EnvironmentVarsRequest(sorted(backend_env_vars))
+        extra_build_time_env = await environment_vars_subset(
+            EnvironmentVarsRequest(sorted(backend_env_vars)), **implicitly()
         )
     else:
         extra_build_time_env = EnvironmentVars()
@@ -411,19 +416,18 @@ async def create_dist_build_request(
     interpreter_constraints = InterpreterConstraints.create_from_targets(
         transitive_targets.closure, python_setup
     ) or InterpreterConstraints(python_setup.interpreter_constraints)
-    chroot = await Get(
-        DistBuildChroot,
+    chroot = await generate_chroot(
         DistBuildChrootRequest(
             exported_target,
             interpreter_constraints=interpreter_constraints,
         ),
+        **implicitly(),
     )
 
     # Find the source roots for the build-time 1stparty deps (e.g., deps of setup.py).
-    optional_dist_source_root, source_roots_result = await MultiGet(
-        Get(OptionalSourceRoot, SourceRootRequest.for_target(dist_tgt)),
-        Get(
-            SourceRootsResult,
+    optional_dist_source_root, source_roots_result = await concurrently(
+        get_optional_source_root(SourceRootRequest.for_target(dist_tgt), **implicitly()),
+        get_source_roots(
             SourceRootsRequest(
                 files=[],
                 dirs={
@@ -431,7 +435,7 @@ async def create_dist_build_request(
                     for tgt in transitive_targets.closure
                     if tgt.has_field(PythonSourceField) or tgt.has_field(ResourceSourceField)
                 },
-            ),
+            )
         ),
     )
 
@@ -453,7 +457,7 @@ async def create_dist_build_request(
                 )
             )
 
-    build_envs = await MultiGet(
+    build_envs = await concurrently(
         [
             Get(DistBuildEnvironment, DistBuildEnvironmentRequest, build_env_request)
             for build_env_request in build_env_requests
@@ -464,11 +468,10 @@ async def create_dist_build_request(
             build_env.extra_build_time_requirements for build_env in build_envs
         )
     )
-    input_digest = await Get(
-        Digest,
+    input_digest = await merge_digests(
         MergeDigests(
             [chroot.digest, *(build_env.extra_build_time_inputs for build_env in build_envs)]
-        ),
+        )
     )
 
     # We prefix the entire chroot, and run with this prefix as the cwd, so that we can capture
@@ -476,8 +479,10 @@ async def create_dist_build_request(
     # process invocation.
     chroot_prefix = "chroot"
     working_directory = os.path.join(chroot_prefix, chroot.working_directory)
-    prefixed_input = await Get(Digest, AddPrefix(input_digest, chroot_prefix))
-    build_system = await Get(BuildSystem, BuildSystemRequest(prefixed_input, working_directory))
+    prefixed_input = await add_prefix(AddPrefix(input_digest, chroot_prefix))
+    build_system = await find_build_system(
+        BuildSystemRequest(prefixed_input, working_directory), **implicitly()
+    )
     output_path = dist_tgt.get(PythonDistributionOutputPathField).value
     assert output_path is not None, (
         "output_path should take a default string value if the user has not provided it."
@@ -556,70 +561,256 @@ class GeneratedSetupPy:
     digest: Digest
 
 
-@rule
-async def generate_chroot(
-    request: DistBuildChrootRequest, subsys: SetupPyGeneration
-) -> DistBuildChroot:
-    generate_setup = request.exported_target.target.get(GenerateSetupField).value
-    if generate_setup is None:
-        generate_setup = subsys.generate_setup_default
+@rule(desc="Get exporting owner for target")
+async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarget:
+    """Find the exported target that owns the given target (and therefore exports it).
 
-    if generate_setup:
-        sources = await Get(DistBuildSources, DistBuildChrootRequest, request)
-        generated_setup_py = await Get(
-            GeneratedSetupPy,
-            GenerateSetupPyRequest(
-                request.exported_target, sources, request.interpreter_constraints
-            ),
+    The owner of T (i.e., the exported target in whose artifact T's code is published) is:
+
+     1. An exported target that depends on T (or is T itself).
+     2. Is T's closest filesystem ancestor among those satisfying 1.
+
+    If there are multiple such exported targets at the same degree of ancestry, the ownership
+    is ambiguous and an error is raised. If there is no exported target that depends on T
+    and is its ancestor, then there is no owner and an error is raised.
+    """
+    target = owned_dependency.target
+    ancestor_addrs = AncestorGlobSpec(target.address.spec_path)
+    ancestor_tgts = await resolve_targets(
+        **implicitly(
+            RawSpecs(
+                ancestor_globs=(ancestor_addrs,),
+                description_of_origin="the `python_distribution` `package` rules",
+            )
         )
-        # We currently generate a setup.py that expects to be in the source root.
-        # TODO: It might make sense to generate one in the target's directory, for
-        #  consistency with the existing setup.py case.
-        working_directory = ""
-        chroot_digest = await Get(Digest, MergeDigests((sources.digest, generated_setup_py.digest)))
-    else:
-        transitive_targets = await Get(
-            TransitiveTargets,
-            TransitiveTargetsRequest([request.exported_target.target.address]),
+    )
+    # Note that addresses sort by (spec_path, target_name), and all these targets are
+    # ancestors of the given target, i.e., their spec_paths are all prefixes. So sorting by
+    # address will effectively sort by closeness of ancestry to the given target.
+    exported_ancestor_tgts = sorted(
+        (t for t in ancestor_tgts if t.has_field(PythonProvidesField)),
+        key=lambda t: t.address,
+        reverse=True,
+    )
+    exported_ancestor_iter = iter(exported_ancestor_tgts)
+    for exported_ancestor in exported_ancestor_iter:
+        transitive_targets = await transitive_targets_get(
+            TransitiveTargetsRequest([exported_ancestor.address]), **implicitly()
         )
-        source_files = await Get(
-            PythonSourceFiles,
-            PythonSourceFilesRequest(
-                targets=transitive_targets.closure, include_resources=True, include_files=True
-            ),
+        if target in transitive_targets.closure:
+            owner = exported_ancestor
+            # Find any exported siblings of owner that also depend on target. They have the
+            # same spec_path as it, so they must immediately follow it in ancestor_iter.
+            sibling_owners = []
+            sibling = next(exported_ancestor_iter, None)
+            while sibling and sibling.address.spec_path == owner.address.spec_path:
+                transitive_targets = await transitive_targets_get(
+                    TransitiveTargetsRequest([sibling.address]), **implicitly()
+                )
+                if target in transitive_targets.closure:
+                    sibling_owners.append(sibling)
+                sibling = next(exported_ancestor_iter, None)
+            if sibling_owners:
+                all_owners = [exported_ancestor] + sibling_owners
+                raise AmbiguousOwnerError(
+                    softwrap(
+                        f"""
+                        Found multiple sibling python_distribution targets that are the closest
+                        ancestor dependents of {target.address} and are therefore candidates to
+                        own it: {", ".join(o.address.spec for o in all_owners)}. Only a
+                        single such owner is allowed, to avoid ambiguity.
+                        """
+                    )
+                )
+            return ExportedTarget(owner)
+    raise NoOwnerError(
+        softwrap(
+            f"""
+            No python_distribution target found to own {target.address}. Note that
+            the owner must be in or above the owned target's directory, and must
+            depend on it (directly or indirectly).
+            """
         )
-        chroot_digest = source_files.source_files.snapshot.digest
-        working_directory = request.exported_target.target.address.spec_path
-    return DistBuildChroot(chroot_digest, working_directory)
+    )
 
 
-@rule
-async def generate_setup_py(request: GenerateSetupPyRequest) -> GeneratedSetupPy:
-    # Generate the setup script.
-    finalized_setup_kwargs = await Get(FinalizedSetupKwargs, GenerateSetupPyRequest, request)
-    setup_py_content = SETUP_BOILERPLATE.format(
-        target_address_spec=request.exported_target.target.address.spec,
-        setup_kwargs_str=distutils_repr(finalized_setup_kwargs.kwargs),
-    ).encode()
-    files_to_create = [
-        FileContent("setup.py", setup_py_content),
-        FileContent("MANIFEST.in", b"include *.py"),
+@rule(desc="Find all code to be published in the distribution", level=LogLevel.DEBUG)
+async def get_owned_dependencies(
+    dependency_owner: DependencyOwner, union_membership: UnionMembership
+) -> OwnedDependencies:
+    """Find the dependencies of dependency_owner that are owned by it.
+
+    Includes dependency_owner itself.
+    """
+    transitive_targets = await transitive_targets_get(
+        TransitiveTargetsRequest([dependency_owner.exported_target.target.address]), **implicitly()
+    )
+    ownable_targets = [
+        tgt for tgt in transitive_targets.closure if is_ownable_target(tgt, union_membership)
     ]
-    digest = await Get(Digest, CreateDigest(files_to_create))
-    return GeneratedSetupPy(digest)
+    owners = await concurrently(
+        get_exporting_owner(OwnedDependency(tgt)) for tgt in ownable_targets
+    )
+    owned_dependencies = [
+        tgt
+        for owner, tgt in zip(owners, ownable_targets)
+        if owner == dependency_owner.exported_target
+    ]
+    return OwnedDependencies(OwnedDependency(t) for t in owned_dependencies)
+
+
+@rule
+async def get_sources(
+    request: DistBuildChrootRequest, union_membership: UnionMembership
+) -> DistBuildSources:
+    owned_deps, transitive_targets = await concurrently(
+        get_owned_dependencies(DependencyOwner(request.exported_target), **implicitly()),
+        transitive_targets_get(
+            TransitiveTargetsRequest([request.exported_target.target.address]), **implicitly()
+        ),
+    )
+    # files() targets aren't owned by a single exported target - they aren't code, so
+    # we allow them to be in multiple dists. This is helpful for, e.g., embedding
+    # a standard license file in a dist.
+    # TODO: This doesn't actually work, the generated setup.py has no way of referencing
+    #  these, since they aren't in a package, so they won't get included in the built dists.
+    # There is a separate `license_files()` setup.py kwarg that we should use for this
+    # special case (see https://setuptools.pypa.io/en/latest/references/keywords.html).
+    file_targets = targets_with_sources_types(
+        [FileSourceField], transitive_targets.closure, union_membership
+    )
+    targets = Targets(sorted(itertools.chain((od.target for od in owned_deps), file_targets)))
+
+    python_sources_request = PythonSourceFilesRequest(
+        targets=targets, include_resources=False, include_files=False
+    )
+    all_sources_request = PythonSourceFilesRequest(
+        targets=targets, include_resources=True, include_files=True
+    )
+    python_sources, all_sources = await concurrently(
+        strip_python_sources(**implicitly({python_sources_request: PythonSourceFilesRequest})),
+        strip_python_sources(**implicitly({all_sources_request: PythonSourceFilesRequest})),
+    )
+
+    python_files = set(python_sources.stripped_source_files.snapshot.files)
+    all_files = set(all_sources.stripped_source_files.snapshot.files)
+    resource_files = all_files - python_files
+
+    init_py_digest_contents = await get_digest_contents(
+        **implicitly(
+            DigestSubset(
+                python_sources.stripped_source_files.snapshot.digest, PathGlobs(["**/__init__.py"])
+            )
+        )
+    )
+
+    packages, namespace_packages, package_data = find_packages(
+        python_files=python_files,
+        resource_files=resource_files,
+        init_py_digest_contents=init_py_digest_contents,
+        # Whether to use py2 or py3 package semantics.
+        py2=request.interpreter_constraints.includes_python2(),
+    )
+    return DistBuildSources(
+        digest=all_sources.stripped_source_files.snapshot.digest,
+        packages=packages,
+        namespace_packages=namespace_packages,
+        package_data=package_data,
+    )
+
+
+@rule(desc="Compute distribution's 3rd party requirements")
+async def get_requirements(
+    dep_owner: DependencyOwner,
+    union_membership: UnionMembership,
+    setup_py_generation: SetupPyGeneration,
+) -> ExportedTargetRequirements:
+    transitive_targets = await transitive_targets_get(
+        TransitiveTargetsRequest([dep_owner.exported_target.target.address]), **implicitly()
+    )
+    ownable_tgts = [
+        tgt for tgt in transitive_targets.closure if is_ownable_target(tgt, union_membership)
+    ]
+    owners = await concurrently(get_exporting_owner(OwnedDependency(tgt)) for tgt in ownable_tgts)
+    owned_by_us: set[Target] = set()
+    owned_by_others: set[Target] = set()
+    for tgt, owner in zip(ownable_tgts, owners):
+        (owned_by_us if owner == dep_owner.exported_target else owned_by_others).add(tgt)
+
+    # Get all 3rdparty deps of our owned deps.
+    #
+    # Note that we need only consider requirements that are direct dependencies of our owned deps:
+    # If T depends on R indirectly, then it must be via some direct deps U1, U2, ... For each such U,
+    # if U is in the owned deps then we'll pick up R through U. And if U is not in the owned deps
+    # then it's owned by an exported target ET, and so R will be in the requirements for ET, and we
+    # will require ET.
+    direct_deps_tgts = await concurrently(
+        resolve_targets(**implicitly(DependenciesRequest(tgt.get(Dependencies))))
+        for tgt in owned_by_us
+    )
+    direct_deps_chained = OrderedSet(itertools.chain.from_iterable(direct_deps_tgts))
+    # If a python_requirement T has an undeclared requirement R, we recommend fixing that by adding
+    # an explicit dependency from T to a python_requirement target for R. In that case we want to
+    # represent these explicit deps in T's distribution metadata. See issue #17593.
+    transitive_explicit_reqs = await concurrently(
+        transitive_targets_get(TransitiveTargetsRequest([tgt.address]), **implicitly())
+        for tgt in direct_deps_chained
+        if tgt.has_field(PythonRequirementsField)
+    )
+
+    transitive_excludes: FrozenOrderedSet[Target] = FrozenOrderedSet()
+    uneval_trans_excl = [
+        tgt.get(Dependencies).unevaluated_transitive_excludes for tgt in transitive_targets.closure
+    ]
+    if uneval_trans_excl:
+        nested_trans_excl = await concurrently(
+            resolve_targets(**implicitly({unparsed: UnparsedAddressInputs}))
+            for unparsed in uneval_trans_excl
+        )
+        transitive_excludes = FrozenOrderedSet(
+            itertools.chain.from_iterable(excludes for excludes in nested_trans_excl)
+        )
+
+    direct_deps_chained.update(
+        itertools.chain.from_iterable(t.dependencies for t in transitive_explicit_reqs)
+    )
+    direct_deps_with_excl = direct_deps_chained.difference(transitive_excludes)
+
+    req_strs = list(
+        PexRequirements.req_strings_from_requirement_fields(
+            (
+                tgt[PythonRequirementsField]
+                for tgt in direct_deps_with_excl
+                if tgt.has_field(PythonRequirementsField)
+            ),
+        )
+    )
+
+    # Add the requirements on any exported targets on which we depend.
+    kwargs_for_exported_targets_we_depend_on = await concurrently(
+        determine_explicitly_provided_setup_kwargs(**implicitly(OwnedDependency(tgt)))
+        for tgt in owned_by_others
+    )
+    req_strs.extend(
+        f"{kwargs.name}{setup_py_generation.first_party_dependency_version(kwargs.version)}"
+        for kwargs in set(kwargs_for_exported_targets_we_depend_on)
+    )
+    return ExportedTargetRequirements(req_strs)
 
 
 @rule
 async def determine_finalized_setup_kwargs(request: GenerateSetupPyRequest) -> FinalizedSetupKwargs:
     exported_target = request.exported_target
     sources = request.sources
-    requirements = await Get(ExportedTargetRequirements, DependencyOwner(exported_target))
+    requirements = await get_requirements(DependencyOwner(exported_target), **implicitly())
 
     # Generate the kwargs for the setup() call. In addition to using the kwargs that are either
     # explicitly provided or generated via a user's plugin, we add additional kwargs based on the
     # resolved requirements and sources.
     target = exported_target.target
-    resolved_setup_kwargs = await Get(SetupKwargs, ExportedTarget, exported_target)
+    resolved_setup_kwargs = await determine_explicitly_provided_setup_kwargs(
+        exported_target, **implicitly()
+    )
     setup_kwargs = resolved_setup_kwargs.kwargs.copy()
 
     # Check interpreter constraints
@@ -702,25 +893,27 @@ async def determine_finalized_setup_kwargs(request: GenerateSetupPyRequest) -> F
         )
 
     if long_description_path:
-        digest_contents = await Get(
-            DigestContents,
-            PathGlobs(
-                [long_description_path],
-                description_of_origin=softwrap(
-                    f"""
+        digest_contents = await get_digest_contents(
+            **implicitly(
+                PathGlobs(
+                    [long_description_path],
+                    description_of_origin=softwrap(
+                        f"""
                     the {LongDescriptionPathField.alias}
                     field of {exported_target.target.address}
                     """
-                ),
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            ),
+                    ),
+                    glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                )
+            )
         )
         long_description_content = digest_contents[0].content.decode()
         setup_kwargs.update({"long_description": long_description_content})
 
     # Resolve entry points from python_distribution(entry_points=...) and from
     # python_distribution(provides=setup_py(entry_points=...)
-    resolved_from_entry_points_field, resolved_from_provides_field = await MultiGet(
+    # TODO: Circular reference for call-by-name
+    resolved_from_entry_points_field, resolved_from_provides_field = await concurrently(
         Get(
             ResolvedPythonDistributionEntryPoints,
             ResolvePythonDistributionEntryPointsRequest(
@@ -766,236 +959,56 @@ async def determine_finalized_setup_kwargs(request: GenerateSetupPyRequest) -> F
 
 
 @rule
-async def get_sources(
-    request: DistBuildChrootRequest, union_membership: UnionMembership
-) -> DistBuildSources:
-    owned_deps, transitive_targets = await MultiGet(
-        Get(OwnedDependencies, DependencyOwner(request.exported_target)),
-        Get(
-            TransitiveTargets,
-            TransitiveTargetsRequest([request.exported_target.target.address]),
-        ),
-    )
-    # files() targets aren't owned by a single exported target - they aren't code, so
-    # we allow them to be in multiple dists. This is helpful for, e.g., embedding
-    # a standard license file in a dist.
-    # TODO: This doesn't actually work, the generated setup.py has no way of referencing
-    #  these, since they aren't in a package, so they won't get included in the built dists.
-    # There is a separate `license_files()` setup.py kwarg that we should use for this
-    # special case (see https://setuptools.pypa.io/en/latest/references/keywords.html).
-    file_targets = targets_with_sources_types(
-        [FileSourceField], transitive_targets.closure, union_membership
-    )
-    targets = Targets(sorted(itertools.chain((od.target for od in owned_deps), file_targets)))
-
-    python_sources_request = PythonSourceFilesRequest(
-        targets=targets, include_resources=False, include_files=False
-    )
-    all_sources_request = PythonSourceFilesRequest(
-        targets=targets, include_resources=True, include_files=True
-    )
-    python_sources, all_sources = await MultiGet(
-        Get(StrippedPythonSourceFiles, PythonSourceFilesRequest, python_sources_request),
-        Get(StrippedPythonSourceFiles, PythonSourceFilesRequest, all_sources_request),
-    )
-
-    python_files = set(python_sources.stripped_source_files.snapshot.files)
-    all_files = set(all_sources.stripped_source_files.snapshot.files)
-    resource_files = all_files - python_files
-
-    init_py_digest_contents = await Get(
-        DigestContents,
-        DigestSubset(
-            python_sources.stripped_source_files.snapshot.digest, PathGlobs(["**/__init__.py"])
-        ),
-    )
-
-    packages, namespace_packages, package_data = find_packages(
-        python_files=python_files,
-        resource_files=resource_files,
-        init_py_digest_contents=init_py_digest_contents,
-        # Whether to use py2 or py3 package semantics.
-        py2=request.interpreter_constraints.includes_python2(),
-    )
-    return DistBuildSources(
-        digest=all_sources.stripped_source_files.snapshot.digest,
-        packages=packages,
-        namespace_packages=namespace_packages,
-        package_data=package_data,
-    )
-
-
-@rule(desc="Compute distribution's 3rd party requirements")
-async def get_requirements(
-    dep_owner: DependencyOwner,
-    union_membership: UnionMembership,
-    setup_py_generation: SetupPyGeneration,
-) -> ExportedTargetRequirements:
-    transitive_targets = await Get(
-        TransitiveTargets,
-        TransitiveTargetsRequest([dep_owner.exported_target.target.address]),
-    )
-    ownable_tgts = [
-        tgt for tgt in transitive_targets.closure if is_ownable_target(tgt, union_membership)
+async def generate_setup_py(request: GenerateSetupPyRequest) -> GeneratedSetupPy:
+    # Generate the setup script.
+    finalized_setup_kwargs = await determine_finalized_setup_kwargs(request)
+    setup_py_content = SETUP_BOILERPLATE.format(
+        target_address_spec=request.exported_target.target.address.spec,
+        setup_kwargs_str=distutils_repr(finalized_setup_kwargs.kwargs),
+    ).encode()
+    files_to_create = [
+        FileContent("setup.py", setup_py_content),
+        FileContent("MANIFEST.in", b"include *.py"),
     ]
-    owners = await MultiGet(Get(ExportedTarget, OwnedDependency(tgt)) for tgt in ownable_tgts)
-    owned_by_us: set[Target] = set()
-    owned_by_others: set[Target] = set()
-    for tgt, owner in zip(ownable_tgts, owners):
-        (owned_by_us if owner == dep_owner.exported_target else owned_by_others).add(tgt)
+    digest = await create_digest(CreateDigest(files_to_create))
+    return GeneratedSetupPy(digest)
 
-    # Get all 3rdparty deps of our owned deps.
-    #
-    # Note that we need only consider requirements that are direct dependencies of our owned deps:
-    # If T depends on R indirectly, then it must be via some direct deps U1, U2, ... For each such U,
-    # if U is in the owned deps then we'll pick up R through U. And if U is not in the owned deps
-    # then it's owned by an exported target ET, and so R will be in the requirements for ET, and we
-    # will require ET.
-    direct_deps_tgts = await MultiGet(
-        Get(Targets, DependenciesRequest(tgt.get(Dependencies))) for tgt in owned_by_us
-    )
-    direct_deps_chained = OrderedSet(itertools.chain.from_iterable(direct_deps_tgts))
-    # If a python_requirement T has an undeclared requirement R, we recommend fixing that by adding
-    # an explicit dependency from T to a python_requirement target for R. In that case we want to
-    # represent these explicit deps in T's distribution metadata. See issue #17593.
-    transitive_explicit_reqs = await MultiGet(
-        Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
-        for tgt in direct_deps_chained
-        if tgt.has_field(PythonRequirementsField)
-    )
 
-    transitive_excludes: FrozenOrderedSet[Target] = FrozenOrderedSet()
-    uneval_trans_excl = [
-        tgt.get(Dependencies).unevaluated_transitive_excludes for tgt in transitive_targets.closure
-    ]
-    if uneval_trans_excl:
-        nested_trans_excl = await MultiGet(
-            Get(Targets, UnparsedAddressInputs, unparsed) for unparsed in uneval_trans_excl
+@rule
+async def generate_chroot(
+    request: DistBuildChrootRequest, subsys: SetupPyGeneration
+) -> DistBuildChroot:
+    generate_setup = request.exported_target.target.get(GenerateSetupField).value
+    if generate_setup is None:
+        generate_setup = subsys.generate_setup_default
+
+    if generate_setup:
+        sources = await get_sources(request, **implicitly())
+        generated_setup_py = await generate_setup_py(
+            GenerateSetupPyRequest(
+                request.exported_target, sources, request.interpreter_constraints
+            )
         )
-        transitive_excludes = FrozenOrderedSet(
-            itertools.chain.from_iterable(excludes for excludes in nested_trans_excl)
+        # We currently generate a setup.py that expects to be in the source root.
+        # TODO: It might make sense to generate one in the target's directory, for
+        #  consistency with the existing setup.py case.
+        working_directory = ""
+        chroot_digest = await merge_digests(
+            MergeDigests((sources.digest, generated_setup_py.digest))
         )
-
-    direct_deps_chained.update(
-        itertools.chain.from_iterable(t.dependencies for t in transitive_explicit_reqs)
-    )
-    direct_deps_with_excl = direct_deps_chained.difference(transitive_excludes)
-
-    req_strs = list(
-        PexRequirements.req_strings_from_requirement_fields(
-            (
-                tgt[PythonRequirementsField]
-                for tgt in direct_deps_with_excl
-                if tgt.has_field(PythonRequirementsField)
+    else:
+        transitive_targets = await transitive_targets_get(
+            TransitiveTargetsRequest([request.exported_target.target.address]), **implicitly()
+        )
+        source_files = await prepare_python_sources(
+            PythonSourceFilesRequest(
+                targets=transitive_targets.closure, include_resources=True, include_files=True
             ),
+            **implicitly(),
         )
-    )
-
-    # Add the requirements on any exported targets on which we depend.
-    kwargs_for_exported_targets_we_depend_on = await MultiGet(
-        Get(SetupKwargs, OwnedDependency(tgt)) for tgt in owned_by_others
-    )
-    req_strs.extend(
-        f"{kwargs.name}{setup_py_generation.first_party_dependency_version(kwargs.version)}"
-        for kwargs in set(kwargs_for_exported_targets_we_depend_on)
-    )
-    return ExportedTargetRequirements(req_strs)
-
-
-@rule(desc="Find all code to be published in the distribution", level=LogLevel.DEBUG)
-async def get_owned_dependencies(
-    dependency_owner: DependencyOwner, union_membership: UnionMembership
-) -> OwnedDependencies:
-    """Find the dependencies of dependency_owner that are owned by it.
-
-    Includes dependency_owner itself.
-    """
-    transitive_targets = await Get(
-        TransitiveTargets,
-        TransitiveTargetsRequest([dependency_owner.exported_target.target.address]),
-    )
-    ownable_targets = [
-        tgt for tgt in transitive_targets.closure if is_ownable_target(tgt, union_membership)
-    ]
-    owners = await MultiGet(Get(ExportedTarget, OwnedDependency(tgt)) for tgt in ownable_targets)
-    owned_dependencies = [
-        tgt
-        for owner, tgt in zip(owners, ownable_targets)
-        if owner == dependency_owner.exported_target
-    ]
-    return OwnedDependencies(OwnedDependency(t) for t in owned_dependencies)
-
-
-@rule(desc="Get exporting owner for target")
-async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarget:
-    """Find the exported target that owns the given target (and therefore exports it).
-
-    The owner of T (i.e., the exported target in whose artifact T's code is published) is:
-
-     1. An exported target that depends on T (or is T itself).
-     2. Is T's closest filesystem ancestor among those satisfying 1.
-
-    If there are multiple such exported targets at the same degree of ancestry, the ownership
-    is ambiguous and an error is raised. If there is no exported target that depends on T
-    and is its ancestor, then there is no owner and an error is raised.
-    """
-    target = owned_dependency.target
-    ancestor_addrs = AncestorGlobSpec(target.address.spec_path)
-    ancestor_tgts = await Get(
-        Targets,
-        RawSpecs(
-            ancestor_globs=(ancestor_addrs,),
-            description_of_origin="the `python_distribution` `package` rules",
-        ),
-    )
-    # Note that addresses sort by (spec_path, target_name), and all these targets are
-    # ancestors of the given target, i.e., their spec_paths are all prefixes. So sorting by
-    # address will effectively sort by closeness of ancestry to the given target.
-    exported_ancestor_tgts = sorted(
-        (t for t in ancestor_tgts if t.has_field(PythonProvidesField)),
-        key=lambda t: t.address,
-        reverse=True,
-    )
-    exported_ancestor_iter = iter(exported_ancestor_tgts)
-    for exported_ancestor in exported_ancestor_iter:
-        transitive_targets = await Get(  # noqa: PNT30: requires triage
-            TransitiveTargets, TransitiveTargetsRequest([exported_ancestor.address])
-        )
-        if target in transitive_targets.closure:
-            owner = exported_ancestor
-            # Find any exported siblings of owner that also depend on target. They have the
-            # same spec_path as it, so they must immediately follow it in ancestor_iter.
-            sibling_owners = []
-            sibling = next(exported_ancestor_iter, None)
-            while sibling and sibling.address.spec_path == owner.address.spec_path:
-                transitive_targets = await Get(  # noqa: PNT30: requires triage
-                    TransitiveTargets, TransitiveTargetsRequest([sibling.address])
-                )
-                if target in transitive_targets.closure:
-                    sibling_owners.append(sibling)
-                sibling = next(exported_ancestor_iter, None)
-            if sibling_owners:
-                all_owners = [exported_ancestor] + sibling_owners
-                raise AmbiguousOwnerError(
-                    softwrap(
-                        f"""
-                        Found multiple sibling python_distribution targets that are the closest
-                        ancestor dependents of {target.address} and are therefore candidates to
-                        own it: {", ".join(o.address.spec for o in all_owners)}. Only a
-                        single such owner is allowed, to avoid ambiguity.
-                        """
-                    )
-                )
-            return ExportedTarget(owner)
-    raise NoOwnerError(
-        softwrap(
-            f"""
-            No python_distribution target found to own {target.address}. Note that
-            the owner must be in or above the owned target's directory, and must
-            depend on it (directly or indirectly).
-            """
-        )
-    )
+        chroot_digest = source_files.source_files.snapshot.digest
+        working_directory = request.exported_target.target.address.spec_path
+    return DistBuildChroot(chroot_digest, working_directory)
 
 
 def is_ownable_target(tgt: Target, union_membership: UnionMembership) -> bool:

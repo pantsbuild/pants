@@ -14,30 +14,30 @@ from pathlib import PurePath
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.util_rules import cgo_binaries, cgo_pkgconfig
 from pants.backend.go.util_rules.build_opts import GoBuildOptions
-from pants.backend.go.util_rules.cgo_binaries import CGoBinaryPathRequest
+from pants.backend.go.util_rules.cgo_binaries import CGoBinaryPathRequest, find_cgo_binary_path
 from pants.backend.go.util_rules.cgo_pkgconfig import (
     CGoPkgConfigFlagsRequest,
-    CGoPkgConfigFlagsResult,
+    resolve_cgo_pkg_config_args,
 )
 from pants.backend.go.util_rules.cgo_security import check_linker_flags
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.core.util_rules.system_binaries import BashBinary, BinaryPath, BinaryPathTest
+from pants.core.util_rules.system_binaries import BinaryPathTest, get_bash
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import (
-    CreateDigest,
-    DigestContents,
-    DigestSubset,
-    Directory,
-    FileContent,
-    PathGlobs,
-)
+from pants.engine.env_vars import EnvironmentVarsRequest
+from pants.engine.fs import CreateDigest, DigestSubset, Directory, FileContent, PathGlobs
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import (
+    create_digest,
+    execute_process,
+    get_digest_contents,
+    merge_digests,
+)
+from pants.engine.process import FallibleProcessResult, Process, fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.util.logging import LogLevel
 
 _logger = logging.getLogger(__name__)
@@ -126,7 +126,7 @@ async def check_compiler_supports_flag(
     input_digest = EMPTY_DIGEST
     tmp_file = "/dev/null"
     if goroot.goos == "windows":
-        input_digest = await Get(Digest, CreateDigest([FileContent("grok.c", b"")]))
+        input_digest = await create_digest(CreateDigest([FileContent("grok.c", b"")]))
         tmp_file = "grok.c"
 
     # We used to write an empty C file, but that gets complicated with
@@ -136,8 +136,7 @@ async def check_compiler_supports_flag(
     # Now we pass an empty file on stdin, which should work at least for
     # GCC and clang.
 
-    result = await Get(
-        FallibleProcessResult,
+    result = await execute_process(
         Process(
             [request.cc, request.flag, "-c", "-x", "c", "-", "-o", tmp_file],
             input_digest=input_digest,
@@ -147,6 +146,7 @@ async def check_compiler_supports_flag(
             description=f"Check whether compiler `{request.cc}` for Cgo supports flag `{request.flag}`",
             level=LogLevel.DEBUG,
         ),
+        **implicitly(),
     )
 
     # GCC says "unrecognized command line option".
@@ -242,16 +242,15 @@ async def setup_compiler_cmd(
         args.append("-mcmodel=large")
 
     # disable ASCII art in clang errors, if possible
-    supports_no_caret_diagnostics = await Get(
-        CheckCompilerSupportsOptionResult,
+    supports_no_caret_diagnostics = await check_compiler_supports_flag(
         CheckCompilerSupportsFlagRequest(request.compiler[0], "-fno-caret-diagnostics"),
+        **implicitly(),
     )
     if supports_no_caret_diagnostics.supports_flag:
         args.append("-fno-caret-diagnostics")
     # clang is too smart about command-line arguments
-    supports_unused_arguments = await Get(
-        CheckCompilerSupportsOptionResult,
-        CheckCompilerSupportsFlagRequest(request.compiler[0], "-Qunused-arguments"),
+    supports_unused_arguments = await check_compiler_supports_flag(
+        CheckCompilerSupportsFlagRequest(request.compiler[0], "-Qunused-arguments"), **implicitly()
     )
     if supports_unused_arguments.supports_flag:
         args.append("-Qunused-arguments")
@@ -270,9 +269,9 @@ async def setup_compiler_cmd(
 
     # Tell gcc not to include flags in object files, which defeats the
     # point of -fdebug-prefix-map above.
-    supports_no_record_gcc_switches = await Get(
-        CheckCompilerSupportsOptionResult,
+    supports_no_record_gcc_switches = await check_compiler_supports_flag(
         CheckCompilerSupportsFlagRequest(request.compiler[0], "-gno-record-gcc-switches"),
+        **implicitly(),
     )
     if supports_no_record_gcc_switches.supports_flag:
         args.append("-gno-record-gcc-switches")
@@ -293,8 +292,7 @@ class CGoCompilerWrapperScript:
 
 @rule
 async def make_cgo_compile_wrapper_script() -> CGoCompilerWrapperScript:
-    digest = await Get(
-        Digest,
+    digest = await create_digest(
         CreateDigest(
             [
                 FileContent(
@@ -309,7 +307,7 @@ async def make_cgo_compile_wrapper_script() -> CGoCompilerWrapperScript:
                     is_executable=True,
                 )
             ]
-        ),
+        )
     )
     return CGoCompilerWrapperScript(digest=digest)
 
@@ -324,24 +322,26 @@ async def _cc(
     description: str,
     golang_env_aware: GolangSubsystem.EnvironmentAware,
 ) -> Process:
-    compiler_path, bash, wrapper_script = await MultiGet(
-        Get(
-            BinaryPath,
+    compiler_path, bash, wrapper_script = await concurrently(
+        find_cgo_binary_path(
             CGoBinaryPathRequest(
                 binary_name=binary_name,
                 binary_path_test=BinaryPathTest(["--version"]),
             ),
+            **implicitly(),
         ),
-        Get(BashBinary),
-        Get(CGoCompilerWrapperScript),
+        get_bash(**implicitly()),
+        make_cgo_compile_wrapper_script(),
     )
-    compiler_args_result, env, input_digest = await MultiGet(
-        Get(SetupCompilerCmdResult, SetupCompilerCmdRequest((compiler_path.path,), dir_path)),
-        Get(
-            EnvironmentVars,
-            EnvironmentVarsRequest(golang_env_aware.env_vars_to_pass_to_subprocesses),
+    compiler_args_result, env, input_digest = await concurrently(
+        setup_compiler_cmd(
+            SetupCompilerCmdRequest((compiler_path.path,), dir_path), **implicitly()
         ),
-        Get(Digest, MergeDigests([input_digest, wrapper_script.digest])),
+        environment_vars_subset(
+            EnvironmentVarsRequest(golang_env_aware.env_vars_to_pass_to_subprocesses),
+            **implicitly(),
+        ),
+        merge_digests(MergeDigests([input_digest, wrapper_script.digest])),
     )
     replaced_flags = _replace_srcdir_in_flags(flags, dir_path)
     args = [
@@ -373,22 +373,24 @@ async def _gccld(
     objs: Iterable[str],
     description: str,
 ) -> FallibleProcessResult:
-    compiler_path, bash, wrapper_script = await MultiGet(
-        Get(
-            BinaryPath,
+    compiler_path, bash, wrapper_script = await concurrently(
+        find_cgo_binary_path(
             CGoBinaryPathRequest(
                 binary_name=binary_name,
                 binary_path_test=BinaryPathTest(["--version"]),
             ),
+            **implicitly(),
         ),
-        Get(BashBinary),
-        Get(CGoCompilerWrapperScript),
+        get_bash(**implicitly()),
+        make_cgo_compile_wrapper_script(),
     )
 
-    compiler_args_result, env, input_digest = await MultiGet(
-        Get(SetupCompilerCmdResult, SetupCompilerCmdRequest((compiler_path.path,), dir_path)),
-        Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"])),
-        Get(Digest, MergeDigests([input_digest, wrapper_script.digest])),
+    compiler_args_result, env, input_digest = await concurrently(
+        setup_compiler_cmd(
+            SetupCompilerCmdRequest((compiler_path.path,), dir_path), **implicitly()
+        ),
+        environment_vars_subset(EnvironmentVarsRequest(["PATH"]), **implicitly()),
+        merge_digests(MergeDigests([input_digest, wrapper_script.digest])),
     )
 
     replaced_flags_in_compiler_args = _replace_srcdir_in_flags(compiler_args_result.args, dir_path)
@@ -404,8 +406,7 @@ async def _gccld(
         *replaced_other_flags,
     ]
 
-    result = await Get(
-        FallibleProcessResult,
+    result = await execute_process(
         Process(
             argv=args,
             env={"TERM": "dumb", **env},
@@ -414,6 +415,7 @@ async def _gccld(
             description=description,
             level=LogLevel.DEBUG,
         ),
+        **implicitly(),
     )
 
     # TODO(#16828): Filter out output with irrelevant warnings just like `go` tool does.
@@ -464,9 +466,10 @@ async def _dynimport(
         description=f"Compile _cgo_main.c ({import_path})",
         golang_env_aware=golang_env_aware,
     )
-    cgo_main_compile_result = await Get(ProcessResult, Process, cgo_main_compile_process)
-    obj_digest = await Get(
-        Digest,
+    cgo_main_compile_result = await fallible_to_exec_result_or_raise(
+        **implicitly(cgo_main_compile_process)
+    )
+    obj_digest = await merge_digests(
         MergeDigests(
             [
                 input_digest,
@@ -556,26 +559,27 @@ async def _dynimport(
             )
 
     # cgo -dynimport
-    dynimport_process_result = await Get(
-        ProcessResult,
-        GoSdkProcess(
-            command=[
-                "tool",
-                "cgo",
-                # record path to dynamic linker
-                *(["-dynlinker"] if import_path == "runtime/cgo" else []),
-                "-dynpackage",
-                pkg_name,
-                "-dynimport",
-                dynobj,
-                "-dynout",
-                import_go_path,
-            ],
-            description="Gather cgo dynimport data.",
-            env={"TERM": "dumb"},
-            input_digest=cgo_binary_link_result.output_digest,
-            output_files=(import_go_path,),
-        ),
+    dynimport_process_result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            GoSdkProcess(
+                command=[
+                    "tool",
+                    "cgo",
+                    # record path to dynamic linker
+                    *(["-dynlinker"] if import_path == "runtime/cgo" else []),
+                    "-dynpackage",
+                    pkg_name,
+                    "-dynimport",
+                    dynobj,
+                    "-dynout",
+                    import_go_path,
+                ],
+                description="Gather cgo dynimport data.",
+                env={"TERM": "dumb"},
+                input_digest=cgo_binary_link_result.output_digest,
+                output_files=(import_go_path,),
+            ),
+        )
     )
     return _DynImportResult(
         digest=dynimport_process_result.output_digest,
@@ -632,16 +636,17 @@ async def _ensure_only_allowed_link_args(
     cgo_go_files = [
         os.path.join(dir_path, go_file) for go_file in go_files if go_file.startswith("_cgo_")
     ]
-    digest_contents = await Get(
-        DigestContents,
-        DigestSubset(
-            digest,
-            PathGlobs(
-                globs=cgo_go_files,
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin="cgo-related go_files",
-            ),
-        ),
+    digest_contents = await get_digest_contents(
+        **implicitly(
+            DigestSubset(
+                digest,
+                PathGlobs(
+                    globs=cgo_go_files,
+                    glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                    description_of_origin="cgo-related go_files",
+                ),
+            )
+        )
     )
 
     for entry in digest_contents:
@@ -670,8 +675,8 @@ async def cgo_compile_request(
     )
     cgo_input_digest = request.digest
     if os.path.isabs(dir_path):
-        mkdir_digest = await Get(Digest, CreateDigest([Directory(obj_dir_path)]))
-        cgo_input_digest = await Get(Digest, MergeDigests([cgo_input_digest, mkdir_digest]))
+        mkdir_digest = await create_digest(CreateDigest([Directory(obj_dir_path)]))
+        cgo_input_digest = await merge_digests(MergeDigests([cgo_input_digest, mkdir_digest]))
 
     # Extract the cgo flags instance from the request so it can be updated as necessary.
     flags = request.cgo_flags
@@ -688,11 +693,10 @@ async def cgo_compile_request(
 
     # Resolve pkg-config flags into compiler and linker flags.
     if request.cgo_flags.pkg_config:
-        pkg_config_flags = await Get(
-            CGoPkgConfigFlagsResult,
+        pkg_config_flags = await resolve_cgo_pkg_config_args(
             CGoPkgConfigFlagsRequest(
                 pkg_config_args=request.cgo_flags.pkg_config,
-            ),
+            )
         )
         flags = dataclasses.replace(
             flags,
@@ -798,30 +802,31 @@ async def cgo_compile_request(
     # produce a header file via the `-exportheader` option. Not necessary since Pants does not support that.
 
     # Invoke cgo.
-    cgo_result = await Get(
-        ProcessResult,
-        GoSdkProcess(
-            [
-                "tool",
-                "cgo",
-                "-objdir",
-                obj_dir_path,
-                "-importpath",
-                request.import_path,
-                *maybe_disable_imports_flags,
-                # TODO(#16835): Add -trimpath option to remove sandbox paths from source paths embedded in files.
-                # This means using `__PANTS_SANDBOX_ROOT__` support of `GoSdkProcess`.
-                "--",
-                *flags.cppflags,
-                *flags.cflags,
-                *(os.path.join(dir_path, f) for f in request.cgo_files),
-            ],
-            env=cgo_env,
-            description=f"Generate Go and C files from CGo files ({request.import_path})",
-            input_digest=cgo_input_digest,
-            output_directories=(obj_dir_path,),
-            replace_sandbox_root_in_args=True,
-        ),
+    cgo_result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            GoSdkProcess(
+                [
+                    "tool",
+                    "cgo",
+                    "-objdir",
+                    obj_dir_path,
+                    "-importpath",
+                    request.import_path,
+                    *maybe_disable_imports_flags,
+                    # TODO(#16835): Add -trimpath option to remove sandbox paths from source paths embedded in files.
+                    # This means using `__PANTS_SANDBOX_ROOT__` support of `GoSdkProcess`.
+                    "--",
+                    *flags.cppflags,
+                    *flags.cflags,
+                    *(os.path.join(dir_path, f) for f in request.cgo_files),
+                ],
+                env=cgo_env,
+                description=f"Generate Go and C files from CGo files ({request.import_path})",
+                input_digest=cgo_input_digest,
+                output_directories=(obj_dir_path,),
+                replace_sandbox_root_in_args=True,
+            ),
+        )
     )
 
     out_obj_files: list[str] = []
@@ -845,7 +850,9 @@ async def cgo_compile_request(
             description=f"Compile cgo source: {gcc_file}",
             golang_env_aware=golang_env_aware,
         )
-        compile_process_gets.append(Get(ProcessResult, Process, compile_process))
+        compile_process_gets.append(
+            fallible_to_exec_result_or_raise(**implicitly({compile_process: Process}))
+        )
 
     # C++ files
     cxxflags = [*flags.cppflags, *flags.cxxflags]
@@ -864,7 +871,9 @@ async def cgo_compile_request(
             description=f"Compile cgo C++ source: {cxx_file}",
             golang_env_aware=golang_env_aware,
         )
-        compile_process_gets.append(Get(ProcessResult, Process, compile_process))
+        compile_process_gets.append(
+            fallible_to_exec_result_or_raise(**implicitly({compile_process: Process}))
+        )
 
     # Objective-C files
     for objc_file in (os.path.join(dir_path, objc_file) for objc_file in request.objc_files):
@@ -882,7 +891,9 @@ async def cgo_compile_request(
             description=f"Compile cgo Objective-C source: {objc_file}",
             golang_env_aware=golang_env_aware,
         )
-        compile_process_gets.append(Get(ProcessResult, Process, compile_process))
+        compile_process_gets.append(
+            fallible_to_exec_result_or_raise(**implicitly({compile_process: Process}))
+        )
 
     fflags = [*flags.cppflags, *flags.fflags]
     for fortran_file in (
@@ -902,25 +913,26 @@ async def cgo_compile_request(
             description=f"Compile cgo Fortran source: {fortran_file}",
             golang_env_aware=golang_env_aware,
         )
-        compile_process_gets.append(Get(ProcessResult, Process, compile_process))
+        compile_process_gets.append(
+            fallible_to_exec_result_or_raise(**implicitly({compile_process: Process}))
+        )
 
     # Dispatch all of the compilation requests.
-    compile_results = await MultiGet(compile_process_gets)
-    out_obj_files_digest = await Get(
-        Digest, MergeDigests([r.output_digest for r in compile_results])
+    compile_results = await concurrently(compile_process_gets)
+    out_obj_files_digest = await merge_digests(
+        MergeDigests([r.output_digest for r in compile_results])
     )
 
     # Run dynimport process to create a Go source file named importGo containing
     # //go:cgo_import_dynamic directives for each symbol or library
     # dynamically imported by the object files outObj.
-    dynimport_input_digest = await Get(
-        Digest,
+    dynimport_input_digest = await merge_digests(
         MergeDigests(
             [
                 cgo_result.output_digest,
                 out_obj_files_digest,
             ]
-        ),
+        )
     )
     transitive_prebuilt_objects_digest: Digest = EMPTY_DIGEST
     transitive_prebuilt_objects: frozenset[str] = frozenset()
@@ -956,15 +968,14 @@ async def cgo_compile_request(
     # such a comment into a file generated by cgo.
     await _ensure_only_allowed_link_args(cgo_result.output_digest, dir_path, go_files)
 
-    output_digest = await Get(
-        Digest,
+    output_digest = await merge_digests(
         MergeDigests(
             [
                 cgo_result.output_digest,
                 out_obj_files_digest,
                 dynimport_result.digest,
             ]
-        ),
+        )
     )
     return CGoCompileResult(
         digest=output_digest,

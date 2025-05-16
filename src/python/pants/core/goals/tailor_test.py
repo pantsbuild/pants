@@ -29,9 +29,10 @@ from pants.core.goals.tailor import (
     resolve_specs_with_build,
 )
 from pants.core.util_rules import source_files
-from pants.engine.fs import DigestContents, FileContent, PathGlobs, Paths
+from pants.engine.fs import DigestContents, FileContent
 from pants.engine.internals.build_files import extract_build_file_options
-from pants.engine.rules import Get, QueryRule, rule
+from pants.engine.intrinsics import path_globs_to_paths
+from pants.engine.rules import QueryRule, rule
 from pants.engine.target import MultipleSourcesField, Target
 from pants.engine.unions import UnionRule
 from pants.source.filespec import FilespecMatcher
@@ -78,7 +79,7 @@ class PutativeFortranTargetsRequest(PutativeTargetsRequest):
 async def find_fortran_targets(
     req: PutativeFortranTargetsRequest, all_owned_sources: AllOwnedSources
 ) -> PutativeTargets:
-    all_fortran_files = await Get(Paths, PathGlobs, req.path_globs("*.f90"))
+    all_fortran_files = await path_globs_to_paths(req.path_globs("*.f90"))
     unowned_shell_files = set(all_fortran_files.files) - set(all_owned_sources)
 
     tests_filespec_matcher = FilespecMatcher(FortranTestsSources.default, ())

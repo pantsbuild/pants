@@ -38,13 +38,16 @@ from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
+    create_docker_build_context,
 )
 from pants.backend.docker.utils import format_rename_suggestion
 from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
-from pants.engine.fs import CreateDigest, Digest, FileContent
-from pants.engine.process import FallibleProcessResult, Process, ProcessExecutionFailure
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import InvalidFieldException, Target, WrappedTarget, WrappedTargetRequest
+from pants.engine.fs import CreateDigest, FileContent
+from pants.engine.internals.graph import resolve_target
+from pants.engine.intrinsics import create_digest, execute_process
+from pants.engine.process import ProcessExecutionFailure
+from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.target import InvalidFieldException, Target, WrappedTargetRequest
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.util.strutil import bullet_list, softwrap
@@ -390,22 +393,21 @@ async def build_docker_image(
     union_membership: UnionMembership,
 ) -> BuiltPackage:
     """Build a Docker image using `docker build`."""
-    context, wrapped_target = await MultiGet(
-        Get(
-            DockerBuildContext,
+    context, wrapped_target = await concurrently(
+        create_docker_build_context(
             DockerBuildContextRequest(
                 address=field_set.address,
                 build_upstream_images=True,
-            ),
+            )
         ),
-        Get(
-            WrappedTarget,
+        resolve_target(
             WrappedTargetRequest(field_set.address, description_of_origin="<infallible>"),
+            **implicitly(),
         ),
     )
 
     image_tags_requests = union_membership.get(DockerImageTagsRequest)
-    additional_image_tags = await MultiGet(
+    additional_image_tags = await concurrently(
         Get(DockerImageTags, DockerImageTagsRequest, image_tags_request_cls(wrapped_target.target))
         for image_tags_request_cls in image_tags_requests
         if image_tags_request_cls.is_applicable(wrapped_target.target)
@@ -459,7 +461,7 @@ async def build_docker_image(
             )
         ),
     )
-    result = await Get(FallibleProcessResult, Process, process)
+    result = await execute_process(process, **implicitly())
 
     if result.exit_code != 0:
         msg = f"Docker build failed for `docker_image` {field_set.address}."
@@ -500,7 +502,7 @@ async def build_docker_image(
 
     metadata_filename = field_set.output_path.value_or_default(file_ending="docker-info.json")
     metadata = DockerInfoV1.serialize(image_refs, image_id=image_id)
-    digest = await Get(Digest, CreateDigest([FileContent(metadata_filename, metadata)]))
+    digest = await create_digest(CreateDigest([FileContent(metadata_filename, metadata)]))
 
     return BuiltPackage(
         digest,
