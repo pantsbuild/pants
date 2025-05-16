@@ -808,6 +808,57 @@ async def determine_local_workspace_environment(
     )
 
 
+@rule
+async def get_target_for_environment_name(
+    env_name: EnvironmentName, environments_subsystem: EnvironmentsSubsystem
+) -> EnvironmentTarget:
+    if env_name.val is None:
+        return EnvironmentTarget(None, None)
+    if env_name.val not in environments_subsystem.names:
+        raise AssertionError(
+            softwrap(
+                f"""
+                The name `{env_name.val}` is not defined. The name should have been normalized and
+                validated in the rule `EnvironmentNameRequest -> EnvironmentName`
+                already. If you directly wrote
+                `Get(EnvironmentTarget, EnvironmentName(my_name))`, refactor to
+                `Get(EnvironmentTarget, EnvironmentNameRequest(my_name, ...))`.
+                """
+            )
+        )
+    _description_of_origin = "the option [environments-preview].names"
+    address = await resolve_address(
+        **implicitly(
+            {
+                AddressInput.parse(
+                    environments_subsystem.names[env_name.val],
+                    description_of_origin=_description_of_origin,
+                ): AddressInput
+            }
+        )
+    )
+    wrapped_target = await resolve_target_for_bootstrapping(
+        WrappedTargetRequest(address, description_of_origin=_description_of_origin), **implicitly()
+    )
+    tgt = wrapped_target.val
+    if (
+        not tgt.has_field(CompatiblePlatformsField)
+        and not tgt.has_field(DockerImageField)
+        and not tgt.has_field(RemotePlatformField)
+    ):
+        raise ValueError(
+            softwrap(
+                f"""
+                Expected to use the address to a `local_environment`, `docker_environment`,
+                `remote_environment`, or `experimental_workspace_environment` target in the option `[environments-preview].names`,
+                but the name `{env_name.val}` was set to the target {address.spec} with the target type
+                `{tgt.alias}`.
+                """
+            )
+        )
+    return EnvironmentTarget(env_name.val, tgt)
+
+
 async def _apply_fallback_environment(env_tgt: Target, error_msg: str) -> EnvironmentName:
     fallback_field = env_tgt[FallbackEnvironmentField]
     if fallback_field.value is None:
@@ -956,57 +1007,6 @@ async def resolve_single_environment_name(
             f"{bullet_list(unique_environments)}"
         )
     return environment_names[0]
-
-
-@rule
-async def get_target_for_environment_name(
-    env_name: EnvironmentName, environments_subsystem: EnvironmentsSubsystem
-) -> EnvironmentTarget:
-    if env_name.val is None:
-        return EnvironmentTarget(None, None)
-    if env_name.val not in environments_subsystem.names:
-        raise AssertionError(
-            softwrap(
-                f"""
-                The name `{env_name.val}` is not defined. The name should have been normalized and
-                validated in the rule `EnvironmentNameRequest -> EnvironmentName`
-                already. If you directly wrote
-                `Get(EnvironmentTarget, EnvironmentName(my_name))`, refactor to
-                `Get(EnvironmentTarget, EnvironmentNameRequest(my_name, ...))`.
-                """
-            )
-        )
-    _description_of_origin = "the option [environments-preview].names"
-    address = await resolve_address(
-        **implicitly(
-            {
-                AddressInput.parse(
-                    environments_subsystem.names[env_name.val],
-                    description_of_origin=_description_of_origin,
-                ): AddressInput
-            }
-        )
-    )
-    wrapped_target = await resolve_target_for_bootstrapping(
-        WrappedTargetRequest(address, description_of_origin=_description_of_origin), **implicitly()
-    )
-    tgt = wrapped_target.val
-    if (
-        not tgt.has_field(CompatiblePlatformsField)
-        and not tgt.has_field(DockerImageField)
-        and not tgt.has_field(RemotePlatformField)
-    ):
-        raise ValueError(
-            softwrap(
-                f"""
-                Expected to use the address to a `local_environment`, `docker_environment`,
-                `remote_environment`, or `experimental_workspace_environment` target in the option `[environments-preview].names`,
-                but the name `{env_name.val}` was set to the target {address.spec} with the target type
-                `{tgt.alias}`.
-                """
-            )
-        )
-    return EnvironmentTarget(env_name.val, tgt)
 
 
 @rule
