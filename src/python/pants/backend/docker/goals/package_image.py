@@ -398,7 +398,8 @@ async def build_docker_image(
             DockerBuildContextRequest(
                 address=field_set.address,
                 build_upstream_images=True,
-            )
+            ),
+            **implicitly(),
         ),
         resolve_target(
             WrappedTargetRequest(field_set.address, description_of_origin="<infallible>"),

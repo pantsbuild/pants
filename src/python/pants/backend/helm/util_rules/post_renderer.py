@@ -97,7 +97,8 @@ async def prepare_post_renderer_for_helm_deployment(
             DockerBuildContextRequest(
                 address=addr,
                 build_upstream_images=False,
-            )
+            ),
+            **implicitly(),
         )
         for addr in docker_addresses
     )
