@@ -35,7 +35,8 @@ from pants.engine.fs import (
     FileContent,
     Snapshot,
 )
-from pants.engine.rules import Get, QueryRule, collect_rules, rule
+from pants.engine.intrinsics import digest_to_snapshot
+from pants.engine.rules import Get, QueryRule, collect_rules, implicitly, rule
 from pants.engine.target import (
     FieldSet,
     MultipleSourcesField,
@@ -109,8 +110,10 @@ async def fortran_fmt_partition(request: FortranFmtRequest.PartitionRequest) -> 
 @rule
 async def fortran_fix(request: FortranFixRequest.Batch) -> FixResult:
     input = request.snapshot
-    output = await Get(
-        Snapshot, CreateDigest([FileContent(file, FORTRAN_FILE.content) for file in request.files])
+    output = await digest_to_snapshot(
+        **implicitly(
+            CreateDigest([FileContent(file, FORTRAN_FILE.content) for file in request.files])
+        )
     )
     return FixResult(
         input=input, output=output, stdout="", stderr="", tool_name=FortranFixRequest.tool_name
@@ -119,8 +122,10 @@ async def fortran_fix(request: FortranFixRequest.Batch) -> FixResult:
 
 @rule
 async def fortran_fmt(request: FortranFmtRequest.Batch) -> FmtResult:
-    output = await Get(
-        Snapshot, CreateDigest([FileContent(file, FORTRAN_FILE.content) for file in request.files])
+    output = await digest_to_snapshot(
+        **implicitly(
+            CreateDigest([FileContent(file, FORTRAN_FILE.content) for file in request.files])
+        )
     )
     return FmtResult(
         input=request.snapshot,

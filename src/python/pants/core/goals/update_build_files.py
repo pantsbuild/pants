@@ -16,7 +16,6 @@ from typing import DefaultDict, cast
 from colors import green, red
 
 from pants.backend.build_files.fix.deprecations import renamed_fields_rules, renamed_targets_rules
-from pants.backend.build_files.fix.deprecations.base import FixedBUILDFile
 from pants.backend.build_files.fmt.black.register import BlackRequest
 from pants.backend.build_files.fmt.buildifier.rules import BuildifierRequest, _run_buildifier_fmt
 from pants.backend.build_files.fmt.buildifier.subsystem import Buildifier
@@ -35,22 +34,19 @@ from pants.base.specs import Specs
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import (
-    CreateDigest,
-    Digest,
-    DigestContents,
-    FileContent,
-    PathGlobs,
-    Paths,
-    Snapshot,
-    SpecsPaths,
-    Workspace,
-)
+from pants.engine.fs import CreateDigest, FileContent, PathGlobs, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.build_files import BuildFileOptions
 from pants.engine.internals.parser import ParseError
+from pants.engine.internals.specs_rules import resolve_specs_paths
+from pants.engine.intrinsics import (
+    create_digest,
+    digest_to_snapshot,
+    get_digest_contents,
+    path_globs_to_paths,
+)
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.rules import Get, collect_rules, concurrently, goal_rule, implicitly, rule
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.option_types import BoolOption, EnumOption
 from pants.util.docutil import bin_name, doc_url
@@ -204,22 +200,20 @@ async def update_build_files(
             )
         return UpdateBuildFilesGoal(exit_code=0)
 
-    all_build_file_paths, specs_paths = await MultiGet(
-        Get(
-            Paths,
+    all_build_file_paths, specs_paths = await concurrently(
+        path_globs_to_paths(
             PathGlobs(
                 globs=(
                     *(os.path.join("**", p) for p in build_file_options.patterns),
                     *(f"!{p}" for p in build_file_options.ignores),
                 )
-            ),
+            )
         ),
-        Get(SpecsPaths, Specs, specs),
+        resolve_specs_paths(specs),
     )
     specified_paths = set(specs_paths.files)
-    specified_build_files = await Get(
-        DigestContents,
-        PathGlobs(fp for fp in all_build_file_paths.files if fp in specified_paths),
+    specified_build_files = await get_digest_contents(
+        **implicitly(PathGlobs(fp for fp in all_build_file_paths.files if fp in specified_paths))
     )
 
     rewrite_request_classes = []
@@ -257,7 +251,7 @@ async def update_build_files(
     }
     build_file_to_change_descriptions: DefaultDict[str, list[str]] = defaultdict(list)
     for rewrite_request_cls in rewrite_request_classes:
-        all_rewritten_files = await MultiGet(  # noqa: PNT30: this is inherently sequential
+        all_rewritten_files = await concurrently(  # noqa: PNT30: this is inherently sequential
             Get(
                 RewrittenBuildFile,
                 RewrittenBuildFileRequest,
@@ -295,14 +289,13 @@ async def update_build_files(
         return UpdateBuildFilesGoal(exit_code=0)
 
     if not update_build_files_subsystem.check:
-        result = await Get(
-            Digest,
+        result = await create_digest(
             CreateDigest(
                 FileContent(
                     build_file, ("\n".join(build_file_to_lines[build_file]) + "\n").encode("utf-8")
                 )
                 for build_file in changed_build_files
-            ),
+            )
         )
         workspace.write_digest(result)
 
@@ -334,7 +327,9 @@ class FormatWithYapfRequest(RewrittenBuildFileRequest):
 async def format_build_file_with_yapf(
     request: FormatWithYapfRequest, yapf: Yapf
 ) -> RewrittenBuildFile:
-    input_snapshot = await Get(Snapshot, CreateDigest([request.to_file_content()]))
+    input_snapshot = await digest_to_snapshot(
+        **implicitly(CreateDigest([request.to_file_content()]))
+    )
     yapf_ics = await get_lockfile_interpreter_constraints(yapf)
     result = await _run_yapf(
         YapfRequest.Batch(
@@ -346,7 +341,7 @@ async def format_build_file_with_yapf(
         yapf,
         yapf_ics,
     )
-    output_content = await Get(DigestContents, Digest, result.output.digest)
+    output_content = await get_digest_contents(result.output.digest)
 
     formatted_build_file_content = next(fc for fc in output_content if fc.path == request.path)
     build_lines = tuple(formatted_build_file_content.content.decode("utf-8").splitlines())
@@ -368,7 +363,9 @@ class FormatWithBlackRequest(RewrittenBuildFileRequest):
 async def format_build_file_with_black(
     request: FormatWithBlackRequest, black: Black
 ) -> RewrittenBuildFile:
-    input_snapshot = await Get(Snapshot, CreateDigest([request.to_file_content()]))
+    input_snapshot = await digest_to_snapshot(
+        **implicitly(CreateDigest([request.to_file_content()]))
+    )
     black_ics = await get_lockfile_interpreter_constraints(black)
     result = await _run_black(
         BlackRequest.Batch(
@@ -380,7 +377,7 @@ async def format_build_file_with_black(
         black,
         black_ics,
     )
-    output_content = await Get(DigestContents, Digest, result.output.digest)
+    output_content = await get_digest_contents(result.output.digest)
 
     formatted_build_file_content = next(fc for fc in output_content if fc.path == request.path)
     build_lines = tuple(formatted_build_file_content.content.decode("utf-8").splitlines())
@@ -402,7 +399,9 @@ class FormatWithRuffRequest(RewrittenBuildFileRequest):
 async def format_build_file_with_ruff(
     request: FormatWithRuffRequest, ruff: Ruff, platform: Platform
 ) -> RewrittenBuildFile:
-    input_snapshot = await Get(Snapshot, CreateDigest([request.to_file_content()]))
+    input_snapshot = await digest_to_snapshot(
+        **implicitly(CreateDigest([request.to_file_content()]))
+    )
     result = await _run_ruff_fmt(
         RuffRequest.Batch(
             Ruff.options_scope,
@@ -413,7 +412,7 @@ async def format_build_file_with_ruff(
         ruff,
         platform,
     )
-    output_content = await Get(DigestContents, Digest, result.output.digest)
+    output_content = await get_digest_contents(result.output.digest)
 
     formatted_build_file_content = next(fc for fc in output_content if fc.path == request.path)
     build_lines = tuple(formatted_build_file_content.content.decode("utf-8").splitlines())
@@ -435,7 +434,9 @@ class FormatWithBuildifierRequest(RewrittenBuildFileRequest):
 async def format_build_file_with_buildifier(
     request: FormatWithBuildifierRequest, buildifier: Buildifier, platform: Platform
 ) -> RewrittenBuildFile:
-    input_snapshot = await Get(Snapshot, CreateDigest([request.to_file_content()]))
+    input_snapshot = await digest_to_snapshot(
+        **implicitly(CreateDigest([request.to_file_content()]))
+    )
     result = await _run_buildifier_fmt(
         request=BuildifierRequest.Batch(
             tool_name=Buildifier.options_scope,
@@ -446,7 +447,7 @@ async def format_build_file_with_buildifier(
         buildifier=buildifier,
         platform=platform,
     )
-    output_content = await Get(DigestContents, Digest, result.output.digest)
+    output_content = await get_digest_contents(result.output.digest)
     formatted_build_file_content = next(fc for fc in output_content if fc.path == request.path)
     build_lines = tuple(formatted_build_file_content.content.decode("utf-8").splitlines())
     change_descriptions = (f"Format with {Buildifier.name}",) if result.did_change else ()
@@ -467,9 +468,9 @@ async def maybe_rename_deprecated_targets(
     request: RenameDeprecatedTargetsRequest,
 ) -> RewrittenBuildFile:
     old_bytes = "\n".join(request.lines).encode("utf-8")
-    new_content = await Get(
-        FixedBUILDFile,
+    new_content = await renamed_targets_rules.fix_single(
         renamed_targets_rules.RenameTargetsInFileRequest(path=request.path, content=old_bytes),
+        **implicitly(),
     )
 
     return RewrittenBuildFile(
@@ -495,9 +496,9 @@ async def maybe_rename_deprecated_fields(
     request: RenameDeprecatedFieldsRequest,
 ) -> RewrittenBuildFile:
     old_bytes = "\n".join(request.lines).encode("utf-8")
-    new_content = await Get(
-        FixedBUILDFile,
+    new_content = await renamed_fields_rules.fix_single(
         renamed_fields_rules.RenameFieldsInFileRequest(path=request.path, content=old_bytes),
+        **implicitly(),
     )
 
     return RewrittenBuildFile(

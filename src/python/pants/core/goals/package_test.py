@@ -19,8 +19,8 @@ from pants.core.goals.package import (
     TraverseIfNotPackageTarget,
 )
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, Digest, FileContent
-from pants.engine.internals.selectors import Get
+from pants.engine.fs import CreateDigest, FileContent
+from pants.engine.intrinsics import create_digest
 from pants.engine.rules import rule
 from pants.engine.target import (
     Dependencies,
@@ -88,8 +88,8 @@ class MockPackageFieldSet(PackageFieldSet):
 @rule
 async def package_mock_target(field_set: MockPackageFieldSet) -> BuiltPackage:
     base_path = Path(f"base/{field_set.address.target_name}")
-    create_digest, relpaths = field_set.type.synth(base_path)
-    digest = await Get(Digest, CreateDigest, create_digest)
+    create_digest_request, relpaths = field_set.type.synth(base_path)
+    digest = await create_digest(create_digest_request)
     return BuiltPackage(
         digest, tuple(BuiltPackageArtifact(relpath=str(relpath)) for relpath in relpaths)
     )
