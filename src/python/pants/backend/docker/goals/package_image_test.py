@@ -179,6 +179,7 @@ def assert_build(
         opts.setdefault("build_no_cache", False)
         opts.setdefault("use_buildx", False)
         opts.setdefault("env_vars", [])
+        opts.setdefault("suggest_renames", True)
 
         docker_options = create_subsystem(
             DockerOptions,
@@ -1365,6 +1366,7 @@ def test_docker_build_labels_option(rule_runner: RuleRunner) -> None:
     )
 
 
+@pytest.mark.parametrize("suggest_renames", [True, False])
 @pytest.mark.parametrize(
     "context_root, copy_sources, build_context_files, expect_logged, fail_log_contains",
     [
@@ -1414,22 +1416,16 @@ def test_docker_build_labels_option(rule_runner: RuleRunner) -> None:
                 "docker/test/config/.a",
                 "docker/test/config/.conf.d/b",
             ),
+            [(logging.WARNING, "Docker build failed for `docker_image` docker/test:test.")],
             [
-                (
-                    logging.WARNING,
-                    (
-                        "Docker build failed for `docker_image` docker/test:test. "
-                        "There are files in the Docker build context that were not referenced by "
-                        "any `COPY` instruction (this is not an error):\n"
-                        "\n"
-                        "  * ..unusal-name\n"
-                        "  * .a\n"
-                        "  * .conf.d/b\n"
-                        "  * .rc\n"
-                    ),
-                )
+                "There are files in the Docker build context that were not referenced by "
+                "any `COPY` instruction (this is not an error):\n"
+                "\n"
+                "  * ..unusal-name\n"
+                "  * .a\n"
+                "  * .conf.d/b\n"
+                "  * .rc\n"
             ],
-            [],
         ),
     ],
 )
@@ -1441,11 +1437,16 @@ def test_docker_build_fail_logs(
     build_context_files: tuple[str, ...],
     expect_logged: list[tuple[int, str]] | None,
     fail_log_contains: list[str],
+    suggest_renames: bool,
 ) -> None:
     caplog.set_level(logging.INFO)
     rule_runner.write_files({"docker/test/BUILD": f"docker_image(context_root={context_root!r})"})
     build_context_files = ("docker/test/Dockerfile", *build_context_files)
     build_context_snapshot = rule_runner.make_snapshot_of_empty_files(build_context_files)
+    suggest_renames_arg = (
+        "--docker-suggest-renames" if suggest_renames else "--no-docker-suggest-renames"
+    )
+    rule_runner.set_options([suggest_renames_arg])
     with pytest.raises(ProcessExecutionFailure):
         assert_build(
             rule_runner,
@@ -1457,7 +1458,10 @@ def test_docker_build_fail_logs(
 
     assert_logged(caplog, expect_logged)
     for msg in fail_log_contains:
-        assert msg in caplog.records[0].message
+        if suggest_renames:
+            assert msg in caplog.records[0].message
+        else:
+            assert msg not in caplog.records[0].message
 
 
 @pytest.mark.parametrize(

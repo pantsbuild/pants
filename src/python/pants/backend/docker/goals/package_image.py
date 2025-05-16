@@ -42,7 +42,6 @@ from pants.backend.docker.util_rules.docker_build_context import (
 )
 from pants.backend.docker.utils import format_rename_suggestion
 from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
-from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.graph import resolve_target
 from pants.engine.intrinsics import create_digest, execute_process
@@ -399,7 +398,8 @@ async def build_docker_image(
             DockerBuildContextRequest(
                 address=field_set.address,
                 build_upstream_images=True,
-            )
+            ),
+            **implicitly(),
         ),
         resolve_target(
             WrappedTargetRequest(field_set.address, description_of_origin="<infallible>"),
@@ -465,14 +465,17 @@ async def build_docker_image(
     result = await execute_process(process, **implicitly())
 
     if result.exit_code != 0:
-        maybe_msg = format_docker_build_context_help_message(
-            address=field_set.address,
-            context_root=context_root,
-            context=context,
-            colors=global_options.colors,
-        )
-        if maybe_msg:
-            logger.warning(maybe_msg)
+        msg = f"Docker build failed for `docker_image` {field_set.address}."
+        if options.suggest_renames:
+            maybe_help_msg = format_docker_build_context_help_message(
+                context_root=context_root,
+                context=context,
+                colors=global_options.colors,
+            )
+            if maybe_help_msg:
+                msg += " " + maybe_help_msg
+
+        logger.warning(msg)
 
         raise ProcessExecutionFailure(
             result.exit_code,
@@ -563,7 +566,7 @@ def parse_image_id_from_docker_build_output(docker: DockerBinary, *outputs: byte
 
 
 def format_docker_build_context_help_message(
-    address: Address, context_root: str, context: DockerBuildContext, colors: bool
+    context_root: str, context: DockerBuildContext, colors: bool
 ) -> str | None:
     paths_outside_context_root: list[str] = []
 
@@ -589,7 +592,7 @@ def format_docker_build_context_help_message(
         # No issues found.
         return None
 
-    msg = f"Docker build failed for `docker_image` {address}. "
+    msg = ""
     has_unsourced_copy = any(src for src, _ in copy_source_vs_context_source)
     if has_unsourced_copy:
         msg += (
