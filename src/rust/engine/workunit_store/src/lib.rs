@@ -845,6 +845,7 @@ macro_rules! in_workunit {
     use futures::future::FutureExt;
     let mut store_handle = $crate::expect_workunit_store_handle();
     let level: log::Level  = $workunit_level;
+    #[allow(clippy::mem_replace_option_with_some)]
     let mut $workunit = {
       let workunit_metadata =
         if store_handle.store.max_level() >= level {

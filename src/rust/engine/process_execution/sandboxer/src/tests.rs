@@ -27,12 +27,12 @@ fn test_ensure_socket_file_removed() {
     file.write(b"SOME CONTENT").unwrap();
     file.flush().unwrap();
     assert!(fs::exists(&socket_path).unwrap());
-    let _ = fs::set_permissions(&subdir, fs::Permissions::from_mode(0o644)).unwrap();
+    fs::set_permissions(&subdir, fs::Permissions::from_mode(0o644)).unwrap();
     assert_eq!(
         Err("Permission denied (os error 13)".to_string()),
         ensure_socket_file_removed(&socket_path)
     );
-    let _ = fs::set_permissions(&subdir, fs::Permissions::from_mode(0o755)).unwrap();
+    fs::set_permissions(&subdir, fs::Permissions::from_mode(0o755)).unwrap();
 
     // Succeed in deleting otherwise.
     assert!(fs::exists(&socket_path).unwrap());
@@ -61,7 +61,7 @@ async fn test_sandboxer_service() {
             &sandbox_path,
             &sandbox_path,
             &DirectoryDigest::from_persisted_digest(dir_digest.as_digest()),
-            &vec![],
+            &[],
         )
         .await;
     assert_eq!(Ok(()), res);

@@ -74,7 +74,7 @@ fn with_setup(
                 .collect::<HashMap<_, _>>(),
         },
         Some(
-            vec![config_path, extra_config_path]
+            [config_path, extra_config_path]
                 .iter()
                 .map(|cp| ConfigSource::from_file(cp).unwrap())
                 .collect(),
@@ -789,7 +789,7 @@ fn test_cli_alias() {
 #[test]
 fn test_cli_alias_validation() {
     let buildroot = TempDir::new().unwrap();
-    File::create(&buildroot.path().join("BUILDROOT")).unwrap();
+    File::create(buildroot.path().join("BUILDROOT")).unwrap();
     assert_eq!(
         "Invalid alias in `[cli].alias` option: foo. This is already a registered goal or subsytem.",
     OptionParser::new(
@@ -809,8 +809,8 @@ fn test_cli_alias_validation() {
 #[test]
 fn test_spec_files() {
     let buildroot = TempDir::new().unwrap();
-    File::create(&buildroot.path().join("BUILDROOT")).unwrap();
-    File::create(&buildroot.path().join("extra_specs.txt"))
+    File::create(buildroot.path().join("BUILDROOT")).unwrap();
+    File::create(buildroot.path().join("extra_specs.txt"))
         .unwrap()
         .write_all("path/to/spec\nanother:spec".as_bytes())
         .unwrap();

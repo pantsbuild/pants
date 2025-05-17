@@ -185,6 +185,7 @@ impl StubCASResponder {
     }
 
     /// Returns an Err to propagate if this CAS responder is configured to always give an error
+    #[allow(clippy::result_large_err)]
     fn check_always_errors(&self) -> Result<(), Status> {
         if self.always_errors {
             Err(Status::internal(
@@ -195,6 +196,7 @@ impl StubCASResponder {
         }
     }
 
+    #[allow(clippy::result_large_err)]
     fn read_internal(&self, req: &ReadRequest) -> Result<Vec<ReadResponse>, Status> {
         let parsed_resource_name = parse_read_resource_name(&req.resource_name).map_err(|err| {
             Status::invalid_argument(format!("Failed to parse resource name: {err}"))
