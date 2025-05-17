@@ -67,6 +67,7 @@ from pants.engine.process import (
     ProcessExecutionFailure,
     ProcessResultMetadata,
 )
+from pants.engine.rules import rule
 from pants.engine.target import InvalidFieldException, WrappedTarget
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import GlobalOptions, KeepSandboxes
@@ -93,8 +94,9 @@ def rule_runner() -> RuleRunner:
     )
 
 
-class DockerImageTagsRequestPlugin(DockerImageTagsRequest):
-    pass
+@rule
+async def get_docker_image_tags(_: DockerImageTagsRequest) -> DockerImageTags:
+    raise NotImplementedError("Will always be mocked")
 
 
 def assert_build(
@@ -111,6 +113,11 @@ def assert_build(
     plugin_tags: tuple[str, ...] = (),
     expected_registries_metadata: None | list = None,
 ) -> None:
+    class DockerImageTagsRequestPlugin(DockerImageTagsRequest):
+        @classmethod
+        def image_tags_rule(cls):
+            return get_docker_image_tags
+
     tgt = rule_runner.get_target(address)
     metadata_file_path: list[str] = []
     metadata_file_contents: list[bytes] = []
@@ -206,13 +213,11 @@ def assert_build(
         mock_calls={
             "pants.backend.docker.util_rules.docker_build_context.create_docker_build_context": build_context_mock,
             "pants.engine.internals.graph.resolve_target": lambda _: WrappedTarget(tgt),
+            "pants.backend.docker.goals.package_image_test.get_docker_image_tags": lambda _: DockerImageTags(
+                plugin_tags
+            ),
         },
         mock_gets=[
-            MockGet(
-                output_type=DockerImageTags,
-                input_types=(DockerImageTagsRequestPlugin,),
-                mock=lambda _: DockerImageTags(plugin_tags),
-            ),
             MockGet(
                 output_type=FallibleProcessResult,
                 input_types=(Process,),

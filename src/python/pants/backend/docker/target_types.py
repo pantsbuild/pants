@@ -662,6 +662,13 @@ class DockerImageTagsRequest:
         """Whether to provide additional tags for this target or not."""
         return True
 
+    @classmethod
+    def image_tags_rule(cls):
+        raise NotImplementedError(
+            "A subclass must implement this method to return the @rule that converts instances "
+            "of that subclass to a DockerImageTags instance."
+        )
+
 
 class DockerImageTags(Collection[str]):
     """Additional image tags to apply to built Docker images."""
