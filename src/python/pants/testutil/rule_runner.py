@@ -661,7 +661,7 @@ def run_rule_with_mocks(
     mock_gets: Sequence[MockGet | MockEffect] = (),
     mock_calls: Mapping[str, Callable] | None = None,
     union_membership: UnionMembership | None = None,
-    warn_on_calls_satisfied_by_gets: bool = True,
+    show_warnings: bool = True,
 ) -> _O:
     """A test helper that runs an @rule with a set of args and mocked underlying @rule invocations.
 
@@ -771,7 +771,10 @@ def run_rule_with_mocks(
             # point we should AssertionError error here as well.
             # Note that this fallthrough only works for single call-by-names. When wrapped in a
             # concurrently() call, mock_calls *must* be used, hence the error above.
-            if warn_on_calls_satisfied_by_gets:
+            if show_warnings:
+                # Note that we used `warnings` instead of `logger.warning` because the latter may
+                # get captured or swallowed by the test framework. These warnings will go away
+                # once we're fully on call-by-name, anyway.
                 warnings.warn(
                     f"No mock_call provided for {res.rule_id}, attempting to find a MockGet to "
                     "satisfy it. Note that this will soon be deprecated, so we recommend switching "
@@ -809,10 +812,13 @@ def run_rule_with_mocks(
     rule_input = None
 
     def warn_on_unconsumed_mocks():
-        if unconsumed_mock_calls:
-            warnings.warn(f"Unconsumed mock_calls: {unconsumed_mock_calls}")
-        if unconsumed_mock_gets:
-            warnings.warn(f"Unconsumed mock_gets: {unconsumed_mock_gets}")
+        # Note that we used `warnings` instead of `logger.warning` because the latter may
+        # get captured or swallowed by the test framework.
+        if show_warnings:
+            if unconsumed_mock_calls:
+                warnings.warn(f"Unconsumed mock_calls: {unconsumed_mock_calls}")
+            if unconsumed_mock_gets:
+                warnings.warn(f"Unconsumed mock_gets: {unconsumed_mock_gets}")
 
     while True:
         try:

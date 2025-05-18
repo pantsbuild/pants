@@ -185,6 +185,8 @@ def run_typecheck_rule(
                 ),
             ],
             union_membership=union_membership,
+            # We don't want temporary warnings to interfere with our expected output.
+            show_warnings=False,
         )
         assert not stdio_reader.get_stdout()
         return result.exit_code, stdio_reader.get_stderr()

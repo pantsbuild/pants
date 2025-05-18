@@ -327,11 +327,6 @@ def run_test_rule(
     ) -> TestDebugRequest:
         return TestDebugRequest(InteractiveProcess(["/bin/example"], input_digest=EMPTY_DIGEST))
 
-    def mock_debug_adapter_request(_: TestFieldSet) -> TestDebugAdapterRequest:
-        return TestDebugAdapterRequest(
-            InteractiveProcess(["/bin/example"], input_digest=EMPTY_DIGEST)
-        )
-
     def mock_coverage_report_generation(
         coverage_data_collection: MockCoverageDataCollection,
         _: EnvironmentName,
@@ -413,7 +408,8 @@ def run_test_rule(
                 ),
             ],
             union_membership=union_membership,
-            warn_on_calls_satisfied_by_gets=False,
+            # We don't want temporary warnings to interfere with our expected output.
+            show_warnings=False,
         )
         assert not stdio_reader.get_stdout()
         return result.exit_code, stdio_reader.get_stderr()
