@@ -413,7 +413,7 @@ def run_test_rule(
                 ),
             ],
             union_membership=union_membership,
-            warn_on_calls_satisfied_by_gets=False,  # So we don't contaminate the expected output.
+            warn_on_calls_satisfied_by_gets=False,
         )
         assert not stdio_reader.get_stdout()
         return result.exit_code, stdio_reader.get_stderr()

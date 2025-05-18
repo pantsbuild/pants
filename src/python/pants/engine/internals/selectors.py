@@ -78,6 +78,9 @@ class Call(PyGeneratorResponseCall):
         result = yield self
         return result
 
+    def __repr__(self) -> str:
+        return f"Call({self.rule_id}(...) -> {self.output_type.__name__})"
+
 
 # TODO: Conditional needed until Python 3.8 allows the subscripted type to be used directly.
 # see https://mypy.readthedocs.io/en/stable/runtime_troubles.html#using-classes-that-are-generic-in-stubs-but-not-at-runtime
