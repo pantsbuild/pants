@@ -6,9 +6,10 @@ from __future__ import annotations
 import logging
 import os
 from abc import ABCMeta
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from string import Template
+from typing import Any, Coroutine, Self
 
 from pants.core.util_rules import distdir
 from pants.core.util_rules.distdir import DistDir
@@ -17,7 +18,7 @@ from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, implicitly, rule
 from pants.engine.target import (
     AllTargets,
     AsyncFieldMixin,
@@ -47,6 +48,13 @@ logger = logging.getLogger(__name__)
 @union(in_scope_types=[EnvironmentName])
 class PackageFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary to build an asset from a target."""
+
+    @classmethod
+    def to_built_package_rule(cls) -> Callable[..., Coroutine[Any, Any, BuiltPackage]]:
+        raise NotImplementedError(
+            "A subclass must implement this method to return the @rule that converts instances "
+            "of that subclass to a BuiltPackage instance."
+        )
 
 
 @dataclass(frozen=True)
@@ -143,9 +151,17 @@ async def environment_aware_package(request: EnvironmentAwarePackageRequest) -> 
         EnvironmentNameRequest,
         EnvironmentNameRequest.from_field_set(request.field_set),
     )
-    package = await Get(
-        BuiltPackage, {request.field_set: PackageFieldSet, environment_name: EnvironmentName}
-    )
+    try:
+        call_or_get = request.field_set.to_built_package_rule()(
+            request.field_set, **implicitly({environment_name: EnvironmentName})
+        )
+        logger.info("XXXXXXXXXXXXXXXXXXXXXXXXXXXX USING CALL BY NAME")
+    except NotImplementedError:
+        call_or_get = Get(
+            BuiltPackage, {request.field_set: PackageFieldSet, environment_name: EnvironmentName}
+        )
+        logger.info("XXXXXXXXXXXXXXXXXXXXXXXXXXXX USING GET")
+    package = await call_or_get
     return package
 
 

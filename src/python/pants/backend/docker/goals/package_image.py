@@ -6,11 +6,11 @@ import json
 import logging
 import os
 import re
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import asdict, dataclass
 from functools import partial
 from itertools import chain
-from typing import Literal, cast
+from typing import Any, Coroutine, Literal, cast
 
 # Re-exporting BuiltDockerImage here, as it has its natural home here, but has moved out to resolve
 # a dependency cycle from docker_build_context.
@@ -82,6 +82,10 @@ class DockerPackageFieldSet(PackageFieldSet):
     tags: DockerImageTagsField
     target_stage: DockerImageTargetStageField
     output_path: OutputPathField
+
+    @classmethod
+    def to_built_package_rule(cls) -> Callable[..., Coroutine[Any, Any, BuiltPackage]]:
+        return build_docker_image
 
     def format_tag(self, tag: str, interpolation_context: InterpolationContext) -> str:
         source = InterpolationContext.TextSource(
