@@ -652,7 +652,7 @@ fn replaces_groups() {
         "#internal/*.js".to_string(),
         vec!["./src/internal/*.js".to_string()],
     );
-    let imports = imports_from_patterns("dir", &patterns, &"#internal/z.js");
+    let imports = imports_from_patterns("dir", &patterns, "#internal/z.js");
 
     assert_eq!(
         imports,
@@ -673,7 +673,7 @@ fn longest_prefix_wins() {
         vec!["./src/things/*.js".to_string()],
     );
 
-    let imports = imports_from_patterns("dir", &patterns, &"#internal/stuff/index.js");
+    let imports = imports_from_patterns("dir", &patterns, "#internal/stuff/index.js");
 
     assert_eq!(
         imports,

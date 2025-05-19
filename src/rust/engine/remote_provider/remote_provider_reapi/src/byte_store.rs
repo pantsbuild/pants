@@ -514,7 +514,7 @@ mod tests {
         // NOTE[TSolberg]: This test is a bit of a hack, but it's the best way I could think of to
         // ensure that the size of the FindMissingBlobsRequest is roughly what we expect. The only
         // delta would be the encoding of the instance name.
-        for it in (0..10).into_iter().chain(1000..1010).chain(10000..10010) {
+        for it in (0..10).chain(1000..1010).chain(10000..10010) {
             while blobs.len() < it {
                 blobs.push(TestData::roland().digest().into());
             }

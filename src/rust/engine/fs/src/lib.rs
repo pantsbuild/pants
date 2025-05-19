@@ -428,12 +428,7 @@ impl PosixFS {
         self.executor
             .spawn_blocking(
                 move || vfs.scandir_sync(&dir_relative_to_root),
-                |e| {
-                    Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        format!("Synchronous scandir failed: {e}"),
-                    ))
-                },
+                |e| Err(io::Error::other(format!("Synchronous scandir failed: {e}"))),
             )
             .await
     }
@@ -657,7 +652,7 @@ impl Vfs<io::Error> for Arc<PosixFS> {
     }
 
     fn mk_error(msg: &str) -> io::Error {
-        io::Error::new(io::ErrorKind::Other, msg)
+        io::Error::other(msg)
     }
 }
 

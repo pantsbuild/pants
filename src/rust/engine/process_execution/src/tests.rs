@@ -198,7 +198,7 @@ async fn wrapper_script_supports_append_only_caches() {
         .unwrap();
 
     let mut cmd = tokio::process::Command::new("./wrapper");
-    cmd.args(&["/bin/sh", "-c", "echo xyzzy > file.txt"]);
+    cmd.args(["/bin/sh", "-c", "echo xyzzy > file.txt"]);
     cmd.current_dir(dummy_sandbox_path.path());
     cmd.stdin(Stdio::null());
     cmd.stdout(Stdio::piped());
@@ -259,7 +259,7 @@ async fn wrapper_script_supports_sandbox_root_replacements_in_args() {
         .unwrap();
 
     let mut cmd = tokio::process::Command::new("./wrapper");
-    cmd.args(&[
+    cmd.args([
         "/bin/sh",
         "-c",
         "echo xyzzy > foo.txt && echo __ROOT__/foo.txt",
@@ -309,7 +309,7 @@ async fn wrapper_script_supports_sandbox_root_replacements_in_environmenbt() {
         .unwrap();
 
     let mut cmd = tokio::process::Command::new("./wrapper");
-    cmd.args(&[
+    cmd.args([
         "/bin/sh",
         "-c",
         "echo xyzzy > $TEST_FILE_PATH && echo $TEST_FILE_PATH",
