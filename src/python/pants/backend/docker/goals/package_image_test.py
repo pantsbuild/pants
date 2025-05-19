@@ -7,9 +7,9 @@ import json
 import logging
 import os.path
 from collections import namedtuple
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from textwrap import dedent
-from typing import ContextManager, cast
+from typing import Any, ContextManager, Self, cast
 
 import pytest
 
@@ -115,7 +115,7 @@ def assert_build(
 ) -> None:
     class DockerImageTagsRequestPlugin(DockerImageTagsRequest):
         @classmethod
-        def image_tags_rule(cls):
+        def image_tags_rule(cls) -> Callable[[Self], Coroutine[Any, Any, DockerImageTags]]:
             return get_docker_image_tags
 
     tgt = rule_runner.get_target(address)

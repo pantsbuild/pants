@@ -6,9 +6,9 @@ from __future__ import annotations
 import os
 import re
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Coroutine, Iterator
 from dataclasses import dataclass
-from typing import ClassVar, cast, final
+from typing import Any, ClassVar, Self, cast, final
 
 from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
 from pants.backend.docker.subsystems.docker_options import DockerOptions
@@ -650,6 +650,10 @@ class DockerImageTarget(Target):
     )
 
 
+class DockerImageTags(Collection[str]):
+    """Additional image tags to apply to built Docker images."""
+
+
 @union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class DockerImageTagsRequest:
@@ -663,15 +667,11 @@ class DockerImageTagsRequest:
         return True
 
     @classmethod
-    def image_tags_rule(cls):
+    def image_tags_rule(cls) -> Callable[[Self], Coroutine[Any, Any, DockerImageTags]]:
         raise NotImplementedError(
             "A subclass must implement this method to return the @rule that converts instances "
             "of that subclass to a DockerImageTags instance."
         )
-
-
-class DockerImageTags(Collection[str]):
-    """Additional image tags to apply to built Docker images."""
 
 
 class AllDockerImageTargets(Targets):
