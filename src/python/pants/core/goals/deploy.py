@@ -11,25 +11,30 @@ from itertools import chain
 from typing import cast
 
 from pants.core.goals.package import PackageFieldSet
-from pants.core.goals.publish import PublishFieldSet, PublishProcesses, PublishProcessesRequest
+from pants.core.goals.publish import (
+    PublishFieldSet,
+    PublishProcesses,
+    PublishProcessesRequest,
+    package_for_publish,
+)
 from pants.engine.console import Console
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.intrinsics import run_interactive_process
+from pants.engine.internals.graph import find_valid_field_sets
+from pants.engine.internals.specs_rules import find_valid_field_sets_for_target_roots
+from pants.engine.intrinsics import execute_process, run_interactive_process
 from pants.engine.process import (
     FallibleProcessResult,
     InteractiveProcess,
     InteractiveProcessResult,
     Process,
 )
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.rules import Get, collect_rules, concurrently, goal_rule, implicitly, rule
 from pants.engine.target import (
     FieldSet,
-    FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     NoApplicableTargetsBehavior,
     Target,
-    TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
 )
 from pants.engine.unions import union
@@ -128,23 +133,27 @@ class _PublishProcessesForTargetRequest:
 async def publish_process_for_target(
     request: _PublishProcessesForTargetRequest,
 ) -> PublishProcesses:
-    package_field_sets, publish_field_sets = await MultiGet(
-        Get(FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, [request.target])),
-        Get(FieldSetsPerTarget, FieldSetsPerTargetRequest(PublishFieldSet, [request.target])),
+    package_field_sets, publish_field_sets = await concurrently(
+        find_valid_field_sets(
+            FieldSetsPerTargetRequest(PackageFieldSet, [request.target]), **implicitly()
+        ),
+        find_valid_field_sets(
+            FieldSetsPerTargetRequest(PublishFieldSet, [request.target]), **implicitly()
+        ),
     )
 
-    return await Get(
-        PublishProcesses,
+    return await package_for_publish(
         PublishProcessesRequest(
             package_field_sets=package_field_sets.field_sets,
             publish_field_sets=publish_field_sets.field_sets,
         ),
+        **implicitly(),
     )
 
 
 async def _all_publish_processes(targets: Iterable[Target]) -> PublishProcesses:
-    processes_per_target = await MultiGet(
-        Get(PublishProcesses, _PublishProcessesForTargetRequest(target)) for target in targets
+    processes_per_target = await concurrently(
+        publish_process_for_target(_PublishProcessesForTargetRequest(target)) for target in targets
     )
 
     return PublishProcesses(chain.from_iterable(processes_per_target))
@@ -208,16 +217,16 @@ async def run_deploy(
     deploy_subsystem: DeploySubsystem,
     local_environment: ChosenLocalEnvironmentName,
 ) -> Deploy:
-    target_roots_to_deploy_field_sets = await Get(
-        TargetRootsToFieldSets,
+    target_roots_to_deploy_field_sets = await find_valid_field_sets_for_target_roots(
         TargetRootsToFieldSetsRequest(
             DeployFieldSet,
             goal_description=f"the `{deploy_subsystem.name}` goal",
             no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
         ),
+        **implicitly(),
     )
 
-    deploy_processes = await MultiGet(
+    deploy_processes = await concurrently(
         Get(DeployProcess, DeployFieldSet, field_set)
         for field_set in target_roots_to_deploy_field_sets.field_sets
     )
@@ -246,10 +255,14 @@ async def run_deploy(
         ]
 
         # Publish all background deployments first
-        background_results = await MultiGet(
-            Get(
-                FallibleProcessResult,
-                {cast(Process, publish.process): Process, local_environment.val: EnvironmentName},
+        background_results = await concurrently(
+            execute_process(
+                **implicitly(
+                    {
+                        cast(Process, publish.process): Process,
+                        local_environment.val: EnvironmentName,
+                    }
+                )
             )
             for publish in background_publish_processes
         )
