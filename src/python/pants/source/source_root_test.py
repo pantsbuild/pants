@@ -48,13 +48,13 @@ def _find_root(
         return run_rule_with_mocks(
             get_optional_source_root,
             rule_args=[src_root_req, source_root_config],
+            mock_calls={"pants.engine.intrinsics.path_globs_to_paths": _mock_fs_check},
             mock_gets=[
                 MockGet(
                     output_type=OptionalSourceRoot,
                     input_types=(SourceRootRequest,),
                     mock=_do_find_root,
                 ),
-                MockGet(output_type=Paths, input_types=(PathGlobs,), mock=_mock_fs_check),
             ],
         )
 
@@ -228,14 +228,10 @@ def test_all_roots() -> None:
     output = run_rule_with_mocks(
         all_roots,
         rule_args=[source_root_config],
-        mock_gets=[
-            MockGet(output_type=Paths, input_types=(PathGlobs,), mock=provider_rule),
-            MockGet(
-                output_type=OptionalSourceRoot,
-                input_types=(SourceRootRequest,),
-                mock=source_root_mock_rule,
-            ),
-        ],
+        mock_calls={
+            "pants.engine.intrinsics.path_globs_to_paths": provider_rule,
+            "pants.source.source_root.get_optional_source_root": source_root_mock_rule,
+        },
     )
 
     assert {
@@ -266,14 +262,12 @@ def test_all_roots_with_root_at_buildroot() -> None:
     output = run_rule_with_mocks(
         all_roots,
         rule_args=[source_root_config],
-        mock_gets=[
-            MockGet(output_type=Paths, input_types=(PathGlobs,), mock=provider_rule),
-            MockGet(
-                output_type=OptionalSourceRoot,
-                input_types=(SourceRootRequest,),
-                mock=lambda req: OptionalSourceRoot(SourceRoot(".")),
+        mock_calls={
+            "pants.engine.intrinsics.path_globs_to_paths": provider_rule,
+            "pants.source.source_root.get_optional_source_root": lambda req: OptionalSourceRoot(
+                SourceRoot(".")
             ),
-        ],
+        },
     )
     assert {SourceRoot(".")} == set(output)
 
