@@ -54,6 +54,37 @@ class KubectlApply:
     context: str | None = None
 
 
+@rule
+async def kubectl_apply_process(
+    request: KubectlApply, platform: Platform, kubectl: Kubectl
+) -> Process:
+    tool_relpath = "__kubectl"
+    argv: tuple[str, ...] = (f"{tool_relpath}/kubectl",)
+
+    if request.context is not None:
+        argv += ("--context", request.context)
+
+    argv += ("apply", "-o", "yaml")
+
+    for path in request.paths:
+        argv += ("-f", path)
+
+    kubectl_tool = await download_external_tool(kubectl.get_request(platform))
+
+    immutable_input_digests = {
+        tool_relpath: kubectl_tool.digest,
+    }
+
+    return Process(
+        argv=argv,
+        input_digest=request.input_digest,
+        cache_scope=ProcessCacheScope.PER_SESSION,
+        description=f"Applying kubernetes config {request.paths}",
+        env=request.env,
+        immutable_input_digests=immutable_input_digests,
+    )
+
+
 @rule(desc="Run k8s deploy process", level=LogLevel.DEBUG)
 async def run_k8s_deploy(
     field_set: DeployK8sBundleFieldSet,
@@ -124,37 +155,6 @@ async def run_k8s_deploy(
         publish_dependencies=tuple(publish_targets),
         process=process,
         description=description,
-    )
-
-
-@rule
-async def kubectl_apply_process(
-    request: KubectlApply, platform: Platform, kubectl: Kubectl
-) -> Process:
-    tool_relpath = "__kubectl"
-    argv: tuple[str, ...] = (f"{tool_relpath}/kubectl",)
-
-    if request.context is not None:
-        argv += ("--context", request.context)
-
-    argv += ("apply", "-o", "yaml")
-
-    for path in request.paths:
-        argv += ("-f", path)
-
-    kubectl_tool = await download_external_tool(kubectl.get_request(platform))
-
-    immutable_input_digests = {
-        tool_relpath: kubectl_tool.digest,
-    }
-
-    return Process(
-        argv=argv,
-        input_digest=request.input_digest,
-        cache_scope=ProcessCacheScope.PER_SESSION,
-        description=f"Applying kubernetes config {request.paths}",
-        env=request.env,
-        immutable_input_digests=immutable_input_digests,
     )
 
 
