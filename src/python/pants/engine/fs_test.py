@@ -50,7 +50,8 @@ from pants.engine.fs import (
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.native_engine import PathMetadata, PathMetadataKind, PathNamespace
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import Get, goal_rule, rule
+from pants.engine.intrinsics import digest_to_snapshot
+from pants.engine.rules import goal_rule, implicitly, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import http_server, temporary_dir
@@ -1295,7 +1296,9 @@ def test_workspace_in_goal_rule() -> None:
     async def workspace_goal_rule(
         console: Console, workspace: Workspace, digest_request: DigestRequest
     ) -> WorkspaceGoal:
-        snapshot = await Get(Snapshot, CreateDigest, digest_request.create_digest)
+        snapshot = await digest_to_snapshot(
+            **implicitly({digest_request.create_digest: CreateDigest})
+        )
         workspace.write_digest(snapshot.digest)
         console.print_stdout(snapshot.files[0], end="")
         return WorkspaceGoal(exit_code=0)
