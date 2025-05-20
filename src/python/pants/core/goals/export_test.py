@@ -156,7 +156,6 @@ def run_export_rule(
                     mock=do_mock_export,
                 ),
                 rule_runner.do_not_use_mock(Digest, (MergeDigests,)),
-                rule_runner.do_not_use_mock(Digest, (AddPrefix,)),
                 rule_runner.do_not_use_mock(EnvironmentVars, (EnvironmentVarsRequest,)),
                 rule_runner.do_not_use_mock(KnownUserResolveNames, (KnownUserResolveNamesRequest,)),
                 rule_runner.do_not_use_mock(Digest, (CreateDigest,)),
