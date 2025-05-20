@@ -146,6 +146,9 @@ def run_export_rule(
                 DistDir(relpath=Path("dist")),
                 create_subsystem(ExportSubsystem, resolve=resolves, bin=binaries),
             ],
+            mock_calls={
+                "pants.engine.intrinsics.add_prefix": lambda *xs: rule_runner.request(Digest, xs),
+            },
             mock_gets=[
                 MockGet(
                     output_type=ExportResults,
