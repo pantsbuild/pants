@@ -20,8 +20,8 @@ from pants.engine.env_vars import (
 )
 from pants.engine.internals.session import SessionValues
 from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.process import Process, execute_process_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
 
@@ -73,14 +73,15 @@ async def complete_environment_vars(
         else:
             return session_values[CompleteEnvironmentVars]
 
-    env_process_result = await Get(
-        ProcessResult,
-        Process(
-            ["env", "-0"],
-            description=f"Extract environment variables from {description_of_env_source}",
-            level=LogLevel.DEBUG,
-            cache_scope=env_tgt.executable_search_path_cache_scope(),
-        ),
+    env_process_result = await execute_process_or_raise(
+        **implicitly(
+            Process(
+                ["env", "-0"],
+                description=f"Extract environment variables from {description_of_env_source}",
+                level=LogLevel.DEBUG,
+                cache_scope=env_tgt.executable_search_path_cache_scope(),
+            )
+        )
     )
     result = {}
     for line in env_process_result.stdout.decode("utf-8").rstrip().split("\0"):
@@ -106,7 +107,7 @@ def environment_vars_subset(
 
 @rule
 async def environment_path_variable() -> PathEnvironmentVariable:
-    env = await Get(EnvironmentVars, EnvironmentVarsRequest(("PATH",)))
+    env = await environment_vars_subset(EnvironmentVarsRequest(("PATH",)), **implicitly())
     path = env.get("PATH", None)
     return PathEnvironmentVariable(path.split(os.pathsep) if path else ())
 
