@@ -33,9 +33,9 @@ from pants.backend.helm.subsystems.post_renderer import SetupHelmPostRenderer
 from pants.backend.helm.target_types import HelmDeploymentFieldSet
 from pants.engine.addresses import Address, Addresses
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.internals.graph import resolve_targets
+from pants.engine.internals.graph import resolve_target, resolve_targets
 from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
-from pants.engine.target import WrappedTarget, WrappedTargetRequest
+from pants.engine.target import WrappedTargetRequest
 from pants.engine.unions import UnionMembership
 from pants.util.logging import LogLevel
 from pants.util.strutil import bullet_list, softwrap
@@ -57,8 +57,8 @@ class HelmDeploymentPostRendererRequest(EngineAwareParameter):
 async def _obtain_custom_image_tags(
     address: Address, union_membership: UnionMembership
 ) -> DockerImageTags:
-    wrapped_target = await Get(
-        WrappedTarget, WrappedTargetRequest(address, description_of_origin="<infallible>")
+    wrapped_target = await resolve_target(
+        WrappedTargetRequest(address, description_of_origin="<infallible>"), **implicitly()
     )
 
     image_tags_requests = union_membership.get(DockerImageTagsRequest)
