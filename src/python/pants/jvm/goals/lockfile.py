@@ -6,6 +6,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Coroutine, Mapping
 from dataclasses import dataclass
+from typing import Any
 
 from pants.core.goals.generate_lockfiles import (
     DEFAULT_TOOL_LOCKFILE,
@@ -151,7 +152,26 @@ async def validate_jvm_artifacts_for_resolve(
     )
 
 
-async def _plan_generate_lockfile(resolve, resolve_to_artifacts, tools) -> Get | Coroutine:
+@rule
+async def setup_lockfile_request_from_tool(
+    request: GenerateJvmLockfileFromTool,
+) -> GenerateJvmLockfile:
+    artifacts = await gather_coordinates_for_jvm_lockfile(
+        GatherJvmCoordinatesRequest(request.artifact_inputs, request.artifact_option_name)
+    )
+    return GenerateJvmLockfile(
+        artifacts=artifacts,
+        resolve_name=request.resolve_name,
+        lockfile_dest=(
+            request.lockfile if request.lockfile != DEFAULT_TOOL_LOCKFILE else DEFAULT_TOOL_LOCKFILE
+        ),
+        diff=False,
+    )
+
+
+async def _plan_generate_lockfile(
+    resolve, resolve_to_artifacts, tools
+) -> Coroutine[Any, Any, GenerateJvmLockfile]:
     """Generate a JVM lockfile request for each requested resolve.
 
     This step also allows other backends to validate the proposed set of artifact requirements for
@@ -169,9 +189,7 @@ async def _plan_generate_lockfile(resolve, resolve_to_artifacts, tools) -> Get |
         tool_cls: type[JvmToolBase] = tools[resolve]
         tool = await _construct_subsystem(tool_cls)
 
-        return Get(
-            GenerateJvmLockfile,
-            GenerateJvmLockfileFromTool,
+        return setup_lockfile_request_from_tool(
             GenerateJvmLockfileFromTool.create(tool),
         )
 
@@ -202,30 +220,13 @@ async def setup_user_lockfile_requests(
 
     tools = ExportableTool.filter_for_subclasses(union_membership, JvmToolBase)
 
-    gets: list[Get | Coroutine] = []
+    gets: list[Coroutine[Any, Any, GenerateJvmLockfile]] = []
     for resolve in requested:
         gets.append(await _plan_generate_lockfile(resolve, resolve_to_artifacts, tools))
 
     jvm_lockfile_requests = await concurrently(*gets)
 
     return UserGenerateLockfiles(jvm_lockfile_requests)
-
-
-@rule
-async def setup_lockfile_request_from_tool(
-    request: GenerateJvmLockfileFromTool,
-) -> GenerateJvmLockfile:
-    artifacts = await gather_coordinates_for_jvm_lockfile(
-        GatherJvmCoordinatesRequest(request.artifact_inputs, request.artifact_option_name)
-    )
-    return GenerateJvmLockfile(
-        artifacts=artifacts,
-        resolve_name=request.resolve_name,
-        lockfile_dest=(
-            request.lockfile if request.lockfile != DEFAULT_TOOL_LOCKFILE else DEFAULT_TOOL_LOCKFILE
-        ),
-        diff=False,
-    )
 
 
 def rules():
