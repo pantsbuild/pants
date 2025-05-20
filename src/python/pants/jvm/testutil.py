@@ -17,8 +17,9 @@ from pants.core.util_rules.system_binaries import UnzipBinary
 from pants.engine.addresses import Addresses
 from pants.engine.fs import CreateDigest, DigestContents, PathGlobs, RemovePrefix
 from pants.engine.internals.native_engine import Digest, Snapshot
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
+from pants.engine.intrinsics import digest_to_snapshot
+from pants.engine.process import Process, execute_process_or_raise
+from pants.engine.rules import QueryRule, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Targets
 from pants.jvm.classpath import Classpath
 from pants.jvm.compile import ClasspathEntry
@@ -63,26 +64,28 @@ async def render_classpath_entry(
     classpath_entry: ClasspathEntry, unzip_binary: UnzipBinary
 ) -> RenderedClasspath:
     dest_dir = "dest"
-    process_results = await MultiGet(
-        Get(
-            ProcessResult,
-            Process(
-                argv=[
-                    unzip_binary.path,
-                    "-d",
-                    dest_dir,
-                    filename,
-                ],
-                input_digest=classpath_entry.digest,
-                output_directories=(dest_dir,),
-                description=f"Extract {filename}",
-            ),
+    process_results = await concurrently(
+        execute_process_or_raise(
+            **implicitly(
+                Process(
+                    argv=[
+                        unzip_binary.path,
+                        "-d",
+                        dest_dir,
+                        filename,
+                    ],
+                    input_digest=classpath_entry.digest,
+                    output_directories=(dest_dir,),
+                    description=f"Extract {filename}",
+                ),
+            )
         )
         for filename in classpath_entry.filenames
     )
 
-    listing_snapshots = await MultiGet(
-        Get(Snapshot, RemovePrefix(pr.output_digest, dest_dir)) for pr in process_results
+    listing_snapshots = await concurrently(
+        digest_to_snapshot(**implicitly(RemovePrefix(pr.output_digest, dest_dir)))
+        for pr in process_results
     )
 
     return RenderedClasspath(
@@ -95,8 +98,8 @@ async def render_classpath_entry(
 
 @rule
 async def render_classpath(classpath: Classpath) -> RenderedClasspath:
-    rendered_classpaths = await MultiGet(
-        Get(RenderedClasspath, ClasspathEntry, cpe)
+    rendered_classpaths = await concurrently(
+        render_classpath_entry(cpe, **implicitly())
         for cpe in ClasspathEntry.closure(classpath.entries)
     )
     return RenderedClasspath({k: v for rc in rendered_classpaths for k, v in rc.content.items()})

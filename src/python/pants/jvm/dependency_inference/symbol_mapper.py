@@ -10,7 +10,7 @@ from typing import Any
 
 from pants.build_graph.address import Address
 from pants.engine.environment import EnvironmentName
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, concurrently, rule
 from pants.engine.unions import UnionMembership, union
 from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmTypeProvidingTargets,
@@ -84,7 +84,7 @@ async def merge_symbol_mappings(
     jvm: JvmSubsystem,
     third_party_mapping: ThirdPartySymbolMapping,
 ) -> SymbolMapping:
-    all_firstparty_mappings = await MultiGet(
+    all_firstparty_mappings = await concurrently(
         Get(
             SymbolMap,
             FirstPartyMappingRequest,
