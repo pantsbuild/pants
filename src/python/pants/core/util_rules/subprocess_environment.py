@@ -3,8 +3,9 @@
 
 from dataclasses import dataclass
 
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.env_vars import EnvironmentVarsRequest
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
@@ -51,8 +52,8 @@ async def get_subprocess_environment(
     subproc_env: SubprocessEnvironment.EnvironmentAware,
 ) -> SubprocessEnvironmentVars:
     return SubprocessEnvironmentVars(
-        await Get(
-            EnvironmentVars, EnvironmentVarsRequest(subproc_env.env_vars_to_pass_to_subprocesses)
+        await environment_vars_subset(
+            EnvironmentVarsRequest(subproc_env.env_vars_to_pass_to_subprocesses), **implicitly()
         )
     )
 
