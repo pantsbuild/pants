@@ -14,7 +14,7 @@ from pkg_resources import Requirement, WorkingSet
 from pkg_resources import working_set as global_working_set
 
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import PexRequest, VenvPexProcess, create_venv_pex
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.core.util_rules.environments import determine_bootstrap_environment
@@ -23,8 +23,8 @@ from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.environment import EnvironmentName
 from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import SessionValues
-from pants.engine.process import ProcessCacheScope, ProcessResult
-from pants.engine.rules import Get, QueryRule, collect_rules, rule
+from pants.engine.process import ProcessCacheScope, execute_process_or_raise
+from pants.engine.rules import QueryRule, collect_rules, implicitly, rule
 from pants.init.bootstrap_scheduler import BootstrapScheduler
 from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -75,16 +75,17 @@ async def resolve_plugins(
             sys.executable, ".".join(map(str, sys.version_info[:3])).encode("utf8")
         )
 
-    plugins_pex = await Get(
-        VenvPex,
-        PexRequest(
-            output_filename="pants_plugins.pex",
-            internal_only=True,
-            python=python,
-            requirements=requirements,
-            interpreter_constraints=request.interpreter_constraints or InterpreterConstraints(),
-            description=f"Resolving plugins: {', '.join(req_strings)}",
-        ),
+    plugins_pex = await create_venv_pex(
+        **implicitly(
+            PexRequest(
+                output_filename="pants_plugins.pex",
+                internal_only=True,
+                python=python,
+                requirements=requirements,
+                interpreter_constraints=request.interpreter_constraints or InterpreterConstraints(),
+                description=f"Resolving plugins: {', '.join(req_strings)}",
+            )
+        )
     )
 
     # NB: We run this Process per-restart because it (intentionally) leaks named cache
@@ -95,15 +96,16 @@ async def resolve_plugins(
         else ProcessCacheScope.PER_RESTART_SUCCESSFUL
     )
 
-    plugins_process_result = await Get(
-        ProcessResult,
-        VenvPexProcess(
-            plugins_pex,
-            argv=("-c", "import os, site; print(os.linesep.join(site.getsitepackages()))"),
-            description="Extracting plugin locations",
-            level=LogLevel.DEBUG,
-            cache_scope=cache_scope,
-        ),
+    plugins_process_result = await execute_process_or_raise(
+        **implicitly(
+            VenvPexProcess(
+                plugins_pex,
+                argv=("-c", "import os, site; print(os.linesep.join(site.getsitepackages()))"),
+                description="Extracting plugin locations",
+                level=LogLevel.DEBUG,
+                cache_scope=cache_scope,
+            )
+        )
     )
     return ResolvedPluginDistributions(plugins_process_result.stdout.decode().strip().split("\n"))
 
