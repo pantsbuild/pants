@@ -10,12 +10,11 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import cast
 
-from pex.bin.pex import build_pex
 from pkg_resources import Requirement, WorkingSet
 from pkg_resources import working_set as global_working_set
 
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import PexRequest, VenvPexProcess
+from pants.backend.python.util_rules.pex import PexRequest, VenvPexProcess, create_venv_pex
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.core.util_rules.environments import determine_bootstrap_environment
@@ -76,16 +75,17 @@ async def resolve_plugins(
             sys.executable, ".".join(map(str, sys.version_info[:3])).encode("utf8")
         )
 
-    plugins_pex = await build_pex(
-        PexRequest(
-            output_filename="pants_plugins.pex",
-            internal_only=True,
-            python=python,
-            requirements=requirements,
-            interpreter_constraints=request.interpreter_constraints or InterpreterConstraints(),
-            description=f"Resolving plugins: {', '.join(req_strings)}",
-        ),
-        **implicitly(),
+    plugins_pex = await create_venv_pex(
+        **implicitly(
+            PexRequest(
+                output_filename="pants_plugins.pex",
+                internal_only=True,
+                python=python,
+                requirements=requirements,
+                interpreter_constraints=request.interpreter_constraints or InterpreterConstraints(),
+                description=f"Resolving plugins: {', '.join(req_strings)}",
+            )
+        )
     )
 
     # NB: We run this Process per-restart because it (intentionally) leaks named cache
