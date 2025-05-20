@@ -6,11 +6,11 @@ import json
 import logging
 import os
 import re
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import asdict, dataclass
 from functools import partial
 from itertools import chain
-from typing import Literal, cast
+from typing import Any, Coroutine, Literal, cast
 
 # Re-exporting BuiltDockerImage here, as it has its natural home here, but has moved out to resolve
 # a dependency cycle from docker_build_context.
@@ -29,7 +29,6 @@ from pants.backend.docker.target_types import (
     DockerImageRegistriesField,
     DockerImageRepositoryField,
     DockerImageSourceField,
-    DockerImageTags,
     DockerImageTagsField,
     DockerImageTagsRequest,
     DockerImageTargetStageField,
@@ -46,7 +45,7 @@ from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.graph import resolve_target
 from pants.engine.intrinsics import create_digest, execute_process
 from pants.engine.process import ProcessExecutionFailure
-from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import InvalidFieldException, Target, WrappedTargetRequest
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import GlobalOptions, KeepSandboxes
@@ -83,6 +82,10 @@ class DockerPackageFieldSet(PackageFieldSet):
     tags: DockerImageTagsField
     target_stage: DockerImageTargetStageField
     output_path: OutputPathField
+
+    @classmethod
+    def to_built_package_rule(cls) -> Callable[..., Coroutine[Any, Any, BuiltPackage]]:
+        return build_docker_image
 
     def format_tag(self, tag: str, interpolation_context: InterpolationContext) -> str:
         source = InterpolationContext.TextSource(
@@ -409,7 +412,7 @@ async def build_docker_image(
 
     image_tags_requests = union_membership.get(DockerImageTagsRequest)
     additional_image_tags = await concurrently(
-        Get(DockerImageTags, DockerImageTagsRequest, image_tags_request_cls(wrapped_target.target))
+        image_tags_request_cls.image_tags_rule()(image_tags_request_cls(wrapped_target.target))
         for image_tags_request_cls in image_tags_requests
         if image_tags_request_cls.is_applicable(wrapped_target.target)
     )
