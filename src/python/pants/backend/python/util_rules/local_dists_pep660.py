@@ -11,7 +11,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import PythonProvidesField, PythonResolveField
 from pants.backend.python.util_rules import package_dists
 from pants.backend.python.util_rules.dists import BuildBackendError, DistBuildRequest
@@ -36,6 +35,7 @@ from pants.engine.fs import (
     RemovePrefix,
 )
 from pants.engine.internals.graph import resolve_target
+from pants.engine.internals.native_engine import Address
 from pants.engine.intrinsics import create_digest, digest_to_snapshot, merge_digests, remove_prefix
 from pants.engine.process import Process, fallible_to_exec_result_or_raise
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
@@ -245,14 +245,14 @@ class LocalDistPEP660Wheels:
 
 @rule
 async def isolate_local_dist_pep660_wheels(
-    dist_field_set: PythonDistributionFieldSet,
+    dist_target_address: Address,
     bash: BashBinary,
     unzip_binary: UnzipBinary,
     python_setup: PythonSetup,
     union_membership: UnionMembership,
 ) -> LocalDistPEP660Wheels:
     dist_build_request = await create_dist_build_request(
-        field_set=dist_field_set,
+        dist_target_address=dist_target_address,
         python_setup=python_setup,
         union_membership=union_membership,
         # editable wheel ignores build_wheel+build_sdist args
@@ -269,13 +269,13 @@ async def isolate_local_dist_pep660_wheels(
 
     if not wheels:
         tgt = await resolve_target(
-            WrappedTargetRequest(dist_field_set.address, description_of_origin="<infallible>"),
+            WrappedTargetRequest(dist_target_address, description_of_origin="<infallible>"),
             **implicitly(),
         )
         logger.warning(
             softwrap(
                 f"""
-                Encountered a dependency on the {tgt.target.alias} target at {dist_field_set.address},
+                Encountered a dependency on the {tgt.target.alias} target at {dist_target_address},
                 but this target does not produce a Python wheel artifact. Therefore this target's
                 code will be used directly from sources, without a distribution being built,
                 and any native extensions in it will not be built.
@@ -300,7 +300,7 @@ async def isolate_local_dist_pep660_wheels(
                 """,
                 ],
                 input_digest=wheels_snapshot.digest,
-                description=f"List contents of editable artifacts produced by {dist_field_set.address}",
+                description=f"List contents of editable artifacts produced by {dist_target_address}",
             )
         )
     )
@@ -406,8 +406,7 @@ async def build_editable_local_dists(
         return EditableLocalDists(None)
 
     local_dists_wheels = await concurrently(
-        isolate_local_dist_pep660_wheels(PythonDistributionFieldSet.create(target), **implicitly())
-        for target in resolve_dists
+        isolate_local_dist_pep660_wheels(target.address, **implicitly()) for target in resolve_dists
     )
 
     wheels: list[str] = []
