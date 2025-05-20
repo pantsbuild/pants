@@ -15,11 +15,9 @@ from pants.backend.python.subsystems.setup_py_generation import (
     FirstPartyDependencyVersionScheme,
     SetupPyGeneration,
 )
-from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import (
     PexBinary,
     PythonDistribution,
-    PythonProvidesField,
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
 )
@@ -1414,7 +1412,7 @@ def test_no_dist_type_selected() -> None:
             *python_sources.rules(),
             *target_types_rules.rules(),
             *SetupPyGeneration.rules(),
-            QueryRule(BuiltPackage, (PythonDistributionFieldSet,)),
+            QueryRule(BuiltPackage, (Address,)),
         ],
         target_types=[PythonDistribution],
         objects={"python_artifact": PythonArtifact},
@@ -1438,12 +1436,7 @@ def test_no_dist_type_selected() -> None:
         rule_runner.request(
             BuiltPackage,
             inputs=[
-                PythonDistributionFieldSet(
-                    address=address,
-                    provides=PythonProvidesField(
-                        PythonArtifact(name="aaa", version="2.2.2"), address
-                    ),
-                )
+                address,
             ],
         )
     assert 1 == len(exc_info.value.wrapped_exceptions)

@@ -18,7 +18,6 @@ from typing import Any, DefaultDict, cast
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setup_py_generation import SetupPyGeneration
-from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import (
     BuildBackendEnvVarsField,
     GenerateSetupField,
@@ -374,7 +373,7 @@ class DistBuildEnvironment:
 
 
 async def create_dist_build_request(
-    field_set: PythonDistributionFieldSet,
+    dist_target_address: Address,
     python_setup: PythonSetup,
     union_membership: UnionMembership,
     validate_wheel_sdist: bool = True,
@@ -386,7 +385,7 @@ async def create_dist_build_request(
     """
 
     transitive_targets = await transitive_targets_get(
-        TransitiveTargetsRequest([field_set.address]), **implicitly()
+        TransitiveTargetsRequest([dist_target_address]), **implicitly()
     )
     exported_target = ExportedTarget(transitive_targets.roots[0])
 
