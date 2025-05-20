@@ -27,16 +27,9 @@ from pants.core.goals.fix import rules as fix_rules
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules import source_files
 from pants.core.util_rules.partitions import PartitionerType
-from pants.engine.fs import (
-    EMPTY_SNAPSHOT,
-    CreateDigest,
-    Digest,
-    DigestContents,
-    FileContent,
-    Snapshot,
-)
-from pants.engine.intrinsics import digest_to_snapshot
-from pants.engine.rules import Get, QueryRule, collect_rules, implicitly, rule
+from pants.engine.fs import EMPTY_SNAPSHOT, CreateDigest, FileContent, Snapshot
+from pants.engine.intrinsics import digest_to_snapshot, get_digest_contents
+from pants.engine.rules import QueryRule, collect_rules, implicitly, rule
 from pants.engine.target import (
     FieldSet,
     MultipleSourcesField,
@@ -242,12 +235,12 @@ async def fix_with_bricky(request: BrickyBuildFileFixer.Batch) -> FixResult:
         return "".join(new_lines).encode()
 
     snapshot = request.snapshot
-    digest_contents = await Get(DigestContents, Digest, snapshot.digest)
+    digest_contents = await get_digest_contents(snapshot.digest)
     new_contents = [
         dataclasses.replace(file_content, content=brickify(file_content.content))
         for file_content in digest_contents
     ]
-    output_snapshot = await Get(Snapshot, CreateDigest(new_contents))
+    output_snapshot = await digest_to_snapshot(**implicitly(CreateDigest(new_contents)))
 
     return FixResult(
         input=snapshot,
