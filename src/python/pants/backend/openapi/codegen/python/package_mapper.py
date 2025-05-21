@@ -7,7 +7,10 @@ from collections import defaultdict
 from pathlib import PurePath
 from typing import DefaultDict
 
-from pants.backend.openapi.codegen.python.generate import GeneratePythonFromOpenAPIRequest
+from pants.backend.openapi.codegen.python.generate import (
+    GeneratePythonFromOpenAPIRequest,
+    generate_python_from_openapi,
+)
 from pants.backend.openapi.target_types import AllOpenApiDocumentTargets, OpenApiDocumentField
 from pants.backend.python.dependency_inference.module_mapper import (
     FirstPartyPythonMappingImpl,
@@ -19,10 +22,11 @@ from pants.backend.python.dependency_inference.module_mapper import (
 )
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonResolveField
-from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
+from pants.core.util_rules.stripped_source_files import StrippedFileNameRequest, strip_file_name
+from pants.engine.internals.graph import hydrate_sources
+from pants.engine.internals.selectors import concurrently
+from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.target import HydrateSourcesRequest
 from pants.engine.unions import UnionRule
 
 logger = logging.getLogger(__name__)
@@ -38,17 +42,17 @@ async def map_openapi_documents_to_python_modules(
     python_setup: PythonSetup,
     _: PythonOpenApiMappingMarker,
 ) -> FirstPartyPythonMappingImpl:
-    hydrated_sources = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(target[OpenApiDocumentField]))
+    hydrated_sources = await concurrently(
+        hydrate_sources(HydrateSourcesRequest(target[OpenApiDocumentField]), **implicitly())
         for target in all_openapi_document_targets
     )
-    generated_sources = await MultiGet(
-        Get(GeneratedSources, GeneratePythonFromOpenAPIRequest(sources.snapshot, target))
+    generated_sources = await concurrently(
+        generate_python_from_openapi(GeneratePythonFromOpenAPIRequest(sources.snapshot, target))
         for (target, sources) in zip(all_openapi_document_targets, hydrated_sources)
     )
-    stripped_file_per_target_sources = await MultiGet(
-        MultiGet(
-            Get(StrippedFileName, StrippedFileNameRequest(file)) for file in sources.snapshot.files
+    stripped_file_per_target_sources = await concurrently(
+        concurrently(
+            strip_file_name(StrippedFileNameRequest(file)) for file in sources.snapshot.files
         )
         for sources in generated_sources
     )

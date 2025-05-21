@@ -8,18 +8,20 @@ from dataclasses import dataclass
 from typing import TypeVar
 
 from pants.bsp.protocol import BSPHandlerMapping
-from pants.bsp.spec.base import BuildTargetIdentifier
 from pants.bsp.spec.resources import ResourcesItem, ResourcesParams, ResourcesResult
 from pants.bsp.util_rules.targets import (
     BSPBuildTargetInternal,
     BSPResourcesRequest,
     BSPResourcesResult,
+    resolve_bsp_build_target_addresses,
+    resolve_bsp_build_target_identifier,
 )
 from pants.engine.fs import Workspace
-from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import _uncacheable_rule, collect_rules, rule
-from pants.engine.target import FieldSet, Targets
+from pants.engine.internals.native_engine import EMPTY_DIGEST, MergeDigests
+from pants.engine.internals.selectors import Get, concurrently
+from pants.engine.intrinsics import merge_digests
+from pants.engine.rules import _uncacheable_rule, collect_rules, implicitly, rule
+from pants.engine.target import FieldSet
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -44,7 +46,7 @@ async def resources_bsp_target(
     request: ResourcesForOneBSPTargetRequest,
     union_membership: UnionMembership,
 ) -> BSPResourcesResult:
-    targets = await Get(Targets, BSPBuildTargetInternal, request.bsp_target)
+    targets = await resolve_bsp_build_target_addresses(request.bsp_target, **implicitly())
     resources_request_types: FrozenOrderedSet[type[BSPResourcesRequest]] = union_membership.get(
         BSPResourcesRequest
     )
@@ -56,7 +58,7 @@ async def resources_bsp_target(
                 field_set = field_set_type.create(target)
                 field_sets_by_request_type[resources_request_type].add(field_set)
 
-    resources_results = await MultiGet(
+    resources_results = await concurrently(
         Get(
             BSPResourcesResult,
             BSPResourcesRequest,
@@ -67,7 +69,9 @@ async def resources_bsp_target(
 
     resources = tuple(sorted({resource for rr in resources_results for resource in rr.resources}))
 
-    output_digest = await Get(Digest, MergeDigests([rr.output_digest for rr in resources_results]))
+    output_digest = await merge_digests(
+        MergeDigests([rr.output_digest for rr in resources_results])
+    )
 
     return BSPResourcesResult(
         resources=resources,
@@ -80,24 +84,24 @@ async def bsp_resources_request(
     request: ResourcesParams,
     workspace: Workspace,
 ) -> ResourcesResult:
-    bsp_targets = await MultiGet(
-        Get(BSPBuildTargetInternal, BuildTargetIdentifier, bsp_target_id)
+    bsp_targets = await concurrently(
+        resolve_bsp_build_target_identifier(bsp_target_id, **implicitly())
         for bsp_target_id in request.targets
     )
 
-    resources_results = await MultiGet(
-        Get(
-            BSPResourcesResult,
+    resources_results = await concurrently(
+        resources_bsp_target(
             ResourcesForOneBSPTargetRequest(
                 bsp_target=bsp_target,
             ),
+            **implicitly(),
         )
         for bsp_target in bsp_targets
     )
 
     # TODO: Need to determine how resources are expected to be exposed. Directories? Individual files?
     # Initially, it looks like loose directories.
-    output_digest = await Get(Digest, MergeDigests([r.output_digest for r in resources_results]))
+    output_digest = await merge_digests(MergeDigests([r.output_digest for r in resources_results]))
     if output_digest != EMPTY_DIGEST:
         workspace.write_digest(output_digest, path_prefix=".pants.d/bsp")
 

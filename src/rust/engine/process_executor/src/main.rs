@@ -254,6 +254,8 @@ async fn main() -> Result<(), String> {
         }
         None => Box::new(process_execution::local::CommandRunner::new(
             store.clone(),
+            // This process is single-threaded and so doesn't suffer from the issues the sandboxer solves.
+            None,
             executor,
             workdir.clone(),
             NamedCaches::new_local(

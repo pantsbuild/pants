@@ -12,8 +12,9 @@ from typing import Any
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.core.goals.lint import LintFilesRequest, LintResult, Partitions
-from pants.engine.fs import DigestContents, PathGlobs
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.fs import PathGlobs
+from pants.engine.intrinsics import get_digest_contents
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.option.option_types import DictOption, EnumOption, SkipOption
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
@@ -291,8 +292,8 @@ async def lint_with_regex_patterns(
         assert content_pattern_names and encoding
         file_to_content_pattern_names_and_encoding[fp] = (content_pattern_names, encoding)
 
-    digest_contents = await Get(
-        DigestContents, PathGlobs(globs=file_to_content_pattern_names_and_encoding.keys())
+    digest_contents = await get_digest_contents(
+        **implicitly(PathGlobs(globs=file_to_content_pattern_names_and_encoding.keys()))
     )
 
     result = []

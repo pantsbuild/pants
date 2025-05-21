@@ -6,7 +6,11 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import TypeVar
 
+from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.goal import GoalSubsystem
+from pants.engine.unions import UnionMembership
+from pants.init.options_initializer import OptionsInitializer
+from pants.option.global_options import DynamicRemoteOptions
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.ranked_value import Rank, RankedValue, Value
@@ -21,6 +25,39 @@ def create_options_bootstrapper(
         env=env or {},
         allow_pantsrc=False,
     )
+
+
+def create_dynamic_remote_options(
+    *,
+    initial_headers: dict[str, str] | None = None,
+    address: str | None = "grpc://fake.url:10",
+    token_path: str | None = None,
+    plugin: str | None = None,
+) -> DynamicRemoteOptions:
+    from pants.testutil import rule_runner
+
+    if initial_headers is None:
+        initial_headers = {}
+    args = [
+        "--remote-cache-read",
+        f"--remote-execution-address={address}",
+        f"--remote-store-address={address}",
+        f"--remote-store-headers={initial_headers}",
+        f"--remote-execution-headers={initial_headers}",
+        "--remote-instance-name=main",
+    ]
+    if token_path:
+        args.append(f"--remote-oauth-bearer-token=@{token_path}")
+    if plugin:
+        args.append(f"--backend-packages={plugin}")
+    ob = create_options_bootstrapper(args)
+    env = CompleteEnvironmentVars({})
+    oi = OptionsInitializer(ob, rule_runner.EXECUTOR)
+    _build_config = oi.build_config(ob, env)
+    options = oi.options(ob, env, _build_config, union_membership=UnionMembership({}), raise_=False)
+    return DynamicRemoteOptions.from_options(
+        options, env, remote_auth_plugin_func=_build_config.remote_auth_plugin_func
+    )[0]
 
 
 def create_option_value_container(

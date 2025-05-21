@@ -267,4 +267,11 @@ impl StubCAS {
     pub fn contains(&self, fingerprint: Fingerprint) -> bool {
         self.blobs.lock().contains_key(&fingerprint)
     }
+
+    pub fn contains_action_result(&self, fingerprint: Fingerprint) -> bool {
+        self.action_cache
+            .action_map
+            .lock()
+            .contains_key(&fingerprint)
+    }
 }

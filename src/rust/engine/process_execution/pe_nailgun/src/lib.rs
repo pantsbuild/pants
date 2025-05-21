@@ -11,6 +11,7 @@ use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt};
 use log::{debug, trace};
 use nails::execution::{self, ChildInput, Command, child_channel};
+use sandboxer::Sandboxer;
 use store::{ImmutableInputs, Store};
 use task_executor::Executor;
 use tokio::net::TcpStream;
@@ -92,6 +93,7 @@ fn construct_nailgun_client_request(
 pub struct CommandRunner {
     nailgun_pool: NailgunPool,
     store: Store,
+    sandboxer: Option<Sandboxer>,
     executor: Executor,
     named_caches: NamedCaches,
     immutable_inputs: ImmutableInputs,
@@ -101,6 +103,7 @@ impl CommandRunner {
     pub fn new(
         workdir_base: PathBuf,
         store: Store,
+        sandboxer: Option<Sandboxer>,
         executor: Executor,
         named_caches: NamedCaches,
         immutable_inputs: ImmutableInputs,
@@ -114,6 +117,7 @@ impl CommandRunner {
                 executor.clone(),
             ),
             store,
+            sandboxer,
             executor,
             named_caches,
             immutable_inputs,
@@ -193,6 +197,7 @@ impl process_execution::CommandRunner for CommandRunner {
                     &client_req,
                     client_req.input_digests.inputs.clone(),
                     &self.store,
+                    self.sandboxer.as_ref(),
                     &self.named_caches,
                     &self.immutable_inputs,
                     None,

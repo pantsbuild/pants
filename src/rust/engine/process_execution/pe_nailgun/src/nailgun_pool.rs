@@ -375,6 +375,10 @@ impl NailgunProcess {
             &startup_options,
             startup_options.input_digests.inputs.clone(),
             store,
+            // We don't need a sandboxer when spawning a nailgun, since the executable
+            // is a JVM and a well-known location outside the sandbox, and not some binary
+            // we wrote out in some thread of this process.
+            None,
             named_caches,
             immutable_inputs,
             None,
