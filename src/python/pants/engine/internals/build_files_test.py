@@ -1249,7 +1249,7 @@ def test_build_file_syntax_error(filename, contents, expect_failure, expected_me
 def test_build_file_duplicate_declared_names() -> None:
     rule_runner = RuleRunner(
         rules=[QueryRule(AddressFamily, [AddressFamilyDir])],
-        target_types=[MockTgt, MockGeneratedTarget, MockTargetGenerator],
+        target_types=[MockTgt],
     )
     rule_runner.write_files(
         {
@@ -1268,6 +1268,7 @@ def test_build_file_duplicate_declared_names() -> None:
         },
     )
     with pytest.raises(
-        ExecutionError, match="The target name `foo` was defined in multiple BUILD files"
+        ExecutionError,
+        match="A target already exists at `src/BUILD.bar` with name `foo` and target type `mock_tgt`",
     ):
         _ = rule_runner.request(AddressFamily, [AddressFamilyDir("src")])

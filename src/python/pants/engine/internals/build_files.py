@@ -13,7 +13,6 @@ import typing
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
-from io import StringIO
 from pathlib import PurePath
 from typing import Any, cast
 
@@ -407,26 +406,18 @@ async def parse_address_family(
                 apply_defaults(target),
             )
 
-    # Ensure that there are not multiple targets with the same name in this namespace.
-    declared_target_name_to_paths: dict[str, set[str]] = defaultdict(set)
-    for declared_address_map in declared_address_maps:
-        for name in declared_address_map.name_to_target_adaptor.keys():
-            declared_target_name_to_paths[name].add(declared_address_map.path)
-
-    for name, paths in declared_target_name_to_paths.items():
-        if len(paths) > 1:
-            msg = StringIO()
-            namespace_dir = os.path.dirname(next(iter(paths)))
-            msg.write(
-                f"The target name `{name}` was defined in multiple BUILD files in directory `{namespace_dir}`:\n\n"
-            )
-            for path in paths:
-                msg.write(f"  - {path}\n")
-            raise DuplicateNameError(msg.getvalue())
-
     name_to_path_and_declared_target: dict[str, tuple[str, TargetAdaptor]] = {}
     for declared_address_map in declared_address_maps:
         for name, target in declared_address_map.name_to_target_adaptor.items():
+            if name in name_to_path_and_declared_target:
+                # This is a duplicate declared name, raise an exception.
+                duplicate_path = name_to_path_and_declared_target[name][0]
+                raise DuplicateNameError(
+                    f"A target already exists at `{duplicate_path}` with name `{name}` and target type "
+                    f"`{target.type_alias}`. The `{name}` target in `{declared_address_map.path}` "
+                    "cannot use the same name."
+                )
+
             name_to_path_and_declared_target[name] = (declared_address_map.path, target)
 
     # We copy the dict so we can modify the original in the loop.
