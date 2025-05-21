@@ -19,10 +19,10 @@ from pants.backend.python.target_types import (
     PythonTestsXdistConcurrencyField,
     SkipPythonTestsField,
 )
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.resolves import ExportableTool
 from pants.core.goals.test import RuntimePackageDependenciesField, TestFieldSet
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.rules import collect_rules
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule

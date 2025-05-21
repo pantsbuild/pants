@@ -17,6 +17,7 @@ from pants.backend.shell.util_rules.shell_command import (
     ShellCommandProcessFromTargetRequest,
     prepare_process_request_from_target,
 )
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.test import (
     TestDebugRequest,
     TestExtraEnv,
@@ -32,7 +33,6 @@ from pants.core.util_rules.adhoc_process_support import (
 )
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
 from pants.core.util_rules.adhoc_process_support import run_prepared_adhoc_process
-from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.fs import EMPTY_DIGEST, Snapshot
 from pants.engine.internals.graph import resolve_target
 from pants.engine.intrinsics import digest_to_snapshot

@@ -7,8 +7,8 @@ from enum import Enum
 from typing import ClassVar
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.util_rules.adhoc_process_support import PathEnvModifyMode
-from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP
 from pants.engine.fs import GlobExpansionConjunction
 from pants.engine.process import ProcessCacheScope

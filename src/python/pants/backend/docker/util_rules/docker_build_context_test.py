@@ -38,11 +38,11 @@ from pants.backend.python.target_types import PexBinary, PythonRequirementTarget
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.shell.target_types import ShellSourcesGeneratorTarget, ShellSourceTarget
 from pants.backend.shell.target_types import rules as shell_target_types_rules
+from pants.core.environments.target_types import DockerEnvironmentTarget
 from pants.core.goals import package
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import FilesGeneratorTarget, FileTarget
 from pants.core.target_types import rules as core_target_types_rules
-from pants.core.util_rules.environments import DockerEnvironmentTarget
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, EMPTY_SNAPSHOT, Snapshot
 from pants.engine.internals.scheduler import ExecutionError

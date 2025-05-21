@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from pants.core.util_rules.environments import LocalWorkspaceEnvironmentTarget
+from pants.core.environments.target_types import LocalWorkspaceEnvironmentTarget
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     EMPTY_DIGEST,

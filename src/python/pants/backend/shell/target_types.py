@@ -25,8 +25,8 @@ from pants.backend.adhoc.target_types import (
     AdhocToolWorkspaceInvalidationSourcesField,
 )
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.test import RuntimePackageDependenciesField, TestTimeoutField
-from pants.core.util_rules.environments import EnvironmentField
 from pants.core.util_rules.system_binaries import BinaryPathTest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (

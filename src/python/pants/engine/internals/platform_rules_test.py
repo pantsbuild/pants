@@ -9,11 +9,11 @@ from unittest.mock import Mock
 import pytest
 
 from pants.build_graph.address import Address
-from pants.core.util_rules.environments import (
+from pants.core.environments.subsystems import EnvironmentsSubsystem
+from pants.core.environments.target_types import (
     DockerEnvironmentTarget,
     DockerImageField,
     DockerPlatformField,
-    EnvironmentsSubsystem,
     EnvironmentTarget,
     LocalEnvironmentTarget,
     RemoteEnvironmentTarget,

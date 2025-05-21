@@ -22,8 +22,8 @@ from pants.backend.python.util_rules.faas import (
     build_python_faas,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
-from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel

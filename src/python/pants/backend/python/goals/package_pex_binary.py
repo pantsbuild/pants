@@ -34,6 +34,7 @@ from pants.backend.python.target_types import (
 from pants.backend.python.target_types_rules import resolve_pex_entry_point
 from pants.backend.python.util_rules.pex import create_pex, digest_complete_platforms
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,
@@ -41,7 +42,6 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior
-from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict

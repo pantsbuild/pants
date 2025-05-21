@@ -10,9 +10,9 @@ import sys
 from collections.abc import Collection
 from dataclasses import dataclass
 
+from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.util_rules import asdf, search_paths
 from pants.core.util_rules.asdf import AsdfPathString, AsdfToolPathsResult
-from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.search_paths import (
     ValidateSearchPathsRequest,
     VersionManagerSearchPathsRequest,

@@ -10,6 +10,7 @@ from pathlib import Path
 from _pytest.monkeypatch import MonkeyPatch
 
 from pants.base.build_root import BuildRoot
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.export import (
     Export,
     ExportRequest,
@@ -22,7 +23,6 @@ from pants.core.goals.export import (
 )
 from pants.core.goals.generate_lockfiles import KnownUserResolveNames, KnownUserResolveNamesRequest
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Workspace

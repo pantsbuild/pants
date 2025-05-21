@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import ClassVar
 
-from pants.core.util_rules.environments import EnvironmentTarget
+from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.util_rules.system_binaries import BashBinary, LnBinary
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileDigest, MergeDigests
 from pants.engine.intrinsics import create_digest, execute_process, merge_digests

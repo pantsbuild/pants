@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.util_rules import go_bootstrap
 from pants.backend.go.util_rules.go_bootstrap import GoBootstrap, compatible_go_version
-from pants.core.util_rules.environments import EnvironmentTarget
+from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.util_rules.system_binaries import (
     BinaryNotFoundError,
     BinaryPathRequest,
