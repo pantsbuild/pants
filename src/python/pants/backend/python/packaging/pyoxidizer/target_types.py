@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 from pants.backend.python.target_types import GenerateSetupField, WheelField
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.package import OutputPathField
-from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,

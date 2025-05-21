@@ -11,6 +11,7 @@ from typing import TypeVar
 import pytest
 
 from pants.base.build_environment import get_pants_cachedir
+from pants.core.environments.target_types import LocalEnvironmentTarget
 from pants.core.subsystems.python_bootstrap import (
     _ExpandInterpreterSearchPathsRequest,
     _get_pex_python_paths,
@@ -20,7 +21,7 @@ from pants.core.subsystems.python_bootstrap import (
 from pants.core.subsystems.python_bootstrap import rules as python_bootstrap_rules
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
-from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
+from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.search_paths import (
     VersionManagerSearchPaths,
     VersionManagerSearchPathsRequest,

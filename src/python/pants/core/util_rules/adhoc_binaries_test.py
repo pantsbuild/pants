@@ -6,16 +6,13 @@ import sys
 import pytest
 
 from pants.build_graph.address import Address
+from pants.core.environments.target_types import DockerEnvironmentTarget, LocalEnvironmentTarget
 from pants.core.util_rules import adhoc_binaries
 from pants.core.util_rules.adhoc_binaries import (
     _DownloadPythonBuildStandaloneBinaryRequest,
     _PythonBuildStandaloneBinary,
 )
-from pants.core.util_rules.environments import (
-    DockerEnvironmentTarget,
-    EnvironmentTarget,
-    LocalEnvironmentTarget,
-)
+from pants.core.util_rules.environments import EnvironmentTarget
 from pants.engine.environment import EnvironmentName
 from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 

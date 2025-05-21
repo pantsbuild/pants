@@ -10,27 +10,29 @@ from textwrap import dedent
 import pytest
 
 from pants.build_graph.address import Address, ResolveError
-from pants.core.util_rules import environments
-from pants.core.util_rules.environments import (
-    AllEnvironmentTargets,
-    AmbiguousEnvironmentError,
-    ChosenLocalEnvironmentName,
+from pants.core.environments.target_types import (
     CompatiblePlatformsField,
     DockerEnvironmentTarget,
     DockerImageField,
     DockerPlatformField,
     EnvironmentField,
+    FallbackEnvironmentField,
+    LocalEnvironmentTarget,
+    LocalWorkspaceEnvironmentTarget,
+    RemoteEnvironmentCacheBinaryDiscovery,
+    RemoteEnvironmentTarget,
+    RemoteExtraPlatformPropertiesField,
+)
+from pants.core.util_rules import environments
+from pants.core.util_rules.environments import (
+    AllEnvironmentTargets,
+    AmbiguousEnvironmentError,
+    ChosenLocalEnvironmentName,
     EnvironmentName,
     EnvironmentNameRequest,
     EnvironmentsSubsystem,
     EnvironmentTarget,
-    FallbackEnvironmentField,
-    LocalEnvironmentTarget,
-    LocalWorkspaceEnvironmentTarget,
     NoFallbackEnvironmentError,
-    RemoteEnvironmentCacheBinaryDiscovery,
-    RemoteEnvironmentTarget,
-    RemoteExtraPlatformPropertiesField,
     SingleEnvironmentNameRequest,
     UnrecognizedEnvironmentError,
     extract_process_config_from_environment,
