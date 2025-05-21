@@ -1244,3 +1244,31 @@ def test_build_file_syntax_error(filename, contents, expect_failure, expected_me
 
     else:
         BUILDFileEnvVarExtractor.get_env_vars(MockFileContent(filename, contents))
+
+
+def test_build_file_duplicate_declared_names() -> None:
+    rule_runner = RuleRunner(
+        rules=[QueryRule(AddressFamily, [AddressFamilyDir])],
+        target_types=[MockTgt],
+    )
+    rule_runner.write_files(
+        {
+            "src/BUILD.foo": dedent(
+                """\
+                # Define a target.
+                mock_tgt(name="foo")
+                """
+            ),
+            "src/BUILD.bar": dedent(
+                """\
+                # Define a target..
+                mock_tgt(name="foo")
+                """
+            ),
+        },
+    )
+    with pytest.raises(
+        ExecutionError,
+        match="A target already exists at `src/BUILD.bar` with name `foo` and target type `mock_tgt`",
+    ):
+        _ = rule_runner.request(AddressFamily, [AddressFamilyDir("src")])
