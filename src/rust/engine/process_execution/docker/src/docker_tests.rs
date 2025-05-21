@@ -211,7 +211,8 @@ trait DockerCommandTestRunner: Send + Sync {
         let docker_ref = docker.get().await?;
         // For the existing container tests, we want to ensure the container ID matches the one created by the command test runner
         // For missing/exited container tests, ensure that the container IDs do NOT match
-        self.assert_correct_container(docker_ref, &container_id);
+        self.assert_correct_container(docker_ref, &container_id)
+            .await;
         match docker_ref
             .inspect_container(&container_id, None)
             .await
