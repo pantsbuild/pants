@@ -424,12 +424,12 @@ async def setup_build_go_package_target_request(
             continue
 
         stdlib_build_request_gets.append(
-            Get(
-                FallibleBuildGoPackageRequest,
+            setup_build_go_package_target_request_for_stdlib(
                 BuildGoPackageRequestForStdlibRequest(
                     import_path=remaining_import,
                     build_opts=request.build_opts,
                 ),
+                **implicitly(),
             )
         )
 
@@ -460,14 +460,14 @@ async def setup_build_go_package_target_request(
         dep_import_path == base_import_path for dep_import_path in imports
     ):
         # TODO need to move setup_build_go_package_target_request_for_stdlib around to resolve circular dependency
-        maybe_base_pkg_dep = await Get(
-            FallibleBuildGoPackageRequest,
+        maybe_base_pkg_dep = await setup_build_go_package_target_request(
             BuildGoPackageTargetRequest(
                 request.address,
                 for_tests=True,
                 with_coverage=request.with_coverage,
                 build_opts=request.build_opts,
             ),
+            **implicitly(),
         )
         if maybe_base_pkg_dep.request is None:
             return dataclasses.replace(
