@@ -66,6 +66,23 @@ from pants.util.strutil import softwrap
 
 def test_parse_address_family_empty() -> None:
     """Test that parsing an empty BUILD file results in an empty AddressFamily."""
+
+    def mock_get_digest_contents(digest) -> DigestContents:
+        return DigestContents([FileContent(path="/dev/null/BUILD", content=b"")])
+
+    def mock_parse_address_family(directory: AddressFamilyDir) -> OptionalAddressFamily:
+        return OptionalAddressFamily("/dev")
+
+    def mock_get_synthetic_address_maps(
+        request: SyntheticAddressMapsRequest,
+    ) -> SyntheticAddressMaps:
+        return SyntheticAddressMaps()
+
+    def mock_environment_vars_subset(
+        request: EnvironmentVarsRequest, complete_env_vars: CompleteEnvironmentVars
+    ) -> EnvironmentVars:
+        return EnvironmentVars({})
+
     optional_af = run_rule_with_mocks(
         parse_address_family,
         rule_args=[
@@ -85,28 +102,12 @@ def test_parse_address_family_empty() -> None:
             MaybeBuildFileDependencyRulesImplementation(None),
             SessionValues({CompleteEnvironmentVars: CompleteEnvironmentVars({})}),
         ],
-        mock_gets=[
-            MockGet(
-                output_type=DigestContents,
-                input_types=(PathGlobs,),
-                mock=lambda _: DigestContents([FileContent(path="/dev/null/BUILD", content=b"")]),
-            ),
-            MockGet(
-                output_type=OptionalAddressFamily,
-                input_types=(AddressFamilyDir,),
-                mock=lambda _: OptionalAddressFamily("/dev"),
-            ),
-            MockGet(
-                output_type=SyntheticAddressMaps,
-                input_types=(SyntheticAddressMapsRequest,),
-                mock=lambda _: SyntheticAddressMaps(),
-            ),
-            MockGet(
-                output_type=EnvironmentVars,
-                input_types=(EnvironmentVarsRequest, CompleteEnvironmentVars),
-                mock=lambda _1, _2: EnvironmentVars({}),
-            ),
-        ],
+        mock_calls={
+            "pants.engine.intrinsics.get_digest_contents": mock_get_digest_contents,
+            "pants.engine.internals.build_files.parse_address_family": mock_parse_address_family,
+            "pants.engine.internals.synthetic_targets.get_synthetic_address_maps": mock_get_synthetic_address_maps,
+            "pants.engine.internals.platform_rules.environment_vars_subset": mock_environment_vars_subset,
+        },
     )
     assert optional_af.path == "/dev/null"
     assert optional_af.address_family is not None
