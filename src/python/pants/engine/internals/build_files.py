@@ -13,6 +13,7 @@ import typing
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
+from io import StringIO
 from pathlib import PurePath
 from typing import Any, cast
 
@@ -35,7 +36,7 @@ from pants.engine.internals.dep_rules import (
     DependencyRuleApplication,
     MaybeBuildFileDependencyRulesImplementation,
 )
-from pants.engine.internals.mapper import AddressFamily, AddressMap
+from pants.engine.internals.mapper import AddressFamily, AddressMap, DuplicateNameError
 from pants.engine.internals.parser import (
     BuildFilePreludeSymbols,
     BuildFileSymbolsInfo,
@@ -375,6 +376,7 @@ async def parse_address_family(
         )
         for fc, env_vars in zip(digest_contents, all_env_vars)
     ]
+    declared_address_maps.sort(key=lambda x: x.path)
 
     # Freeze defaults and dependency rules
     frozen_defaults = defaults_parser_state.get_frozen_defaults()
@@ -404,6 +406,23 @@ async def parse_address_family(
                 synthetic_address_map.path,
                 apply_defaults(target),
             )
+
+    # Ensure that there are not multiple targets with the same name in this namespace.
+    declared_target_name_to_paths: dict[str, set[str]] = defaultdict(set)
+    for declared_address_map in declared_address_maps:
+        for name in declared_address_map.name_to_target_adaptor.keys():
+            declared_target_name_to_paths[name].add(declared_address_map.path)
+
+    for name, paths in declared_target_name_to_paths.items():
+        if len(paths) > 1:
+            msg = StringIO()
+            namespace_dir = os.path.dirname(next(iter(paths)))
+            msg.write(
+                f"The target name `{name}` was defined in multiple BUILD files in directory `{namespace_dir}`:\n\n"
+            )
+            for path in paths:
+                msg.write(f"  - {path}\n")
+            raise DuplicateNameError(msg.getvalue())
 
     name_to_path_and_declared_target: dict[str, tuple[str, TargetAdaptor]] = {}
     for declared_address_map in declared_address_maps:

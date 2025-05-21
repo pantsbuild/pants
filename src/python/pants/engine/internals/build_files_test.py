@@ -1244,3 +1244,30 @@ def test_build_file_syntax_error(filename, contents, expect_failure, expected_me
 
     else:
         BUILDFileEnvVarExtractor.get_env_vars(MockFileContent(filename, contents))
+
+
+def test_build_file_duplicate_declared_names() -> None:
+    rule_runner = RuleRunner(
+        rules=[QueryRule(AddressFamily, [AddressFamilyDir])],
+        target_types=[MockTgt, MockGeneratedTarget, MockTargetGenerator],
+    )
+    rule_runner.write_files(
+        {
+            "src/BUILD.foo": dedent(
+                """\
+                # Define a target.
+                mock_tgt(name="foo")
+                """
+            ),
+            "src/BUILD.bar": dedent(
+                """\
+                # Define a target..
+                mock_tgt(name="foo")
+                """
+            ),
+        },
+    )
+    with pytest.raises(
+        ExecutionError, match="The target name `foo` was defined in multiple BUILD files"
+    ):
+        _ = rule_runner.request(AddressFamily, [AddressFamilyDir("src")])
