@@ -16,7 +16,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.target_types import GenericTarget, ResourceTarget
 from pants.engine.addresses import Address, AddressInput, BuildFileAddress
 from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import DigestContents, FileContent, PathGlobs
+from pants.engine.fs import Digest, DigestContents, FileContent, PathGlobs
 from pants.engine.internals.build_files import (
     AddressFamilyDir,
     BUILDFileEnvVarExtractor,
@@ -67,7 +67,7 @@ from pants.util.strutil import softwrap
 def test_parse_address_family_empty() -> None:
     """Test that parsing an empty BUILD file results in an empty AddressFamily."""
 
-    def mock_get_digest_contents(digest) -> DigestContents:
+    def mock_get_digest_contents(digest: Digest) -> DigestContents:
         return DigestContents([FileContent(path="/dev/null/BUILD", content=b"")])
 
     def mock_parse_address_family(directory: AddressFamilyDir) -> OptionalAddressFamily:

@@ -305,6 +305,19 @@ async def parse_address_family(
         ),
         get_synthetic_address_maps(SyntheticAddressMapsRequest(directory.path), **implicitly()),
     )
+
+    # digest_contents = await get_digest_contents(
+    #     **implicitly(
+    #         PathGlobs(
+    #             globs=(
+    #                 *(os.path.join(directory.path, p) for p in build_file_options.patterns),
+    #                 *(f"!{p}" for p in build_file_options.ignores),
+    #             )
+    #         )
+    #     )
+    # )
+    # all_synthetic_address_maps = await get_synthetic_address_maps(SyntheticAddressMapsRequest(directory.path), **implicitly())
+
     synthetic_address_maps = tuple(itertools.chain(all_synthetic_address_maps))
     if not digest_contents and not synthetic_address_maps:
         return OptionalAddressFamily(directory.path)
