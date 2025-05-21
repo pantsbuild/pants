@@ -10,12 +10,12 @@ import pytest
 from pants.core.environments.target_types import (
     DockerEnvironmentTarget,
     DockerImageField,
+    EnvironmentTarget,
     LocalEnvironmentTarget,
     RemoteEnvironmentTarget,
 )
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult, get_asdf_data_dir
-from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.testutil import fake_asdf_root, materialize_indices
 from pants.engine.addresses import Address
 from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars

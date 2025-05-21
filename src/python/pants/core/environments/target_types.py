@@ -3,8 +3,11 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from pants.engine.environment import LOCAL_ENVIRONMENT_MATCHER, LOCAL_WORKSPACE_ENVIRONMENT_MATCHER
 from pants.engine.platform import Platform
+from pants.engine.process import ProcessCacheScope
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
@@ -352,3 +355,73 @@ class RemoteEnvironmentTarget(Target):
         """
         # TODO(#17096) Add a link to the environments docs once they land.
     )
+
+
+@dataclass(frozen=True)
+class EnvironmentTarget:
+    name: str | None
+    val: Target | None
+
+    def executable_search_path_cache_scope(
+        self, *, cache_failures: bool = False
+    ) -> ProcessCacheScope:
+        """Whether it's safe to cache executable search path discovery or not.
+
+        If the environment may change on us, e.g. the user upgrades a binary, then it's not safe to
+        cache the discovery to disk. Technically, in that case, we should recheck the binary every
+        session (i.e. Pants run), but we instead settle for every Pantsd lifetime to have more
+        acceptable performance.
+
+        Meanwhile, when running with Docker, we already invalidate whenever the image changes
+        thanks to https://github.com/pantsbuild/pants/pull/17101.
+
+        Remote execution often is safe to cache, but depends on the remote execution server.
+        So, we rely on the user telling us what is safe.
+        """
+        caching_allowed = self.val and (
+            self.val.has_field(DockerImageField)
+            or (
+                self.val.has_field(RemoteEnvironmentCacheBinaryDiscovery)
+                and self.val[RemoteEnvironmentCacheBinaryDiscovery].value
+            )
+        )
+        if cache_failures:
+            return (
+                ProcessCacheScope.ALWAYS
+                if caching_allowed
+                else ProcessCacheScope.PER_RESTART_ALWAYS
+            )
+        return (
+            ProcessCacheScope.SUCCESSFUL
+            if caching_allowed
+            else ProcessCacheScope.PER_RESTART_SUCCESSFUL
+        )
+
+    def sandbox_base_path(self) -> str:
+        if self.val and self.val.has_field(LocalWorkspaceCompatiblePlatformsField):
+            return "{chroot}"
+        else:
+            return ""
+
+    @property
+    def default_cache_scope(self) -> ProcessCacheScope:
+        if self.val and self.val.has_field(LocalWorkspaceCompatiblePlatformsField):
+            return ProcessCacheScope.PER_SESSION
+        else:
+            return ProcessCacheScope.SUCCESSFUL
+
+    @property
+    def use_working_directory_as_base_for_output_captures(self) -> bool:
+        if self.val and self.val.has_field(LocalWorkspaceCompatiblePlatformsField):
+            return False
+        return True
+
+    @property
+    def can_access_local_system_paths(self) -> bool:
+        tgt = self.val
+        if not tgt:
+            return True
+
+        return tgt.has_field(LocalCompatiblePlatformsField) or tgt.has_field(
+            LocalWorkspaceCompatiblePlatformsField
+        )

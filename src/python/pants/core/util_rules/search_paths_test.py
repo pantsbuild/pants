@@ -12,12 +12,12 @@ from pants.build_graph.address import Address
 from pants.core.environments.target_types import (
     DockerEnvironmentTarget,
     DockerImageField,
+    EnvironmentTarget,
     LocalEnvironmentTarget,
     RemoteEnvironmentTarget,
 )
 from pants.core.util_rules import search_paths
 from pants.core.util_rules.asdf import AsdfPathString
-from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.search_paths import (
     ValidateSearchPathsRequest,
     VersionManagerSearchPaths,

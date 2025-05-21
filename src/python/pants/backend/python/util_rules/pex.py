@@ -53,8 +53,8 @@ from pants.backend.python.util_rules.pex_requirements import (
     validate_metadata,
 )
 from pants.build_graph.address import Address
+from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.target_types import FileSourceField, ResourceSourceField
-from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.stripped_source_files import StrippedFileNameRequest
 from pants.core.util_rules.stripped_source_files import rules as stripped_source_rules
 from pants.core.util_rules.stripped_source_files import strip_file_name

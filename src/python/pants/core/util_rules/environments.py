@@ -12,6 +12,7 @@ from itertools import groupby
 from typing import Any, ClassVar, cast
 
 from pants.build_graph.address import Address, AddressInput
+from pants.core.environments.subsystems import EnvironmentsSubsystem
 from pants.core.environments.target_types import (
     CompatiblePlatformsField,
     DockerEnvironmentTarget,
@@ -19,13 +20,13 @@ from pants.core.environments.target_types import (
     DockerImageField,
     DockerPlatformField,
     EnvironmentField,
+    EnvironmentTarget,
     FallbackEnvironmentField,
     LocalCompatiblePlatformsField,
     LocalEnvironmentTarget,
     LocalFallbackEnvironmentField,
     LocalWorkspaceCompatiblePlatformsField,
     LocalWorkspaceEnvironmentTarget,
-    RemoteEnvironmentCacheBinaryDiscovery,
     RemoteEnvironmentTarget,
     RemoteExtraPlatformPropertiesField,
     RemoteFallbackEnvironmentField,
@@ -46,7 +47,6 @@ from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.intrinsics import docker_resolve_image
 from pants.engine.platform import Platform
-from pants.engine.process import ProcessCacheScope
 from pants.engine.rules import Get, QueryRule, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     Field,
@@ -61,49 +61,13 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.option import custom_types
 from pants.option.global_options import GlobalOptions, KeepSandboxes
-from pants.option.option_types import DictOption, OptionInfo, collect_options_info
+from pants.option.option_types import OptionInfo, collect_options_info
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized
-from pants.util.strutil import bullet_list, help_text, softwrap
+from pants.util.strutil import bullet_list, softwrap
 
 logger = logging.getLogger(__name__)
-
-
-class EnvironmentsSubsystem(Subsystem):
-    options_scope = "environments-preview"
-    help = help_text(
-        """
-        A highly experimental subsystem to allow setting environment variables and executable
-        search paths for different environments, e.g. macOS vs. Linux.
-        """
-    )
-
-    names = DictOption[str](
-        help=softwrap(
-            """
-            A mapping of logical names to addresses to environment targets. For example:
-
-                [environments-preview.names]
-                linux_local = "//:linux_env"
-                macos_local = "//:macos_env"
-                centos6 = "//:centos6_docker_env"
-                linux_ci = "build-support:linux_ci_env"
-                macos_ci = "build-support:macos_ci_env"
-
-            To use an environment for a given target, specify the name in the `environment` field
-            on that target. Pants will consume the environment target at the address mapped from
-            that name.
-
-            Pants will ignore any environment targets that are not given a name via this option.
-            """
-        )
-    )
-
-    def remote_execution_used_globally(self, global_options: GlobalOptions) -> bool:
-        """If the environments mechanism is not used, `--remote-execution` toggles remote execution
-        globally."""
-        return not self.names and global_options.remote_execution
 
 
 class DockerPlatformFieldDefaultFactoryRequest(FieldDefaultFactoryRequest):
@@ -202,76 +166,6 @@ class NoFallbackEnvironmentError(Exception):
 
 class AllEnvironmentTargets(FrozenDict[str, Target]):
     """A mapping of environment names to their corresponding environment target."""
-
-
-@dataclass(frozen=True)
-class EnvironmentTarget:
-    name: str | None
-    val: Target | None
-
-    def executable_search_path_cache_scope(
-        self, *, cache_failures: bool = False
-    ) -> ProcessCacheScope:
-        """Whether it's safe to cache executable search path discovery or not.
-
-        If the environment may change on us, e.g. the user upgrades a binary, then it's not safe to
-        cache the discovery to disk. Technically, in that case, we should recheck the binary every
-        session (i.e. Pants run), but we instead settle for every Pantsd lifetime to have more
-        acceptable performance.
-
-        Meanwhile, when running with Docker, we already invalidate whenever the image changes
-        thanks to https://github.com/pantsbuild/pants/pull/17101.
-
-        Remote execution often is safe to cache, but depends on the remote execution server.
-        So, we rely on the user telling us what is safe.
-        """
-        caching_allowed = self.val and (
-            self.val.has_field(DockerImageField)
-            or (
-                self.val.has_field(RemoteEnvironmentCacheBinaryDiscovery)
-                and self.val[RemoteEnvironmentCacheBinaryDiscovery].value
-            )
-        )
-        if cache_failures:
-            return (
-                ProcessCacheScope.ALWAYS
-                if caching_allowed
-                else ProcessCacheScope.PER_RESTART_ALWAYS
-            )
-        return (
-            ProcessCacheScope.SUCCESSFUL
-            if caching_allowed
-            else ProcessCacheScope.PER_RESTART_SUCCESSFUL
-        )
-
-    def sandbox_base_path(self) -> str:
-        if self.val and self.val.has_field(LocalWorkspaceCompatiblePlatformsField):
-            return "{chroot}"
-        else:
-            return ""
-
-    @property
-    def default_cache_scope(self) -> ProcessCacheScope:
-        if self.val and self.val.has_field(LocalWorkspaceCompatiblePlatformsField):
-            return ProcessCacheScope.PER_SESSION
-        else:
-            return ProcessCacheScope.SUCCESSFUL
-
-    @property
-    def use_working_directory_as_base_for_output_captures(self) -> bool:
-        if self.val and self.val.has_field(LocalWorkspaceCompatiblePlatformsField):
-            return False
-        return True
-
-    @property
-    def can_access_local_system_paths(self) -> bool:
-        tgt = self.val
-        if not tgt:
-            return True
-
-        return tgt.has_field(LocalCompatiblePlatformsField) or tgt.has_field(
-            LocalWorkspaceCompatiblePlatformsField
-        )
 
 
 def _compute_env_field(field_set: FieldSet) -> EnvironmentField:

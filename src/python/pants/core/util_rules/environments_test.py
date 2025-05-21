@@ -10,12 +10,14 @@ from textwrap import dedent
 import pytest
 
 from pants.build_graph.address import Address, ResolveError
+from pants.core.environments.subsystems import EnvironmentsSubsystem
 from pants.core.environments.target_types import (
     CompatiblePlatformsField,
     DockerEnvironmentTarget,
     DockerImageField,
     DockerPlatformField,
     EnvironmentField,
+    EnvironmentTarget,
     FallbackEnvironmentField,
     LocalEnvironmentTarget,
     LocalWorkspaceEnvironmentTarget,
@@ -30,8 +32,6 @@ from pants.core.util_rules.environments import (
     ChosenLocalEnvironmentName,
     EnvironmentName,
     EnvironmentNameRequest,
-    EnvironmentsSubsystem,
-    EnvironmentTarget,
     NoFallbackEnvironmentError,
     SingleEnvironmentNameRequest,
     UnrecognizedEnvironmentError,

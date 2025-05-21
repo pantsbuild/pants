@@ -16,8 +16,8 @@ from itertools import groupby
 from textwrap import dedent  # noqa: PNT20
 from typing import Self
 
+from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.subsystems import python_bootstrap
-from pants.core.util_rules.environments import EnvironmentTarget
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import CreateDigest, FileContent, PathMetadataRequest
