@@ -15,27 +15,29 @@ from pants.backend.shell.target_types import (
 )
 from pants.backend.shell.target_types import rules as target_types_rules
 from pants.backend.shell.util_rules import shell_command
+from pants.init.extension_api import ExtensionInitContextV0
 
 
-def target_types():
-    return [
-        ShellCommandTarget,
-        ShellCommandRunTarget,
-        ShellCommandTestTarget,
-        ShellSourcesGeneratorTarget,
-        Shunit2TestsGeneratorTarget,
-        ShellSourceTarget,
-        Shunit2TestTarget,
-    ]
-
-
-def rules():
-    return [
-        *dependency_inference.rules(),
-        *shell_command.rules(),
-        *shunit2.rules(),
-        *shunit2_test_runner.rules(),
-        *tailor.rules(),
-        *target_types_rules(),
-        *test.rules(),
-    ]
+def initializeV0(context: ExtensionInitContextV0) -> None:
+    context.register_target_types(
+        [
+            ShellCommandTarget,
+            ShellCommandRunTarget,
+            ShellCommandTestTarget,
+            ShellSourcesGeneratorTarget,
+            Shunit2TestsGeneratorTarget,
+            ShellSourceTarget,
+            Shunit2TestTarget,
+        ]
+    )
+    context.register_rules(
+        [
+            *dependency_inference.rules(),
+            *shell_command.rules(),
+            *shunit2.rules(),
+            *shunit2_test_runner.rules(),
+            *tailor.rules(),
+            *target_types_rules(),
+            *test.rules(),
+        ]
+    )
