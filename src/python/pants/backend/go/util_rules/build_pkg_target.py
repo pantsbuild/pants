@@ -111,6 +111,58 @@ class BuildGoPackageTargetRequest(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
+class _ResolveStdlibEmbedConfigRequest:
+    package: GoStdLibPackage
+
+
+@dataclass(frozen=True)
+class _ResolveStdlibEmbedConfigResult:
+    embed_config: EmbedConfig | None
+    stderr: str | None
+
+
+@rule
+async def resolve_go_stdlib_embed_config(
+    request: _ResolveStdlibEmbedConfigRequest,
+) -> _ResolveStdlibEmbedConfigResult:
+    patterns_json = json.dumps(
+        {
+            "EmbedPatterns": request.package.embed_patterns,
+            "TestEmbedPatterns": [],
+            "XTestEmbedPatterns": [],
+        }
+    ).encode("utf-8")
+
+    embedder, patterns_json_digest = await concurrently(
+        setup_go_binary(
+            LoadedGoBinaryRequest("embedcfg", ("main.go",), "./embedder"), **implicitly()
+        ),
+        create_digest(CreateDigest([FileContent("patterns.json", patterns_json)])),
+    )
+    input_digest = await merge_digests(MergeDigests((patterns_json_digest, embedder.digest)))
+    embed_result = await execute_process(
+        Process(
+            ("./embedder", "patterns.json", request.package.pkg_source_path),
+            input_digest=input_digest,
+            description=f"Create embed mapping for {request.package.import_path}",
+            level=LogLevel.DEBUG,
+        ),
+        **implicitly(),
+    )
+    if embed_result.exit_code != 0:
+        return _ResolveStdlibEmbedConfigResult(
+            embed_config=None,
+            stderr=embed_result.stderr.decode(),
+        )
+    metadata = json.loads(embed_result.stdout)
+    embed_config = EmbedConfig.from_json_dict(metadata.get("EmbedConfig", {}))
+    return _ResolveStdlibEmbedConfigResult(
+        embed_config=embed_config,
+        stderr=None,
+    )
+
+
+@dataclass(frozen=True)
 class BuildGoPackageRequestForStdlibRequest:
     import_path: str
     build_opts: GoBuildOptions
@@ -631,58 +683,6 @@ def _is_coverage_enabled_for_stdlib_package(import_path: str, build_opts: GoBuil
             return True
 
     return False
-
-
-@dataclass(frozen=True)
-class _ResolveStdlibEmbedConfigRequest:
-    package: GoStdLibPackage
-
-
-@dataclass(frozen=True)
-class _ResolveStdlibEmbedConfigResult:
-    embed_config: EmbedConfig | None
-    stderr: str | None
-
-
-@rule
-async def resolve_go_stdlib_embed_config(
-    request: _ResolveStdlibEmbedConfigRequest,
-) -> _ResolveStdlibEmbedConfigResult:
-    patterns_json = json.dumps(
-        {
-            "EmbedPatterns": request.package.embed_patterns,
-            "TestEmbedPatterns": [],
-            "XTestEmbedPatterns": [],
-        }
-    ).encode("utf-8")
-
-    embedder, patterns_json_digest = await concurrently(
-        setup_go_binary(
-            LoadedGoBinaryRequest("embedcfg", ("main.go",), "./embedder"), **implicitly()
-        ),
-        create_digest(CreateDigest([FileContent("patterns.json", patterns_json)])),
-    )
-    input_digest = await merge_digests(MergeDigests((patterns_json_digest, embedder.digest)))
-    embed_result = await execute_process(
-        Process(
-            ("./embedder", "patterns.json", request.package.pkg_source_path),
-            input_digest=input_digest,
-            description=f"Create embed mapping for {request.package.import_path}",
-            level=LogLevel.DEBUG,
-        ),
-        **implicitly(),
-    )
-    if embed_result.exit_code != 0:
-        return _ResolveStdlibEmbedConfigResult(
-            embed_config=None,
-            stderr=embed_result.stderr.decode(),
-        )
-    metadata = json.loads(embed_result.stdout)
-    embed_config = EmbedConfig.from_json_dict(metadata.get("EmbedConfig", {}))
-    return _ResolveStdlibEmbedConfigResult(
-        embed_config=embed_config,
-        stderr=None,
-    )
 
 
 def rules():
