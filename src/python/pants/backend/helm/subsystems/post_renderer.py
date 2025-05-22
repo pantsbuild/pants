@@ -30,11 +30,11 @@ from pants.core.util_rules.system_binaries import CatBinary
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import CreateDigest, Digest, FileContent
-from pants.engine.internals.graph import resolve_targets
+from pants.engine.internals.graph import find_valid_field_sets, resolve_targets
 from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.intrinsics import create_digest, merge_digests
 from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
-from pants.engine.target import FieldSetsPerTarget, FieldSetsPerTargetRequest
+from pants.engine.target import FieldSetsPerTargetRequest
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import bullet_list, pluralize, softwrap
@@ -168,8 +168,9 @@ async def _resolve_post_renderers(
     )
 
     targets = await resolve_targets(**implicitly({address_inputs: UnparsedAddressInputs}))
-    field_sets_per_target = await Get(
-        FieldSetsPerTarget, FieldSetsPerTargetRequest(RunFieldSet, targets)
+    field_sets_per_target = await find_valid_field_sets(
+        FieldSetsPerTargetRequest(RunFieldSet, targets),
+        **implicitly(),
     )
     return await concurrently(
         Get(RunRequest, RunFieldSet, field_set) for field_set in field_sets_per_target.field_sets

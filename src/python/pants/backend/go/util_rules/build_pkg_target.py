@@ -111,9 +111,151 @@ class BuildGoPackageTargetRequest(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
+class _ResolveStdlibEmbedConfigRequest:
+    package: GoStdLibPackage
+
+
+@dataclass(frozen=True)
+class _ResolveStdlibEmbedConfigResult:
+    embed_config: EmbedConfig | None
+    stderr: str | None
+
+
+@rule
+async def resolve_go_stdlib_embed_config(
+    request: _ResolveStdlibEmbedConfigRequest,
+) -> _ResolveStdlibEmbedConfigResult:
+    patterns_json = json.dumps(
+        {
+            "EmbedPatterns": request.package.embed_patterns,
+            "TestEmbedPatterns": [],
+            "XTestEmbedPatterns": [],
+        }
+    ).encode("utf-8")
+
+    embedder, patterns_json_digest = await concurrently(
+        setup_go_binary(
+            LoadedGoBinaryRequest("embedcfg", ("main.go",), "./embedder"), **implicitly()
+        ),
+        create_digest(CreateDigest([FileContent("patterns.json", patterns_json)])),
+    )
+    input_digest = await merge_digests(MergeDigests((patterns_json_digest, embedder.digest)))
+    embed_result = await execute_process(
+        Process(
+            ("./embedder", "patterns.json", request.package.pkg_source_path),
+            input_digest=input_digest,
+            description=f"Create embed mapping for {request.package.import_path}",
+            level=LogLevel.DEBUG,
+        ),
+        **implicitly(),
+    )
+    if embed_result.exit_code != 0:
+        return _ResolveStdlibEmbedConfigResult(
+            embed_config=None,
+            stderr=embed_result.stderr.decode(),
+        )
+    metadata = json.loads(embed_result.stdout)
+    embed_config = EmbedConfig.from_json_dict(metadata.get("EmbedConfig", {}))
+    return _ResolveStdlibEmbedConfigResult(
+        embed_config=embed_config,
+        stderr=None,
+    )
+
+
+@dataclass(frozen=True)
 class BuildGoPackageRequestForStdlibRequest:
     import_path: str
     build_opts: GoBuildOptions
+
+
+@rule
+async def setup_build_go_package_target_request_for_stdlib(
+    request: BuildGoPackageRequestForStdlibRequest,
+    goroot: GoRoot,
+) -> FallibleBuildGoPackageRequest:
+    stdlib_packages = await analyze_go_stdlib_packages(
+        GoStdLibPackagesRequest(
+            with_race_detector=request.build_opts.with_race_detector,
+            cgo_enabled=request.build_opts.cgo_enabled,
+        )
+    )
+
+    pkg_info = stdlib_packages[request.import_path]
+
+    direct_dependency_import_pats = set(pkg_info.imports)
+    if pkg_info.cgo_files:
+        if request.import_path != "runtime/cgo":
+            direct_dependency_import_pats.add("runtime/cgo")
+        if pkg_info.import_path not in (
+            "runtime/cgo",
+            "runtime/race",
+            "runtime/msan",
+            "runtime/asan",
+        ):
+            direct_dependency_import_pats.add("syscall")
+
+    direct_dependencies_wrapped = await concurrently(
+        # TODO need to move setup_build_go_package_target_request_for_stdlib around above this rule
+        setup_build_go_package_target_request_for_stdlib(
+            BuildGoPackageRequestForStdlibRequest(
+                import_path=dep_import_path,
+                build_opts=request.build_opts,
+            ),
+            **implicitly(),
+        )
+        for dep_import_path in sorted(direct_dependency_import_pats)
+        if dep_import_path not in {"builtin", "C", "unsafe"}
+    )
+
+    direct_dependencies: list[BuildGoPackageRequest] = []
+    for dep in direct_dependencies_wrapped:
+        assert dep.request is not None
+        direct_dependencies.append(dep.request)
+    direct_dependencies.sort(key=lambda p: p.import_path)
+
+    with_coverage = _is_coverage_enabled_for_stdlib_package(request.import_path, request.build_opts)
+
+    embed_config: EmbedConfig | None = None
+    if pkg_info.embed_patterns and pkg_info.embed_files:
+        embed_config_result = await resolve_go_stdlib_embed_config(
+            _ResolveStdlibEmbedConfigRequest(pkg_info)
+        )
+        if not embed_config_result.embed_config:
+            assert embed_config_result.stderr is not None
+            return FallibleBuildGoPackageRequest(
+                request=None,
+                import_path=request.import_path,
+                exit_code=1,
+                stderr=embed_config_result.stderr,
+            )
+        embed_config = embed_config_result.embed_config
+
+    return FallibleBuildGoPackageRequest(
+        request=BuildGoPackageRequest(
+            import_path=pkg_info.import_path,
+            pkg_name=pkg_info.name,
+            digest=EMPTY_DIGEST,
+            dir_path=pkg_info.pkg_source_path,
+            build_opts=request.build_opts,
+            go_files=pkg_info.go_files,
+            s_files=pkg_info.s_files,
+            direct_dependencies=tuple(direct_dependencies),
+            import_map=pkg_info.import_map,
+            minimum_go_version=goroot.version,
+            cgo_files=pkg_info.cgo_files,
+            c_files=pkg_info.c_files,
+            header_files=pkg_info.h_files,
+            cxx_files=pkg_info.cxx_files,
+            objc_files=pkg_info.m_files,
+            fortran_files=pkg_info.f_files,
+            prebuilt_object_files=pkg_info.syso_files,
+            cgo_flags=pkg_info.cgo_flags,
+            with_coverage=with_coverage,
+            is_stdlib=True,
+            embed_config=embed_config,
+        ),
+        import_path=request.import_path,
+    )
 
 
 @union(in_scope_types=[EnvironmentName])
@@ -415,23 +557,6 @@ async def setup_build_go_package_target_request(
             cgo_enabled=request.build_opts.cgo_enabled,
         )
     )
-    stdlib_build_request_gets = []
-    for remaining_import in remaining_imports_set:
-        if remaining_import in {"builtin", "C", "unsafe"}:
-            continue
-
-        if remaining_import not in stdlib_packages:
-            continue
-
-        stdlib_build_request_gets.append(
-            Get(
-                FallibleBuildGoPackageRequest,
-                BuildGoPackageRequestForStdlibRequest(
-                    import_path=remaining_import,
-                    build_opts=request.build_opts,
-                ),
-            )
-        )
 
     pkg_dependency_addresses = sorted(pkg_dependency_addresses_set)
     maybe_pkg_direct_dependencies = await concurrently(
@@ -440,7 +565,18 @@ async def setup_build_go_package_target_request(
         )
         for address in pkg_dependency_addresses
     )
-    pkg_stdlib_dependencies = await concurrently(stdlib_build_request_gets)
+    pkg_stdlib_dependencies = await concurrently(
+        setup_build_go_package_target_request_for_stdlib(
+            BuildGoPackageRequestForStdlibRequest(
+                import_path=remaining_import,
+                build_opts=request.build_opts,
+            ),
+            **implicitly(),
+        )
+        for remaining_import in remaining_imports_set
+        if remaining_import not in {"builtin", "C", "unsafe"}
+        and remaining_import in stdlib_packages
+    )
 
     pkg_direct_dependencies = []
     for maybe_pkg_dep in maybe_pkg_direct_dependencies:
@@ -460,14 +596,14 @@ async def setup_build_go_package_target_request(
         dep_import_path == base_import_path for dep_import_path in imports
     ):
         # TODO need to move setup_build_go_package_target_request_for_stdlib around to resolve circular dependency
-        maybe_base_pkg_dep = await Get(
-            FallibleBuildGoPackageRequest,
+        maybe_base_pkg_dep = await setup_build_go_package_target_request(
             BuildGoPackageTargetRequest(
                 request.address,
                 for_tests=True,
                 with_coverage=request.with_coverage,
                 build_opts=request.build_opts,
             ),
+            **implicitly(),
         )
         if maybe_base_pkg_dep.request is None:
             return dataclasses.replace(
@@ -547,147 +683,6 @@ def _is_coverage_enabled_for_stdlib_package(import_path: str, build_opts: GoBuil
             return True
 
     return False
-
-
-@dataclass(frozen=True)
-class _ResolveStdlibEmbedConfigRequest:
-    package: GoStdLibPackage
-
-
-@dataclass(frozen=True)
-class _ResolveStdlibEmbedConfigResult:
-    embed_config: EmbedConfig | None
-    stderr: str | None
-
-
-@rule
-async def resolve_go_stdlib_embed_config(
-    request: _ResolveStdlibEmbedConfigRequest,
-) -> _ResolveStdlibEmbedConfigResult:
-    patterns_json = json.dumps(
-        {
-            "EmbedPatterns": request.package.embed_patterns,
-            "TestEmbedPatterns": [],
-            "XTestEmbedPatterns": [],
-        }
-    ).encode("utf-8")
-
-    embedder, patterns_json_digest = await concurrently(
-        setup_go_binary(
-            LoadedGoBinaryRequest("embedcfg", ("main.go",), "./embedder"), **implicitly()
-        ),
-        create_digest(CreateDigest([FileContent("patterns.json", patterns_json)])),
-    )
-    input_digest = await merge_digests(MergeDigests((patterns_json_digest, embedder.digest)))
-    embed_result = await execute_process(
-        Process(
-            ("./embedder", "patterns.json", request.package.pkg_source_path),
-            input_digest=input_digest,
-            description=f"Create embed mapping for {request.package.import_path}",
-            level=LogLevel.DEBUG,
-        ),
-        **implicitly(),
-    )
-    if embed_result.exit_code != 0:
-        return _ResolveStdlibEmbedConfigResult(
-            embed_config=None,
-            stderr=embed_result.stderr.decode(),
-        )
-    metadata = json.loads(embed_result.stdout)
-    embed_config = EmbedConfig.from_json_dict(metadata.get("EmbedConfig", {}))
-    return _ResolveStdlibEmbedConfigResult(
-        embed_config=embed_config,
-        stderr=None,
-    )
-
-
-@rule
-async def setup_build_go_package_target_request_for_stdlib(
-    request: BuildGoPackageRequestForStdlibRequest,
-    goroot: GoRoot,
-) -> FallibleBuildGoPackageRequest:
-    stdlib_packages = await analyze_go_stdlib_packages(
-        GoStdLibPackagesRequest(
-            with_race_detector=request.build_opts.with_race_detector,
-            cgo_enabled=request.build_opts.cgo_enabled,
-        )
-    )
-
-    pkg_info = stdlib_packages[request.import_path]
-
-    direct_dependency_import_pats = set(pkg_info.imports)
-    if pkg_info.cgo_files:
-        if request.import_path != "runtime/cgo":
-            direct_dependency_import_pats.add("runtime/cgo")
-        if pkg_info.import_path not in (
-            "runtime/cgo",
-            "runtime/race",
-            "runtime/msan",
-            "runtime/asan",
-        ):
-            direct_dependency_import_pats.add("syscall")
-
-    direct_dependencies_wrapped = await concurrently(
-        setup_build_go_package_target_request_for_stdlib(
-            BuildGoPackageRequestForStdlibRequest(
-                import_path=dep_import_path,
-                build_opts=request.build_opts,
-            ),
-            **implicitly(),
-        )
-        for dep_import_path in sorted(direct_dependency_import_pats)
-        if dep_import_path not in {"builtin", "C", "unsafe"}
-    )
-
-    direct_dependencies: list[BuildGoPackageRequest] = []
-    for dep in direct_dependencies_wrapped:
-        assert dep.request is not None
-        direct_dependencies.append(dep.request)
-    direct_dependencies.sort(key=lambda p: p.import_path)
-
-    with_coverage = _is_coverage_enabled_for_stdlib_package(request.import_path, request.build_opts)
-
-    embed_config: EmbedConfig | None = None
-    if pkg_info.embed_patterns and pkg_info.embed_files:
-        embed_config_result = await resolve_go_stdlib_embed_config(
-            _ResolveStdlibEmbedConfigRequest(pkg_info)
-        )
-        if not embed_config_result.embed_config:
-            assert embed_config_result.stderr is not None
-            return FallibleBuildGoPackageRequest(
-                request=None,
-                import_path=request.import_path,
-                exit_code=1,
-                stderr=embed_config_result.stderr,
-            )
-        embed_config = embed_config_result.embed_config
-
-    return FallibleBuildGoPackageRequest(
-        request=BuildGoPackageRequest(
-            import_path=pkg_info.import_path,
-            pkg_name=pkg_info.name,
-            digest=EMPTY_DIGEST,
-            dir_path=pkg_info.pkg_source_path,
-            build_opts=request.build_opts,
-            go_files=pkg_info.go_files,
-            s_files=pkg_info.s_files,
-            direct_dependencies=tuple(direct_dependencies),
-            import_map=pkg_info.import_map,
-            minimum_go_version=goroot.version,
-            cgo_files=pkg_info.cgo_files,
-            c_files=pkg_info.c_files,
-            header_files=pkg_info.h_files,
-            cxx_files=pkg_info.cxx_files,
-            objc_files=pkg_info.m_files,
-            fortran_files=pkg_info.f_files,
-            prebuilt_object_files=pkg_info.syso_files,
-            cgo_flags=pkg_info.cgo_flags,
-            with_coverage=with_coverage,
-            is_stdlib=True,
-            embed_config=embed_config,
-        ),
-        import_path=request.import_path,
-    )
 
 
 def rules():

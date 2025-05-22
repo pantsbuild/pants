@@ -24,8 +24,8 @@ from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.graph import hydrate_sources, resolve_target
 from pants.engine.internals.native_engine import NativeDependenciesRequest
 from pants.engine.intrinsics import create_digest, parse_dockerfile_info
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, collect_rules, implicitly, rule
+from pants.engine.process import Process, execute_process_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import HydrateSourcesRequest, SourcesField, WrappedTargetRequest
 from pants.option.option_types import BoolOption
 from pants.util.docutil import bin_name, doc_url
@@ -167,7 +167,9 @@ async def _natively_parse_dockerfile(address: Address, digest: Digest) -> Docker
 async def _legacy_parse_dockerfile(
     address: Address, digest: Digest, dockerfiles: tuple[str, ...]
 ) -> DockerfileInfo:
-    result = await Get(ProcessResult, DockerfileParseRequest(digest, dockerfiles))
+    result = await execute_process_or_raise(
+        **implicitly(DockerfileParseRequest(digest, dockerfiles))
+    )
 
     try:
         raw_output = result.stdout.decode("utf-8")
