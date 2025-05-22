@@ -335,6 +335,7 @@ impl PyRemotingOptions {
         store_rpc_concurrency,
         store_rpc_timeout_millis,
         store_batch_api_size_limit,
+        store_batch_load_enabled,
         cache_warnings_behavior,
         cache_content_behavior,
         cache_rpc_concurrency,
@@ -360,6 +361,7 @@ impl PyRemotingOptions {
         store_rpc_concurrency: usize,
         store_rpc_timeout_millis: u64,
         store_batch_api_size_limit: usize,
+        store_batch_load_enabled: bool,
         cache_warnings_behavior: String,
         cache_content_behavior: String,
         cache_rpc_concurrency: usize,
@@ -392,6 +394,7 @@ impl PyRemotingOptions {
             store_rpc_concurrency,
             store_rpc_timeout: Duration::from_millis(store_rpc_timeout_millis),
             store_batch_api_size_limit,
+            store_batch_load_enabled,
             cache_warnings_behavior: RemoteCacheWarningsBehavior::from_str(
                 &cache_warnings_behavior,
             )
