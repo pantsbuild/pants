@@ -415,23 +415,6 @@ async def setup_build_go_package_target_request(
             cgo_enabled=request.build_opts.cgo_enabled,
         )
     )
-    stdlib_build_request_gets = []
-    for remaining_import in remaining_imports_set:
-        if remaining_import in {"builtin", "C", "unsafe"}:
-            continue
-
-        if remaining_import not in stdlib_packages:
-            continue
-
-        stdlib_build_request_gets.append(
-            setup_build_go_package_target_request_for_stdlib(
-                BuildGoPackageRequestForStdlibRequest(
-                    import_path=remaining_import,
-                    build_opts=request.build_opts,
-                ),
-                **implicitly(),
-            )
-        )
 
     pkg_dependency_addresses = sorted(pkg_dependency_addresses_set)
     maybe_pkg_direct_dependencies = await concurrently(
@@ -440,7 +423,18 @@ async def setup_build_go_package_target_request(
         )
         for address in pkg_dependency_addresses
     )
-    pkg_stdlib_dependencies = await concurrently(stdlib_build_request_gets)
+    pkg_stdlib_dependencies = await concurrently(
+        setup_build_go_package_target_request_for_stdlib(
+            BuildGoPackageRequestForStdlibRequest(
+                import_path=remaining_import,
+                build_opts=request.build_opts,
+            ),
+            **implicitly(),
+        )
+        for remaining_import in remaining_imports_set
+        if remaining_import not in {"builtin", "C", "unsafe"}
+        and remaining_import in stdlib_packages
+    )
 
     pkg_direct_dependencies = []
     for maybe_pkg_dep in maybe_pkg_direct_dependencies:
