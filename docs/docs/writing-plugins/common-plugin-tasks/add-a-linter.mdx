@@ -210,7 +210,7 @@ At the bottom of your file, tell Pants about your rules:
 def rules():
     return [
       	*collect_rules(),
-        ShellcheckRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
+        *ShellcheckRequest.rules(),
         UnionRule(ExportableTool, Shellcheck),  # allows exporting the `shellcheck` binary
     ]
 ```

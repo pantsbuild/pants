@@ -40,6 +40,7 @@ def create_scheduler(rules, validate=True):
         ignore_patterns=[],
         use_gitignore=False,
         build_root=str(Path.cwd()),
+        pants_workdir="./.pants.d/workdir",
         local_execution_root_dir=".",
         named_caches_dir="./.pants.d/named_caches",
         ca_certs_path=None,

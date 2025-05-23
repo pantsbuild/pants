@@ -12,6 +12,7 @@ async-lock = { workspace = true }
 futures = { workspace = true }
 log = { workspace = true }
 nails = { workspace = true }
+sandboxer = { path = "../sandboxer" }
 store = { path = "../../fs/store" }
 task_executor = { path = "../../task_executor" }
 tokio = { workspace = true, features = ["net", "process", "rt-multi-thread", "sync", "time"] }

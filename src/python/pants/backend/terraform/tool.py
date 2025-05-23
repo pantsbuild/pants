@@ -24,18 +24,14 @@ from pathlib import Path
 
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import external_tool
-from pants.core.util_rules.external_tool import (
-    DownloadedExternalTool,
-    ExternalToolRequest,
-    TemplatedExternalTool,
-)
+from pants.core.util_rules.external_tool import TemplatedExternalTool, download_external_tool
 from pants.core.util_rules.system_binaries import BashBinary, MkdirBinary
 from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_DIGEST, Digest
-from pants.engine.internals.selectors import Get
+from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.platform import Platform
 from pants.engine.process import Process
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, StrListOption
 from pants.util.logging import LogLevel
@@ -448,12 +444,10 @@ async def setup_terraform_process(
     mkdir: MkdirBinary,
     platform: Platform,
 ) -> Process:
-    downloaded_terraform = await Get(
-        DownloadedExternalTool,
-        ExternalToolRequest,
-        terraform.get_request(platform),
+    downloaded_terraform = await download_external_tool(terraform.get_request(platform))
+    env = await environment_vars_subset(
+        EnvironmentVarsRequest(terraform.extra_env_vars), **implicitly()
     )
-    env = await Get(EnvironmentVars, EnvironmentVarsRequest(terraform.extra_env_vars))
 
     extra_env_vars = {}
 

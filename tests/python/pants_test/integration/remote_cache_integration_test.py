@@ -395,9 +395,20 @@ def test_remote_cache_workunits() -> None:
     process_unit, action_digest, command_digest = run_process()
     assert process_unit["metadata"]["source"] == "Ran"
 
-    # Verify the action and command digests are in the CAS
-    assert cas.contains(action_digest)
-    assert cas.contains(command_digest)
+    # Verify the action and command digests are in the CAS and the action result is in the Action Cache.
+    loops_remaining_to_check = 8
+    while loops_remaining_to_check > 0:
+        time.sleep(0.25)  # wait for CAS/AC to receive data
+        cas_has_action_digest = cas.contains(action_digest)
+        cas_has_command_digest = cas.contains(command_digest)
+        ac_has_action_result = cas.contains_action_result(action_digest)
+        if cas_has_action_digest and cas_has_command_digest and ac_has_action_result:
+            break
+        loops_remaining_to_check -= 1
+
+    assert cas_has_action_digest, "Action digest should be in the CAS"
+    assert cas_has_command_digest, "Command digest should be in the CAS"
+    assert ac_has_action_result, "Action result should be in the Action Cache"
 
     # Second run should hit cache
     process_unit2, action_digest2, command_digest2 = run_process()

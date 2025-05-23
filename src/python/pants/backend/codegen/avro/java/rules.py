@@ -28,16 +28,22 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
     RemovePrefix,
-    Snapshot,
 )
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import ProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.internals.graph import hydrate_sources
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import (
+    create_digest,
+    digest_subset_to_digest,
+    digest_to_snapshot,
+    merge_digests,
+    remove_prefix,
+)
+from pants.engine.process import execute_process_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
     FieldSet,
     GeneratedSources,
     GenerateSourcesRequest,
-    HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
@@ -52,11 +58,11 @@ from pants.jvm.dependency_inference.artifact_mapper import (
 )
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve import jvm_tool
-from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.coursier_fetch import ToolClasspathRequest, materialize_classpath_for_tool
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField, PrefixedJvmJdkField, PrefixedJvmResolveField
-from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.source.source_root import SourceRootRequest, get_source_root
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 
@@ -77,32 +83,6 @@ class CompiledAvroSource:
     output_digest: Digest
 
 
-@rule(desc="Generate Java from Avro", level=LogLevel.DEBUG)
-async def generate_java_from_avro(
-    request: GenerateJavaFromAvroRequest,
-) -> GeneratedSources:
-    sources = await Get(
-        HydratedSources, HydrateSourcesRequest(request.protocol_target[AvroSourceField])
-    )
-
-    compile_results = await MultiGet(
-        Get(CompiledAvroSource, CompileAvroSourceRequest(sources.snapshot.digest, path))
-        for path in sources.snapshot.files
-    )
-
-    merged_output_digest, source_root = await MultiGet(
-        Get(Digest, MergeDigests([r.output_digest for r in compile_results])),
-        Get(SourceRoot, SourceRootRequest, SourceRootRequest.for_target(request.protocol_target)),
-    )
-
-    source_root_restored = (
-        await Get(Snapshot, AddPrefix(merged_output_digest, source_root.path))
-        if source_root.path != "."
-        else await Get(Snapshot, Digest, merged_output_digest)
-    )
-    return GeneratedSources(source_root_restored)
-
-
 @rule
 async def compile_avro_source(
     request: CompileAvroSourceRequest,
@@ -113,10 +93,9 @@ async def compile_avro_source(
     toolcp_relpath = "__toolcp"
 
     lockfile_request = GenerateJvmLockfileFromTool.create(avro_tools)
-    tool_classpath, subsetted_input_digest, empty_output_dir = await MultiGet(
-        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
-        Get(
-            Digest,
+    tool_classpath, subsetted_input_digest, empty_output_dir = await concurrently(
+        materialize_classpath_for_tool(ToolClasspathRequest(lockfile=lockfile_request)),
+        digest_subset_to_digest(
             DigestSubset(
                 request.digest,
                 PathGlobs(
@@ -125,19 +104,18 @@ async def compile_avro_source(
                     conjunction=GlobExpansionConjunction.all_match,
                     description_of_origin="the Avro source file name",
                 ),
-            ),
+            )
         ),
-        Get(Digest, CreateDigest([Directory(output_dir)])),
+        create_digest(CreateDigest([Directory(output_dir)])),
     )
 
-    input_digest = await Get(
-        Digest,
+    input_digest = await merge_digests(
         MergeDigests(
             [
                 subsetted_input_digest,
                 empty_output_dir,
             ]
-        ),
+        )
     )
 
     extra_immutable_input_digests = {
@@ -170,52 +148,82 @@ async def compile_avro_source(
 
     path = PurePath(request.path)
     if path.suffix == ".avsc":
-        result = await Get(
-            ProcessResult,
-            JvmProcess,
-            make_avro_process(["compile", "schema", request.path, output_dir]),
+        result = await execute_process_or_raise(
+            **implicitly(
+                {make_avro_process(["compile", "schema", request.path, output_dir]): JvmProcess}
+            )
         )
     elif path.suffix == ".avpr":
-        result = await Get(
-            ProcessResult,
-            JvmProcess,
-            make_avro_process(["compile", "protocol", request.path, output_dir]),
+        result = await execute_process_or_raise(
+            **implicitly(
+                {make_avro_process(["compile", "protocol", request.path, output_dir]): JvmProcess}
+            )
         )
     elif path.suffix == ".avdl":
         idl_output_dir = "__idl"
         avpr_path = os.path.join(idl_output_dir, str(path.with_suffix(".avpr")))
-        idl_output_dir_digest = await Get(
-            Digest, CreateDigest([Directory(os.path.dirname(avpr_path))])
+        idl_output_dir_digest = await create_digest(
+            CreateDigest([Directory(os.path.dirname(avpr_path))])
         )
-        idl_input_digest = await Get(Digest, MergeDigests([input_digest, idl_output_dir_digest]))
-        idl_result = await Get(
-            ProcessResult,
-            JvmProcess,
-            make_avro_process(
-                ["idl", request.path, avpr_path],
-                overridden_input_digest=idl_input_digest,
-                overridden_output_dir=idl_output_dir,
-            ),
+        idl_input_digest = await merge_digests(MergeDigests([input_digest, idl_output_dir_digest]))
+        idl_result = await execute_process_or_raise(
+            **implicitly(
+                {
+                    make_avro_process(
+                        ["idl", request.path, avpr_path],
+                        overridden_input_digest=idl_input_digest,
+                        overridden_output_dir=idl_output_dir,
+                    ): JvmProcess
+                }
+            )
         )
-        generated_files_dir = await Get(Digest, CreateDigest([Directory(output_dir)]))
-        protocol_input_digest = await Get(
-            Digest, MergeDigests([idl_result.output_digest, generated_files_dir])
+        generated_files_dir = await create_digest(CreateDigest([Directory(output_dir)]))
+        protocol_input_digest = await merge_digests(
+            MergeDigests([idl_result.output_digest, generated_files_dir])
         )
-        result = await Get(
-            ProcessResult,
-            JvmProcess,
-            make_avro_process(
-                ["compile", "protocol", avpr_path, output_dir],
-                overridden_input_digest=protocol_input_digest,
-            ),
+        result = await execute_process_or_raise(
+            **implicitly(
+                {
+                    make_avro_process(
+                        ["compile", "protocol", avpr_path, output_dir],
+                        overridden_input_digest=protocol_input_digest,
+                    ): JvmProcess
+                }
+            )
         )
     else:
         raise AssertionError(
             f"Avro backend does not support files with extension `{path.suffix}`: {path}"
         )
 
-    normalized_digest = await Get(Digest, RemovePrefix(result.output_digest, output_dir))
+    normalized_digest = await remove_prefix(RemovePrefix(result.output_digest, output_dir))
     return CompiledAvroSource(normalized_digest)
+
+
+@rule(desc="Generate Java from Avro", level=LogLevel.DEBUG)
+async def generate_java_from_avro(
+    request: GenerateJavaFromAvroRequest,
+) -> GeneratedSources:
+    sources = await hydrate_sources(
+        HydrateSourcesRequest(request.protocol_target[AvroSourceField]), **implicitly()
+    )
+
+    compile_results = await concurrently(
+        compile_avro_source(CompileAvroSourceRequest(sources.snapshot.digest, path), **implicitly())
+        for path in sources.snapshot.files
+    )
+
+    merged_output_digest, source_root = await concurrently(
+        merge_digests(MergeDigests([r.output_digest for r in compile_results])),
+        get_source_root(SourceRootRequest.for_target(request.protocol_target)),
+    )
+
+    source_root_restored = (
+        await digest_to_snapshot(**implicitly(AddPrefix(merged_output_digest, source_root.path)))
+        if source_root.path != "."
+        else await digest_to_snapshot(merged_output_digest)
+    )
+    return GeneratedSources(source_root_restored)
 
 
 @dataclass(frozen=True)
@@ -278,8 +286,8 @@ async def infer_apache_avro_java_dependencies(
 ) -> InferredDependencies:
     resolve = request.field_set.resolve.normalized_value(jvm)
 
-    dependencies_info = await Get(
-        ApacheAvroRuntimeForResolve, ApacheAvroRuntimeForResolveRequest(resolve)
+    dependencies_info = await resolve_apache_avro_runtime_for_resolve(
+        ApacheAvroRuntimeForResolveRequest(resolve), **implicitly()
     )
     return InferredDependencies(dependencies_info.addresses)
 

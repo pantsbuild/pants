@@ -192,3 +192,16 @@ To run `terraform plan`, use the `--dry-run` flag of the `experimental-deploy` g
 ```
 pants experimental-deploy --dry-run ::
 ```
+
+### Linters
+
+#### Trivy
+
+Pants can run [Trivy](https://github.com/aquasecurity/trivy) on your Terraform modules and deployments. When run against deployments, the relevant vars files will be used. When run against modules, no vars files will be passed.
+
+This must first be enabled by activating the Trivy backend:
+
+```toml title="pants.toml"
+[GLOBAL]
+backend_packages = ["pants.backend.experimental.terraform.lint.trivy"]
+```

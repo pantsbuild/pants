@@ -12,12 +12,12 @@ from pants.backend.openapi.subsystems import openapi_generator
 from pants.backend.openapi.subsystems.openapi_generator import OpenAPIGenerator
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import EMPTY_DIGEST
-from pants.engine.process import Process, ProcessCacheScope, ProcessResult
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.process import Process, ProcessCacheScope, fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.jvm import jdk_rules, non_jvm_dependencies
-from pants.jvm.jdk_rules import InternalJdk, JvmProcess
+from pants.jvm.jdk_rules import InternalJdk, JvmProcess, jvm_process
 from pants.jvm.resolve import coursier_fetch, coursier_setup, jvm_tool
-from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.coursier_fetch import ToolClasspathRequest, materialize_classpath_for_tool
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.util_rules import rules as jvm_util_rules
 from pants.util.frozendict import FrozenDict
@@ -90,8 +90,8 @@ def _parse_names(stdout: str) -> Iterator[str]:
 async def get_openapi_generator_names(
     subsystem: OpenAPIGenerator, jdk: InternalJdk
 ) -> OpenAPIGeneratorNames:
-    tool_classpath = await Get(
-        ToolClasspath, ToolClasspathRequest(lockfile=GenerateJvmLockfileFromTool.create(subsystem))
+    tool_classpath = await materialize_classpath_for_tool(
+        ToolClasspathRequest(lockfile=GenerateJvmLockfileFromTool.create(subsystem))
     )
 
     toolcp_relpath = "__toolcp"
@@ -113,7 +113,7 @@ async def get_openapi_generator_names(
         description="Get openapi generator names.",
         cache_scope=ProcessCacheScope.SUCCESSFUL,
     )
-    result = await Get(ProcessResult, JvmProcess, jvm_process)
+    result = await fallible_to_exec_result_or_raise(**implicitly({jvm_process: JvmProcess}))
     return OpenAPIGeneratorNames(names=tuple(_parse_names(result.stdout.decode("utf-8"))))
 
 
@@ -130,8 +130,8 @@ async def openapi_generator_process(
             f"OpenAPI generator `{request.generator_name}` is not found, available generators: {names}"
         )
 
-    tool_classpath = await Get(
-        ToolClasspath, ToolClasspathRequest(lockfile=GenerateJvmLockfileFromTool.create(subsystem))
+    tool_classpath = await materialize_classpath_for_tool(
+        ToolClasspathRequest(lockfile=GenerateJvmLockfileFromTool.create(subsystem))
     )
 
     toolcp_relpath = "__toolcp"
@@ -147,27 +147,30 @@ async def openapi_generator_process(
 
     extra_jvm_options = [*subsystem.jvm_options, *request.extra_jvm_options]
 
-    jvm_process = JvmProcess(
-        jdk=jdk,
-        argv=[
-            _GENERATOR_CLASS_NAME,
-            "generate",
-            "-g",
-            request.generator_name,
-            *request.argv,
-        ],
-        classpath_entries=classpath_entries,
-        input_digest=request.input_digest,
-        extra_env=request.extra_env,
-        extra_immutable_input_digests=immutable_input_digests,
-        extra_jvm_options=extra_jvm_options,
-        description=request.description,
-        level=request.level,
-        output_directories=request.output_directories,
-        output_files=request.output_files,
-        cache_scope=request.cache_scope or ProcessCacheScope.SUCCESSFUL,
+    return await jvm_process(
+        **implicitly(
+            JvmProcess(
+                jdk=jdk,
+                argv=[
+                    _GENERATOR_CLASS_NAME,
+                    "generate",
+                    "-g",
+                    request.generator_name,
+                    *request.argv,
+                ],
+                classpath_entries=classpath_entries,
+                input_digest=request.input_digest,
+                extra_env=request.extra_env,
+                extra_immutable_input_digests=immutable_input_digests,
+                extra_jvm_options=extra_jvm_options,
+                description=request.description,
+                level=request.level,
+                output_directories=request.output_directories,
+                output_files=request.output_files,
+                cache_scope=request.cache_scope or ProcessCacheScope.SUCCESSFUL,
+            )
+        )
     )
-    return await Get(Process, JvmProcess, jvm_process)
 
 
 def rules():

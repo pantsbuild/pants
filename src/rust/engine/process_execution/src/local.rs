@@ -23,6 +23,7 @@ use futures::stream::{BoxStream, StreamExt, TryStreamExt};
 use futures::{FutureExt, TryFutureExt, try_join};
 use log::{debug, info};
 use nails::execution::ExitCode;
+use sandboxer::Sandboxer;
 use serde::Serialize;
 use shell_quote::Bash;
 use store::{
@@ -56,6 +57,7 @@ pub enum KeepSandboxes {
 
 pub struct CommandRunner {
     pub store: Store,
+    sandboxer: Option<Sandboxer>,
     executor: Executor,
     work_dir_base: PathBuf,
     named_caches: NamedCaches,
@@ -66,6 +68,7 @@ pub struct CommandRunner {
 impl CommandRunner {
     pub fn new(
         store: Store,
+        sandboxer: Option<Sandboxer>,
         executor: Executor,
         work_dir_base: PathBuf,
         named_caches: NamedCaches,
@@ -74,6 +77,7 @@ impl CommandRunner {
     ) -> CommandRunner {
         CommandRunner {
             store,
+            sandboxer,
             executor,
             work_dir_base,
             named_caches,
@@ -218,6 +222,7 @@ impl super::CommandRunner for CommandRunner {
                     &req,
                     req.input_digests.inputs.clone(),
                     &self.store,
+                    self.sandboxer.as_ref(),
                     &self.named_caches,
                     &self.immutable_inputs,
                     None,
@@ -667,6 +672,7 @@ pub async fn prepare_workdir(
     req: &Process,
     materialized_input_digest: DirectoryDigest,
     store: &Store,
+    sandboxer: Option<&Sandboxer>,
     named_caches: &NamedCaches,
     immutable_inputs: &ImmutableInputs,
     named_caches_prefix: Option<&Path>,
@@ -701,17 +707,54 @@ pub async fn prepare_workdir(
 
         let mut mutable_paths = req.output_files.clone();
         mutable_paths.extend(req.output_directories.clone());
-        store
-            .materialize_directory(
-                workdir_path.clone(),
-                workdir_root_path,
-                complete_input_digest,
-                false,
-                &mutable_paths,
-                Permissions::Writable,
-            )
-            .await
-            .map_err(|se| se.enrich(format!("An error occurred when attempting to materialize a working directory at {workdir_path:#?}").as_str()).to_string())?;
+
+        if let Some(sandboxer) = sandboxer {
+            debug!(
+                "Materializing via sandboxer to {:?}: {:#?}",
+                &workdir_path, &complete_input_digest
+            );
+            // Ensure that the tree is persisted in the store, so that the sandboxer
+            // can materialize it from there.  Since record_digest_trie() takes ownership of its
+            // argument, and we only need the digest anyway, we decompose the trie and digest
+            // out of complete_input_digest.
+            let persisted_digest =
+                DirectoryDigest::from_persisted_digest(complete_input_digest.as_digest());
+            if let Some(digest_trie) = complete_input_digest.tree {
+                store
+                    .record_digest_trie(digest_trie, true)
+                    .await?;
+            }
+            sandboxer
+                .materialize_directory(
+                    &workdir_path,
+                    workdir_root_path,
+                    &persisted_digest,
+                    &mutable_paths,
+                )
+                .await
+                .map_err(|e| {
+                    format!(
+                        "materialize_directory() request to sandboxer process failed: {}",
+                        e
+                    )
+                })?;
+        } else {
+            debug!(
+                "Materializing directly to {:?}: {:#?}",
+                &workdir_path, &complete_input_digest
+            );
+            store
+                .materialize_directory(
+                    workdir_path.clone(),
+                    workdir_root_path,
+                    complete_input_digest,
+                    false,
+                    &mutable_paths,
+                    Permissions::Writable,
+                )
+                .await
+                .map_err(|se| se.enrich(format!("An error occurred when attempting to materialize a working directory at {workdir_path:#?}").as_str()).to_string())?;
+        }
 
         if let Some(executable_path) = maybe_executable_path {
             Ok(tokio::fs::metadata(executable_path).await.is_ok())

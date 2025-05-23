@@ -19,11 +19,12 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSLayoutField,
     PythonFaaSPex3VenvCreateExtraArgsField,
     PythonFaaSPexBuildExtraArgs,
+    build_python_faas,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
 from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
 from pants.core.util_rules.environments import EnvironmentField
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
@@ -49,8 +50,7 @@ class PythonGoogleCloudFunctionFieldSet(PackageFieldSet):
 async def package_python_google_cloud_function(
     field_set: PythonGoogleCloudFunctionFieldSet,
 ) -> BuiltPackage:
-    return await Get(
-        BuiltPackage,
+    return await build_python_faas(
         BuildPythonFaaSRequest(
             address=field_set.address,
             target_name=PythonGoogleCloudFunction.alias,
@@ -67,7 +67,7 @@ async def package_python_google_cloud_function(
             include_sources=True,
             reexported_handler_module=PythonGoogleCloudFunctionHandlerField.reexported_handler_module,
             log_only_reexported_handler_func=True,
-        ),
+        )
     )
 
 

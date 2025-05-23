@@ -117,6 +117,7 @@ class Scheduler:
         ignore_patterns: list[str],
         use_gitignore: bool,
         build_root: str,
+        pants_workdir: str,
         local_execution_root_dir: str,
         named_caches_dir: str,
         ca_certs_path: str | None,
@@ -134,6 +135,7 @@ class Scheduler:
         :param ignore_patterns: A list of gitignore-style file patterns for pants to ignore.
         :param use_gitignore: If set, pay attention to .gitignore files.
         :param build_root: The build root as a string.
+        :param pants_workdir: The pants workdir as a string.
         :param local_execution_root_dir: The directory to use for local execution sandboxes.
         :param named_caches_dir: The directory to use as the root for named mutable caches.
         :param ca_certs_path: Path to pem file for custom CA, if needed.
@@ -223,6 +225,7 @@ class Scheduler:
             local_cache=execution_options.local_cache,
             remote_cache_read=execution_options.remote_cache_read,
             remote_cache_write=execution_options.remote_cache_write,
+            use_sandboxer=execution_options.use_sandboxer,
             local_parallelism=execution_options.process_execution_local_parallelism,
             local_enable_nailgun=execution_options.process_execution_local_enable_nailgun,
             remote_parallelism=execution_options.process_execution_remote_parallelism,
@@ -237,6 +240,7 @@ class Scheduler:
             tasks,
             types,
             build_root,
+            pants_workdir,
             local_execution_root_dir,
             named_caches_dir,
             ignore_patterns,

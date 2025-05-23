@@ -134,6 +134,10 @@ impl PantsLogger {
         log!(target: target, level.into(), "{}", message);
         Ok(())
     }
+
+    pub fn global_level(&self) -> LevelFilter {
+        self.0.load().global_level
+    }
 }
 
 impl Log for PantsLogger {

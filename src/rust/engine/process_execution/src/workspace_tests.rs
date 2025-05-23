@@ -68,6 +68,7 @@ async fn run_command_with_workdir(
 
     let runner = crate::workspace::CommandRunner::new(
         store.clone(),
+        None,
         executor.clone(),
         workspace_dir.to_path_buf(),
         work_dir.to_path_buf(),
