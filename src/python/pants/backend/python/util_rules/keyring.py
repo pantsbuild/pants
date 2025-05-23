@@ -21,13 +21,11 @@ class ForgedKeyring:
 
 def _separate_authority_component(url: str) -> tuple[str, str] | None:
     parsed = urlparse(url)
-    if not parsed.username:
+    if not (parsed.hostname and parsed.username):
         return None
 
     # Create a new ParseResult without the username
-    cleaned_netloc = parsed.hostname
-    if parsed.port:
-        cleaned_netloc += f":{parsed.port}"
+    cleaned_netloc = f"{parsed.hostname}:{parsed.port}" if parsed.port else parsed.hostname
 
     # Reconstruct the URL without userinfo
     cleaned_url = urlunparse(
@@ -88,12 +86,12 @@ async def forge_keyring(python_repos: PythonRepos) -> ForgedKeyring:
         )
         for repo_url, username in repo_username_tuples
     )
-    forgery_process_results: tuple[FallibleProcessResult, ...] = await concurrently(
-        execute_process(forgery_process) for forgery_process in forgery_processes
+    forgery_process_results = await concurrently(
+        execute_process(**implicitly(forgery_process)) for forgery_process in forgery_processes
     )
     forged_script = FORGERY_SCRIPT_FORMAT_STR.format(
         pairs="\n".join(
-            _make_forgery_string(repo, username, result.stdout.decode)
+            _make_forgery_string(repo, username, result.stdout.decode())
             for (repo, username), result in zip(repo_username_tuples, forgery_process_results)
             if result.exit_code == 0
         )
