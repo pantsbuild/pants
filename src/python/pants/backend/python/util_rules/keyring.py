@@ -7,7 +7,7 @@ from urllib.parse import urlparse, urlunparse
 from pants.backend.python.subsystems.repos import PythonRepos
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
 from pants.engine.intrinsics import create_digest, execute_process
-from pants.engine.process import FallibleProcessResult, ProcessCacheScope
+from pants.engine.process import ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
 
 _FORGERY_DIR = ".keyring"
