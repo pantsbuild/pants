@@ -18,7 +18,8 @@ from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.engine.addresses import Address, Addresses, AddressInput, UnparsedAddressInputs
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, Snapshot
+from pants.engine.fs import CreateDigest, FileContent
+from pants.engine.internals.build_files import resolve_address
 from pants.engine.internals.graph import (
     AmbiguousCodegenImplementationsException,
     CycleException,
@@ -28,12 +29,15 @@ from pants.engine.internals.graph import (
     _DependencyMapping,
     _DependencyMappingRequest,
     _TargetParametrizations,
-    warn_deprecated_field_type,
+    hydrate_sources,
 )
+from pants.engine.internals.graph import transitive_targets as transitive_targets_get
+from pants.engine.internals.graph import warn_deprecated_field_type
 from pants.engine.internals.native_engine import AddressParseException
 from pants.engine.internals.parametrize import Parametrize, _TargetParametrizationsRequest
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import Get, MultiGet, rule
+from pants.engine.intrinsics import digest_to_snapshot, get_digest_contents
+from pants.engine.rules import concurrently, implicitly, rule
 from pants.engine.target import (
     AllTargets,
     AllUnexpandedTargets,
@@ -1938,14 +1942,18 @@ async def generate_smalltalk_from_avro(
 
     # Many codegen implementations will need to look up a protocol target's dependencies in their
     # rule. We add this here to ensure that this does not result in rule graph issues.
-    _ = await Get(TransitiveTargets, TransitiveTargetsRequest([request.protocol_target.address]))
+    _ = await transitive_targets_get(
+        TransitiveTargetsRequest([request.protocol_target.address]), **implicitly()
+    )
 
     def generate_fortran(fp: str) -> FileContent:
         parent = str(PurePath(fp).parent).replace("src/avro", "src/smalltalk")
         file_name = f"{PurePath(fp).stem}.st"
         return FileContent(str(PurePath(parent, file_name)), b"Generated")
 
-    result = await Get(Snapshot, CreateDigest([generate_fortran(fp) for fp in protocol_files]))
+    result = await digest_to_snapshot(
+        **implicitly(CreateDigest([generate_fortran(fp) for fp in protocol_files]))
+    )
     return GeneratedSources(result)
 
 
@@ -2161,24 +2169,30 @@ class TransitivelyExcludeSmalltalkDependencies(TransitivelyExcludeDependenciesRe
 async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> InferredDependencies:
     # To demo an inference rule, we simply treat each `sources` file to contain a list of
     # addresses, one per line.
-    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.field_set.source))
-    digest_contents = await Get(DigestContents, Digest, hydrated_sources.snapshot.digest)
+    hydrated_sources = await hydrate_sources(
+        HydrateSourcesRequest(request.field_set.source), **implicitly()
+    )
+    digest_contents = await get_digest_contents(hydrated_sources.snapshot.digest)
     all_lines = [
         line.strip()
         for line in itertools.chain.from_iterable(
             file_content.content.decode().splitlines() for file_content in digest_contents
         )
     ]
-    include = await MultiGet(
-        Get(Address, AddressInput, AddressInput.parse(line, description_of_origin="smalltalk rule"))
+    include = await concurrently(
+        resolve_address(
+            **implicitly(
+                {AddressInput.parse(line, description_of_origin="smalltalk rule"): AddressInput}
+            )
+        )
         for line in all_lines
         if not line.startswith("!")
     )
-    exclude = await MultiGet(
-        Get(
-            Address,
-            AddressInput,
-            AddressInput.parse(line[1:], description_of_origin="smalltalk rule"),
+    exclude = await concurrently(
+        resolve_address(
+            **implicitly(
+                {AddressInput.parse(line[1:], description_of_origin="smalltalk rule"): AddressInput}
+            )
         )
         for line in all_lines
         if line.startswith("!") and not line.startswith("!!")
@@ -2191,19 +2205,21 @@ async def transitive_exclude_smalltalk_dependencies(
     request: TransitivelyExcludeSmalltalkDependencies,
 ) -> TransitivelyExcludeDependencies:
     # (Similar to `infer_smalltalk_dependencies`, but for `!!` addresses)
-    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.field_set.source))
-    digest_contents = await Get(DigestContents, Digest, hydrated_sources.snapshot.digest)
+    hydrated_sources = await hydrate_sources(
+        HydrateSourcesRequest(request.field_set.source), **implicitly()
+    )
+    digest_contents = await get_digest_contents(hydrated_sources.snapshot.digest)
     all_lines = [
         line.strip()
         for line in itertools.chain.from_iterable(
             file_content.content.decode().splitlines() for file_content in digest_contents
         )
     ]
-    transitive_excludes = await MultiGet(
-        Get(
-            Address,
-            AddressInput,
-            AddressInput.parse(line[2:], description_of_origin="smalltalk rule"),
+    transitive_excludes = await concurrently(
+        resolve_address(
+            **implicitly(
+                {AddressInput.parse(line[2:], description_of_origin="smalltalk rule"): AddressInput}
+            )
         )
         for line in all_lines
         if line.startswith("!!")

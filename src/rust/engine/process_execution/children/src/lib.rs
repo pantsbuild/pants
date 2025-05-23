@@ -39,12 +39,9 @@ impl ManagedChild {
         // later.
         unsafe {
             command.pre_exec(|| {
-                nix::unistd::setsid().map(|_pgid| ()).map_err(|e| {
-                    std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        format!("Could not create new pgid: {e}"),
-                    )
-                })
+                nix::unistd::setsid()
+                    .map(|_pgid| ())
+                    .map_err(|e| std::io::Error::other(format!("Could not create new pgid: {e}")))
             });
         };
 

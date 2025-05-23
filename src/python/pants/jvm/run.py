@@ -11,13 +11,20 @@ from pants.core.goals.run import RunRequest
 from pants.core.util_rules.system_binaries import UnzipBinary
 from pants.core.util_rules.system_binaries import rules as system_binaries_rules
 from pants.engine.addresses import Addresses
-from pants.engine.internals.native_engine import Digest, MergeDigests, Snapshot
-from pants.engine.process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import CoarsenedTargets
-from pants.jvm.classpath import Classpath
+from pants.engine.internals.graph import coarsened_targets
+from pants.engine.internals.native_engine import Digest, MergeDigests
+from pants.engine.intrinsics import digest_to_snapshot, execute_process, merge_digests
+from pants.engine.process import Process, execute_process_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
+from pants.jvm.classpath import classpath as classpath_get
 from pants.jvm.classpath import rules as classpath_rules
-from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
+from pants.jvm.jdk_rules import (
+    JdkEnvironment,
+    JdkRequest,
+    JvmProcess,
+    jvm_process,
+    prepare_jdk_environment,
+)
 from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.jvm.target_types import NO_MAIN_CLASS, GenericJvmRunRequest
 from pants.util.logging import LogLevel
@@ -54,13 +61,13 @@ async def _find_main_by_manifest(
     # jvm only allows `-cp` or `-jar` to be specified, and `-jar` takes precedence. So, even for a
     # JAR with a valid `Main-Class` in the manifest, we need to peek inside the manifest and
     # extract `main` ourself.
-    manifest = await Get(
-        FallibleProcessResult,
+    manifest = await execute_process(
         Process(
             description="Get manifest destails from classpath",
             argv=(unzip.path, "-p", jarfile, "META-INF/MANIFEST.MF"),
             input_digest=input_digest,
         ),
+        **implicitly(),
     )
 
     if manifest.exit_code == 11:
@@ -88,32 +95,34 @@ async def _find_main_by_javap(
     # Finds the `main` class by inspecting all of the classes inside the specified JAR
     # to find one with a JVM main method.
 
-    first_jar_contents = await Get(
-        ProcessResult,
-        Process(
-            description=f"Get class files from `{jarfile}` to find `main`",
-            argv=(unzip.path, jarfile, "*.class", "-d", "zip_output"),
-            input_digest=input_digest,
-            output_directories=("zip_output",),
-        ),
+    first_jar_contents = await execute_process_or_raise(
+        **implicitly(
+            Process(
+                description=f"Get class files from `{jarfile}` to find `main`",
+                argv=(unzip.path, jarfile, "*.class", "-d", "zip_output"),
+                input_digest=input_digest,
+                output_directories=("zip_output",),
+            )
+        )
     )
 
-    outputs = await Get(Snapshot, Digest, first_jar_contents.output_digest)
+    outputs = await digest_to_snapshot(first_jar_contents.output_digest)
 
-    class_index = await Get(
-        ProcessResult,
-        JvmProcess(
-            jdk=jdk,
-            classpath_entries=[f"{jdk.java_home}/lib/tools.jar"],
-            argv=[
-                "com.sun.tools.javap.Main",
-                *("-cp", jarfile),
-                *outputs.files,
-            ],
-            input_digest=first_jar_contents.output_digest,
-            description=f"Index class files in `{jarfile}` to find `main`",
-            level=LogLevel.DEBUG,
-        ),
+    class_index = await execute_process_or_raise(
+        **implicitly(
+            JvmProcess(
+                jdk=jdk,
+                classpath_entries=[f"{jdk.java_home}/lib/tools.jar"],
+                argv=[
+                    "com.sun.tools.javap.Main",
+                    *("-cp", jarfile),
+                    *outputs.files,
+                ],
+                input_digest=first_jar_contents.output_digest,
+                description=f"Index class files in `{jarfile}` to find `main`",
+                level=LogLevel.DEBUG,
+            )
+        )
     )
 
     output = class_index.stdout.decode()
@@ -135,30 +144,31 @@ async def create_run_request(
 ) -> RunRequest:
     field_set = request.field_set
 
-    jdk = await Get(JdkEnvironment, JdkRequest, JdkRequest.from_field(field_set.jdk_version))
+    jdk = await prepare_jdk_environment(**implicitly(JdkRequest.from_field(field_set.jdk_version)))
 
-    artifacts = await Get(CoarsenedTargets, Addresses([field_set.address]))
-    classpath = await Get(Classpath, CoarsenedTargets, artifacts)
+    artifacts = await coarsened_targets(**implicitly(Addresses([field_set.address])))
+    classpath = await classpath_get(artifacts, **implicitly())
 
     classpath_entries = list(classpath.args(prefix="{chroot}"))
 
-    input_digest = await Get(Digest, MergeDigests(classpath.digests()))
+    input_digest = await merge_digests(MergeDigests(classpath.digests()))
 
     # Assume that the first entry in `classpath_entries` is the artifact specified in `Addresses`?
     main_class = field_set.main_class.value
     if main_class is None:
         main_class = await _find_main(unzip, jdk, input_digest, classpath_entries[0])
 
-    proc = await Get(
-        Process,
-        JvmProcess(
-            jdk=jdk,
-            classpath_entries=classpath_entries,
-            argv=(main_class,),
-            input_digest=input_digest,
-            description=f"Run {field_set.address}",
-            use_nailgun=False,
-        ),
+    proc = await jvm_process(
+        **implicitly(
+            JvmProcess(
+                jdk=jdk,
+                classpath_entries=classpath_entries,
+                argv=(main_class,),
+                input_digest=input_digest,
+                description=f"Run {field_set.address}",
+                use_nailgun=False,
+            )
+        )
     )
 
     return _post_process_jvm_process(proc, jdk)

@@ -67,7 +67,7 @@ from pants.engine.process import (
     ProcessExecutionFailure,
     ProcessResultMetadata,
 )
-from pants.engine.target import InvalidFieldException, WrappedTarget, WrappedTargetRequest
+from pants.engine.target import InvalidFieldException, WrappedTarget
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.testutil.option_util import create_subsystem
@@ -179,6 +179,7 @@ def assert_build(
         opts.setdefault("build_no_cache", False)
         opts.setdefault("use_buildx", False)
         opts.setdefault("env_vars", [])
+        opts.setdefault("suggest_renames", True)
 
         docker_options = create_subsystem(
             DockerOptions,
@@ -189,6 +190,9 @@ def assert_build(
 
     global_options = rule_runner.request(GlobalOptions, [])
 
+    union_membership = UnionMembership.from_rules(
+        [UnionRule(DockerImageTagsRequest, DockerImageTagsRequestPlugin)]
+    )
     result = run_rule_with_mocks(
         build_docker_image,
         rule_args=[
@@ -197,21 +201,13 @@ def assert_build(
             global_options,
             DockerBinary("/dummy/docker"),
             KeepSandboxes.never,
-            UnionMembership.from_rules(
-                [UnionRule(DockerImageTagsRequest, DockerImageTagsRequestPlugin)]
-            ),
+            union_membership,
         ],
+        mock_calls={
+            "pants.backend.docker.util_rules.docker_build_context.create_docker_build_context": build_context_mock,
+            "pants.engine.internals.graph.resolve_target": lambda _: WrappedTarget(tgt),
+        },
         mock_gets=[
-            MockGet(
-                output_type=DockerBuildContext,
-                input_types=(DockerBuildContextRequest,),
-                mock=build_context_mock,
-            ),
-            MockGet(
-                output_type=WrappedTarget,
-                input_types=(WrappedTargetRequest,),
-                mock=lambda _: WrappedTarget(tgt),
-            ),
             MockGet(
                 output_type=DockerImageTags,
                 input_types=(DockerImageTagsRequestPlugin,),
@@ -228,6 +224,8 @@ def assert_build(
                 mock=mock_get_info_file,
             ),
         ],
+        union_membership=union_membership,
+        show_warnings=False,
     )
 
     assert result.digest == EMPTY_DIGEST
@@ -1368,6 +1366,7 @@ def test_docker_build_labels_option(rule_runner: RuleRunner) -> None:
     )
 
 
+@pytest.mark.parametrize("suggest_renames", [True, False])
 @pytest.mark.parametrize(
     "context_root, copy_sources, build_context_files, expect_logged, fail_log_contains",
     [
@@ -1417,22 +1416,16 @@ def test_docker_build_labels_option(rule_runner: RuleRunner) -> None:
                 "docker/test/config/.a",
                 "docker/test/config/.conf.d/b",
             ),
+            [(logging.WARNING, "Docker build failed for `docker_image` docker/test:test.")],
             [
-                (
-                    logging.WARNING,
-                    (
-                        "Docker build failed for `docker_image` docker/test:test. "
-                        "There are files in the Docker build context that were not referenced by "
-                        "any `COPY` instruction (this is not an error):\n"
-                        "\n"
-                        "  * ..unusal-name\n"
-                        "  * .a\n"
-                        "  * .conf.d/b\n"
-                        "  * .rc\n"
-                    ),
-                )
+                "There are files in the Docker build context that were not referenced by "
+                "any `COPY` instruction (this is not an error):\n"
+                "\n"
+                "  * ..unusal-name\n"
+                "  * .a\n"
+                "  * .conf.d/b\n"
+                "  * .rc\n"
             ],
-            [],
         ),
     ],
 )
@@ -1444,11 +1437,16 @@ def test_docker_build_fail_logs(
     build_context_files: tuple[str, ...],
     expect_logged: list[tuple[int, str]] | None,
     fail_log_contains: list[str],
+    suggest_renames: bool,
 ) -> None:
     caplog.set_level(logging.INFO)
     rule_runner.write_files({"docker/test/BUILD": f"docker_image(context_root={context_root!r})"})
     build_context_files = ("docker/test/Dockerfile", *build_context_files)
     build_context_snapshot = rule_runner.make_snapshot_of_empty_files(build_context_files)
+    suggest_renames_arg = (
+        "--docker-suggest-renames" if suggest_renames else "--no-docker-suggest-renames"
+    )
+    rule_runner.set_options([suggest_renames_arg])
     with pytest.raises(ProcessExecutionFailure):
         assert_build(
             rule_runner,
@@ -1460,7 +1458,10 @@ def test_docker_build_fail_logs(
 
     assert_logged(caplog, expect_logged)
     for msg in fail_log_contains:
-        assert msg in caplog.records[0].message
+        if suggest_renames:
+            assert msg in caplog.records[0].message
+        else:
+            assert msg not in caplog.records[0].message
 
 
 @pytest.mark.parametrize(

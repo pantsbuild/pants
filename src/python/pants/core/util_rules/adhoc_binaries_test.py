@@ -17,7 +17,7 @@ from pants.core.util_rules.environments import (
     LocalEnvironmentTarget,
 )
 from pants.engine.environment import EnvironmentName
-from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
+from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 
 
 @pytest.fixture
@@ -36,16 +36,17 @@ def rule_runner() -> RuleRunner:
 
 @pytest.mark.parametrize("env_tgt", [None, LocalEnvironmentTarget({}, address=Address(""))])
 def test_local(env_tgt) -> None:
+    def mock_download_python_binary(
+        _: _DownloadPythonBuildStandaloneBinaryRequest,
+    ) -> _PythonBuildStandaloneBinary:
+        pytest.fail()
+
     result = run_rule_with_mocks(
         adhoc_binaries.get_python_for_scripts,
         rule_args=[EnvironmentTarget("local", env_tgt)],
-        mock_gets=[
-            MockGet(
-                output_type=_PythonBuildStandaloneBinary,
-                input_types=(_DownloadPythonBuildStandaloneBinaryRequest,),
-                mock=lambda _: pytest.fail(),
-            )
-        ],
+        mock_calls={
+            "pants.core.util_rules.adhoc_binaries.download_python_binary": mock_download_python_binary,
+        },
     )
     assert result == adhoc_binaries.PythonBuildStandaloneBinary(sys.executable)
 

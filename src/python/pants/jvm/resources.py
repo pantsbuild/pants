@@ -10,12 +10,13 @@ from pathlib import Path
 from pants.core.target_types import ResourcesFieldSet, ResourcesGeneratorFieldSet
 from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFilesRequest
-from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
+from pants.core.util_rules.stripped_source_files import strip_source_roots
 from pants.core.util_rules.system_binaries import BashBinary, TouchBinary, ZipBinary
-from pants.engine.fs import Digest, MergeDigests
-from pants.engine.internals.selectors import MultiGet
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.fs import MergeDigests
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import merge_digests
+from pants.engine.process import Process, execute_process_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import SourcesField
 from pants.engine.unions import UnionRule
 from pants.jvm import compile
@@ -27,8 +28,9 @@ from pants.jvm.compile import (
     CompileResult,
     FallibleClasspathEntries,
     FallibleClasspathEntry,
+    compile_classpath_entries,
 )
-from pants.jvm.strip_jar.strip_jar import StripJarRequest
+from pants.jvm.strip_jar.strip_jar import StripJarRequest, strip_jar
 from pants.jvm.subsystems import JvmSubsystem
 from pants.util.logging import LogLevel
 
@@ -56,9 +58,11 @@ async def assemble_resources_jar(
     # NOTE: Generated dependencies will have the same dependencies as the current target, so we
     # don't need to inspect those dependencies.
     optional_prereq_request = [*((request.prerequisite,) if request.prerequisite else ())]
-    fallibles = await MultiGet(
-        Get(FallibleClasspathEntries, ClasspathEntryRequests(optional_prereq_request)),
-        Get(FallibleClasspathEntries, ClasspathDependenciesRequest(request, ignore_generated=True)),
+    fallibles = await concurrently(
+        compile_classpath_entries(ClasspathEntryRequests(optional_prereq_request)),
+        compile_classpath_entries(
+            **implicitly(ClasspathDependenciesRequest(request, ignore_generated=True))
+        ),
     )
     direct_dependency_classpath_entries = FallibleClasspathEntries(
         itertools.chain(*fallibles)
@@ -72,9 +76,10 @@ async def assemble_resources_jar(
             exit_code=1,
         )
 
-    source_files = await Get(
-        StrippedSourceFiles,
-        SourceFilesRequest([tgt.get(SourcesField) for tgt in request.component.members]),
+    source_files = await strip_source_roots(
+        **implicitly(
+            SourceFilesRequest([tgt.get(SourcesField) for tgt in request.component.members])
+        )
     )
 
     output_filename = f"{request.component.representative.address.path_safe_spec}.resources.jar"
@@ -91,43 +96,45 @@ async def assemble_resources_jar(
 
     input_filenames = " ".join(shlex.quote(file) for file in sorted(input_files))
 
-    resources_jar_result = await Get(
-        ProcessResult,
-        Process(
-            argv=[
-                bash.path,
-                "-c",
-                " ".join(
-                    [
-                        "TZ=UTC",
-                        touch.path,
-                        "-t 198001010000.00",
-                        input_filenames,
-                        "&&",
-                        "TZ=UTC",
-                        zip.path,
-                        "-oX",
-                        output_filename,
-                        input_filenames,
-                    ]
-                ),
-            ],
-            description=f"Build resources JAR for {request.component}",
-            input_digest=resources_jar_input_digest,
-            output_files=output_files,
-            level=LogLevel.DEBUG,
-        ),
+    resources_jar_result = await execute_process_or_raise(
+        **implicitly(
+            Process(
+                argv=[
+                    bash.path,
+                    "-c",
+                    " ".join(
+                        [
+                            "TZ=UTC",
+                            touch.path,
+                            "-t 198001010000.00",
+                            input_filenames,
+                            "&&",
+                            "TZ=UTC",
+                            zip.path,
+                            "-oX",
+                            output_filename,
+                            input_filenames,
+                        ]
+                    ),
+                ],
+                description=f"Build resources JAR for {request.component}",
+                input_digest=resources_jar_input_digest,
+                output_files=output_files,
+                level=LogLevel.DEBUG,
+            )
+        )
     )
 
     output_digest = resources_jar_result.output_digest
     if jvm.reproducible_jars:
-        output_digest = await Get(Digest, StripJarRequest(output_digest, tuple(output_files)))
+        output_digest = await strip_jar(
+            **implicitly(StripJarRequest(output_digest, tuple(output_files)))
+        )
 
     cpe = ClasspathEntry(output_digest, output_files, [])
 
-    merged_cpe_digest = await Get(
-        Digest,
-        MergeDigests(chain((cpe.digest,), (i.digest for i in direct_dependency_classpath_entries))),
+    merged_cpe_digest = await merge_digests(
+        MergeDigests(chain((cpe.digest,), (i.digest for i in direct_dependency_classpath_entries)))
     )
 
     merged_cpe = ClasspathEntry.merge(

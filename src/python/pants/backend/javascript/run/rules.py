@@ -8,9 +8,12 @@ from dataclasses import dataclass
 from pants.backend.javascript import install_node_package
 from pants.backend.javascript.install_node_package import (
     InstalledNodePackageRequest,
-    InstalledNodePackageWithSource,
+    add_sources_to_installed_node_package,
 )
-from pants.backend.javascript.nodejs_project_environment import NodeJsProjectEnvironmentProcess
+from pants.backend.javascript.nodejs_project_environment import (
+    NodeJsProjectEnvironmentProcess,
+    setup_nodejs_project_environment_process,
+)
 from pants.backend.javascript.package_json import (
     NodeBuildScriptEntryPointField,
     NodeBuildScriptExtraEnvVarsField,
@@ -18,10 +21,9 @@ from pants.backend.javascript.package_json import (
 )
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.util_rules.environments import EnvironmentField
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.internals.selectors import Get
-from pants.engine.process import Process
-from pants.engine.rules import Rule, collect_rules, rule
+from pants.engine.env_vars import EnvironmentVarsRequest
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 
 
@@ -39,16 +41,15 @@ class RunNodeBuildScriptFieldSet(RunFieldSet):
 async def run_node_build_script(
     field_set: RunNodeBuildScriptFieldSet,
 ) -> RunRequest:
-    installation = await Get(
-        InstalledNodePackageWithSource, InstalledNodePackageRequest(field_set.address)
+    installation = await add_sources_to_installed_node_package(
+        InstalledNodePackageRequest(field_set.address)
     )
-    target_env_vars = await Get(
-        EnvironmentVars, EnvironmentVarsRequest(field_set.extra_env_vars.value or ())
+    target_env_vars = await environment_vars_subset(
+        EnvironmentVarsRequest(field_set.extra_env_vars.value or ()), **implicitly()
     )
     package_dir = "{chroot}" + "/" + installation.project_env.package_dir()
 
-    process = await Get(
-        Process,
+    process = await setup_nodejs_project_environment_process(
         NodeJsProjectEnvironmentProcess(
             installation.project_env,
             args=(
@@ -61,6 +62,7 @@ async def run_node_build_script(
             input_digest=installation.digest,
             extra_env=target_env_vars,
         ),
+        **implicitly(),
     )
 
     return RunRequest(

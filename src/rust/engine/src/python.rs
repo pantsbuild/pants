@@ -637,21 +637,19 @@ mod pycomparedbool_tests {
         pyo3::prepare_freethreaded_python();
 
         Python::with_gil(|py| {
-            assert_eq!(
+            assert!(
                 PyComparedBool(Some(true))
                     .into_pyobject(py)
                     .unwrap()
                     .extract::<bool>()
-                    .unwrap(),
-                true
+                    .unwrap()
             );
-            assert_eq!(
-                PyComparedBool(Some(false))
+            assert!(
+                !PyComparedBool(Some(false))
                     .into_pyobject(py)
                     .unwrap()
                     .extract::<bool>()
-                    .unwrap(),
-                false
+                    .unwrap()
             );
             assert!(
                 PyComparedBool(None)

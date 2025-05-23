@@ -13,22 +13,27 @@ from pathlib import PurePath
 from pants.backend.go.util_rules import cgo, coverage
 from pants.backend.go.util_rules.assembly import (
     AssembleGoAssemblyFilesRequest,
-    FallibleAssembleGoAssemblyFilesResult,
-    FallibleGenerateAssemblySymabisResult,
     GenerateAssemblySymabisRequest,
+    assemble_go_assembly_files,
+    generate_go_assembly_symabisfile,
 )
 from pants.backend.go.util_rules.build_opts import GoBuildOptions
-from pants.backend.go.util_rules.cgo import CGoCompileRequest, CGoCompileResult, CGoCompilerFlags
+from pants.backend.go.util_rules.cgo import (
+    CGoCompileRequest,
+    CGoCompileResult,
+    CGoCompilerFlags,
+    cgo_compile_request,
+)
 from pants.backend.go.util_rules.coverage import (
     ApplyCodeCoverageRequest,
-    ApplyCodeCoverageResult,
     BuiltGoPackageCodeCoverageMetadata,
     FileCodeCoverageMetadata,
+    go_apply_code_coverage,
 )
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.goroot import GoRoot
-from pants.backend.go.util_rules.import_config import ImportConfig, ImportConfigRequest
-from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, GoSdkToolIDResult
+from pants.backend.go.util_rules.import_config import ImportConfigRequest, generate_import_config
+from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, compute_go_tool_id
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import (
@@ -36,15 +41,22 @@ from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
     Digest,
-    DigestEntries,
     DigestSubset,
     FileContent,
     FileEntry,
     MergeDigests,
     PathGlobs,
 )
-from pants.engine.process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.intrinsics import (
+    add_prefix,
+    create_digest,
+    digest_subset_to_digest,
+    execute_process,
+    get_digest_entries,
+    merge_digests,
+)
+from pants.engine.process import Process, ProcessResult, execute_process_or_raise
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.resources import read_resource
@@ -320,23 +332,24 @@ async def _add_objects_to_archive(
     obj_file_paths: Iterable[str],
 ) -> ProcessResult:
     # Use `go tool asm` tool ID since `go tool pack` does not have a version argument.
-    asm_tool_id = await Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm"))
-    pack_result = await Get(
-        ProcessResult,
-        GoSdkProcess(
-            input_digest=input_digest,
-            command=(
-                "tool",
-                "pack",
-                "r",
-                pkg_archive_path,
-                *obj_file_paths,
-            ),
-            env={
-                "__PANTS_GO_ASM_TOOL_ID": asm_tool_id.tool_id,
-            },
-            description="Link objects to Go package archive",
-            output_files=(pkg_archive_path,),
+    asm_tool_id = await compute_go_tool_id(GoSdkToolIDRequest("asm"))
+    pack_result = await execute_process_or_raise(
+        **implicitly(
+            GoSdkProcess(
+                input_digest=input_digest,
+                command=(
+                    "tool",
+                    "pack",
+                    "r",
+                    pkg_archive_path,
+                    *obj_file_paths,
+                ),
+                env={
+                    "__PANTS_GO_ASM_TOOL_ID": asm_tool_id.tool_id,
+                },
+                description="Link objects to Go package archive",
+                output_files=(pkg_archive_path,),
+            )
         ),
     )
     return pack_result
@@ -358,17 +371,18 @@ async def setup_golang_asm_check_binary() -> SetupAsmCheckBinary:
     if not content:
         raise AssertionError(f"Unable to find resource for `{src_file}`.")
 
-    sources_digest = await Get(Digest, CreateDigest([FileContent(src_file, content)]))
+    sources_digest = await create_digest(CreateDigest([FileContent(src_file, content)]))
 
     binary_name = "__go_asm_check__"
-    compile_result = await Get(
-        ProcessResult,
-        GoSdkProcess(
-            command=("build", "-o", binary_name, src_file),
-            input_digest=sources_digest,
-            output_files=(binary_name,),
-            env={"CGO_ENABLED": "0"},
-            description="Build Go assembly check binary",
+    compile_result = await execute_process_or_raise(
+        **implicitly(
+            GoSdkProcess(
+                command=("build", "-o", binary_name, src_file),
+                input_digest=sources_digest,
+                output_files=(binary_name,),
+                env={"CGO_ENABLED": "0"},
+                description="Build Go assembly check binary",
+            )
         ),
     )
 
@@ -399,17 +413,18 @@ async def check_for_golang_assembly(
     This is used by the cgo rules as a heuristic to determine if the user is passing Golang assembly
     format instead of gcc assembly format.
     """
-    input_digest = await Get(Digest, MergeDigests([request.digest, asm_check_setup.digest]))
-    result = await Get(
-        ProcessResult,
-        Process(
-            argv=(
-                asm_check_setup.path,
-                *(os.path.join(request.dir_path, s_file) for s_file in request.s_files),
-            ),
-            input_digest=input_digest,
-            level=LogLevel.DEBUG,
-            description="Check whether assembly language sources are in Go format",
+    input_digest = await merge_digests(MergeDigests([request.digest, asm_check_setup.digest]))
+    result = await execute_process_or_raise(
+        **implicitly(
+            Process(
+                argv=(
+                    asm_check_setup.path,
+                    *(os.path.join(request.dir_path, s_file) for s_file in request.s_files),
+                ),
+                input_digest=input_digest,
+                level=LogLevel.DEBUG,
+                description="Check whether assembly language sources are in Go format",
+            )
         ),
     )
     return CheckForGolangAssemblyResult(len(result.stdout) > 0)
@@ -430,7 +445,7 @@ async def _maybe_copy_headers_to_platform_independent_names(
     goos = f"_{goroot.goos}"
     goarch = f"_{goroot.goarch}"
 
-    digest_entries = await Get(DigestEntries, Digest, input_digest)
+    digest_entries = await get_digest_entries(input_digest)
     digest_entries_by_path: dict[str, FileEntry] = {
         entry.path: entry for entry in digest_entries if isinstance(entry, FileEntry)
     }
@@ -457,10 +472,67 @@ async def _maybe_copy_headers_to_platform_independent_names(
             new_digest_entries.append(dataclasses.replace(entry, path=str(new_header_file_path)))
 
     if new_digest_entries:
-        digest = await Get(Digest, CreateDigest(new_digest_entries))
+        digest = await create_digest(CreateDigest(new_digest_entries))
         return digest
     else:
         return None
+
+
+@rule
+async def render_embed_config(request: RenderEmbedConfigRequest) -> RenderedEmbedConfig:
+    digest = EMPTY_DIGEST
+    if request.embed_config:
+        digest = await create_digest(
+            CreateDigest(
+                [FileContent(RenderedEmbedConfig.PATH, request.embed_config.to_embedcfg())]
+            )
+        )
+    return RenderedEmbedConfig(digest)
+
+
+# Compute a cache key for the compile action. This computation is intended to capture similar values to the
+# action ID computed by the `go` tool for its own cache.
+# For details, see https://github.com/golang/go/blob/21998413ad82655fef1f31316db31e23e0684b21/src/cmd/go/internal/work/exec.go#L216-L403
+@rule
+async def compute_compile_action_id(
+    request: GoCompileActionIdRequest, goroot: GoRoot
+) -> GoCompileActionIdResult:
+    bq = request.build_request
+
+    h = hashlib.sha256()
+
+    # All Go action IDs have the full version (as returned by `runtime.Version()`) in the key.
+    # See https://github.com/golang/go/blob/master/src/cmd/go/internal/cache/hash.go#L32-L46
+    h.update(goroot.full_version.encode())
+
+    h.update(b"compile\n")
+    if bq.minimum_go_version:
+        h.update(f"go {bq.minimum_go_version}\n".encode())
+    h.update(f"goos {goroot.goos} goarch {goroot.goarch}\n".encode())
+    h.update(f"import {bq.import_path}\n".encode())
+    # TODO: Consider what to do with this information from Go tool:
+    # fmt.Fprintf(h, "omitdebug %v standard %v local %v prefix %q\n", p.Internal.OmitDebug, p.Standard, p.Internal.Local, p.Internal.LocalPrefix)
+    # TODO: Inject cgo-related values here.
+    # TODO: Inject cover mode values here.
+    # TODO: Inject fuzz instrumentation values here.
+
+    compile_tool_id = await compute_go_tool_id(GoSdkToolIDRequest("compile"))
+    h.update(f"compile {compile_tool_id.tool_id}\n".encode())
+    # TODO: Add compiler flags as per `go`'s algorithm. Need to figure out
+    if bq.s_files:
+        asm_tool_id = await compute_go_tool_id(GoSdkToolIDRequest("asm"))
+        h.update(f"asm {asm_tool_id.tool_id}\n".encode())
+        # TODO: Add asm flags as per `go`'s algorithm.
+    # TODO: Add micro-architecture into cache key (e.g., GOAMD64 setting).
+    if "GOEXPERIMENT" in goroot._raw_metadata:
+        h.update(f"GOEXPERIMENT={goroot._raw_metadata['GOEXPERIMENT']}".encode())
+    # TODO: Maybe handle go "magic" env vars: "GOCLOBBERDEADHASH", "GOSSAFUNC", "GOSSADIR", "GOSSAHASH" ?
+    # TODO: Handle GSHS_LOGFILE compiler debug option by breaking cache?
+
+    # Note: Input files are already part of cache key. Thus, this algorithm omits incorporating their
+    # content hashes into the action ID.
+
+    return GoCompileActionIdResult(h.hexdigest())
 
 
 # Gather transitive prebuilt object files for Cgo. Traverse the provided dependencies and lifts `.syso`
@@ -488,7 +560,7 @@ async def _gather_transitive_prebuilt_object_files(
                 )
             )
 
-    object_digest = await Get(Digest, MergeDigests([digest for digest, _ in prebuilt_objects]))
+    object_digest = await merge_digests(MergeDigests([digest for digest, _ in prebuilt_objects]))
     object_files = set()
     for _, files in prebuilt_objects:
         object_files.update(files)
@@ -502,9 +574,8 @@ async def _gather_transitive_prebuilt_object_files(
 async def build_go_package(
     request: BuildGoPackageRequest, go_root: GoRoot
 ) -> FallibleBuiltGoPackage:
-    maybe_built_deps = await MultiGet(
-        Get(FallibleBuiltGoPackage, BuildGoPackageRequest, build_request)
-        for build_request in request.direct_dependencies
+    maybe_built_deps = await concurrently(
+        build_go_package(build_request, go_root) for build_request in request.direct_dependencies
     )
 
     import_paths_to_pkg_a_files: dict[str, str] = {}
@@ -520,18 +591,17 @@ async def build_go_package(
                 import_paths_to_pkg_a_files[dep_import_path] = pkg_archive_path
                 dep_digests.append(dep.digest)
 
-    merged_deps_digest, import_config, embedcfg, action_id_result = await MultiGet(
-        Get(Digest, MergeDigests(dep_digests)),
-        Get(
-            ImportConfig,
+    merged_deps_digest, import_config, embedcfg, action_id_result = await concurrently(
+        merge_digests(MergeDigests(dep_digests)),
+        generate_import_config(
             ImportConfigRequest(
                 FrozenDict(import_paths_to_pkg_a_files),
                 build_opts=request.build_opts,
                 import_map=request.import_map,
-            ),
+            )
         ),
-        Get(RenderedEmbedConfig, RenderEmbedConfigRequest(request.embed_config)),
-        Get(GoCompileActionIdResult, GoCompileActionIdRequest(request)),
+        render_embed_config(RenderEmbedConfigRequest(request.embed_config)),
+        compute_compile_action_id(GoCompileActionIdRequest(request), go_root),
     )
 
     unmerged_input_digests = [
@@ -551,8 +621,7 @@ async def build_go_package(
     if request.with_coverage:
         coverage_config = request.build_opts.coverage_config
         assert coverage_config is not None, "with_coverage=True but coverage_config is None!"
-        coverage_result = await Get(
-            ApplyCodeCoverageResult,
+        coverage_result = await go_apply_code_coverage(
             ApplyCodeCoverageRequest(
                 digest=request.digest,
                 dir_path=request.dir_path,
@@ -560,7 +629,7 @@ async def build_go_package(
                 cgo_files=cgo_files,
                 cover_mode=coverage_config.cover_mode,
                 import_path=request.import_path,
-            ),
+            )
         )
         go_files_digest = coverage_result.digest
         unmerged_input_digests.append(go_files_digest)
@@ -597,13 +666,13 @@ async def build_go_package(
                     new_s_files.append(s_file)
             s_files = new_s_files
         else:
-            asm_check_result = await Get(
-                CheckForGolangAssemblyResult,
+            asm_check_result = await check_for_golang_assembly(
                 CheckForGolangAssemblyRequest(
                     digest=request.digest,
                     dir_path=request.dir_path,
                     s_files=tuple(s_files),
                 ),
+                **implicitly(),
             )
             if asm_check_result.maybe_golang_assembly:
                 raise ValueError(
@@ -618,8 +687,7 @@ async def build_go_package(
         transitive_prebuilt_object_files = await _gather_transitive_prebuilt_object_files(request)
 
         assert request.cgo_flags is not None
-        cgo_compile_result = await Get(
-            CGoCompileResult,
+        cgo_compile_result = await cgo_compile_request(
             CGoCompileRequest(
                 import_path=request.import_path,
                 pkg_name=request.pkg_name,
@@ -636,6 +704,7 @@ async def build_go_package(
                 is_stdlib=request.is_stdlib,
                 transitive_prebuilt_object_files=transitive_prebuilt_object_files,
             ),
+            **implicitly(),
         )
         assert cgo_compile_result is not None
         unmerged_input_digests.append(cgo_compile_result.digest)
@@ -658,10 +727,7 @@ async def build_go_package(
         unmerged_input_digests.append(copied_headers_digest)
 
     # Merge all of the input digests together.
-    input_digest = await Get(
-        Digest,
-        MergeDigests(unmerged_input_digests),
-    )
+    input_digest = await merge_digests(MergeDigests(unmerged_input_digests))
 
     # If any assembly files are present, generate a "symabis" file containing API metadata about those files.
     # The "symabis" file is passed to the Go compiler when building Go code so that the compiler is aware of
@@ -674,8 +740,7 @@ async def build_go_package(
         *request.build_opts.assembler_flags, *request.pkg_specific_assembler_flags
     )
     if s_files:
-        symabis_fallible_result = await Get(
-            FallibleGenerateAssemblySymabisResult,
+        symabis_fallible_result = await generate_go_assembly_symabisfile(
             GenerateAssemblySymabisRequest(
                 compilation_input=input_digest,
                 s_files=tuple(s_files),
@@ -683,6 +748,7 @@ async def build_go_package(
                 dir_path=request.dir_path,
                 extra_assembler_flags=extra_assembler_flags,
             ),
+            **implicitly(),
         )
         symabis_result = symabis_fallible_result.result
         if symabis_result is None:
@@ -693,8 +759,8 @@ async def build_go_package(
                 stdout=symabis_fallible_result.stdout,
                 stderr=symabis_fallible_result.stderr,
             )
-        input_digest = await Get(
-            Digest, MergeDigests([input_digest, symabis_result.symabis_digest])
+        input_digest = await merge_digests(
+            MergeDigests([input_digest, symabis_result.symabis_digest])
         )
         symabis_path = symabis_result.symabis_path
 
@@ -812,21 +878,22 @@ async def build_go_package(
     # may end up to exceed those limits when compiling standard library packages where we append a very long GOROOT
     # path to each file name or in packages with large numbers of files.
     go_source_file_paths_config = "\n".join([*go_file_paths, *generated_cgo_file_paths])
-    go_sources_file_paths_digest = await Get(
-        Digest, CreateDigest([FileContent("__sources__.txt", go_source_file_paths_config.encode())])
+    go_sources_file_paths_digest = await create_digest(
+        CreateDigest([FileContent("__sources__.txt", go_source_file_paths_config.encode())])
     )
-    input_digest = await Get(Digest, MergeDigests([input_digest, go_sources_file_paths_digest]))
+    input_digest = await merge_digests(MergeDigests([input_digest, go_sources_file_paths_digest]))
     compile_args.append("@__sources__.txt")
 
-    compile_result = await Get(
-        FallibleProcessResult,
-        GoSdkProcess(
-            input_digest=input_digest,
-            command=tuple(compile_args),
-            description=f"Compile Go package: {request.import_path}",
-            output_files=("__pkg__.a", *([asm_header_path] if asm_header_path else [])),
-            env={"__PANTS_GO_COMPILE_ACTION_ID": action_id_result.action_id},
-        ),
+    compile_result = await execute_process(
+        **implicitly(
+            GoSdkProcess(
+                input_digest=input_digest,
+                command=tuple(compile_args),
+                description=f"Compile Go package: {request.import_path}",
+                output_files=("__pkg__.a", *([asm_header_path] if asm_header_path else [])),
+                env={"__PANTS_GO_COMPILE_ACTION_ID": action_id_result.action_id},
+            )
+        )
     )
     if compile_result.exit_code != 0:
         return FallibleBuiltGoPackage(
@@ -846,8 +913,7 @@ async def build_go_package(
     if s_files:
         # Extract the `go_asm.h` header from the compilation output and merge into the original compilation input.
         assert asm_header_path is not None
-        asm_header_digest = await Get(
-            Digest,
+        asm_header_digest = await digest_subset_to_digest(
             DigestSubset(
                 compilation_digest,
                 PathGlobs(
@@ -855,11 +921,10 @@ async def build_go_package(
                     glob_match_error_behavior=GlobMatchErrorBehavior.error,
                     description_of_origin="the `build_go_package` rule",
                 ),
-            ),
+            )
         )
-        assembly_input_digest = await Get(Digest, MergeDigests([input_digest, asm_header_digest]))
-        assembly_fallible_result = await Get(
-            FallibleAssembleGoAssemblyFilesResult,
+        assembly_input_digest = await merge_digests(MergeDigests([input_digest, asm_header_digest]))
+        assembly_fallible_result = await assemble_go_assembly_files(
             AssembleGoAssemblyFilesRequest(
                 input_digest=assembly_input_digest,
                 s_files=tuple(sorted(s_files)),
@@ -867,6 +932,7 @@ async def build_go_package(
                 import_path=request.import_path,
                 extra_assembler_flags=extra_assembler_flags,
             ),
+            **implicitly(),
         )
         assembly_result = assembly_fallible_result.result
         if assembly_result is None:
@@ -881,14 +947,13 @@ async def build_go_package(
 
     # If there are any loose object files, link them into the package archive.
     if objects:
-        assembly_link_input_digest = await Get(
-            Digest,
+        assembly_link_input_digest = await merge_digests(
             MergeDigests(
                 [
                     compilation_digest,
                     *(digest for obj_file, digest in objects),
                 ]
-            ),
+            )
         )
         assembly_link_result = await _add_objects_to_archive(
             input_digest=assembly_link_input_digest,
@@ -899,15 +964,15 @@ async def build_go_package(
 
     path_prefix = os.path.join("__pkgs__", path_safe(request.import_path))
     import_paths_to_pkg_a_files[request.import_path] = os.path.join(path_prefix, "__pkg__.a")
-    output_digest = await Get(Digest, AddPrefix(compilation_digest, path_prefix))
-    merged_result_digest = await Get(Digest, MergeDigests([*dep_digests, output_digest]))
+    output_digest = await add_prefix(AddPrefix(compilation_digest, path_prefix))
+    merged_result_digest = await merge_digests(MergeDigests([*dep_digests, output_digest]))
 
     # Include the modules sources in the output `Digest` alongside the package archive if the Cgo rules
     # detected a potential attempt to link against a static archive (or other reference to `${SRCDIR}` in
     # options) which necessitates the linker needing access to module sources.
     if cgo_compile_result and cgo_compile_result.include_module_sources_with_output:
-        merged_result_digest = await Get(
-            Digest, MergeDigests([merged_result_digest, request.digest])
+        merged_result_digest = await merge_digests(
+            MergeDigests([merged_result_digest, request.digest])
         )
 
     coverage_metadata = (
@@ -937,64 +1002,6 @@ def required_built_go_package(fallible_result: FallibleBuiltGoPackage) -> BuiltG
         f"Failed to compile {fallible_result.import_path}:\n"
         f"{fallible_result.stdout}\n{fallible_result.stderr}"
     )
-
-
-@rule
-async def render_embed_config(request: RenderEmbedConfigRequest) -> RenderedEmbedConfig:
-    digest = EMPTY_DIGEST
-    if request.embed_config:
-        digest = await Get(
-            Digest,
-            CreateDigest(
-                [FileContent(RenderedEmbedConfig.PATH, request.embed_config.to_embedcfg())]
-            ),
-        )
-    return RenderedEmbedConfig(digest)
-
-
-# Compute a cache key for the compile action. This computation is intended to capture similar values to the
-# action ID computed by the `go` tool for its own cache.
-# For details, see https://github.com/golang/go/blob/21998413ad82655fef1f31316db31e23e0684b21/src/cmd/go/internal/work/exec.go#L216-L403
-@rule
-async def compute_compile_action_id(
-    request: GoCompileActionIdRequest, goroot: GoRoot
-) -> GoCompileActionIdResult:
-    bq = request.build_request
-
-    h = hashlib.sha256()
-
-    # All Go action IDs have the full version (as returned by `runtime.Version()`) in the key.
-    # See https://github.com/golang/go/blob/master/src/cmd/go/internal/cache/hash.go#L32-L46
-    h.update(goroot.full_version.encode())
-
-    h.update(b"compile\n")
-    if bq.minimum_go_version:
-        h.update(f"go {bq.minimum_go_version}\n".encode())
-    h.update(f"goos {goroot.goos} goarch {goroot.goarch}\n".encode())
-    h.update(f"import {bq.import_path}\n".encode())
-    # TODO: Consider what to do with this information from Go tool:
-    # fmt.Fprintf(h, "omitdebug %v standard %v local %v prefix %q\n", p.Internal.OmitDebug, p.Standard, p.Internal.Local, p.Internal.LocalPrefix)
-    # TODO: Inject cgo-related values here.
-    # TODO: Inject cover mode values here.
-    # TODO: Inject fuzz instrumentation values here.
-
-    compile_tool_id = await Get(GoSdkToolIDResult, GoSdkToolIDRequest("compile"))
-    h.update(f"compile {compile_tool_id.tool_id}\n".encode())
-    # TODO: Add compiler flags as per `go`'s algorithm. Need to figure out
-    if bq.s_files:
-        asm_tool_id = await Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm"))
-        h.update(f"asm {asm_tool_id.tool_id}\n".encode())
-        # TODO: Add asm flags as per `go`'s algorithm.
-    # TODO: Add micro-architecture into cache key (e.g., GOAMD64 setting).
-    if "GOEXPERIMENT" in goroot._raw_metadata:
-        h.update(f"GOEXPERIMENT={goroot._raw_metadata['GOEXPERIMENT']}".encode())
-    # TODO: Maybe handle go "magic" env vars: "GOCLOBBERDEADHASH", "GOSSAFUNC", "GOSSADIR", "GOSSAHASH" ?
-    # TODO: Handle GSHS_LOGFILE compiler debug option by breaking cache?
-
-    # Note: Input files are already part of cache key. Thus, this algorithm omits incorporating their
-    # content hashes into the action ID.
-
-    return GoCompileActionIdResult(h.hexdigest())
 
 
 def rules():

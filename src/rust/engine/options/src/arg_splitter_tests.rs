@@ -5,7 +5,6 @@ use crate::Scope;
 use crate::arg_splitter::{ArgSplitter, Args, NO_GOAL_NAME, PantsCommand, UNKNOWN_GOAL_NAME};
 use crate::flags::Flag;
 use crate::scope::GoalInfo;
-use shlex;
 use std::fs::File;
 use std::path::Path;
 use tempfile::TempDir;
@@ -16,7 +15,7 @@ fn _sv(v: &[&str]) -> Vec<String> {
 
 fn shlex_and_split_args(build_root: Option<&Path>, args_str: &str) -> PantsCommand {
     ArgSplitter::new(
-        &build_root.unwrap_or(TempDir::new().unwrap().path()),
+        build_root.unwrap_or(TempDir::new().unwrap().path()),
         vec![
             GoalInfo::new("run", false, false, vec![]),
             GoalInfo::new("check", false, false, vec![]),

@@ -26,10 +26,9 @@ from pants.core.goals.lint import (
     lint,
 )
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.environments import EnvironmentNameRequest
+from pants.core.util_rules.environments import EnvironmentNameRequest, EnvironmentTarget
 from pants.core.util_rules.partitions import PartitionerType, _EmptyMetadata
 from pants.engine.addresses import Address
-from pants.engine.environment import EnvironmentName
 from pants.engine.fs import PathGlobs, SpecsPaths, Workspace
 from pants.engine.internals.native_engine import EMPTY_SNAPSHOT, Snapshot
 from pants.engine.rules import QueryRule
@@ -368,9 +367,9 @@ def run_lint_rule(
                     mock=mock_target_partitioner,
                 ),
                 MockGet(
-                    output_type=EnvironmentName,
+                    output_type=EnvironmentTarget,
                     input_types=(EnvironmentNameRequest,),
-                    mock=lambda _: EnvironmentName(None),
+                    mock=lambda _: EnvironmentTarget(None, None),
                 ),
                 MockGet(
                     output_type=Partitions,
@@ -399,6 +398,8 @@ def run_lint_rule(
                 ),
             ],
             union_membership=union_membership,
+            # We don't want temporary warnings to interfere with our expected output.
+            show_warnings=False,
         )
         assert not stdio_reader.get_stdout()
         return result.exit_code, stdio_reader.get_stderr()

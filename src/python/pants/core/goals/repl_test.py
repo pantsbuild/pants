@@ -5,8 +5,9 @@ import pytest
 
 from pants.core.goals.repl import Repl, ReplImplementation, ReplRequest
 from pants.core.goals.repl import rules as repl_rules
-from pants.engine.fs import CreateDigest, Digest, FileContent
-from pants.engine.rules import Get, rule
+from pants.engine.fs import CreateDigest, FileContent
+from pants.engine.intrinsics import create_digest
+from pants.engine.rules import rule
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner, mock_console
 
@@ -18,7 +19,7 @@ class MockRepl(ReplImplementation):
 
 @rule
 async def create_mock_repl_request(repl: MockRepl) -> ReplRequest:
-    digest = await Get(Digest, CreateDigest([FileContent("repl.sh", b"exit 0")]))
+    digest = await create_digest(CreateDigest([FileContent("repl.sh", b"exit 0")]))
     return ReplRequest(
         digest=digest,
         args=("/bin/bash", "repl.sh"),

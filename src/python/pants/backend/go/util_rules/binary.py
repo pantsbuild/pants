@@ -13,15 +13,14 @@ from pants.backend.go.target_types import (
 from pants.base.specs import DirGlobSpec, RawSpecs
 from pants.build_graph.address import Address, AddressInput, ResolveError
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import collect_rules, rule
+from pants.engine.internals.build_files import resolve_address
+from pants.engine.internals.graph import resolve_target, resolve_targets
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
     FieldSet,
     InferDependenciesRequest,
     InferredDependencies,
     InvalidFieldException,
-    Targets,
-    WrappedTarget,
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
@@ -53,18 +52,15 @@ async def determine_main_pkg_for_go_binary(
         description_of_origin = (
             f"the `{request.field.alias}` field from the target {request.field.address}"
         )
-        specified_address = await Get(
-            Address,
-            AddressInput,
-            AddressInput.parse(
-                request.field.value,
-                relative_to=addr.spec_path,
-                description_of_origin=description_of_origin,
-            ),
+        address_input = AddressInput.parse(
+            request.field.value,
+            relative_to=addr.spec_path,
+            description_of_origin=description_of_origin,
         )
-        wrapped_specified_tgt = await Get(
-            WrappedTarget,
+        specified_address = await resolve_address(**implicitly({address_input: AddressInput}))
+        wrapped_specified_tgt = await resolve_target(
             WrappedTargetRequest(specified_address, description_of_origin=description_of_origin),
+            **implicitly(),
         )
         if not wrapped_specified_tgt.target.has_field(
             GoPackageSourcesField
@@ -86,12 +82,13 @@ async def determine_main_pkg_for_go_binary(
             )
         return GoBinaryMainPackage(wrapped_specified_tgt.target.address, is_third_party=False)
 
-    candidate_targets = await Get(
-        Targets,
-        RawSpecs(
-            dir_globs=(DirGlobSpec(addr.spec_path),),
-            description_of_origin="the `go_binary` dependency inference rule",
-        ),
+    candidate_targets = await resolve_targets(
+        **implicitly(
+            RawSpecs(
+                dir_globs=(DirGlobSpec(addr.spec_path),),
+                description_of_origin="the `go_binary` dependency inference rule",
+            )
+        )
     )
     relevant_pkg_targets = [
         tgt
@@ -134,9 +131,8 @@ class InferGoBinaryMainDependencyRequest(InferDependenciesRequest):
 async def infer_go_binary_main_dependency(
     request: InferGoBinaryMainDependencyRequest,
 ) -> InferredDependencies:
-    main_pkg = await Get(
-        GoBinaryMainPackage,
-        GoBinaryMainPackageRequest(request.field_set.main_package),
+    main_pkg = await determine_main_pkg_for_go_binary(
+        GoBinaryMainPackageRequest(request.field_set.main_package)
     )
     return InferredDependencies([main_pkg.address])
 

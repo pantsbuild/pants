@@ -9,9 +9,10 @@ from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.config_files import find_config_file
 from pants.core.util_rules.external_tool import download_external_tool
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.internals.native_engine import Digest, MergeDigests
-from pants.engine.internals.selectors import Get, concurrently
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import execute_process, merge_digests
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process
@@ -70,7 +71,7 @@ async def run_trivy(
 
     download_trivy, env, input_digest = await concurrently(
         download_external_tool(trivy.get_request(platform)),
-        Get(EnvironmentVars, EnvironmentVarsRequest(trivy.extra_env_vars)),
+        environment_vars_subset(EnvironmentVarsRequest(trivy.extra_env_vars), **implicitly()),
         merge_digests(MergeDigests((request.input_digest, config_file.snapshot.digest))),
     )
 

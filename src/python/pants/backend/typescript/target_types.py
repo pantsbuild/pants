@@ -1,6 +1,6 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from pants.backend.javascript.target_types import JSRuntimeSourceField
+from pants.backend.javascript.target_types import JSRuntimeDependenciesField, JSRuntimeSourceField
 from pants.core.goals.test import (
     TestExtraEnvVarsField,
     TestsBatchCompatibilityTagField,
@@ -8,7 +8,6 @@ from pants.core.goals.test import (
 )
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
-    Dependencies,
     MultipleSourcesField,
     OverridesField,
     Target,
@@ -22,7 +21,7 @@ TS_FILE_EXTENSIONS: tuple[str, ...] = (".ts",)
 TS_TEST_FILE_EXTENSIONS = tuple(f"*.test{ext}" for ext in TS_FILE_EXTENSIONS)
 
 
-class TypeScriptDependenciesField(Dependencies):
+class TypeScriptDependenciesField(JSRuntimeDependenciesField):
     pass
 
 
