@@ -16,9 +16,8 @@ from pants.backend.go.util_rules.coverage_profile import (
     GoCoverageProfile,
     parse_go_coverage_profiles,
 )
-from pants.engine.fs import DigestContents
 from pants.engine.internals.native_engine import Digest
-from pants.engine.internals.selectors import Get
+from pants.engine.intrinsics import get_digest_contents
 from pants.engine.rules import collect_rules, rule
 
 # Adapted from Go toolchain.
@@ -111,7 +110,7 @@ def _render_source_file(content: bytes, boundaries: Sequence[GoCoverageBoundary]
 async def render_go_coverage_profile_to_html(
     request: RenderGoCoverageProfileToHtmlRequest,
 ) -> RenderGoCoverageProfileToHtmlResult:
-    digest_contents = await Get(DigestContents, Digest, request.sources_digest)
+    digest_contents = await get_digest_contents(request.sources_digest)
     profiles = parse_go_coverage_profiles(
         request.raw_coverage_profile, description_of_origin=request.description_of_origin
     )

@@ -17,9 +17,10 @@ from pants.core.goals.publish import (
 from pants.core.register import rules as core_rules
 from pants.engine import process
 from pants.engine.fs import EMPTY_DIGEST
+from pants.engine.internals.graph import resolve_targets
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import InteractiveProcess
-from pants.engine.rules import Get, rule
+from pants.engine.rules import implicitly, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
@@ -27,7 +28,6 @@ from pants.engine.target import (
     StringField,
     StringSequenceField,
     Target,
-    Targets,
 )
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner
@@ -128,7 +128,7 @@ async def mock_deploy(field_set: MockDeployFieldSet) -> DeployProcess:
     if not field_set.destination.value:
         return DeployProcess(name="test-deploy", publish_dependencies=(), process=None)
 
-    dependencies = await Get(Targets, DependenciesRequest(field_set.dependencies))
+    dependencies = await resolve_targets(**implicitly(DependenciesRequest(field_set.dependencies)))
     dest = field_set.destination.value
     return DeployProcess(
         name="test-deploy",

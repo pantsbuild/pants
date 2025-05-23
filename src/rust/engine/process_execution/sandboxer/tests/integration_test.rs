@@ -31,7 +31,7 @@ async fn test_sandboxer_process() {
 
     let dir = TempDir::new().unwrap();
     let dir_path = dir.path();
-    let (store_cli_opt, dir_digest) = test_util::prep_store(&dir_path).await;
+    let (store_cli_opt, dir_digest) = test_util::prep_store(dir_path).await;
     let pants_workdir = dir_path.join("workdir");
     let sandbox_path = dir_path.join("sandbox");
 

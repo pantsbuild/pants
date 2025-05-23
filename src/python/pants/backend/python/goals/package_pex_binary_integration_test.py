@@ -20,7 +20,6 @@ from pants.backend.python.goals.package_pex_binary import (
 )
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.providers.python_build_standalone import rules as pbs
-from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import (
     PexBinary,
     PexLayout,
@@ -55,7 +54,6 @@ def rule_runner() -> PythonRuleRunner:
             *package_dists.rules(),
             QueryRule(BuiltPackage, [PexBinaryFieldSet]),
             QueryRule(PexFromTargetsRequestForBuiltPackage, [PexBinaryFieldSet]),
-            QueryRule(BuiltPackage, [PythonDistributionFieldSet]),
         ],
         target_types=[
             FileTarget,

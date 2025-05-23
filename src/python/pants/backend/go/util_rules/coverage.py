@@ -10,15 +10,16 @@ from pathlib import PurePath
 
 import chevron
 
-from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, GoSdkToolIDResult
+from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, compute_go_tool_id
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.build_graph.address import Address
 from pants.core.goals.test import CoverageData
 from pants.engine.fs import CreateDigest, DigestSubset, FileContent, PathGlobs
 from pants.engine.internals.native_engine import Digest, MergeDigests
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import ProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import create_digest, digest_subset_to_digest, merge_digests
+from pants.engine.process import fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -103,27 +104,28 @@ class ApplyCodeCoverageToFileResult:
 async def go_apply_code_coverage_to_file(
     request: ApplyCodeCoverageToFileRequest,
 ) -> ApplyCodeCoverageToFileResult:
-    cover_tool_id = await Get(GoSdkToolIDResult, GoSdkToolIDRequest("cover"))
+    cover_tool_id = await compute_go_tool_id(GoSdkToolIDRequest("cover"))
 
-    result = await Get(
-        ProcessResult,
-        GoSdkProcess(
-            input_digest=request.digest,
-            command=[
-                "tool",
-                "cover",
-                "-mode",
-                request.mode.value,
-                "-var",
-                request.cover_var,
-                "-o",
-                request.cover_go_file,
-                request.go_file,
-            ],
-            description=f"Apply Go coverage to: {request.go_file}",
-            output_files=(str(request.cover_go_file),),
-            env={"__PANTS_GO_COVER_TOOL_ID": cover_tool_id.tool_id},
-        ),
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            GoSdkProcess(
+                input_digest=request.digest,
+                command=[
+                    "tool",
+                    "cover",
+                    "-mode",
+                    request.mode.value,
+                    "-var",
+                    request.cover_var,
+                    "-o",
+                    request.cover_go_file,
+                    request.go_file,
+                ],
+                description=f"Apply Go coverage to: {request.go_file}",
+                output_files=(str(request.cover_go_file),),
+                env={"__PANTS_GO_COVER_TOOL_ID": cover_tool_id.tool_id},
+            )
+        )
     )
 
     return ApplyCodeCoverageToFileResult(
@@ -172,9 +174,8 @@ async def go_apply_code_coverage(request: ApplyCodeCoverageRequest) -> ApplyCode
         else:
             output_cgo_files.append(cover_go_file)
 
-    subsetted_digests = await MultiGet(
-        Get(
-            Digest,
+    subsetted_digests = await concurrently(
+        digest_subset_to_digest(
             DigestSubset(
                 request.digest,
                 PathGlobs(
@@ -182,29 +183,28 @@ async def go_apply_code_coverage(request: ApplyCodeCoverageRequest) -> ApplyCode
                     glob_match_error_behavior=GlobMatchErrorBehavior.error,
                     description_of_origin="coverage",
                 ),
-            ),
+            )
         )
         for file_metadata in file_metadatas
     )
 
     # Apply code coverage codegen to each file that will be analyzed.
-    cover_results = await MultiGet(
-        Get(
-            ApplyCodeCoverageToFileResult,
+    cover_results = await concurrently(
+        go_apply_code_coverage_to_file(
             ApplyCodeCoverageToFileRequest(
                 digest=go_file_digest,
                 go_file=os.path.join(request.dir_path, file_metadata.go_file),
                 cover_go_file=os.path.join(request.dir_path, file_metadata.cover_go_file),
                 mode=request.cover_mode,
                 cover_var=file_metadata.cover_var,
-            ),
+            )
         )
         for file_metadata, go_file_digest in zip(file_metadatas, subsetted_digests)
     )
 
     # Merge the coverage codegen back into the original digest so that non-covered and covered sources are in
     # the same digest.
-    digest = await Get(Digest, MergeDigests([request.digest, *(r.digest for r in cover_results)]))
+    digest = await merge_digests(MergeDigests([request.digest, *(r.digest for r in cover_results)]))
 
     return ApplyCodeCoverageResult(
         digest=digest,
@@ -304,8 +304,8 @@ async def generate_go_coverage_setup_code(
         },
     )
 
-    digest = await Get(
-        Digest, CreateDigest([FileContent(GenerateCoverageSetupCodeResult.PATH, content.encode())])
+    digest = await create_digest(
+        CreateDigest([FileContent(GenerateCoverageSetupCodeResult.PATH, content.encode())])
     )
     return GenerateCoverageSetupCodeResult(digest=digest)
 

@@ -6,8 +6,9 @@ from __future__ import annotations
 import os
 
 from pants.backend.docker.target_types import DockerImageInstructionsField, DockerImageSourceField
-from pants.engine.fs import CreateDigest, FileContent, Snapshot
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.fs import CreateDigest, FileContent
+from pants.engine.intrinsics import digest_to_snapshot
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import GeneratedSources, GenerateSourcesRequest, InvalidFieldException
 from pants.engine.unions import UnionRule
 
@@ -44,11 +45,12 @@ async def hydrate_dockerfile(request: GenerateDockerfileRequest) -> GeneratedSou
         return os.path.join(address.spec_path, ".".join(filter(bool, name_parts)))
 
     output = (
-        await Get(
-            Snapshot,
-            CreateDigest(
-                (FileContent(dockerfile_path(), "\n".join([*instructions, ""]).encode()),)
-            ),
+        await digest_to_snapshot(
+            **implicitly(
+                CreateDigest(
+                    (FileContent(dockerfile_path(), "\n".join([*instructions, ""]).encode()),)
+                ),
+            )
         )
         if instructions
         else request.protocol_sources

@@ -573,6 +573,14 @@ impl PyGeneratorResponseCall {
     }
 
     #[getter]
+    fn rule_id(&self, py: Python) -> PyResult<String> {
+        // TODO: Currently this is only called in test infrastructure (specifically, by
+        // rule_runner.py). But if this ends up being used in a performance sensitive
+        // code path, consider denormalizing the rule_id to avoid this copy.
+        Ok(self.borrow_inner(py)?.rule_id.as_str().to_owned())
+    }
+
+    #[getter]
     fn output_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyType>> {
         Ok(self.borrow_inner(py)?.output_type.as_py_type(py))
     }

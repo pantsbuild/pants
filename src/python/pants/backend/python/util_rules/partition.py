@@ -11,8 +11,9 @@ from typing import Protocol, TypeVar
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField, PythonResolveField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.engine.rules import Get
-from pants.engine.target import AllTargets, FieldSet
+from pants.engine.internals.graph import find_all_targets
+from pants.engine.rules import implicitly
+from pants.engine.target import FieldSet
 from pants.util.ordered_set import OrderedSet
 
 ResolveName = str
@@ -64,7 +65,7 @@ async def _find_all_unique_interpreter_constraints(
 
     Returns the global interpreter constraints if no relevant targets were matched.
     """
-    all_tgts = await Get(AllTargets)
+    all_tgts = await find_all_targets(**implicitly())
     unique_constraints = {
         InterpreterConstraints.create_from_compatibility_fields(
             [tgt[InterpreterConstraintsField], *extra_constraints_per_tgt], python_setup

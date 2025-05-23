@@ -364,6 +364,7 @@ Created as part of the release process.
 + Ulugbek Adilbekov
 + Viktor Kleen
 + Vincent Tavernier
++ Vito Laurenza
 + Walter Scheper
 + Wei An
 + Wilhelmina Drengwitz

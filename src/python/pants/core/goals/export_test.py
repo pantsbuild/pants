@@ -25,7 +25,7 @@ from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests, Workspace
+from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Workspace
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target, Targets
@@ -146,6 +146,9 @@ def run_export_rule(
                 DistDir(relpath=Path("dist")),
                 create_subsystem(ExportSubsystem, resolve=resolves, bin=binaries),
             ],
+            mock_calls={
+                "pants.engine.intrinsics.add_prefix": lambda *xs: rule_runner.request(Digest, xs),
+            },
             mock_gets=[
                 MockGet(
                     output_type=ExportResults,
@@ -153,7 +156,6 @@ def run_export_rule(
                     mock=do_mock_export,
                 ),
                 rule_runner.do_not_use_mock(Digest, (MergeDigests,)),
-                rule_runner.do_not_use_mock(Digest, (AddPrefix,)),
                 rule_runner.do_not_use_mock(EnvironmentVars, (EnvironmentVarsRequest,)),
                 rule_runner.do_not_use_mock(KnownUserResolveNames, (KnownUserResolveNamesRequest,)),
                 rule_runner.do_not_use_mock(Digest, (CreateDigest,)),

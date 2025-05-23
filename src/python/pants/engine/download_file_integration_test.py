@@ -50,16 +50,14 @@ def test_no_union_members(global_options: GlobalOptions) -> None:
             union_membership,
             global_options,
         ],
+        mock_calls={
+            "pants.engine.intrinsics.download_file": lambda _: DOWNLOADS_EXPECTED_DIRECTORY_DIGEST,
+        },
         mock_gets=[
             MockGet(
                 output_type=Digest,
                 input_types=(URLDownloadHandler,),
                 mock=lambda _: None,
-            ),
-            MockGet(
-                output_type=Digest,
-                input_types=(NativeDownloadFile,),
-                mock=lambda _: DOWNLOADS_EXPECTED_DIRECTORY_DIGEST,
             ),
         ],
         union_membership=union_membership,
@@ -107,16 +105,14 @@ def test_matches(scheme, authority, url, global_options: GlobalOptions) -> None:
             union_membership,
             global_options,
         ],
+        mock_calls={
+            "pants.engine.intrinsics.download_file": lambda _: None,
+        },
         mock_gets=[
             MockGet(
                 output_type=Digest,
                 input_types=(URLDownloadHandler,),
                 mock=UnionMember.mock_rule,
-            ),
-            MockGet(
-                output_type=Digest,
-                input_types=(NativeDownloadFile,),
-                mock=lambda _: None,
             ),
         ],
         union_membership=union_membership,
@@ -153,16 +149,14 @@ def test_doesnt_match(scheme, authority, url, global_options: GlobalOptions) -> 
             union_membership,
             global_options,
         ],
+        mock_calls={
+            "pants.engine.intrinsics.download_file": lambda _: DOWNLOADS_EXPECTED_DIRECTORY_DIGEST,
+        },
         mock_gets=[
             MockGet(
                 output_type=Digest,
                 input_types=(URLDownloadHandler,),
                 mock=lambda _: None,
-            ),
-            MockGet(
-                output_type=Digest,
-                input_types=(NativeDownloadFile,),
-                mock=lambda _: DOWNLOADS_EXPECTED_DIRECTORY_DIGEST,
             ),
         ],
         union_membership=union_membership,
@@ -187,16 +181,14 @@ def test_too_many_matches(global_options: GlobalOptions) -> None:
                 union_membership,
                 global_options,
             ],
+            mock_calls={
+                "pants.engine.intrinsics.download_file": lambda _: DOWNLOADS_EXPECTED_DIRECTORY_DIGEST,
+            },
             mock_gets=[
                 MockGet(
                     output_type=Digest,
                     input_types=(URLDownloadHandler,),
                     mock=lambda _: None,
-                ),
-                MockGet(
-                    output_type=Digest,
-                    input_types=(NativeDownloadFile,),
-                    mock=lambda _: DOWNLOADS_EXPECTED_DIRECTORY_DIGEST,
                 ),
             ],
             union_membership=union_membership,

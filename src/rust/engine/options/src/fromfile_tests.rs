@@ -90,24 +90,24 @@ fn test_expand_fromfile_to_list() {
     }
 
     fn add<T>(items: Vec<T>) -> ListEdit<T> {
-        return ListEdit {
+        ListEdit {
             action: ListEditAction::Add,
             items: items,
-        };
+        }
     }
 
     fn remove<T>(items: Vec<T>) -> ListEdit<T> {
-        return ListEdit {
+        ListEdit {
             action: ListEditAction::Remove,
             items: items,
-        };
+        }
     }
 
     fn replace<T>(items: Vec<T>) -> ListEdit<T> {
-        return ListEdit {
+        ListEdit {
             action: ListEditAction::Replace,
             items: items,
-        };
+        }
     }
 
     do_test(
@@ -231,17 +231,17 @@ fn test_expand_fromfile_to_dict() {
     }
 
     fn add(items: HashMap<String, Val>) -> DictEdit {
-        return DictEdit {
+        DictEdit {
             action: DictEditAction::Add,
             items,
-        };
+        }
     }
 
     fn replace(items: HashMap<String, Val>) -> DictEdit {
-        return DictEdit {
+        DictEdit {
             action: DictEditAction::Replace,
             items,
-        };
+        }
     }
 
     do_test(

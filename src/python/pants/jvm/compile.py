@@ -21,9 +21,9 @@ from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.selectors import Get
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules, concurrently, rule
 from pants.engine.target import (
     CoarsenedTarget,
     Field,
@@ -443,7 +443,7 @@ def classpath_dependency_requests(
 @rule
 async def compile_classpath_entries(requests: ClasspathEntryRequests) -> FallibleClasspathEntries:
     return FallibleClasspathEntries(
-        await MultiGet(
+        await concurrently(
             Get(FallibleClasspathEntry, ClasspathEntryRequest, request) for request in requests
         )
     )

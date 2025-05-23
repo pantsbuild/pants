@@ -18,14 +18,15 @@ from pants.core.util_rules import adhoc_binaries, external_tool
 from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
-    ExternalToolRequest,
     TemplatedExternalTool,
+    download_external_tool,
 )
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests
-from pants.engine.internals.selectors import MultiGet
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import create_digest, merge_digests
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions, ca_certs_path_to_file_content
 from pants.option.option_types import ArgsListOption
@@ -118,7 +119,7 @@ class PexPEX(DownloadedExternalTool):
 
 @rule
 async def download_pex_pex(pex_cli: PexCli, platform: Platform) -> PexPEX:
-    pex_pex = await Get(DownloadedExternalTool, ExternalToolRequest, pex_cli.get_request(platform))
+    pex_pex = await download_external_tool(pex_cli.get_request(platform))
     return PexPEX(digest=pex_pex.digest, exe=pex_pex.exe)
 
 
@@ -135,19 +136,19 @@ async def setup_pex_cli_process(
     python_setup: PythonSetup,
 ) -> Process:
     tmpdir = ".tmp"
-    gets: list[Get] = [Get(Digest, CreateDigest([Directory(tmpdir)]))]
+    gets = [create_digest(CreateDigest([Directory(tmpdir)]))]
 
     cert_args = []
     if global_options.ca_certs_path:
         ca_certs_fc = ca_certs_path_to_file_content(global_options.ca_certs_path)
-        gets.append(Get(Digest, CreateDigest((ca_certs_fc,))))
+        gets.append(create_digest(CreateDigest((ca_certs_fc,))))
         cert_args = ["--cert", ca_certs_fc.path]
 
     digests_to_merge = [pex_pex.digest]
-    digests_to_merge.extend(await MultiGet(gets))
+    digests_to_merge.extend(await concurrently(gets))
     if request.additional_input_digest:
         digests_to_merge.append(request.additional_input_digest)
-    input_digest = await Get(Digest, MergeDigests(digests_to_merge))
+    input_digest = await merge_digests(MergeDigests(digests_to_merge))
 
     global_args = [
         # Ensure Pex and its subprocesses create temporary files in the process execution

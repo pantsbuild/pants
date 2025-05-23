@@ -12,26 +12,27 @@ from string import Template
 
 from pants.core.util_rules import distdir
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.environments import EnvironmentNameRequest
+from pants.core.util_rules.environments import EnvironmentNameRequest, resolve_environment_name
 from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.internals.graph import find_valid_field_sets
+from pants.engine.internals.specs_rules import find_valid_field_sets_for_target_roots
+from pants.engine.intrinsics import merge_digests
+from pants.engine.rules import Get, collect_rules, concurrently, goal_rule, implicitly, rule
 from pants.engine.target import (
     AllTargets,
     AsyncFieldMixin,
     Dependencies,
     DepsTraversalBehavior,
     FieldSet,
-    FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     NoApplicableTargetsBehavior,
     ShouldTraverseDepsPredicate,
     SpecialCasedDependencies,
     StringField,
     Target,
-    TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
     Targets,
 )
@@ -138,10 +139,8 @@ class EnvironmentAwarePackageRequest:
 
 @rule
 async def environment_aware_package(request: EnvironmentAwarePackageRequest) -> BuiltPackage:
-    environment_name = await Get(
-        EnvironmentName,
-        EnvironmentNameRequest,
-        EnvironmentNameRequest.from_field_set(request.field_set),
+    environment_name = await resolve_environment_name(
+        EnvironmentNameRequest.from_field_set(request.field_set), **implicitly()
     )
     package = await Get(
         BuiltPackage, {request.field_set: PackageFieldSet, environment_name: EnvironmentName}
@@ -169,8 +168,8 @@ class AllPackageableTargets(Targets):
 
 @rule(desc="Find all packageable targets in project", level=LogLevel.DEBUG)
 async def find_all_packageable_targets(all_targets: AllTargets) -> AllPackageableTargets:
-    fs_per_target = await Get(
-        FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, all_targets)
+    fs_per_target = await find_valid_field_sets(
+        FieldSetsPerTargetRequest(PackageFieldSet, all_targets), **implicitly()
     )
     return AllPackageableTargets(
         target
@@ -181,23 +180,23 @@ async def find_all_packageable_targets(all_targets: AllTargets) -> AllPackageabl
 
 @goal_rule
 async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
-    target_roots_to_field_sets = await Get(
-        TargetRootsToFieldSets,
+    target_roots_to_field_sets = await find_valid_field_sets_for_target_roots(
         TargetRootsToFieldSetsRequest(
             PackageFieldSet,
             goal_description="the `package` goal",
             no_applicable_targets_behavior=NoApplicableTargetsBehavior.warn,
         ),
+        **implicitly(),
     )
     if not target_roots_to_field_sets.field_sets:
         return Package(exit_code=0)
 
-    packages = await MultiGet(
-        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
+    packages = await concurrently(
+        environment_aware_package(EnvironmentAwarePackageRequest(field_set))
         for field_set in target_roots_to_field_sets.field_sets
     )
 
-    merged_digest = await Get(Digest, MergeDigests(pkg.digest for pkg in packages))
+    merged_digest = await merge_digests(MergeDigests(pkg.digest for pkg in packages))
     all_relpaths = [
         artifact.relpath for pkg in packages for artifact in pkg.artifacts if artifact.relpath
     ]

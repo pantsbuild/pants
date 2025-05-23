@@ -4,7 +4,7 @@ from abc import ABCMeta
 from dataclasses import dataclass
 from typing import Any
 
-from pants.backend.helm.subsystems.post_renderer import HelmPostRenderer
+from pants.backend.helm.subsystems.post_renderer import setup_post_renderer_launcher
 from pants.backend.helm.target_types import (
     HelmChartFieldSet,
     HelmChartTarget,
@@ -17,12 +17,13 @@ from pants.backend.helm.util_rules.renderer import (
     HelmDeploymentRequest,
     RenderedHelmFiles,
     RenderHelmChartRequest,
+    render_helm_chart,
+    run_renderer,
 )
 from pants.backend.tools.trivy.rules import RunTrivyRequest, run_trivy
 from pants.backend.tools.trivy.subsystem import SkipTrivyField, Trivy
 from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.partitions import PartitionerType
-from pants.engine.internals.selectors import Get
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import FieldSet, Target
@@ -86,15 +87,18 @@ async def run_trivy_on_helm_deployment(
     assert len(request.elements) == 1, "not single element in partition"  # "Do we need to?"
     [field_set] = request.elements
 
-    post_renderer = await Get(HelmPostRenderer, HelmDeploymentPostRendererRequest(field_set))
-    rendered_files = await Get(
-        RenderedHelmFiles,
-        HelmDeploymentRequest(
-            field_set,
-            cmd=HelmDeploymentCmd.RENDER,
-            post_renderer=post_renderer,
-            description=f"Evaluating Helm deployment files for {field_set.address}",
-        ),
+    post_renderer = await setup_post_renderer_launcher(
+        **implicitly(HelmDeploymentPostRendererRequest(field_set))
+    )
+    rendered_files = await run_renderer(
+        **implicitly(
+            HelmDeploymentRequest(
+                field_set,
+                cmd=HelmDeploymentCmd.RENDER,
+                post_renderer=post_renderer,
+                description=f"Evaluating Helm deployment files for {field_set.address}",
+            )
+        )
     )
 
     r = await run_trivy_on_helm(RunTrivyOnHelmRequest(field_set, rendered_files))
@@ -120,9 +124,7 @@ async def run_trivy_on_helm_chart(
     assert len(request.elements) == 1, "not single element in partition"  # "Do we need to?"
     [field_set] = request.elements
 
-    rendered_files: RenderedHelmFiles = await Get(
-        RenderedHelmFiles, RenderHelmChartRequest(field_set)
-    )
+    rendered_files: RenderedHelmFiles = await render_helm_chart(RenderHelmChartRequest(field_set))
     r = await run_trivy_on_helm(RunTrivyOnHelmRequest(field_set, rendered_files))
 
     return LintResult.create(request, r)

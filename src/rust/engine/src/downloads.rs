@@ -378,7 +378,7 @@ mod tests {
                         // This error code is retryable.
                         (StatusCode::BAD_GATEWAY, &b"502"[..]).into_response()
                     } else if attempt == 1 {
-                        (StatusCode::OK, &TEST_RESPONSE[..]).into_response()
+                        (StatusCode::OK, TEST_RESPONSE).into_response()
                     } else {
                         (StatusCode::INTERNAL_SERVER_ERROR, &b"unexpected"[..]).into_response()
                     }

@@ -4,9 +4,8 @@ from pants.backend.scala.dependency_inference.symbol_mapper import AllScalaTarge
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.util_rules.versions import (
     ScalaArtifactsForVersionRequest,
-    ScalaArtifactsForVersionResult,
+    resolve_scala_artifacts_for_version,
 )
-from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.goals.lockfile import (
@@ -78,8 +77,8 @@ async def validate_scala_runtime_is_present_in_resolve(
         return ValidateJvmArtifactsForResolveResult()
 
     scala_version = scala_subsystem.version_for_resolve(request.resolve_name)
-    scala_artifacts = await Get(
-        ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(scala_version)
+    scala_artifacts = await resolve_scala_artifacts_for_version(
+        ScalaArtifactsForVersionRequest(scala_version)
     )
 
     has_scala_library_artifact = False
