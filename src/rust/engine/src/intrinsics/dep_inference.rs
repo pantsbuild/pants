@@ -158,7 +158,7 @@ fn parse_dockerfile_info(deps_request: Value) -> PyGeneratorResponseNativeCall {
                                 .map(|s| s.to_string())
                                 .ok_or_else(|| {
                                     PyException::new_err(format!(
-                                        "Could not convert path `{}` to UTF8.",
+                                        "Could not convert ParsedDockerfileInfo.path `{}` to UTF8.",
                                         result.path.display()
                                     ))
                                 })?

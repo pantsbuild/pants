@@ -256,7 +256,7 @@ impl AddressInput {
             .map(|s| s.to_string())
             .ok_or_else(|| {
                 PyException::new_err(format!(
-                    "Could not convert path component `{}` to UTF8.",
+                    "Could not convert AddressInput.path_component `{}` to UTF8.",
                     self.path_component.display()
                 ))
             })
@@ -545,7 +545,7 @@ impl Address {
             .map(|s| s.to_string())
             .ok_or_else(|| {
                 PyException::new_err(format!(
-                    "Could not convert spec_path `{}` to UTF8.",
+                    "Could not convert Address.spec_path `{}` to UTF8.",
                     self.spec_path.display()
                 ))
             })
@@ -565,7 +565,7 @@ impl Address {
                     .map(|s| s.to_string())
                     .ok_or_else(|| {
                         PyException::new_err(format!(
-                            "Could not convert relative_file_path `{}` to UTF8.",
+                            "Could not convert Address.relative_file_path `{}` to UTF8.",
                             self.relative_file_path.as_ref().unwrap().display()
                         ))
                     })?,
@@ -613,7 +613,7 @@ impl Address {
                 .map(|s| s.to_string())
                 .ok_or_else(|| {
                     PyException::new_err(format!(
-                        "Could not convert path component `{}` to UTF8.",
+                        "Could not convert Address.path_component `{}` to UTF8.",
                         full_path.display()
                     ))
                 })

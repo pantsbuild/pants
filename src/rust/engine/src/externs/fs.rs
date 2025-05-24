@@ -580,7 +580,7 @@ impl PyPathMetadata {
             .map(|s| s.to_string())
             .ok_or_else(|| {
                 PyException::new_err(format!(
-                    "Could not convert path `{}` to UTF8.",
+                    "Could not convert PyPathMetadata.path `{}` to UTF8.",
                     self.0.path.display()
                 ))
             })
@@ -633,7 +633,7 @@ impl PyPathMetadata {
                 .map(|s| s.to_string())
                 .ok_or_else(|| {
                     PyException::new_err(format!(
-                        "Could not convert symlink target `{}` to UTF8.",
+                        "Could not convert PyPathMetadata.symlink_target `{}` to UTF8.",
                         symlink_target.display()
                     ))
                 })?,
