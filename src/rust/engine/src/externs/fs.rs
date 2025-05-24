@@ -572,8 +572,18 @@ impl PyPathMetadata {
     }
 
     #[getter]
-    pub fn path(&self) -> PyResult<PathBuf> {
-        Ok(self.0.path.clone())
+    pub fn path(&self) -> PyResult<String> {
+        self.0
+            .path
+            .as_os_str()
+            .to_str()
+            .map(|s| s.to_string())
+            .ok_or_else(|| {
+                PyException::new_err(format!(
+                    "Could not convert path `{}` to UTF8.",
+                    self.0.path.display()
+                ))
+            })
     }
 
     #[getter]
@@ -612,8 +622,22 @@ impl PyPathMetadata {
     }
 
     #[getter]
-    pub fn symlink_target(&self) -> PyResult<Option<PathBuf>> {
-        Ok(self.0.symlink_target.clone())
+    pub fn symlink_target(&self) -> PyResult<Option<String>> {
+        let Some(symlink_target) = self.0.symlink_target.as_ref() else {
+            return Ok(None);
+        };
+        Ok(Some(
+            symlink_target
+                .as_os_str()
+                .to_str()
+                .map(|s| s.to_string())
+                .ok_or_else(|| {
+                    PyException::new_err(format!(
+                        "Could not convert symlink target `{}` to UTF8.",
+                        symlink_target.display()
+                    ))
+                })?,
+        ))
     }
 
     pub fn copy(&self) -> PyResult<Self> {
