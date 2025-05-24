@@ -249,8 +249,17 @@ impl AddressInput {
     }
 
     #[getter]
-    fn path_component(&self) -> &Path {
-        &self.path_component
+    fn path_component(&self) -> PyResult<String> {
+        self.path_component
+            .as_os_str()
+            .to_str()
+            .map(|s| s.to_string())
+            .ok_or_else(|| {
+                PyException::new_err(format!(
+                    "Could not convert AddressInput.path_component `{}` to UTF8.",
+                    self.path_component.display()
+                ))
+            })
     }
 
     #[getter]
@@ -529,8 +538,17 @@ impl Address {
     }
 
     #[getter]
-    fn spec_path(&self) -> &Path {
-        &self.spec_path
+    fn spec_path(&self) -> PyResult<String> {
+        self.spec_path
+            .as_os_str()
+            .to_str()
+            .map(|s| s.to_string())
+            .ok_or_else(|| {
+                PyException::new_err(format!(
+                    "Could not convert Address.spec_path `{}` to UTF8.",
+                    self.spec_path.display()
+                ))
+            })
     }
 
     #[getter]
@@ -539,8 +557,21 @@ impl Address {
     }
 
     #[getter]
-    fn relative_file_path(&self) -> Option<&Path> {
-        self.relative_file_path.as_deref()
+    fn relative_file_path(&self) -> PyResult<Option<String>> {
+        match &self.relative_file_path {
+            Some(p) => Ok(Some(
+                p.as_os_str()
+                    .to_str()
+                    .map(|s| s.to_string())
+                    .ok_or_else(|| {
+                        PyException::new_err(format!(
+                            "Could not convert Address.relative_file_path `{}` to UTF8.",
+                            self.relative_file_path.as_ref().unwrap().display()
+                        ))
+                    })?,
+            )),
+            None => Ok(None),
+        }
     }
 
     #[getter]
@@ -573,9 +604,19 @@ impl Address {
     }
 
     #[getter]
-    fn filename(&self) -> PyResult<PathBuf> {
+    fn filename(&self) -> PyResult<String> {
         if let Some(relative_file_path) = self.relative_file_path.as_ref() {
-            Ok(self.spec_path.join(relative_file_path))
+            let full_path = self.spec_path.join(relative_file_path);
+            full_path
+                .as_os_str()
+                .to_str()
+                .map(|s| s.to_string())
+                .ok_or_else(|| {
+                    PyException::new_err(format!(
+                        "Could not convert Address.path_component `{}` to UTF8.",
+                        full_path.display()
+                    ))
+                })
         } else {
             Err(PyException::new_err(format!(
                 "Only a file Address (`self.is_file_target`) has a filename: {self}",

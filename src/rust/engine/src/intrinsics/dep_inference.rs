@@ -15,6 +15,7 @@ use hashing::Digest;
 use protos::gen::pants::cache::{
     CacheKey, CacheKeyType, DependencyInferenceRequest, dependency_inference_request,
 };
+use pyo3::exceptions::PyException;
 use pyo3::prelude::{PyModule, PyResult, Python, pyfunction, wrap_pyfunction};
 use pyo3::types::{PyAnyMethods, PyModuleMethods};
 use pyo3::{Bound, IntoPyObject, PyErr};
@@ -150,7 +151,20 @@ fn parse_dockerfile_info(deps_request: Value) -> PyGeneratorResponseNativeCall {
                         py,
                         core.types.parsed_dockerfile_info_result,
                         &[
-                            result.path.into_pyobject(py)?.into_any().into(),
+                            result
+                                .path
+                                .as_os_str()
+                                .to_str()
+                                .map(|s| s.to_string())
+                                .ok_or_else(|| {
+                                    PyException::new_err(format!(
+                                        "Could not convert ParsedDockerfileInfo.path `{}` to UTF8.",
+                                        result.path.display()
+                                    ))
+                                })?
+                                .into_pyobject(py)?
+                                .into_any()
+                                .into(),
                             result.build_args.into_pyobject(py)?.into_any().into(),
                             result
                                 .copy_source_paths

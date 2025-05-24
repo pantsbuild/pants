@@ -161,7 +161,7 @@ impl ExecuteProcess {
         let attempt = externs::getattr(value, "attempt").unwrap_or(0);
 
         Ok(Process {
-            argv: externs::getattr(value, "argv").unwrap(),
+            argv: externs::getattr(value, "argv")?,
             env,
             working_directory,
             input_digests,
