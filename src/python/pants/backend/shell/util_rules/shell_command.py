@@ -32,6 +32,7 @@ from pants.backend.shell.target_types import (
 )
 from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
+from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.adhoc_process_support import (
@@ -46,11 +47,7 @@ from pants.core.util_rules.adhoc_process_support import (
     resolve_execution_environment,
 )
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
-from pants.core.util_rules.environments import (
-    EnvironmentNameRequest,
-    EnvironmentTarget,
-    resolve_environment_name,
-)
+from pants.core.util_rules.environments import EnvironmentNameRequest, resolve_environment_name
 from pants.core.util_rules.system_binaries import (
     BashBinary,
     BinaryShimsRequest,

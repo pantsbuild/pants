@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from pants.backend.codegen.thrift.apache.subsystem import ApacheThriftSubsystem
 from pants.backend.codegen.thrift.target_types import ThriftSourceField
-from pants.core.util_rules.environments import EnvironmentTarget
+from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.core.util_rules.system_binaries import (
     BinaryNotFoundError,

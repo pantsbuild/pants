@@ -5,10 +5,10 @@ from __future__ import annotations
 
 import os
 
-from pants.core.util_rules.environments import (
+from pants.core.environments.subsystems import EnvironmentsSubsystem
+from pants.core.environments.target_types import (
     DockerImageField,
     DockerPlatformField,
-    EnvironmentsSubsystem,
     EnvironmentTarget,
     RemotePlatformField,
 )

@@ -7,9 +7,9 @@ from collections.abc import Collection
 from dataclasses import dataclass
 
 from pants.backend.go.subsystems.golang import GolangSubsystem
+from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.util_rules import asdf, search_paths
 from pants.core.util_rules.asdf import AsdfPathString, AsdfToolPathsResult
-from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.search_paths import ValidateSearchPathsRequest, validate_search_paths
 from pants.engine.internals.platform_rules import environment_path_variable
 from pants.engine.rules import collect_rules, rule

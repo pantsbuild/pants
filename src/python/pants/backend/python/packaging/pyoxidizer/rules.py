@@ -24,6 +24,7 @@ from pants.backend.python.packaging.pyoxidizer.target_types import (
 )
 from pants.backend.python.target_types import GenerateSetupField, WheelField
 from pants.backend.python.util_rules.pex import PexProcess, create_pex, setup_pex_process
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,
@@ -32,7 +33,6 @@ from pants.core.goals.package import (
     environment_aware_package,
 )
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
-from pants.core.util_rules.environments import EnvironmentField
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests, RemovePrefix
 from pants.engine.internals.graph import find_valid_field_sets, hydrate_sources, resolve_targets

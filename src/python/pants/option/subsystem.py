@@ -23,7 +23,7 @@ from pants.util.strutil import softwrap
 
 if TYPE_CHECKING:
     # Needed to avoid an import cycle.
-    from pants.core.util_rules.environments import EnvironmentTarget
+    from pants.core.environments.target_types import EnvironmentTarget
     from pants.engine.rules import Rule
 
 _SubsystemT = TypeVar("_SubsystemT", bound="Subsystem")
@@ -221,7 +221,7 @@ class Subsystem(metaclass=_SubsystemMeta):
     def _construct_env_aware_rule(cls) -> Rule:
         """Returns a `TaskRule` that will construct the target Subsystem.EnvironmentAware."""
         # Global-level imports are conditional, we need to re-import here for runtime use
-        from pants.core.util_rules.environments import EnvironmentTarget
+        from pants.core.environments.target_types import EnvironmentTarget
         from pants.engine.rules import TaskRule
 
         snake_scope = normalize_scope(cls.options_scope)
