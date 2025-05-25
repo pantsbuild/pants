@@ -1,11 +1,11 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use glob::glob;
+use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::LazyLock;
-
-use ignore::gitignore::{Gitignore, GitignoreBuilder};
 
 use crate::Stat;
 
@@ -78,10 +78,14 @@ impl GitignoreStyleExcludes {
         {
             result.push(global_ignore_path);
         }
-
-        let gitignore_path = build_root.join(".gitignore");
-        if Path::is_file(&gitignore_path) {
-            result.push(gitignore_path);
+        if let Ok(gitignore_paths) =
+            glob(&build_root.join("**").join("*.gitignore").to_string_lossy())
+        {
+            result.extend(
+                gitignore_paths
+                    .filter_map(Result::ok)
+                    .filter(|p| p.is_file()),
+            )
         }
 
         // Unlike Git, we hardcode `.git` and don't look for `$GIT_DIR`. See
@@ -216,9 +220,10 @@ mod tests {
     }
 
     #[test]
-    fn test_gitignore_file_paths() {
+    fn test_gitignore_file_paths() -> Result<(), Box<dyn std::error::Error>> {
         let root = tempfile::TempDir::new().unwrap();
         let root_path = root.path();
+        let subpath = root_path.join("folder");
 
         // The behavior of gitignore_file_paths depends on whether the machine has a global config
         // file or not. We do not want to muck around with people's global config, so instead we
@@ -236,10 +241,17 @@ mod tests {
         );
 
         let gitignore_path = root_path.join(".gitignore");
+        fs::create_dir_all(&subpath)?;
+        let sub_folder_gitignore_path = subpath.join(".gitignore");
         make_file(&gitignore_path, b"", 0o700);
+        make_file(&sub_folder_gitignore_path, b"", 0o700);
         let expected = match global_config_path.clone() {
-            Some(global_fp) => vec![global_fp, gitignore_path.clone()],
-            None => vec![gitignore_path.clone()],
+            Some(global_fp) => vec![
+                global_fp,
+                gitignore_path.clone(),
+                sub_folder_gitignore_path.clone(),
+            ],
+            None => vec![gitignore_path.clone(), sub_folder_gitignore_path.clone()],
         };
         assert_eq!(
             GitignoreStyleExcludes::gitignore_file_paths(root_path),
@@ -250,12 +262,22 @@ mod tests {
         fs::create_dir_all(git_info_exclude_path.parent().unwrap()).unwrap();
         make_file(&git_info_exclude_path, b"", 0o700);
         let expected = match global_config_path.clone() {
-            Some(global_fp) => vec![global_fp, gitignore_path.clone(), git_info_exclude_path],
-            None => vec![gitignore_path.clone(), git_info_exclude_path],
+            Some(global_fp) => vec![
+                global_fp,
+                gitignore_path,
+                sub_folder_gitignore_path,
+                git_info_exclude_path,
+            ],
+            None => vec![
+                gitignore_path,
+                sub_folder_gitignore_path,
+                git_info_exclude_path,
+            ],
         };
         assert_eq!(
             GitignoreStyleExcludes::gitignore_file_paths(root_path),
             expected
         );
+        Ok(())
     }
 }
