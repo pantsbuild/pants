@@ -118,7 +118,7 @@ def _parse_config_from_content(content: FileContent) -> tuple[TSConfig, str | No
         module_resolution=compiler_options.get("moduleResolution"),
         paths=compiler_options.get("paths"),
         base_url=compiler_options.get("baseUrl"),
-    ), compiler_options.get("extends")
+    ), parsed_ts_config_json.get("extends")
 
 
 @rule
