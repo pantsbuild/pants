@@ -653,6 +653,7 @@ impl Core {
                 store_rpc_retries: remoting_opts.store_rpc_retries,
                 store_rpc_concurrency: remoting_opts.store_rpc_concurrency,
                 store_batch_api_size_limit: remoting_opts.store_batch_api_size_limit,
+                store_batch_load_enabled: remoting_opts.store_batch_load_enabled,
                 header: remoting_opts
                     .store_headers
                     .iter()
