@@ -38,6 +38,7 @@ from pants.backend.python.util_rules.pex_environment import (
 )
 from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
+    LoadedLockfile,
     LoadedLockfileRequest,
     Lockfile,
 )
@@ -532,6 +533,27 @@ async def get_req_strings(pex_reqs: PexRequirements) -> PexRequirementsInfo:
     return PexRequirementsInfo(tuple(sorted(req_strings)), tuple(sorted(find_links)))
 
 
+async def _get_entire_lockfile_and_requirements(
+    requirements: EntireLockfile | PexRequirements,
+) -> tuple[LoadedLockfile | None, tuple[str, ...]]:
+    lockfile: Lockfile | None = None
+    complete_req_strings: tuple[str, ...] = tuple()
+    # TODO: This is clunky, but can be simplified once we get rid of old-style tool
+    #  lockfiles, because we can unify EntireLockfile and Resolve.
+    if isinstance(requirements, EntireLockfile):
+        complete_req_strings = requirements.complete_req_strings or tuple()
+        lockfile = requirements.lockfile
+    elif (
+        isinstance(requirements.from_superset, Resolve)
+        and requirements.from_superset.use_entire_lockfile
+    ):
+        lockfile = await get_lockfile_for_resolve(requirements.from_superset, **implicitly())
+    if not lockfile:
+        return None, complete_req_strings
+    loaded_lockfile = await load_lockfile(LoadedLockfileRequest(lockfile), **implicitly())
+    return loaded_lockfile, complete_req_strings
+
+
 @rule
 async def _setup_pex_requirements(
     request: PexRequest, python_setup: PythonSetup
@@ -553,20 +575,10 @@ async def _setup_pex_requirements(
     pex_lock_resolver_args = list(resolve_config.pex_args())
     pip_resolver_args = [*resolve_config.pex_args(), "--resolver-version", "pip-2020-resolver"]
 
-    # TODO: This is clunky, but can be simplified once we get rid of old-style tool
-    #  lockfiles, because we can unify EntireLockfile and Resolve.
-    if isinstance(request.requirements, EntireLockfile) or (
-        isinstance(request.requirements.from_superset, Resolve)
-        and request.requirements.from_superset.use_entire_lockfile
-    ):
-        if isinstance(request.requirements, EntireLockfile):
-            complete_req_strings = request.requirements.complete_req_strings
-            lockfile = request.requirements.lockfile
-        else:
-            complete_req_strings = None
-            # TODO: Call-by-name fails with "get_lockfile_for_resolve" has incompatible type "Pex | Resolve | None"; expected "Resolve" - need to narrow this (later)
-            lockfile = await Get(Lockfile, Resolve, request.requirements.from_superset)
-        loaded_lockfile = await load_lockfile(LoadedLockfileRequest(lockfile), **implicitly())
+    loaded_lockfile, complete_req_strings = await _get_entire_lockfile_and_requirements(
+        request.requirements
+    )
+    if loaded_lockfile:
         argv = (
             ["--lock", loaded_lockfile.lockfile_path, *pex_lock_resolver_args]
             if loaded_lockfile.is_pex_native
