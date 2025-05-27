@@ -192,10 +192,22 @@ async fn load_bytes_batch_missing() {
     let results = provider
         .load_batch(digests, &mut destination)
         .await
-        .unwrap_err();
+        .unwrap();
+    assert_eq!(results.len(), 2);
+
     assert_eq!(
-        results,
-        "Unknown: \"Batch read of digest Digest { hash: Fingerprint<eb1b94cfd6971df4a73991580e1664cfbd8d830c5bd784e92ead3d7de9a9c874>, size_bytes: 6 } returned status 5: \\\"\\\"\""
+        results[&TestData::roland().digest()],
+        Err(
+            "status: NotFound, message: \"\", details: [], metadata: MetadataMap { headers: {} }"
+                .to_owned()
+        )
+    );
+    assert_eq!(
+        results[&TestData::catnip().digest()],
+        Err(
+            "status: NotFound, message: \"\", details: [], metadata: MetadataMap { headers: {} }"
+                .to_owned()
+        )
     );
 }
 
