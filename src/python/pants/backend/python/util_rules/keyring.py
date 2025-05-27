@@ -20,6 +20,11 @@ class ForgedKeyring:
 
 
 def _separate_authority_component(url: str) -> tuple[str, str] | None:
+    """Function to separate the username from the repository URL.
+    
+    See here for details: https://datatracker.ietf.org/doc/html/rfc3986#section-3.2
+    """
+
     parsed = urlparse(url)
     if not (parsed.hostname and parsed.username):
         return None
@@ -41,6 +46,11 @@ def _make_forgery_string(repo: str, username: str, password: str) -> str:
 FORGERY_SCRIPT_FORMAT_STR = """\
 #!/bin/sh
 
+if [ "$1" != 'get' ]; then
+    echo "Pant keyring-forgery script only supports 'get' operations, not '$1'" >&2
+    exit 2
+fi
+
 # Define the hardcoded pairs and associated values
 # Format: "url username password"
 PAIRS="
@@ -49,7 +59,7 @@ PAIRS="
 
 # Loop through the pairs
 echo "$PAIRS" | while read URL USERNAME PASSWORD; do
-  if ["$1" = 'get' ] && [ "$2" = "$URL" ] && [ "$3" = "$USERNAME" ]; then
+  if [ "$2" = "$URL" ] && [ "$3" = "$USERNAME" ]; then
     echo "$PASSWORD"
     exit 0
   fi

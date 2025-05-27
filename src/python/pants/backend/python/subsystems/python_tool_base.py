@@ -307,6 +307,7 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
             interpreter_constraints=interpreter_constraints,
             main=main,
             sources=sources,
+            allow_keyring=False,
         )
 
 
