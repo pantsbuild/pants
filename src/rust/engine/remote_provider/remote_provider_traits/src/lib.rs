@@ -1,7 +1,7 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -37,6 +37,7 @@ pub struct RemoteStoreOptions {
     pub retries: usize,
     pub concurrency_limit: usize,
     pub batch_api_size_limit: usize,
+    pub batch_load_enabled: bool,
 }
 
 #[async_trait]
@@ -62,6 +63,14 @@ pub trait ByteStoreProvider: Sync + Send + 'static {
         digest: Digest,
         destination: &mut dyn LoadDestination,
     ) -> Result<bool, String>;
+
+    async fn load_batch(
+        &self,
+        digests: Vec<Digest>,
+        destination: &mut dyn BatchLoadDestination,
+    ) -> Result<HashMap<Digest, Result<bool, String>>, String>;
+
+    fn batch_load_supported(&self) -> bool;
 
     /// Return any digests from `digests` that are not (currently) available in the remote store.
     ///
@@ -94,6 +103,11 @@ impl LoadDestination for Vec<u8> {
         self.clear();
         Ok(())
     }
+}
+
+#[async_trait]
+pub trait BatchLoadDestination: Send + Sync + Unpin + 'static {
+    async fn write(&mut self, digests: Vec<(Digest, Bytes)>) -> Result<(), String>;
 }
 
 /// This `ActionCacheProvider` trait captures the operations required to be able to cache command

@@ -75,6 +75,7 @@ fn remote_options(
         retries: 1,
         concurrency_limit: 256,
         batch_api_size_limit: STORE_BATCH_API_SIZE_LIMIT,
+        batch_load_enabled: false,
     }
 }
 ///

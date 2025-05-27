@@ -259,6 +259,7 @@ def test_remote_provider_matches_rust_enum(
         store_rpc_concurrency=0,
         store_rpc_timeout_millis=0,
         store_batch_api_size_limit=0,
+        store_batch_load_enabled=False,
         cache_warnings_behavior="ignore",
         cache_content_behavior="validate",
         cache_rpc_concurrency=0,
