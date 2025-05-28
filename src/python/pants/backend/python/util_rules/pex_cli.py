@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import os
 import logging
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
