@@ -14,3 +14,7 @@ class KeyringSubsystem(PythonToolBase):
     default_interpreter_constraints = ["CPython>=3.6,<4"]
 
     register_interpreter_constraints = True
+
+
+def rules():
+    return KeyringSubsystem.rules()
