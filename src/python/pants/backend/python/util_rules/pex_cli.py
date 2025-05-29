@@ -171,7 +171,7 @@ async def setup_pex_cli_process(
             keyring_args.append("--keyring-provider=subprocess")
             digests_to_merge.append(maybe_keyring.digest)
             # PATH is guaranteed to be in env
-            env["PATH"] = os.pathsep.join(env["PATH"], maybe_keyring.bin_path)
+            env["PATH"] = os.pathsep.join([env["PATH"], maybe_keyring.bin_path])
 
     input_digest = await merge_digests(MergeDigests(digests_to_merge))
 
