@@ -1,10 +1,13 @@
 # Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import dataclasses
+from typing import Iterable
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.target_types import ConsoleScript
+from pants.backend.python.target_types import ConsoleScript, MainSpecification
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest
+from pants.engine.fs import Digest
 from pants.option.option_types import BoolOption
 
 
@@ -27,7 +30,12 @@ class KeyringSubsystem(PythonToolBase):
     )
 
     def to_pex_request(
-        self, *, interpreter_constraints=None, extra_requirements=..., main=None, sources=None
+        self,
+        *,
+        interpreter_constraints: InterpreterConstraints | None = None,
+        extra_requirements: Iterable[str] = (),
+        main: MainSpecification | None = None,
+        sources: Digest | None = None,
     ) -> PexRequest:
         return dataclasses.replace(
             super().to_pex_request(

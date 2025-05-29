@@ -85,7 +85,7 @@ async def forge_keyring(
     from pants.backend.python.util_rules.pex import PexProcess, create_pex, setup_pex_process
 
     subsystem = await _construct_subsystem(KeyringSubsystem)
-    if not subsystem.install_from_resolve:
+    if not subsystem.enabled:
         return ForgedKeyring(EMPTY_DIGEST, None)
 
     pants_cache_key_store = os.path.join(get_pants_cachedir(), _KEYSTORE_DIR)
