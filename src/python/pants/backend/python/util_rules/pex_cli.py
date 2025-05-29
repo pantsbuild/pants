@@ -4,16 +4,17 @@
 from __future__ import annotations
 
 import dataclasses
-import os
 import logging
+import os
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 from pants.backend.python.subsystems.python_native_code import PythonNativeCodeSubsystem
+from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.util_rules import pex_environment, keyring
-from pants.backend.python.util_rules.pex_environment import PexEnvironment, PexSubsystem
+from pants.backend.python.util_rules import keyring, pex_environment
 from pants.backend.python.util_rules.keyring import forge_keyring
+from pants.backend.python.util_rules.pex_environment import PexEnvironment, PexSubsystem
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import adhoc_binaries, external_tool
 from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
@@ -27,7 +28,7 @@ from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import create_digest, merge_digests
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
-from pants.engine.rules import collect_rules, rule, implicitly
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions, ca_certs_path_to_file_content
 from pants.option.option_types import ArgsListOption
@@ -138,6 +139,7 @@ async def setup_pex_cli_process(
     pex_subsystem: PexSubsystem,
     pex_cli_subsystem: PexCli,
     python_setup: PythonSetup,
+    python_repos: PythonRepos,
 ) -> Process:
     tmpdir = ".tmp"
     gets = [create_digest(CreateDigest([Directory(tmpdir)]))]
@@ -163,7 +165,7 @@ async def setup_pex_cli_process(
     }
 
     keyring_args = []
-    if request.allow_keyring:
+    if request.allow_keyring and python_repos.indexes != (PythonRepos.pypi_index,):
         maybe_keyring = await forge_keyring(**implicitly())
         if maybe_keyring.bin_path:
             keyring_args.append("--keyring-provider=subprocess")
@@ -220,7 +222,7 @@ async def setup_pex_cli_process(
         *request.extra_args,
     ]
     normalized_argv = complete_pex_env.create_argv(pex_pex.exe, *args)
-    
+
     return Process(
         normalized_argv,
         description=request.description,
