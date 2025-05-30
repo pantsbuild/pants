@@ -9,7 +9,6 @@ from pants.backend.tsx.target_types import (
     TSXTestsGeneratorTarget,
     TSXTestTarget,
 )
-from pants.backend.typescript.dependency_inference import rules as dependency_inference_rules
 from pants.backend.typescript.goals import tailor
 from pants.backend.typescript.target_types import (
     TypeScriptSourcesGeneratorTarget,
@@ -37,7 +36,6 @@ def target_types() -> Iterable[type[Target]]:
 
 def rules() -> Iterable[Rule | UnionRule]:
     return (
-        *dependency_inference_rules.rules(),
         *tailor.rules(),
         *tsx_tailor.rules(),
     )

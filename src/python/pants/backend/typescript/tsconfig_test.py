@@ -45,7 +45,7 @@ def test_parses_extended_tsconfig(rule_runner: RuleRunner) -> None:
             "project/BUILD": "typescript_source()",
             "project/index.ts": "",
             "project/tsconfig.json": json.dumps({"compilerOptions": {"baseUrl": "./"}}),
-            "project/lib/tsconfig.json": json.dumps({"compilerOptions": {"extends": ".."}}),
+            "project/lib/tsconfig.json": json.dumps({"extends": ".."}),
         }
     )
     configs = rule_runner.request(AllTSConfigs, [TSConfigsRequest("tsconfig.json")])
@@ -60,7 +60,7 @@ def test_parses_tsconfig_with_missing_extends_parent(rule_runner: RuleRunner) ->
         {
             "project/BUILD": "typescript_source()",
             "project/index.ts": "",
-            "project/lib/tsconfig.json": json.dumps({"compilerOptions": {"extends": ".."}}),
+            "project/lib/tsconfig.json": json.dumps({"extends": ".."}),
         }
     )
     configs = rule_runner.request(AllTSConfigs, [TSConfigsRequest("tsconfig.json")])
@@ -74,7 +74,7 @@ def test_parses_extended_tsconfig_with_overrides(rule_runner: RuleRunner) -> Non
             "project/index.ts": "",
             "project/tsconfig.json": json.dumps({"compilerOptions": {"baseUrl": "./"}}),
             "project/lib/tsconfig.json": json.dumps(
-                {"compilerOptions": {"baseUrl": "./src", "extends": ".."}}
+                {"compilerOptions": {"baseUrl": "./src"}, "extends": ".."}
             ),
         }
     )
