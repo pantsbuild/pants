@@ -19,7 +19,7 @@ hex = { workspace = true }
 sha2 = { workspace = true }
 walkdir = { workspace = true }
 tree-sitter = { workspace = true }
-tree-sitter-javascript = { workspace = true }
+tree-sitter-typescript = { workspace = true }
 tree-sitter-python = { workspace = true }
 tree-sitter-dockerfile = { workspace = true }
 
@@ -31,7 +31,7 @@ serde = { workspace = true }
 serde_derive = { workspace = true }
 itertools = { workspace = true }
 tree-sitter = { workspace = true }
-tree-sitter-javascript = { workspace = true }
+tree-sitter-typescript = { workspace = true }
 tree-sitter-python = { workspace = true }
 tree-sitter-dockerfile = { workspace = true }
 regex = { workspace = true }

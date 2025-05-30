@@ -213,7 +213,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         out_dir,
     )?;
     gen_files_for_language(
-        tree_sitter_javascript::language(),
+        tree_sitter_typescript::language_tsx(),
         "javascript",
         &source_dir,
         out_dir,
