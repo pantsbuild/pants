@@ -58,7 +58,15 @@ class FilterSubsystem(LineOriented, GoalSubsystem):
     )
     address_regex = StrListOption(
         metavar="[+-]regex1,regex2,...",
-        help="Filter on target addresses matching these regexes.",
+        help=softwrap(
+            """
+            Filter on target addresses matching the provided regular expressions. The regular expressions
+            are parsed by the Python `re` module. See https://docs.python.org/3/library/re.html#regular-expression-syntax
+            for the details of the regular expression syntax.
+
+            Any match of a regular expression may be inverted by prefixing the regular expression with a `!`.
+            """
+        ),
     )
     tag_regex = StrListOption(
         metavar="[+-]regex1,regex2,...",
