@@ -749,17 +749,37 @@ def run_rule_with_mocks(
     unconsumed_mock_calls = set(mock_calls.keys())
     unconsumed_mock_gets = set(mock_gets)
 
+    def extract_args(locals: dict[str, Any]) -> tuple[Any, ...]:
+        if "args" in locals:
+            args = locals["args"]
+            if args:
+                return tuple(args)
+            
+        if "__implicitly" in locals:
+            implicit_args = locals["__implicitly"]
+            if isinstance(implicit_args, (tuple, list)):
+                return tuple(implicit_args)
+           
+        return ()
+
     def get(res: Get | Effect | Call | Coroutine):
+        print(f"MOCKS: get={res}")
         if isinstance(res, Coroutine):
             # A call-by-name element in a concurrently() is a Coroutine whose frame is
             # the trampoline wrapper that creates and immediately awaits the Call.
             assert res.cr_frame is not None
-            rule_id = res.cr_frame.f_locals["rule_id"]
-            args = res.cr_frame.f_locals["args"]
+            rule_id = res.cr_frame.f_locals["rule_id"]            
+            args = extract_args(res.cr_frame.f_locals)
             mock_call = mock_calls.get(rule_id)
+            print(f"MOCKS: rule_id={rule_id}, args={args}, mock_call={mock_call}")
             if mock_call:
                 unconsumed_mock_calls.discard(rule_id)
-                return mock_call(*args)
+                if isinstance(args, (tuple, list)):
+                    return mock_call(*args)
+                elif isinstance(args, dict):
+                    return mock_call(**args)
+                else:
+                    raise AssertionError("Internal error: mock call expected arguments to be a tuple, list, or dict.")
             raise AssertionError(f"No mock_call provided for {rule_id}.")
         elif isinstance(res, Call):
             mock_call = mock_calls.get(res.rule_id)
@@ -823,6 +843,8 @@ def run_rule_with_mocks(
     while True:
         try:
             res = rule_coroutine.send(rule_input)
+            import ipdb  # pants: no-infer-dep
+            ipdb.set_trace()  
             if isinstance(res, (Get, Effect, Call)):
                 rule_input = get(res)
             elif type(res) in (tuple, list):

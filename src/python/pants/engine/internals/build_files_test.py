@@ -16,7 +16,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.target_types import GenericTarget, ResourceTarget
 from pants.engine.addresses import Address, AddressInput, BuildFileAddress
 from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import DigestContents, FileContent, PathGlobs
+from pants.engine.fs import Digest, DigestContents, FileContent, PathGlobs
 from pants.engine.internals.build_files import (
     AddressFamilyDir,
     BUILDFileEnvVarExtractor,
@@ -66,6 +66,23 @@ from pants.util.strutil import softwrap
 
 def test_parse_address_family_empty() -> None:
     """Test that parsing an empty BUILD file results in an empty AddressFamily."""
+
+    def mock_get_digest_contents(digest: Digest) -> DigestContents:
+        return DigestContents([FileContent(path="/dev/null/BUILD", content=b"")])
+
+    def mock_parse_address_family(directory: AddressFamilyDir) -> OptionalAddressFamily:
+        return OptionalAddressFamily("/dev")
+
+    def mock_get_synthetic_address_maps(
+        request: SyntheticAddressMapsRequest,
+    ) -> SyntheticAddressMaps:
+        return SyntheticAddressMaps()
+
+    def mock_environment_vars_subset(
+        request: EnvironmentVarsRequest, complete_env_vars: CompleteEnvironmentVars
+    ) -> EnvironmentVars:
+        return EnvironmentVars({})
+
     optional_af = run_rule_with_mocks(
         parse_address_family,
         rule_args=[
@@ -85,28 +102,12 @@ def test_parse_address_family_empty() -> None:
             MaybeBuildFileDependencyRulesImplementation(None),
             SessionValues({CompleteEnvironmentVars: CompleteEnvironmentVars({})}),
         ],
-        mock_gets=[
-            MockGet(
-                output_type=DigestContents,
-                input_types=(PathGlobs,),
-                mock=lambda _: DigestContents([FileContent(path="/dev/null/BUILD", content=b"")]),
-            ),
-            MockGet(
-                output_type=OptionalAddressFamily,
-                input_types=(AddressFamilyDir,),
-                mock=lambda _: OptionalAddressFamily("/dev"),
-            ),
-            MockGet(
-                output_type=SyntheticAddressMaps,
-                input_types=(SyntheticAddressMapsRequest,),
-                mock=lambda _: SyntheticAddressMaps(),
-            ),
-            MockGet(
-                output_type=EnvironmentVars,
-                input_types=(EnvironmentVarsRequest, CompleteEnvironmentVars),
-                mock=lambda _1, _2: EnvironmentVars({}),
-            ),
-        ],
+        mock_calls={
+            "pants.engine.intrinsics.get_digest_contents": mock_get_digest_contents,
+            "pants.engine.internals.build_files.parse_address_family": mock_parse_address_family,
+            "pants.engine.internals.synthetic_targets.get_synthetic_address_maps": mock_get_synthetic_address_maps,
+            "pants.engine.internals.platform_rules.environment_vars_subset": mock_environment_vars_subset,
+        },
     )
     assert optional_af.path == "/dev/null"
     assert optional_af.address_family is not None
@@ -116,6 +117,55 @@ def test_parse_address_family_empty() -> None:
 
 
 def test_extend_synthetic_target() -> None:
+    def mock_get_digest_contents(digest) -> DigestContents:
+        return DigestContents(
+            [
+                FileContent(path="/foo/BUILD.1", content=b"resource(name='aaa', description='a')"),
+                FileContent(
+                    path="/foo/BUILD.2",
+                    content=b"resource(name='bar', description='b', _extend_synthetic=True)",
+                ),
+            ]
+        )
+
+    def mock_get_synthetic_address_maps(
+        request: SyntheticAddressMapsRequest,
+    ) -> SyntheticAddressMaps:
+        return SyntheticAddressMaps(
+            [
+                SyntheticAddressMap.create(
+                    "/foo/synthetic1",
+                    [
+                        TargetAdaptor("resource", "xxx", "", description="x"),
+                    ],
+                ),
+                SyntheticAddressMap.create(
+                    "/foo/synthetic2",
+                    [
+                        TargetAdaptor("resource", "yyy", ""),
+                        TargetAdaptor("resource", "bar", "", extend=42),
+                    ],
+                ),
+            ]
+        )
+
+    def mock_parse_address_family(directory: AddressFamilyDir) -> OptionalAddressFamily:
+        return OptionalAddressFamily(
+            "/",
+            address_family=AddressFamily.create(
+                "/",
+                [],
+                defaults=BuildFileDefaults(
+                    FrozenDict({"resource": FrozenDict({"description": "q"})})
+                ),
+            ),
+        )
+
+    def mock_environment_vars_subset(
+        request: EnvironmentVarsRequest, complete_env_vars: CompleteEnvironmentVars
+    ) -> EnvironmentVars:
+        return EnvironmentVars({})
+
     optional_af = run_rule_with_mocks(
         parse_address_family,
         rule_args=[
@@ -135,63 +185,12 @@ def test_extend_synthetic_target() -> None:
             MaybeBuildFileDependencyRulesImplementation(None),
             SessionValues({CompleteEnvironmentVars: CompleteEnvironmentVars({})}),
         ],
-        mock_gets=[
-            MockGet(
-                output_type=DigestContents,
-                input_types=(PathGlobs,),
-                mock=lambda _: DigestContents(
-                    [
-                        FileContent(
-                            path="/foo/BUILD.1", content=b"resource(name='aaa', description='a')"
-                        ),
-                        FileContent(
-                            path="/foo/BUILD.2",
-                            content=b"resource(name='bar', description='b', _extend_synthetic=True)",
-                        ),
-                    ]
-                ),
-            ),
-            MockGet(
-                output_type=OptionalAddressFamily,
-                input_types=(AddressFamilyDir,),
-                mock=lambda _: OptionalAddressFamily(
-                    "/",
-                    address_family=AddressFamily.create(
-                        "/",
-                        [],
-                        defaults=BuildFileDefaults(
-                            FrozenDict({"resource": FrozenDict({"description": "q"})})
-                        ),
-                    ),
-                ),
-            ),
-            MockGet(
-                output_type=SyntheticAddressMaps,
-                input_types=(SyntheticAddressMapsRequest,),
-                mock=lambda _: SyntheticAddressMaps(
-                    [
-                        SyntheticAddressMap.create(
-                            "/foo/synthetic1",
-                            [
-                                TargetAdaptor("resource", "xxx", "", description="x"),
-                            ],
-                        ),
-                        SyntheticAddressMap.create(
-                            "/foo/synthetic2",
-                            [
-                                TargetAdaptor("resource", "yyy", ""),
-                                TargetAdaptor("resource", "bar", "", extend=42),
-                            ],
-                        ),
-                    ]
-                ),
-            ),
-            MockGet(
-                output_type=EnvironmentVars,
-                input_types=(EnvironmentVarsRequest, CompleteEnvironmentVars),
-                mock=lambda _1, _2: EnvironmentVars({}),
-            ),
-        ],
+        mock_calls={
+            "pants.engine.intrinsics.get_digest_contents": mock_get_digest_contents,
+            "pants.engine.internals.synthetic_targets.get_synthetic_address_maps": mock_get_synthetic_address_maps,
+            "pants.engine.internals.build_files.parse_address_family": mock_parse_address_family,
+            "pants.engine.internals.platform_rules.environment_vars_subset": mock_environment_vars_subset,
+        },
     )
     assert optional_af.path == "/foo"
     assert optional_af.address_family is not None
