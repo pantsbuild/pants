@@ -87,8 +87,16 @@ class FilterSubsystem(LineOriented, GoalSubsystem):
 
     def address_regex_filters(self) -> list[TargetFilter]:
         def outer_filter(address_regex: str) -> TargetFilter:
+            invert = False
+            if address_regex.startswith("!"):
+                invert = True
+                address_regex = address_regex[1:]
             regex = compile_regex(address_regex)
-            return lambda tgt: bool(regex.search(tgt.address.spec))
+
+            if invert:
+                return lambda tgt: not bool(regex.search(tgt.address.spec))
+            else:
+                return lambda tgt: bool(regex.search(tgt.address.spec))
 
         return create_filters(self.address_regex, outer_filter)
 

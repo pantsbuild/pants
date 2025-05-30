@@ -198,6 +198,10 @@ def test_filter_by_address_regex(rule_runner: RuleRunner) -> None:
     # This ANDs the regex.
     assert_targets(rule_runner, {"dir2:lib"}, address_regex=[r"^dir", "2:lib$"])
 
+    # A ! inverts the regex.
+    assert_targets(rule_runner, {"dir1:lib", "dir2:lib"}, address_regex=["!common"])
+    assert_targets(rule_runner, {"dir1:lib"}, address_regex=["!common:tests", "!dir2:lib"])
+
     # Invalid regex.
     with engine_error(re.error):
         assert_targets(rule_runner, set(), address_regex=["("])
