@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import importlib.metadata
 import logging
 import site
 import sys
@@ -10,8 +11,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import cast
 
-from pkg_resources import Requirement, WorkingSet
-from pkg_resources import working_set as global_working_set
+from packaging.requirements import Requirement
 
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPexProcess, create_venv_pex
@@ -111,21 +111,18 @@ async def resolve_plugins(
 
 
 class PluginResolver:
-    """Encapsulates the state of plugin loading for the given WorkingSet.
+    """Encapsulates the state of plugin loading.
 
-    Plugin loading is inherently stateful, and so this class captures the state of the WorkingSet at
-    creation time, even though it will be mutated by each call to `PluginResolver.resolve`. This
-    makes the inputs to each `resolve(..)` call idempotent, even if the output is not.
+    Plugin loading is inherently stateful, and so the system enviroment on `sys.path` will be
+    mutatetd by  each call to `PluginResolver.resolve`.
     """
 
     def __init__(
         self,
         scheduler: BootstrapScheduler,
         interpreter_constraints: InterpreterConstraints | None = None,
-        working_set: WorkingSet | None = None,
     ) -> None:
         self._scheduler = scheduler
-        self._working_set = working_set or global_working_set
         self._interpreter_constraints = interpreter_constraints
 
     def resolve(
@@ -133,20 +130,21 @@ class PluginResolver:
         options_bootstrapper: OptionsBootstrapper,
         env: CompleteEnvironmentVars,
         requirements: Iterable[str] = (),
-    ) -> WorkingSet:
-        """Resolves any configured plugins and adds them to the working_set."""
+    ) -> None:
+        """Resolves any configured plugins and adds them to the sys.path as a side effect."""
+
+        def to_requirement(d):
+            return f"{d.name}=={d.version}"
+
         request = PluginsRequest(
             self._interpreter_constraints,
-            tuple(dist.as_requirement() for dist in self._working_set),
+            tuple(to_requirement(dist) for dist in importlib.metadata.distributions()),
             tuple(requirements),
         )
 
         for resolved_plugin_location in self._resolve_plugins(options_bootstrapper, env, request):
-            site.addsitedir(
-                resolved_plugin_location
-            )  # Activate any .pth files plugin wheels may have.
-            self._working_set.add_entry(resolved_plugin_location)
-        return self._working_set
+            # Activate any .pth files plugin wheels may have.
+            site.addsitedir(resolved_plugin_location)
 
     def _resolve_plugins(
         self,

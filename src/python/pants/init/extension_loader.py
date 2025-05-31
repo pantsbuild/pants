@@ -2,10 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import importlib
+import importlib.metadata
+import importlib.util
 import logging
+import re
 import traceback
 
-from pkg_resources import Requirement, WorkingSet
+from packaging.requirements import InvalidRequirement, Requirement
+from packaging.version import InvalidVersion, Version
 
 from pants.base.exceptions import BackendConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
@@ -29,28 +33,103 @@ class PluginLoadOrderError(PluginLoadingError):
 
 def load_backends_and_plugins(
     plugins: list[str],
-    working_set: WorkingSet,
     backends: list[str],
     bc_builder: BuildConfiguration.Builder | None = None,
 ) -> BuildConfiguration:
     """Load named plugins and source backends.
 
     :param plugins: v2 plugins to load.
-    :param working_set: A pkg_resources.WorkingSet to load plugins from.
     :param backends: v2 backends to load.
     :param bc_builder: The BuildConfiguration (for adding aliases).
     """
     bc_builder = bc_builder or BuildConfiguration.Builder()
     load_build_configuration_from_source(bc_builder, backends)
-    load_plugins(bc_builder, plugins, working_set)
+    load_plugins(bc_builder, plugins)
     register_builtin_goals(bc_builder)
     return bc_builder.create()
+
+
+def _normalize_name(name: str) -> str:
+    """Normalize package names according to PEP 508.
+
+    Convert to lowercase and replace underscores/dots with hyphens.
+    """
+    return name.lower().replace("_", "-").replace(".", "-")
+
+
+def _distribution_matches_requirement(
+    dist: importlib.metadata.Distribution, requirement: Requirement
+) -> bool:
+    """Check if a distribution matches a requirement.
+
+    Args:
+        dist: Distribution to check
+        requirement: Requirement to match against
+
+    Returns:
+        True if the distribution matches the requirement
+    """
+    # Check name match (case-insensitive, normalize underscores/hyphens)
+    dist_name = _normalize_name(dist.metadata["Name"])
+    req_name = _normalize_name(requirement.name)
+
+    if dist_name != req_name:
+        return False
+
+    # If no version specifier, name match is sufficient
+    if not requirement.specifier:
+        return True
+
+    # Check version specifier
+    try:
+        dist_version = Version(dist.version)
+        return requirement.specifier.contains(dist_version)
+    except InvalidVersion:
+        # If we can't parse the version, assume it doesn't match
+        return False
+
+
+def _find_all_matching_distributions(
+    requirement: Requirement,
+) -> list[importlib.metadata.Distribution]:
+    """Internal function to find all matching distributions."""
+    matching_dists = []
+
+    for dist in importlib.metadata.distributions():
+        if _distribution_matches_requirement(dist, requirement):
+            matching_dists.append(dist)
+
+    return matching_dists
+
+
+def find_all_distributions_by_requirement(
+    requirement: Requirement, search_paths: list[str] | None = None
+) -> list[importlib.metadata.Distribution]:
+    """Find all distributions that match the given requirement.
+
+    Args:
+        requirement: A packaging.requirements.Requirement object
+        search_paths: Optional list of paths to search in addition to sys.path
+
+    Returns:
+        List of all matching Distribution objects
+    """
+    matching_dists: list[importlib.metadata.Distribution] = []
+
+    # Search in current environment (avoid duplicates)
+    current_matches = _find_all_matching_distributions(requirement)
+    seen_names = {dist.metadata["Name"] for dist in matching_dists}
+
+    for dist in current_matches:
+        if dist.metadata["Name"] not in seen_names:
+            matching_dists.append(dist)
+
+    return matching_dists
 
 
 def load_plugins(
     build_configuration: BuildConfiguration.Builder,
     plugins: list[str],
-    working_set: WorkingSet,
 ) -> None:
     """Load named plugins from the current working_set into the supplied build_configuration.
 
@@ -73,44 +152,53 @@ def load_plugins(
     :param build_configuration: The BuildConfiguration (for adding aliases).
     :param plugins: A list of plugin names optionally with versions, in requirement format.
                               eg ['widgetpublish', 'widgetgen==1.2'].
-    :param working_set: A pkg_resources.WorkingSet to load plugins from.
     """
+
+    def _requirement_key(req: Requirement) -> str:
+        return re.sub("[^A-Za-z0-9.]+", "-", req.name).lower()
+
     loaded: dict = {}
     for plugin in plugins or []:
-        req = Requirement.parse(plugin)
-        dist = working_set.find(req)
-
-        if not dist:
+        try:
+            req = Requirement(plugin)
+            req_key = _requirement_key(req)
+        except InvalidRequirement:
             raise PluginNotFound(f"Could not find plugin: {req}")
 
-        entries = dist.get_entry_map().get("pantsbuild.plugin", {})
+        dists = _find_all_matching_distributions(req)
+        if len(dists) > 0:
+            raise PluginNotFound(f"Multiple Python distributions match plugin `{req}`")
+        dist = dists[0]
 
-        if "load_after" in entries:
-            deps = entries["load_after"].load()()
+        entry_points = dist.entry_points.select(group="pantsbuild.plugin")
+
+        if "load_after" in entry_points:
+            deps = entry_points["load_after"].load()()
             for dep_name in deps:
-                dep = Requirement.parse(dep_name)
-                if dep.key not in loaded:
+                dep = Requirement(dep_name)
+                dep_key = _requirement_key(dep)
+                if dep_key not in loaded:
                     raise PluginLoadOrderError(f"Plugin {plugin} must be loaded after {dep}")
-        if "target_types" in entries:
-            target_types = entries["target_types"].load()()
-            build_configuration.register_target_types(req.key, target_types)
-        if "build_file_aliases" in entries:
-            aliases = entries["build_file_aliases"].load()()
+        if "target_types" in entry_points:
+            target_types = entry_points["target_types"].load()()
+            build_configuration.register_target_types(req_key, target_types)
+        if "build_file_aliases" in entry_points:
+            aliases = entry_points["build_file_aliases"].load()()
             build_configuration.register_aliases(aliases)
-        if "rules" in entries:
-            rules = entries["rules"].load()()
-            build_configuration.register_rules(req.key, rules)
-        if "remote_auth" in entries:
-            remote_auth_func = entries["remote_auth"].load()
+        if "rules" in entry_points:
+            rules = entry_points["rules"].load()()
+            build_configuration.register_rules(req_key, rules)
+        if "remote_auth" in entry_points:
+            remote_auth_func = entry_points["remote_auth"].load()
             logger.debug(
                 f"register remote auth function {remote_auth_func.__module__}.{remote_auth_func.__name__} from plugin: {plugin}"
             )
             build_configuration.register_remote_auth_plugin(remote_auth_func)
-        if "auxiliary_goals" in entries:
-            auxiliary_goals = entries["auxiliary_goals"].load()()
-            build_configuration.register_auxiliary_goals(req.key, auxiliary_goals)
+        if "auxiliary_goals" in entry_points:
+            auxiliary_goals = entry_points["auxiliary_goals"].load()()
+            build_configuration.register_auxiliary_goals(req_key, auxiliary_goals)
 
-        loaded[dist.as_requirement().key] = dist
+        loaded[req_key] = dist
 
 
 def load_build_configuration_from_source(
