@@ -63,7 +63,7 @@ class WorkunitsLogger(WorkunitsCallback):
 
 
 @rule
-def construct_workunits_logger_callback(
+async def construct_workunits_logger_callback(
     _: WorkunitsLoggerRequest,
     opts: WorkunitsLoggerOptions,
 ) -> WorkunitsCallbackFactory:

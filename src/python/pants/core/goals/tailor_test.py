@@ -118,7 +118,7 @@ class MockPutativeFortranModuleRequest(PutativeTargetsRequest):
 
 
 @rule
-def infer_fortran_module_dependency(_request: MockPutativeFortranModuleRequest) -> PutativeTargets:
+async def infer_fortran_module_dependency(_request: MockPutativeFortranModuleRequest) -> PutativeTargets:
     return PutativeTargets(
         [
             PutativeTarget.for_target_type(
