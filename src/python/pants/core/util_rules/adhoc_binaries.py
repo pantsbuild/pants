@@ -157,7 +157,7 @@ class GunzipBinary:
 
 
 @rule
-def find_gunzip(python_binary: PythonBuildStandaloneBinary) -> GunzipBinary:
+async def find_gunzip(python_binary: PythonBuildStandaloneBinary) -> GunzipBinary:
     return GunzipBinary(python_binary)
 
 

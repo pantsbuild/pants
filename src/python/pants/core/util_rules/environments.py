@@ -75,7 +75,7 @@ class DockerPlatformFieldDefaultFactoryRequest(FieldDefaultFactoryRequest):
 
 
 @rule
-def docker_platform_field_default_factory(
+async def docker_platform_field_default_factory(
     _: DockerPlatformFieldDefaultFactoryRequest,
 ) -> FieldDefaultFactoryResult:
     return FieldDefaultFactoryResult(lambda f: f.normalized_value)

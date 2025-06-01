@@ -255,7 +255,7 @@ async def _partition_scalafix(
 
 
 @rule
-def _scalafix_fix_partitions(
+async def _scalafix_fix_partitions(
     request: ScalafixFixRequest.PartitionRequest[ScalafixFieldSet],
 ) -> _ScalafixPartitionRequest:
     return _ScalafixPartitionRequest(request.field_sets)
