@@ -161,7 +161,7 @@ async def package_pex_binary(
 
 
 @rule
-async def built_pacakge_for_pex_from_targets_request(
+async def built_package_for_pex_from_targets_request(
     request: PexFromTargetsRequestForBuiltPackage,
 ) -> BuiltPackage:
     pft_request = request.request
