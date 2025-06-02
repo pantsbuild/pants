@@ -30,10 +30,9 @@ def union(
     polymorphism.
 
     Annotating a class with @union allows other classes to register a `UnionRule(BaseClass,
-    MemberClass)`. Then, you can use `await Get(Output, UnionBase, concrete_union_member)`. This
-    would be similar to writing `UnionRule(Output, ConcreteUnionMember,
-    concrete_union_member_instance)`, but allows you to write generic code without knowing what
-    concrete classes might later implement that union.
+    MemberClass)`. Then, you can use `Get(Output, BaseClass, member_class_instance)`. This
+    would be similar to writing `Get(Output, MemberClass, member_class_instance)`, but allows you
+    to write generic code without knowing what concrete classes might later implement that union.
 
     Often, union bases are abstract classes, but they need not be.
 
@@ -43,7 +42,7 @@ def union(
     which must already be in scope at callsites where the `@union` is used in a `Get`, and
     which are propagated to the callee.
 
-    See https://www.pantsbuild.org/docs/rules-api-unions.
+    See https://www.pantsbuild.org/stable/docs/writing-plugins/the-rules-api/union-rules-advanced.
     """
 
     def decorator(cls: _T) -> _T:

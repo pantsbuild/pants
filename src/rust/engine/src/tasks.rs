@@ -1,7 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 use crate::python::{Function, TypeId};
 
@@ -144,6 +144,9 @@ pub struct DisplayInfo {
     pub level: Level,
 }
 
+// Map of base rule -> map of derived type to derived rule for that type.
+type VTable = HashMap<RuleId, HashMap<TypeId, RuleId>>;
+
 ///
 /// Registry of user Tasks.
 ///
@@ -151,6 +154,7 @@ pub struct DisplayInfo {
 pub struct Tasks {
     rules: IndexSet<Rule>,
     queries: IndexSet<Query<TypeId>>,
+    vtable: VTable,
     // Used during the construction of a rule.
     preparing: Option<Task>,
 }
@@ -169,8 +173,9 @@ impl Tasks {
     pub fn new() -> Tasks {
         Tasks {
             rules: IndexSet::default(),
-            preparing: None,
             queries: IndexSet::default(),
+            vtable: VTable::default(),
+            preparing: None,
         }
     }
 
@@ -180,6 +185,10 @@ impl Tasks {
 
     pub fn queries(&self) -> &IndexSet<Query<TypeId>> {
         &self.queries
+    }
+
+    pub fn vtable(&self) -> &VTable {
+        &self.vtable
     }
 
     ///
@@ -225,22 +234,21 @@ impl Tasks {
         &mut self,
         output: TypeId,
         inputs: Vec<TypeId>,
-        rule_id: String,
+        rule_id: RuleId,
         explicit_args_arity: u16,
+        vtable_entries: Option<HashMap<TypeId, RuleId>>,
     ) {
-        let gets = &mut self
+        if let Some(vtable_entries) = vtable_entries {
+            self.vtable.insert(rule_id.clone(), vtable_entries);
+        }
+        let calls = &mut self
             .preparing
             .as_mut()
             .expect("Must `begin()` a task creation before adding calls!")
             .gets;
-        gets.push(
-            DependencyKey::for_known_rule(
-                RuleId::from_string(rule_id),
-                output,
-                explicit_args_arity,
-            )
-            .provided_params(inputs),
-        )
+        let dep_key = DependencyKey::for_known_rule(rule_id, output, explicit_args_arity)
+            .provided_params(inputs);
+        calls.push(dep_key);
     }
 
     pub fn add_get(&mut self, output: TypeId, inputs: Vec<TypeId>) {

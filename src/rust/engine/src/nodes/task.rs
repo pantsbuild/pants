@@ -48,8 +48,23 @@ impl Task {
         call: externs::Call,
     ) -> NodeResult<Value> {
         let context = context.clone();
+        let vtable_entries = context.core.tasks.vtable().get(&call.rule_id);
+        let implementation_rule = match vtable_entries {
+            Some(ve) => call
+                .inputs
+                .iter()
+                .map(|t| ve.get(t.type_id()))
+                .find(Option::is_some)
+                .flatten(),
+            None => None,
+        };
+
+        // If no implementation rule, use the base rule. Typically that will throw a
+        // relevant error, but could hypothetically provide a sensible default implementation.
+        let rule_id = implementation_rule.unwrap_or(&call.rule_id);
+
         let dependency_key =
-            DependencyKey::for_known_rule(call.rule_id.clone(), call.output_type, call.args_arity)
+            DependencyKey::for_known_rule(rule_id.clone(), call.output_type, call.args_arity)
                 .provided_params(call.inputs.iter().map(|t| *t.type_id()));
         params.extend(call.inputs.iter().cloned());
 
