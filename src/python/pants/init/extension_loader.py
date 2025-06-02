@@ -165,9 +165,10 @@ def load_plugins(
         except InvalidRequirement:
             raise PluginNotFound(f"Could not find plugin: {req}")
 
-        dists = _find_all_matching_distributions(req)
-        if len(dists) > 0:
-            raise PluginNotFound(f"Multiple Python distributions match plugin `{req}`")
+        dists = [d for d in _find_all_matching_distributions(req) if d]
+        if len(dists) > 1:
+            msg = ", ".join(repr(d) for d in dists)
+            raise PluginNotFound(f"Multiple Python distributions match plugin `{req}`: {msg}")
         dist = dists[0]
 
         entry_points = dist.entry_points.select(group="pantsbuild.plugin")
