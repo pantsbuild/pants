@@ -55,7 +55,10 @@ def rule_runner() -> RuleRunner:
         ]
     )
     rule_runner.set_options(
-        ["--backend-packages=pants.backend.python"],
+        [
+            "--backend-packages=pants.backend.python",
+            "--keep-sandboxes=on_failure",
+        ],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     return rule_runner
@@ -192,7 +195,7 @@ def plugin_resolution(
         if existing:
             yield existing, False
         else:
-            with temporary_dir() as new_chroot:
+            with temporary_dir(cleanup=False) as new_chroot:
                 yield new_chroot, True
 
     @contextmanager
@@ -211,9 +214,14 @@ def plugin_resolution(
         [f"=={'.'.join(map(str, sys.version_info[:3]))}"]
     )
 
+    # import pdb ; pdb.set_trace()
+
     with provide_chroot(chroot) as (root_dir, create_artifacts), save_sys_path() as saved_sys_path:
         env: dict[str, str] = {}
+
         repo_dir = os.path.join(root_dir, "repo")
+        print(f"TEST: repo_dir={repo_dir}")
+        Path(repo_dir).mkdir(parents=True)
 
         def _create_artifact(name, version, install_requires):
             if create_artifacts:
@@ -229,8 +237,9 @@ def plugin_resolution(
                 )
 
         env.update(
-            PANTS_PYTHON_REPOS_REPOS=f"['file://{repo_dir}']",
+            PANTS_PYTHON_REPOS_FIND_LINKS=f"['file://{repo_dir}/']",
             PANTS_PYTHON_RESOLVER_CACHE_TTL="1",
+            PANTS_KEEP_SANDBOXES="always",
         )
         if not use_pypi:
             env.update(PANTS_PYTHON_REPOS_INDEXES="[]")
@@ -241,23 +250,37 @@ def plugin_resolution(
                 version = plugin.version
                 plugin_list.append(f"{plugin.name}=={version}" if version else plugin.name)
                 _create_artifact(plugin.name, version, plugin.install_requires)
+                print(f"TEST: Added plugin `{plugin}`.")
             env["PANTS_PLUGINS"] = f"[{','.join(map(repr, plugin_list))}]"
 
             for requirement in tuple(requirements):
                 r = Requirement(requirement)
-                assert len(r.specifier) == 1
+                assert len(r.specifier) == 1, (
+                    f"Expected requirement {requirement} to only have one comparison."
+                )
                 specs = next(iter(r.specifier))
                 _create_artifact(_requirement_key(r), specs.version, [])
 
         configpath = os.path.join(root_dir, "pants.toml")
         if create_artifacts:
+            print(f"TEST: Touched config path at `{configpath}`.")
             touch(configpath)
-        args = ["pants", f"--pants-config-files=['{configpath}']"]
+
+        args = [
+            "pants",
+            "--pex-verbosity=9",
+            "--keep-sandboxes=on_failure",
+            f"--pants-config-files=['{configpath}']",
+        ]
 
         options_bootstrapper = OptionsBootstrapper.create(env=env, args=args, allow_pantsrc=False)
+        print(f"TEST: options_bootstrapper={options_bootstrapper}")
+
         complete_env = CompleteEnvironmentVars(
             {**{k: os.environ[k] for k in ["PATH", "HOME", "PYENV_ROOT"] if k in os.environ}, **env}
         )
+        print(f"TEST: complete_env={complete_env}")
+
         bootstrap_scheduler = create_bootstrap_scheduler(options_bootstrapper, EXECUTOR)
         cache_dir = options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
 
@@ -268,9 +291,13 @@ def plugin_resolution(
             dist.create(site_packages_path)
             expected_distribution_names.add(dist.name)
 
-        plugin_resolver = PluginResolver(bootstrap_scheduler, interpreter_constraints)
+        plugin_resolver = PluginResolver(bootstrap_scheduler, interpreter_constraints, distribution_constraints_override=())
+        try:
+            plugin_resolver.resolve(options_bootstrapper, complete_env, requirements)
+        except Exception:
+            # import pdb ; pdb.set_trace()
+            raise
 
-        plugin_resolver.resolve(options_bootstrapper, complete_env, requirements)
         for found_dist in importlib.metadata.distributions():
             if found_dist.name in expected_distribution_names:
                 assert (
@@ -286,15 +313,8 @@ def test_no_plugins(rule_runner: RuleRunner) -> None:
         assert saved_sys_path == sys.path
 
 
-def test_plugins_sdist(rule_runner: RuleRunner) -> None:
-    _do_test_plugins(rule_runner, True)
-
-
-def test_plugins_bdist(rule_runner: RuleRunner) -> None:
-    _do_test_plugins(rule_runner, False)
-
-
-def _do_test_plugins(rule_runner: RuleRunner, sdist: bool) -> None:
+@pytest.mark.parametrize("sdist", (False, True), ids=("bdist", "sdist"))
+def test_plugins(rule_runner: RuleRunner, sdist: bool) -> None:
     with plugin_resolution(
         rule_runner,
         plugins=[Plugin("jake", "1.2.3"), Plugin("jane")],
@@ -316,15 +336,8 @@ def _do_test_plugins(rule_runner: RuleRunner, sdist: bool) -> None:
         assert_dist_version(name="jane", expected_version=DEFAULT_VERSION)
 
 
-def test_exact_requirements_sdist(rule_runner: RuleRunner) -> None:
-    _do_test_exact_requirements(rule_runner, True)
-
-
-def test_exact_requirements_bdist(rule_runner: RuleRunner) -> None:
-    _do_test_exact_requirements(rule_runner, False)
-
-
-def _do_test_exact_requirements(rule_runner: RuleRunner, sdist: bool) -> None:
+@pytest.mark.parametrize("sdist", (False, True), ids=("bdist", "sdist"))
+def test_exact_requirements(rule_runner: RuleRunner, sdist: bool) -> None:
     with plugin_resolution(
         rule_runner, plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")], sdist=sdist
     ) as results:
@@ -338,8 +351,8 @@ def _do_test_exact_requirements(rule_runner: RuleRunner, sdist: bool) -> None:
         with plugin_resolution(
             rule_runner, chroot=chroot, plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")]
         ) as results2:
-            _, _, saved_sys_path2 = results2
-            assert list(saved_sys_path) == list(saved_sys_path2)
+            _, _, _ = results2
+            assert list(saved_sys_path) == sys.path
 
 
 def test_range_deps(rule_runner: RuleRunner) -> None:
@@ -361,16 +374,8 @@ def test_range_deps(rule_runner: RuleRunner) -> None:
 
 
 @skip_unless_python38_and_python39_present
-def test_exact_requirements_interpreter_change_sdist(rule_runner: RuleRunner) -> None:
-    _do_test_exact_requirements_interpreter_change(rule_runner, True)
-
-
-@skip_unless_python38_and_python39_present
-def test_exact_requirements_interpreter_change_bdist(rule_runner: RuleRunner) -> None:
-    _do_test_exact_requirements_interpreter_change(rule_runner, False)
-
-
-def _do_test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdist: bool) -> None:
+@pytest.mark.parametrize("sdist", (False, True), ids=("bdist", "sdist"))
+def test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdist: bool) -> None:
     with plugin_resolution(
         rule_runner,
         python_version=PY_38,
