@@ -221,7 +221,7 @@ def plugin_resolution(
 
         repo_dir = os.path.join(root_dir, "repo")
         print(f"TEST: repo_dir={repo_dir}")
-        Path(repo_dir).mkdir(parents=True)
+        # Path(repo_dir).mkdir(parents=True)
 
         def _create_artifact(name, version, install_requires):
             if create_artifacts:
@@ -293,7 +293,7 @@ def plugin_resolution(
 
         plugin_resolver = PluginResolver(bootstrap_scheduler, interpreter_constraints, distribution_constraints_override=())
         try:
-            plugin_resolver.resolve(options_bootstrapper, complete_env, requirements)
+            plugin_paths = plugin_resolver.resolve(options_bootstrapper, complete_env, requirements)
         except Exception:
             # import pdb ; pdb.set_trace()
             raise
@@ -305,11 +305,12 @@ def plugin_resolution(
                     in Path(os.path.realpath(str(found_dist.locate_file("")))).parents
                 )
 
-        yield root_dir, repo_dir, saved_sys_path
+        yield plugin_paths, root_dir, repo_dir, saved_sys_path
 
 
 def test_no_plugins(rule_runner: RuleRunner) -> None:
-    with plugin_resolution(rule_runner) as (_, _, saved_sys_path):
+    with plugin_resolution(rule_runner) as (plugin_paths, _, _, saved_sys_path):
+        assert len(plugin_paths) == 0
         assert saved_sys_path == sys.path
 
 
@@ -321,6 +322,7 @@ def test_plugins(rule_runner: RuleRunner, sdist: bool) -> None:
         sdist=sdist,
         requirements=["lib==4.5.6"],
     ) as (
+        _,
         _,
         _,
         _,
@@ -341,7 +343,8 @@ def test_exact_requirements(rule_runner: RuleRunner, sdist: bool) -> None:
     with plugin_resolution(
         rule_runner, plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")], sdist=sdist
     ) as results:
-        chroot, repo_dir, saved_sys_path = results
+        plugin_paths1, chroot, repo_dir, saved_sys_path = results
+        assert len(plugin_paths1) > 0
 
         # Kill the repo source dir and re-resolve. If the PluginResolver truly detects exact
         # requirements it should skip any resolves and load directly from the still intact
@@ -351,13 +354,13 @@ def test_exact_requirements(rule_runner: RuleRunner, sdist: bool) -> None:
         with plugin_resolution(
             rule_runner, chroot=chroot, plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")]
         ) as results2:
-            _, _, _ = results2
-            assert list(saved_sys_path) == sys.path
+            plugin_paths2, _, _, _ = results2
+            assert plugin_paths1 == plugin_paths2
 
 
 def test_range_deps(rule_runner: RuleRunner) -> None:
     # Test that when a plugin has a range dependency, specifying a working set constrains
-    # to a particular version, where otherwise we would get the highest released (2.27.0 in
+    # to a particular version, where otherwise we would get the highest released (2.27.1 in
     # this case).
     with plugin_resolution(
         rule_runner,
@@ -368,9 +371,11 @@ def test_range_deps(rule_runner: RuleRunner) -> None:
     ) as (
         _,
         _,
+        _,
+        _,
     ):
         dist = importlib.metadata.distribution("requests")
-        assert "2.26.0" == dist.version
+        assert "2.27.1" == dist.version
 
 
 @skip_unless_python38_and_python39_present
@@ -382,7 +387,7 @@ def test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdist: b
         plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
         sdist=sdist,
     ) as results:
-        chroot, repo_dir = results
+        plugin_paths_1, chroot, repo_dir, saved_sys_path = results
 
         safe_rmtree(repo_dir)
         with pytest.raises(ExecutionError):
@@ -409,6 +414,5 @@ def test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdist: b
             chroot=chroot,
             plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
         ) as results2:
-            _, _ = results2
-            pytest.fail("TODO: Figure out how to compare distributions before and after.")
-            # assert list(working_set) == list(working_set2)
+            plugin_paths_2, _, _, _ = results2
+            assert plugin_paths_1 == plugin_paths_2

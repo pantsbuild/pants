@@ -138,7 +138,7 @@ class PluginResolver:
         options_bootstrapper: OptionsBootstrapper,
         env: CompleteEnvironmentVars,
         requirements: Iterable[str] = (),
-    ) -> None:
+    ) -> list[str]:
         """Resolves any configured plugins and adds them to the sys.path as a side effect."""
 
         def to_requirement(d):
@@ -158,11 +158,16 @@ class PluginResolver:
             tuple(requirements),
             
         )
-        logger.info(f"PluginsRequest={request}")
 
+        result = []
         for resolved_plugin_location in self._resolve_plugins(options_bootstrapper, env, request):
             # Activate any .pth files plugin wheels may have.
+            orig_sys_path_len = len(sys.path)
             site.addsitedir(resolved_plugin_location)
+            if len(sys.path) != orig_sys_path_len:
+                result.append(resolved_plugin_location)
+
+        return result
 
     def _resolve_plugins(
         self,
