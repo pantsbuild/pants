@@ -151,8 +151,10 @@ def load_plugins(
         if len(dists) == 0:
             raise PluginNotFound(f"Could not find plugin: {req}")
         elif len(dists) > 1:
-            msg = ", ".join(repr(d) for d in dists)
-            raise PluginNotFound(f"Multiple Python distributions match plugin `{req}`: {msg}")
+            # If multiple copies of the same distribution are on the `sys.path`, then query
+            # to see which one is "active" and use only that copy.
+            active_dist = importlib.metadata.distribution(plugin)
+            dists = [active_dist]
         dist = dists[0]
 
         entry_points = dist.entry_points.select(group="pantsbuild.plugin")
