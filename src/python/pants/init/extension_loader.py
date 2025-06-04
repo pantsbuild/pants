@@ -93,22 +93,6 @@ def _find_all_matching_distributions(
     return matching_dists
 
 
-def find_all_distributions_by_requirement(
-    requirement: Requirement, search_paths: list[str] | None = None
-) -> list[importlib.metadata.Distribution]:
-    matching_dists: list[importlib.metadata.Distribution] = []
-
-    # Search in current environment (avoid duplicates)
-    current_matches = _find_all_matching_distributions(requirement)
-    seen_names = {dist.name for dist in matching_dists}
-
-    for dist in current_matches:
-        if dist.name not in seen_names:
-            matching_dists.append(dist)
-
-    return matching_dists
-
-
 def load_plugins(
     build_configuration: BuildConfiguration.Builder,
     plugins: list[str],
