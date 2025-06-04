@@ -57,7 +57,7 @@ class FilterSubsystem(LineOriented, GoalSubsystem):
         ),
     )
     address_regex = StrListOption(
-        metavar="[+-]regex1,regex2,...",
+        metavar="[+-][!]regex1,[!]regex2,...",
         help=softwrap(
             """
             Filter on target addresses matching the provided regular expressions. The regular expressions
