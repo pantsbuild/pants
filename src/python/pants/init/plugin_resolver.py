@@ -145,22 +145,24 @@ class PluginResolver:
         def to_requirement(d):
             return f"{d.name}=={d.version}"
 
-        distributions: list[importlib.metadata.Distribution] = []
+        all_distributions: list[importlib.metadata.Distribution] = []
         if self._inherit_existing_constraints:
-            distributions = list(importlib.metadata.distributions())
+            all_distributions = list(importlib.metadata.distributions())
 
-        dist_name_to_versions: dict[str, set[importlib.metadata.Distribution]] = defaultdict(set)
-        for dist in distributions:
-            dist_name_to_versions[dist.name].add(dist)
+        dist_name_to_dists: dict[str, set[importlib.metadata.Distribution]] = defaultdict(set)
+        for dist in all_distributions:
+            dist_name_to_dists[dist.name].add(dist)
+
+        active_distributions: list[importlib.metadata.Distribution] = []
+        for dist_name, dists_for_dist_name in dist_name_to_dists.items():
+            if len(dist_name_to_dists) > 1:
+                active_distributions.append(importlib.metadata.distribution(dist_name))
+            else:
+                active_distributions.extend(dists_for_dist_name)
 
         request = PluginsRequest(
             self._interpreter_constraints,
-            tuple(
-                to_requirement(
-                    sorted(dists_for_dist_name, key=lambda d: d.version, reverse=True)[0]
-                )
-                for dists_for_dist_name in dist_name_to_versions.values()
-            ),
+            tuple(to_requirement(dist) for dist in active_distributions),
             tuple(requirements),
         )
 
