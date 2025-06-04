@@ -30,6 +30,10 @@ class PluginLoadOrderError(PluginLoadingError):
     pass
 
 
+def _requirement_key(req: Requirement) -> str:
+    return re.sub("[^A-Za-z0-9.]+", "-", req.name).lower()
+
+
 def load_backends_and_plugins(
     plugins: list[str],
     backends: list[str],
@@ -74,9 +78,6 @@ def load_plugins(
     :param plugins: A list of plugin names optionally with versions, in requirement format.
                               eg ['widgetpublish', 'widgetgen==1.2'].
     """
-
-    def _requirement_key(req: Requirement) -> str:
-        return re.sub("[^A-Za-z0-9.]+", "-", req.name).lower()
 
     loaded: dict = {}
     for plugin in plugins or []:

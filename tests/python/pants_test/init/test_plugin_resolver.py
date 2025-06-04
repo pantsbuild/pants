@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import importlib.metadata
 import os
-import re
 import shutil
 import sys
 import textwrap
@@ -28,6 +27,7 @@ from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessResult
+from pants.init.extension_loader import _requirement_key
 from pants.init.options_initializer import create_bootstrap_scheduler
 from pants.init.plugin_resolver import PluginResolver
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -171,10 +171,6 @@ class MockDistribution:
 
         # Create top_level.txt
         (dist_info / "top_level.txt").write_text(f"{self.name}\n")
-
-
-def _requirement_key(req: Requirement) -> str:
-    return re.sub("[^A-Za-z0-9.]+", "-", req.name).lower()
 
 
 @contextmanager
