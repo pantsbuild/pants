@@ -24,15 +24,10 @@ from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.environment import EnvironmentName
 from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import SessionValues
-from pants.engine.platform import Platform
-from pants.engine.process import (
-    ProcessCacheScope,
-    ProcessExecutionEnvironment,
-    execute_process_or_raise,
-)
+from pants.engine.process import ProcessCacheScope, execute_process_or_raise
 from pants.engine.rules import QueryRule, collect_rules, implicitly, rule
 from pants.init.bootstrap_scheduler import BootstrapScheduler
-from pants.option.global_options import GlobalOptions, KeepSandboxes
+from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.logging import LogLevel
 
@@ -191,18 +186,7 @@ class PluginResolver:
                 }
             ),
         )
-        process_execution_environment = ProcessExecutionEnvironment(
-            environment_name=None,
-            platform=Platform.create_for_localhost().value,
-            remote_execution=False,
-            remote_execution_extra_platform_properties=(),
-            execute_in_workspace=False,
-            keep_sandboxes=KeepSandboxes.on_failure.value,
-            docker_image=None,
-        )
-        params = Params(
-            request, determine_bootstrap_environment(session), process_execution_environment
-        )
+        params = Params(request, determine_bootstrap_environment(session))
         return cast(
             ResolvedPluginDistributions,
             session.product_request(ResolvedPluginDistributions, [params])[0],
