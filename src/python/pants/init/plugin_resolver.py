@@ -26,6 +26,7 @@ from pants.engine.internals.session import SessionValues
 from pants.engine.process import ProcessCacheScope, execute_process_or_raise
 from pants.engine.rules import QueryRule, collect_rules, implicitly, rule
 from pants.init.bootstrap_scheduler import BootstrapScheduler
+from pants.init.import_util import find_matching_distributions
 from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.logging import LogLevel
@@ -139,21 +140,13 @@ class PluginResolver:
         def to_requirement(d):
             return f"{d.name}=={d.version}"
 
-        all_distributions: list[importlib.metadata.Distribution] = []
+        distributions: list[importlib.metadata.Distribution] = []
         if self._inherit_existing_constraints:
-            all_distributions = list(importlib.metadata.distributions())
-
-        seen_dist_names: set[str] = set()
-        active_distributions: list[importlib.metadata.Distribution] = []
-        for dist in all_distributions:
-            if dist.name in seen_dist_names:
-                continue
-            seen_dist_names.add(dist.name)
-            active_distributions.append(dist)
+            distributions = list(find_matching_distributions(None))
 
         request = PluginsRequest(
             self._interpreter_constraints,
-            tuple(to_requirement(dist) for dist in active_distributions),
+            tuple(to_requirement(dist) for dist in distributions),
             tuple(requirements),
         )
 

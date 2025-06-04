@@ -3,18 +3,16 @@
 
 import importlib
 import importlib.metadata
-import importlib.util
 import logging
 import re
 import traceback
-from collections.abc import Generator
 
 from packaging.requirements import InvalidRequirement, Requirement
-from packaging.version import InvalidVersion, Version
 
 from pants.base.exceptions import BackendConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.goal.builtins import register_builtin_goals
+from pants.init.import_util import find_matching_distributions
 from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
@@ -48,51 +46,6 @@ def load_backends_and_plugins(
     load_plugins(bc_builder, plugins)
     register_builtin_goals(bc_builder)
     return bc_builder.create()
-
-
-def _normalize_name(name: str) -> str:
-    """Normalize package names according to PEP 508.
-
-    Convert to lowercase and replace underscores/dots with hyphens.
-    """
-    return name.lower().replace("_", "-").replace(".", "-")
-
-
-def _distribution_matches_requirement(
-    dist: importlib.metadata.Distribution, requirement: Requirement
-) -> bool:
-    # Check name match (case-insensitive, normalize underscores/hyphens)
-    dist_name = _normalize_name(dist.metadata["Name"])
-    req_name = _normalize_name(requirement.name)
-
-    if dist_name != req_name:
-        return False
-
-    # If no version specifier, name match is sufficient.
-    if not requirement.specifier:
-        return True
-
-    # Check version specifier and see if version is contained.
-    try:
-        dist_version = Version(dist.version)
-        return requirement.specifier.contains(dist_version)
-    except InvalidVersion:
-        # If we can't parse the version, assume it doesn't match
-        return False
-
-
-def _find_all_matching_distributions(
-    requirement: Requirement,
-) -> Generator[importlib.metadata.Distribution, None, None]:
-    """Yield distributions matching the given requirement."""
-    seen_dist_names: set[str] = set()
-    for dist in importlib.metadata.distributions():
-        # Skip non-active distributions. Python prefers first distribution on `sys.path`.
-        if dist.name in seen_dist_names:
-            continue
-        seen_dist_names.add(dist.name)
-        if _distribution_matches_requirement(dist, requirement):
-            yield dist
 
 
 def load_plugins(
@@ -133,7 +86,7 @@ def load_plugins(
         except InvalidRequirement:
             raise PluginNotFound(f"Could not find plugin: {req}")
 
-        dists = list(_find_all_matching_distributions(req))
+        dists = list(find_matching_distributions(req))
         if not dists:
             raise PluginNotFound(f"Could not find plugin: {req}")
         dist = dists[0]
