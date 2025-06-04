@@ -47,8 +47,9 @@ def find_matching_distributions(
     seen_dist_names: set[str] = set()
     for dist in importlib.metadata.distributions():
         # Skip non-active distributions. Python prefers the first distribution on `sys.path`.
-        if dist.name in seen_dist_names:
+        normalized_dist_name = normalize_name(dist.name)
+        if normalized_dist_name in seen_dist_names:
             continue
-        seen_dist_names.add(dist.name)
+        seen_dist_names.add(normalized_dist_name)
         if requirement is None or distribution_matches_requirement(dist, requirement):
             yield dist
