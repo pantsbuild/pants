@@ -90,7 +90,6 @@ async def resolve_plugins(
                 requirements=requirements,
                 interpreter_constraints=request.interpreter_constraints or InterpreterConstraints(),
                 description=f"Resolving plugins: {', '.join(req_strings)}",
-                inject_env={"PIP_VERBOSE": "9"},
             )
         )
     )
