@@ -278,7 +278,7 @@ def plugin_resolution(
             expected_distribution_names.add(dist.name)
 
         plugin_resolver = PluginResolver(
-            bootstrap_scheduler, interpreter_constraints, distribution_constraints_override=()
+            bootstrap_scheduler, interpreter_constraints, inherit_existing_constraints=False
         )
         plugin_paths = plugin_resolver.resolve(options_bootstrapper, complete_env, requirements)
 

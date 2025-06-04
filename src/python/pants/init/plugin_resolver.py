@@ -7,6 +7,7 @@ import importlib.metadata
 import logging
 import site
 import sys
+from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import cast
@@ -127,15 +128,11 @@ class PluginResolver:
         self,
         scheduler: BootstrapScheduler,
         interpreter_constraints: InterpreterConstraints | None = None,
-        distribution_constraints_override: Iterable[str] | None = None,
+        inherit_existing_constraints: bool = True,
     ) -> None:
         self._scheduler = scheduler
         self._interpreter_constraints = interpreter_constraints
-        self._distribution_constraints_override: list[str] | None = (
-            sorted(distribution_constraints_override)
-            if distribution_constraints_override is not None
-            else None
-        )
+        self._inherit_existing_constraints = inherit_existing_constraints
 
     def resolve(
         self,
@@ -148,17 +145,22 @@ class PluginResolver:
         def to_requirement(d):
             return f"{d.name}=={d.version}"
 
-        distributions: list[importlib.metadata.Distribution]
-        if self._distribution_constraints_override is None:
+        distributions: list[importlib.metadata.Distribution] = []
+        if self._inherit_existing_constraints:
             distributions = list(importlib.metadata.distributions())
-        else:
-            distributions = []
-            for dist_name in self._distribution_constraints_override:
-                distributions.append(importlib.metadata.distribution(dist_name))
+
+        dist_name_to_versions: dict[str, set[importlib.metadata.Distribution]] = defaultdict(set)
+        for dist in distributions:
+            dist_name_to_versions[dist.name].add(dist)
 
         request = PluginsRequest(
             self._interpreter_constraints,
-            tuple(to_requirement(dist) for dist in distributions),
+            tuple(
+                to_requirement(
+                    sorted(dists_for_dist_name, key=lambda d: d.version, reverse=True)[0]
+                )
+                for dists_for_dist_name in dist_name_to_versions.values()
+            ),
             tuple(requirements),
         )
 
