@@ -6,7 +6,6 @@ python_tests(
     timeout=360,
     overrides={
         ("test_options_initializer.py", "test_plugin_resolver.py"): {
-            "timeout": 3600,
             "dependencies": [
                 "//BUILD_ROOT:files",
                 # These tests load `pants.toml`, which references many of these plugins.
