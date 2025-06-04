@@ -120,7 +120,7 @@ class PluginResolver:
     """Encapsulates the state of plugin loading.
 
     Plugin loading is inherently stateful, and so the system enviroment on `sys.path` will be
-    mutatetd by  each call to `PluginResolver.resolve`.
+    mutated by each call to `PluginResolver.resolve`.
     """
 
     def __init__(
