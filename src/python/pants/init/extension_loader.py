@@ -7,6 +7,7 @@ import importlib.util
 import logging
 import re
 import traceback
+from collections.abc import Generator
 
 from packaging.requirements import InvalidRequirement, Requirement
 from packaging.version import InvalidVersion, Version
@@ -82,15 +83,16 @@ def _distribution_matches_requirement(
 
 def _find_all_matching_distributions(
     requirement: Requirement,
-) -> list[importlib.metadata.Distribution]:
-    """Internal function to find all matching distributions."""
-    matching_dists = []
-
+) -> Generator[importlib.metadata.Distribution, None, None]:
+    """Yield distributions matching the given requirement."""
+    seen_dist_names: set[str] = set()
     for dist in importlib.metadata.distributions():
+        # Skip non-active distributions. Python prefers first distribution on `sys.path`.
+        if dist.name in seen_dist_names:
+            continue
+        seen_dist_names.add(dist.name)
         if _distribution_matches_requirement(dist, requirement):
-            matching_dists.append(dist)
-
-    return matching_dists
+            yield dist
 
 
 def load_plugins(
@@ -131,14 +133,9 @@ def load_plugins(
         except InvalidRequirement:
             raise PluginNotFound(f"Could not find plugin: {req}")
 
-        dists = [d for d in _find_all_matching_distributions(req) if d]
-        if len(dists) == 0:
+        dists = list(_find_all_matching_distributions(req))
+        if not dists:
             raise PluginNotFound(f"Could not find plugin: {req}")
-        elif len(dists) > 1:
-            # If multiple copies of the same distribution are on the `sys.path`, then query
-            # to see which one is "active" and use only that copy.
-            active_dist = importlib.metadata.distribution(plugin)
-            dists = [active_dist]
         dist = dists[0]
 
         entry_points = dist.entry_points.select(group="pantsbuild.plugin")

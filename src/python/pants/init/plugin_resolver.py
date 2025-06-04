@@ -7,7 +7,6 @@ import importlib.metadata
 import logging
 import site
 import sys
-from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import cast
@@ -144,16 +143,13 @@ class PluginResolver:
         if self._inherit_existing_constraints:
             all_distributions = list(importlib.metadata.distributions())
 
-        dist_name_to_dists: dict[str, set[importlib.metadata.Distribution]] = defaultdict(set)
-        for dist in all_distributions:
-            dist_name_to_dists[dist.name].add(dist)
-
+        seen_dist_names: set[str] = set()
         active_distributions: list[importlib.metadata.Distribution] = []
-        for dist_name, dists_for_dist_name in dist_name_to_dists.items():
-            if len(dist_name_to_dists) > 1:
-                active_distributions.append(importlib.metadata.distribution(dist_name))
-            else:
-                active_distributions.extend(dists_for_dist_name)
+        for dist in all_distributions:
+            if dist.name in seen_dist_names:
+                continue
+            seen_dist_names.add(dist.name)
+            active_distributions.append(dist)
 
         request = PluginsRequest(
             self._interpreter_constraints,
