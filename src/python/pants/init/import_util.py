@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib.metadata
+import re
 from collections.abc import Generator
 from importlib.metadata import Distribution
 
@@ -12,11 +13,12 @@ from packaging.version import InvalidVersion, Version
 
 
 def normalize_name(name: str) -> str:
-    """Normalize package names according to PEP 508.
+    """Normalize package names in similar manner to `pkg_resources.safe_name`.
 
-    Convert to lowercase and replace underscores/dots with hyphens.
+    Replace runs of non-alphanumeric characters with a single `-`. Convert to lower case since the
+    official Python packaging regex for names is case-insensitive.
     """
-    return name.lower().replace("_", "-").replace(".", "-")
+    return re.sub("[^A-Za-z0-9.]+", "-", name).lower()
 
 
 def distribution_matches_requirement(dist: Distribution, requirement: Requirement) -> bool:
