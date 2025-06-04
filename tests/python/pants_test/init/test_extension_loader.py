@@ -1,22 +1,17 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import importlib.metadata
+import logging
 import sys
 import types
 import unittest
 import uuid
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from importlib.metadata import Distribution, DistributionFinder
 from typing import Any
-
-from pkg_resources import (
-    Distribution,
-    EmptyProvider,
-    VersionConflict,
-    WorkingSet,
-    working_set,
-    yield_lines,
-)
 
 from pants.base.exceptions import BuildConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
@@ -32,21 +27,48 @@ from pants.init.extension_loader import (
 )
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
+from pants.util.memo import memoized_method
 from pants.util.ordered_set import FrozenOrderedSet
 
+logger = logging.getLogger(__name__)
 
-class MockMetadata(EmptyProvider):
-    def __init__(self, metadata):
-        self.metadata = metadata
 
-    def has_metadata(self, name):
-        return name in self.metadata
+class MockDistribution(Distribution):
+    def __init__(self, metadata: dict[str, str]) -> None:
+        self._mocked_metadata = metadata
 
-    def get_metadata(self, name):
-        return self.metadata[name]
+    @memoized_method
+    def _text_for_metadata(self) -> str:
+        mocked_metadata_text = "Metadata-Version: 2.1\n"
+        for key, value in self._mocked_metadata.items():
+            title_case_key = key[0].upper() + key[1:]
+            mocked_metadata_text += f"{title_case_key}: {value}\n"
+        return mocked_metadata_text
 
-    def get_metadata_lines(self, name):
-        return yield_lines(self.get_metadata(name))
+    def read_text(self, filename):
+        if filename == "entry_points.txt":
+            return self._mocked_metadata.get("entry_points.txt")
+        if filename == "METADATA":
+            return self._text_for_metadata()
+        return None
+
+    def locate_file(self):
+        return None
+
+
+class MockDistributionFinder(DistributionFinder):
+    def __init__(self, dist: MockDistribution) -> None:
+        self._dist = dist
+
+    def find_distributions(
+        self, context: DistributionFinder.Context = DistributionFinder.Context()
+    ):
+        if context.name is None or self._dist.name == context.name:
+            return [self._dist]
+        return []
+
+    def find_spec(self, fullname, path, target=None):
+        return None
 
 
 class DummySubsystem(Subsystem):
@@ -98,9 +120,6 @@ def example_plugin_rule(root_type: RootType) -> PluginProduct:
 class LoaderTest(unittest.TestCase):
     def setUp(self):
         self.bc_builder = BuildConfiguration.Builder()
-        self.working_set = WorkingSet()
-        for entry in working_set.entries:
-            self.working_set.add_entry(entry)
 
     @contextmanager
     def create_register(
@@ -173,10 +192,10 @@ class LoaderTest(unittest.TestCase):
         with self.assertRaises(PluginNotFound):
             self.load_plugins(["Foobar"])
 
-    @staticmethod
-    def get_mock_plugin(
-        name, version, reg=None, alias=None, after=None, rules=None, target_types=None
-    ):
+    @contextmanager
+    def with_mock_plugin(
+        self, name, version, reg=None, alias=None, after=None, rules=None, target_types=None
+    ) -> Generator[str, None, None]:
         """Make a fake Distribution (optionally with entry points)
 
         Note the entry points do not actually point to code in the returned distribution --
@@ -227,35 +246,48 @@ class LoaderTest(unittest.TestCase):
             setattr(plugin, "tofu", target_types)
             entry_lines.append(f"target_types = {module_name}:tofu\n")
 
+        metadata = {"name": name, "version": version}
         if entry_lines:
             entry_data = "[pantsbuild.plugin]\n{}\n".format("\n".join(entry_lines))
-            metadata = {"entry_points.txt": entry_data}
+            metadata["entry_points.txt"] = entry_data
 
-        return Distribution(project_name=name, version=version, metadata=MockMetadata(metadata))
+        try:
+            orig_sys_meta_path = sys.meta_path[:]
+            sys.meta_path.insert(0, MockDistributionFinder(MockDistribution(metadata)))
+            importlib.invalidate_caches()
+            yield module_name
+        finally:
+            sys.meta_path = orig_sys_meta_path
+            del sys.modules[module_name]
 
     def load_plugins(self, plugins):
-        load_plugins(self.bc_builder, plugins, self.working_set)
+        load_plugins(self.bc_builder, plugins)
 
     def test_plugin_load_and_order(self):
-        d1 = self.get_mock_plugin("demo1", "0.0.1", after=lambda: ["demo2"])
-        d2 = self.get_mock_plugin("demo2", "0.0.3")
-        self.working_set.add(d1)
+        with (
+            self.with_mock_plugin("demo1", "0.0.1", after=lambda: ["demo2"]),
+        ):
+            # Attempting to load 'demo1' then 'demo2' should fail as 'demo1' requires 'after'=['demo2'].
+            with self.assertRaises(PluginLoadOrderError):
+                self.load_plugins(["demo1", "demo2"])
 
-        # Attempting to load 'demo1' then 'demo2' should fail as 'demo1' requires 'after'=['demo2'].
-        with self.assertRaises(PluginLoadOrderError):
-            self.load_plugins(["demo1", "demo2"])
-
-        # Attempting to load 'demo2' first should fail as it is not (yet) installed.
-        with self.assertRaises(PluginNotFound):
-            self.load_plugins(["demo2", "demo1"])
+        with (
+            self.with_mock_plugin("demo1", "0.0.1", after=lambda: ["demo2"]),
+        ):
+            # Attempting to load 'demo2' first should fail as it is not (yet) installed.
+            with self.assertRaises(PluginNotFound):
+                self.load_plugins(["demo2", "demo1"])
 
         # Installing demo2 and then loading in correct order should work though.
-        self.working_set.add(d2)
-        self.load_plugins(["demo2>=0.0.2", "demo1"])
+        with (
+            self.with_mock_plugin("demo2", "0.0.3"),
+            self.with_mock_plugin("demo1", "0.0.1", after=lambda: ["demo2"]),
+        ):
+            self.load_plugins(["demo2>=0.0.2", "demo1"])
 
-        # But asking for a bad (not installed) version fails.
-        with self.assertRaises(VersionConflict):
-            self.load_plugins(["demo2>=0.0.5"])
+            # But asking for a bad (not installed) version fails.
+            with self.assertRaises(PluginNotFound):
+                self.load_plugins(["demo2>=0.0.5"])
 
     def test_plugin_installs_alias(self):
         def reg_alias():
@@ -263,19 +295,18 @@ class LoaderTest(unittest.TestCase):
                 objects={"FROMPLUGIN1": DummyObject1, "FROMPLUGIN2": DummyObject2},
             )
 
-        self.working_set.add(self.get_mock_plugin("aliasdemo", "0.0.1", alias=reg_alias))
+        with self.with_mock_plugin("aliasdemo", "0.0.1", alias=reg_alias):
+            # Start with no aliases.
+            self.assert_empty()
 
-        # Start with no aliases.
-        self.assert_empty()
+            # Now load the plugin which defines aliases.
+            self.load_plugins(["aliasdemo"])
 
-        # Now load the plugin which defines aliases.
-        self.load_plugins(["aliasdemo"])
-
-        # Aliases now exist.
-        build_configuration = self.bc_builder.create()
-        registered_aliases = build_configuration.registered_aliases
-        self.assertEqual(DummyObject1, registered_aliases.objects["FROMPLUGIN1"])
-        self.assertEqual(DummyObject2, registered_aliases.objects["FROMPLUGIN2"])
+            # Aliases now exist.
+            build_configuration = self.bc_builder.create()
+            registered_aliases = build_configuration.registered_aliases
+            self.assertEqual(DummyObject1, registered_aliases.objects["FROMPLUGIN1"])
+            self.assertEqual(DummyObject2, registered_aliases.objects["FROMPLUGIN2"])
 
     def test_rules(self):
         def backend_rules():
@@ -288,12 +319,12 @@ class LoaderTest(unittest.TestCase):
         def plugin_rules():
             return [example_plugin_rule]
 
-        self.working_set.add(self.get_mock_plugin("this-plugin-rules", "0.0.1", rules=plugin_rules))
-        self.load_plugins(["this-plugin-rules"])
-        self.assertEqual(
-            self.bc_builder.create().rules,
-            FrozenOrderedSet([example_rule.rule, example_plugin_rule.rule]),
-        )
+        with self.with_mock_plugin("this-plugin-rules", "0.0.1", rules=plugin_rules):
+            self.load_plugins(["this-plugin-rules"])
+            self.assertEqual(
+                self.bc_builder.create().rules,
+                FrozenOrderedSet([example_rule.rule, example_plugin_rule.rule]),
+            )
 
     def test_target_types(self):
         def target_types():
@@ -310,25 +341,27 @@ class LoaderTest(unittest.TestCase):
         def plugin_targets():
             return [PluginTarget]
 
-        self.working_set.add(
-            self.get_mock_plugin("new-targets", "0.0.1", target_types=plugin_targets)
-        )
-        self.load_plugins(["new-targets"])
-        assert self.bc_builder.create().target_types == (DummyTarget, DummyTarget2, PluginTarget)
+        with self.with_mock_plugin("new-targets", "0.0.1", target_types=plugin_targets):
+            self.load_plugins(["new-targets"])
+            assert self.bc_builder.create().target_types == (
+                DummyTarget,
+                DummyTarget2,
+                PluginTarget,
+            )
 
     def test_backend_plugin_ordering(self):
         def reg_alias():
             return BuildFileAliases(objects={"override-alias": DummyObject2})
 
-        self.working_set.add(self.get_mock_plugin("pluginalias", "0.0.1", alias=reg_alias))
-        plugins = ["pluginalias==0.0.1"]
-        aliases = BuildFileAliases(objects={"override-alias": DummyObject1})
-        with self.create_register(build_file_aliases=lambda: aliases) as backend_module:
-            backends = [backend_module]
-            build_configuration = load_backends_and_plugins(
-                plugins, self.working_set, backends, bc_builder=self.bc_builder
-            )
-        # The backend should load first, then the plugins, therefore the alias registered in
-        # the plugin will override the alias registered by the backend
-        registered_aliases = build_configuration.registered_aliases
-        self.assertEqual(DummyObject2, registered_aliases.objects["override-alias"])
+        with self.with_mock_plugin("pluginalias", "0.0.1", alias=reg_alias):
+            plugins = ["pluginalias==0.0.1"]
+            aliases = BuildFileAliases(objects={"override-alias": DummyObject1})
+            with self.create_register(build_file_aliases=lambda: aliases) as backend_module:
+                backends = [backend_module]
+                build_configuration = load_backends_and_plugins(
+                    plugins, backends, bc_builder=self.bc_builder
+                )
+            # The backend should load first, then the plugins, therefore the alias registered in
+            # the plugin will override the alias registered by the backend
+            registered_aliases = build_configuration.registered_aliases
+            self.assertEqual(DummyObject2, registered_aliases.objects["override-alias"])

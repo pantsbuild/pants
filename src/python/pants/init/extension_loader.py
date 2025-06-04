@@ -60,15 +60,6 @@ def _normalize_name(name: str) -> str:
 def _distribution_matches_requirement(
     dist: importlib.metadata.Distribution, requirement: Requirement
 ) -> bool:
-    """Check if a distribution matches a requirement.
-
-    Args:
-        dist: Distribution to check
-        requirement: Requirement to match against
-
-    Returns:
-        True if the distribution matches the requirement
-    """
     # Check name match (case-insensitive, normalize underscores/hyphens)
     dist_name = _normalize_name(dist.metadata["Name"])
     req_name = _normalize_name(requirement.name)
@@ -76,11 +67,11 @@ def _distribution_matches_requirement(
     if dist_name != req_name:
         return False
 
-    # If no version specifier, name match is sufficient
+    # If no version specifier, name match is sufficient.
     if not requirement.specifier:
         return True
 
-    # Check version specifier
+    # Check version specifier and see if version is contained.
     try:
         dist_version = Version(dist.version)
         return requirement.specifier.contains(dist_version)
@@ -105,23 +96,14 @@ def _find_all_matching_distributions(
 def find_all_distributions_by_requirement(
     requirement: Requirement, search_paths: list[str] | None = None
 ) -> list[importlib.metadata.Distribution]:
-    """Find all distributions that match the given requirement.
-
-    Args:
-        requirement: A packaging.requirements.Requirement object
-        search_paths: Optional list of paths to search in addition to sys.path
-
-    Returns:
-        List of all matching Distribution objects
-    """
     matching_dists: list[importlib.metadata.Distribution] = []
 
     # Search in current environment (avoid duplicates)
     current_matches = _find_all_matching_distributions(requirement)
-    seen_names = {dist.metadata["Name"] for dist in matching_dists}
+    seen_names = {dist.name for dist in matching_dists}
 
     for dist in current_matches:
-        if dist.metadata["Name"] not in seen_names:
+        if dist.name not in seen_names:
             matching_dists.append(dist)
 
     return matching_dists
@@ -166,37 +148,45 @@ def load_plugins(
             raise PluginNotFound(f"Could not find plugin: {req}")
 
         dists = [d for d in _find_all_matching_distributions(req) if d]
-        if len(dists) > 1:
+        if len(dists) == 0:
+            raise PluginNotFound(f"Could not find plugin: {req}")
+        elif len(dists) > 1:
             msg = ", ".join(repr(d) for d in dists)
             raise PluginNotFound(f"Multiple Python distributions match plugin `{req}`: {msg}")
         dist = dists[0]
 
         entry_points = dist.entry_points.select(group="pantsbuild.plugin")
 
-        if "load_after" in entry_points:
-            deps = entry_points["load_after"].load()()
+        def find_entry_point(entry_point_name: str) -> importlib.metadata.EntryPoint | None:
+            for entry_point in entry_points:
+                if entry_point.name == entry_point_name:
+                    return entry_point
+            return None
+
+        if load_after_entry_point := find_entry_point("load_after"):
+            deps = load_after_entry_point.load()()
             for dep_name in deps:
                 dep = Requirement(dep_name)
                 dep_key = _requirement_key(dep)
                 if dep_key not in loaded:
                     raise PluginLoadOrderError(f"Plugin {plugin} must be loaded after {dep}")
-        if "target_types" in entry_points:
-            target_types = entry_points["target_types"].load()()
+        if target_types_entry_point := find_entry_point("target_types"):
+            target_types = target_types_entry_point.load()()
             build_configuration.register_target_types(req_key, target_types)
-        if "build_file_aliases" in entry_points:
-            aliases = entry_points["build_file_aliases"].load()()
+        if build_file_aliases_entry_point := find_entry_point("build_file_aliases"):
+            aliases = build_file_aliases_entry_point.load()()
             build_configuration.register_aliases(aliases)
-        if "rules" in entry_points:
-            rules = entry_points["rules"].load()()
+        if rules_entry_point := find_entry_point("rules"):
+            rules = rules_entry_point.load()()
             build_configuration.register_rules(req_key, rules)
-        if "remote_auth" in entry_points:
-            remote_auth_func = entry_points["remote_auth"].load()
+        if remote_auth_entry_point := find_entry_point("remote_auth"):
+            remote_auth_func = remote_auth_entry_point.load()
             logger.debug(
                 f"register remote auth function {remote_auth_func.__module__}.{remote_auth_func.__name__} from plugin: {plugin}"
             )
             build_configuration.register_remote_auth_plugin(remote_auth_func)
-        if "auxiliary_goals" in entry_points:
-            auxiliary_goals = entry_points["auxiliary_goals"].load()()
+        if auxiliary_goals_entry_point := find_entry_point("auxiliary_goals"):
+            auxiliary_goals = auxiliary_goals_entry_point.load()()
             build_configuration.register_auxiliary_goals(req_key, auxiliary_goals)
 
         loaded[req_key] = dist

@@ -56,7 +56,8 @@ class ResolvedPluginDistributions(DeduplicatedCollection[str]):
 
 @rule
 async def resolve_plugins(
-    request: PluginsRequest, global_options: GlobalOptions,
+    request: PluginsRequest,
+    global_options: GlobalOptions,
 ) -> ResolvedPluginDistributions:
     """This rule resolves plugins using a VenvPex, and exposes the absolute paths of their dists.
 
@@ -89,7 +90,7 @@ async def resolve_plugins(
                 requirements=requirements,
                 interpreter_constraints=request.interpreter_constraints or InterpreterConstraints(),
                 description=f"Resolving plugins: {', '.join(req_strings)}",
-                inject_env={"PIP_VERBOSE": "9"},                
+                inject_env={"PIP_VERBOSE": "9"},
             )
         )
     )
@@ -131,7 +132,11 @@ class PluginResolver:
     ) -> None:
         self._scheduler = scheduler
         self._interpreter_constraints = interpreter_constraints
-        self._distribution_constraints_override: list[str] | None = sorted(distribution_constraints_override) if distribution_constraints_override is not None else None
+        self._distribution_constraints_override: list[str] | None = (
+            sorted(distribution_constraints_override)
+            if distribution_constraints_override is not None
+            else None
+        )
 
     def resolve(
         self,
@@ -156,7 +161,6 @@ class PluginResolver:
             self._interpreter_constraints,
             tuple(to_requirement(dist) for dist in distributions),
             tuple(requirements),
-            
         )
 
         result = []

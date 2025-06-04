@@ -57,7 +57,6 @@ def rule_runner() -> RuleRunner:
     rule_runner.set_options(
         [
             "--backend-packages=pants.backend.python",
-            "--keep-sandboxes=on_failure",
         ],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
@@ -200,7 +199,9 @@ def plugin_resolution(
 
     @contextmanager
     def save_sys_path() -> Generator[list[str], None, None]:
-        orig_sys_path = sys.path[:]
+        """Restores the previous `sys.path` once context ends."""
+        orig_sys_path = sys.path
+        sys.path = sys.path[:]
         try:
             yield orig_sys_path
         finally:
@@ -214,14 +215,9 @@ def plugin_resolution(
         [f"=={'.'.join(map(str, sys.version_info[:3]))}"]
     )
 
-    # import pdb ; pdb.set_trace()
-
     with provide_chroot(chroot) as (root_dir, create_artifacts), save_sys_path() as saved_sys_path:
         env: dict[str, str] = {}
-
         repo_dir = os.path.join(root_dir, "repo")
-        print(f"TEST: repo_dir={repo_dir}")
-        # Path(repo_dir).mkdir(parents=True)
 
         def _create_artifact(name, version, install_requires):
             if create_artifacts:
@@ -239,7 +235,6 @@ def plugin_resolution(
         env.update(
             PANTS_PYTHON_REPOS_FIND_LINKS=f"['file://{repo_dir}/']",
             PANTS_PYTHON_RESOLVER_CACHE_TTL="1",
-            PANTS_KEEP_SANDBOXES="always",
         )
         if not use_pypi:
             env.update(PANTS_PYTHON_REPOS_INDEXES="[]")
@@ -250,7 +245,6 @@ def plugin_resolution(
                 version = plugin.version
                 plugin_list.append(f"{plugin.name}=={version}" if version else plugin.name)
                 _create_artifact(plugin.name, version, plugin.install_requires)
-                print(f"TEST: Added plugin `{plugin}`.")
             env["PANTS_PLUGINS"] = f"[{','.join(map(repr, plugin_list))}]"
 
             for requirement in tuple(requirements):
@@ -263,40 +257,30 @@ def plugin_resolution(
 
         configpath = os.path.join(root_dir, "pants.toml")
         if create_artifacts:
-            print(f"TEST: Touched config path at `{configpath}`.")
             touch(configpath)
 
         args = [
             "pants",
-            "--pex-verbosity=9",
-            "--keep-sandboxes=on_failure",
             f"--pants-config-files=['{configpath}']",
         ]
 
         options_bootstrapper = OptionsBootstrapper.create(env=env, args=args, allow_pantsrc=False)
-        print(f"TEST: options_bootstrapper={options_bootstrapper}")
-
         complete_env = CompleteEnvironmentVars(
             {**{k: os.environ[k] for k in ["PATH", "HOME", "PYENV_ROOT"] if k in os.environ}, **env}
         )
-        print(f"TEST: complete_env={complete_env}")
-
         bootstrap_scheduler = create_bootstrap_scheduler(options_bootstrapper, EXECUTOR)
         cache_dir = options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
 
         site_packages_path = Path(root_dir, "site-packages")
-
         expected_distribution_names: set[str] = set()
         for dist in existing_distributions:
             dist.create(site_packages_path)
             expected_distribution_names.add(dist.name)
 
-        plugin_resolver = PluginResolver(bootstrap_scheduler, interpreter_constraints, distribution_constraints_override=())
-        try:
-            plugin_paths = plugin_resolver.resolve(options_bootstrapper, complete_env, requirements)
-        except Exception:
-            # import pdb ; pdb.set_trace()
-            raise
+        plugin_resolver = PluginResolver(
+            bootstrap_scheduler, interpreter_constraints, distribution_constraints_override=()
+        )
+        plugin_paths = plugin_resolver.resolve(options_bootstrapper, complete_env, requirements)
 
         for found_dist in importlib.metadata.distributions():
             if found_dist.name in expected_distribution_names:
