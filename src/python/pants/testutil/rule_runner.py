@@ -38,10 +38,12 @@ from pants.engine.internals.session import SessionValues
 from pants.engine.platform import Platform
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import QueryRule as QueryRule
+from pants.engine.rules import Rule
 from pants.engine.target import AllTargets, Target, WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.goal.auxiliary_goal import AuxiliaryGoal
 from pants.init.engine_initializer import EngineInitializer
+from pants.init.extension_api import ExtensionInitContextV0
 from pants.init.logging import initialize_stdio, initialize_stdio_raw, stdio_destination
 from pants.option.global_options import (
     DynamicRemoteOptions,
@@ -50,6 +52,7 @@ from pants.option.global_options import (
     LocalStoreOptions,
 )
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.subsystem import Subsystem
 from pants.source import source_root
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.util.collections import assert_single_element
@@ -223,6 +226,30 @@ class GoalRuleResult:
         return GoalRuleResult(0, stdout="", stderr="")
 
 
+class _ExtensionInitContextProxy(ExtensionInitContextV0):
+    def __init__(self, bc_builder: BuildConfiguration.Builder) -> None:
+        self._bc_builder = bc_builder
+        self.rules: list[Rule | UnionRule] = []
+
+    def register_aliases(self, aliases: BuildFileAliases) -> None:
+        self._bc_builder.register_aliases(aliases)
+
+    def register_auxiliary_goals(self, goals: Iterable[type[AuxiliaryGoal]]) -> None:
+        self._bc_builder.register_auxiliary_goals("_dummy_for_test_", goals)
+
+    def register_remote_auth_plugin(self, remote_auth_plugin: Callable) -> None:
+        self._bc_builder.register_remote_auth_plugin(remote_auth_plugin)
+
+    def register_rules(self, rules: Iterable[Rule | UnionRule]) -> None:
+        self.rules.extend(rules)
+
+    def register_subsystems(self, subsystems: Iterable[type[Subsystem]]):
+        self._bc_builder.register_subsystems("_dummy_for_test_", subsystems)
+
+    def register_target_types(self, target_types: Iterable[type[Target]] | Any) -> None:
+        self._bc_builder.register_target_types("_dummy_for_test_", target_types or ())
+
+
 # This is not frozen because we need to update the `scheduler` when setting options.
 @dataclass
 class RuleRunner:
@@ -251,6 +278,7 @@ class RuleRunner:
         inherent_environment: EnvironmentName | None = EnvironmentName(None),
         is_bootstrap: bool = False,
         auxiliary_goals: Iterable[type[AuxiliaryGoal]] | None = None,
+        plugin_initializers: Iterable[Callable[[ExtensionInitContextV0], None]] | None = None,
     ) -> None:
         bootstrap_args = [*bootstrap_args]
 
@@ -275,9 +303,19 @@ class RuleRunner:
                 return rule
             return QueryRule(rule.output_type, OrderedSet((*rule.input_types, EnvironmentName)))
 
+        build_config_builder = BuildConfiguration.Builder()
+
+        init_context = _ExtensionInitContextProxy(build_config_builder)
+        if plugin_initializers:
+            for plugin_initializer in plugin_initializers:
+                plugin_initializer(init_context)
+
         # TODO: Redesign rule registration for tests to be more ergonomic and to make this less
         #  special-cased.
-        self.rules = tuple(rewrite_rule_for_inherent_environment(rule) for rule in (rules or ()))
+        self.rules = tuple(
+            rewrite_rule_for_inherent_environment(rule)
+            for rule in [*(rules or ()), *init_context.rules]
+        )
         all_rules = (
             *self.rules,
             *source_root.rules(),
@@ -286,7 +324,7 @@ class RuleRunner:
             QueryRule(AllTargets, []),
             QueryRule(UnionMembership, []),
         )
-        build_config_builder = BuildConfiguration.Builder()
+
         build_config_builder.register_aliases(
             BuildFileAliases(
                 objects=objects, context_aware_object_factories=context_aware_object_factories
@@ -299,6 +337,7 @@ class RuleRunner:
         build_config_builder.register_rules("_dummy_for_test_", all_rules)
         build_config_builder.register_target_types("_dummy_for_test_", target_types or ())
         build_config_builder.register_auxiliary_goals("_dummy_for_test_", auxiliary_goals or ())
+
         self.build_config = build_config_builder.create()
 
         self.environment = CompleteEnvironmentVars({})

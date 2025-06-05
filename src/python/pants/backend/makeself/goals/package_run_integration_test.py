@@ -13,7 +13,7 @@ from pants.backend.makeself.goals.package import (
 )
 from pants.backend.makeself.subsystem import RunMakeselfArchive
 from pants.backend.makeself.target_types import MakeselfArchiveTarget
-from pants.backend.shell import register
+from pants.backend.shell.register import initializeV0 as shell_plugin_initializer
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import FilesGeneratorTarget, FileTarget
 from pants.core.target_types import rules as core_target_types_rules
@@ -31,19 +31,18 @@ def rule_runner() -> RuleRunner:
             MakeselfArchiveTarget,
             FileTarget,
             FilesGeneratorTarget,
-            *register.target_types(),
         ],
         rules=[
             *subsystem.rules(),
             *package.rules(),
             *run.rules(),
             *system_binaries.rules(),
-            *register.rules(),
             *makeself_system_binaries.rules(),
             *core_target_types_rules(),
             QueryRule(BuiltPackage, [MakeselfArchiveFieldSet]),
             QueryRule(ProcessResult, [RunMakeselfArchive]),
         ],
+        plugin_initializers=[shell_plugin_initializer],
     )
     rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
