@@ -10,7 +10,6 @@ import os
 import re
 import sys
 from collections.abc import Generator, Iterable
-from datetime import date
 from pathlib import Path
 
 import github
@@ -79,23 +78,14 @@ def scrape_release(
             asset_map[asset.name] = asset
 
 
-def pbs_tag_to_date(pbs_tag: str) -> date | None:
-    if len(pbs_tag) != 8:
-        return None
-    return date(year=int(pbs_tag[0:4]), month=int(pbs_tag[4:6]), day=int(pbs_tag[6:8]))
-
-
 def get_releases_after_given_release(
-    gh: github.Github, pbs_repo: Repository, filter_date: date
+    gh: github.Github, pbs_repo: Repository, scraped_releases: set[str]
 ) -> list[GitRelease]:
     recent_releases: list[GitRelease] = []
     for release in pbs_repo.get_releases():
         if release.prerelease or release.draft:
             continue
-        release_date = pbs_tag_to_date(release.tag_name)
-        if release_date is None:
-            continue
-        if release_date <= filter_date:
+        if release.tag_name in scraped_releases:
             break
         recent_releases.append(release)
 
@@ -137,11 +127,8 @@ def main() -> None:
     else:
         latest_scraped_release_name = max(scraped_releases)
         print(f"Latest scraped release: {latest_scraped_release_name}")
-        latest_scraped_release = pbs_repo.get_release(latest_scraped_release_name)
-        latest_scraped_release_date = pbs_tag_to_date(latest_scraped_release.tag_name)
-        assert latest_scraped_release_date is not None
         releases = get_releases_after_given_release(
-            gh, pbs_repo=pbs_repo, filter_date=latest_scraped_release_date
+            gh, pbs_repo=pbs_repo, scraped_releases=scraped_releases
         )
         recent_release_tags = [r.tag_name for r in releases]
         print(f"Found recent release tags: {','.join(recent_release_tags)}")
