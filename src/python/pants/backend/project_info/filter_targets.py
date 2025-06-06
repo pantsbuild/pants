@@ -53,8 +53,8 @@ class FilterSubsystem(LineOriented, GoalSubsystem):
             Filter targets based each targets's target type, e.g. `resources` or `python_sources`.
 
             As with any target filter, a `-` prefix will negate matches for purposes of filtering;
-            that is, the filter will _exclude_ a target unless the target's target type does _not_
-            match any of the provided values.
+            that is, the filter will include a target only if the target's target type fails to
+            match all of the provided values.
             """
         ),
         # help="",
@@ -80,8 +80,8 @@ class FilterSubsystem(LineOriented, GoalSubsystem):
             at https://docs.python.org/3/library/re.html#regular-expression-syntax.
 
             As with any target filter, a `-` prefix will negate matches for purposes of filtering;
-            that is, the filter will _exclude_ a target unless the target's adddress does _not_
-            match any of the regular expressions.
+            that is, the filter will include a target only if the target's adddress fails to
+            match all of the provided regular expressions.
             """
         ),
     )
@@ -97,8 +97,8 @@ class FilterSubsystem(LineOriented, GoalSubsystem):
             at https://docs.python.org/3/library/re.html#regular-expression-syntax.
 
             As with any target filter, a `-` prefix will negate matches for purposes of filtering;
-            that is, the filter will _exclude_ a target unless all of the target's tags do _not_
-            match any of the regular expressions.
+            that is, the filter will include a target only if all of the target's tags fail to
+            match all of the provided regular expressions.
             """
         ),
     )
