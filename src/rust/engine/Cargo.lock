@@ -976,8 +976,8 @@ dependencies = [
  "sha2",
  "tree-sitter",
  "tree-sitter-dockerfile",
- "tree-sitter-javascript",
  "tree-sitter-python",
+ "tree-sitter-typescript",
  "walkdir",
 ]
 
@@ -4719,20 +4719,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "tree-sitter-javascript"
+name = "tree-sitter-python"
 version = "0.20.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d015c02ea98b62c806f7329ff71c383286dfc3a7a7da0cc484f6e42922f73c2c"
+checksum = "e6c93b1b1fbd0d399db3445f51fd3058e43d0b4dcff62ddbdb46e66550978aa5"
 dependencies = [
  "cc",
  "tree-sitter",
 ]
 
 [[package]]
-name = "tree-sitter-python"
-version = "0.20.4"
+name = "tree-sitter-typescript"
+version = "0.20.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6c93b1b1fbd0d399db3445f51fd3058e43d0b4dcff62ddbdb46e66550978aa5"
+checksum = "c8bc1d2c24276a48ef097a71b56888ac9db63717e8f8d0b324668a27fd619670"
 dependencies = [
  "cc",
  "tree-sitter",

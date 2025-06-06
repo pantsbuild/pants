@@ -102,6 +102,11 @@ fn simple_imports() {
 }
 
 #[test]
+fn type_imports() {
+    assert_imports("import type a from 'a'", &["a"]);
+}
+
+#[test]
 fn await_import() {
     assert_imports("const i = await import('i');", &["i"]);
 }
@@ -192,6 +197,14 @@ fn simple_exports() {
     );
     // just confirm a relative path is preserved
     assert_imports("export * from './b/c'", &["./b/c"]);
+}
+
+#[test]
+fn type_exports() {
+    assert_imports(
+        r#"export type { Stuff } from "module-name";"#,
+        &["module-name"],
+    );
 }
 
 #[test]
