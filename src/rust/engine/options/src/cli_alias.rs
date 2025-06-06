@@ -73,10 +73,11 @@ fn construct_alias_expansion(
         (Some(alias_metavar), Some(vs)) => {
             let alias_metavar = &alias_metavar.as_str()[1..];
 
+            let re_escaped_alias_metavar = regex::escape(alias_metavar);
+            let marker_re = Regex::new(&format!(r"(\${re_escaped_alias_metavar})\W?")).unwrap();
+
             let mut args = Vec::with_capacity(vs.len());
             for v in vs {
-                let re_escaped_alias_metavar = regex::escape(alias_metavar);
-                let marker_re = Regex::new(&format!(r"(\${re_escaped_alias_metavar})\W?")).unwrap();
                 let mut v_with_sentinels = v.clone();
                 loop {
                     let Some(captures) = marker_re.captures(&v_with_sentinels) else {
