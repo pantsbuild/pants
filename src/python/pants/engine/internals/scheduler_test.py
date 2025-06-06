@@ -35,7 +35,7 @@ async def consumes_a_and_b(a: A, b: B) -> str:
     return str(f"{a} and {b}")
 
 
-def test_use_params() -> None:
+async def test_use_params() -> None:
     rule_runner = RuleRunner(
         rules=[consumes_a_and_b, QueryRule(str, [A, B])],
         inherent_environment=None,
@@ -44,11 +44,11 @@ def test_use_params() -> None:
     # Confirm that we can pass in Params in order to provide multiple inputs to an execution.
     a, b = A(), B()
     result_str = rule_runner.request(str, [a, b])
-    assert result_str == consumes_a_and_b.rule.func(a, b)  # type: ignore[attr-defined]
+    assert result_str == await consumes_a_and_b.rule.func(a, b)  # type: ignore[attr-defined]
 
     # And confirm that a superset of Params is also accepted.
     result_str = rule_runner.request(str, [a, b, b"bytes aren't used by any rules"])
-    assert result_str == consumes_a_and_b.rule.func(a, b)  # type: ignore[attr-defined]
+    assert result_str == await consumes_a_and_b.rule.func(a, b)  # type: ignore[attr-defined]
 
     # But not a subset.
     expected_msg = "No installed QueryRules can compute str given input Params(A), but"
