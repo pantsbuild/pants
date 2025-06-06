@@ -16,7 +16,6 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Literal
 
 from pants.engine.collection import Collection
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
@@ -51,30 +50,31 @@ class AllTSConfigs(Collection[TSConfig]):
 class ParseTSConfigRequest:
     content: FileContent
     others: DigestContents
-    target_file: Literal["tsconfig.json", "jsconfig.json"]
 
 
 async def _read_parent_config(
     child_path: str,
     extends_path: str,
     others: DigestContents,
-    target_file: Literal["tsconfig.json", "jsconfig.json"],
 ) -> TSConfig | None:
     if child_path.endswith(".json"):
         relative = os.path.dirname(child_path)
     else:
         relative = child_path
     relative = os.path.normpath(os.path.join(relative, extends_path))
-    if not extends_path.endswith(".json"):
-        relative = os.path.join(relative, target_file)
-    parent = next((other for other in others if other.path == relative), None)
+    for target_file in ("tsconfig.json", "jsconfig.json"):
+        if not extends_path.endswith(".json"):
+            relative = os.path.join(relative, target_file)
+        parent = next((other for other in others if other.path == relative), None)
+        if parent:
+            break
     if not parent:
         logger.warning(
             f"pants could not locate {child_path}'s 'extends' at {relative}. Found: {[other.path for other in others]}."
         )
         return None
     return await Get(  # Must be a Get until https://github.com/pantsbuild/pants/pull/21174 lands
-        TSConfig, ParseTSConfigRequest(parent, others, target_file)
+        TSConfig, ParseTSConfigRequest(parent, others)
     )
 
 
@@ -118,7 +118,7 @@ def _parse_config_from_content(content: FileContent) -> tuple[TSConfig, str | No
         module_resolution=compiler_options.get("moduleResolution"),
         paths=compiler_options.get("paths"),
         base_url=compiler_options.get("baseUrl"),
-    ), compiler_options.get("extends")
+    ), parsed_ts_config_json.get("extends")
 
 
 @rule
@@ -127,9 +127,7 @@ async def parse_extended_ts_config(request: ParseTSConfigRequest) -> TSConfig:
     if not extends:
         return ts_config
 
-    extended_parent = await _read_parent_config(
-        ts_config.path, extends, request.others, request.target_file
-    )
+    extended_parent = await _read_parent_config(ts_config.path, extends, request.others)
     if not extended_parent:
         return ts_config
     return TSConfig(
@@ -142,19 +140,17 @@ async def parse_extended_ts_config(request: ParseTSConfigRequest) -> TSConfig:
 
 @dataclass(frozen=True)
 class TSConfigsRequest:
-    target_file: Literal["tsconfig.json", "jsconfig.json"]
+    target_file: str
 
 
 @rule
-async def construct_effective_ts_configs(req: TSConfigsRequest) -> AllTSConfigs:
-    all_files = await path_globs_to_digest(PathGlobs([f"**/{req.target_file}"]))
+async def construct_effective_ts_configs() -> AllTSConfigs:
+    all_files = await path_globs_to_digest(PathGlobs(["**/tsconfig*.json", "**/jsconfig*.json"]))
     digest_contents = await get_digest_contents(all_files)
 
     return AllTSConfigs(
         await concurrently(
-            parse_extended_ts_config(
-                ParseTSConfigRequest(digest_content, digest_contents, req.target_file)
-            )
+            parse_extended_ts_config(ParseTSConfigRequest(digest_content, digest_contents))
             for digest_content in digest_contents
         )
     )
@@ -168,13 +164,12 @@ class ClosestTSConfig:
 @dataclass(frozen=True)
 class ParentTSConfigRequest:
     file: str
-    target_file: Literal["tsconfig.json", "jsconfig.json"]
 
 
 @rule(desc="Finding parent tsconfig.json")
 async def find_parent_ts_config(req: ParentTSConfigRequest) -> ClosestTSConfig:
-    all_configs = await construct_effective_ts_configs(TSConfigsRequest(req.target_file))
-    configs_by_longest_path = sorted(all_configs, key=lambda config: config.path, reverse=True)
+    all_configs = await construct_effective_ts_configs()
+    configs_by_longest_path = sorted(all_configs, key=lambda config: len(config.path), reverse=True)
     for config in configs_by_longest_path:
         if PurePath(req.file).is_relative_to(os.path.dirname(config.path)):
             return ClosestTSConfig(config)
