@@ -8,8 +8,8 @@ import sys
 from dataclasses import dataclass
 from textwrap import dedent  # noqa: PNT20
 
+from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.subsystems.python_bootstrap import PythonBootstrapSubsystem
-from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.system_binaries import BashBinary, SystemBinariesSubsystem, TarBinary
 from pants.engine.download_file import download_file
 from pants.engine.fs import DownloadFile

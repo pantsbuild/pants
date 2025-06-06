@@ -32,6 +32,7 @@ from pants.backend.go.util_rules.third_party_pkg import (
     ThirdPartyPkgAnalysisRequest,
     extract_package_info,
 )
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,
@@ -39,7 +40,6 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior
-from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.fs import AddPrefix
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import add_prefix

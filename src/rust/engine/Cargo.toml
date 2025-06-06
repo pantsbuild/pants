@@ -297,8 +297,8 @@ prodash = { git = "https://github.com/stuhood/prodash", rev = "stuhood/raw-messa
 prost = "0.13"
 prost-build = "0.13"
 prost-types = "0.13"
-pyo3 = "0.23.4"
-pyo3-build-config = "0.23.4"
+pyo3 = "0.25.0"
+pyo3-build-config = "0.25.0"
 rand = "0.8"
 regex = "1"
 rlimit = "0.8"
@@ -342,7 +342,7 @@ whoami = "1.5.2"
 # NB: If a change to these versions requires cache busting, bump the version of
 # `src/rust/engine/dep_inference/Cargo.toml`.
 tree-sitter = "0.20.10"
-tree-sitter-javascript = "0.20.1"
+tree-sitter-typescript = "0.20.5"
 tree-sitter-python = "0.20.4"
 # TODO: Waiting on https://github.com/camdencheek/tree-sitter-dockerfile/pull/58.
 tree-sitter-dockerfile = { git = "https://github.com/tobni/tree-sitter-dockerfile.git", rev = "ce1cbc3537995f0d968c8bc6315b6a62d6faacde" }

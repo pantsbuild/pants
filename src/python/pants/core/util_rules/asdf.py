@@ -11,7 +11,7 @@ from pathlib import Path, PurePath
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
-from pants.core.util_rules.environments import EnvironmentTarget
+from pants.core.environments.target_types import EnvironmentTarget
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import _uncacheable_rule, collect_rules
