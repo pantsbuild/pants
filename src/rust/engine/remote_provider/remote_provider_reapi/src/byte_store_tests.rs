@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use grpc_util::tls;
+use hashing::Digest;
 use mock::{RequestType, StubCAS};
 use tempfile::TempDir;
 use testutil::data::TestData;
@@ -12,7 +13,9 @@ use testutil::file::mk_tempfile;
 use tokio::fs::File;
 use workunit_store::WorkunitStore;
 
-use remote_provider_traits::{ByteStoreProvider, RemoteProvider, RemoteStoreOptions};
+use remote_provider_traits::{
+    BatchLoadDestination, ByteStoreProvider, RemoteProvider, RemoteStoreOptions,
+};
 
 use crate::byte_store::Provider;
 
@@ -35,6 +38,7 @@ fn remote_options(
         retries: 1,
         concurrency_limit: 256,
         batch_api_size_limit,
+        batch_load_enabled: false,
     }
 }
 
@@ -152,6 +156,59 @@ async fn load_existing_wrong_digest_error() {
         error.contains("Remote CAS gave wrong digest"),
         "Bad error message, got: {error}"
     )
+}
+
+#[tokio::test]
+async fn load_bytes_batch_existing() {
+    let _ = WorkunitStore::setup_for_tests();
+    let cas = StubCAS::builder()
+        .file(&TestData::roland())
+        .file(&TestData::catnip())
+        .build()
+        .await;
+
+    let provider = new_provider(&cas).await;
+    let mut destination = TestLocalStore {};
+
+    let digests = vec![TestData::roland().digest(), TestData::catnip().digest()];
+    let results = provider
+        .load_batch(digests, &mut destination)
+        .await
+        .unwrap();
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[&TestData::roland().digest()], Ok(true));
+    assert_eq!(results[&TestData::catnip().digest()], Ok(true));
+}
+
+#[tokio::test]
+async fn load_bytes_batch_missing() {
+    let _ = WorkunitStore::setup_for_tests();
+    let cas = StubCAS::builder().file(&TestData::roland()).build().await;
+
+    let provider = new_provider(&cas).await;
+    let mut destination = TestLocalStore {};
+
+    let digests = vec![TestData::roland().digest(), TestData::catnip().digest()];
+    let results = provider
+        .load_batch(digests, &mut destination)
+        .await
+        .unwrap();
+    assert_eq!(results.len(), 2);
+
+    assert_eq!(
+        results[&TestData::roland().digest()],
+        Err(
+            "status: NotFound, message: \"\", details: [], metadata: MetadataMap { headers: {} }"
+                .to_owned()
+        )
+    );
+    assert_eq!(
+        results[&TestData::catnip().digest()],
+        Err(
+            "status: NotFound, message: \"\", details: [], metadata: MetadataMap { headers: {} }"
+                .to_owned()
+        )
+    );
 }
 
 fn assert_cas_store(cas: &StubCAS, testdata: &TestData, chunks: usize, chunk_size: usize) {
@@ -519,4 +576,14 @@ async fn list_missing_digests_grpc_error() {
             .get(&RequestType::CASFindMissingBlobs),
         Some(&3)
     );
+}
+
+#[derive(Debug, Clone)]
+struct TestLocalStore;
+
+#[async_trait::async_trait]
+impl BatchLoadDestination for TestLocalStore {
+    async fn write(&mut self, _: Vec<(Digest, Bytes)>) -> Result<(), String> {
+        Ok(())
+    }
 }
