@@ -138,7 +138,7 @@ async def resolve_unexpanded_targets(addresses: Addresses) -> UnexpandedTargets:
 
 
 @rule
-def target_types_to_generate_targets_requests(
+async def target_types_to_generate_targets_requests(
     union_membership: UnionMembership,
 ) -> TargetTypesToGenerateTargetsRequests:
     return TargetTypesToGenerateTargetsRequests(
@@ -879,7 +879,7 @@ async def transitive_targets(
 
 
 @rule(_masked_types=[EnvironmentName])
-def coarsened_targets_request(addresses: Addresses) -> CoarsenedTargetsRequest:
+async def coarsened_targets_request(addresses: Addresses) -> CoarsenedTargetsRequest:
     return CoarsenedTargetsRequest(addresses)
 
 
@@ -1003,7 +1003,7 @@ class TargetOriginSourcesBlocksOptions:
 
 
 @rule
-def extract_enable_target_origin_sources_blocks(
+async def extract_enable_target_origin_sources_blocks(
     global_options: GlobalOptions,
 ) -> TargetOriginSourcesBlocksOptions:
     return TargetOriginSourcesBlocksOptions(
@@ -1012,7 +1012,7 @@ def extract_enable_target_origin_sources_blocks(
 
 
 @rule
-def calc_source_block_mapping(
+async def calc_source_block_mapping(
     targets: AllTargets,
     options: TargetOriginSourcesBlocksOptions,
 ) -> FilenameTargetSourceBlocksMapping:
@@ -1036,7 +1036,7 @@ class FilesWithSourceBlocks(frozenset[str]):
 
 
 @rule
-def calc_files_with_sources_blocks(
+async def calc_files_with_sources_blocks(
     mapping: FilenameTargetSourceBlocksMapping,
 ) -> FilesWithSourceBlocks:
     return FilesWithSourceBlocks(mapping.keys())
@@ -1184,7 +1184,7 @@ async def find_owners(
 
 
 @rule
-def find_source_blocks_owners(
+async def find_source_blocks_owners(
     request: TextBlocksOwnersRequest, mapping: FilenameTargetSourceBlocksMapping
 ) -> Owners:
     file_blocks = mapping.get(request.filename)
@@ -1216,7 +1216,7 @@ def find_source_blocks_owners(
 
 
 @rule
-def extract_unmatched_build_file_globs(
+async def extract_unmatched_build_file_globs(
     global_options: GlobalOptions,
 ) -> UnmatchedBuildFileGlobs:
     return UnmatchedBuildFileGlobs(global_options.unmatched_build_file_globs)
@@ -1359,7 +1359,7 @@ class SubprojectRoots(Collection[str]):
 
 
 @rule
-def extract_subproject_roots(global_options: GlobalOptions) -> SubprojectRoots:
+async def extract_subproject_roots(global_options: GlobalOptions) -> SubprojectRoots:
     return SubprojectRoots(global_options.subproject_roots)
 
 
@@ -1740,7 +1740,7 @@ async def field_defaults(union_membership: UnionMembership) -> FieldDefaults:
 
 
 @rule
-def find_valid_field_sets(
+async def find_valid_field_sets(
     request: FieldSetsPerTargetRequest, union_membership: UnionMembership
 ) -> FieldSetsPerTarget:
     field_set_types = union_membership.get(request.field_set_superclass)

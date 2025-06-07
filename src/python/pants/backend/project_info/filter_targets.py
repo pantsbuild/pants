@@ -186,7 +186,7 @@ class FilterGoal(Goal):
 
 
 @goal_rule
-def filter_targets(
+async def filter_targets(
     addresses: Addresses, filter_subsystem: FilterSubsystem, console: Console
 ) -> FilterGoal:
     # When removing, also remove the special casing in `help_info_extractor.py` to reclassify the

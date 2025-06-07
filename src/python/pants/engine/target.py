@@ -108,7 +108,7 @@ class AsyncFieldMixin(Field):
 
 
         @rule
-        def hydrate_sources(request: HydrateSourcesRequest) -> HydratedSources:
+        async def hydrate_sources(request: HydrateSourcesRequest) -> HydratedSources:
             result = await Get(Snapshot, PathGlobs(request.field.value))
             request.field.validate_resolved_files(result.files)
             ...
@@ -2569,7 +2569,7 @@ class GenerateSourcesRequest:
             output = FortranSources
 
         @rule
-        def generate_fortran_from_avro(request: GenerateFortranFromAvroRequest) -> GeneratedSources:
+        async def generate_fortran_from_avro(request: GenerateFortranFromAvroRequest) -> GeneratedSources:
             ...
 
         def rules():
@@ -2845,7 +2845,7 @@ class InferDependenciesRequest(Generic[FS], EngineAwareParameter):
             infer_from = FortranDependenciesInferenceFieldSet
 
         @rule
-        def infer_fortran_dependencies(request: InferFortranDependencies) -> InferredDependencies:
+        async def infer_fortran_dependencies(request: InferFortranDependencies) -> InferredDependencies:
             hydrated_sources = await Get(HydratedSources, HydrateSources(request.field_set.sources))
             ...
             return InferredDependencies(...)

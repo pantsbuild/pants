@@ -36,7 +36,7 @@ Example demonstrating how to register synthetic targets:
 
 
     @rule
-    def example_synthetic_targets_per_directory_spec_paths(
+    async def example_synthetic_targets_per_directory_spec_paths(
         request: SyntheticExampleTargetsPerDirectorySpecPathsRequest,
     ) -> SyntheticTargetsSpecPaths:
         # Return all paths we have targets for.
@@ -267,7 +267,7 @@ async def all_synthetic_targets(union_membership: UnionMembership) -> AllSynthet
 
 
 @rule
-def get_synthetic_targets_spec_paths(
+async def get_synthetic_targets_spec_paths(
     request: SyntheticTargetsSpecPathsRequest, all_synthetic: AllSyntheticAddressMaps
 ) -> SyntheticTargetsSpecPaths:
     """Return all known paths for synthetic targets."""

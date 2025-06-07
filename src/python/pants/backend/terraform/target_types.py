@@ -139,7 +139,7 @@ class AllTerraformDeploymentTargets(Targets):
 
 
 @rule
-def all_terraform_deployment_targets(targets: AllTargets) -> AllTerraformDeploymentTargets:
+async def all_terraform_deployment_targets(targets: AllTargets) -> AllTerraformDeploymentTargets:
     return AllTerraformDeploymentTargets(
         tgt for tgt in targets if TerraformDeploymentFieldSet.is_applicable(tgt)
     )

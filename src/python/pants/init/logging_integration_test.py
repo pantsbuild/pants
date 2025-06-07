@@ -20,7 +20,7 @@ class LogGoal(Goal):
 
 
 @goal_rule
-def write_logs() -> LogGoal:
+async def write_logs() -> LogGoal:
     for logger_name in ("globalLevel", "infoOverride", "debugOverride"):
         logger = logging.getLogger(f"plugins.logger.{{logger_name}}")
         logger.debug("debug log")

@@ -82,7 +82,7 @@ class WrapperType:
 
 
 @rule
-def example_rule(root_type: RootType) -> WrapperType:
+async def example_rule(root_type: RootType) -> WrapperType:
     return WrapperType(root_type.value)
 
 
@@ -91,7 +91,7 @@ class PluginProduct:
 
 
 @rule
-def example_plugin_rule(root_type: RootType) -> PluginProduct:
+async def example_plugin_rule(root_type: RootType) -> PluginProduct:
     return PluginProduct()
 
 

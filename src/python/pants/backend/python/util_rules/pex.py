@@ -1066,7 +1066,7 @@ class VenvPexRequest:
 
 
 @rule
-def wrap_venv_prex_request(
+async def wrap_venv_prex_request(
     pex_request: PexRequest, pex_environment: PexEnvironment
 ) -> VenvPexRequest:
     # Allow creating a VenvPex from a plain PexRequest when no extra bin scripts need to be exposed.
