@@ -69,7 +69,7 @@ class GeneratePythonLockfile(GenerateLockfile):
 
 
 @rule
-def wrap_python_lockfile_request(request: GeneratePythonLockfile) -> WrappedGenerateLockfile:
+async def wrap_python_lockfile_request(request: GeneratePythonLockfile) -> WrappedGenerateLockfile:
     return WrappedGenerateLockfile(request)
 
 

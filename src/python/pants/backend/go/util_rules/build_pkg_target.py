@@ -647,7 +647,7 @@ async def setup_build_go_package_target_request(
 
 
 @rule
-def required_build_go_package_request(
+async def required_build_go_package_request(
     fallible_request: FallibleBuildGoPackageRequest,
 ) -> BuildGoPackageRequest:
     if fallible_request.request is not None:

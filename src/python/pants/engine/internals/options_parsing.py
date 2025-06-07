@@ -38,7 +38,7 @@ class _Options:
 
 
 @rule
-def parse_options(
+async def parse_options(
     build_config: BuildConfiguration,
     session_values: SessionValues,
     union_membership: UnionMembership,
@@ -50,22 +50,22 @@ def parse_options(
 
 
 @rule
-def scope_options(scope: Scope, options: _Options) -> ScopedOptions:
+async def scope_options(scope: Scope, options: _Options) -> ScopedOptions:
     return ScopedOptions(scope, options.options.for_scope(scope.scope))
 
 
 @rule
-def log_level(global_options: GlobalOptions) -> LogLevel:
+async def log_level(global_options: GlobalOptions) -> LogLevel:
     return global_options.level
 
 
 @rule
-def extract_keep_sandboxes(global_options: GlobalOptions) -> KeepSandboxes:
+async def extract_keep_sandboxes(global_options: GlobalOptions) -> KeepSandboxes:
     return GlobalOptions.resolve_keep_sandboxes(global_options.options)
 
 
 @rule
-def extract_named_caches_dir_option(global_options: GlobalOptions) -> NamedCachesDirOption:
+async def extract_named_caches_dir_option(global_options: GlobalOptions) -> NamedCachesDirOption:
     return NamedCachesDirOption(global_options.named_caches_dir)
 
 

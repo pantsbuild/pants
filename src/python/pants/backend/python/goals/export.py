@@ -45,7 +45,7 @@ from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.graph import hydrate_sources
 from pants.engine.internals.native_engine import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests
-from pants.engine.internals.selectors import Get, concurrently
+from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import add_prefix, create_digest, digest_to_snapshot, merge_digests
 from pants.engine.process import Process, ProcessCacheScope, execute_process_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
@@ -451,8 +451,8 @@ async def add_codegen_to_export_result(
     resolve: str, export_result: ExportResult, codegen_setup: _ExportPythonCodegenSetup
 ) -> ExportResult:
     # Generate Python sources from codegen targets in this resolve.
-    codegen_result = await Get(
-        _ExportPythonCodegenResult, _ExportPythonCodegenRequest(resolve=resolve)
+    codegen_result = await export_python_codegen(
+        _ExportPythonCodegenRequest(resolve=resolve), **implicitly()
     )
     if codegen_result.digest == EMPTY_DIGEST:
         return export_result

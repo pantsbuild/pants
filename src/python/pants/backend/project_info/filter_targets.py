@@ -29,14 +29,17 @@ class TargetGranularity(Enum):
 
 class FilterSubsystem(LineOriented, GoalSubsystem):
     name = "filter"
+
     help = help_text(
         """
         Filter the input targets based on various criteria.
 
         Most of the filtering options below are comma-separated lists of filtering criteria, with
         an implied logical OR between them, so that a target passes the filter if it matches any of
-        the criteria in the list. A '-' prefix inverts the sense of the entire comma-separated list,
-        so that a target passes the filter only if it matches none of the criteria in the list.
+        the criteria in the list.
+
+        A '-' prefix inverts the sense of the entire comma-separated list, so that a target passes
+        the filter only if it matches _none_ of the criteria in the list.
 
         Each of the filtering options may be specified multiple times, with an implied logical AND
         between them.
@@ -45,8 +48,18 @@ class FilterSubsystem(LineOriented, GoalSubsystem):
 
     target_type = StrListOption(
         metavar="[+-]type1,type2,...",
-        help="Filter on these target types, e.g. `resources` or `python_sources`.",
+        help=softwrap(
+            """
+            Filter targets based each targets's target type, e.g. `resources` or `python_sources`.
+
+            As with any target filter, a `-` prefix will negate matches for purposes of filtering;
+            that is, the filter will include a target only if the target's target type fails to
+            match all of the provided values.
+            """
+        ),
+        # help="",
     )
+
     granularity = EnumOption(
         default=TargetGranularity.all_targets,
         help=softwrap(
@@ -56,13 +69,38 @@ class FilterSubsystem(LineOriented, GoalSubsystem):
             """
         ),
     )
+
     address_regex = StrListOption(
         metavar="[+-]regex1,regex2,...",
-        help="Filter on target addresses matching these regexes.",
+        help=softwrap(
+            """
+            Filter targets based on each target's address matching the provided regular expressions.
+
+            The regular expressions are parsed by the Python `re` module. The syntax is documented
+            at https://docs.python.org/3/library/re.html#regular-expression-syntax.
+
+            As with any target filter, a `-` prefix will negate matches for purposes of filtering;
+            that is, the filter will include a target only if the target's adddress fails to
+            match all of the provided regular expressions.
+            """
+        ),
     )
+
     tag_regex = StrListOption(
         metavar="[+-]regex1,regex2,...",
-        help="Filter on targets with tags matching these regexes.",
+        help=softwrap(
+            """
+            Filter targets based on whether any of each target's tags (in the target's `tags` field)
+            matches the provided regular expressions.
+
+            The regular expressions are parsed by the Python `re` module. The syntax is documented
+            at https://docs.python.org/3/library/re.html#regular-expression-syntax.
+
+            As with any target filter, a `-` prefix will negate matches for purposes of filtering;
+            that is, the filter will include a target only if all of the target's tags fail to
+            match all of the provided regular expressions.
+            """
+        ),
     )
 
     def target_type_filters(
@@ -148,7 +186,7 @@ class FilterGoal(Goal):
 
 
 @goal_rule
-def filter_targets(
+async def filter_targets(
     addresses: Addresses, filter_subsystem: FilterSubsystem, console: Console
 ) -> FilterGoal:
     # When removing, also remove the special casing in `help_info_extractor.py` to reclassify the

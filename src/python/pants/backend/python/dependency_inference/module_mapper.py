@@ -86,7 +86,7 @@ class AllPythonTargets:
 
 
 @rule(desc="Find all Python targets in project", level=LogLevel.DEBUG)
-def find_all_python_projects(all_targets: AllTargets) -> AllPythonTargets:
+async def find_all_python_projects(all_targets: AllTargets) -> AllPythonTargets:
     first_party = []
     third_party = []
     for tgt in all_targets:
