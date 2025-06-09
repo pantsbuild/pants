@@ -1,6 +1,6 @@
 // Common type definitions for the monorepo
 
-export * from './api.js';
+export * from "./api.js";
 
 export interface User {
   id: string;
@@ -15,7 +15,7 @@ export interface Config {
   retries: number;
 }
 
-export type Status = 'pending' | 'success' | 'error';
+export type Status = "pending" | "success" | "error";
 
 export interface Result<T> {
   status: Status;

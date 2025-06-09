@@ -1,18 +1,22 @@
 // Shared utility functions
 
-export * from './math.js';
+export * from "./math.js";
 
-import type { Result, Status } from '@pants-example/common-types';
+import type { Result, Status } from "@pants-example/common-types";
 
 export function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export function formatDate(date: Date): string {
-  return date.toISOString().split('T')[0];
+  return date.toISOString().split("T")[0];
 }
 
-export function createResult<T>(status: Status, data?: T, error?: string): Result<T> {
+export function createResult<T>(
+  status: Status,
+  data?: T,
+  error?: string,
+): Result<T> {
   return { status, data, error };
 }
 

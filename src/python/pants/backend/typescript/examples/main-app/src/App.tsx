@@ -1,7 +1,12 @@
-import React, { useState, useCallback } from 'react';
-import { Button } from '@pants-example/shared-components';
-import { add, formatDate, createResult, isValidEmail } from '@pants-example/shared-utils';
-import type { Config, User, Status } from '@pants-example/common-types';
+import React, { useState, useCallback } from "react";
+import { Button } from "@pants-example/shared-components";
+import {
+  add,
+  formatDate,
+  createResult,
+  isValidEmail,
+} from "@pants-example/shared-utils";
+import type { Config, User, Status } from "@pants-example/common-types";
 
 interface AppProps {
   config: Config;
@@ -9,34 +14,37 @@ interface AppProps {
 
 export function App({ config }: AppProps) {
   const [count, setCount] = useState(0);
-  const [email, setEmail] = useState('');
-  const [status, setStatus] = useState<Status>('pending');
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<Status>("pending");
 
   const handleIncrement = useCallback(() => {
-    setCount(current => add(current, 1));
+    setCount((current) => add(current, 1));
   }, []);
 
-  const handleEmailChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    setEmail(event.target.value);
-    setStatus(isValidEmail(event.target.value) ? 'success' : 'error');
-  }, []);
+  const handleEmailChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      setEmail(event.target.value);
+      setStatus(isValidEmail(event.target.value) ? "success" : "error");
+    },
+    [],
+  );
 
   const currentDate = formatDate(new Date());
-  
+
   // Simulate user data
   const user: User = {
-    id: '1',
-    name: 'Demo User',
-    email: 'demo@example.com',
+    id: "1",
+    name: "Demo User",
+    email: "demo@example.com",
     createdAt: new Date(),
   };
 
-  const result = createResult('success', user);
+  const result = createResult("success", user);
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
+    <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
       <h1>TypeScript Monorepo Example</h1>
-      
+
       <section>
         <h2>Configuration</h2>
         <p>API URL: {config.apiUrl}</p>
@@ -59,15 +67,15 @@ export function App({ config }: AppProps) {
           value={email}
           onChange={handleEmailChange}
           placeholder="Enter your email"
-          style={{ 
-            padding: '8px', 
-            marginRight: '10px',
-            border: `2px solid ${status === 'error' ? 'red' : status === 'success' ? 'green' : 'gray'}`
+          style={{
+            padding: "8px",
+            marginRight: "10px",
+            border: `2px solid ${status === "error" ? "red" : status === "success" ? "green" : "gray"}`,
           }}
         />
-        <Button 
-          variant={status === 'success' ? 'primary' : 'secondary'}
-          disabled={status !== 'success'}
+        <Button
+          variant={status === "success" ? "primary" : "secondary"}
+          disabled={status !== "success"}
           status={status}
         >
           Submit
@@ -76,7 +84,7 @@ export function App({ config }: AppProps) {
 
       <section>
         <h2>User Data</h2>
-        {result.status === 'success' && result.data && (
+        {result.status === "success" && result.data && (
           <div>
             <p>Name: {result.data.name}</p>
             <p>Email: {result.data.email}</p>
