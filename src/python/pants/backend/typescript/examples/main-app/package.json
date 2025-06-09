@@ -1,0 +1,35 @@
+{
+  "name": "@pants-example/main-app",
+  "version": "0.0.1",
+  "description": "Main application demonstrating TypeScript monorepo",
+  "main": "./src/index.ts",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@pants-example/common-types": "workspace:*",
+    "@pants-example/shared-utils": "workspace:*",
+    "@pants-example/shared-components": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.2.0",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "esbuild": "^0.25.0"
+  },
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --outfile=dist/main.js --platform=browser --format=esm",
+    "test": "jest"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "jsdom",
+    "setupFilesAfterEnv": ["@testing-library/jest-dom"],
+    "extensionsToTreatAsEsm": [".ts", ".tsx"],
+    "moduleNameMapper": {
+      "^(\\.{1,2}/.*)\\.js$": "$1"
+    }
+  }
+}

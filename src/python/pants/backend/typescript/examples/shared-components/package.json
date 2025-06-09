@@ -1,0 +1,29 @@
+{
+  "name": "@pants-example/shared-components",
+  "version": "0.0.1",
+  "description": "Reusable UI components",
+  "main": "./src/index.ts",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@pants-example/common-types": "workspace:*",
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.2.0",
+    "@types/react": "^19.0.10"
+  },
+  "scripts": {
+    "test": "jest"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "jsdom",
+    "setupFilesAfterEnv": ["@testing-library/jest-dom"],
+    "extensionsToTreatAsEsm": [".ts", ".tsx"],
+    "moduleNameMapper": {
+      "^(\\.{1,2}/.*)\\.js$": "$1"
+    }
+  }
+}
