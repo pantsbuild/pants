@@ -17,7 +17,8 @@
     "@testing-library/react": "^16.2.0",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
-    "esbuild": "^0.25.0"
+    "esbuild": "^0.25.0",
+    "jest-environment-jsdom": "^29.7.0"
   },
   "scripts": {
     "build": "esbuild src/index.ts --bundle --outfile=dist/main.js --platform=browser --format=esm",
@@ -30,6 +31,18 @@
     "extensionsToTreatAsEsm": [".ts", ".tsx"],
     "moduleNameMapper": {
       "^(\\.{1,2}/.*)\\.js$": "$1"
+    },
+    "testMatch": [
+      "**/src/**/*.(test|spec).(ts|tsx)"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/dist/"
+    ],
+    "transform": {
+      "^.+\\.(ts|tsx)$": ["ts-jest", {
+        "useESM": true
+      }]
     }
   }
 }

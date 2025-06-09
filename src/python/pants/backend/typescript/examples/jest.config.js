@@ -15,11 +15,14 @@ export default {
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   testMatch: [
-    '**/__tests__/**/*.(ts|tsx|js)',
-    '**/*.(test|spec).(ts|tsx|js)',
+    '**/src/**/*.(test|spec).(ts|tsx)'
+  ],
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/dist/'
   ],
   collectCoverageFrom: [
-    '**/*.(ts|tsx)',
+    '**/src/**/*.(ts|tsx)',
     '!**/*.d.ts',
     '!**/node_modules/**',
     '!**/dist/**',
