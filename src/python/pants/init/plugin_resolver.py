@@ -155,7 +155,7 @@ class PluginResolver:
             # Activate any .pth files plugin wheels may have.
             orig_sys_path_len = len(sys.path)
             site.addsitedir(resolved_plugin_location)
-            if len(sys.path) != orig_sys_path_len:
+            if len(sys.path) > orig_sys_path_len:
                 result.append(resolved_plugin_location)
 
         return result
