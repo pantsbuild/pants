@@ -4,27 +4,18 @@
 from __future__ import annotations
 
 import importlib.metadata
-import re
 from collections.abc import Generator
 from importlib.metadata import Distribution
 
 from packaging.requirements import Requirement
+from packaging.utils import NormalizedName, canonicalize_name
 from packaging.version import InvalidVersion, Version
-
-
-def normalize_name(name: str) -> str:
-    """Normalize package names in similar manner to `pkg_resources.safe_name`.
-
-    Replace runs of non-alphanumeric characters with a single `-`. Convert to lower case since the
-    official Python packaging regex for names is case-insensitive.
-    """
-    return re.sub("[^A-Za-z0-9.]+", "-", name).lower()
 
 
 def distribution_matches_requirement(dist: Distribution, requirement: Requirement) -> bool:
     # Check whether the normalized names match.
-    dist_name = normalize_name(dist.name)
-    req_name = normalize_name(requirement.name)
+    dist_name = canonicalize_name(dist.name)
+    req_name = canonicalize_name(requirement.name)
     if dist_name != req_name:
         return False
 
@@ -46,10 +37,10 @@ def find_matching_distributions(
 ) -> Generator[Distribution, None, None]:
     """Yield distributions matching the given requirement or all active distributions if
     `requirement` is `None`."""
-    seen_dist_names: set[str] = set()
+    seen_dist_names: set[NormalizedName] = set()
     for dist in importlib.metadata.distributions():
         # Skip non-active distributions. Python prefers the first distribution on `sys.path`.
-        normalized_dist_name = normalize_name(dist.name)
+        normalized_dist_name = canonicalize_name(dist.name)
         if normalized_dist_name in seen_dist_names:
             continue
         seen_dist_names.add(normalized_dist_name)
