@@ -203,7 +203,7 @@ This example uses PNPM but can be adapted for npm or yarn by:
 - Updating lockfile name (`package-lock.json` for npm, `yarn.lock` for yarn)
 
 ### TypeScript Versions
-Each package can specify its own TypeScript version in `devDependencies`, or rely on the workspace root version.
+All packages within a Pants resolve must use the same TypeScript version for project references to work correctly. The TypeScript version should be specified at the Pants resolve level.
 
 ### Testing Framework
 The example includes Jest configuration but can be adapted for other test runners like Vitest or Mocha.
@@ -212,12 +212,6 @@ The example includes Jest configuration but can be adapted for other test runner
 This example follows the common TypeScript convention of **co-located test files**, where test files sit next to their source files:
 - `math.ts` → `math.test.ts` (same directory)
 - `Button.tsx` → `Button.test.tsx` (same directory)
-
-This pattern is widely adopted in the TypeScript community as it:
-- Makes tests easier to find and maintain
-- Reduces cognitive overhead when navigating the codebase  
-- Aligns with modern TypeScript project conventions
-- Works naturally with most IDE test runners
 
 ## TypeScript Project References Integration
 
