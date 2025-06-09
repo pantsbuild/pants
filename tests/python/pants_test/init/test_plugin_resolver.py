@@ -16,6 +16,7 @@ from textwrap import dedent
 
 import pytest
 from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
 from packaging.version import Version
 
 from pants.backend.python.util_rules import pex
@@ -27,7 +28,6 @@ from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessResult
-from pants.init.extension_loader import _requirement_key
 from pants.init.options_initializer import create_bootstrap_scheduler
 from pants.init.plugin_resolver import PluginResolver
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -186,7 +186,7 @@ def plugin_resolution(
     use_pypi: bool = False,
 ):
     @contextmanager
-    def provide_chroot(existing):
+    def provide_chroot(existing: str | None) -> Generator[tuple[str, bool], None, None]:
         if existing:
             yield existing, False
         else:
@@ -215,7 +215,9 @@ def plugin_resolution(
         env: dict[str, str] = {}
         repo_dir = os.path.join(root_dir, "repo")
 
-        def _create_artifact(name, version, install_requires):
+        def _create_artifact(
+            name: str, version: str | None, install_requires: Sequence[str] | None
+        ) -> None:
             if create_artifacts:
                 setup_py_args = ["sdist" if sdist else "bdist_wheel", "--dist-dir", "dist/"]
                 _run_setup_py(
@@ -249,7 +251,7 @@ def plugin_resolution(
                     f"Expected requirement {requirement} to only have one comparison."
                 )
                 specs = next(iter(r.specifier))
-                _create_artifact(_requirement_key(r), specs.version, [])
+                _create_artifact(canonicalize_name(r.name), specs.version, [])
 
         configpath = os.path.join(root_dir, "pants.toml")
         if create_artifacts:

@@ -4,10 +4,11 @@
 import importlib
 import importlib.metadata
 import logging
-import re
 import traceback
+from importlib.metadata import Distribution
 
 from packaging.requirements import InvalidRequirement, Requirement
+from packaging.utils import NormalizedName, canonicalize_name
 
 from pants.base.exceptions import BackendConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
@@ -28,10 +29,6 @@ class PluginNotFound(PluginLoadingError):
 
 class PluginLoadOrderError(PluginLoadingError):
     pass
-
-
-def _requirement_key(req: Requirement) -> str:
-    return re.sub("[^A-Za-z0-9.]+", "-", req.name).lower()
 
 
 def load_backends_and_plugins(
@@ -79,11 +76,11 @@ def load_plugins(
                               eg ['widgetpublish', 'widgetgen==1.2'].
     """
 
-    loaded: dict = {}
+    loaded: dict[NormalizedName, Distribution] = {}
     for plugin in plugins or []:
         try:
             req = Requirement(plugin)
-            req_key = _requirement_key(req)
+            req_key = canonicalize_name(req.name)
         except InvalidRequirement:
             raise PluginNotFound(f"Could not find plugin: {req}")
 
@@ -104,7 +101,7 @@ def load_plugins(
             deps = load_after_entry_point.load()()
             for dep_name in deps:
                 dep = Requirement(dep_name)
-                dep_key = _requirement_key(dep)
+                dep_key = canonicalize_name(dep.name)
                 if dep_key not in loaded:
                     raise PluginLoadOrderError(f"Plugin {plugin} must be loaded after {dep}")
         if target_types_entry_point := find_entry_point("target_types"):
