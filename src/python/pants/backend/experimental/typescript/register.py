@@ -9,7 +9,7 @@ from pants.backend.tsx.target_types import (
     TSXTestsGeneratorTarget,
     TSXTestTarget,
 )
-from pants.backend.typescript.goals import tailor
+from pants.backend.typescript.goals import tailor, check
 from pants.backend.typescript.target_types import (
     TypeScriptSourcesGeneratorTarget,
     TypeScriptSourceTarget,
@@ -38,4 +38,5 @@ def rules() -> Iterable[Rule | UnionRule]:
     return (
         *tailor.rules(),
         *tsx_tailor.rules(),
+        *check.rules(),
     )
