@@ -57,7 +57,6 @@ class FilterSubsystem(LineOriented, GoalSubsystem):
             match all of the provided values.
             """
         ),
-        # help="",
     )
 
     granularity = EnumOption(
