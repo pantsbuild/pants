@@ -37,9 +37,7 @@ examples/
 │       ├── BUILD
 │       ├── index.ts
 │       ├── math.ts
-│       └── test/
-│           ├── BUILD
-│           └── math.test.ts
+│       └── math.test.ts        # Co-located test file
 ├── shared-components/          # Reusable UI components
 │   ├── BUILD
 │   ├── package.json
@@ -48,9 +46,7 @@ examples/
 │       ├── BUILD
 │       ├── index.ts
 │       ├── Button.tsx
-│       └── test/
-│           ├── BUILD
-│           └── Button.test.tsx
+│       └── Button.test.tsx     # Co-located test file
 └── main-app/                   # Main application
     ├── BUILD
     ├── package.json
@@ -59,9 +55,7 @@ examples/
         ├── BUILD
         ├── index.ts
         ├── App.tsx
-        └── test/
-            ├── BUILD
-            └── App.test.tsx
+        └── App.test.tsx        # Co-located test file
 ```
 
 ## Current Pants Goals
@@ -95,7 +89,7 @@ pants test examples/shared-utils::
 pants test examples/main-app::
 
 # Run a specific test file
-pants test examples/shared-utils/src/test/math.test.ts
+pants test examples/shared-utils/src/math.test.ts
 ```
 
 ### Dependency Analysis
@@ -159,9 +153,8 @@ pants package examples/shared-components::
 - Development dependencies for testing
 
 ### 4. Target Structure
-- `typescript_sources()` for source files
-- `typescript_tests()` for test files  
-- `tsx_sources()` for React components
+- `typescript_sources()` and `typescript_tests()` in the same directory (co-located)
+- `tsx_sources()` and `tsx_tests()` for React components and their tests
 - `package_json()` targets with proper configuration
 
 ### 5. Dependency Inference
@@ -189,7 +182,7 @@ To test this example structure:
 
 3. **Test dependency inference**:
    ```bash
-   pants dependencies examples/main-app/src:index
+   pants dependencies examples/main-app/src
    ```
 
 4. **Run formatting**:
@@ -214,6 +207,17 @@ Each package can specify its own TypeScript version in `devDependencies`, or rel
 
 ### Testing Framework
 The example includes Jest configuration but can be adapted for other test runners like Vitest or Mocha.
+
+### Test File Convention
+This example follows the common TypeScript convention of **co-located test files**, where test files sit next to their source files:
+- `math.ts` → `math.test.ts` (same directory)
+- `Button.tsx` → `Button.test.tsx` (same directory)
+
+This pattern is widely adopted in the TypeScript community as it:
+- Makes tests easier to find and maintain
+- Reduces cognitive overhead when navigating the codebase  
+- Aligns with modern TypeScript project conventions
+- Works naturally with most IDE test runners
 
 ## TypeScript Project References Integration
 

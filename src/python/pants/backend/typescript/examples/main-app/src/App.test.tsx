@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import { App } from "../App.js";
+import { App } from "./App.js";
 import type { Config } from "@pants-example/common-types";
 
 const mockConfig: Config = {
