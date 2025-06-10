@@ -478,12 +478,12 @@ def test_package_object(rule_runner: RuleRunner) -> None:
     ]
 
 
-def test_source3(rule_runner: RuleRunner) -> None:
+def test_scala_2_13_source3(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         args=[
             "-ldebug",
             "--scala-version-for-resolve={'jvm-default':'2.13.8'}",
-            "--scalac-args=['-Xsource:3']",
+            "--scalac-args-for-resolve={'jvm-default':['-Xsource:3']}",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
@@ -499,6 +499,26 @@ def test_source3(rule_runner: RuleRunner) -> None:
     )
     assert analysis.imports_by_scope.get("foo") == (ScalaImport("bar", None, True),)
 
+def test_scala_3_default_args(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        args=[
+            "-ldebug",
+            "--scala-version-for-resolve={'jvm-default':'3.3.0'}",
+            "--scalac-args=['']",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """
+            package foo
+
+            import bar.*
+            """
+        ),
+    )
+    assert analysis.imports_by_scope.get("foo") == (ScalaImport("bar", None, True),)
 
 def test_extract_annotations(rule_runner: RuleRunner) -> None:
     analysis = _analyze(
