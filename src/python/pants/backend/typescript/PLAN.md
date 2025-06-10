@@ -73,13 +73,38 @@ Implement `pants check examples/main-app::` that runs TypeScript type checking u
 - Custom configuration scenarios are supported
 - Subsequent runs on same package are faster due to incremental compilation
 
+### Phase 1.5: Hardcoded Workspace Support
+
+**Goal**: Get `pants check examples::` working for a single hardcoded workspace with multiple packages
+
+**Key Challenge**: The resolve-based installation process only includes source files that are declared as Pants targets, not arbitrary files from path globs.
+
+**Tasks**:
+1. **Fix source file availability during installation**
+   - Root cause: `install_node_packages_for_address` only includes transitive target source files, not input_digest files
+   - Solution: Ensure TypeScript source files are available to the resolve-based installation process
+   - Either modify installation to accept additional source files via input_digest
+   - Or create proper Pants targets for the TypeScript source files so they're included in transitive resolution
+
+2. **Hardcoded workspace compilation**
+   - Use `tsc --build` to compile all packages in the hardcoded examples workspace
+   - Ensure workspace packages (`@pants-example/common-types`) can be resolved during installation
+   - Handle proper working directory and path resolution
+   - Include all necessary config files and source files in the compilation context
+
+**Acceptance Criteria**:
+- `pants check examples::` works for the entire hardcoded workspace
+- Workspace package imports (e.g., `@pants-example/common-types`) resolve correctly during pnpm installation
+- TypeScript compilation sees all packages and their dependencies
+- Error messages reference correct file paths across packages
+
 ### Phase 2: Workspace and Cross-Package Dependencies
 
-**Goal**: Handle monorepo scenarios with package dependencies
+**Goal**: Handle monorepo scenarios with package dependencies generically
 
 **Tasks**:
 1. **Dependency resolution**
-   - Extend existing import analysis to understand workspace package imports
+   - Extend existing import analysis to understand workspace package imports (moved from Phase 1)
    - Ensure `@pants-example/common-types` imports resolve to correct targets
    - Handle `node_modules` resolution for external packages
 
