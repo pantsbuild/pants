@@ -828,10 +828,10 @@ def run_rule_with_mocks(
             if isinstance(res, (Get, Effect, Call)):
                 rule_input = get(res)
             elif type(res) in (tuple, list):
-                rule_input = [get(g) for g in res]  # type: ignore[union-attr]
+                rule_input = [get(g) for g in res]
             else:
                 warn_on_unconsumed_mocks()
-                return res  # type: ignore[return-value]
+                return cast(_O, res)
         except StopIteration as e:
             warn_on_unconsumed_mocks()
             return e.value  # type: ignore[no-any-return]

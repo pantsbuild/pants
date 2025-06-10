@@ -6,7 +6,7 @@ import os
 from abc import ABC
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import ClassVar, Optional, cast
+from typing import ClassVar
 
 from pants.core.util_rules.environments import _warn_on_non_local_environments
 from pants.engine.addresses import Addresses
@@ -119,9 +119,7 @@ async def run_repl(
     #  on the targets.  For now we default to the python repl.
     repl_shell_name = repl_subsystem.shell or "python"
     implementations = {impl.name: impl for impl in union_membership[ReplImplementation]}
-    repl_implementation_cls = cast(
-        Optional[type[ReplImplementation]], implementations.get(repl_shell_name)
-    )
+    repl_implementation_cls = implementations.get(repl_shell_name)
     if repl_implementation_cls is None:
         available = sorted(implementations.keys())
         console.print_stderr(

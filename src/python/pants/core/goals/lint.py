@@ -352,7 +352,7 @@ async def _get_partitions_by_request_type(
 ) -> dict[type[_CoreRequestType], list[Partitions]]:
     specified_ids = determine_specified_tool_ids(
         subsystem.name,
-        subsystem.only,
+        subsystem.only,  # type: ignore[arg-type]
         core_request_types,
     )
 
