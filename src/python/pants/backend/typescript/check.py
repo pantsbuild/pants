@@ -7,9 +7,13 @@ import dataclasses
 import logging
 from dataclasses import dataclass
 
+from pants.backend.javascript import install_node_package
+from pants.backend.javascript.install_node_package import (
+    InstalledNodePackageRequest,
+    install_node_packages_for_address,
+)
 from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolRequest
 from pants.backend.typescript.subsystem import TypeScriptSubsystem
-from pants.backend.typescript.tsconfig import ParentTSConfigRequest, find_parent_ts_config
 from pants.backend.typescript.target_types import (
     TypeScriptSourceField,
     TypeScriptSourceTarget,
@@ -18,7 +22,7 @@ from pants.backend.typescript.target_types import (
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.engine.fs import PathGlobs
 from pants.engine.internals.graph import hydrate_sources, HydrateSourcesRequest
-from pants.engine.internals.native_engine import MergeDigests
+from pants.engine.internals.native_engine import Address, MergeDigests
 from pants.engine.internals.selectors import Get, concurrently
 from pants.engine.intrinsics import execute_process, path_globs_to_digest, merge_digests
 from pants.engine.process import Process
@@ -85,6 +89,21 @@ async def _typecheck_typescript_files(
         for field_set in field_sets
     )
     
+    # For Phase 1: Install all workspace packages to ensure all dependencies are available
+    # Get unique addresses to avoid duplicate installations
+    unique_addresses = {field_set.address for field_set in field_sets}
+    # Also include the workspace root to get workspace-level dependencies
+    unique_addresses.add(Address("src/python/pants/backend/typescript/examples"))
+    
+    installations = await concurrently(
+        install_node_packages_for_address(InstalledNodePackageRequest(address), **implicitly())
+        for address in unique_addresses
+    )
+    
+    # Merge all installation digests to include all workspace packages and their dependencies
+    installation_digests = [installation.digest for installation in installations]
+    merged_installation_digest = await merge_digests(MergeDigests(installation_digests))
+    
     # Phase 1: Compile all packages together to handle project references properly
     # Collect all source files from all field sets
     all_source_files = []
@@ -94,55 +113,61 @@ async def _typecheck_typescript_files(
     if not all_source_files:
         return CheckResults([], checker_name=tool_name)
     
-    # Get all source digests
-    all_source_digests = [sources.snapshot.digest for sources in all_sources]
-    
-    # Include all tsconfig.json files and node_modules to support project references
-    config_and_deps_digest = await path_globs_to_digest(
+    # For --build to work with project references, include ALL TypeScript source files in the monorepo
+    # This ensures referenced projects have their source files available
+    all_ts_sources_digest = await path_globs_to_digest(
         PathGlobs([
+            "**/src/**/*.ts",
+            "**/src/**/*.tsx", 
+            "**/src/**/*.js",
+            "**/src/**/*.jsx",
             "**/tsconfig*.json", 
             "**/jsconfig*.json",
             "**/package.json",
-            "**/node_modules/**/*",
-            "**/dist/**/*"  # Include built artifacts
+            "**/pnpm-workspace.yaml",
+            "**/yarn.lock",
+            "**/package-lock.json", 
+            "**/pnpm-lock.yaml",
         ]),
         **implicitly()
     )
     
-    # Merge all source files, config files, and dependencies
+    # Merge all installations and all source files
     input_digest = await merge_digests(
-        MergeDigests(tuple(all_source_digests + [config_and_deps_digest]))
+        MergeDigests((merged_installation_digest, all_ts_sources_digest))
     )
     
     # Set working directory to the examples directory where the monorepo is located
     examples_dir = "src/python/pants/backend/typescript/examples"
     
-    # Use relative path from the examples directory
-    root_tsconfig_path = "tsconfig.json"
+    # Use --build without specific project path to build all projects in workspace
+    args = ("--build",)
     
-    # Use tsc --build with the root configuration to handle all packages
-    args = ("--build", root_tsconfig_path, "--force")
     
-    # Create TypeScript tool request for all packages
+    # Use the TypeScript subsystem's tool request for proper environment setup
+    # This avoids the package filtering that comes with NodeJsProjectEnvironmentProcess
     tool_request = subsystem.request(
         args=args,
         input_digest=input_digest,
-        description=f"Type-check TypeScript monorepo ({len(field_sets)} packages)",
+        description=f"Type-check TypeScript monorepo ({len(field_sets)} targets)",
         level=LogLevel.DEBUG,
     )
     
-    # Execute TypeScript type checking for all packages with correct working directory
+    # Execute TypeScript type checking with correct working directory
     process = await Get(Process, NodeJSToolRequest, tool_request)
+    process = dataclasses.replace(
+        process, 
+        working_directory=examples_dir,
+        # Add system utilities to fix uname issue
+        env={**process.env, "PATH": f"{process.env.get('PATH', '')}:/usr/bin:/bin:/usr/sbin:/sbin"}
+    )
     
-    # Set the working directory to the examples directory
-    process_with_chdir = dataclasses.replace(process, working_directory=examples_dir)
-    
-    result = await execute_process(process_with_chdir, **implicitly())
+    result = await execute_process(process, **implicitly())
     
     # Convert to CheckResult - single result for all packages
     check_result = CheckResult.from_fallible_process_result(
         result,
-        partition_description=f"TypeScript check on {len(field_sets)} packages",
+        partition_description=f"TypeScript check on {len(field_sets)} targets",
     )
     
     return CheckResults([check_result], checker_name=tool_name)
@@ -166,6 +191,7 @@ async def typecheck_typescript(
 def rules():
     return [
         *collect_rules(),
+        *install_node_package.rules(),
         UnionRule(CheckRequest, TypeScriptCheckRequest),
         # UnionRule(CheckRequest, TypeScriptTestCheckRequest),
         TypeScriptSourceTarget.register_plugin_field(SkipTypeScriptCheckField),
