@@ -99,7 +99,7 @@ class WorkunitLogger(Subsystem):
 
 
 @rule
-def construct_callback(
+async def construct_callback(
     _: WorkunitLoggerCallbackFactoryRequest,
     wulogger: WorkunitLogger,
 ) -> WorkunitsCallbackFactory:

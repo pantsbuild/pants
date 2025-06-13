@@ -68,7 +68,7 @@ class ShellGeneratorSettingsRequest(TargetFilesGeneratorSettingsRequest):
 
 
 @rule
-def generator_settings(
+async def generator_settings(
     _: ShellGeneratorSettingsRequest,
     shell_setup: ShellSetup,
 ) -> TargetFilesGeneratorSettings:

@@ -282,7 +282,7 @@ def test_get_all_help_info(tmp_path) -> None:
     Bar.register_options_on_scope(options, UnionMembership({}))
 
     @rule
-    def rule_info_test(foo: Foo) -> Target:  # type: ignore[empty-body]
+    async def rule_info_test(foo: Foo) -> Target:  # type: ignore[empty-body]
         """This rule is for testing info extraction only."""
         ...
 

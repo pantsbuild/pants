@@ -148,7 +148,7 @@ class ResolvedHelmArtifact(HelmArtifact, EngineAwareReturnType):
 
 
 @rule
-def resolved_helm_artifact(
+async def resolved_helm_artifact(
     artifact: HelmArtifact, subsystem: HelmSubsystem
 ) -> ResolvedHelmArtifact:
     remotes = subsystem.remotes()

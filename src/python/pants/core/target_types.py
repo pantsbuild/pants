@@ -660,7 +660,7 @@ class AllAssetTargets:
 
 
 @rule(desc="Find all assets in project")
-def find_all_assets(all_targets: AllTargets) -> AllAssetTargets:
+async def find_all_assets(all_targets: AllTargets) -> AllAssetTargets:
     resources = []
     files = []
     for tgt in all_targets:
