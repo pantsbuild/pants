@@ -63,6 +63,7 @@ class K8sSourcesTargetGenerator(TargetFilesGenerator):
 
 class K8sBundleSourcesField(SpecialCasedDependencies):
     alias = "sources"
+    help = "Files to deploy as a bundle"
 
 
 class K8sBundleContextField(StringField):
