@@ -7,10 +7,10 @@ use std::sync::OnceLock;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use bollard::Docker;
-use bollard::container::RemoveContainerOptions;
+use bollard::container::{Config, RemoveContainerOptions};
+use bollard::{Docker, errors::Error as DockerError};
 use fs::{EMPTY_DIRECTORY_DIGEST, RelativePath};
-use maplit::hashset;
+use maplit::{hashmap, hashset};
 use parameterized::parameterized;
 use store::{ImmutableInputs, Store};
 use tempfile::TempDir;
@@ -19,12 +19,13 @@ use testutil::{owned_string_vec, relative_paths};
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::docker::{
-    ContainerCache, DockerOnceCell, ImagePullCache, SANDBOX_BASE_PATH_IN_CONTAINER,
+    ContainerCache, DockerOnceCell, ImagePullCache, PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY,
+    SANDBOX_BASE_PATH_IN_CONTAINER,
 };
 use process_execution::local::KeepSandboxes;
 use process_execution::{
     CacheName, CommandRunner, Context, FallibleProcessResultWithPlatform, InputDigests,
-    NamedCaches, Platform, Process, ProcessError, local,
+    NamedCaches, Platform, Process, ProcessError, ProcessExecutionStrategy, local,
 };
 
 /// Docker image to use for most tests in this file.
@@ -73,12 +74,58 @@ macro_rules! skip_if_no_docker_available_in_macos_ci {
     }};
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+#[cfg(unix)]
+async fn test_old_container_cleanup_on_init() {
+    skip_if_no_docker_available_in_macos_ci!();
+
+    let docker = Docker::connect_with_local_defaults().unwrap();
+    let container_id = docker
+        .create_container::<&str, &str>(
+            None,
+            Config {
+                image: Some(IMAGE),
+                labels: Some(hashmap! {PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY => "old"}),
+                ..Config::default()
+            },
+        )
+        .await
+        .unwrap()
+        .id;
+    docker
+        .start_container::<&str>(&container_id, None)
+        .await
+        .unwrap();
+    docker.stop_container(&container_id, None).await.unwrap();
+    let docker_cell = DockerOnceCell::new();
+    docker_cell.get().await.unwrap();
+    // We have a 60 second timeout but cleanup up one container shouldn't take that long
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    assert!(matches!(
+        check_container_exists(&docker, &container_id).await,
+        Ok(false)
+    ));
+}
+
 fn platform_for_tests() -> Result<Platform, String> {
     Platform::current().map(|platform| match platform {
         Platform::Macos_arm64 => Platform::Linux_arm64,
         Platform::Macos_x86_64 => Platform::Linux_x86_64,
         p => p,
     })
+}
+
+#[must_use = "message"]
+async fn check_container_exists(docker: &Docker, container_id: &str) -> Result<bool, String> {
+    match docker.inspect_container(container_id, None).await {
+        Ok(_) => Ok(true),
+        Err(DockerError::DockerResponseServerError {
+            status_code: 404, ..
+        }) => Ok(false),
+        Err(err) => Err(format!(
+            "An unexpected error {err} occurred when inspecting container {container_id}, which should not exist"
+        )),
+    }
 }
 
 #[async_trait]
@@ -93,6 +140,8 @@ trait DockerCommandTestRunner: Send + Sync {
         immutable_inputs: ImmutableInputs,
     ) -> Result<crate::docker::CommandRunner<'a>, String>;
 
+    async fn assert_correct_container(&self, docker: &Docker, actual_container_id: &str);
+
     async fn run_command_via_docker_in_dir(
         &self,
         mut req: Process,
@@ -101,8 +150,15 @@ trait DockerCommandTestRunner: Send + Sync {
         store: Option<Store>,
         executor: Option<task_executor::Executor>,
     ) -> Result<LocalTestResult, ProcessError> {
-        req.execution_environment.platform =
-            platform_for_tests().map_err(ProcessError::Unclassified)?;
+        let image =
+            if let ProcessExecutionStrategy::Docker(image) = &req.execution_environment.strategy {
+                Some(image.clone())
+            } else {
+                None
+            };
+        let platform = platform_for_tests().map_err(ProcessError::Unclassified)?;
+        req.execution_environment.platform = platform;
+        req.execution_environment.name = Some("test".to_string());
         let store_dir = TempDir::new().unwrap();
         let executor = executor.unwrap_or_else(task_executor::Executor::new);
         let store =
@@ -137,7 +193,39 @@ trait DockerCommandTestRunner: Send + Sync {
         }
         .await;
         let (original, stdout_bytes, stderr_bytes) = result?;
+        // Assert the container cache contains one entry and ensure the image and platform are as expected and that the arc is initialized
+        // Then return the container ID from the container cache, so we can assert it is the correct container
+        let container_id = {
+            let containers = runner.container_cache.containers.lock();
+            assert_eq!(containers.len(), 1);
+            if let Some(((actual_image, actual_platform), value_arc)) = containers.first_key_value()
+            {
+                assert_eq!(*actual_image, image.unwrap());
+                assert_eq!(*actual_platform, platform);
+                assert!(value_arc.initialized());
+                value_arc.get().unwrap().0.clone()
+            } else {
+                unreachable!("we know we have the entry")
+            }
+        };
+        let docker_ref = docker.get().await?;
+        // For the existing container tests, we want to ensure the container ID matches the one created by the command test runner
+        // For missing/exited container tests, ensure that the container IDs do NOT match
+        self.assert_correct_container(docker_ref, &container_id)
+            .await;
+        match docker_ref
+            .inspect_container(&container_id, None)
+            .await
+            .map_err(|err| ProcessError::Unclassified(err.to_string()))?
+            .config
+            .unwrap()
+            .labels
+        {
+            Some(labels) => assert_eq!(labels[PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY], "test"),
+            None => panic!("No labels found for container {container_id}"),
+        }
         runner.shutdown().await?;
+        assert!(!check_container_exists(docker_ref, &container_id).await?);
         Ok(LocalTestResult {
             original,
             stdout_bytes,
@@ -176,6 +264,8 @@ impl DockerCommandTestRunner for DefaultTestRunner {
             immutable_inputs,
         )
     }
+
+    async fn assert_correct_container(&self, _docker: &Docker, _actual_container_id: &str) {}
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -226,6 +316,10 @@ impl ExistingContainerTestRunner {
             container_id: OnceLock::new(),
         }
     }
+
+    fn get_container_id(&self) -> String {
+        self.container_id.get().unwrap().0.clone()
+    }
 }
 
 #[async_trait]
@@ -250,12 +344,70 @@ impl DockerCommandTestRunner for ExistingContainerTestRunner {
         match self.container_id.set(
             command_runner
                 .container_cache
-                .container_for_image(&self.image_name, &self.platform, "")
+                .container_for_image(&self.image_name, &self.platform, "", "test")
                 .await?,
         ) {
             Ok(()) => Ok(command_runner),
             Err(_) => Err("An error occurred when attempting to save container ID".to_string()),
         }
+    }
+
+    async fn assert_correct_container(&self, _docker: &Docker, actual_container_id: &str) {
+        assert_eq!(self.get_container_id(), actual_container_id);
+    }
+}
+
+#[async_trait]
+trait UnavailableContainerTestRunner: DockerCommandTestRunner {
+    async fn get_command_runner<'a>(
+        &self,
+        store: Store,
+        executor: task_executor::Executor,
+        docker: &'a DockerOnceCell,
+        image_pull_cache: &'a ImagePullCache,
+        work_dir_base: PathBuf,
+        immutable_inputs: ImmutableInputs,
+    ) -> Result<crate::docker::CommandRunner<'a>, String>;
+
+    async fn make_container_unavailable(&self, docker: &Docker) -> Result<(), String>;
+
+    fn get_initial_container_id(&self) -> String;
+}
+
+#[async_trait]
+impl<T: UnavailableContainerTestRunner> DockerCommandTestRunner for T {
+    async fn setup<'a>(
+        &self,
+        store: Store,
+        executor: task_executor::Executor,
+        docker: &'a DockerOnceCell,
+        image_pull_cache: &'a ImagePullCache,
+        work_dir_base: PathBuf,
+        immutable_inputs: ImmutableInputs,
+    ) -> Result<crate::docker::CommandRunner<'a>, String> {
+        let command_runner = self
+            .get_command_runner(
+                store,
+                executor,
+                docker,
+                image_pull_cache,
+                work_dir_base,
+                immutable_inputs,
+            )
+            .await?;
+        let docker_ref = docker.get().await?;
+        self.make_container_unavailable(docker_ref).await?;
+        Ok(command_runner)
+    }
+
+    async fn assert_correct_container(&self, docker: &Docker, actual_container_id: &str) {
+        let initial_container_id = self.get_initial_container_id();
+        assert_ne!(initial_container_id, actual_container_id);
+        // Check and ensure initial container was cleaned up
+        assert!(matches!(
+            check_container_exists(docker, &initial_container_id).await,
+            Ok(false)
+        ));
     }
 }
 
@@ -272,8 +424,8 @@ impl MissingContainerTestRunner {
 }
 
 #[async_trait]
-impl DockerCommandTestRunner for MissingContainerTestRunner {
-    async fn setup<'a>(
+impl UnavailableContainerTestRunner for MissingContainerTestRunner {
+    async fn get_command_runner<'a>(
         &self,
         store: Store,
         executor: task_executor::Executor,
@@ -282,8 +434,7 @@ impl DockerCommandTestRunner for MissingContainerTestRunner {
         work_dir_base: PathBuf,
         immutable_inputs: ImmutableInputs,
     ) -> Result<crate::docker::CommandRunner<'a>, String> {
-        let command_runner = self
-            .inner
+        self.inner
             .setup(
                 store,
                 executor,
@@ -292,10 +443,13 @@ impl DockerCommandTestRunner for MissingContainerTestRunner {
                 work_dir_base,
                 immutable_inputs,
             )
-            .await?;
+            .await
+    }
+
+    async fn make_container_unavailable(&self, docker: &Docker) -> Result<(), String> {
         let container_id = self.inner.container_id.get().unwrap().0.as_str();
         ContainerCache::remove_container(
-            docker.get().await?,
+            docker,
             container_id,
             Some(RemoveContainerOptions {
                 force: true,
@@ -305,8 +459,11 @@ impl DockerCommandTestRunner for MissingContainerTestRunner {
         .await
         .map_err(|err| {
             format!("Failed to remove Docker container during missing container test setup `{container_id}`: {err:?}")
-        })?;
-        Ok(command_runner)
+        })
+    }
+
+    fn get_initial_container_id(&self) -> String {
+        self.inner.get_container_id()
     }
 }
 
@@ -975,4 +1132,110 @@ async fn immutable_inputs(runner: &dyn DockerCommandTestRunner) {
     assert_eq!(stdout_lines, hashset! {"falcons", "cats"});
     assert_eq!(result.stderr_bytes, "".as_bytes());
     assert_eq!(result.original.exit_code, 0);
+}
+
+struct ExitedContainerTestRunner {
+    inner: ExistingContainerTestRunner,
+}
+
+impl ExitedContainerTestRunner {
+    fn new(image_name: &str) -> Self {
+        ExitedContainerTestRunner {
+            inner: ExistingContainerTestRunner::new(image_name),
+        }
+    }
+}
+
+#[async_trait]
+impl UnavailableContainerTestRunner for ExitedContainerTestRunner {
+    async fn get_command_runner<'a>(
+        &self,
+        store: Store,
+        executor: task_executor::Executor,
+        docker: &'a DockerOnceCell,
+        image_pull_cache: &'a ImagePullCache,
+        work_dir_base: PathBuf,
+        immutable_inputs: ImmutableInputs,
+    ) -> Result<crate::docker::CommandRunner<'a>, String> {
+        self.inner
+            .setup(
+                store,
+                executor,
+                docker,
+                image_pull_cache,
+                work_dir_base,
+                immutable_inputs,
+            )
+            .await
+    }
+
+    async fn make_container_unavailable(&self, docker: &Docker) -> Result<(), String> {
+        let container_id = self.inner.container_id.get().unwrap().0.as_str();
+        docker.stop_container(container_id, None)
+            .await
+            .map_err(|err| format!("An error occurred when trying to kill running container {container_id}:\n\n{err}"))?;
+        Ok(())
+    }
+
+    fn get_initial_container_id(&self) -> String {
+        self.inner.get_container_id()
+    }
+}
+
+// Runs the prune_container unit test and returns whether the container still exists
+async fn run_prune_container_test(runner: &dyn DockerCommandTestRunner) -> bool {
+    let executor = task_executor::Executor::new();
+    let store = Store::local_only(executor.clone(), TempDir::new().unwrap().path()).unwrap();
+
+    let root_path = TempDir::new().unwrap().path().to_owned();
+    let immutable_inputs = ImmutableInputs::new(store.clone(), &root_path).unwrap();
+
+    let docker = Box::new(DockerOnceCell::new());
+    let image_pull_cache = Box::new(ImagePullCache::new());
+
+    let key = (IMAGE.to_string(), platform_for_tests().unwrap());
+    let command_runner = runner
+        .setup(
+            store,
+            executor,
+            &docker,
+            &image_pull_cache,
+            TempDir::new().unwrap().path().to_owned(),
+            immutable_inputs,
+        )
+        .await
+        .unwrap();
+    let should_be_container_entry = {
+        command_runner
+            .container_cache
+            .containers
+            .lock()
+            .get(&key)
+            .map(|x| x.clone())
+    }
+    .unwrap();
+    let container_id = &should_be_container_entry.get().unwrap().0;
+    command_runner
+        .container_cache
+        .prune_container(IMAGE, &key.1)
+        .await;
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    check_container_exists(docker.get().await.unwrap(), container_id)
+        .await
+        .unwrap()
+}
+
+#[parameterized(runner = {&MissingContainerTestRunner::new(IMAGE), &ExitedContainerTestRunner::new(IMAGE)}, name = {"missing", "exited"})]
+#[parameterized_macro(tokio::test(flavor = "multi_thread", worker_threads = 1))]
+async fn test_prune_container_delete_expected(runner: &dyn DockerCommandTestRunner) {
+    skip_if_no_docker_available_in_macos_ci!();
+    assert!(!run_prune_container_test(runner).await);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+async fn test_prune_container_no_delete() {
+    skip_if_no_docker_available_in_macos_ci!();
+
+    let runner = ExistingContainerTestRunner::new(IMAGE);
+    assert!(run_prune_container_test(&runner).await);
 }
