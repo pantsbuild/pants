@@ -77,6 +77,7 @@ class K8sBundleDependenciesField(Dependencies):
 
 class K8sBundleTarget(Target):
     alias = "k8s_bundle"
+    help = "A bundle of Kubernetes files."
     core_fields = (
         *COMMON_TARGET_FIELDS,
         K8sBundleSourcesField,
