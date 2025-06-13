@@ -853,6 +853,72 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
     )
 
 
+class SubprojectRoots(Collection[str]):
+    pass
+
+
+@rule
+async def extract_subproject_roots(global_options: GlobalOptions) -> SubprojectRoots:
+    return SubprojectRoots(global_options.subproject_roots)
+
+
+@rule(desc="Resolve addresses")
+async def resolve_unparsed_address_inputs(
+    request: UnparsedAddressInputs, subproject_roots: SubprojectRoots
+) -> Addresses:
+    address_inputs = []
+    invalid_addresses = []
+    for v in request.values:
+        try:
+            address_inputs.append(
+                AddressInput.parse(
+                    v,
+                    relative_to=request.relative_to,
+                    subproject_roots=subproject_roots,
+                    description_of_origin=request.description_of_origin,
+                )
+            )
+        except AddressParseException:
+            if not request.skip_invalid_addresses:
+                raise
+            invalid_addresses.append(v)
+
+    if request.skip_invalid_addresses:
+        maybe_addresses = await concurrently(maybe_resolve_address(ai) for ai in address_inputs)
+        valid_addresses = []
+        for maybe_address, address_input in zip(maybe_addresses, address_inputs):
+            if isinstance(maybe_address.val, Address):
+                valid_addresses.append(maybe_address.val)
+            else:
+                invalid_addresses.append(address_input.spec)
+
+        if invalid_addresses:
+            logger.debug(
+                softwrap(
+                    f"""
+                    Invalid addresses from {request.description_of_origin}:
+                    {sorted(invalid_addresses)}. Skipping them.
+                    """
+                )
+            )
+        return Addresses(valid_addresses)
+
+    addresses = await concurrently(
+        resolve_address(**implicitly({ai: AddressInput})) for ai in address_inputs
+    )
+    # Validate that the addresses exist. We do this eagerly here because
+    # `Addresses -> UnexpandedTargets` does not preserve the `description_of_origin`, so it would
+    # be too late, per https://github.com/pantsbuild/pants/issues/15858.
+    await concurrently(
+        resolve_target(
+            WrappedTargetRequest(addr, description_of_origin=request.description_of_origin),
+            **implicitly(),
+        )
+        for addr in addresses
+    )
+    return Addresses(addresses)
+
+
 @rule(desc="Resolve transitive targets", level=LogLevel.DEBUG, _masked_types=[EnvironmentName])
 async def transitive_targets(
     request: TransitiveTargetsRequest,
@@ -1405,15 +1471,6 @@ async def resolve_source_paths(
 # -----------------------------------------------------------------------------------------------
 
 
-class SubprojectRoots(Collection[str]):
-    pass
-
-
-@rule
-async def extract_subproject_roots(global_options: GlobalOptions) -> SubprojectRoots:
-    return SubprojectRoots(global_options.subproject_roots)
-
-
 class ParsedDependencies(NamedTuple):
     addresses: list[AddressInput]
     ignored_addresses: list[AddressInput]
@@ -1713,63 +1770,6 @@ async def resolve_dependencies(
     )
 
     return result
-
-
-@rule(desc="Resolve addresses")
-async def resolve_unparsed_address_inputs(
-    request: UnparsedAddressInputs, subproject_roots: SubprojectRoots
-) -> Addresses:
-    address_inputs = []
-    invalid_addresses = []
-    for v in request.values:
-        try:
-            address_inputs.append(
-                AddressInput.parse(
-                    v,
-                    relative_to=request.relative_to,
-                    subproject_roots=subproject_roots,
-                    description_of_origin=request.description_of_origin,
-                )
-            )
-        except AddressParseException:
-            if not request.skip_invalid_addresses:
-                raise
-            invalid_addresses.append(v)
-
-    if request.skip_invalid_addresses:
-        maybe_addresses = await concurrently(maybe_resolve_address(ai) for ai in address_inputs)
-        valid_addresses = []
-        for maybe_address, address_input in zip(maybe_addresses, address_inputs):
-            if isinstance(maybe_address.val, Address):
-                valid_addresses.append(maybe_address.val)
-            else:
-                invalid_addresses.append(address_input.spec)
-
-        if invalid_addresses:
-            logger.debug(
-                softwrap(
-                    f"""
-                    Invalid addresses from {request.description_of_origin}:
-                    {sorted(invalid_addresses)}. Skipping them.
-                    """
-                )
-            )
-        return Addresses(valid_addresses)
-
-    addresses = await concurrently(
-        resolve_address(**implicitly({ai: AddressInput})) for ai in address_inputs
-    )
-    # Validate that the addresses exist. We do this eagerly here because
-    # `Addresses -> UnexpandedTargets` does not preserve the `description_of_origin`, so it would
-    # be too late, per https://github.com/pantsbuild/pants/issues/15858.
-    await concurrently(
-        resolve_target(
-            WrappedTargetRequest(addr, description_of_origin=request.description_of_origin),
-            **implicitly(),
-        )
-        for addr in addresses
-    )
-    return Addresses(addresses)
 
 
 # -----------------------------------------------------------------------------------------------
