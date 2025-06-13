@@ -5,9 +5,6 @@
   "main": "./src/index.ts",
   "private": true,
   "type": "module",
-  "dependencies": {
-    "@pants-example/common-types": "workspace:*"
-  },
   "scripts": {
     "test": "jest"
   },

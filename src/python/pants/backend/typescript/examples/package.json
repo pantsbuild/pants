@@ -4,7 +4,13 @@
   "description": "TypeScript monorepo example for Pants",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@9.15.2",
+  "packageManager": "npm@10.9.2",
+  "workspaces": [
+    "common-types",
+    "shared-utils",
+    "shared-components", 
+    "main-app"
+  ],
   "engines": {
     "node": ">=18.0.0"
   },

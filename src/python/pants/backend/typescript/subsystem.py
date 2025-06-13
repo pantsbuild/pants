@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase
 from pants.option.option_types import SkipOption
-from pants.util.strutil import softwrap
 
 
 class TypeScriptSubsystem(NodeJSToolBase):

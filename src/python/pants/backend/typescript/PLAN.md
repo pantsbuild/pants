@@ -77,24 +77,30 @@ Implement `pants check examples/main-app::` that runs TypeScript type checking u
 
 **Goal**: Get `pants check examples::` working for a single hardcoded workspace with multiple packages
 
-**Key Challenge**: The resolve-based installation process only includes source files that are declared as Pants targets, not arbitrary files from path globs.
+**Key Challenge**: The resolve-based installation process only includes source files from transitive target dependencies, but doesn't see the `input_digest` files needed for workspace package linking.
+
+**Root Cause Analysis**:
+- Installation happens in `install_node_packages_for_address()` which calls `_get_relevant_source_files()`
+- This only includes source files from transitive target dependencies, not from tool `input_digest`
+- Tool `input_digest` is merged AFTER installation completes, so workspace packages can't be linked
+- During installation, pnpm only sees package.json files but not source files, breaking workspace resolution
 
 **Tasks**:
-1. **Fix source file availability during installation**
-   - Root cause: `install_node_packages_for_address` only includes transitive target source files, not input_digest files
-   - Solution: Ensure TypeScript source files are available to the resolve-based installation process
-   - Either modify installation to accept additional source files via input_digest
-   - Or create proper Pants targets for the TypeScript source files so they're included in transitive resolution
+1. **Modify JavaScript backend installation process**
+   - **Option A**: Extend `InstalledNodePackageRequest` to accept additional source files from tool `input_digest`
+   - **Option B**: Modify `install_node_packages_for_address` to accept optional additional digest parameter
+   - **Option C**: Create new installation variant for tools that need source files during installation
+   - Ensure workspace source files are available during pnpm installation, not just execution
 
-2. **Hardcoded workspace compilation**
-   - Use `tsc --build` to compile all packages in the hardcoded examples workspace
-   - Ensure workspace packages (`@pants-example/common-types`) can be resolved during installation
-   - Handle proper working directory and path resolution
-   - Include all necessary config files and source files in the compilation context
+2. **Update TypeScript check rule to use modified installation**
+   - Pass TypeScript source files to the installation process
+   - Ensure workspace packages can be resolved during installation phase
+   - Maintain working directory and configuration file handling
 
 **Acceptance Criteria**:
 - `pants check examples::` works for the entire hardcoded workspace
 - Workspace package imports (e.g., `@pants-example/common-types`) resolve correctly during pnpm installation
+- Installation sandbox contains source files, enabling proper workspace linking
 - TypeScript compilation sees all packages and their dependencies
 - Error messages reference correct file paths across packages
 

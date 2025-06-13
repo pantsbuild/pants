@@ -41,6 +41,7 @@ from pants.engine.unions import UnionMembership, UnionRule
 @dataclass(frozen=True)
 class InstalledNodePackageRequest:
     address: Address
+    include_typescript_sources: bool = False
 
 
 @dataclass(frozen=True)
@@ -70,13 +71,20 @@ class InstalledNodePackageWithSource(InstalledNodePackage):
 
 
 async def _get_relevant_source_files(
-    sources: Iterable[SourcesField], with_js: bool = False
+    sources: Iterable[SourcesField], with_js: bool = False, with_ts: bool = False
 ) -> SourceFiles:
+    # Import TypeScript fields only when needed to avoid circular dependency
+    ts_fields = ()
+    if with_ts:
+        from pants.backend.typescript.target_types import TypeScriptSourceField, TypeScriptTestSourceField
+        ts_fields = (TypeScriptSourceField, TypeScriptTestSourceField)
+    
     return await determine_source_files(
         SourceFilesRequest(
             sources,
             for_sources_types=(PackageJsonSourceField, FileSourceField)
-            + ((ResourceSourceField, JSRuntimeSourceField) if with_js else ()),
+            + ((ResourceSourceField, JSRuntimeSourceField) if with_js else ())
+            + (ts_fields if with_ts else ()),
             enable_codegen=True,
         )
     )
@@ -97,6 +105,7 @@ async def install_node_packages_for_address(
     source_files = await _get_relevant_source_files(
         (tgt[SourcesField] for tgt in transitive_tgts.closure if tgt.has_field(SourcesField)),
         with_js=False,
+        with_ts=req.include_typescript_sources,
     )
     package_digest = source_files.snapshot.digest
 
@@ -138,6 +147,7 @@ async def add_sources_to_installed_node_package(
     source_files = await _get_relevant_source_files(
         (tgt[SourcesField] for tgt in transitive_tgts.dependencies if tgt.has_field(SourcesField)),
         with_js=True,
+        with_ts=req.include_typescript_sources,
     )
     digest = await merge_digests(MergeDigests((installation.digest, source_files.snapshot.digest)))
     return InstalledNodePackageWithSource(installation.project_env, digest=digest)

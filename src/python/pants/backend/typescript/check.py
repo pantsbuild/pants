@@ -3,15 +3,9 @@
 
 from __future__ import annotations
 
-import dataclasses
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
-from pants.backend.javascript import install_node_package
-from pants.backend.javascript.install_node_package import (
-    InstalledNodePackageRequest,
-    install_node_packages_for_address,
-)
 from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolRequest
 from pants.backend.typescript.subsystem import TypeScriptSubsystem
 from pants.backend.typescript.target_types import (
@@ -20,11 +14,11 @@ from pants.backend.typescript.target_types import (
     TypeScriptTestSourceField,
 )
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
-from pants.engine.fs import PathGlobs
+from pants.engine.fs import Digest, DigestContents, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.internals.graph import hydrate_sources, HydrateSourcesRequest
-from pants.engine.internals.native_engine import Address, MergeDigests
+from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.internals.selectors import Get, concurrently
-from pants.engine.intrinsics import execute_process, path_globs_to_digest, merge_digests
+from pants.engine.intrinsics import execute_process, merge_digests, path_globs_to_digest
 from pants.engine.process import Process
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import BoolField, FieldSet, Target
@@ -83,69 +77,83 @@ async def _typecheck_typescript_files(
     if not field_sets:
         return CheckResults([], checker_name=tool_name)
     
-    # Get source files for all field sets
-    all_sources = await concurrently(
+    # For workspace compilation, we need ALL TypeScript sources in the workspace,
+    # not just the sources from the targets being checked, because TypeScript needs
+    # to resolve workspace dependencies like @pants-example/common-types
+    all_workspace_sources = await path_globs_to_digest(
+        PathGlobs([
+            "src/python/pants/backend/typescript/examples/**/src/**/*.ts",
+            "src/python/pants/backend/typescript/examples/**/src/**/*.tsx",
+        ]),
+        **implicitly()
+    )
+    
+    # DEBUG: Log what source files were captured
+    source_contents = await Get(DigestContents, Digest, all_workspace_sources)
+    logger.info(f"DEBUG: Captured {len(source_contents)} source files:")
+    for file_content in sorted(source_contents, key=lambda f: f.path):
+        logger.info(f"DEBUG:   {file_content.path}")
+    
+    # Get source files for the specific field sets being checked (for validation)
+    target_sources = await concurrently(
         hydrate_sources(HydrateSourcesRequest(field_set.sources), **implicitly())
         for field_set in field_sets
     )
     
-    # For Phase 1: Install all workspace packages to ensure all dependencies are available
-    # Get unique addresses to avoid duplicate installations
-    unique_addresses = {field_set.address for field_set in field_sets}
-    # Also include the workspace root to get workspace-level dependencies
-    unique_addresses.add(Address("src/python/pants/backend/typescript/examples"))
-    
-    installations = await concurrently(
-        install_node_packages_for_address(InstalledNodePackageRequest(address), **implicitly())
-        for address in unique_addresses
-    )
-    
-    # Merge all installation digests to include all workspace packages and their dependencies
-    installation_digests = [installation.digest for installation in installations]
-    merged_installation_digest = await merge_digests(MergeDigests(installation_digests))
-    
-    # Phase 1: Compile all packages together to handle project references properly
-    # Collect all source files from all field sets
+    # Collect source files for validation
     all_source_files = []
-    for sources in all_sources:
+    for sources in target_sources:
         all_source_files.extend(sources.snapshot.files)
     
     if not all_source_files:
         return CheckResults([], checker_name=tool_name)
     
-    # For --build to work with project references, include ALL TypeScript source files in the monorepo
-    # This ensures referenced projects have their source files available
-    all_ts_sources_digest = await path_globs_to_digest(
-        PathGlobs([
-            "**/src/**/*.ts",
-            "**/src/**/*.tsx", 
-            "**/src/**/*.js",
-            "**/src/**/*.jsx",
-            "**/tsconfig*.json", 
-            "**/jsconfig*.json",
-            "**/package.json",
-            "**/pnpm-workspace.yaml",
-            "**/yarn.lock",
-            "**/package-lock.json", 
-            "**/pnpm-lock.yaml",
-        ]),
-        **implicitly()
-    )
+    # Include TypeScript configuration files AND package.json files for each workspace package
+    config_files = [
+        # Root workspace files
+        "src/python/pants/backend/typescript/examples/tsconfig.json",
+        "src/python/pants/backend/typescript/examples/package.json",
+        "src/python/pants/backend/typescript/examples/pnpm-workspace.yaml",
+        "src/python/pants/backend/typescript/examples/.npmrc",
+        # Each workspace package needs both tsconfig.json and package.json
+        "src/python/pants/backend/typescript/examples/common-types/tsconfig.json",
+        "src/python/pants/backend/typescript/examples/common-types/package.json", 
+        "src/python/pants/backend/typescript/examples/shared-utils/tsconfig.json",
+        "src/python/pants/backend/typescript/examples/shared-utils/package.json",
+        "src/python/pants/backend/typescript/examples/shared-components/tsconfig.json",
+        "src/python/pants/backend/typescript/examples/shared-components/package.json",
+        "src/python/pants/backend/typescript/examples/main-app/tsconfig.json",
+        "src/python/pants/backend/typescript/examples/main-app/package.json",
+    ]
     
-    # Merge all installations and all source files
-    input_digest = await merge_digests(
-        MergeDigests((merged_installation_digest, all_ts_sources_digest))
-    )
+    # Get config file digests
+    config_digests = []
+    for config_file in config_files:
+        try:
+            config_digest = await path_globs_to_digest(
+                PathGlobs([config_file], glob_match_error_behavior=GlobMatchErrorBehavior.ignore),
+                **implicitly()
+            )
+            config_digests.append(config_digest)
+        except Exception:
+            # Skip missing config files
+            continue
     
-    # Set working directory to the examples directory where the monorepo is located
-    examples_dir = "src/python/pants/backend/typescript/examples"
+    # Merge workspace sources and config files (including .npmrc)
+    all_digests = [all_workspace_sources] + config_digests
+    input_digest = await merge_digests(MergeDigests(all_digests))
     
-    # Use --build without specific project path to build all projects in workspace
+    # DEBUG: Log final input_digest contents  
+    final_contents = await Get(DigestContents, Digest, input_digest)
+    logger.info(f"DEBUG: Final input_digest contains {len(final_contents)} files:")
+    for file_content in sorted(final_contents, key=lambda f: f.path):
+        logger.info(f"DEBUG:   {file_content.path}")
+    
+    # Use --build to compile all projects in workspace with project references
     args = ("--build",)
     
-    
-    # Use the TypeScript subsystem's tool request for proper environment setup
-    # This avoids the package filtering that comes with NodeJsProjectEnvironmentProcess
+    # Use the TypeScript subsystem's tool request with resolve-based installation
+    # The resolve system will automatically handle package installation and working directory
     tool_request = subsystem.request(
         args=args,
         input_digest=input_digest,
@@ -153,16 +161,13 @@ async def _typecheck_typescript_files(
         level=LogLevel.DEBUG,
     )
     
-    # Execute TypeScript type checking with correct working directory
+    # Execute TypeScript type checking - resolve system handles environment setup
     process = await Get(Process, NodeJSToolRequest, tool_request)
-    process = dataclasses.replace(
-        process, 
-        working_directory=examples_dir,
-        # Add system utilities to fix uname issue
-        env={**process.env, "PATH": f"{process.env.get('PATH', '')}:/usr/bin:/bin:/usr/sbin:/sbin"}
-    )
     
-    result = await execute_process(process, **implicitly())
+    # Set the working directory to the examples root where tsconfig.json is located
+    process_with_workdir = replace(process, working_directory="src/python/pants/backend/typescript/examples")
+    
+    result = await execute_process(process_with_workdir, **implicitly())
     
     # Convert to CheckResult - single result for all packages
     check_result = CheckResult.from_fallible_process_result(
@@ -191,7 +196,6 @@ async def typecheck_typescript(
 def rules():
     return [
         *collect_rules(),
-        *install_node_package.rules(),
         UnionRule(CheckRequest, TypeScriptCheckRequest),
         # UnionRule(CheckRequest, TypeScriptTestCheckRequest),
         TypeScriptSourceTarget.register_plugin_field(SkipTypeScriptCheckField),
