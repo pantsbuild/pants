@@ -87,7 +87,7 @@ class MyOutput:
     pass
 
 @rule
-def my_rule(zip_binary: ZipBinary) -> MyOutput:
+async def my_rule(zip_binary: ZipBinary) -> MyOutput:
     return MyOutput()
 
 @rule

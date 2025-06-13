@@ -25,7 +25,7 @@ class AllWsdlTargets(Targets):
 
 
 @rule(desc="Find all WSDL sources in a project", level=LogLevel.DEBUG)
-def find_all_wsdl_targets(all_targets: AllTargets) -> AllWsdlTargets:
+async def find_all_wsdl_targets(all_targets: AllTargets) -> AllWsdlTargets:
     return AllWsdlTargets([tgt for tgt in all_targets if tgt.has_field(WsdlSourceField)])
 
 

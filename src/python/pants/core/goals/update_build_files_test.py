@@ -60,14 +60,14 @@ class MockRewriteReverseLines(RewrittenBuildFileRequest):
 
 
 @rule
-def add_line(request: MockRewriteAddLine) -> RewrittenBuildFile:
+async def add_line(request: MockRewriteAddLine) -> RewrittenBuildFile:
     return RewrittenBuildFile(
         request.path, (*request.lines, "# added line"), change_descriptions=("Add a new line",)
     )
 
 
 @rule
-def reverse_lines(request: MockRewriteReverseLines) -> RewrittenBuildFile:
+async def reverse_lines(request: MockRewriteReverseLines) -> RewrittenBuildFile:
     return RewrittenBuildFile(
         request.path, tuple(reversed(request.lines)), change_descriptions=("Reverse lines",)
     )

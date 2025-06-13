@@ -315,7 +315,7 @@ class AllPythonDistributionTargets:
 
 
 @rule(desc="Find all Python Distribution targets in project", level=LogLevel.DEBUG)
-def find_all_python_distributions(
+async def find_all_python_distributions(
     all_targets: AllTargets,
 ) -> AllPythonDistributionTargets:
     return AllPythonDistributionTargets(

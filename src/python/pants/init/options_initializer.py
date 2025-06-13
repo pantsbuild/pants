@@ -55,13 +55,14 @@ def _initialize_build_configuration(
             sys.path.append(path)
             pkg_resources.fixup_namespace_packages(path)
 
+    # Resolve the actual Python code for any plugins. `sys.path` is modified as a side effect if
+    # plugins were configured.
     backends_requirements = _collect_backends_requirements(bootstrap_options.backend_packages)
-    working_set = plugin_resolver.resolve(options_bootstrapper, env, backends_requirements)
+    plugin_resolver.resolve(options_bootstrapper, env, backends_requirements)
 
     # Load plugins and backends.
     return load_backends_and_plugins(
         bootstrap_options.plugins,
-        working_set,
         bootstrap_options.backend_packages,
     )
 
