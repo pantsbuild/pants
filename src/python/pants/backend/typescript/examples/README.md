@@ -1,290 +1,87 @@
-# TypeScript Monorepo Example
+# TypeScript Backend Examples
 
-This directory contains a comprehensive TypeScript monorepo example that demonstrates how to structure projects for the Pants TypeScript backend, including support for future typechecking capabilities.
+This directory contains examples demonstrating TypeScript support in Pants with multiple package managers and project structures.
 
 ## Project Structure
 
-This example models a typical TypeScript monorepo with:
+### projectA (npm + Complex Workspace)
+- **Package Manager**: npm
+- **Structure**: Complex monorepo with 4 workspace packages
+- **Features**: Cross-package dependencies, project references, React components
+- **Packages**: common-types, shared-utils, shared-components, main-app
 
-- **Root workspace**: Package manager workspace configuration
-- **Main application** (`main-app/`): A web application that depends on shared libraries
-- **Shared utilities** (`shared-utils/`): Common utility functions
-- **Shared components** (`shared-components/`): Reusable UI components
-- **Common types** (`common-types/`): Shared TypeScript type definitions
+### projectB (yarn + Simple Library)  
+- **Package Manager**: yarn@1.22.22
+- **Structure**: Simple TypeScript library
+- **Features**: Basic library with lodash dependency
+- **Config Files**: .npmrc declared as target
 
-## Package Structure
+### projectC (pnpm + Simple Library)
+- **Package Manager**: pnpm@9.15.2  
+- **Structure**: Simple TypeScript library
+- **Features**: Date utilities with date-fns dependency
+- **Config Files**: .pnpmrc declared as target
 
-```
-examples/
-├── README.md                    # This file
-├── BUILD                        # Root workspace
-├── package.json                 # Root workspace configuration
-├── pnpm-workspace.yaml         # PNPM workspace definition
-├── pnpm-lock.yaml              # Package manager lockfile
-├── common-types/               # Shared type definitions
-│   ├── BUILD
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── src/
-│       ├── BUILD
-│       ├── index.ts
-│       └── api.ts
-├── shared-utils/               # Shared utility functions
-│   ├── BUILD
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── src/
-│       ├── BUILD
-│       ├── index.ts
-│       ├── math.ts
-│       └── math.test.ts        # Co-located test file
-├── shared-components/          # Reusable UI components
-│   ├── BUILD
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── src/
-│       ├── BUILD
-│       ├── index.ts
-│       ├── Button.tsx
-│       └── Button.test.tsx     # Co-located test file
-└── main-app/                   # Main application
-    ├── BUILD
-    ├── package.json
-    ├── tsconfig.json
-    └── src/
-        ├── BUILD
-        ├── index.ts
-        ├── App.tsx
-        └── App.test.tsx        # Co-located test file
+## Configuration File Management
+
+**Important**: Package manager configuration files must be declared as `file()` targets in BUILD files.
+
+### Required Pattern:
+```python
+package_json(
+    dependencies=[":npmrc", ":pnpmrc"],  # Reference config files
+)
+
+file(name="npmrc", source=".npmrc")      # Declare config files
+file(name="pnpmrc", source=".pnpmrc")
 ```
 
-## Current Pants Goals
+### Supported Config Files:
+- `.npmrc` - npm configuration
+- `.pnpmrc` - pnpm configuration  
+- `pnpm-workspace.yaml` - pnpm workspace definition
 
-### Formatting
+### Why This Is Required:
+1. **Explicit Dependencies**: Config files affect package installation
+2. **Cache Invalidation**: Changes to config files trigger rebuilds
+3. **Reproducible Builds**: All inputs are declared and tracked
+
+## Usage Examples
+
+### Check All Projects:
 ```bash
-# Format all TypeScript files in the monorepo
-pants fmt examples::
-
-# Format specific packages
-pants fmt examples/shared-utils::
-pants fmt examples/main-app::
-```
-
-### Linting  
-```bash
-# Lint all TypeScript files (when prettier is configured)
-pants lint examples::
-
-# Lint specific packages
-pants lint examples/shared-utils::
-```
-
-### Testing
-```bash
-# Run all tests in the monorepo
-pants test examples::
-
-# Run tests for specific packages
-pants test examples/shared-utils::
-pants test examples/main-app::
-
-# Run a specific test file
-pants test examples/shared-utils/src/math.test.ts
-```
-
-### Dependency Analysis
-```bash
-# Show dependencies for a target
-pants dependencies examples/main-app/src:index
-
-# Show dependents of a target
-pants dependents examples/common-types/src:index
-
-# List all targets
-pants list examples::
-```
-
-## Future Typechecking Goals
-
-Once TypeScript typechecking is implemented, these commands will be available:
-
-### Type Checking
-```bash
-# Type check all TypeScript files (follows project reference order)
 pants check examples::
-
-# Type check specific packages (dependencies checked first)
-pants check examples/shared-utils::
-pants check examples/main-app::
-
-# Build references (incremental compilation)
-tsc --build examples/
-
-# Type check with specific TypeScript version
-pants --tsc-version=typescript@5.8.2 check examples::
 ```
 
-### Build/Compilation
+### Check Individual Projects:
 ```bash
-# Compile TypeScript to JavaScript (future goal)
-pants package examples/main-app::
-
-# Build specific packages
-pants package examples/shared-components::
+pants check examples/projectA::    # Complex npm workspace
+pants check examples/projectB::    # Simple yarn library  
+pants check examples/projectC::    # Simple pnpm library
 ```
 
-## Key Features Demonstrated
-
-### 1. Workspace Configuration
-- PNPM workspace setup with `pnpm-workspace.yaml`
-- Shared lockfile for dependency management
-- Proper package manager configuration
-
-### 2. TypeScript Configuration
-- **Project References**: Root `tsconfig.json` with references to all packages
-- **Composite builds**: Each package is a TypeScript composite project
-- **Incremental compilation**: Enabled for fast rebuilds
-- **Dependency order**: TypeScript understands build dependencies
-- **Declaration files**: Generated for all packages for cross-package type checking
-
-### 3. Package Dependencies
-- Internal dependencies between workspace packages
-- External npm dependencies
-- Development dependencies for testing
-
-### 4. Target Structure
-- `typescript_sources()` and `typescript_tests()` in the same directory (co-located)
-- `tsx_sources()` and `tsx_tests()` for React components and their tests
-- `package_json()` targets with proper configuration
-
-### 5. Dependency Inference
-- Automatic discovery of internal dependencies
-- TypeScript import resolution
-- Package.json dependency detection
-
-## Testing the Example
-
-To test this example structure:
-
-1. **Enable the TypeScript backend** in your `pants.toml`:
-   ```toml
-   [GLOBAL]
-   backend_packages = [
-       "pants.backend.experimental.typescript",
-       "pants.backend.experimental.tsx",
-   ]
-   ```
-
-2. **Run tailor** to verify target generation:
-   ```bash
-   pants tailor examples::
-   ```
-
-3. **Test dependency inference**:
-   ```bash
-   pants dependencies examples/main-app/src
-   ```
-
-4. **Run formatting**:
-   ```bash
-   pants fmt examples::
-   ```
-
-5. **Run tests** (when test framework is configured):
-   ```bash
-   pants test examples::
-   ```
-
-## Configuration Notes
-
-### Package Manager
-This example uses PNPM but can be adapted for npm or yarn by:
-- Replacing `pnpm-workspace.yaml` with `workspaces` field in root `package.json`
-- Updating lockfile name (`package-lock.json` for npm, `yarn.lock` for yarn)
-
-### TypeScript Versions
-All packages within a Pants resolve must use the same TypeScript version for project references to work correctly. The TypeScript version should be specified at the Pants resolve level.
-
-### Testing Framework
-The example includes Jest configuration but can be adapted for other test runners like Vitest or Mocha.
-
-### Test File Convention
-This example follows the common TypeScript convention of **co-located test files**, where test files sit next to their source files:
-- `math.ts` → `math.test.ts` (same directory)
-- `Button.tsx` → `Button.test.tsx` (same directory)
-
-## TypeScript Project References Integration
-
-This example uses [TypeScript Project References](https://www.typescriptlang.org/docs/handbook/project-references.html) which provides several benefits:
-
-### **How Project References Work Here**
-
-**Root Configuration** (`tsconfig.json`):
-```json
-{
-  "files": [],
-  "references": [
-    { "path": "./common-types" },
-    { "path": "./shared-utils" },
-    { "path": "./shared-components" },
-    { "path": "./main-app" }
-  ]
-}
-```
-
-**Package Configuration** (e.g., `main-app/tsconfig.json`):
-```json
-{
-  "compilerOptions": {
-    "composite": true,      // Enables project references
-    "incremental": true,    // Faster rebuilds
-    "declaration": true     // Generates .d.ts files
-  },
-  "references": [
-    { "path": "../common-types" },
-    { "path": "../shared-utils" },
-    { "path": "../shared-components" }
-  ]
-}
-```
-
-### **Benefits for Pants TypeScript Backend**
-
-1. **Incremental Type Checking**: Only recheck changed projects and their dependents
-2. **Build Ordering**: TypeScript knows to check dependencies first
-3. **Better IDE Performance**: VS Code can load projects individually
-4. **Declaration File Generation**: Enables proper cross-package type checking
-5. **Pants Compatibility**: Aligns with Pants' understanding of dependencies
-
-### **How Pants Will Leverage This**
-
-- **Dependency Graph**: Pants can read `references` to understand project dependencies
-- **Incremental Builds**: Use TypeScript's incremental compilation for speed
-- **Parallel Execution**: Check independent packages in parallel
-- **Target Ordering**: Ensure dependencies are type-checked before dependents
-
-### **Commands for Project References**
-
+### Check Specific Targets:
 ```bash
-# Build all projects in dependency order
-tsc --build examples/
-
-# Clean all build outputs
-tsc --build examples/ --clean
-
-# Force rebuild all projects
-tsc --build examples/ --force
-
-# Verbose output showing what's being built
-tsc --build examples/ --verbose
+pants check examples/projectA/main-app/src::
+pants check examples/projectB/src/index.ts
 ```
+
+## Package Manager Testing
+
+This examples directory serves as a test suite for package manager compatibility:
+
+- **npm**: Default, works out of the box
+- **yarn**: Classic 1.x, standard workspace support  
+- **pnpm**: Requires special workspace configuration (see projectA)
+
+Each project demonstrates best practices for that package manager with TypeScript.
 
 ## Implementation Status
 
 - ✅ **Target types**: TypeScript and TSX targets work
 - ✅ **Dependency inference**: Basic import resolution  
 - ✅ **Formatting**: Integration with prettier
-- ✅ **Project References**: Configured for optimal TypeScript experience
-- ⏳ **Type checking**: In development (tsc integration)
+- ✅ **Type checking**: Multi-project support with all package managers
+- ✅ **Configuration management**: Target-based config file discovery
 - ⏳ **Build/compilation**: Future enhancement
 - ⏳ **Advanced dependency inference**: Enhanced import resolution

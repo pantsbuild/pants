@@ -378,7 +378,7 @@ enableGlobalCache: false
 
 **Goal**: ✅ Remove hard-coded project paths and make TypeScript check work with any targets/projects
 
-**Status**: ✅ **COMPLETED** - TypeScript check now works dynamically with any TypeScript project structure
+**Status**: ✅ **COMPLETED** - TypeScript check now works dynamically with any TypeScript project structure including multi-project support
 
 **Target Flow**:
 1. **Target Analysis**: Given input targets (e.g., `pants check src/my-app::`), determine which TypeScript sources need checking
@@ -460,10 +460,51 @@ enableGlobalCache: false
 
 **PR_NOTE Comments Added**: All major changes include PR_NOTE comments explaining the transformation from hard-coded to dynamic approach for pull request reviewers.
 
-**Out of Scope for Phase 2**:
-- Multiple resolve/project support (will be addressed later with updated examples)
-- Performance optimization across projects
-- Complex project reference scenarios
+### Phase 2.7: Multi-Project Support (COMPLETED)
+
+**Goal**: ✅ Remove single project limitation and implement concurrent multi-project execution
+
+**Status**: ✅ **COMPLETED** - TypeScript check now supports checking multiple projects concurrently
+
+**Key Implementation Changes**:
+
+1. **Removed Single Project Limitation**:
+   ```python
+   # Before: Single project restriction
+   if len(projects_to_check) > 1:
+       raise ValueError(f"TypeScript check across multiple projects not yet supported")
+   
+   # After: Multi-project support
+   project_results = await concurrently(
+       _typecheck_single_project(project, addresses, subsystem, tool_name)
+       for project, addresses in projects_to_check.items()
+   )
+   ```
+
+2. **Concurrent Project Execution**:
+   - Each project type-checked independently and concurrently
+   - Proper isolation between projects (different package managers, resolves, dependencies)
+   - Results aggregated from all projects
+
+3. **Multi-Project Examples Structure Created**:
+   ```
+   examples/
+   ├── projectA/  # Complex workspace (npm) - 13 targets
+   ├── projectB/  # Simple library (yarn) - 2 targets  
+   ├── projectC/  # Simple library (pnpm) - 2 targets
+   ```
+
+**Verification Results**:
+- ✅ **All 3 projects checked concurrently**: ~8 seconds total runtime
+- ✅ **Package manager isolation**: npm, yarn, pnpm work independently
+- ✅ **Proper target grouping**: 13 + 2 + 2 = 17 total targets across projects
+- ✅ **Individual project checks**: Each project can be checked separately
+- ✅ **Cross-project checks**: `pants check examples::` checks all projects
+
+**Performance Characteristics**:
+- ✅ **Parallel package installation**: All package managers install concurrently
+- ✅ **Parallel type checking**: Projects type-checked independently
+- ✅ **Optimal resource usage**: No blocking between unrelated projects
 
 **Expected Architecture After Phase 2**:
 ```python

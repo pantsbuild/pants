@@ -6,6 +6,7 @@ package_json(dependencies=[
     ":jest_config", 
     ":jest_setup", 
     ":tsconfig",
+    ":pnpm_workspace",
     # Include all package targets to get their tsconfig.json files
     "./common-types:common-types",
     "./main-app:main-app",
