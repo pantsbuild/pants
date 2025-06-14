@@ -22,6 +22,7 @@ class PythonFormatStringSourceField(SingleSourceField):
 class PythonFormatStringValuesField(DictStringToStringField):
     alias = "values"
     required = True
+    help = "Dictionary of key/value pairs to substitute."
 
 
 class PythonFormatStringOutputPathField(OutputPathField):
