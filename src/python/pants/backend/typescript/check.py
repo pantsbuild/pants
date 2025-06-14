@@ -19,7 +19,7 @@ from pants.backend.typescript.target_types import (
 )
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.core.target_types import FileSourceField
-from pants.engine.fs import Digest, DigestContents, GlobMatchErrorBehavior, PathGlobs
+from pants.engine.fs import EMPTY_DIGEST, Digest, DigestContents, DigestSubset, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.internals.graph import hydrate_sources, HydrateSourcesRequest
 from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.internals.selectors import Get, concurrently
@@ -31,6 +31,63 @@ from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
+
+
+async def _load_cached_typescript_artifacts(project) -> Digest:
+    """Load cached .tsbuildinfo files and output files for incremental TypeScript compilation."""
+    cache_globs = []
+    for workspace_pkg in project.workspaces:
+        # Cache .tsbuildinfo files for incremental state
+        cache_globs.append(f"{workspace_pkg.root_dir}/tsconfig.tsbuildinfo")
+        # Cache output directories that TypeScript --build generates
+        cache_globs.append(f"{workspace_pkg.root_dir}/dist/**/*")
+        
+    cached_artifacts = await path_globs_to_digest(
+        PathGlobs(cache_globs, glob_match_error_behavior=GlobMatchErrorBehavior.ignore),
+        **implicitly()
+    )
+    
+    if cached_artifacts != EMPTY_DIGEST:
+        artifact_contents = await Get(DigestContents, Digest, cached_artifacts)
+        logger.info(f"DEBUG: Found {len(artifact_contents)} cached TypeScript artifacts for incremental compilation")
+        for artifact in sorted(artifact_contents, key=lambda f: f.path):
+            logger.info(f"DEBUG:   {artifact.path}")
+    else:
+        logger.info(f"DEBUG: No cached TypeScript artifacts found - this will be a full compilation")
+    
+    return cached_artifacts
+
+
+async def _extract_typescript_artifacts_for_caching(project, process_output_digest: Digest) -> Digest:
+    """Extract .tsbuildinfo files and output files from TypeScript compilation for caching."""
+    output_globs = []
+    for workspace_pkg in project.workspaces:
+        # Extract .tsbuildinfo files for incremental state
+        output_globs.append(f"{workspace_pkg.root_dir}/tsconfig.tsbuildinfo")
+        # Extract output directories that TypeScript --build generates
+        output_globs.append(f"{workspace_pkg.root_dir}/dist/**/*")
+    
+    artifacts_digest = await Get(
+        Digest,
+        DigestSubset(
+            process_output_digest,
+            PathGlobs(
+                output_globs, 
+                glob_match_error_behavior=GlobMatchErrorBehavior.ignore
+            )
+        )
+    )
+    
+    # DEBUG: Log captured artifacts
+    if artifacts_digest != EMPTY_DIGEST:
+        artifact_contents = await Get(DigestContents, Digest, artifacts_digest)
+        logger.info(f"DEBUG: Cached {len(artifact_contents)} TypeScript artifacts for incremental compilation")
+        for artifact in sorted(artifact_contents, key=lambda f: f.path):
+            logger.info(f"DEBUG:   {artifact.path}")
+    else:
+        logger.info(f"DEBUG: No TypeScript artifacts generated for project {project.root_dir}")
+    
+    return artifacts_digest
 
 
 class SkipTypeScriptCheckField(BoolField):
@@ -73,9 +130,7 @@ class TypeScriptTestCheckRequest(CheckRequest):
 
 async def _typecheck_single_project(
     project,  # NodeJSProject - can't import due to circular imports
-    target_addresses: set,
     subsystem: TypeScriptSubsystem,
-    tool_name: str
 ) -> CheckResult:
     """Type check a single TypeScript project."""
     logger.info(f"DEBUG: TypeScript check for project: {project.root_dir}")
@@ -194,18 +249,18 @@ async def _typecheck_single_project(
     # Get config file digests
     config_digests = []
     for config_file in config_files:
-        try:
-            config_digest = await path_globs_to_digest(
-                PathGlobs([config_file], glob_match_error_behavior=GlobMatchErrorBehavior.ignore),
-                **implicitly()
-            )
-            config_digests.append(config_digest)
-        except Exception:
-            # Skip missing config files
-            continue
+        config_digest = await path_globs_to_digest(
+            PathGlobs([config_file], glob_match_error_behavior=GlobMatchErrorBehavior.ignore),
+            **implicitly()
+        )
+        config_digests.append(config_digest)
     
-    # Merge workspace sources and config files (including .npmrc)
-    all_digests = [all_workspace_sources] + config_digests
+    # Include cached .tsbuildinfo files and output files for incremental compilation
+    # TypeScript --build uses these files to skip unchanged packages
+    cached_typescript_artifacts = await _load_cached_typescript_artifacts(project)
+    
+    # Merge workspace sources, config files, and cached TypeScript artifacts
+    all_digests = [all_workspace_sources] + config_digests + ([cached_typescript_artifacts] if cached_typescript_artifacts != EMPTY_DIGEST else [])
     input_digest = await merge_digests(MergeDigests(all_digests))
     
     # DEBUG: Log final input_digest contents  
@@ -239,7 +294,7 @@ async def _typecheck_single_project(
     tool_request = subsystem.request(
         args=args,
         input_digest=input_digest,
-        description=f"Type-check TypeScript project {project.root_dir} ({len(target_addresses)} targets)",
+        description=f"Type-check TypeScript project {project.root_dir} ({len(project_typescript_targets)} targets)",
         level=LogLevel.DEBUG,
     )
     
@@ -255,10 +310,16 @@ async def _typecheck_single_project(
     
     result = await execute_process(process_with_workdir, **implicitly())
     
-    # Convert to CheckResult - single result for the project
+    # Cache TypeScript incremental build artifacts for faster subsequent runs
+    # TypeScript --build generates .tsbuildinfo files and output files that enable incremental compilation
+    typescript_artifacts_digest = await _extract_typescript_artifacts_for_caching(project, result.output_digest)
+    
+    # Convert to CheckResult with caching support - single result for the project
     check_result = CheckResult.from_fallible_process_result(
         result,
-        partition_description=f"TypeScript check on {project.root_dir} ({len(target_addresses)} targets)",
+        partition_description=f"TypeScript check on {project.root_dir} ({len(project_typescript_targets)} targets)",
+        # Cache TypeScript artifacts via the report field - this enables incremental compilation
+        report=typescript_artifacts_digest,
     )
     
     return check_result
@@ -324,8 +385,8 @@ async def _typecheck_typescript_files(
     
     # Check all projects concurrently
     project_results = await concurrently(
-        _typecheck_single_project(project, addresses, subsystem, tool_name)
-        for project, addresses in projects_to_check.items()
+        _typecheck_single_project(project, subsystem)
+        for project in projects_to_check.keys()
     )
     
     return CheckResults(project_results, checker_name=tool_name)
