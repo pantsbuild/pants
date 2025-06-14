@@ -35,6 +35,7 @@ class PythonFormatStringOutputPathField(OutputPathField):
 
 class PythonFormatStringTarget(Target):
     alias = "python_format_string"
+    help = "Substitutes values into a file. See k8s backend documentation for details."
     core_fields = (
         *COMMON_TARGET_FIELDS,
         PythonFormatStringSourceField,
@@ -50,6 +51,7 @@ class PythonFormatStringsSourcesField(MultipleSourcesField):
 class PythonFormatStringTargetGenerator(TargetFilesGenerator):
     alias = "python_format_strings"
     generated_target_cls = PythonFormatStringTarget
+    help = "Substitutes values into files. See k8s backend documentation for details."
     core_fields = (
         *COMMON_TARGET_FIELDS,
         PythonFormatStringsSourcesField,
