@@ -482,7 +482,6 @@ for project in projects:
 
 **Tasks**:
 1. **Multi-package incremental compilation**
-   - Extend single-package incremental compilation to handle cross-package dependencies
    - Cache `.tsbuildinfo` files for multiple related packages
    - Optimize for repeated executions across package boundaries
 

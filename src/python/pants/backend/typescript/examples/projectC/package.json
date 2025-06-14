@@ -1,0 +1,20 @@
+{
+  "name": "@pants-example/simple-library-c",
+  "version": "1.0.0",
+  "description": "Simple TypeScript library for testing with pnpm",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest"
+  },
+  "packageManager": "pnpm@9.15.2",
+  "dependencies": {
+    "date-fns": "^3.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.0",
+    "typescript": "^5.8.2"
+  },
+  "license": "MIT"
+}

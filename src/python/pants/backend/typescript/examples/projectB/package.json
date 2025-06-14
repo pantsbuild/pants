@@ -1,0 +1,21 @@
+{
+  "name": "@pants-example/simple-library-b",
+  "version": "1.0.0",
+  "description": "Simple TypeScript library for testing with yarn",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest"
+  },
+  "packageManager": "yarn@1.22.22",
+  "dependencies": {
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "@types/lodash": "^4.17.17",
+    "@types/node": "^20.19.0",
+    "typescript": "^5.8.2"
+  },
+  "license": "MIT"
+}
