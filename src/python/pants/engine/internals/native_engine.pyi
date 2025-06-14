@@ -833,7 +833,12 @@ def tasks_task_begin(
 ) -> None: ...
 def tasks_task_end(tasks: PyTasks) -> None: ...
 def tasks_add_call(
-    tasks: PyTasks, output: type, inputs: Sequence[type], rule_id: str, explicit_args_arity: int
+    tasks: PyTasks,
+    output: type,
+    inputs: Sequence[type],
+    rule_id: str,
+    explicit_args_arity: int,
+    vtable_entries: Sequence[tuple[type, str]] | None,
 ) -> None: ...
 def tasks_add_get(tasks: PyTasks, output: type, inputs: Sequence[type]) -> None: ...
 def tasks_add_get_union(
