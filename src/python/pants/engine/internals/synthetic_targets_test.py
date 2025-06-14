@@ -134,7 +134,7 @@ example_synthetic_targets_per_directory_targets = {
 
 
 @rule
-def example_synthetic_targets_per_directory_spec_paths(
+async def example_synthetic_targets_per_directory_spec_paths(
     request: SyntheticExampleTargetsPerDirectorySpecPathsRequest,
 ) -> SyntheticTargetsSpecPaths:
     # Return all paths we have targets for.

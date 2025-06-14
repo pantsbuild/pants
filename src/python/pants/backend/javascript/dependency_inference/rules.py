@@ -146,7 +146,7 @@ def _create_inference_metadata(
 async def _prepare_inference_metadata(address: Address, file_path: str) -> InferenceMetadata:
     owning_pkg, maybe_config = await concurrently(
         find_owning_package(OwningNodePackageRequest(address)),
-        find_parent_ts_config(ParentTSConfigRequest(file_path, "jsconfig.json"), **implicitly()),
+        find_parent_ts_config(ParentTSConfigRequest(file_path), **implicitly()),
     )
     if not owning_pkg.target:
         return InferenceMetadata.javascript(

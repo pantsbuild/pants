@@ -108,7 +108,7 @@ class AsyncFieldMixin(Field):
 
 
         @rule
-        def hydrate_sources(request: HydrateSourcesRequest) -> HydratedSources:
+        async def hydrate_sources(request: HydrateSourcesRequest) -> HydratedSources:
             result = await Get(Snapshot, PathGlobs(request.field.value))
             request.field.validate_resolved_files(result.files)
             ...
@@ -1839,7 +1839,7 @@ class ValidNumbers(Enum):
         if num is None or self == self.all:  # type: ignore[comparison-overlap]
             return
         if self == self.positive_and_zero:  # type: ignore[comparison-overlap]
-            if num < 0:  # type: ignore[unreachable]
+            if num < 0:
                 raise InvalidFieldException(
                     f"The {repr(alias)} field in target {address} must be greater than or equal to "
                     f"zero, but was set to `{num}`."
@@ -2569,7 +2569,7 @@ class GenerateSourcesRequest:
             output = FortranSources
 
         @rule
-        def generate_fortran_from_avro(request: GenerateFortranFromAvroRequest) -> GeneratedSources:
+        async def generate_fortran_from_avro(request: GenerateFortranFromAvroRequest) -> GeneratedSources:
             ...
 
         def rules():
@@ -2845,7 +2845,7 @@ class InferDependenciesRequest(Generic[FS], EngineAwareParameter):
             infer_from = FortranDependenciesInferenceFieldSet
 
         @rule
-        def infer_fortran_dependencies(request: InferFortranDependencies) -> InferredDependencies:
+        async def infer_fortran_dependencies(request: InferFortranDependencies) -> InferredDependencies:
             hydrated_sources = await Get(HydratedSources, HydrateSources(request.field_set.sources))
             ...
             return InferredDependencies(...)

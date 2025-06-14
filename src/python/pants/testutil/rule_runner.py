@@ -6,6 +6,7 @@ from __future__ import annotations
 import atexit
 import dataclasses
 import functools
+import inspect
 import os
 import re
 import sys
@@ -753,9 +754,10 @@ def run_rule_with_mocks(
         if isinstance(res, Coroutine):
             # A call-by-name element in a concurrently() is a Coroutine whose frame is
             # the trampoline wrapper that creates and immediately awaits the Call.
-            assert res.cr_frame is not None
-            rule_id = res.cr_frame.f_locals["rule_id"]
-            args = res.cr_frame.f_locals["args"]
+            locals = inspect.getcoroutinelocals(res)
+            assert locals is not None
+            rule_id = locals["rule_id"]
+            args = locals["args"]
             mock_call = mock_calls.get(rule_id)
             if mock_call:
                 unconsumed_mock_calls.discard(rule_id)

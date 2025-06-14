@@ -672,7 +672,7 @@ class AllDockerImageTargets(Targets):
 
 
 @rule
-def all_docker_targets(all_targets: AllTargets) -> AllDockerImageTargets:
+async def all_docker_targets(all_targets: AllTargets) -> AllDockerImageTargets:
     return AllDockerImageTargets(
         [tgt for tgt in all_targets if tgt.has_field(DockerImageSourceField)]
     )
