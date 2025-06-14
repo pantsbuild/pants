@@ -56,6 +56,7 @@ target(
         "src/python/pants/backend/experimental/nfpm",
         "src/python/pants/backend/experimental/openapi",
         "src/python/pants/backend/experimental/openapi/codegen/java",
+        "src/python/pants/backend/experimental/openapi/codegen/python",
         "src/python/pants/backend/experimental/openapi/lint/openapi_format",
         "src/python/pants/backend/experimental/openapi/lint/spectral",
         "src/python/pants/backend/experimental/python",
