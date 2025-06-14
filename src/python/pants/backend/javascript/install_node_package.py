@@ -31,14 +31,13 @@ from pants.core.util_rules.source_files import (
     determine_source_files,
 )
 from pants.engine.internals.graph import transitive_targets
-from pants.engine.fs import CreateDigest, DigestContents, FileContent
+from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests
 from pants.engine.intrinsics import add_prefix, merge_digests
 from pants.engine.process import fallible_to_exec_result_or_raise
 from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.target import SourcesField, Target, TransitiveTargetsRequest
-from pants.engine.unions import UnionMembership, UnionRule
-from pants.engine.internals.selectors import Get
+from pants.engine.unions import UnionRule
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +45,6 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class InstalledNodePackageRequest:
     address: Address
-    include_typescript_sources: bool = False
 
 
 @dataclass(frozen=True)
@@ -76,20 +74,13 @@ class InstalledNodePackageWithSource(InstalledNodePackage):
 
 
 async def _get_relevant_source_files(
-    sources: Iterable[SourcesField], with_js: bool = False, with_ts: bool = False
+    sources: Iterable[SourcesField], with_js: bool = False
 ) -> SourceFiles:
-    # Import TypeScript fields only when needed to avoid circular dependency
-    ts_fields = ()
-    if with_ts:
-        from pants.backend.typescript.target_types import TypeScriptSourceField, TypeScriptTestSourceField
-        ts_fields = (TypeScriptSourceField, TypeScriptTestSourceField)
-    
     return await determine_source_files(
         SourceFilesRequest(
             sources,
             for_sources_types=(PackageJsonSourceField, FileSourceField)
-            + ((ResourceSourceField, JSRuntimeSourceField) if with_js else ())
-            + (ts_fields if with_ts else ()),
+            + ((ResourceSourceField, JSRuntimeSourceField) if with_js else ()),
             enable_codegen=True,
         )
     )
@@ -98,35 +89,19 @@ async def _get_relevant_source_files(
 @rule
 async def install_node_packages_for_address(
     req: InstalledNodePackageRequest,
-    union_membership: UnionMembership,
-    nodejs: nodejs.NodeJS,
 ) -> InstalledNodePackage:
-    logger.info(f"DEBUG: About to install packages for address {req.address}")
-    
     project_env = await get_nodejs_environment(NodeJSProjectEnvironmentRequest(req.address))
     target = project_env.ensure_target()
     transitive_tgts = await transitive_targets(
         TransitiveTargetsRequest([target.address]), **implicitly()
     )
     
-    # Check if this is coming from TypeScript tool
-    logger.info(f"DEBUG: Checking if this is a TypeScript tool that needs TypeScript sources during installation")
-    logger.info(f"DEBUG: include_typescript_sources = {req.include_typescript_sources} (options_scope = {getattr(req, 'options_scope', 'unknown')})")
-
     source_files = await _get_relevant_source_files(
         (tgt[SourcesField] for tgt in transitive_tgts.closure if tgt.has_field(SourcesField)),
         with_js=False,
-        with_ts=req.include_typescript_sources,
     )
     package_digest = source_files.snapshot.digest
-    
-    # Log what files are in the package digest before installation
-    digest_contents = await Get(DigestContents, Digest, package_digest)
-    logger.info(f"DEBUG: Files in package_digest before pnpm install ({len(digest_contents)} files):")
-    for file_content in sorted(digest_contents, key=lambda f: f.path):
-        logger.info(f"DEBUG:   {file_content.path}")
 
-    # Single installation with inject-workspace-packages flag
     install_result = await fallible_to_exec_result_or_raise(
         **implicitly(
             NodeJsProjectEnvironmentProcess(
@@ -138,29 +113,6 @@ async def install_node_packages_for_address(
             )
         )
     )
-    
-    logger.info(f"DEBUG: pnpm install with inject-workspace-packages completed")
-    
-    # Log pnpm install output
-    logger.info(f"DEBUG: pnpm install stdout:\n{install_result.stdout.decode()}")
-    logger.info(f"DEBUG: pnpm install stderr:\n{install_result.stderr.decode()}")
-    
-    # Check what's in the output digest
-    output_contents = await Get(DigestContents, Digest, install_result.output_digest)
-    logger.info(f"DEBUG: Files in output_digest after pnpm install ({len(output_contents)} files)")
-    workspace_files = [f for f in output_contents if '@pants-example' in f.path or 'workspace' in f.path.lower()]
-    logger.info(f"DEBUG: Workspace-related files found: {len(workspace_files)}")
-    for file_content in sorted(workspace_files, key=lambda f: f.path):
-        logger.info(f"DEBUG:   {file_content.path}")
-    
-    # Also check for symlinks or @pants-example directories
-    node_modules_files = [f for f in output_contents if f.path.startswith('node_modules/') and not f.path.startswith('node_modules/.')]
-    pants_example_files = [f for f in node_modules_files if 'pants-example' in f.path]
-    logger.info(f"DEBUG: Direct node_modules entries: {len(node_modules_files)}")
-    logger.info(f"DEBUG: @pants-example entries: {len(pants_example_files)}")
-    if len(pants_example_files) > 0:
-        for f in pants_example_files[:10]:
-            logger.info(f"DEBUG:   Found: {f.path}")
     
     node_modules = await add_prefix(AddPrefix(install_result.output_digest, project_env.root_dir))
 
@@ -189,7 +141,6 @@ async def add_sources_to_installed_node_package(
     source_files = await _get_relevant_source_files(
         (tgt[SourcesField] for tgt in transitive_tgts.dependencies if tgt.has_field(SourcesField)),
         with_js=True,
-        with_ts=req.include_typescript_sources,
     )
     digest = await merge_digests(MergeDigests((installation.digest, source_files.snapshot.digest)))
     return InstalledNodePackageWithSource(installation.project_env, digest=digest)

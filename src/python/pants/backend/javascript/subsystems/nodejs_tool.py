@@ -170,12 +170,6 @@ async def _run_tool_without_resolve(request: NodeJSToolRequest) -> Process:
 
 
 async def _run_tool_with_resolve(request: NodeJSToolRequest, resolve: str) -> Process:
-    import logging
-    logger = logging.getLogger(__name__)
-    
-    # DEBUG: Log what we're about to do
-    logger.info(f"DEBUG: _run_tool_with_resolve called for resolve '{resolve}'")
-    logger.info(f"DEBUG: request.input_digest has request available, but not used for installation yet")
     
     resolves = await resolve_to_projects(**implicitly())
 
@@ -191,27 +185,13 @@ async def _run_tool_with_resolve(request: NodeJSToolRequest, resolve: str) -> Pr
     package_for_resolve = all_first_party[resolve]
     project = resolves[resolve]
     
-    # DEBUG: Log before installation 
-    logger.info(f"DEBUG: About to install packages for address {package_for_resolve.address}")
-    logger.info(f"DEBUG: Checking if this is a TypeScript tool that needs TypeScript sources during installation")
-    
-    # Check if this is a TypeScript tool that needs TypeScript sources during installation
-    include_typescript_sources = request.options_scope == "typescript"
-    logger.info(f"DEBUG: include_typescript_sources = {include_typescript_sources} (options_scope = {request.options_scope})")
-    
     installed = await install_node_packages_for_address(
-        InstalledNodePackageRequest(
-            package_for_resolve.address, 
-            include_typescript_sources=include_typescript_sources
-        ), 
+        InstalledNodePackageRequest(package_for_resolve.address), 
         **implicitly()
     )
-    # DEBUG: Log what's happening with the merge
     merged_input_digest = await merge_digests(
         MergeDigests([request.input_digest, installed.digest])
     )
-    logger.info(f"DEBUG: Merged input_digest with installed.digest for execution")
-    logger.info(f"DEBUG: This merged digest should now have both source files AND installed packages")
     
     # Add system binaries to PATH for tools that need them (like uname for TypeScript)
     extra_env_with_path = {
