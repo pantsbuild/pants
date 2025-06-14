@@ -374,30 +374,68 @@ enableGlobalCache: false
 **Workaround**: Use Yarn 1.22.22 (Classic) which is fully supported and provides identical functionality.
 
 
-### Phase 2: Workspace and Cross-Package Dependencies
+### Phase 2: Dynamic Project Resolution and Generic TypeScript Check
 
-**Goal**: Handle monorepo scenarios with package dependencies generically
+**Goal**: Remove hard-coded project paths and make TypeScript check work with any targets/projects
+
+**Current Issue**: TypeScript check implementation hard-codes `src/python/pants/backend/typescript/examples/**/` paths, making it only work with the examples directory.
+
+**Target Flow**:
+1. **Target Analysis**: Given input targets (e.g., `pants check src/my-app::`), determine which TypeScript sources need checking
+2. **Project Discovery**: Identify which NodeJS projects/resolves contain the target sources
+3. **Workspace Resolution**: For each project, determine the complete workspace scope needed for type checking
+4. **Execution**: Run TypeScript check on the complete workspace(s) with proper dependency resolution
+5. **Result Aggregation**: Collect and report results from all checked projects
 
 **Tasks**:
-1. **Dependency resolution**
-   - Extend existing import analysis to understand workspace package imports (moved from Phase 1)
-   - Ensure `@pants-example/common-types` imports resolve to correct targets
-   - Handle `node_modules` resolution for external packages
+1. **Remove Hard-Coded Paths**
+   - Replace hard-coded `examples/**/` glob patterns with dynamic target-based source discovery
+   - Use target source files to determine workspace root and project boundaries
+   - Implement project detection logic based on `package.json` and `tsconfig.json` locations
 
-2. **Multi-package compilation context**
-   - Determine when to include multiple packages in single `tsc` invocation
-   - Handle TypeScript project references in compilation
-   - Manage `node_modules` and workspace linking
+2. **Project-to-Resolve Mapping**
+   - Given TypeScript target sources, determine which NodeJS resolve they belong to
+   - Group targets by their containing project/resolve
+   - Ensure each project is type-checked as a complete unit (with all workspace dependencies)
 
-3. **Configuration handling**
-   - Read and merge `tsconfig.json` configurations
-   - Handle `extends` and project references
-   - Respect compiler options and path mappings
+3. **Dynamic Workspace Discovery**
+   - From target files, discover the workspace root (where root `package.json`/`tsconfig.json` exists)
+   - Identify all workspace packages that need to be included for cross-package type resolution
+   - Build complete source file list dynamically based on workspace configuration
+
+4. **Configuration Path Resolution**
+   - Dynamically locate `tsconfig.json`, `package.json`, and workspace config files
+   - Support multiple project layouts (not just the examples structure)
+   - Handle relative path resolution for project references and extends
+
+**Implementation Strategy**:
+- Leverage existing NodeJS project detection from JavaScript backend
+- Use target source paths to infer project structure
+- Build on existing `TSConfig` parsing but make it target-driven
+- Maintain workspace-level type checking (don't regress to file-by-file checking)
 
 **Acceptance Criteria**:
-- `pants check examples/main-app::` works with cross-package imports
-- Workspace package dependencies are resolved
-- TypeScript configuration is properly applied
+- ✅ `pants check path/to/any-typescript-project::` works (not just examples)
+- ✅ Cross-package imports resolve correctly in any workspace structure  
+- ✅ TypeScript configuration is discovered and applied dynamically
+- ✅ Multiple targets from same project are batched into single type check execution
+- ✅ No hard-coded paths remain in implementation
+
+**Out of Scope for Phase 2**:
+- Multiple resolve/project support (will be addressed later with updated examples)
+- Performance optimization across projects
+- Complex project reference scenarios
+
+**Expected Architecture After Phase 2**:
+```python
+# Target sources → Project discovery → Workspace resolution → Type checking
+targets = [typescript_target1, typescript_target2, ...]
+projects = discover_typescript_projects(targets)
+for project in projects:
+    workspace_sources = discover_workspace_sources(project)
+    workspace_config = discover_workspace_config(project) 
+    typecheck_result = run_typescript_check(workspace_sources, workspace_config)
+```
 
 ### Phase 3: Performance and Optimization
 
