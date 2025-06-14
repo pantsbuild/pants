@@ -46,7 +46,7 @@ class PythonFormatStringTarget(Target):
 
 
 class PythonFormatStringsSourcesField(MultipleSourcesField):
-    pass
+    help = "See k8s backend documentatiom."
 
 
 class PythonFormatStringTargetGenerator(TargetFilesGenerator):
