@@ -4,8 +4,5 @@ packages:
   - 'shared-components'
   - 'main-app'
 nodeLinker: hoisted
-symlink: true
-hoistWorkspacePackages: true
 publicHoistPattern:
   - "*"
-shamefullyHoist: true

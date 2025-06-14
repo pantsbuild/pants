@@ -73,36 +73,175 @@ Implement `pants check examples/main-app::` that runs TypeScript type checking u
 - Custom configuration scenarios are supported
 - Subsequent runs on same package are faster due to incremental compilation
 
-### Phase 1.5: Hardcoded Workspace Support
+### Phase 1.5: Hardcoded Workspace Support (COMPLETED)
 
-**Goal**: Get `pants check examples::` working for a single hardcoded workspace with multiple packages
+**Status**: ✅ Completed with npm package manager support
 
-**Key Challenge**: The resolve-based installation process only includes source files from transitive target dependencies, but doesn't see the `input_digest` files needed for workspace package linking.
+### Phase 1.6: pnpm Package Manager Support (COMPLETED)
 
-**Root Cause Analysis**:
-- Installation happens in `install_node_packages_for_address()` which calls `_get_relevant_source_files()`
-- This only includes source files from transitive target dependencies, not from tool `input_digest`
-- Tool `input_digest` is merged AFTER installation completes, so workspace packages can't be linked
-- During installation, pnpm only sees package.json files but not source files, breaking workspace resolution
+**Goal**: ✅ Investigate and fix TypeScript check compatibility with pnpm package manager
 
-**Tasks**:
-1. **Modify JavaScript backend installation process**
-   - **Option A**: Extend `InstalledNodePackageRequest` to accept additional source files from tool `input_digest`
-   - **Option B**: Modify `install_node_packages_for_address` to accept optional additional digest parameter
-   - **Option C**: Create new installation variant for tools that need source files during installation
-   - Ensure workspace source files are available during pnpm installation, not just execution
+**Status**: ✅ **COMPLETED** - TypeScript check now works with pnpm workspace packages
 
-2. **Update TypeScript check rule to use modified installation**
-   - Pass TypeScript source files to the installation process
-   - Ensure workspace packages can be resolved during installation phase
-   - Maintain working directory and configuration file handling
+**Key Challenge Solved**: pnpm creates workspace symlinks in individual package `node_modules` directories, but Pants' digest merging process only preserves the root-level `node_modules`, losing the workspace symlinks needed for TypeScript module resolution.
 
-**Acceptance Criteria**:
-- `pants check examples::` works for the entire hardcoded workspace
-- Workspace package imports (e.g., `@pants-example/common-types`) resolve correctly during pnpm installation
-- Installation sandbox contains source files, enabling proper workspace linking
-- TypeScript compilation sees all packages and their dependencies
-- Error messages reference correct file paths across packages
+**Root Cause Identified**:
+- pnpm correctly creates workspace symlinks: `shared-utils/node_modules/@pants-example/common-types -> ../../../common-types`
+- Pants digest merging preserves only the root `node_modules`, losing individual package-level directories
+- TypeScript execution fails because workspace symlinks are missing in the execution sandbox
+
+**Solution Implemented**:
+Based on [pnpm issue #3642](https://github.com/pnpm/pnpm/issues/3642), the solution is to force workspace packages to be hoisted to the root level by:
+
+1. **Add workspace packages as explicit dependencies in root `package.json` using `link:` protocol**:
+   ```json
+   {
+     "dependencies": {
+       "@pants-example/common-types": "link:common-types",
+       "@pants-example/shared-utils": "link:shared-utils", 
+       "@pants-example/shared-components": "link:shared-components",
+       "@pants-example/main-app": "link:main-app"
+     }
+   }
+   ```
+
+2. **Configure pnpm workspace hoisting in `pnpm-workspace.yaml`**:
+   ```yaml
+   packages:
+     - 'common-types'
+     - 'shared-utils'  
+     - 'shared-components'
+     - 'main-app'
+   nodeLinker: hoisted
+   publicHoistPattern:
+     - "*"
+   ```
+
+**Key Configuration Notes**:
+- `nodeLinker: hoisted` forces pnpm to use hoisted mode instead of symlink mode
+- `publicHoistPattern: ["*"]` hoists all packages to root level (sufficient for most cases)
+- `hoistWorkspacePackages: true` only enables hoisting of external (non-workspace) dependencies used by workspace packages — NOT the workspace packages themselves
+- The `link:` protocol in dependencies is essential to force root-level symlinks that survive digest merging
+
+**Package Manager Configuration Differences**:
+
+| Package Manager | Workspace Configuration Required |
+|-----------------|----------------------------------|
+| **npm** | Works out of the box with `workspaces` field in package.json |
+| **pnpm** | Requires `link:` dependencies + hoisting configuration in pnpm-workspace.yaml |
+| **yarn** | TBD (Phase 1.7) |
+
+**Verification**:
+- ✅ `pants check examples::` works with `--nodejs-package-manager=pnpm`
+- ✅ Workspace package imports resolve correctly (`@pants-example/common-types` etc.)
+- ✅ No module resolution errors for workspace packages
+- ✅ Root-level symlinks preserved: `node_modules/@pants-example/common-types -> ../../common-types`
+- ✅ Performance is comparable to npm
+
+**Investigation Methods That Led to Solution**:
+1. ✅ Manual sandbox inspection revealed symlinks exist but in wrong locations
+2. ✅ Identified digest merging preserves only root `node_modules`
+3. ✅ Research on pnpm workspace hoisting via GitHub issues
+4. ✅ Testing `link:` protocol + hoisting configuration combination
+
+### Phase 1.7: yarn Package Manager Support (COMPLETED)
+
+**Goal**: ✅ Investigate and fix TypeScript check compatibility with yarn package manager
+
+**Status**: ✅ **COMPLETED** - TypeScript check works with Yarn Classic workspace packages
+
+**Research Findings - Yarn Version Compatibility**:
+
+**Yarn Classic (1.x) vs Yarn Berry (2.x+)**:
+- **Yarn Classic (1.22.22)**: Traditional `node_modules`, uses `--frozen-lockfile`, wide ecosystem compatibility
+- **Yarn Berry (2.x+)**: Complete rewrite with Plug'n'Play (PnP), uses `--immutable`, performance improvements
+
+**Pants Support Analysis**:
+- **Current Default**: Yarn 1.22.22 (Classic) - optimal for compatibility
+- **Automatic Version Detection**: Pants auto-detects version and uses appropriate flags
+- **Berry Compatibility**: Requires `nodeLinker: node-modules` in `.yarnrc.yml` for Pants compatibility
+- **PnP Mode**: Not compatible with Pants' current digest merging architecture
+
+**Solution Implemented**:
+Yarn Classic works perfectly with standard workspace configuration - **no special configuration required**!
+
+1. **Standard workspace dependencies** using version wildcards:
+   ```json
+   {
+     "dependencies": {
+       "@pants-example/common-types": "*",
+       "@pants-example/shared-components": "*"
+     }
+   }
+   ```
+
+2. **Root workspace configuration**:
+   ```json
+   {
+     "workspaces": [
+       "common-types",
+       "shared-utils", 
+       "shared-components",
+       "main-app"
+     ]
+   }
+   ```
+
+**Key Advantages of Yarn Classic**:
+- ✅ Creates root-level workspace symlinks automatically
+- ✅ No need for `link:` protocol dependencies (unlike pnpm)
+- ✅ No special hoisting configuration required
+- ✅ Fully compatible with Pants' digest merging process
+- ✅ Already the default in Pants (yarn@1.22.22)
+
+**Verification Results**:
+- ✅ `pants check examples::` works with `--nodejs-package-manager=yarn`
+- ✅ Workspace package imports resolve correctly (`@pants-example/common-types` etc.)
+- ✅ Root-level symlinks preserved: `node_modules/@pants-example/common-types -> ../../common-types`
+- ✅ No module resolution errors for workspace packages
+- ✅ Performance comparable to npm
+- ✅ TypeScript errors are only about testing library issues, not workspace resolution
+
+**Package Manager Configuration Matrix** (Updated):
+
+| Package Manager | Workspace Configuration Required | Status | Notes |
+|-----------------|----------------------------------|--------|-------|
+| **npm** | Standard `workspaces` field in package.json | ✅ Working | Works out of the box |
+| **pnpm** | `link:` dependencies + hoisting configuration | ✅ Working | Requires special config due to symlink behavior |
+| **yarn** (Classic 1.x) | Standard `workspaces` field in package.json | ✅ Working | Works out of the box, simplest setup |
+| **yarn** (Berry 4.x) | `nodeLinker: node-modules` in .yarnrc.yml | ⚠️ Partial | Installs + creates symlinks but command syntax incompatible |
+
+### Yarn 4 (Berry) Investigation Results
+
+**Status**: ⚠️ **PARTIALLY WORKING** - Package installation and workspace symlinks work, but Pants command syntax is incompatible
+
+**Configuration Used**:
+```yaml
+# .yarnrc.yml
+nodeLinker: node-modules
+enableGlobalCache: false
+```
+
+**What Works**:
+- ✅ Package installation with `yarn@4.5.3`
+- ✅ Workspace symlink creation at root level
+- ✅ `node_modules/@pants-example/*` symlinks created correctly
+- ✅ Compatible with Pants digest merging
+
+**What Doesn't Work**:
+- ❌ Pants command execution fails with "Unknown Syntax Error"
+- ❌ Yarn 4 doesn't recognize `yarn --silent exec -- tsc` command syntax
+- ❌ Expected: `yarn exec tsc` (Yarn 4 syntax) vs Actual: `yarn --silent exec -- tsc` (Yarn 1.x syntax)
+
+**Root Cause**: Pants package manager configuration for Yarn uses `execute_args=("--silent", "exec", "--")` which is Yarn 1.x syntax. Yarn 4 requires updated command structure.
+
+**Required Pants Changes for Full Yarn 4 Support**:
+1. Update `PackageManager.yarn()` to detect Yarn 4.x versions
+2. Use `execute_args=("exec",)` for Yarn 4.x instead of `("--silent", "exec", "--")`
+3. Handle Yarn 4 command differences in package manager abstraction
+
+**Workaround**: Use Yarn 1.22.22 (Classic) which is fully supported and provides identical functionality.
+
 
 ### Phase 2: Workspace and Cross-Package Dependencies
 

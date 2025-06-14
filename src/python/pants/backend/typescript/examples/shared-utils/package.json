@@ -5,13 +5,18 @@
   "main": "./src/index.ts",
   "private": true,
   "type": "module",
+  "dependencies": {
+    "@pants-example/common-types": "*"
+  },
   "scripts": {
     "test": "jest"
   },
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "node",
-    "extensionsToTreatAsEsm": [".ts"],
+    "extensionsToTreatAsEsm": [
+      ".ts"
+    ],
     "moduleNameMapper": {
       "^(\\.{1,2}/.*)\\.js$": "$1"
     }

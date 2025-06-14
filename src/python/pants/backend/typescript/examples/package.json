@@ -4,11 +4,11 @@
   "description": "TypeScript monorepo example for Pants",
   "private": true,
   "type": "module",
-  "packageManager": "npm@10.9.2",
+  "packageManager": "yarn@1.22.22",
   "workspaces": [
     "common-types",
     "shared-utils",
-    "shared-components", 
+    "shared-components",
     "main-app"
   ],
   "engines": {
@@ -28,5 +28,8 @@
     "test": "jest",
     "type-check": "tsc --noEmit",
     "format": "prettier --write ."
+  },
+  "dependencies": {
+    "@testing-library/dom": "^10.4.0"
   }
 }

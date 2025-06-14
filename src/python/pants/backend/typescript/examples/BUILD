@@ -6,7 +6,6 @@ package_json(dependencies=[
     ":jest_config", 
     ":jest_setup", 
     ":tsconfig",
-    ":package_lock",
     # Include all package targets to get their tsconfig.json files
     "./common-types:common-types",
     "./main-app:main-app",
@@ -22,7 +21,6 @@ package_json(dependencies=[
 ])
 
 file(name="pnpm_workspace", source="pnpm-workspace.yaml")
-file(name="package_lock", source="package-lock.json")
 file(name="jest_config", source="jest.config.js")
 file(name="jest_setup", source="jest-setup.ts")
 file(name="tsconfig", source="tsconfig.json")

@@ -6,6 +6,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@pants-example/common-types": "*",
     "react": "^19.1.0"
   },
   "devDependencies": {
@@ -20,8 +21,13 @@
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "jsdom",
-    "setupFilesAfterEnv": ["@testing-library/jest-dom"],
-    "extensionsToTreatAsEsm": [".ts", ".tsx"],
+    "setupFilesAfterEnv": [
+      "@testing-library/jest-dom"
+    ],
+    "extensionsToTreatAsEsm": [
+      ".ts",
+      ".tsx"
+    ],
     "moduleNameMapper": {
       "^(\\.{1,2}/.*)\\.js$": "$1"
     },
@@ -33,9 +39,12 @@
       "/dist/"
     ],
     "transform": {
-      "^.+\\.(ts|tsx)$": ["ts-jest", {
-        "useESM": true
-      }]
+      "^.+\\.(ts|tsx)$": [
+        "ts-jest",
+        {
+          "useESM": true
+        }
+      ]
     }
   }
 }
