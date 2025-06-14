@@ -211,6 +211,137 @@ Yarn Classic works perfectly with standard workspace configuration - **no specia
 | **yarn** (Classic 1.x) | Standard `workspaces` field in package.json | ✅ Working | Works out of the box, simplest setup |
 | **yarn** (Berry 4.x) | `nodeLinker: node-modules` in .yarnrc.yml | ⚠️ Partial | Installs + creates symlinks but command syntax incompatible |
 
+### Phase 1.8: Source Code Installation Requirements (COMPLETED)
+
+**Goal**: ✅ Investigate if source code can be removed from installation sandbox to simplify implementation
+
+**Status**: ✅ **COMPLETED** - Confirmed that source code must be included in the installation sandbox
+
+**Key Finding**: TypeScript requires source files to be present in the execution sandbox, even with proper `node_modules` symlinks.
+
+**Investigation Results**:
+- ❌ **Without source code**: TypeScript fails with `error TS18003: No inputs were found in config file`
+- ✅ **With source code**: TypeScript compilation proceeds normally (may still have dependency resolution issues)
+
+**Root Cause**: TypeScript reads the `include` paths from `tsconfig.json` (e.g., `["src/**/*"]`) and expects to find actual source files at those locations. The `node_modules` symlinks handle dependency resolution but cannot replace the need for source files.
+
+**Implementation Impact**: 
+- The current approach of including all workspace source files in the input digest is **correct and necessary**
+- Cannot simplify by relying only on `node_modules` symlinks for TypeScript execution
+- Source file inclusion is fundamental to TypeScript's compilation model
+
+**Technical Details**:
+- Config-only sandbox: Contains `tsconfig.json`, `package.json`, and `node_modules` but no `.ts`/`.tsx` files
+- TypeScript error: Cannot find any inputs matching the `include` patterns in configuration
+- Execution sandbox structure confirmed via `--keep-sandboxes=always` inspection
+
+### Phase 1.9: JavaScript Backend Modifications Cleanup (COMPLETED)
+
+**Goal**: ✅ Remove temporary `include_typescript_sources` modifications from JavaScript backend
+
+**Status**: ✅ **COMPLETED** - Successfully removed all temporary debugging modifications
+
+**Key Finding**: The temporary modifications added to the JavaScript backend during pnpm debugging are **no longer needed** and have been safely removed.
+
+**Modifications Removed**:
+1. **`InstalledNodePackageRequest.include_typescript_sources`** parameter (nodejs_tool.py:190, install_node_package.py:49)
+2. **TypeScript source inclusion logic** in `_get_relevant_source_files()` (install_node_package.py:82-85)
+3. **Debug logging** from installation and tool execution (install_node_package.py:112-164, nodejs_tool.py:185-191)
+4. **Unused imports and parameters** cleanup (install_node_package.py:34, 41, 92-94)
+
+**Why These Can Be Removed**:
+- TypeScript check rule provides source files directly via `all_workspace_sources` glob
+- JavaScript backend only needs to provide `node_modules` with package dependencies and symlinks
+- Clear separation of concerns: JS backend handles installation, TS backend handles source inclusion
+- Both parts work together without coupling through the installation system
+
+**Architecture Validation**:
+- ✅ TypeScript check continues to work with same functionality
+- ✅ Package manager compatibility (npm, pnpm, Yarn Classic) maintained
+- ✅ Workspace symlink resolution still works
+- ✅ Clean separation between installation and source file management
+
+**Result**: The JavaScript backend is now restored to its clean state while the TypeScript check implementation handles all TypeScript-specific requirements independently.
+
+## Test Coverage Analysis and Gaps
+
+### Current Test Coverage Status
+
+**JavaScript Backend (`nodejs_tool_test.py`)**:
+- ✅ Package manager command generation (npm, yarn, pnpm)
+- ✅ Version configuration and overrides
+- ✅ Resolve-based tool execution basic functionality
+- ✅ Binary name override (e.g., typescript package → tsc binary)
+
+**TypeScript Backend**:
+- ✅ TSConfig parsing and extends resolution (`tsconfig_test.py`)
+- ❌ **Missing**: TypeScript check rule integration tests
+- ❌ **Missing**: Workspace package resolution tests
+- ❌ **Missing**: Package manager compatibility tests
+
+### Critical Test Gaps Identified
+
+1. **Input Digest Pass-Through Not Tested**:
+   - All existing `nodejs_tool_test.py` tests use `EMPTY_DIGEST`
+   - No verification that `request.input_digest` is properly included in `Process.input_digest`
+   - **Root Cause**: This gap allowed the missing `input_digest` merge bug to go undetected
+
+2. **Resolve-Based Execution With Custom Input**:
+   - Missing tests for `_run_tool_with_resolve()` with non-empty input digests
+   - No verification of the critical merge: `merge_digests([request.input_digest, installed.digest])`
+   - No tests ensuring both source files AND installed packages are present in execution
+
+3. **TypeScript Check Integration**:
+   - No end-to-end tests for `pants check` on TypeScript code
+   - No tests for workspace package resolution (e.g., `@pants-example/common-types` imports)
+   - No tests verifying package manager compatibility (npm, pnpm, yarn) with TypeScript check
+
+4. **Package Manager Workspace Scenarios**:
+   - Missing tests for pnpm `link:` protocol workspace dependencies
+   - Missing tests for Yarn Classic workspace resolution
+   - Missing tests for npm workspace compatibility
+
+### Recommended Test Additions (Future Work)
+
+**Phase A: Core Infrastructure Tests**
+```python
+# nodejs_tool_test.py additions
+def test_tool_request_preserves_input_digest()
+def test_resolve_based_execution_merges_input_and_installation()
+def test_input_digest_with_custom_files()
+```
+
+**Phase B: TypeScript Check Integration Tests**  
+```python
+# check_test.py (new file)
+def test_typescript_check_basic_compilation()
+def test_typescript_check_with_workspace_packages()
+def test_typescript_check_npm_package_manager()
+def test_typescript_check_pnpm_package_manager()
+def test_typescript_check_yarn_package_manager()
+def test_typescript_check_workspace_symlink_resolution()
+```
+
+**Phase C: Error Handling and Edge Cases**
+```python
+def test_typescript_check_missing_dependencies()
+def test_typescript_check_invalid_workspace_config()
+def test_typescript_check_cross_package_type_errors()
+```
+
+### Why These Tests Matter
+
+- **Prevent Regressions**: The `input_digest` merge bug would have been caught with proper test coverage
+- **Validate Package Manager Compatibility**: Ensure npm, pnpm, and Yarn Classic continue working
+- **Document Expected Behavior**: Tests serve as executable documentation for workspace resolution
+- **Enable Confident Refactoring**: Comprehensive tests allow safe architectural improvements
+
+### Test Implementation Priority
+
+1. **High Priority**: `input_digest` pass-through tests (prevent critical bugs)
+2. **Medium Priority**: TypeScript check integration tests (validate core functionality)  
+3. **Low Priority**: Edge case and error handling tests (polish and robustness)
+
 ### Yarn 4 (Berry) Investigation Results
 
 **Status**: ⚠️ **PARTIALLY WORKING** - Package installation and workspace symlinks work, but Pants command syntax is incompatible
