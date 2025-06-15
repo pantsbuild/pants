@@ -1038,15 +1038,13 @@ class BootstrapOptions:
         default=True,
         help=softwrap(
             """
-            Include patterns from `.gitignore`, `.git/info/exclude`, and the global gitignore
+            Include patterns from `.gitignore` files, `.git/info/exclude`, and the global gitignore
             files in the option `[GLOBAL].pants_ignore`, which is used for Pants to ignore
             filesystem operations on those patterns.
 
             Patterns from `[GLOBAL].pants_ignore` take precedence over these files' rules. For
             example, you can use `!my_pattern` in `pants_ignore` to have Pants operate on files
             that are gitignored.
-
-            Warning: this does not yet support reading nested gitignore files.
             """
         ),
     )

@@ -5,6 +5,7 @@ pub mod directory;
 #[cfg(test)]
 mod directory_tests;
 pub mod gitignore;
+pub mod gitignore_stack;
 mod glob_matching;
 #[cfg(test)]
 mod glob_matching_tests;
@@ -35,6 +36,7 @@ pub use crate::gitignore::GitignoreStyleExcludes;
 pub use crate::glob_matching::{
     DOUBLE_STAR_GLOB, FilespecMatcher, GlobMatching, PathGlob, PreparedPathGlobs, SINGLE_STAR_GLOB,
 };
+use crate::gitignore_stack::GitignoreStack;
 #[cfg(unix)]
 use crate::posixfs::PosixFS;
 
@@ -189,6 +191,25 @@ pub struct Link {
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Dir(pub PathBuf);
 
+impl Dir {
+    pub fn parent(&self) -> Option<Dir> {
+        self.0.parent().map(|p| Dir(p.to_path_buf()))
+    }
+}
+
+impl Deref for Dir {
+    type Target = PathBuf;
+    fn deref(&self) -> &PathBuf {
+        &self.0
+    }
+}
+
+impl AsRef<Path> for Dir {
+    fn as_ref(&self) -> &Path {
+        &self.0
+    }
+}
+
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct File {
     pub path: PathBuf,
@@ -279,7 +300,7 @@ pub struct PathMetadata {
 }
 
 #[derive(Debug, DeepSizeOf, Eq, PartialEq)]
-pub struct DirectoryListing(pub Vec<Stat>);
+pub struct DirectoryListing(pub Vec<Stat>, pub GitignoreStack);
 
 #[derive(Debug, DeepSizeOf, Clone, Eq, Hash, PartialEq)]
 pub enum StrictGlobMatching {
@@ -449,6 +470,7 @@ impl Vfs<String> for DigestTrie {
                     directory::Entry::Directory(d) => Stat::Dir(Dir(d.name().as_ref().into())),
                 })
                 .collect(),
+            GitignoreStack::empty(),
         )))
     }
 

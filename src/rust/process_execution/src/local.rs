@@ -14,6 +14,7 @@ use std::time::Instant;
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use deepsize::DeepSizeOf;
+use fs::gitignore_stack::GitignoreStack;
 use fs::{
     self, DigestTrie, DirectoryDigest, EMPTY_DIRECTORY_DIGEST, GlobExpansionConjunction,
     GlobMatching, PathGlobs, Permissions, RelativePath, StrictGlobMatching, SymlinkBehavior,
@@ -472,13 +473,9 @@ pub trait CapturedWorkdir {
             };
             // Use no ignore patterns, because we are looking for explicitly listed paths.
             let fs = Arc::new(
-                fs::FS::new(root, fs::GitignoreStyleExcludes::empty(), executor.clone()).map_err(
-                    |err| {
-                        format!(
-                            "Error making fs to fetch local process execution output files: {err}"
-                        )
-                    },
-                )?,
+                fs::FS::new(root, GitignoreStack::empty(), executor.clone()).map_err(|err| {
+                    format!("Error making fs to fetch local process execution output files: {err}")
+                })?,
             );
             CommandRunner::construct_output_snapshot(
                 store.clone(),

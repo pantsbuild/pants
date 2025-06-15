@@ -139,6 +139,12 @@ pub struct Session {
     state: Arc<SessionState>,
 }
 
+#[derive(Clone, Debug)]
+pub struct WeakSession {
+    handle: Weak<SessionHandle>,
+    state: Weak<SessionState>,
+}
+
 impl Session {
     pub fn new(
         core: Arc<Core>,
@@ -384,6 +390,13 @@ impl Session {
     pub fn tail_tasks(&self) -> TailTasks {
         self.state.tail_tasks.clone()
     }
+
+    pub fn downgrade(&self) -> WeakSession {
+        WeakSession {
+            handle: Arc::downgrade(&self.handle),
+            state: Arc::downgrade(&self.state),
+        }
+    }
 }
 
 ///
@@ -489,5 +502,13 @@ impl Sessions {
 impl Drop for Sessions {
     fn drop(&mut self) {
         self.signal_task_handle.abort();
+    }
+}
+
+impl WeakSession {
+    pub fn upgrade(&self) -> Option<Session> {
+        self.handle
+            .upgrade()
+            .and_then(|handle| self.state.upgrade().map(|state| Session { handle, state }))
     }
 }

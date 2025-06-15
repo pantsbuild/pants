@@ -10,6 +10,7 @@ use testutil::data::TestDirectory;
 use testutil::make_file;
 
 use crate::{OneOffStoreFileByDigest, RelativePath, Snapshot, SnapshotOps, Store, StoreError};
+use fs::gitignore_stack::GitignoreStack;
 use fs::{
     Dir, DirectoryDigest, FS, File, GitignoreStyleExcludes, GlobExpansionConjunction, GlobMatching,
     PathGlobs, PathStat, StrictGlobMatching, SymlinkBehavior,
@@ -31,7 +32,14 @@ pub fn setup() -> (Store, tempfile::TempDir, Arc<FS>, OneOffStoreFileByDigest) {
     .unwrap();
     let dir = tempfile::Builder::new().prefix("root").tempdir().unwrap();
     let ignorer = GitignoreStyleExcludes::create(vec![]).unwrap();
-    let fs = Arc::new(FS::new(dir.path(), ignorer, executor).unwrap());
+    let fs = Arc::new(
+        FS::new(
+            dir.path(),
+            GitignoreStack::root(ignorer.clone(), ignorer, false),
+            executor,
+        )
+        .unwrap(),
+    );
     let file_saver = OneOffStoreFileByDigest::new(store.clone(), fs.clone(), true);
     (store, dir, fs, file_saver)
 }

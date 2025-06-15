@@ -42,12 +42,12 @@ def test_restartable(use_pantsd: bool) -> None:
     with temporary_workdir() as workdir:
         client_handle = run_pants_with_workdir_without_waiting(
             [
-                "--backend-packages=['pants.backend.python']",
                 "run",
                 f"{dirname}:bin",
             ],
             workdir=workdir,
             use_pantsd=use_pantsd,
+            hermetic=False,
         )
 
         # The process shouldn't exit on its own.
@@ -97,12 +97,12 @@ def test_non_restartable(use_pantsd: bool) -> None:
     with temporary_workdir() as workdir:
         client_handle = run_pants_with_workdir_without_waiting(
             [
-                "--backend-packages=['pants.backend.python']",
                 "run",
                 str(dirname / "script.py"),
             ],
             workdir=workdir,
             use_pantsd=use_pantsd,
+            hermetic=False,
         )
 
         # Check that the pants run has actually started.
