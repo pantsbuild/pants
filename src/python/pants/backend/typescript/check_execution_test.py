@@ -419,3 +419,60 @@ def test_typescript_check_test_files(rule_runner: RuleRunner, typescript_lockfil
     assert result.exit_code == 0
     assert "error" not in result.stdout.lower()
 
+
+def test_typescript_check_cross_project_imports(rule_runner: RuleRunner, typescript_lockfile: dict[str, str]) -> None:
+    """Test that cross-project imports fail as expected (projects are compiled in isolation)."""
+    
+    rule_runner.write_files(
+        {
+            # Project A with shared utility
+            "projectA/BUILD": "package_json(name='projectA')",
+            "projectA/package.json": get_package_json_content(),
+            "projectA/tsconfig.json": TYPESCRIPT_TSCONFIG,
+            "projectA/src/BUILD": "typescript_sources()",
+            "projectA/src/shared.ts": textwrap.dedent("""
+                export function sharedFunction(value: string): string {
+                    return `Shared: ${value}`;
+                }
+            """),
+            **{f"projectA/{filename}": content for filename, content in typescript_lockfile.items()},
+            
+            # Project B trying to import from Project A (should fail)
+            "projectB/BUILD": "package_json(name='projectB')",
+            "projectB/package.json": get_package_json_content(),
+            "projectB/tsconfig.json": TYPESCRIPT_TSCONFIG,
+            "projectB/src/BUILD": "typescript_sources()",
+            "projectB/src/consumer.ts": textwrap.dedent("""
+                // This import should fail - cross-project imports not supported
+                import { sharedFunction } from '../../projectA/src/shared';
+                
+                export function useShared(): string {
+                    return sharedFunction('test');
+                }
+            """),
+            **{f"projectB/{filename}": content for filename, content in typescript_lockfile.items()},
+        }
+    )
+    
+    # Get the target that attempts cross-project import
+    cross_import_target = rule_runner.get_target(Address("projectB/src", relative_file_path="consumer.ts"))
+    cross_import_field_set = TypeScriptCheckFieldSet.create(cross_import_target)
+    
+    # Create check request for the target with cross-project import
+    request = TypeScriptCheckRequest([cross_import_field_set])
+    
+    # Execute the check
+    results = rule_runner.request(CheckResults, [request])
+    
+    # Should fail due to module resolution error (can't find cross-project import)
+    assert len(results.results) == 1
+    result = results.results[0]
+    
+    # TypeScript should fail to resolve the cross-project import
+    assert result.exit_code != 0
+    
+    # Should contain TypeScript's specific "Cannot find module" error (TS2307)
+    # TypeScript outputs: "error TS2307: Cannot find module '../../projectA/src/shared' or its corresponding type declarations."
+    error_output = result.stdout + result.stderr
+    assert "TS2307" in error_output and "Cannot find module" in error_output
+

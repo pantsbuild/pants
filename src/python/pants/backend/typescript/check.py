@@ -278,22 +278,15 @@ async def _typecheck_single_project(
     args = ("--build",)
     
     # Determine which resolve to use for this TypeScript project
-    # Find the root package within this project to get the resolve
-    root_package = None
-    for workspace_pkg in project.workspaces:
-        if workspace_pkg.root_dir == project.root_dir:
-            root_package = workspace_pkg
-            break
-    
-    if not root_package:
-        # If no root package found, use the first workspace package
-        root_package = list(project.workspaces)[0]
-    
-    # We need the package target address, not the PackageJson. 
-    # For now, construct it based on the directory
+    # Use the project's root directory to get the correct resolve
+    # This follows the standard JavaScript backend pattern where the project resolve
+    # is determined by the project root, regardless of workspace structure.
+    # The JavaScript backend's RequestNodeResolve handles workspace resolution correctly:
+    # - For monorepos: all workspaces share the parent project's lockfile/resolve
+    # - For standalone projects: the project root contains the lockfile/resolve
     from pants.build_graph.address import Address
-    package_address = Address(root_package.root_dir)
-    project_resolve = await Get(ChosenNodeResolve, RequestNodeResolve(package_address))
+    project_address = Address(project.root_dir)
+    project_resolve = await Get(ChosenNodeResolve, RequestNodeResolve(project_address))
     
     # Use the TypeScript subsystem's tool request with the discovered resolve
     tool_request = subsystem.request(
