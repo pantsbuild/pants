@@ -141,10 +141,13 @@ async def _typecheck_single_project(
     # This replaces glob-based file discovery with proper target-based source discovery
     all_targets = await Get(AllTargets)
     
-    # Find all TypeScript targets
+    # Find all TypeScript targets, excluding those that opt out
+    # NOTE: This differs from other backends that handle opt-out via field set filtering
+    # TypeScript requires project-level checking, so we filter at the target level
     typescript_targets = [
         target for target in all_targets 
-        if target.has_field(TypeScriptSourceField) or target.has_field(TypeScriptTestSourceField)
+        if (target.has_field(TypeScriptSourceField) or target.has_field(TypeScriptTestSourceField))
+        and not (TypeScriptCheckFieldSet.opt_out(target) or TypeScriptTestCheckFieldSet.opt_out(target))
     ]
     
     # Get owning packages for all TypeScript targets concurrently
@@ -406,8 +409,18 @@ async def typecheck_typescript(
 
 
 def rules():
+    from pants.backend.typescript.target_types import (
+        TypeScriptSourcesGeneratorTarget,
+        TypeScriptTestTarget,
+        TypeScriptTestsGeneratorTarget,
+    )
+    
     return [
         *collect_rules(),
         UnionRule(CheckRequest, TypeScriptCheckRequest),
+        # Register skip field on all TypeScript target types
         TypeScriptSourceTarget.register_plugin_field(SkipTypeScriptCheckField),
+        TypeScriptSourcesGeneratorTarget.register_plugin_field(SkipTypeScriptCheckField),
+        TypeScriptTestTarget.register_plugin_field(SkipTypeScriptCheckField),
+        TypeScriptTestsGeneratorTarget.register_plugin_field(SkipTypeScriptCheckField),
     ]

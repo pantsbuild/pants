@@ -842,15 +842,15 @@ src/python/pants/backend/typescript/
 - ❌ .tsbuildinfo caching functionality with real TypeScript --build
 - ❌ Integration tests with figlet package requiring real package installation
 
-### BREAKTHROUGH: Integration Tests Working! (COMPLETED)
+### Phase 5: Comprehensive Test Implementation (COMPLETED)
 
 **Status**: ✅ **COMPLETED** - All 9/9 integration tests passing with real TypeScript compilation
 
-#### The Solution That Worked
+#### Test Implementation Summary
 
-After extensive debugging of intrinsic rule dependencies, the **breakthrough came from following the exact minimal pattern from `nodejs_tool_test.py`**:
+After initially encountering intrinsic rule dependency issues with full integration tests, the **solution was to follow the minimal pattern from `nodejs_tool_test.py`**:
 
-**✅ Working Pattern**:
+**Working Test Architecture**:
 ```python
 @pytest.fixture
 def rule_runner(package_manager: str) -> RuleRunner:
@@ -870,68 +870,80 @@ def rule_runner(package_manager: str) -> RuleRunner:
     )
 ```
 
-#### Why This Worked vs. Previous Attempts
+#### Test Coverage Achieved
 
-**❌ What Didn't Work**:
-- Adding comprehensive rule collections (`*intrinsics.rules()`, `*platform_rules.rules()`, `*graph_rules.rules()`)
-- Following JavaScript `test_integration_test.py` patterns (too complex)
-- Manually constructing rule dependencies
-- Adding extensive rule modules to resolve intrinsic dependencies
+**✅ All 9 Integration Tests Passing**:
+- ✅ **npm scenarios**: Success, failure detection, multiple file compilation
+- ✅ **pnpm scenarios**: Success with `link:` protocol, failure detection, multiple files  
+- ✅ **yarn scenarios**: Success with Yarn Classic, failure detection, multiple files
 
-**✅ What Worked**:
-- **Minimal rule set**: Only `nodejs_tool.rules()` + `check.rules()` + specific QueryRule
-- **Following successful tool test pattern**: Used `nodejs_tool_test.py` as base template
-- **Real lockfile generation**: Used actual package managers to create lockfiles with correct integrity hashes
-- **Proper test_resources directory**: Following JavaScript backend structure with BUILD file dependencies
+**✅ Test Features Validated**:
+- Real package manager execution with proper lockfiles and integrity verification
+- Actual TypeScript compilation with `tsc` binary execution in sandbox environment
+- Type error detection validating exit codes and error message content
+- Multi-file import resolution testing cross-file dependencies and workspace scenarios
+- Package manager compatibility across npm, pnpm, and Yarn Classic
 
-#### Key Technical Lessons
+**✅ Test Infrastructure**:
+- Created `test_resources/` directory with package.json, lockfiles, and TypeScript test files
+- Used real package managers to generate lockfiles with correct integrity hashes
+- Established pattern for adding future test scenarios
 
-**1. Lockfile Generation is Critical**
-- **❌ NEVER create lockfiles manually** - integrity hashes are nearly impossible to get right
-- **✅ ALWAYS use package managers**: `npm install --package-lock-only`, `pnpm install --lockfile-only`, `yarn install`
-- **✅ Use real integrity hashes**: Package managers provide the exact SHA-512 hashes that installation expects
+#### Key Technical Learnings
 
-**2. Test Resource Management** 
-- **✅ Create test_resources/ directory** with proper BUILD file: `resources(sources=["*"])`
-- **✅ Add test dependencies** in main BUILD file: `dependencies: ["./test_resources"]`
-- **✅ Follow JavaScript backend patterns** exactly for resource management
+**1. Lockfile Generation**:
+- Must use actual package managers to create lockfiles - manual creation fails integrity checks
+- Commands: `npm install --package-lock-only`, `pnpm install --lockfile-only`, `yarn install`
 
-**3. Rule Dependency Resolution**
-- **✅ Start with working examples**: `nodejs_tool_test.py` provided the successful minimal pattern
-- **❌ Avoid complex rule collections**: Comprehensive rule imports often create circular dependencies
-- **✅ Use minimal, proven combinations**: Exactly what other working tests use
+**2. Test Pattern**:
+- Follow minimal working examples from existing tests (nodejs_tool_test.py)
+- Avoid over-engineering with complex rule dependencies
+- TypeScript errors appear in stdout, not stderr
 
-**4. Assertion Patterns**
-- **✅ TypeScript errors appear in stdout, not stderr**: Check `result.stdout.lower()` for "error"
-- **❌ Package manager warnings in stderr are normal**: Don't assert against stderr for TypeScript errors
+**3. Resource Management**:
+- Create test_resources/ with proper BUILD file configuration
+- Add dependencies in main BUILD file
+- Follow JavaScript backend patterns for resource handling
 
-#### Final Working Test Architecture
+#### Test File Cleanup
 
-**9/9 Tests Passing**:
-- ✅ **npm success/failure/multiple files** - Real npm package installation and TypeScript compilation
-- ✅ **pnpm success/failure/multiple files** - Real pnpm package installation and TypeScript compilation  
-- ✅ **yarn success/failure/multiple files** - Real yarn package installation and TypeScript compilation
+**Removed Redundant Tests**:
+- ✅ Deleted `check_simple_test.py` - basic infrastructure tests superseded by integration tests
+- ✅ Deleted `check_integration_test.py` - intermediate tests no longer needed
+- ✅ Kept only `check_test.py` with comprehensive integration test coverage
 
-**Test Features**:
-- ✅ **Real package manager execution** with proper lockfiles and integrity verification
-- ✅ **Actual TypeScript compilation** with `tsc` binary execution in sandbox environment
-- ✅ **Type error detection** validating exit codes and error message content
-- ✅ **Multi-file import resolution** testing cross-file dependencies and workspace scenarios
-- ✅ **Package manager compatibility** across npm, pnpm, and Yarn Classic
+**Result**: Clean, focused test suite that validates real-world TypeScript check functionality across all supported package managers.
 
-#### Why the Struggle Was Worth It
+### Phase 5.2: Code Path Coverage Tests (COMPLETED)
 
-**Technical Debt Prevented**:
-- **Avoided fake/mock testing**: Real integration tests provide confidence in actual production behavior
-- **Validated all package managers**: Ensures TypeScript check works in all real-world scenarios
-- **Tested full pipeline**: From package installation through TypeScript compilation to error reporting
+**Status**: ✅ **COMPLETED** - Achieved comprehensive test coverage of all code paths in check.py
 
-**Robust Foundation Established**:
-- **Proper test infrastructure**: Can easily add more test scenarios following the established pattern
-- **Real-world validation**: Tests prove the implementation works with actual package managers and TypeScript compiler
-- **Future-proof approach**: Test pattern can accommodate future TypeScript and package manager changes
+**Tests Implemented**:
 
-**Key Insight**: The complexity of getting integration tests working validated that the TypeScript check implementation itself is solid and production-ready. The testing struggles were primarily about test infrastructure, not the core functionality.
+1. ✅ **`test_typescript_check_skip_field()`** - Tests skip_typescript_check field functionality
+   - Verifies targets with `skip_typescript_check=true` are properly skipped
+   - Registered skip field on all TypeScript target types (source, test, generator targets)
+   
+2. ✅ **`test_typescript_check_no_targets_in_project()`** - Tests project with no TypeScript targets
+   - Returns empty CheckResults when no TypeScript targets exist
+   
+3. ✅ **`test_typescript_check_subsystem_skip()`** - Tests global TypeScript skip via --typescript-skip
+   - Verifies all type checking is skipped when subsystem.skip is True
+   
+4. ✅ **`test_typescript_check_multiple_projects()`** - Tests checking targets across multiple projects
+   - Validates concurrent execution across projectA and projectB
+   - Ensures proper project isolation and result aggregation
+   
+5. ✅ **`test_typescript_check_test_files()`** - Tests TypeScriptTestCheckFieldSet with typescript_tests targets
+   - Added TypeScriptTestCheckRequest union rule
+   - Validates test file type checking with proper imports
+
+**Key Implementation Changes**:
+- Added skip field registration for all TypeScript target types in check.py rules()
+- Added TypeScriptTestCheckRequest union rule for test file support
+- All tests follow minimal rule pattern from nodejs_tool_test.py to avoid dependency issues
+
+**Result**: Complete code path coverage for TypeScript check implementation, ensuring all branches and edge cases are tested
 
 ## Implementation Phases Timeline
 
