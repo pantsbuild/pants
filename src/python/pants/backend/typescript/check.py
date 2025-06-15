@@ -28,6 +28,7 @@ from pants.engine.process import Process
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import AllTargets, BoolField, FieldSet, Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
+from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -131,6 +132,7 @@ class TypeScriptTestCheckRequest(CheckRequest):
 async def _typecheck_single_project(
     project,  # NodeJSProject - can't import due to circular imports
     subsystem: TypeScriptSubsystem,
+    global_options: GlobalOptions,
 ) -> CheckResult:
     """Type check a single TypeScript project."""
     logger.info(f"DEBUG: TypeScript check for project: {project.root_dir}")
@@ -320,6 +322,8 @@ async def _typecheck_single_project(
         partition_description=f"TypeScript check on {project.root_dir} ({len(project_typescript_targets)} targets)",
         # Cache TypeScript artifacts via the report field - this enables incremental compilation
         report=typescript_artifacts_digest,
+        # PR_NOTE: Use output simplifier to clean up temporary paths in error messages
+        output_simplifier=global_options.output_simplifier(),
     )
     
     return check_result
@@ -328,7 +332,8 @@ async def _typecheck_single_project(
 async def _typecheck_typescript_files(
     field_sets: tuple[TypeScriptCheckFieldSet | TypeScriptTestCheckFieldSet, ...],
     subsystem: TypeScriptSubsystem,
-    tool_name: str
+    tool_name: str,
+    global_options: GlobalOptions,
 ) -> CheckResults:
     if subsystem.skip:
         return CheckResults([], checker_name=tool_name)
@@ -385,7 +390,7 @@ async def _typecheck_typescript_files(
     
     # Check all projects concurrently
     project_results = await concurrently(
-        _typecheck_single_project(project, subsystem)
+        _typecheck_single_project(project, subsystem, global_options)
         for project in projects_to_check.keys()
     )
     
@@ -394,9 +399,9 @@ async def _typecheck_typescript_files(
 
 @rule(desc="Check TypeScript compilation", level=LogLevel.DEBUG)
 async def typecheck_typescript(
-    request: TypeScriptCheckRequest, subsystem: TypeScriptSubsystem
+    request: TypeScriptCheckRequest, subsystem: TypeScriptSubsystem, global_options: GlobalOptions
 ) -> CheckResults:
-    return await _typecheck_typescript_files(request.field_sets, subsystem, request.tool_name)
+    return await _typecheck_typescript_files(request.field_sets, subsystem, request.tool_name, global_options)
 
 
 
