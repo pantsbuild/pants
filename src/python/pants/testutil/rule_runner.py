@@ -334,28 +334,27 @@ class RuleRunner:
 
         local_execution_root_dir = global_options.local_execution_root_dir
         named_caches_dir = global_options.named_caches_dir
-
-        self._set_new_session(
-            EngineInitializer.setup_graph_extended(
-                pants_ignore_patterns=GlobalOptions.compute_pants_ignore(
-                    self.build_root, global_options
-                ),
-                use_gitignore=False,
-                local_store_options=local_store_options,
-                local_execution_root_dir=local_execution_root_dir,
-                named_caches_dir=named_caches_dir,
-                pants_workdir=self.pants_workdir,
-                build_root=self.build_root,
-                build_configuration=self.build_config,
-                # Each Scheduler that is created borrows the global executor, which is shut down `atexit`.
-                executor=EXECUTOR.to_borrowed(),
-                execution_options=ExecutionOptions.from_options(
-                    global_options, dynamic_remote_options
-                ),
-                ca_certs_path=ca_certs_path,
-                engine_visualize_to=None,
-                is_bootstrap=is_bootstrap,
-            ).scheduler
+        scheduler = EngineInitializer.setup_graph_extended(
+            pants_ignore_patterns=GlobalOptions.compute_pants_ignore(
+                self.build_root, global_options
+            ),
+            use_gitignore=False,
+            local_store_options=local_store_options,
+            local_execution_root_dir=local_execution_root_dir,
+            named_caches_dir=named_caches_dir,
+            pants_workdir=self.pants_workdir,
+            build_root=self.build_root,
+            build_configuration=self.build_config,
+            # Each Scheduler that is created borrows the global executor, which is shut down `atexit`.
+            executor=EXECUTOR.to_borrowed(),
+            execution_options=ExecutionOptions.from_options(global_options, dynamic_remote_options),
+            ca_certs_path=ca_certs_path,
+            engine_visualize_to=None,
+            is_bootstrap=is_bootstrap,
+        ).scheduler
+        self._set_new_session(scheduler)
+        scheduler.attach_session_to_invalidation_watcher(
+            scheduler.new_session(build_id="scheduler_session_for_testing")
         )
 
     def __repr__(self) -> str:

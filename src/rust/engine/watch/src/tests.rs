@@ -1,6 +1,6 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-use crate::{Invalidatable, InvalidateCaller, InvalidationWatcher};
+use crate::{Invalidatable, InvalidateCaller, InvalidationWatcher, StaticExcludes};
 
 use std::collections::HashSet;
 use std::fs::create_dir;
@@ -54,7 +54,9 @@ async fn receive_watch_event_on_file_change() {
     let invalidatable = Arc::new(TestInvalidatable::default());
     let ignorer = GitignoreStyleExcludes::empty();
     let watcher = setup_watch(ignorer, build_root.clone(), file_path.clone()).await;
-    watcher.start(&invalidatable).unwrap();
+    watcher
+        .start(&invalidatable, None::<StaticExcludes>)
+        .unwrap();
 
     // Update the content of the file being watched.
     let new_content = "stnetnoc".as_bytes().to_vec();
@@ -86,7 +88,9 @@ async fn ignore_file_events_matching_patterns_in_pants_ignore() {
     let invalidatable = Arc::new(TestInvalidatable::default());
     let ignorer = GitignoreStyleExcludes::create(vec!["/foo".to_string()]).unwrap();
     let watcher = setup_watch(ignorer, build_root, file_path.clone()).await;
-    watcher.start(&invalidatable).unwrap();
+    watcher
+        .start(&invalidatable, None::<StaticExcludes>)
+        .unwrap();
 
     // Update the content of the file being watched.
     let new_content = "stnetnoc".as_bytes().to_vec();
@@ -116,7 +120,7 @@ async fn liveness_watch_error() {
     let (event_sender, event_receiver) = crossbeam_channel::unbounded();
     let join_handle = InvalidationWatcher::start_background_thread(
         Arc::downgrade(&invalidatable),
-        ignorer,
+        StaticExcludes(ignorer),
         build_root,
         liveness_sender,
         event_receiver,

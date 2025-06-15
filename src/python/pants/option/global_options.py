@@ -1065,15 +1065,13 @@ class BootstrapOptions:
         default=True,
         help=softwrap(
             """
-            Include patterns from `.gitignore`, `.git/info/exclude`, and the global gitignore
+            Include patterns from `.gitignore` files, `.git/info/exclude`, and the global gitignore
             files in the option `[GLOBAL].pants_ignore`, which is used for Pants to ignore
             filesystem operations on those patterns.
 
             Patterns from `[GLOBAL].pants_ignore` take precedence over these files' rules. For
             example, you can use `!my_pattern` in `pants_ignore` to have Pants operate on files
             that are gitignored.
-
-            Warning: this does not yet support reading nested gitignore files.
             """
         ),
     )
@@ -2215,7 +2213,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
         # Explicitly specified globs are already relative, and are added verbatim.
         invalidation_globs.update(
-            ("!*.pyc", "!__pycache__/", ".gitignore", *bootstrap_options.pantsd_invalidation_globs)
+            ("!*.pyc", "!__pycache__/", *bootstrap_options.pantsd_invalidation_globs)
         )
         return tuple(invalidation_globs)
 

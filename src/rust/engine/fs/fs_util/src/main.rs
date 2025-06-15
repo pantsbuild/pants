@@ -11,6 +11,7 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use clap::{Arg, ArgAction, Command, value_parser};
+use fs::gitignore_stack::GitignoreStack;
 use fs::{
     DirectoryDigest, GlobExpansionConjunction, GlobMatching, Permissions, PreparedPathGlobs,
     RelativePath, StrictGlobMatching, SymlinkBehavior,
@@ -776,12 +777,7 @@ fn expand_files_helper(
 
 fn make_posix_fs<P: AsRef<Path>>(executor: task_executor::Executor, root: P) -> fs::PosixFS {
     // Unwrapping the output of creating the git ignorer with no patterns is infallible.
-    fs::PosixFS::new(
-        &root,
-        fs::GitignoreStyleExcludes::create(vec![]).unwrap(),
-        executor,
-    )
-    .unwrap()
+    fs::PosixFS::new(&root, GitignoreStack::empty(), executor).unwrap()
 }
 
 async fn ensure_uploaded_to_remote(
