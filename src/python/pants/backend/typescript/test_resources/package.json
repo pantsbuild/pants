@@ -1,0 +1,9 @@
+{
+  "name": "test-pkg",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}
