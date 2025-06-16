@@ -117,6 +117,7 @@ impl StoreSetup {
                 retries: 1,
                 concurrency_limit: 256,
                 batch_api_size_limit: 4 * 1024 * 1024,
+                batch_load_enabled: false,
             })
             .await
             .unwrap();
@@ -172,6 +173,7 @@ async fn create_cached_runner(
                 retries: 0,
                 batch_api_size_limit: 0,
                 chunk_size_bytes: 0,
+                batch_load_enabled: false,
             },
         )
         .await
@@ -781,6 +783,7 @@ async fn make_action_result_basic() {
             timeout: CACHE_READ_TIMEOUT,
             retries: 0,
             batch_api_size_limit: 0,
+            batch_load_enabled: false,
             chunk_size_bytes: 0,
         },
     )
