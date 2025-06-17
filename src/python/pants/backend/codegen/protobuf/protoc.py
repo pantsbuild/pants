@@ -11,8 +11,12 @@ class Protoc(TemplatedExternalTool):
     options_scope = "protoc"
     help = "The protocol buffer compiler (https://developers.google.com/protocol-buffers)."
 
-    default_version = "3.20.1"
+    default_version = "30.2"
     default_known_versions = [
+        "30.2|linux_arm64 |a3173ea338ef91b1605b88c4f8120d6c8ccf36f744d9081991d595d0d4352996|3324324",
+        "30.2|linux_x86_64|327e9397c6fb3ea2a542513a3221334c6f76f7aa524a7d2561142b67b312a01f|3364030",
+        "30.2|macos_arm64 |92728c650f6cf2b6c37891ae04ef5bc2d4b5f32c5fbbd101eda623f90bb95f63|2344514",
+        "30.2|macos_x86_64|65675c3bb874a2d5f0c941e61bce6175090be25fe466f0ec2d4a6f5978333624|2469884",
         "25.2|linux_arm64 |07683afc764e4efa3fa969d5f049fbc2bdfc6b4e7786a0b233413ac0d8753f6b|3071655",
         "25.2|linux_x86_64|78ab9c3288919bdaa6cfcec6127a04813cf8a0ce406afa625e48e816abee2878|3105555",
         "25.2|macos_arm64 |8822b090c396800c96ac652040917eb3fbc5e542538861aad7c63b8457934b20|2209071",
