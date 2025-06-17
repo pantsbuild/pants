@@ -114,7 +114,7 @@ class ResolveFieldDefaultFactoryRequest(FieldDefaultFactoryRequest):
 
 
 @rule
-def resolve_field_default_factory(
+async def resolve_field_default_factory(
     request: ResolveFieldDefaultFactoryRequest,
 ) -> FieldDefaultFactoryResult:
     return FieldDefaultFactoryResult(lambda f: f.value or _DEFAULT_RESOLVE)

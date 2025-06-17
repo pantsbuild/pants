@@ -1288,7 +1288,7 @@ class WorkspaceGoal(Goal):
 
 def test_workspace_in_goal_rule() -> None:
     @rule
-    def digest_request_singleton() -> DigestRequest:
+    async def digest_request_singleton() -> DigestRequest:
         fc = FileContent(path="a.txt", content=b"hello")
         return DigestRequest(CreateDigest([fc]))
 

@@ -1,6 +1,6 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
 use std::time::Instant;
@@ -10,7 +10,8 @@ use futures::Future;
 use hashing::Digest;
 use log::Level;
 use remote_provider::{
-    ByteStoreProvider, LoadDestination, RemoteStoreOptions, choose_byte_store_provider,
+    BatchLoadDestination, ByteStoreProvider, LoadDestination, RemoteStoreOptions,
+    choose_byte_store_provider,
 };
 use tokio::fs::File;
 use workunit_store::{Metric, ObservationMetric, in_workunit};
@@ -157,6 +158,73 @@ impl ByteStore {
             .load(digest, Vec::with_capacity(digest.size_bytes))
             .await?;
         Ok(result.map(Bytes::from))
+    }
+
+    pub async fn load_bytes_batch(
+        &self,
+        digests: Vec<Digest>,
+        destination: &mut dyn BatchLoadDestination,
+    ) -> Result<HashMap<Digest, Result<bool, String>>, String> {
+        let start = Instant::now();
+        let workunit_desc = format!(
+            "Loading batch at {} of {} digets ({} bytes)",
+            self.instance_name.as_ref().map_or("", |s| s),
+            digests.len(),
+            digests.iter().map(|d| d.size_bytes).sum::<usize>()
+        );
+
+        in_workunit!(
+            "load_bytes_batch",
+            Level::Trace,
+            desc = Some(workunit_desc),
+            |workunit| async move {
+                workunit.increment_counter(Metric::RemoteStoreReadAttempts, 1);
+                let batch_result = self.provider.load_batch(digests, destination).await;
+
+                workunit.record_observation(
+                    ObservationMetric::RemoteStoreReadBlobTimeMicros,
+                    start.elapsed().as_micros() as u64,
+                );
+
+                match batch_result {
+                    Ok(results) => {
+                        let mut total_bytes = 0;
+                        let mut misses = 0;
+
+                        results.iter().for_each(|(digest, result)| match result {
+                            Ok(_) => {
+                                total_bytes += digest.size_bytes;
+                            }
+                            Err(_) => {
+                                misses += 1;
+                            }
+                        });
+                        let hits = results.len() - misses;
+                        workunit.record_observation(
+                            ObservationMetric::RemoteStoreBlobBytesDownloaded,
+                            total_bytes as u64,
+                        );
+                        if hits > 0 {
+                            workunit.increment_counter(Metric::RemoteStoreReadCached, hits as u64);
+                        }
+                        if misses > 0 {
+                            workunit
+                                .increment_counter(Metric::RemoteStoreReadUncached, misses as u64);
+                        }
+                        Ok(results)
+                    }
+                    Err(e) => {
+                        workunit.increment_counter(Metric::RemoteStoreReadErrors, 1);
+                        Err(e)
+                    }
+                }
+            },
+        )
+        .await
+    }
+
+    pub fn batch_load_supported(&self) -> bool {
+        self.provider.batch_load_supported()
     }
 
     /// Write the data for `digest` (if it exists in the remote store) into `file`.

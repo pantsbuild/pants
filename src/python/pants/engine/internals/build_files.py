@@ -97,7 +97,7 @@ class BuildFileOptions:
 
 
 @rule
-def extract_build_file_options(
+async def extract_build_file_options(
     global_options: GlobalOptions,
     bootstrap_status: BootstrapStatus,
 ) -> BuildFileOptions:

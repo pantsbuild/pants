@@ -243,6 +243,7 @@ async fn main() -> Result<(), String> {
                             retries: 0,
                             batch_api_size_limit: 0,
                             chunk_size_bytes: 0,
+                            batch_load_enabled: false,
                         },
                     )
                     .await

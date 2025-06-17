@@ -83,7 +83,7 @@ def test_logs_unhandled_exception(tmp_path: Path) -> None:
     pants_run.assert_failure()
 
     regex = "exception during import!"
-    assert re.search(regex, pants_run.stderr)
+    assert re.search(regex, pants_run.stderr), f"Regex not found in log: {pants_run.stderr}"
 
     pid_specific_log_file, shared_log_file = get_log_file_paths(tmp_path.as_posix(), pants_run.pid)
     assert_unhandled_exception_log_matches(pants_run.pid, read_file(pid_specific_log_file))
