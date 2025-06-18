@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import ClassVar
@@ -58,7 +59,15 @@ class NodeJSToolBase(Subsystem):
     @property
     def binary_name(self) -> str:
         """The binary name to run for this tool."""
-        return self._binary_name or self.version.split("@")[0]
+        if self._binary_name:
+            return self._binary_name
+
+        # For scoped packages (@scope/package), use the scope name (often matches the binary)
+        # For regular packages, use the full package name
+        match = re.match(r"^(?:@([^/]+)/[^@]+|([^@]+))", self.version)
+        if not match:
+            raise ValueError(f"Invalid npm package specification: {self.version}")
+        return match.group(1) or match.group(2)
 
     install_from_resolve = StrOption(
         advanced=True,
