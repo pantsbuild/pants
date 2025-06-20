@@ -557,7 +557,8 @@ def test_source_plugin(rule_runner: PythonRuleRunner) -> None:
     assert "Success: no issues found in 1 source file" in result.stdout
 
 
-def test_protobuf_mypy(rule_runner: PythonRuleRunner) -> None:
+@pytest.mark.parametrize("protoc_type_stubs", (False, True), ids=("mypy_plugin", "protoc_direct"))
+def test_protobuf_mypy(rule_runner: PythonRuleRunner, protoc_type_stubs: bool) -> None:
     rule_runner = PythonRuleRunner(
         rules=[*rule_runner.rules, *protobuf_rules(), *protobuf_subsystem_rules()],
         target_types=[*rule_runner.target_types, ProtobufSourceTarget],
@@ -597,7 +598,11 @@ def test_protobuf_mypy(rule_runner: PythonRuleRunner) -> None:
     result = run_mypy(
         rule_runner,
         [tgt],
-        extra_args=["--python-protobuf-mypy-plugin"],
+        extra_args=[
+            "--python-protobuf-generate-type-stubs"
+            if protoc_type_stubs
+            else "--python-protobuf-mypy-plugin"
+        ],
     )
     assert len(result) == 1
     assert 'Argument "name" to "Person" has incompatible type "int"' in result[0].stdout
