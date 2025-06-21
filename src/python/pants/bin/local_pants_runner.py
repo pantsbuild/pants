@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -16,6 +17,7 @@ from pants.core.util_rules.environments import determine_bootstrap_environment
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.goal import CurrentExecutingGoals
 from pants.engine.internals import native_engine
+from pants.engine.internals.engine_execution_context import EngineExecutionContext
 from pants.engine.internals.native_engine import PyExecutor, PySessionCancellationLatch
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.selectors import Params
@@ -72,6 +74,7 @@ class LocalPantsRunner:
         options_initializer: OptionsInitializer | None = None,
         scheduler: GraphScheduler | None = None,
         cancellation_latch: PySessionCancellationLatch | None = None,
+        release_daemon_concurrency_lock: Callable[[], None] | None = None,
     ) -> LocalPantsRunner:
         """Creates a new LocalPantsRunner instance by parsing options.
 
@@ -111,6 +114,16 @@ class LocalPantsRunner:
         if global_bootstrap_options.verify_config:
             options.verify_configs()
 
+        engine_execution_context: EngineExecutionContext
+        if release_daemon_concurrency_lock:
+            engine_execution_context = EngineExecutionContext(
+                release_daemon_concurrency_lock=release_daemon_concurrency_lock
+            )
+        else:
+            engine_execution_context = EngineExecutionContext(
+                release_daemon_concurrency_lock=lambda: None
+            )
+
         # If we're running with the daemon, we'll be handed a warmed Scheduler, which we use
         # to initialize a session here.
         is_pantsd_run = scheduler is not None
@@ -144,6 +157,7 @@ class LocalPantsRunner:
                     OptionsBootstrapper: options_bootstrapper,
                     CompleteEnvironmentVars: env,
                     CurrentExecutingGoals: CurrentExecutingGoals(),
+                    EngineExecutionContext: engine_execution_context,
                 }
             ),
             cancellation_latch=cancellation_latch,

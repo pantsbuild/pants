@@ -31,7 +31,7 @@ from pants.engine.internals import (
     specs_rules,
     synthetic_targets,
 )
-from pants.engine.internals.native_engine import PyExecutor, PySessionCancellationLatch, session_run_interactive_process
+from pants.engine.internals.native_engine import PyExecutor, PySessionCancellationLatch
 from pants.engine.internals.parser import Parser
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Params
@@ -139,8 +139,6 @@ class GraphSession:
         workspace = Workspace(self.scheduler_session)
         env_name = determine_bootstrap_environment(self.scheduler_session)
 
-        maybe_interactice_process: process.InteractiveProcess | None = None
-
         for goal in goals:
             goal_product = self.goal_map[goal]
             if not goal_product.subsystem_cls.activated(union_membership):
@@ -149,7 +147,7 @@ class GraphSession:
             params = Params(specs, self.console, workspace, env_name)
             logger.debug(f"requesting {goal_product} to satisfy execution of `{goal}` goal")
             try:
-                exit_code, maybe_interactice_process_from_goal = self.scheduler_session.run_goal_rule(
+                exit_code = self.scheduler_session.run_goal_rule(
                     goal_product, params, poll=poll, poll_delay=poll_delay
                 )
             finally:
@@ -157,21 +155,6 @@ class GraphSession:
 
             if exit_code != PANTS_SUCCEEDED_EXIT_CODE:
                 return exit_code
-
-            if maybe_interactice_process_from_goal is not None and maybe_interactice_process is not None:
-                raise ValueError("Multiple goals returned an interactice process to run.")
-
-        if maybe_interactice_process is not None:
-            session_run_interactive_process(self.scheduler_session, maybe_interactice_process,                 ProcessExecutionEnvironment(
-                    environment_name=None,
-                    platform=Platform.create_for_localhost().value,
-                    docker_image=None,
-                    remote_execution=False,
-                    remote_execution_extra_platform_properties=[],
-                    execute_in_workspace=False,
-                    keep_sandboxes="never",
-                ),
-)
 
         return PANTS_SUCCEEDED_EXIT_CODE
 

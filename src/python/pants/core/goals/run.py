@@ -16,6 +16,8 @@ from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.engine_execution_context import EngineExecutionContext
+from pants.engine.internals.session import SessionValues
 from pants.engine.internals.specs_rules import (
     AmbiguousImplementationsException,
     TooManyTargetsException,
@@ -233,6 +235,7 @@ async def run(
     global_options: GlobalOptions,
     workspace: Workspace,  # Needed to enable side-effecting.
     complete_env: CompleteEnvironmentVars,
+    session_values: SessionValues,
 ) -> Run:
     field_set, target = await _find_what_to_run("the `run` goal")
 
@@ -253,6 +256,12 @@ async def run(
                 """
             )
         )
+
+    engine_execution_context: EngineExecutionContext | None = session_values.get(
+        EngineExecutionContext
+    )
+    if engine_execution_context is not None:
+        engine_execution_context.release_daemon_concurrency_lock()
 
     result = await run_interactive_process(
         InteractiveProcess(
