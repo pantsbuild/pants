@@ -60,7 +60,7 @@ def run_generic_test(
         "src_root2/codegen/BUILD": dedent(
             """\
             protobuf_sources()
-            python_requirement(name='protobuf', requirements=['protobuf'])
+            python_requirement(name='protobuf', requirements=['protobuf==6.31.1'])
             """
         ),
     }
