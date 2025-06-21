@@ -2215,7 +2215,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
         # Explicitly specified globs are already relative, and are added verbatim.
         invalidation_globs.update(
-            ("!*.pyc", "!__pycache__/", ".gitignore", *bootstrap_options.pantsd_invalidation_globs)
+            ("!*.pyc", "!__pycache__/", *bootstrap_options.pantsd_invalidation_globs)
         )
         return tuple(invalidation_globs)
 

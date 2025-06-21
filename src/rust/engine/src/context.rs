@@ -19,6 +19,7 @@ use crate::types::Types;
 
 use cache::PersistentCache;
 use docker::docker;
+use fs::gitignore_stack::GitignoreStack;
 use fs::{GitignoreStyleExcludes, PosixFS};
 use futures::FutureExt;
 use graph::{Graph, InvalidationResult};
@@ -729,7 +730,6 @@ impl Core {
         let watcher = if watch_filesystem {
             let w =
                 InvalidationWatcher::new(executor.clone(), build_root.clone(), ignorer.clone())?;
-            w.start(&graph)?;
             Some(w)
         } else {
             None
@@ -748,9 +748,13 @@ impl Core {
             command_runners,
             http_client,
             local_cache,
-            vfs: PosixFS::new(&build_root, ignorer, executor.clone())
-                .map_err(|e| format!("Could not initialize Vfs: {e:?}"))?,
-            vfs_system: PosixFS::new(Path::new("/"), GitignoreStyleExcludes::empty(), executor)
+            vfs: PosixFS::new(
+                &build_root,
+                GitignoreStack::root(ignorer, use_gitignore),
+                executor.clone(),
+            )
+            .map_err(|e| format!("Could not initialize Vfs: {e:?}"))?,
+            vfs_system: PosixFS::new(Path::new("/"), GitignoreStack::empty(), executor)
                 .map_err(|e| format!("Could not initialize Vfs for local system: {e:?}"))?,
             build_root,
             watcher,
