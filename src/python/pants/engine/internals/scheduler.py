@@ -551,7 +551,7 @@ class SchedulerSession:
         *,
         poll: bool = False,
         poll_delay: float | None = None,
-    ) -> int:
+    ) -> tuple[int, InteractiveProcess | None]:
         """
         :param product: A Goal subtype.
         :param subject: subject for the request.

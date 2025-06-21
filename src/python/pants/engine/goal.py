@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, ClassVar, cast, final
 
+from pants.engine.interactive_process import InteractiveProcess
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.unions import UnionMembership
 from pants.option.option_types import StrOption
@@ -19,6 +20,7 @@ from pants.util.meta import classproperty
 
 if TYPE_CHECKING:
     from pants.engine.console import Console
+    from pants.engine.process import InteractiveProcess
 
 
 class GoalSubsystem(Subsystem):
@@ -98,6 +100,7 @@ class Goal:
         USES_ENVIRONMENTS = 3
 
     exit_code: int
+    interactive_process: InteractiveProcess | None = None
     subsystem_cls: ClassVar[type[GoalSubsystem]]
 
     f"""Indicates that a Goal has been migrated to compute EnvironmentNames to build targets in.

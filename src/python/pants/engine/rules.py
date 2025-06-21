@@ -95,6 +95,7 @@ def _make_rule(
                       its inputs.
     """
 
+    # TODO: Check return type is a union here.
     is_goal_cls = issubclass(return_type, Goal)
     if rule_type == RuleType.rule and is_goal_cls:
         raise TypeError(
