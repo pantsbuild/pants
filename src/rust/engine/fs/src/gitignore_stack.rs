@@ -12,14 +12,20 @@ use std::sync::Arc;
 pub struct GitignoreStack {
     matcher: Option<Arc<GitignoreStyleExcludes>>,
     parent: Option<Arc<GitignoreStack>>,
+    configured_patterns: Arc<GitignoreStyleExcludes>,
     pub use_nested_gitignore: bool,
 }
 
 impl GitignoreStack {
-    pub fn root(matcher: Arc<GitignoreStyleExcludes>, use_nested_gitignore: bool) -> Self {
+    pub fn root(
+        configured_patterns: Arc<GitignoreStyleExcludes>,
+        root_matcher: Arc<GitignoreStyleExcludes>,
+        use_nested_gitignore: bool,
+    ) -> Self {
         Self {
-            matcher: Some(matcher),
+            matcher: Some(root_matcher),
             parent: None,
+            configured_patterns,
             use_nested_gitignore,
         }
     }
@@ -28,6 +34,7 @@ impl GitignoreStack {
         Self {
             matcher: Some(matcher),
             use_nested_gitignore: parent.use_nested_gitignore,
+            configured_patterns: parent.configured_patterns.clone(),
             parent: Some(parent),
         }
     }
@@ -47,14 +54,15 @@ impl GitignoreStack {
     }
 
     pub fn push(self, directory: &Path, git_ignore_file: &Path) -> Result<GitignoreStack, String> {
-        Ok(GitignoreStack::parse(
-            directory,
-            git_ignore_file,
-            Arc::new(self),
-        )?)
+        GitignoreStack::parse(directory, git_ignore_file, Arc::new(self))
     }
 
     pub fn is_path_ignored(&self, path: &Path, is_dir: bool) -> bool {
+        match self.configured_patterns.gitignore.matched(path, is_dir) {
+            ::ignore::Match::Ignore(_) => return true,
+            ::ignore::Match::Whitelist(_) => return false,
+            ::ignore::Match::None => {}
+        };
         let mut node = Some(self);
         while let Some(n) = node {
             if let Some(ref matcher) = n.matcher {
@@ -78,10 +86,11 @@ impl GitignoreStack {
         self.matcher.is_none() && self.parent.is_none()
     }
 
-    pub const fn empty() -> Self {
+    pub fn empty() -> Self {
         Self {
             matcher: None,
             parent: None,
+            configured_patterns: GitignoreStyleExcludes::empty(),
             use_nested_gitignore: false,
         }
     }

@@ -334,6 +334,7 @@ pub trait Invalidatable: Send + Sync + 'static {
     fn invalidate_all(&self, caller: InvalidateCaller) -> usize;
 }
 
+#[derive(Debug)]
 struct StaticExcludes(pub Arc<GitignoreStyleExcludes>);
 
 impl GitIgnoreProvider for StaticExcludes {

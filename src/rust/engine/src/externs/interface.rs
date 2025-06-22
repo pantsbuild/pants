@@ -1418,7 +1418,6 @@ fn check_invalidation_watcher_liveness(py_scheduler: &Bound<'_, PyScheduler>) ->
         .enter(|| scheduler.is_valid().map_err(PyException::new_err))
 }
 
-#[allow(unused_variables)]
 #[pyfunction]
 fn start_invalidation_watcher(py_session: &Bound<'_, PySession>) -> PyO3Result<()> {
     let session = &py_session.borrow().0;

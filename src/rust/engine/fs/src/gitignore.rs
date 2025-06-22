@@ -61,9 +61,23 @@ impl Hash for GitignoreStyleExcludes {
     }
 }
 
+pub struct PatternsAndFileExcludes {
+    pub patterns: Arc<GitignoreStyleExcludes>,
+    pub files: Arc<GitignoreStyleExcludes>,
+}
+
+impl PatternsAndFileExcludes {
+    pub fn empty() -> PatternsAndFileExcludes {
+        Self {
+            patterns: EMPTY_IGNORE.clone(),
+            files: EMPTY_IGNORE.clone(),
+        }
+    }
+}
+
 impl GitignoreStyleExcludes {
     pub fn create(patterns: Vec<String>) -> Result<Arc<Self>, String> {
-        Self::create_with_gitignore_files(patterns, vec![])
+        Self::create_with_gitignore_files(patterns, vec![]).map(|excludes| excludes.patterns)
     }
 
     pub fn empty() -> Arc<Self> {
@@ -77,11 +91,13 @@ impl GitignoreStyleExcludes {
     pub fn create_with_gitignore_files(
         patterns: Vec<String>,
         gitignore_paths: Vec<PathBuf>,
-    ) -> Result<Arc<Self>, String> {
+    ) -> Result<PatternsAndFileExcludes, String> {
         if patterns.is_empty() && gitignore_paths.is_empty() {
-            return Ok(EMPTY_IGNORE.clone());
+            return Ok(PatternsAndFileExcludes::empty());
         }
-        Self::create_with_builder(patterns, gitignore_paths, GitignoreBuilder::new(""))
+        let patterns = Self::create_with_builder(patterns, vec![], GitignoreBuilder::new(""))?;
+        let files = Self::create_with_builder(vec![], gitignore_paths, GitignoreBuilder::new(""))?;
+        Ok(PatternsAndFileExcludes { patterns, files })
     }
 
     pub fn create_with_gitignore_file(
@@ -229,7 +245,7 @@ mod tests {
             Arc::new(
                 PosixFS::new(
                     root.as_ref(),
-                    GitignoreStack::root(ignorer, false),
+                    GitignoreStack::root(ignorer.patterns, ignorer.files, false),
                     task_executor::Executor::new(),
                 )
                 .unwrap(),

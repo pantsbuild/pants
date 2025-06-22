@@ -720,13 +720,16 @@ impl Core {
             vec![]
         };
 
-        let ignorer =
+        let ignorers =
             GitignoreStyleExcludes::create_with_gitignore_files(ignore_patterns, gitignore_files)
                 .map_err(|e| format!("Could not parse build ignore patterns: {e:?}"))?;
 
         let watcher = if watch_filesystem {
-            let w =
-                InvalidationWatcher::new(executor.clone(), build_root.clone(), ignorer.clone())?;
+            let w = InvalidationWatcher::new(
+                executor.clone(),
+                build_root.clone(),
+                ignorers.patterns.clone(),
+            )?;
             Some(w)
         } else {
             None
@@ -747,7 +750,7 @@ impl Core {
             local_cache,
             vfs: PosixFS::new(
                 &build_root,
-                GitignoreStack::root(ignorer, use_gitignore),
+                GitignoreStack::root(ignorers.patterns, ignorers.files, use_gitignore),
                 executor.clone(),
             )
             .map_err(|e| format!("Could not initialize Vfs: {e:?}"))?,

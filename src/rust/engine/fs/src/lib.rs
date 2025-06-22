@@ -503,7 +503,7 @@ impl PosixFS {
         if let Some(path) = gitignore {
             gitignore_stack = gitignore_stack
                 .push(dir_relative_to_root, &path)
-                .map_err(|e| io::Error::new(ErrorKind::Other, e))?
+                .map_err(io::Error::other)?
         }
         stats.retain(|s| {
             !gitignore_stack.is_path_ignored(

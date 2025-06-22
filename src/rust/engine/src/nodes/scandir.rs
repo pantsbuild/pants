@@ -53,8 +53,7 @@ impl Scandir {
             .subject_path
             .parent()
             .map_err(throw)?
-            .map(|subject_path| self.dir.parent().map(|dir| Scandir { dir, subject_path }))
-            .flatten())
+            .and_then(|subject_path| self.dir.parent().map(|dir| Scandir { dir, subject_path })))
     }
 }
 
