@@ -715,6 +715,7 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
                 union = unions[0]
                 if awaitable.rule_id:
                     if rule_id_to_rule[awaitable.rule_id].polymorphic:
+                        #logger.warning(f"POLYMORPHIC: {awaitable.rule_id}")
                         # This is a polymorphic call-by-name. Compute its vtable data, i.e., a list
                         # of pairs (union member type, id of implementation rule for that type).
                         member_rule_type_pairs = base_type_to_member_rule_type_pairs.get(union)
@@ -724,6 +725,7 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
                             # output type, then we take it to be the implementation of the
                             # polymorphic rule for the union member.
                             if member_rule.output_type == awaitable.output_type:
+                                #logger.warning(f"  VTABLE ENTRY: {member_type} {member_rule.canonical_name}")
                                 vtable_entries.append((member_type, member_rule.canonical_name))
                                 input_types = tuple(
                                     member_type if t == union else t for t in awaitable.input_types
@@ -760,7 +762,7 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
                         )
             elif len(unions) > 1:
                 raise TypeError(
-                    "Only one @union may be used in a call or Get, but {awaitable} used: {unions}."
+                    f"Only one @union may be used in a call or Get, but {awaitable} used: {unions}."
                 )
             elif awaitable.rule_id is not None:
                 # Is a non-polymorphic call to a known rule.

@@ -101,6 +101,8 @@ from pants.engine.target import (
     WrappedTarget,
     WrappedTargetRequest,
     _generate_file_level_targets,
+    generate_sources,
+    generate_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import GlobalOptions, UnmatchedBuildFileGlobs
@@ -451,7 +453,7 @@ async def resolve_target_parametrizations(
         )
     if requests and requests.requests:
         all_generated = await concurrently(
-            Get(GeneratedTargets, GenerateTargetsRequest, generate_request)
+            generate_targets(**implicitly({generate_request: GenerateTargetsRequest}))
             for generate_request in requests.requests
         )
         parametrizations.extend(
@@ -1445,11 +1447,15 @@ async def hydrate_sources(
         ),
         **implicitly(),
     )
-    generated_sources = await Get(
-        GeneratedSources,
-        GenerateSourcesRequest,
-        generate_request_type(snapshot, wrapped_protocol_target.target),
-    )
+    req = generate_request_type(snapshot, wrapped_protocol_target.target)
+    generated_sources = await generate_sources(req, **implicitly())
+
+    # generated_sources = await Get(
+    #     GeneratedSources,
+    #     GenerateSourcesRequest,
+    #     generate_request_type(snapshot, wrapped_protocol_target.target),
+    # )
+
     return HydratedSources(
         generated_sources.snapshot, sources_field.filespec, sources_type=sources_type
     )

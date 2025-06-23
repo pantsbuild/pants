@@ -391,11 +391,17 @@ impl<R: Rule> Builder<R> {
             iteration += 1;
             if iteration % 1000 == 0 {
                 log::trace!(
-                    "initial_polymorphic iteration {}: {} nodes",
+                    "initial_polymorphic iteration {}: {} nodes, {} to visit",
                     iteration,
-                    graph.node_count()
+                    graph.node_count(),
+                    to_visit.len(),
                 );
             }
+
+            // let ggg = &graph[node_id];
+            // if format!("{:?}", ggg.0).contains(" id: RuleId(\"pants.engine.target.generate_sources\")") {
+            //     log::warn!("XXXXXXXXXXXXXXXXXXX {:?}", ggg.1.iter().sorted().collect::<Vec<_>>());
+            // }
 
             // Collect the candidates that might satisfy the dependency keys of the node (if it has any).
             let candidates_by_key = graph[node_id]
