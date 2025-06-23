@@ -94,7 +94,8 @@ class NodeRunScript(NodeScript):
         entry_point: str,
         extra_env_vars: Iterable[str] = (),
     ) -> NodeRunScript:
-        """A script that can be run directly via the run goal, mapped from the `scripts` section of a package.json file.
+        """A script that can be run directly via the run goal, mapped from the `scripts` section of
+        a package.json file.
 
         This allows running any script defined in package.json directly through pants run.
         """
@@ -1005,9 +1006,7 @@ async def generate_node_package_targets(
                     )
                 )
             else:
-                raise _script_missing_error(
-                    script.entry_point, scripts, request.generator.address
-                )
+                raise _script_missing_error(script.entry_point, scripts, request.generator.address)
 
     coverage_script = package_target[NodePackageTestScriptField].value.coverage_entry_point
     if coverage_script and coverage_script not in scripts:

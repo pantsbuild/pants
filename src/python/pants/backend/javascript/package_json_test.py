@@ -220,7 +220,9 @@ def test_run_script_missing_entry_point_error(
             ),
         }
     )
-    with engine_error(ValueError, contains="missing-script was not found in package.json#scripts section"):
+    with engine_error(
+        ValueError, contains="missing-script was not found in package.json#scripts section"
+    ):
         rule_runner.request(AllTargets, ())
 
 
@@ -248,7 +250,7 @@ def test_generates_multiple_run_script_targets(
                         "start": "node server.js",
                         "dev": "nodemon server.js",
                         "build": "tsc",
-                    }
+                    },
                 }
             ),
         }

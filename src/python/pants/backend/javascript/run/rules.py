@@ -122,4 +122,9 @@ async def run_node_build_script(
 
 
 def rules() -> Iterable[Rule | UnionRule]:
-    return [*collect_rules(), *install_node_package.rules(), *RunNodeBuildScriptFieldSet.rules(), *RunNodeScriptFieldSet.rules()]
+    return [
+        *collect_rules(),
+        *install_node_package.rules(),
+        *RunNodeBuildScriptFieldSet.rules(),
+        *RunNodeScriptFieldSet.rules(),
+    ]
