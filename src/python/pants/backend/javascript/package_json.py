@@ -79,6 +79,32 @@ class NodeScript(ABC):
 
 
 @dataclass(frozen=True)
+class NodeRunScript(NodeScript):
+    entry_point: str
+    extra_env_vars: tuple[str, ...] = ()
+
+    alias: ClassVar[str] = "node_run_script"
+
+    def __str__(self) -> str:
+        return f'{self.alias}(entry_point="{self.entry_point}", ...)'
+
+    @classmethod
+    def create(
+        cls,
+        entry_point: str,
+        extra_env_vars: Iterable[str] = (),
+    ) -> NodeRunScript:
+        """A script that can be run directly via the run goal, mapped from the `scripts` section of a package.json file.
+
+        This allows running any script defined in package.json directly through pants run.
+        """
+        return cls(
+            entry_point=entry_point,
+            extra_env_vars=tuple(extra_env_vars),
+        )
+
+
+@dataclass(frozen=True)
 class NodeBuildScript(NodeScript):
     entry_point: str
     output_directories: tuple[str, ...] = ()
@@ -489,6 +515,42 @@ class NodeBuildScriptTarget(Target):
         """
         A package.json script that is invoked by the configured package manager
         to produce `resource` targets or a packaged artifact.
+        """
+    )
+
+
+class NodeRunScriptEntryPointField(StringField):
+    alias = "entry_point"
+    required = True
+    value: str
+
+
+class NodeRunScriptExtraEnvVarsField(StringSequenceField):
+    alias = "extra_env_vars"
+    required = False
+    default = ()
+    help = help_text(
+        f"""
+        Additional environment variables to include in environment when running a script process.
+
+        {EXTRA_ENV_VARS_USAGE_HELP}
+        """
+    )
+
+
+class NodeRunScriptTarget(Target):
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        NodeRunScriptEntryPointField,
+        NodeRunScriptExtraEnvVarsField,
+        NodePackageDependenciesField,
+    )
+
+    alias = "_node_run_script"
+
+    help = help_text(
+        """
+        A package.json script that can be invoked directly via the run goal.
         """
     )
 
@@ -921,12 +983,45 @@ async def generate_node_package_targets(
                 build_script.entry_point, scripts, request.generator.address
             )
 
+    run_script_tgts = []
+    for script in request.generator[NodePackageScriptsField].value or ():
+        if isinstance(script, NodeRunScript):
+            if script.entry_point in scripts:
+                run_script_tgts.append(
+                    NodeRunScriptTarget(
+                        {
+                            **request.template,
+                            NodeRunScriptEntryPointField.alias: script.entry_point,
+                            NodeRunScriptExtraEnvVarsField.alias: script.extra_env_vars,
+                            NodePackageDependenciesField.alias: [
+                                file_tgt.address.spec,
+                                *(tgt.address.spec for tgt in third_party_tgts),
+                                *request.template.get("dependencies", []),
+                                package_target.address.spec,
+                            ],
+                        },
+                        request.generator.address.create_generated(script.entry_point),
+                        union_membership,
+                    )
+                )
+            else:
+                raise _script_missing_error(
+                    script.entry_point, scripts, request.generator.address
+                )
+
     coverage_script = package_target[NodePackageTestScriptField].value.coverage_entry_point
     if coverage_script and coverage_script not in scripts:
         raise _script_missing_error(coverage_script, scripts, request.generator.address)
 
     return GeneratedTargets(
-        request.generator, [package_target, file_tgt, *third_party_tgts, *build_script_tgts]
+        request.generator,
+        [
+            package_target,
+            file_tgt,
+            *third_party_tgts,
+            *build_script_tgts,
+            *run_script_tgts,
+        ],
     )
 
 
@@ -955,5 +1050,6 @@ def build_file_aliases() -> BuildFileAliases:
         objects={
             NodeBuildScript.alias: NodeBuildScript.create,
             NodeTestScript.alias: NodeTestScript.create,
+            NodeRunScript.alias: NodeRunScript.create,
         }
     )

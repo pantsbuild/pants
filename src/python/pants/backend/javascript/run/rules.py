@@ -18,6 +18,8 @@ from pants.backend.javascript.package_json import (
     NodeBuildScriptEntryPointField,
     NodeBuildScriptExtraEnvVarsField,
     NodePackageDependenciesField,
+    NodeRunScriptEntryPointField,
+    NodeRunScriptExtraEnvVarsField,
 )
 from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
@@ -35,6 +37,52 @@ class RunNodeBuildScriptFieldSet(RunFieldSet):
     entry_point: NodeBuildScriptEntryPointField
     extra_env_vars: NodeBuildScriptExtraEnvVarsField
     environment: EnvironmentField
+
+
+@dataclass(frozen=True)
+class RunNodeScriptFieldSet(RunFieldSet):
+    required_fields = (NodeRunScriptEntryPointField, NodePackageDependenciesField)
+    run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
+
+    entry_point: NodeRunScriptEntryPointField
+    extra_env_vars: NodeRunScriptExtraEnvVarsField
+    environment: EnvironmentField
+
+
+@rule
+async def run_node_script(
+    field_set: RunNodeScriptFieldSet,
+) -> RunRequest:
+    installation = await add_sources_to_installed_node_package(
+        InstalledNodePackageRequest(field_set.address)
+    )
+    target_env_vars = await environment_vars_subset(
+        EnvironmentVarsRequest(field_set.extra_env_vars.value or ()), **implicitly()
+    )
+    package_dir = "{chroot}" + "/" + installation.project_env.package_dir()
+
+    process = await setup_nodejs_project_environment_process(
+        NodeJsProjectEnvironmentProcess(
+            installation.project_env,
+            args=(
+                *installation.package_manager.current_directory_args,
+                package_dir,
+                "run",
+                str(field_set.entry_point.value),
+            ),
+            description=f"Running {str(field_set.entry_point.value)}.",
+            input_digest=installation.digest,
+            extra_env=target_env_vars,
+        ),
+        **implicitly(),
+    )
+
+    return RunRequest(
+        digest=process.input_digest,
+        args=process.argv,
+        extra_env=process.env,
+        immutable_input_digests=process.immutable_input_digests,
+    )
 
 
 @rule
@@ -74,4 +122,4 @@ async def run_node_build_script(
 
 
 def rules() -> Iterable[Rule | UnionRule]:
-    return [*collect_rules(), *install_node_package.rules(), *RunNodeBuildScriptFieldSet.rules()]
+    return [*collect_rules(), *install_node_package.rules(), *RunNodeBuildScriptFieldSet.rules(), *RunNodeScriptFieldSet.rules()]
