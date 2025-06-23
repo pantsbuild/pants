@@ -1248,9 +1248,9 @@ class GeneratedTargets(FrozenDict[Address, Target]):
         super().__init__(mapping)
 
 
-@rule(polymorphic=True)
-async def generate_targets(req: GenerateTargetsRequest) -> GeneratedTargets:
-    raise NotImplementedError()
+# @rule(polymorphic=True)
+# async def generate_targets(req: GenerateTargetsRequest) -> GeneratedTargets:
+#     raise NotImplementedError()
 
 
 class TargetTypesToGenerateTargetsRequests(
@@ -2599,9 +2599,9 @@ class GeneratedSources:
     snapshot: Snapshot
 
 
-@rule(polymorphic=True)
-async def generate_sources(req: GenerateSourcesRequest) -> GeneratedSources:
-    raise NotImplementedError()
+# @rule(polymorphic=True)
+# async def generate_sources(req: GenerateSourcesRequest) -> GeneratedSources:
+#     raise NotImplementedError()
 
 
 class SourcesPaths(Paths):
