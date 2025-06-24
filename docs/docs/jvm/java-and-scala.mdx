@@ -441,7 +441,7 @@ jvm-default = "semanticdb"
 :::note Scalafix and Scala 3
 At the moment the support for Scalac 3 in Scalafix is limited, most of the syntactic rules work but not that many in the semantic front.
 
-Despite those raugh edges, Scalafix is a great linting tool for Scala 3, just note that the setup is different than from prior versions: Instead of adding a scalac plugin to our build, we only need to add the `-Xsemanticdb` flag to our `[scalac].args` settings, or  or the appropriate entry in `[scalac].args_for_resolve, to enable the generation of `.semanticdb` compiled files.
+Despite those rough edges, Scalafix is a great linting tool for Scala 3, just note that the setup is different than from prior versions: Instead of adding a scalac plugin to our build, we only need to add the `-Xsemanticdb` flag to our `[scalac].args` settings, or  or the appropriate entry in `[scalac].args_for_resolve, to enable the generation of `.semanticdb` compiled files.
 :::
 
 ## Working in an IDE
