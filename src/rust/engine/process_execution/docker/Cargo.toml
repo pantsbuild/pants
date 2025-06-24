@@ -28,6 +28,7 @@ once_cell = { workspace = true }
 process_execution = { path = ".." }
 hashing = { path = "../../hashing" }
 bytes = { workspace = true }
+shell-quote = { workspace = true }
 
 [dev-dependencies]
 env_logger = { workspace = true }
