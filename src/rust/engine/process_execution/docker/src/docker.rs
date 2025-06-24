@@ -20,6 +20,7 @@ use bollard::service::CreateImageInfo;
 use bollard::volume::CreateVolumeOptions;
 use bollard::{Docker, errors::Error as DockerError};
 use bytes::{Bytes, BytesMut};
+use fs::RelativePath;
 use futures::stream::BoxStream;
 use futures::{FutureExt, StreamExt};
 use hashing::Digest;
@@ -28,15 +29,14 @@ use log::Level;
 use nails::execution::ExitCode;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
-use fs::RelativePath;
 use shell_quote::Bash;
 use store::{ImmutableInputs, Store};
 use task_executor::Executor;
 use workunit_store::{Metric, RunningWorkunit, in_workunit};
 
 use process_execution::local::{
-    CapturedWorkdir, CapturedWorkdirError, ChildOutput, KeepSandboxes, apply_chroot,
-    collect_child_outputs, create_sandbox, prepare_workdir, USER_EXECUTABLE_MODE,
+    CapturedWorkdir, CapturedWorkdirError, ChildOutput, KeepSandboxes, USER_EXECUTABLE_MODE,
+    apply_chroot, collect_child_outputs, create_sandbox, prepare_workdir,
 };
 use process_execution::{
     Context, FallibleProcessResultWithPlatform, NamedCaches, Platform, Process, ProcessError,
@@ -1096,10 +1096,14 @@ fn setup_docker_run_sh_script(
     let container_workdir = {
         let sandbox_relpath = workdir_path
             .strip_prefix(host_work_dir_base)
-            .map_err(|err| format!("Internal error - base directory was not prefix of sandbox directory: {err}"))?;
-        let sandbox_path_in_container = Path::new(SANDBOX_BASE_PATH_IN_CONTAINER)
-            .join(sandbox_relpath);
-        
+            .map_err(|err| {
+                format!(
+                    "Internal error - base directory was not prefix of sandbox directory: {err}"
+                )
+            })?;
+        let sandbox_path_in_container =
+            Path::new(SANDBOX_BASE_PATH_IN_CONTAINER).join(sandbox_relpath);
+
         if let Some(working_directory) = working_directory {
             sandbox_path_in_container.join(working_directory)
         } else {
@@ -1107,8 +1111,10 @@ fn setup_docker_run_sh_script(
         }
     };
 
-    let container_workdir_str = container_workdir.to_str()
-        .ok_or_else(|| "Unable to convert container working directory to string due to non UTF-8 characters".to_string())?;
+    let container_workdir_str = container_workdir.to_str().ok_or_else(|| {
+        "Unable to convert container working directory to string due to non UTF-8 characters"
+            .to_string()
+    })?;
 
     // Format environment variables for Docker
     let mut env_args: Vec<String> = vec![];
@@ -1132,8 +1138,9 @@ fn setup_docker_run_sh_script(
     }
 
     // Create volume mount arguments
-    let host_work_dir_str = host_work_dir_base.to_str()
-        .ok_or_else(|| "Unable to convert host work directory to string due to non UTF-8 characters".to_string())?;
+    let host_work_dir_str = host_work_dir_base.to_str().ok_or_else(|| {
+        "Unable to convert host work directory to string due to non UTF-8 characters".to_string()
+    })?;
     let host_immutable_inputs_str = host_immutable_inputs_base.to_str()
         .ok_or_else(|| "Unable to convert host immutable inputs directory to string due to non UTF-8 characters".to_string())?;
 
@@ -1147,7 +1154,7 @@ fn setup_docker_run_sh_script(
     let named_cache_volume_name = format!("pants-named-caches-{image_hash}");
 
     let script_content = format!(
-r#"#!/usr/bin/env bash
+        r#"#!/usr/bin/env bash
 # This script replicates the Docker-based process execution performed by Pants.
 # It starts a container and executes the process within it.
 
@@ -1206,7 +1213,12 @@ docker exec \
         .write(true)
         .mode(USER_EXECUTABLE_MODE)
         .open(&script_path)
-        .map_err(|e| format!("Failed to create Docker run script at {}: {e:?}", script_path.display()))?
+        .map_err(|e| {
+            format!(
+                "Failed to create Docker run script at {}: {e:?}",
+                script_path.display()
+            )
+        })?
         .write_all(script_content.as_bytes())
         .map_err(|e| format!("Failed to write Docker run script: {e:?}"))
 }
