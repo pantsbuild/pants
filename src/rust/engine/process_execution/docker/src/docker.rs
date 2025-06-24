@@ -504,7 +504,7 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                             workdir.path(),
                             image_name,
                             &self.work_dir_base,
-                            &self.immutable_inputs.workdir(),
+                            self.immutable_inputs.workdir(),
                         )?;
                     }
                     res
@@ -1123,7 +1123,7 @@ fn setup_docker_run_sh_script(
         let value_str = str::from_utf8(&quoted_value)
             .map_err(|e| format!("Error quoting environment variable value: {e:?}"))?
             .to_string();
-        env_args.push(format!("-e"));
+        env_args.push("-e".to_string());
         env_args.push(format!("{key}={value_str}"));
     }
 
