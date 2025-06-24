@@ -242,7 +242,9 @@ async def _partition_scalafix(
                     **dict(rule_classpath.immutable_inputs(prefix=rulecp_relpath)),
                 }
             ),
-            resolve_name=classpath.classpath.resolve.name if classpath.classpath else jvm.default_resolve,
+            resolve_name=classpath.classpath.resolve.name
+            if classpath.classpath
+            else jvm.default_resolve,
         )
 
     return Partitions(
@@ -303,7 +305,7 @@ async def _run_scalafix_process(
     merged_digest = await merge_digests(
         MergeDigests([partition_info.config_snapshot.digest, request.snapshot.digest])
     )
-
+    parsed_args = scalac.parsed_args_for_resolve(partition_info.resolve_name)
     return await execute_process(
         **implicitly(
             JvmProcess(
@@ -326,9 +328,9 @@ async def _run_scalafix_process(
                     *(
                         (
                             f"--scalac-options={arg}"
-                            for arg in scalac.parsed_args_for_resolve(partition_info.resolve_name)
+                            for arg in parsed_args
                         )
-                        if scalac.parsed_args_for_resolve(partition_info.resolve_name)
+                        if parsed_args
                         else ()
                     ),
                     *(f"--files={file}" for file in request.snapshot.files),

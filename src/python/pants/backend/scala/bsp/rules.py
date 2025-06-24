@@ -388,7 +388,10 @@ async def handle_bsp_scalac_options_request(
     return HandleScalacOptionsResult(
         ScalacOptionsItem(
             target=request.bsp_target_id,
-            options=(*local_plugins.args(local_plugins_prefix), *scalac.parsed_args_for_resolve(resolve.name)),
+            options=(
+                *local_plugins.args(local_plugins_prefix),
+                *scalac.parsed_args_for_resolve(resolve.name),
+            ),
             classpath=classpath,
             class_directory=build_root.pathlib_path.joinpath(
                 f".pants.d/bsp/{jvm_classes_directory(request.bsp_target_id)}"

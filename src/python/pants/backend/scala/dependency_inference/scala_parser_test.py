@@ -499,6 +499,7 @@ def test_scala_2_13_source3(rule_runner: RuleRunner) -> None:
     )
     assert analysis.imports_by_scope.get("foo") == (ScalaImport("bar", None, True),)
 
+
 def test_scala_3_default_args(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         args=[
@@ -519,6 +520,7 @@ def test_scala_3_default_args(rule_runner: RuleRunner) -> None:
         ),
     )
     assert analysis.imports_by_scope.get("foo") == (ScalaImport("bar", None, True),)
+
 
 def test_extract_annotations(rule_runner: RuleRunner) -> None:
     analysis = _analyze(

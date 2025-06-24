@@ -23,10 +23,9 @@ class Scalac(Subsystem):
 
     args = ArgsListOption(example="-encoding UTF-8")
 
-
     args_for_resolve = DictOption[list[str]](
         help=softwrap(
-             """
+            """
             A dictionary mapping JVM resolve names to additional arguments to pass
             to `scalac` for that resolve. These arguments are appended to the
             global `[scalac].args` option when compiling Scala code using the
@@ -47,9 +46,8 @@ class Scalac(Subsystem):
         ),
     )
 
-
     def parsed_args_for_resolve(self, resolve_name: str) -> list[str]:
-        return self.args_for_resolve.get(resolve_name, []) + list(self.args)
+        return list(self.args) + self.args_for_resolve.get(resolve_name, [])
 
     def parsed_default_plugins(self) -> dict[str, list[str]]:
         return {
