@@ -398,11 +398,6 @@ impl<R: Rule> Builder<R> {
                 );
             }
 
-            let ggg = &graph[node_id];
-            if format!("{:?}", ggg.0).contains(" id: RuleId(\"pants.core.goals.package.build_package\")") {
-                log::warn!("XXXXXXXXXXXXXXXXXXX {:?}", ggg.1.iter().sorted().collect::<Vec<_>>());
-            }
-
             // Collect the candidates that might satisfy the dependency keys of the node (if it has any).
             let candidates_by_key = graph[node_id]
                 .0

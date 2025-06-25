@@ -75,13 +75,20 @@ impl Task {
             .ok_or_else(|| throw(format!("No edges for task {entry:?} exist!")))?;
 
         // Find the entry for the Call.
-        let entry = edges.entry_for(&dependency_key).ok_or_else(|| {
-            // NB: The Python constructor for `Call()` will have already errored if
-            // `type(input) != input_type`.
-            throw(format!(
-                "{call} was not detected in your @rule body at rule compile time."
-            ))
-        })?;
+        let entry = edges
+            .entry_for(&dependency_key)
+            .or_else(|| {
+                // The Get might have involved a @union: if so, include its in_scope types in the
+                // lookup.
+                edges.entry_for(&dependency_key.in_scope_params(vec![]))
+            })
+            .ok_or_else(|| {
+                // NB: The Python constructor for `Call()` will have already errored if
+                // `type(input) != input_type`.
+                throw(format!(
+                    "{call} was not detected in your @rule body at rule compile time."
+                ))
+            })?;
         select(context, call.args, call.args_arity, params, entry).await
     }
 
