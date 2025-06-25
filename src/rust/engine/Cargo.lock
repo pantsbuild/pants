@@ -1108,6 +1108,7 @@ dependencies = [
  "parking_lot 0.12.3",
  "process_execution",
  "sharded_lmdb",
+ "shell-quote",
  "store",
  "task_executor",
  "tempfile",
