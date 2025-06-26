@@ -3,8 +3,11 @@
 use std::collections::{BTreeMap, HashMap};
 use std::ffi::OsStr;
 use std::fmt;
+use std::io::Write;
 use std::net::ToSocketAddrs;
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
+use std::str;
 use std::sync::Arc;
 
 use async_oncecell::OnceCell;
@@ -17,6 +20,7 @@ use bollard::service::CreateImageInfo;
 use bollard::volume::CreateVolumeOptions;
 use bollard::{Docker, errors::Error as DockerError};
 use bytes::{Bytes, BytesMut};
+use fs::RelativePath;
 use futures::stream::BoxStream;
 use futures::{FutureExt, StreamExt};
 use hashing::Digest;
@@ -25,13 +29,14 @@ use log::Level;
 use nails::execution::ExitCode;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
+use shell_quote::Bash;
 use store::{ImmutableInputs, Store};
 use task_executor::Executor;
 use workunit_store::{Metric, RunningWorkunit, in_workunit};
 
 use process_execution::local::{
-    CapturedWorkdir, CapturedWorkdirError, ChildOutput, KeepSandboxes, apply_chroot,
-    collect_child_outputs, create_sandbox, prepare_workdir, setup_run_sh_script,
+    CapturedWorkdir, CapturedWorkdirError, ChildOutput, KeepSandboxes, USER_EXECUTABLE_MODE,
+    apply_chroot, collect_child_outputs, create_sandbox, prepare_workdir,
 };
 use process_execution::{
     Context, FallibleProcessResultWithPlatform, NamedCaches, Platform, Process, ProcessError,
@@ -491,12 +496,15 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                             res.as_ref().map(|r| r.exit_code).unwrap_or(1) != 0
                     ) {
                         workdir.keep(&mreq.description);
-                        setup_run_sh_script(
+                        setup_docker_run_sh_script(
                             workdir.path(),
                             &mreq.env,
                             &mreq.working_directory,
                             &mreq.argv,
                             workdir.path(),
+                            image_name,
+                            &self.work_dir_base,
+                            self.immutable_inputs.workdir(),
                         )?;
                     }
                     res
@@ -1070,4 +1078,147 @@ impl<'a> ContainerCache<'a> {
         futures::future::try_join_all(removal_futures).await?;
         Ok(())
     }
+}
+
+/// Create a file called __run.sh with Docker commands to facilitate debugging Docker-based executions.
+/// This creates a script that starts a Docker container and executes the process within it.
+fn setup_docker_run_sh_script(
+    sandbox_path: &Path,
+    env: &BTreeMap<String, String>,
+    working_directory: &Option<RelativePath>,
+    argv: &[String],
+    workdir_path: &Path,
+    image_name: &str,
+    host_work_dir_base: &Path,
+    host_immutable_inputs_base: &Path,
+) -> Result<(), String> {
+    // Determine the working directory inside the container
+    let container_workdir = {
+        let sandbox_relpath = workdir_path
+            .strip_prefix(host_work_dir_base)
+            .map_err(|err| {
+                format!(
+                    "Internal error - base directory was not prefix of sandbox directory: {err}"
+                )
+            })?;
+        let sandbox_path_in_container =
+            Path::new(SANDBOX_BASE_PATH_IN_CONTAINER).join(sandbox_relpath);
+
+        if let Some(working_directory) = working_directory {
+            sandbox_path_in_container.join(working_directory)
+        } else {
+            sandbox_path_in_container
+        }
+    };
+
+    let container_workdir_str = container_workdir.to_str().ok_or_else(|| {
+        "Unable to convert container working directory to string due to non UTF-8 characters"
+            .to_string()
+    })?;
+
+    // Format environment variables for Docker
+    let mut env_args: Vec<String> = vec![];
+    for (key, value) in env.iter() {
+        let quoted_value = Bash::quote_vec(value.as_str());
+        let value_str = str::from_utf8(&quoted_value)
+            .map_err(|e| format!("Error quoting environment variable value: {e:?}"))?
+            .to_string();
+        env_args.push("-e".to_string());
+        env_args.push(format!("{key}={value_str}"));
+    }
+
+    // Shell-quote every command-line argument
+    let mut quoted_argv: Vec<String> = vec![];
+    for arg in argv.iter() {
+        let quoted_arg = Bash::quote_vec(arg.as_str());
+        let arg_str = str::from_utf8(&quoted_arg)
+            .map_err(|e| format!("Error quoting command argument: {e:?}"))?
+            .to_string();
+        quoted_argv.push(arg_str);
+    }
+
+    // Create volume mount arguments
+    let host_work_dir_str = host_work_dir_base.to_str().ok_or_else(|| {
+        "Unable to convert host work directory to string due to non UTF-8 characters".to_string()
+    })?;
+    let host_immutable_inputs_str = host_immutable_inputs_base.to_str()
+        .ok_or_else(|| "Unable to convert host immutable inputs directory to string due to non UTF-8 characters".to_string())?;
+
+    // Generate named cache volume name (same logic as in make_named_cache_volume)
+    let image_hash = hashing::Digest::of_bytes(image_name.as_bytes())
+        .hash
+        .to_hex()
+        .chars()
+        .take(12)
+        .collect::<String>();
+    let named_cache_volume_name = format!("pants-named-caches-{image_hash}");
+
+    let script_content = format!(
+        r#"#!/usr/bin/env bash
+# This script replicates the Docker-based process execution performed by Pants.
+# It starts a container and executes the process within it.
+
+set -euo pipefail
+
+# Ensure required Docker volume exists
+if ! docker volume inspect {named_cache_volume_name} >/dev/null 2>&1; then
+    echo "Creating Docker volume: {named_cache_volume_name}"
+    docker volume create {named_cache_volume_name}
+fi
+
+# Start the container if it's not already running
+CONTAINER_ID=$(docker run -d \
+    --init \
+    --tty \
+    -v {host_work_dir_str}:{SANDBOX_BASE_PATH_IN_CONTAINER} \
+    -v {named_cache_volume_name}:{NAMED_CACHES_BASE_PATH_IN_CONTAINER} \
+    -v {host_immutable_inputs_str}:{IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER} \
+    {image_name} \
+    /bin/sh)
+
+echo "Started container: $CONTAINER_ID"
+
+# Ensure container cleanup on script exit
+cleanup() {{
+    echo "Stopping and removing container: $CONTAINER_ID"
+    docker stop "$CONTAINER_ID" >/dev/null 2>&1 || true
+    docker rm "$CONTAINER_ID" >/dev/null 2>&1 || true
+}}
+trap cleanup EXIT
+
+# Execute the command in the container
+echo "Executing command in container..."
+docker exec \
+    -w {container_workdir_str} \
+    {env_args} \
+    "$CONTAINER_ID" \
+    {command_line}
+"#,
+        named_cache_volume_name = named_cache_volume_name,
+        host_work_dir_str = str::from_utf8(&Bash::quote_vec(host_work_dir_str))
+            .map_err(|e| format!("Error quoting host work directory: {e:?}"))?,
+        host_immutable_inputs_str = str::from_utf8(&Bash::quote_vec(host_immutable_inputs_str))
+            .map_err(|e| format!("Error quoting host immutable inputs directory: {e:?}"))?,
+        image_name = str::from_utf8(&Bash::quote_vec(image_name))
+            .map_err(|e| format!("Error quoting image name: {e:?}"))?,
+        container_workdir_str = str::from_utf8(&Bash::quote_vec(container_workdir_str))
+            .map_err(|e| format!("Error quoting container working directory: {e:?}"))?,
+        env_args = env_args.join(" "),
+        command_line = quoted_argv.join(" "),
+    );
+
+    let script_path = sandbox_path.join("__run.sh");
+    std::fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .mode(USER_EXECUTABLE_MODE)
+        .open(&script_path)
+        .map_err(|e| {
+            format!(
+                "Failed to create Docker run script at {}: {e:?}",
+                script_path.display()
+            )
+        })?
+        .write_all(script_content.as_bytes())
+        .map_err(|e| format!("Failed to write Docker run script: {e:?}"))
 }
