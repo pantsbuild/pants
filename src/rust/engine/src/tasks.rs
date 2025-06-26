@@ -248,18 +248,17 @@ impl Tasks {
             // This is a polymorphic call. In this case we set in_scope_params() to an empty vec,
             // so that only the explicit params passed to the call are considered by the solver.
             // This ensures stability of the API of the polymorphic rule (and also prevents the
-            // engine from having so solve unnecessarily for these calls).
+            // engine from having to do unnecessary solving for these calls).
             // Once we are fully call-by-name we can deprecate and remove the `in_scope_types`
             // keyword of the @union decorator, since for call-by-name we take the set of
             // params from the call itself, as you'd expect.
 
-            // Note that since we have vtable_entries, we know that the Python code calling this
-            // function has already verified that there is a relevant union type in the inputs,
-            // so this should never panic in practice.
+            // Note that the Python code calling this function has already verified that there
+            // is a relevant union type in the inputs, so this should never panic in practice.
             let union_type = inputs.iter().find(|t| t.is_union()).unwrap_or_else(|| {
                 panic!("No union argument found in inputs of call to {}", rule_id)
             });
-            // Add calls for each vtable member.
+            // Add calls for each vtable member. At runtime we'll select the relevant one.
             for (member_type, member_rule) in vtable_entries.iter() {
                 let member_rule_inputs = inputs
                     .iter()
@@ -273,7 +272,8 @@ impl Tasks {
                 );
             }
             self.vtable.insert(rule_id.clone(), vtable_entries);
-            // Add the polymorphic call for the base type.
+
+            // Add the polymorphic call itself.
             calls.push(
                 DependencyKey::for_known_rule(rule_id, output, explicit_args_arity)
                     .provided_params(inputs)
