@@ -16,3 +16,8 @@ class SpectralSubsystem(NodeJSToolBase):
 
     skip = SkipOption("lint")
     args = ArgsListOption(example="--fail-severity=warn")
+
+    @property
+    def binary_name(self) -> str:
+        """The binary name to run for this tool."""
+        return self._binary_name or "spectral"
