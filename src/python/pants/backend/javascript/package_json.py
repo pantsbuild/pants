@@ -379,6 +379,14 @@ class NodeBuildScriptEntryPointField(StringField):
     required = True
     value: str
 
+    help = help_text(
+        """
+        The name of the script from the package.json#scripts section to execute for the build.
+
+        This script should produce the output files/directories specified in the build script configuration.
+        """
+    )
+
 
 class NodeBuildScriptSourcesField(SourcesField):
     alias = "_sources"
@@ -936,6 +944,7 @@ def target_types() -> Iterable[type[Target]]:
         NodePackageTarget,
         NodeThirdPartyPackageTarget,
         NPMDistributionTarget,
+        NodeBuildScriptTarget,
     ]
 
 
