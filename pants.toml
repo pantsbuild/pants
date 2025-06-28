@@ -68,6 +68,11 @@ pants_ignore.add = [
   # We have Pants stuff in here
   "!.github/",
   "!/src/rust/engine/.cargo",
+  # Gitignored but part of builds
+  "!/src/python/pants/engine/internals/native_engine.so",
+  "!/src/python/pants/engine/internals/native_engine.so.metadata",
+  "!/src/python/pants/bin/native_client",
+  "!/src/python/pants/bin/sandboxer",
 ]
 
 build_ignore.add = [
