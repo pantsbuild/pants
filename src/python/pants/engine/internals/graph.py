@@ -67,7 +67,6 @@ from pants.engine.target import (
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     FilteredTargets,
-    GeneratedSources,
     GeneratedTargets,
     GenerateSourcesRequest,
     GenerateTargetsRequest,
@@ -101,6 +100,8 @@ from pants.engine.target import (
     WrappedTarget,
     WrappedTargetRequest,
     _generate_file_level_targets,
+    generate_sources,
+    generate_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import GlobalOptions, UnmatchedBuildFileGlobs
@@ -434,7 +435,9 @@ async def resolve_all_generator_target_requests(
 
 @rule
 async def resolve_target_parametrizations(
-    request: _TargetParametrizationsRequest, union_membership: UnionMembership
+    request: _TargetParametrizationsRequest,
+    union_membership: UnionMembership,
+    env_name: EnvironmentName,
 ) -> _TargetParametrizations:
     address = request.address
     adaptor_and_type = await _determine_target_adaptor_and_type(
@@ -451,7 +454,9 @@ async def resolve_target_parametrizations(
         )
     if requests and requests.requests:
         all_generated = await concurrently(
-            Get(GeneratedTargets, GenerateTargetsRequest, generate_request)
+            generate_targets(
+                **implicitly({generate_request: GenerateTargetsRequest, env_name: EnvironmentName})
+            )
             for generate_request in requests.requests
         )
         parametrizations.extend(
@@ -1386,6 +1391,7 @@ async def hydrate_sources(
     request: HydrateSourcesRequest,
     unmatched_build_file_globs: UnmatchedBuildFileGlobs,
     union_membership: UnionMembership,
+    env_name: EnvironmentName,
 ) -> HydratedSources:
     sources_field = request.field
 
@@ -1445,11 +1451,11 @@ async def hydrate_sources(
         ),
         **implicitly(),
     )
-    generated_sources = await Get(
-        GeneratedSources,
-        GenerateSourcesRequest,
-        generate_request_type(snapshot, wrapped_protocol_target.target),
+    req = generate_request_type(snapshot, wrapped_protocol_target.target)
+    generated_sources = await generate_sources(
+        **implicitly({req: GenerateSourcesRequest, env_name: EnvironmentName})
     )
+
     return HydratedSources(
         generated_sources.snapshot, sources_field.filespec, sources_type=sources_type
     )

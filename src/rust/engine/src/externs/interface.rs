@@ -44,7 +44,7 @@ use pyo3::types::{
 use pyo3::{Bound, IntoPyObject, PyAny, PyRef, create_exception};
 use regex::Regex;
 use remote::remote_cache::RemoteCacheWarningsBehavior;
-use rule_graph::{self, RuleGraph};
+use rule_graph::{self, RuleGraph, RuleId};
 use store::RemoteProvider;
 use task_executor::Executor;
 use tokio::sync::Mutex;
@@ -1313,14 +1313,20 @@ fn tasks_add_call<'py>(
     inputs: Vec<Bound<'py, PyType>>,
     rule_id: String,
     explicit_args_arity: u16,
+    vtable_entries: Option<Vec<(Bound<'py, PyType>, String)>>,
 ) {
     let output = TypeId::new(output);
     let inputs = inputs.into_iter().map(|t| TypeId::new(&t)).collect();
     py_tasks.borrow_mut().0.get(py).borrow_mut().add_call(
         output,
         inputs,
-        rule_id,
+        RuleId::from_string(rule_id),
         explicit_args_arity,
+        vtable_entries.map(|vte| {
+            vte.into_iter()
+                .map(|(k, v)| (TypeId::new(&k), RuleId::from_string(v)))
+                .collect()
+        }),
     );
 }
 
