@@ -48,16 +48,18 @@ impl Task {
         call: externs::Call,
     ) -> NodeResult<Value> {
         let context = context.clone();
-        let vtable_entries = context.core.tasks.vtable().get(&call.rule_id);
-        let implementation_rule = match vtable_entries {
-            Some(ve) => call
-                .inputs
-                .iter()
-                .map(|t| ve.get(t.type_id()))
-                .find(Option::is_some)
-                .flatten(),
-            None => None,
-        };
+        let implementation_rule = context
+            .core
+            .tasks
+            .vtable()
+            .get(&call.rule_id)
+            .and_then(|ve| {
+                call.inputs
+                    .iter()
+                    .map(|t| ve.get(t.type_id()))
+                    .find(Option::is_some)
+                    .flatten()
+            });
 
         // If no implementation rule, use the base rule. Typically that will throw a
         // relevant error, but could hypothetically provide a sensible default implementation.
@@ -79,14 +81,18 @@ impl Task {
             .entry_for(&dependency_key)
             .or_else(|| {
                 // The Get might have involved a @union: if so, include its in_scope types in the
-                // lookup.
+                // lookup. This just means setting in_scope_params to non-None, to signal that
+                // in_scope types should be considered. For call-by-name the in_scope types are
+                // the explicit params passed to the call, and the in_scope_params field acts
+                // as a bool.
                 edges.entry_for(&dependency_key.in_scope_params(vec![]))
             })
             .ok_or_else(|| {
                 // NB: The Python constructor for `Call()` will have already errored if
                 // `type(input) != input_type`.
                 throw(format!(
-                    "{call} was not detected in your @rule body at rule compile time."
+                    "{call} was not detected in your @rule body at rule compile time. Make sure
+                    the callee is defined before the @rule body."
                 ))
             })?;
         select(context, call.args, call.args_arity, params, entry).await

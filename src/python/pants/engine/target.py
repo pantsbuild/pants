@@ -2600,7 +2600,9 @@ class GeneratedSources:
 
 
 @rule(polymorphic=True)
-async def generate_sources(req: GenerateSourcesRequest) -> GeneratedSources:
+async def generate_sources(
+    req: GenerateSourcesRequest, env_name: EnvironmentName
+) -> GeneratedSources:
     raise NotImplementedError()
 
 

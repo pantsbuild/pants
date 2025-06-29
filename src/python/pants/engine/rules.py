@@ -230,11 +230,11 @@ class RuleDecoratorKwargs(TypedDict):
 
     ```
     @rule(polymorphic=True)
-    def base_rule(arg: UnionBase, other_arg: OtherType) -> OutputType
+    async def base_rule(arg: UnionBase, other_arg: OtherType) -> OutputType
         ...
 
     @rule(polymorphic=True)
-    def derived_rule(arg: UnionMember, other_arg: OtherType) -> OutputType
+    async def derived_rule(arg: UnionMember, other_arg: OtherType) -> OutputType
        ...
 
     ```
