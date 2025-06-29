@@ -6,7 +6,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use fs::{
-    DigestTrie, DirectoryDigest, GlobMatching, PathStat, RelativePath, SymlinkBehavior, TypedPath,
+    DigestTrie, DirectoryDigest, GlobMatching, PathGlobs, PathStat, RelativePath, SymlinkBehavior,
+    TypedPath,
 };
 use hashing::{Digest, EMPTY_DIGEST};
 use pyo3::prelude::{PyModule, PyRef, PyResult, Python, pyfunction, wrap_pyfunction};
@@ -14,7 +15,6 @@ use pyo3::types::{PyAnyMethods, PyModuleMethods, PyTuple, PyTypeMethods};
 use pyo3::{Bound, IntoPyObject, PyAny};
 use store::{SnapshotOps, SubsetParams};
 
-use crate::Failure;
 use crate::externs;
 use crate::externs::PyGeneratorResponseNativeCall;
 use crate::externs::fs::{
@@ -25,6 +25,7 @@ use crate::nodes::{
     task_get_context, unmatched_globs_additional_context,
 };
 use crate::python::{Key, Value, throw};
+use crate::{Context, Failure};
 
 pub fn register(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(add_prefix, m)?)?;
@@ -178,17 +179,30 @@ fn download_file(download_file: Value) -> PyGeneratorResponseNativeCall {
 fn path_globs_to_digest(path_globs: Value) -> PyGeneratorResponseNativeCall {
     PyGeneratorResponseNativeCall::new(async move {
         let context = task_get_context();
-
-        let path_globs = Python::with_gil(|py| {
-            let py_path_globs = path_globs.bind(py);
-            Snapshot::lift_path_globs(py_path_globs)
-        })
-        .map_err(|e| throw(format!("Failed to parse PathGlobs: {e}")))?;
-        let snapshot = context.get(Snapshot::from_path_globs(path_globs)).await?;
-        Ok::<_, Failure>(Python::with_gil(|py| {
-            Snapshot::store_directory_digest(py, snapshot.into())
+        let digest = inner_path_globs_to_digest(path_globs, &context).await?;
+        Ok(Python::with_gil(|py| {
+            Snapshot::store_directory_digest(py, digest)
         })?)
     })
+}
+
+async fn inner_path_globs_to_digest(
+    path_globs: Value,
+    context: &Context,
+) -> Result<DirectoryDigest, Failure> {
+    let path_globs = lift_python_path_globs(path_globs)?;
+    Ok(context
+        .get(Snapshot::from_path_globs(path_globs))
+        .await?
+        .into())
+}
+
+fn lift_python_path_globs(path_globs: Value) -> Result<PathGlobs, Failure> {
+    Python::with_gil(|py| {
+        let py_path_globs = path_globs.bind(py);
+        Snapshot::lift_path_globs(py_path_globs)
+    })
+    .map_err(|e| throw(format!("Failed to parse PathGlobs: {e}")))
 }
 
 #[pyfunction]
@@ -197,11 +211,7 @@ fn path_globs_to_paths(path_globs: Value) -> PyGeneratorResponseNativeCall {
         let context = task_get_context();
         let core = &context.core;
 
-        let path_globs = Python::with_gil(|py| {
-            let py_path_globs = path_globs.bind(py);
-            Snapshot::lift_path_globs(py_path_globs)
-        })
-        .map_err(|e| throw(format!("Failed to parse PathGlobs: {e}")))?;
+        let path_globs = lift_python_path_globs(path_globs)?;
 
         let path_globs = path_globs.parse().map_err(throw)?;
         let path_stats = context
