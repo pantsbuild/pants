@@ -103,6 +103,29 @@ def get_package_json_content() -> str:
     return resource_path.read_text()
 
 
+def get_pnpm_workspace_content() -> str:
+    """Get pnpm-workspace.yaml content from test_resources directory.
+    
+    This ensures consistent pnpm workspace configuration with hoisted node linking.
+    """
+    resource_path = Path(__file__).parent / "test_resources" / "pnpm-workspace.yaml"
+    return resource_path.read_text()
+
+
+def _load_pnpm_link_test_files() -> dict[str, str]:
+    """Load test files for pnpm link: protocol test from resources with test directory prefix."""
+    base_dir = Path(__file__).parent / "test_resources" / "pnpm_link"
+    files = {}
+    
+    # Load all files recursively, adding test directory prefix
+    for file_path in base_dir.rglob("*"):
+        if file_path.is_file():
+            relative_path = file_path.relative_to(base_dir)
+            files[f"pnpm_link_test/{relative_path}"] = file_path.read_text()
+    
+    return files
+
+
 _LOCKFILE_FILE_NAMES = {
     "pnpm": "pnpm-lock.yaml",
     "npm": "package-lock.json",
@@ -188,7 +211,7 @@ def test_typescript_check_failure(rule_runner: RuleRunner, package_manager: str,
             **{f"test_project/{filename}": content for filename, content in typescript_lockfile.items()},
         }
     )
-    
+        
     # Get the TypeScript target
     target = rule_runner.get_target(Address("test_project/src", relative_file_path="index.ts"))
     field_set = TypeScriptCheckFieldSet.create(target)
@@ -475,4 +498,32 @@ def test_typescript_check_cross_project_imports(rule_runner: RuleRunner, typescr
     # TypeScript outputs: "error TS2307: Cannot find module '../../projectA/src/shared' or its corresponding type declarations."
     error_output = result.stdout + result.stderr
     assert "TS2307" in error_output and "Cannot find module" in error_output
+
+
+def test_typescript_check_pnpm_link_protocol_success(rule_runner: RuleRunner, package_manager: str) -> None:
+    """Test that pnpm link: protocol allows successful imports between packages."""
+    
+    # Only run this test with pnpm
+    if package_manager != "pnpm":
+        pytest.skip("This test is specific to pnpm link: protocol")
+    
+    # Load all test files from test_resources/pnpm_link directory (with test prefix applied)
+    test_files = _load_pnpm_link_test_files()
+    
+    rule_runner.write_files(test_files)
+    
+    # Get the parent target that imports from child via link: protocol
+    parent_target = rule_runner.get_target(Address("pnpm_link_test/src", relative_file_path="main.ts"))
+    parent_field_set = TypeScriptCheckFieldSet.create(parent_target)
+    
+    # Create check request
+    request = TypeScriptCheckRequest([parent_field_set])
+    
+    # Execute the check
+    results = rule_runner.request(CheckResults, [request])
+    
+    # Should succeed - pnpm link: protocol should resolve with hoisted configuration
+    assert len(results.results) == 1
+    result = results.results[0]
+    assert result.exit_code == 0, f"TypeScript check failed: {result.stdout}\n{result.stderr}"
 

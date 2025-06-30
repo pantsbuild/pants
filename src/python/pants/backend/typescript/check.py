@@ -48,13 +48,6 @@ async def _load_cached_typescript_artifacts(project) -> Digest:
         **implicitly()
     )
     
-    if cached_artifacts != EMPTY_DIGEST:
-        artifact_contents = await Get(DigestContents, Digest, cached_artifacts)
-        logger.info(f"DEBUG: Found {len(artifact_contents)} cached TypeScript artifacts for incremental compilation")
-        for artifact in sorted(artifact_contents, key=lambda f: f.path):
-            logger.info(f"DEBUG:   {artifact.path}")
-    else:
-        logger.info(f"DEBUG: No cached TypeScript artifacts found - this will be a full compilation")
     
     return cached_artifacts
 
@@ -79,14 +72,6 @@ async def _extract_typescript_artifacts_for_caching(project, process_output_dige
         )
     )
     
-    # DEBUG: Log captured artifacts
-    if artifacts_digest != EMPTY_DIGEST:
-        artifact_contents = await Get(DigestContents, Digest, artifacts_digest)
-        logger.info(f"DEBUG: Cached {len(artifact_contents)} TypeScript artifacts for incremental compilation")
-        for artifact in sorted(artifact_contents, key=lambda f: f.path):
-            logger.info(f"DEBUG:   {artifact.path}")
-    else:
-        logger.info(f"DEBUG: No TypeScript artifacts generated for project {project.root_dir}")
     
     return artifacts_digest
 
@@ -135,8 +120,6 @@ async def _typecheck_single_project(
     global_options: GlobalOptions,
 ) -> CheckResult:
     """Type check a single TypeScript project."""
-    logger.info(f"DEBUG: TypeScript check for project: {project.root_dir}")
-    
     # PR_NOTE: Find all TypeScript targets within this project using Pants' target knowledge
     # This replaces glob-based file discovery with proper target-based source discovery
     all_targets = await Get(AllTargets)
@@ -167,8 +150,6 @@ async def _typecheck_single_project(
             if target_project == project:
                 project_typescript_targets.append(target)
     
-    logger.info(f"DEBUG: Found {len(project_typescript_targets)} TypeScript targets in project")
-    
     # Get source files from all TypeScript targets in the project
     if project_typescript_targets:
         workspace_target_sources = await concurrently(
@@ -183,11 +164,6 @@ async def _typecheck_single_project(
         all_workspace_digests = [sources.snapshot.digest for sources in workspace_target_sources]
         all_workspace_sources = await merge_digests(MergeDigests(all_workspace_digests))
         
-        # DEBUG: Log what source files were captured
-        source_contents = await Get(DigestContents, Digest, all_workspace_sources)
-        logger.info(f"DEBUG: Captured {len(source_contents)} source files from project targets:")
-        for file_content in sorted(source_contents, key=lambda f: f.path):
-            logger.info(f"DEBUG:   {file_content.path}")
     else:
         logger.warning(f"No TypeScript targets found in project {project.root_dir}")
         return CheckResult(
@@ -246,10 +222,6 @@ async def _typecheck_single_project(
     
     config_files.extend(config_file_targets)
     
-    logger.info(f"DEBUG: Found {len(config_file_targets)} config file targets")
-    
-    logger.info(f"DEBUG: Configuration files discovered: {len(project_package_jsons)} package.json, {len(project_ts_configs)} tsconfig.json")
-    logger.info(f"DEBUG: Total configuration files to include: {config_files}")
     
     # Get config file digests
     config_digests = []
@@ -268,11 +240,6 @@ async def _typecheck_single_project(
     all_digests = [all_workspace_sources] + config_digests + ([cached_typescript_artifacts] if cached_typescript_artifacts != EMPTY_DIGEST else [])
     input_digest = await merge_digests(MergeDigests(all_digests))
     
-    # DEBUG: Log final input_digest contents  
-    final_contents = await Get(DigestContents, Digest, input_digest)
-    logger.info(f"DEBUG: Final input_digest contains {len(final_contents)} files:")
-    for file_content in sorted(final_contents, key=lambda f: f.path):
-        logger.info(f"DEBUG:   {file_content.path}")
     
     # Use --build to compile all projects in workspace with project references
     args = ("--build",)
@@ -382,7 +349,6 @@ async def _typecheck_typescript_files(
     
     # PR_NOTE: Multi-project support - check each project concurrently
     # This replaces the single project limitation with concurrent multi-project execution
-    logger.info(f"DEBUG: TypeScript check across {len(projects_to_check)} projects: {[proj.root_dir for proj in projects_to_check.keys()]}")
     
     # Check all projects concurrently
     project_results = await concurrently(

@@ -834,7 +834,7 @@ src/python/pants/backend/typescript/
 
 **Phase 5.2: Package Manager Tests** - ❌ **BLOCKED** 
 - ❌ npm workspace resolution with real npm execution
-- ❌ pnpm workspace resolution with real pnpm and `link:` protocol  
+- ❌ pnpm workspace resolution with real pnpm and `link:` protocol (test shows module resolution fails - current limitation)  
 - ❌ Yarn Classic workspace resolution with real yarn execution
 
 **Phase 5.3: Multi-Project and Caching Tests** - ❌ **BLOCKED**

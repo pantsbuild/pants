@@ -20,5 +20,6 @@ resources(
         "package-lock.json", 
         "pnpm-lock.yaml",
         "yarn.lock",
+        "pnpm_link/**/*",
     ]
 )
