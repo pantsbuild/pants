@@ -146,7 +146,6 @@ def _load_project_test_files(test_project: str) -> dict[str, str]:
     base_dir = Path(__file__).parent / "test_resources" / test_project
     files = {}
     
-    # Load all files recursively
     for file_path in base_dir.rglob("*"):
         if file_path.is_file():
             relative_path = file_path.relative_to(base_dir)
@@ -160,22 +159,15 @@ def test_typescript_check_success(basic_rule_runner: tuple[RuleRunner, str, str]
     
     rule_runner, test_project, package_manager = basic_rule_runner
     
-    # Load project files
     test_files = _load_project_test_files(test_project)
-    
     rule_runner.write_files(test_files)
     
-    # Get the TypeScript target
     target = rule_runner.get_target(Address("basic_project/src", target_name="ts_sources", relative_file_path="index.ts"))
     field_set = TypeScriptCheckFieldSet.create(target)
     
-    # Create check request
     request = TypeScriptCheckRequest([field_set])
-    
-    # Execute the check
     results = rule_runner.request(CheckResults, [request])
     
-    # Should succeed with no type errors
     assert len(results.results) == 1
     assert results.results[0].exit_code == 0
 
@@ -197,17 +189,12 @@ def test_typescript_check_failure(basic_rule_runner: tuple[RuleRunner, str, str]
     
     rule_runner.write_files(test_files)
         
-    # Get the TypeScript target
     target = rule_runner.get_target(Address("basic_project/src", target_name="ts_sources", relative_file_path="index.ts"))
     field_set = TypeScriptCheckFieldSet.create(target)
     
-    # Create check request
     request = TypeScriptCheckRequest([field_set])
-    
-    # Execute the check
     results = rule_runner.request(CheckResults, [request])
     
-    # Should fail with type errors
     assert len(results.results) == 1
     assert results.results[0].exit_code != 0
 
@@ -293,36 +280,19 @@ def test_typescript_check_skip_field(basic_rule_runner: tuple[RuleRunner, str, s
         }
     )
     
-    # Get both targets
     normal_target = rule_runner.get_target(Address("test_skip/src", target_name="normal", relative_file_path="math.ts"))
     skipped_target = rule_runner.get_target(Address("test_skip/src", target_name="skipped", relative_file_path="invalid.ts"))
-    
-    # Debug: Check if the skip field is available on targets
-    from pants.backend.typescript.check import SkipTypeScriptCheckField
-    
-    # Check the generator targets have the field
-    normal_generator = rule_runner.get_target(Address("test_skip/src", target_name="normal"))
-    skipped_generator = rule_runner.get_target(Address("test_skip/src", target_name="skipped"))
-    
-    assert not normal_generator.get(SkipTypeScriptCheckField).value
-    assert skipped_generator.get(SkipTypeScriptCheckField).value
-    
-    # Check individual targets inherit the field  
-    assert not normal_target.get(SkipTypeScriptCheckField).value
-    assert skipped_target.get(SkipTypeScriptCheckField).value
     
     # Verify the skipped target opts out
     assert not TypeScriptCheckFieldSet.opt_out(normal_target)
     assert TypeScriptCheckFieldSet.opt_out(skipped_target)
     
-    # Create field set for normal target
     normal_field_set = TypeScriptCheckFieldSet.create(normal_target)
     
     # Check only the normal target - skipped one should not cause failure
     request = TypeScriptCheckRequest([normal_field_set])
     results = rule_runner.request(CheckResults, [request])
     
-    # Should succeed since we only checked the valid file
     assert len(results.results) == 1
     assert results.results[0].exit_code == 0
 
@@ -336,17 +306,14 @@ def test_typescript_check_no_targets_in_project(basic_rule_runner: tuple[RuleRun
     test_files = _load_project_test_files(test_project)
     test_files["basic_project/src/BUILD"] = "javascript_sources()"  # Only JS sources, no TS
     test_files["basic_project/src/index.js"] = "console.log('Hello from JS');"
-    # Remove TypeScript files
     del test_files["basic_project/src/index.ts"]
     
     rule_runner.write_files(test_files)
     
-    # Try to get TypeScript targets - there should be none
-    # We need to create an empty request since there are no TS targets
+    # Create an empty request since there are no TS targets
     request = TypeScriptCheckRequest([])
     results = rule_runner.request(CheckResults, [request])
     
-    # Should return empty results when no field sets provided
     assert len(results.results) == 0
 
 
@@ -355,7 +322,6 @@ def test_typescript_check_subsystem_skip(basic_rule_runner: tuple[RuleRunner, st
     
     rule_runner, test_project, package_manager = basic_rule_runner
     
-    # Set the skip option
     rule_runner.set_options(
         [
             "--typescript-skip",  # Skip all TypeScript checking
@@ -369,17 +335,12 @@ def test_typescript_check_subsystem_skip(basic_rule_runner: tuple[RuleRunner, st
     
     rule_runner.write_files(test_files)
     
-    # Get the TypeScript target
     target = rule_runner.get_target(Address("basic_project/src", target_name="ts_sources", relative_file_path="index.ts"))
     field_set = TypeScriptCheckFieldSet.create(target)
     
-    # Create check request
     request = TypeScriptCheckRequest([field_set])
-    
-    # Execute the check
     results = rule_runner.request(CheckResults, [request])
     
-    # Should return empty results due to subsystem skip
     assert len(results.results) == 0
 
 
@@ -388,9 +349,7 @@ def test_typescript_check_multiple_projects(workspace_rule_runner: tuple[RuleRun
     
     rule_runner, test_project, package_manager = workspace_rule_runner
     
-    # Load project files  
     test_files = _load_project_test_files(test_project)
-    
     rule_runner.write_files(test_files)
     
     # Get targets from different packages in the workspace to simulate multiple projects
@@ -402,16 +361,12 @@ def test_typescript_check_multiple_projects(workspace_rule_runner: tuple[RuleRun
     field_setB = TypeScriptCheckFieldSet.create(shared_utils_target)
     field_setC = TypeScriptCheckFieldSet.create(main_app_target)
     
-    # Create check request with targets from different packages
     request = TypeScriptCheckRequest([field_setA, field_setB, field_setC])
-    
-    # Execute the check
     results = rule_runner.request(CheckResults, [request])
     
     # Should have results for the packages (could be combined or separate depending on Pants optimization)
     assert len(results.results) >= 1
     
-    # All should succeed
     for result in results.results:
         assert result.exit_code == 0
         assert "error" not in result.stdout.lower()
@@ -437,17 +392,12 @@ def test_typescript_check_test_files(workspace_rule_runner: tuple[RuleRunner, st
     
     rule_runner.write_files(test_files)
     
-    # Get the test target - TypeScript tests are also handled by TypeScriptCheckFieldSet
     test_target = rule_runner.get_target(Address("complex_project/main-app/tests", relative_file_path="math.test.ts"))
     test_field_set = TypeScriptCheckFieldSet.create(test_target)
     
-    # Create check request
     request = TypeScriptCheckRequest([test_field_set])
-    
-    # Execute the check
     results = rule_runner.request(CheckResults, [request])
     
-    # Should succeed
     assert len(results.results) == 1
     assert results.results[0].exit_code == 0
 
@@ -473,14 +423,10 @@ def test_typescript_check_cross_project_imports(basic_rule_runner: tuple[RuleRun
     
     rule_runner.write_files(test_files)
     
-    # Get the target that attempts invalid import
     cross_import_target = rule_runner.get_target(Address("basic_project/src", target_name="ts_sources", relative_file_path="index.ts"))
     cross_import_field_set = TypeScriptCheckFieldSet.create(cross_import_target)
     
-    # Create check request for the target with invalid import
     request = TypeScriptCheckRequest([cross_import_field_set])
-    
-    # Execute the check
     results = rule_runner.request(CheckResults, [request])
     
     # Should fail due to module resolution error (can't find invalid import)
@@ -505,14 +451,10 @@ def test_typescript_check_pnpm_link_protocol_success(pnpm_rule_runner: tuple[Rul
     
     rule_runner.write_files(test_files)
     
-    # Get the parent target that imports from child via link: protocol
     parent_target = rule_runner.get_target(Address("pnpm_link/src", relative_file_path="main.ts"))
     parent_field_set = TypeScriptCheckFieldSet.create(parent_target)
     
-    # Create check request
     request = TypeScriptCheckRequest([parent_field_set])
-    
-    # Execute the check
     results = rule_runner.request(CheckResults, [request])
     
     # Should succeed - pnpm link: protocol should resolve with hoisted configuration
@@ -525,22 +467,16 @@ def test_typescript_check_tsx_files(basic_rule_runner: tuple[RuleRunner, str, st
     
     rule_runner, test_project, package_manager = basic_rule_runner
     
-    # Load project files
     test_files = _load_project_test_files(test_project)
-    
     rule_runner.write_files(test_files)
     
-    # Get the TSX target
     tsx_target = rule_runner.get_target(Address("basic_project/src", target_name="tsx_sources", relative_file_path="Button.tsx"))
     tsx_field_set = TypeScriptCheckFieldSet.create(tsx_target)
     
-    # Create check request for TSX file
     request = TypeScriptCheckRequest([tsx_field_set])
-    
-    # Execute the check
     results = rule_runner.request(CheckResults, [request])
     
-    # Should succeed - TSX compilation should work with React types
+    # TSX compilation should work with React types
     assert len(results.results) == 1
     assert results.results[0].exit_code == 0, f"TypeScript check of TSX failed: {results.results[0].stdout}\n{results.results[0].stderr}"
 
