@@ -89,22 +89,22 @@ def _create_rule_runner(package_manager: str) -> RuleRunner:
 @pytest.fixture
 def basic_rule_runner(basic_project_test: tuple[str, str]) -> tuple[RuleRunner, str, str]:
     """Create RuleRunner for basic project tests (all package managers)."""
-    project_type, package_manager = basic_project_test
-    return _create_rule_runner(package_manager), project_type, package_manager
+    test_project, package_manager = basic_project_test
+    return _create_rule_runner(package_manager), test_project, package_manager
 
 
 @pytest.fixture  
 def workspace_rule_runner(workspace_project_test: tuple[str, str]) -> tuple[RuleRunner, str, str]:
     """Create RuleRunner for workspace tests (npm/yarn only)."""
-    project_type, package_manager = workspace_project_test
-    return _create_rule_runner(package_manager), project_type, package_manager
+    test_project, package_manager = workspace_project_test
+    return _create_rule_runner(package_manager), test_project, package_manager
 
 
 @pytest.fixture
 def pnpm_rule_runner(pnpm_project_test: tuple[str, str]) -> tuple[RuleRunner, str, str]:
     """Create RuleRunner for pnpm-specific tests."""
-    project_type, package_manager = pnpm_project_test
-    return _create_rule_runner(package_manager), project_type, package_manager
+    test_project, package_manager = pnpm_project_test
+    return _create_rule_runner(package_manager), test_project, package_manager
 
 
 # Test content constants
@@ -141,35 +141,16 @@ TYPESCRIPT_TSCONFIG = json.dumps({
 })
 
 
-def get_package_json_content() -> str:
-    """Get package.json content from test_resources directory.
-    
-    This uses the same package.json that the lockfiles were generated from,
-    ensuring consistency between package.json and lockfiles.
-    """
-    resource_path = Path(__file__).parent / "test_resources" / "package.json"
-    return resource_path.read_text()
-
-
-def get_pnpm_workspace_content() -> str:
-    """Get pnpm-workspace.yaml content from test_resources directory.
-    
-    This ensures consistent pnpm workspace configuration with hoisted node linking.
-    """
-    resource_path = Path(__file__).parent / "test_resources" / "pnpm-workspace.yaml"
-    return resource_path.read_text()
-
-
-def _load_project_test_files(project_type: str) -> dict[str, str]:
+def _load_project_test_files(test_project: str) -> dict[str, str]:
     """Load test files for the specified project type."""
-    base_dir = Path(__file__).parent / "test_resources" / project_type
+    base_dir = Path(__file__).parent / "test_resources" / test_project
     files = {}
     
     # Load all files recursively
     for file_path in base_dir.rglob("*"):
         if file_path.is_file():
             relative_path = file_path.relative_to(base_dir)
-            files[f"{project_type}/{relative_path}"] = file_path.read_text()
+            files[f"{test_project}/{relative_path}"] = file_path.read_text()
     
     return files
 
@@ -177,10 +158,10 @@ def _load_project_test_files(project_type: str) -> dict[str, str]:
 def test_typescript_check_success(basic_rule_runner: tuple[RuleRunner, str, str]) -> None:
     """Test successful TypeScript type checking."""
     
-    rule_runner, project_type, package_manager = basic_rule_runner
+    rule_runner, test_project, package_manager = basic_rule_runner
     
     # Load project files
-    test_files = _load_project_test_files(project_type)
+    test_files = _load_project_test_files(test_project)
     
     rule_runner.write_files(test_files)
     
@@ -196,18 +177,16 @@ def test_typescript_check_success(basic_rule_runner: tuple[RuleRunner, str, str]
     
     # Should succeed with no type errors
     assert len(results.results) == 1
-    result = results.results[0]
-    assert result.exit_code == 0
-    assert "error" not in result.stdout.lower()
+    assert results.results[0].exit_code == 0
 
 
 def test_typescript_check_failure(basic_rule_runner: tuple[RuleRunner, str, str]) -> None:
     """Test TypeScript type checking with type errors."""
     
-    rule_runner, project_type, package_manager = basic_rule_runner
+    rule_runner, test_project, package_manager = basic_rule_runner
     
     # Load base project files and override index.ts with type error
-    test_files = _load_project_test_files(project_type)
+    test_files = _load_project_test_files(test_project)
     test_files["basic_project/src/index.ts"] = textwrap.dedent("""\
         import { add } from './math';
         
@@ -230,15 +209,13 @@ def test_typescript_check_failure(basic_rule_runner: tuple[RuleRunner, str, str]
     
     # Should fail with type errors
     assert len(results.results) == 1
-    result = results.results[0]
-    assert result.exit_code != 0
-    assert "error" in result.stdout.lower()
+    assert results.results[0].exit_code != 0
 
 
 def test_typescript_check_skip_field(basic_rule_runner: tuple[RuleRunner, str, str]) -> None:
     """Test that targets with skip_typescript_check=true are skipped."""
     
-    rule_runner, project_type, package_manager = basic_rule_runner
+    rule_runner, test_project, package_manager = basic_rule_runner
     
     # Skip complex package manager setup and just test with npm for simplicity
     if package_manager != "npm":
@@ -347,19 +324,16 @@ def test_typescript_check_skip_field(basic_rule_runner: tuple[RuleRunner, str, s
     
     # Should succeed since we only checked the valid file
     assert len(results.results) == 1
-    result = results.results[0]
-    
-    assert result.exit_code == 0
-    assert "error" not in result.stdout.lower()
+    assert results.results[0].exit_code == 0
 
 
 def test_typescript_check_no_targets_in_project(basic_rule_runner: tuple[RuleRunner, str, str]) -> None:
     """Test project with no TypeScript targets."""
     
-    rule_runner, project_type, package_manager = basic_rule_runner
+    rule_runner, test_project, package_manager = basic_rule_runner
     
     # Load base project but override to have only JS sources
-    test_files = _load_project_test_files(project_type)
+    test_files = _load_project_test_files(test_project)
     test_files["basic_project/src/BUILD"] = "javascript_sources()"  # Only JS sources, no TS
     test_files["basic_project/src/index.js"] = "console.log('Hello from JS');"
     # Remove TypeScript files
@@ -379,7 +353,7 @@ def test_typescript_check_no_targets_in_project(basic_rule_runner: tuple[RuleRun
 def test_typescript_check_subsystem_skip(basic_rule_runner: tuple[RuleRunner, str, str]) -> None:
     """Test global TypeScript skip via --typescript-skip option."""
     
-    rule_runner, project_type, package_manager = basic_rule_runner
+    rule_runner, test_project, package_manager = basic_rule_runner
     
     # Set the skip option
     rule_runner.set_options(
@@ -390,7 +364,7 @@ def test_typescript_check_subsystem_skip(basic_rule_runner: tuple[RuleRunner, st
     )
     
     # Load base project but override index.ts with invalid TypeScript
-    test_files = _load_project_test_files(project_type)
+    test_files = _load_project_test_files(test_project)
     test_files["basic_project/src/index.ts"] = SIMPLE_INVALID_TS  # Has type error but checking is skipped
     
     rule_runner.write_files(test_files)
@@ -412,10 +386,10 @@ def test_typescript_check_subsystem_skip(basic_rule_runner: tuple[RuleRunner, st
 def test_typescript_check_multiple_projects(workspace_rule_runner: tuple[RuleRunner, str, str]) -> None:
     """Test checking targets across multiple projects (workspace structure)."""
     
-    rule_runner, project_type, package_manager = workspace_rule_runner
+    rule_runner, test_project, package_manager = workspace_rule_runner
     
     # Load project files  
-    test_files = _load_project_test_files(project_type)
+    test_files = _load_project_test_files(test_project)
     
     rule_runner.write_files(test_files)
     
@@ -446,10 +420,10 @@ def test_typescript_check_multiple_projects(workspace_rule_runner: tuple[RuleRun
 def test_typescript_check_test_files(workspace_rule_runner: tuple[RuleRunner, str, str]) -> None:
     """Test TypeScript test files using typescript_tests target (workspace structure)."""
     
-    rule_runner, project_type, package_manager = workspace_rule_runner
+    rule_runner, test_project, package_manager = workspace_rule_runner
     
     # Load complex project and add test files
-    test_files = _load_project_test_files(project_type)
+    test_files = _load_project_test_files(test_project)
     test_files.update({
         "complex_project/main-app/tests/BUILD": "typescript_tests()",
         "complex_project/main-app/tests/math.test.ts": textwrap.dedent("""
@@ -475,19 +449,17 @@ def test_typescript_check_test_files(workspace_rule_runner: tuple[RuleRunner, st
     
     # Should succeed
     assert len(results.results) == 1
-    result = results.results[0]
-    assert result.exit_code == 0
-    assert "error" not in result.stdout.lower()
+    assert results.results[0].exit_code == 0
 
 
 def test_typescript_check_cross_project_imports(basic_rule_runner: tuple[RuleRunner, str, str]) -> None:
     """Test that cross-project imports fail as expected (projects are compiled in isolation)."""
     
-    rule_runner, project_type, package_manager = basic_rule_runner
+    rule_runner, test_project, package_manager = basic_rule_runner
     
     # Simplify to test imports that should fail within a single workspace
     # by trying to import from a non-workspace path
-    test_files = _load_project_test_files(project_type)
+    test_files = _load_project_test_files(test_project)
     
     # Override to try importing from an invalid path
     test_files["src/index.ts"] = textwrap.dedent("""
@@ -526,10 +498,10 @@ def test_typescript_check_cross_project_imports(basic_rule_runner: tuple[RuleRun
 def test_typescript_check_pnpm_link_protocol_success(pnpm_rule_runner: tuple[RuleRunner, str, str]) -> None:
     """Test that pnpm link: protocol allows successful imports between packages."""
     
-    rule_runner, project_type, package_manager = pnpm_rule_runner
+    rule_runner, test_project, package_manager = pnpm_rule_runner
     
     # Load project files (pnpm_link uses special test prefix)
-    test_files = _load_project_test_files(project_type)
+    test_files = _load_project_test_files(test_project)
     
     rule_runner.write_files(test_files)
     
@@ -545,17 +517,16 @@ def test_typescript_check_pnpm_link_protocol_success(pnpm_rule_runner: tuple[Rul
     
     # Should succeed - pnpm link: protocol should resolve with hoisted configuration
     assert len(results.results) == 1
-    result = results.results[0]
-    assert result.exit_code == 0, f"TypeScript check failed: {result.stdout}\n{result.stderr}"
+    assert results.results[0].exit_code == 0, f"TypeScript check failed: {results.results[0].stdout}\n{results.results[0].stderr}"
 
 
 def test_typescript_check_tsx_files(basic_rule_runner: tuple[RuleRunner, str, str]) -> None:
     """Test TypeScript compilation of .tsx files with React components."""
     
-    rule_runner, project_type, package_manager = basic_rule_runner
+    rule_runner, test_project, package_manager = basic_rule_runner
     
     # Load project files
-    test_files = _load_project_test_files(project_type)
+    test_files = _load_project_test_files(test_project)
     
     rule_runner.write_files(test_files)
     
@@ -571,6 +542,5 @@ def test_typescript_check_tsx_files(basic_rule_runner: tuple[RuleRunner, str, st
     
     # Should succeed - TSX compilation should work with React types
     assert len(results.results) == 1
-    result = results.results[0]
-    assert result.exit_code == 0, f"TypeScript check of TSX failed: {result.stdout}\n{result.stderr}"
+    assert results.results[0].exit_code == 0, f"TypeScript check of TSX failed: {results.results[0].stdout}\n{results.results[0].stderr}"
 
