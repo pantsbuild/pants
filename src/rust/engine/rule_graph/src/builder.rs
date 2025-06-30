@@ -391,9 +391,10 @@ impl<R: Rule> Builder<R> {
             iteration += 1;
             if iteration % 1000 == 0 {
                 log::trace!(
-                    "initial_polymorphic iteration {}: {} nodes",
+                    "initial_polymorphic iteration {}: {} nodes, {} to visit",
                     iteration,
-                    graph.node_count()
+                    graph.node_count(),
+                    to_visit.len(),
                 );
             }
 

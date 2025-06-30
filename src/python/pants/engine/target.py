@@ -51,6 +51,7 @@ from pants.engine.internals.dep_rules import (
 from pants.engine.internals.native_engine import NO_VALUE as NO_VALUE  # noqa: F401
 from pants.engine.internals.native_engine import Field as Field
 from pants.engine.internals.target_adaptor import SourceBlock, SourceBlocks  # noqa: F401
+from pants.engine.rules import rule
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.source.filespec import Filespec, FilespecMatcher
@@ -1245,6 +1246,11 @@ class GeneratedTargets(FrozenDict[Address, Target]):
                 )
             mapping[tgt.address] = tgt
         super().__init__(mapping)
+
+
+@rule(polymorphic=True)
+async def generate_targets(req: GenerateTargetsRequest) -> GeneratedTargets:
+    raise NotImplementedError()
 
 
 class TargetTypesToGenerateTargetsRequests(
@@ -2591,6 +2597,13 @@ class GenerateSourcesRequest:
 @dataclass(frozen=True)
 class GeneratedSources:
     snapshot: Snapshot
+
+
+@rule(polymorphic=True)
+async def generate_sources(
+    req: GenerateSourcesRequest, env_name: EnvironmentName
+) -> GeneratedSources:
+    raise NotImplementedError()
 
 
 class SourcesPaths(Paths):
