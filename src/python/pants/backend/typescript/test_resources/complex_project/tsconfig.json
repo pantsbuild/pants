@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "outDir": "dist",
+    "rootDir": ".",
+    "jsx": "react-jsx"
+  },
+  "include": ["*/src/**/*"],
+  "exclude": ["node_modules", "dist"],
+  "references": [
+    { "path": "./common-types" },
+    { "path": "./shared-utils" },
+    { "path": "./main-app" }
+  ]
+}

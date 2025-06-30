@@ -21,5 +21,7 @@ resources(
         "pnpm-lock.yaml",
         "yarn.lock",
         "pnpm_link/**/*",
+        "basic_project/**/*",
+        "complex_project/**/*",
     ]
 )

@@ -1,0 +1,15 @@
+{
+  "name": "@test/shared-utils",
+  "version": "1.0.0",
+  "description": "Shared utility functions and React components",
+  "main": "./src/index.ts",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@test/common-types": "*"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.0",
+    "react": "^18.0.0"
+  }
+}

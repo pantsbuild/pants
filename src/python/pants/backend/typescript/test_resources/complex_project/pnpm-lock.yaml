@@ -6,7 +6,7 @@ settings:
 
 importers:
 
-  basic_project:
+  .:
     devDependencies:
       '@types/node':
         specifier: ^22.13.8
@@ -21,30 +21,29 @@ importers:
         specifier: ^5.7.3
         version: 5.8.3
 
-  complex_project:
-    devDependencies:
-      '@types/node':
-        specifier: ^22.13.8
-        version: 22.15.34
-      '@types/react':
-        specifier: ^18.0.0
-        version: 18.3.23
-      react:
-        specifier: ^18.0.0
-        version: 18.3.1
-      typescript:
-        specifier: ^5.7.3
-        version: 5.8.3
+  common-types: {}
 
-  pnpm_link:
+  main-app:
     dependencies:
-      child-pkg:
-        specifier: link:./child
-        version: link:child
+      '@test/common-types':
+        specifier: '*'
+        version: link:../common-types
+      '@test/shared-utils':
+        specifier: '*'
+        version: link:../shared-utils
+
+  shared-utils:
+    dependencies:
+      '@test/common-types':
+        specifier: '*'
+        version: link:../common-types
     devDependencies:
-      typescript:
-        specifier: ^5.7.3
-        version: 5.8.3
+      '@types/react':
+        specifier: ^18.0.0
+        version: 18.3.23
+      react:
+        specifier: ^18.0.0
+        version: 18.3.1
 
 packages:
 

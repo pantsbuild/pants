@@ -1,5 +1,7 @@
 packages:
-  - '*'
+  - 'common-types'
+  - 'shared-utils'
+  - 'main-app'
 nodeLinker: hoisted
 publicHoistPattern:
   - "*"

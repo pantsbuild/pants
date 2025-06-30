@@ -6,7 +6,7 @@ settings:
 
 importers:
 
-  basic_project:
+  .:
     devDependencies:
       '@types/node':
         specifier: ^22.13.8
@@ -17,31 +17,6 @@ importers:
       react:
         specifier: ^18.0.0
         version: 18.3.1
-      typescript:
-        specifier: ^5.7.3
-        version: 5.8.3
-
-  complex_project:
-    devDependencies:
-      '@types/node':
-        specifier: ^22.13.8
-        version: 22.15.34
-      '@types/react':
-        specifier: ^18.0.0
-        version: 18.3.23
-      react:
-        specifier: ^18.0.0
-        version: 18.3.1
-      typescript:
-        specifier: ^5.7.3
-        version: 5.8.3
-
-  pnpm_link:
-    dependencies:
-      child-pkg:
-        specifier: link:./child
-        version: link:child
-    devDependencies:
       typescript:
         specifier: ^5.7.3
         version: 5.8.3
