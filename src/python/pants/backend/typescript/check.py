@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, replace
+from typing import TYPE_CHECKING
 
 from pants.backend.javascript.nodejs_project import AllNodeJSProjects
 from pants.backend.javascript.package_json import (
@@ -40,8 +41,11 @@ from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    from pants.backend.javascript.nodejs_project import NodeJSProject
 
-async def _load_cached_typescript_artifacts(project) -> Digest:
+
+async def _load_cached_typescript_artifacts(project: NodeJSProject) -> Digest:
     """Load cached .tsbuildinfo files and output files for incremental TypeScript compilation."""
     cache_globs = []
     for workspace_pkg in project.workspaces:
@@ -60,7 +64,7 @@ async def _load_cached_typescript_artifacts(project) -> Digest:
 
 
 async def _extract_typescript_artifacts_for_caching(
-    project, process_output_digest: Digest
+    project: NodeJSProject, process_output_digest: Digest
 ) -> Digest:
     """Extract .tsbuildinfo files and output files from TypeScript compilation for caching."""
     output_globs = []
@@ -85,7 +89,7 @@ async def _extract_typescript_artifacts_for_caching(
 
 
 async def _collect_config_files_for_project(
-    project,  # NodeJSProject
+    project: NodeJSProject,
     all_package_json: AllPackageJson,
     all_ts_configs: AllTSConfigs,
 ) -> list[str]:
@@ -163,7 +167,7 @@ class TypeScriptTestCheckRequest(CheckRequest):
 
 
 async def _typecheck_single_project(
-    project,  # NodeJSProject - can't import due to circular imports. #TODO: Is there a way around this?
+    project: NodeJSProject,
     subsystem: TypeScriptSubsystem,
     global_options: GlobalOptions,
 ) -> CheckResult:
@@ -335,7 +339,7 @@ async def _typecheck_typescript_files(
     )
 
     # Group targets by their containing NodeJS project
-    projects_to_check: dict[object, list[object]] = {}
+    projects_to_check: dict[NodeJSProject, list[object]] = {}
     for i, owning_package in enumerate(owning_packages):
         address = list(target_addresses)[i]
         if owning_package.target:
