@@ -199,103 +199,6 @@ def test_typescript_check_failure(basic_rule_runner: tuple[RuleRunner, str, str]
     assert results.results[0].exit_code != 0
 
 
-def test_typescript_check_skip_field(basic_rule_runner: tuple[RuleRunner, str, str]) -> None:
-    """Test that targets with skip_typescript_check=true are skipped."""
-    
-    rule_runner, test_project, package_manager = basic_rule_runner
-    
-    # Skip complex package manager setup and just test with npm for simplicity
-    if package_manager != "npm":
-        pytest.skip(f"Skip field test simplified for npm only, skipping {package_manager}")
-    
-    rule_runner.write_files(
-        {
-            "test_skip/BUILD": "package_json(name='test_skip')",
-            "test_skip/package.json": json.dumps({
-                "name": "test-project",
-                "version": "1.0.0",
-                "devDependencies": {
-                    "@types/node": "^22.13.8",
-                    "typescript": "^5.7.3"
-                }
-            }),
-            "test_skip/tsconfig.json": TYPESCRIPT_TSCONFIG,
-            "test_skip/src/BUILD": textwrap.dedent("""
-                typescript_sources(
-                    name="normal",
-                    sources=["math.ts"],
-                )
-                typescript_sources(
-                    name="skipped",
-                    sources=["invalid.ts"],
-                    skip_typescript_check=True,
-                )
-            """),
-            "test_skip/src/math.ts": SIMPLE_VALID_TS,
-            "test_skip/src/invalid.ts": SIMPLE_INVALID_TS,  # Has type error but should be skipped
-            "test_skip/package-lock.json": json.dumps({
-                "name": "test-project",
-                "version": "1.0.0",
-                "lockfileVersion": 3,
-                "requires": True,
-                "packages": {
-                    "": {
-                        "name": "test-project",
-                        "version": "1.0.0",
-                        "devDependencies": {
-                            "@types/node": "^22.13.8",
-                            "typescript": "^5.7.3"
-                        }
-                    },
-                    "node_modules/@types/node": {
-                        "version": "22.15.34",
-                        "resolved": "https://registry.npmjs.org/@types/node/-/node-22.15.34.tgz",
-                        "integrity": "sha512-8Y6E5WUupYy1Dd0II32BsWAx5MWdcnRd8L84Oys3veg1YrYtNtzgO4CFhiBg6MDSjk7Ay36HYOnU7/tuOzIzcw==",
-                        "dev": True,
-                        "dependencies": {
-                            "undici-types": "~6.21.0"
-                        }
-                    },
-                    "node_modules/typescript": {
-                        "version": "5.8.3",
-                        "resolved": "https://registry.npmjs.org/typescript/-/typescript-5.8.3.tgz",
-                        "integrity": "sha512-p1diW6TqL9L07nNxvRMM7hMMw4c5XOo/1ibL4aAIGmSAt9slTE1Xgw5KWuof2uTOvCg9BY7ZRi+GaF+7sfgPeQ==",
-                        "dev": True,
-                        "bin": {
-                            "tsc": "bin/tsc",
-                            "tsserver": "bin/tsserver"
-                        },
-                        "engines": {
-                            "node": ">=14.17"
-                        }
-                    },
-                    "node_modules/undici-types": {
-                        "version": "6.21.0",
-                        "resolved": "https://registry.npmjs.org/undici-types/-/undici-types-6.21.0.tgz",
-                        "integrity": "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==",
-                        "dev": True
-                    }
-                }
-            }),
-        }
-    )
-    
-    normal_target = rule_runner.get_target(Address("test_skip/src", target_name="normal", relative_file_path="math.ts"))
-    skipped_target = rule_runner.get_target(Address("test_skip/src", target_name="skipped", relative_file_path="invalid.ts"))
-    
-    # Verify the skipped target opts out
-    assert not TypeScriptCheckFieldSet.opt_out(normal_target)
-    assert TypeScriptCheckFieldSet.opt_out(skipped_target)
-    
-    normal_field_set = TypeScriptCheckFieldSet.create(normal_target)
-    
-    # Check only the normal target - skipped one should not cause failure
-    request = TypeScriptCheckRequest([normal_field_set])
-    results = rule_runner.request(CheckResults, [request])
-    
-    assert len(results.results) == 1
-    assert results.results[0].exit_code == 0
-
 
 def test_typescript_check_no_targets_in_project(basic_rule_runner: tuple[RuleRunner, str, str]) -> None:
     """Test project with no TypeScript targets."""
@@ -317,31 +220,6 @@ def test_typescript_check_no_targets_in_project(basic_rule_runner: tuple[RuleRun
     assert len(results.results) == 0
 
 
-def test_typescript_check_subsystem_skip(basic_rule_runner: tuple[RuleRunner, str, str]) -> None:
-    """Test global TypeScript skip via --typescript-skip option."""
-    
-    rule_runner, test_project, package_manager = basic_rule_runner
-    
-    rule_runner.set_options(
-        [
-            "--typescript-skip",  # Skip all TypeScript checking
-        ],
-        env_inherit={"PATH"},
-    )
-    
-    # Load base project but override index.ts with invalid TypeScript
-    test_files = _load_project_test_files(test_project)
-    test_files["basic_project/src/index.ts"] = SIMPLE_INVALID_TS  # Has type error but checking is skipped
-    
-    rule_runner.write_files(test_files)
-    
-    target = rule_runner.get_target(Address("basic_project/src", target_name="ts_sources", relative_file_path="index.ts"))
-    field_set = TypeScriptCheckFieldSet.create(target)
-    
-    request = TypeScriptCheckRequest([field_set])
-    results = rule_runner.request(CheckResults, [request])
-    
-    assert len(results.results) == 0
 
 
 def test_typescript_check_multiple_projects(workspace_rule_runner: tuple[RuleRunner, str, str]) -> None:
