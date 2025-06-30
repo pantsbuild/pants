@@ -160,85 +160,18 @@ def get_pnpm_workspace_content() -> str:
     return resource_path.read_text()
 
 
-def _load_pnpm_link_test_files() -> dict[str, str]:
-    """Load test files for pnpm link: protocol test from resources with test directory prefix."""
-    base_dir = Path(__file__).parent / "test_resources" / "pnpm_link"
-    files = {}
-    
-    # Load all files recursively, adding test directory prefix
-    for file_path in base_dir.rglob("*"):
-        if file_path.is_file():
-            relative_path = file_path.relative_to(base_dir)
-            files[f"pnpm_link_test/{relative_path}"] = file_path.read_text()
-    
-    return files
-
-
-def _load_basic_project_test_files(test_dir_name: str = "test_project") -> dict[str, str]:
-    """Load simple basic project test files (single package, no workspace deps)."""
-    base_dir = Path(__file__).parent / "test_resources" / "basic_project"
-    files = {}
-    
-    # Load all files recursively, adding test directory prefix
-    for file_path in base_dir.rglob("*"):
-        if file_path.is_file():
-            relative_path = file_path.relative_to(base_dir)
-            files[f"{test_dir_name}/{relative_path}"] = file_path.read_text()
-    
-    return files
-
-
-def _load_complex_project_test_files(test_dir_name: str = "test_project") -> dict[str, str]:
-    """Load complex project test files (workspace with linked dependencies)."""
-    base_dir = Path(__file__).parent / "test_resources" / "complex_project"
-    files = {}
-    
-    # Load all files recursively, adding test directory prefix
-    for file_path in base_dir.rglob("*"):
-        if file_path.is_file():
-            relative_path = file_path.relative_to(base_dir)
-            files[f"{test_dir_name}/{relative_path}"] = file_path.read_text()
-    
-    return files
-
-
-def _load_project_test_files(project_type: str, test_dir_name: str = "test_project") -> dict[str, str]:
+def _load_project_test_files(project_type: str) -> dict[str, str]:
     """Load test files for the specified project type."""
-    if project_type == "basic_project":
-        return _load_basic_project_test_files(test_dir_name)
-    elif project_type == "complex_project":
-        return _load_complex_project_test_files(test_dir_name)
-    elif project_type == "pnpm_link":
-        return _load_pnpm_link_test_files()
-    else:
-        raise ValueError(f"Unknown project type: {project_type}")
-
-
-_LOCKFILE_FILE_NAMES = {
-    "pnpm": "pnpm-lock.yaml",
-    "npm": "package-lock.json",
-    "yarn": "yarn.lock",
-}
-
-
-def _find_lockfile_resource(package_manager: str, resource_dir: str) -> dict[str, str]:
-    """Find and read lockfile from test resources directory.
+    base_dir = Path(__file__).parent / "test_resources" / project_type
+    files = {}
     
-    Returns:
-        Dict of {filename: content}
-    """
-    for file in (Path(__file__).parent / resource_dir).iterdir():
-        if _LOCKFILE_FILE_NAMES.get(package_manager) == file.name:
-            return {file.name: file.read_text()}
-    raise AssertionError(
-        f"No lockfile for {package_manager} set up in test resources directory {resource_dir}."
-    )
-
-
-@pytest.fixture
-def typescript_lockfile(package_manager: str) -> dict[str, str]:
-    """Get lockfile for TypeScript tests following JavaScript backend pattern."""
-    return _find_lockfile_resource(package_manager, "test_resources")
+    # Load all files recursively
+    for file_path in base_dir.rglob("*"):
+        if file_path.is_file():
+            relative_path = file_path.relative_to(base_dir)
+            files[f"{project_type}/{relative_path}"] = file_path.read_text()
+    
+    return files
 
 
 def test_typescript_check_success(basic_rule_runner: tuple[RuleRunner, str, str]) -> None:
@@ -252,7 +185,7 @@ def test_typescript_check_success(basic_rule_runner: tuple[RuleRunner, str, str]
     rule_runner.write_files(test_files)
     
     # Get the TypeScript target
-    target = rule_runner.get_target(Address("test_project/src", target_name="ts_sources", relative_file_path="index.ts"))
+    target = rule_runner.get_target(Address("basic_project/src", target_name="ts_sources", relative_file_path="index.ts"))
     field_set = TypeScriptCheckFieldSet.create(target)
     
     # Create check request
@@ -275,7 +208,7 @@ def test_typescript_check_failure(basic_rule_runner: tuple[RuleRunner, str, str]
     
     # Load base project files and override index.ts with type error
     test_files = _load_project_test_files(project_type)
-    test_files["test_project/src/index.ts"] = textwrap.dedent("""\
+    test_files["basic_project/src/index.ts"] = textwrap.dedent("""\
         import { add } from './math';
         
         export function calculate(): number {
@@ -286,7 +219,7 @@ def test_typescript_check_failure(basic_rule_runner: tuple[RuleRunner, str, str]
     rule_runner.write_files(test_files)
         
     # Get the TypeScript target
-    target = rule_runner.get_target(Address("test_project/src", target_name="ts_sources", relative_file_path="index.ts"))
+    target = rule_runner.get_target(Address("basic_project/src", target_name="ts_sources", relative_file_path="index.ts"))
     field_set = TypeScriptCheckFieldSet.create(target)
     
     # Create check request
@@ -313,8 +246,8 @@ def test_typescript_check_skip_field(basic_rule_runner: tuple[RuleRunner, str, s
     
     rule_runner.write_files(
         {
-            "test_project/BUILD": "package_json(name='test_project')",
-            "test_project/package.json": json.dumps({
+            "test_skip/BUILD": "package_json(name='test_skip')",
+            "test_skip/package.json": json.dumps({
                 "name": "test-project",
                 "version": "1.0.0",
                 "devDependencies": {
@@ -322,8 +255,8 @@ def test_typescript_check_skip_field(basic_rule_runner: tuple[RuleRunner, str, s
                     "typescript": "^5.7.3"
                 }
             }),
-            "test_project/tsconfig.json": TYPESCRIPT_TSCONFIG,
-            "test_project/src/BUILD": textwrap.dedent("""
+            "test_skip/tsconfig.json": TYPESCRIPT_TSCONFIG,
+            "test_skip/src/BUILD": textwrap.dedent("""
                 typescript_sources(
                     name="normal",
                     sources=["math.ts"],
@@ -334,9 +267,9 @@ def test_typescript_check_skip_field(basic_rule_runner: tuple[RuleRunner, str, s
                     skip_typescript_check=True,
                 )
             """),
-            "test_project/src/math.ts": SIMPLE_VALID_TS,
-            "test_project/src/invalid.ts": SIMPLE_INVALID_TS,  # Has type error but should be skipped
-            "test_project/package-lock.json": json.dumps({
+            "test_skip/src/math.ts": SIMPLE_VALID_TS,
+            "test_skip/src/invalid.ts": SIMPLE_INVALID_TS,  # Has type error but should be skipped
+            "test_skip/package-lock.json": json.dumps({
                 "name": "test-project",
                 "version": "1.0.0",
                 "lockfileVersion": 3,
@@ -384,15 +317,15 @@ def test_typescript_check_skip_field(basic_rule_runner: tuple[RuleRunner, str, s
     )
     
     # Get both targets
-    normal_target = rule_runner.get_target(Address("test_project/src", target_name="normal", relative_file_path="math.ts"))
-    skipped_target = rule_runner.get_target(Address("test_project/src", target_name="skipped", relative_file_path="invalid.ts"))
+    normal_target = rule_runner.get_target(Address("test_skip/src", target_name="normal", relative_file_path="math.ts"))
+    skipped_target = rule_runner.get_target(Address("test_skip/src", target_name="skipped", relative_file_path="invalid.ts"))
     
     # Debug: Check if the skip field is available on targets
     from pants.backend.typescript.check import SkipTypeScriptCheckField
     
     # Check the generator targets have the field
-    normal_generator = rule_runner.get_target(Address("test_project/src", target_name="normal"))
-    skipped_generator = rule_runner.get_target(Address("test_project/src", target_name="skipped"))
+    normal_generator = rule_runner.get_target(Address("test_skip/src", target_name="normal"))
+    skipped_generator = rule_runner.get_target(Address("test_skip/src", target_name="skipped"))
     
     assert not normal_generator.get(SkipTypeScriptCheckField).value
     assert skipped_generator.get(SkipTypeScriptCheckField).value
@@ -427,10 +360,10 @@ def test_typescript_check_no_targets_in_project(basic_rule_runner: tuple[RuleRun
     
     # Load base project but override to have only JS sources
     test_files = _load_project_test_files(project_type)
-    test_files["test_project/src/BUILD"] = "javascript_sources()"  # Only JS sources, no TS
-    test_files["test_project/src/index.js"] = "console.log('Hello from JS');"
+    test_files["basic_project/src/BUILD"] = "javascript_sources()"  # Only JS sources, no TS
+    test_files["basic_project/src/index.js"] = "console.log('Hello from JS');"
     # Remove TypeScript files
-    del test_files["test_project/src/index.ts"]
+    del test_files["basic_project/src/index.ts"]
     
     rule_runner.write_files(test_files)
     
@@ -458,12 +391,12 @@ def test_typescript_check_subsystem_skip(basic_rule_runner: tuple[RuleRunner, st
     
     # Load base project but override index.ts with invalid TypeScript
     test_files = _load_project_test_files(project_type)
-    test_files["test_project/src/index.ts"] = SIMPLE_INVALID_TS  # Has type error but checking is skipped
+    test_files["basic_project/src/index.ts"] = SIMPLE_INVALID_TS  # Has type error but checking is skipped
     
     rule_runner.write_files(test_files)
     
     # Get the TypeScript target
-    target = rule_runner.get_target(Address("test_project/src", target_name="ts_sources", relative_file_path="index.ts"))
+    target = rule_runner.get_target(Address("basic_project/src", target_name="ts_sources", relative_file_path="index.ts"))
     field_set = TypeScriptCheckFieldSet.create(target)
     
     # Create check request
@@ -487,9 +420,9 @@ def test_typescript_check_multiple_projects(workspace_rule_runner: tuple[RuleRun
     rule_runner.write_files(test_files)
     
     # Get targets from different packages in the workspace to simulate multiple projects
-    common_types_target = rule_runner.get_target(Address("test_project/common-types/src", relative_file_path="index.ts"))
-    shared_utils_target = rule_runner.get_target(Address("test_project/shared-utils/src", target_name="ts_sources", relative_file_path="math.ts"))
-    main_app_target = rule_runner.get_target(Address("test_project/main-app/src", relative_file_path="index.ts"))
+    common_types_target = rule_runner.get_target(Address("complex_project/common-types/src", relative_file_path="index.ts"))
+    shared_utils_target = rule_runner.get_target(Address("complex_project/shared-utils/src", target_name="ts_sources", relative_file_path="math.ts"))
+    main_app_target = rule_runner.get_target(Address("complex_project/main-app/src", relative_file_path="index.ts"))
     
     field_setA = TypeScriptCheckFieldSet.create(common_types_target)
     field_setB = TypeScriptCheckFieldSet.create(shared_utils_target)
@@ -518,8 +451,8 @@ def test_typescript_check_test_files(workspace_rule_runner: tuple[RuleRunner, st
     # Load complex project and add test files
     test_files = _load_project_test_files(project_type)
     test_files.update({
-        "test_project/main-app/tests/BUILD": "typescript_tests()",
-        "test_project/main-app/tests/math.test.ts": textwrap.dedent("""
+        "complex_project/main-app/tests/BUILD": "typescript_tests()",
+        "complex_project/main-app/tests/math.test.ts": textwrap.dedent("""
             import { add } from '@test/shared-utils';
             
             // Test file imports should work
@@ -531,7 +464,7 @@ def test_typescript_check_test_files(workspace_rule_runner: tuple[RuleRunner, st
     rule_runner.write_files(test_files)
     
     # Get the test target - TypeScript tests are also handled by TypeScriptCheckFieldSet
-    test_target = rule_runner.get_target(Address("test_project/main-app/tests", relative_file_path="math.test.ts"))
+    test_target = rule_runner.get_target(Address("complex_project/main-app/tests", relative_file_path="math.test.ts"))
     test_field_set = TypeScriptCheckFieldSet.create(test_target)
     
     # Create check request
@@ -557,7 +490,7 @@ def test_typescript_check_cross_project_imports(basic_rule_runner: tuple[RuleRun
     test_files = _load_project_test_files(project_type)
     
     # Override to try importing from an invalid path
-    test_files["test_project/src/index.ts"] = textwrap.dedent("""
+    test_files["src/index.ts"] = textwrap.dedent("""
         // This import should fail - trying to import from non-existent external path
         import { nonExistentFunction } from '../../external-project/src/shared';
         
@@ -569,7 +502,7 @@ def test_typescript_check_cross_project_imports(basic_rule_runner: tuple[RuleRun
     rule_runner.write_files(test_files)
     
     # Get the target that attempts invalid import
-    cross_import_target = rule_runner.get_target(Address("test_project/src", target_name="ts_sources", relative_file_path="index.ts"))
+    cross_import_target = rule_runner.get_target(Address("basic_project/src", target_name="ts_sources", relative_file_path="index.ts"))
     cross_import_field_set = TypeScriptCheckFieldSet.create(cross_import_target)
     
     # Create check request for the target with invalid import
@@ -601,7 +534,7 @@ def test_typescript_check_pnpm_link_protocol_success(pnpm_rule_runner: tuple[Rul
     rule_runner.write_files(test_files)
     
     # Get the parent target that imports from child via link: protocol
-    parent_target = rule_runner.get_target(Address("pnpm_link_test/src", relative_file_path="main.ts"))
+    parent_target = rule_runner.get_target(Address("pnpm_link/src", relative_file_path="main.ts"))
     parent_field_set = TypeScriptCheckFieldSet.create(parent_target)
     
     # Create check request
@@ -627,7 +560,7 @@ def test_typescript_check_tsx_files(basic_rule_runner: tuple[RuleRunner, str, st
     rule_runner.write_files(test_files)
     
     # Get the TSX target
-    tsx_target = rule_runner.get_target(Address("test_project/src", target_name="tsx_sources", relative_file_path="Button.tsx"))
+    tsx_target = rule_runner.get_target(Address("basic_project/src", target_name="tsx_sources", relative_file_path="Button.tsx"))
     tsx_field_set = TypeScriptCheckFieldSet.create(tsx_target)
     
     # Create check request for TSX file
