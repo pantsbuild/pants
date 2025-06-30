@@ -20,7 +20,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.graph import find_valid_field_sets
 from pants.engine.internals.specs_rules import find_valid_field_sets_for_target_roots
 from pants.engine.intrinsics import merge_digests
-from pants.engine.rules import Get, collect_rules, concurrently, goal_rule, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, goal_rule, implicitly, rule
 from pants.engine.target import (
     AllTargets,
     AsyncFieldMixin,
@@ -65,6 +65,14 @@ class BuiltPackageArtifact:
 class BuiltPackage:
     digest: Digest
     artifacts: tuple[BuiltPackageArtifact, ...]
+
+
+@rule(polymorphic=True)
+async def build_package(
+    package_fieldset: PackageFieldSet,
+    environment_name: EnvironmentName,
+) -> BuiltPackage:
+    raise NotImplementedError()
 
 
 class OutputPathField(StringField, AsyncFieldMixin):
@@ -142,8 +150,8 @@ async def environment_aware_package(request: EnvironmentAwarePackageRequest) -> 
     environment_name = await resolve_environment_name(
         EnvironmentNameRequest.from_field_set(request.field_set), **implicitly()
     )
-    package = await Get(
-        BuiltPackage, {request.field_set: PackageFieldSet, environment_name: EnvironmentName}
+    package = await build_package(
+        **implicitly({request.field_set: PackageFieldSet, environment_name: EnvironmentName})
     )
     return package
 
