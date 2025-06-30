@@ -85,6 +85,8 @@ class NodeBuildScript(NodeScript):
     output_files: tuple[str, ...] = ()
     extra_caches: tuple[str, ...] = ()
     extra_env_vars: tuple[str, ...] = ()
+    description: str | None = None
+    tags: tuple[str, ...] = ()
 
     alias: ClassVar[str] = "node_build_script"
 
@@ -96,6 +98,8 @@ class NodeBuildScript(NodeScript):
         output_files: Iterable[str] = (),
         extra_caches: Iterable[str] = (),
         extra_env_vars: Iterable[str] = (),
+        description: str | None = None,
+        tags: Iterable[str] = (),
     ) -> NodeBuildScript:
         """A build script, mapped from the `scripts` section of a package.json file.
 
@@ -109,6 +113,8 @@ class NodeBuildScript(NodeScript):
             output_files=tuple(output_files),
             extra_caches=tuple(extra_caches),
             extra_env_vars=tuple(extra_env_vars),
+            description=description,
+            tags=tuple(tags),
         )
 
 
@@ -896,22 +902,30 @@ async def generate_node_package_targets(
     build_script_tgts = []
     for build_script in request.generator[NodePackageScriptsField].build_scripts():
         if build_script.entry_point in scripts:
+            build_script_fields = {
+                **request.template,
+                NodeBuildScriptEntryPointField.alias: build_script.entry_point,
+                NodeBuildScriptOutputDirectoriesField.alias: build_script.output_directories,
+                NodeBuildScriptOutputFilesField.alias: build_script.output_files,
+                NodeBuildScriptExtraEnvVarsField.alias: build_script.extra_env_vars,
+                NodeBuildScriptExtraCaches.alias: build_script.extra_caches,
+                NodePackageDependenciesField.alias: [
+                    file_tgt.address.spec,
+                    *(tgt.address.spec for tgt in third_party_tgts),
+                    *request.template.get("dependencies", []),
+                    package_target.address.spec,
+                ],
+            }
+            # Add description if provided in the build script
+            if build_script.description is not None:
+                build_script_fields["description"] = build_script.description
+
+            if build_script.tags:
+                build_script_fields["tags"] = build_script.tags
+
             build_script_tgts.append(
                 NodeBuildScriptTarget(
-                    {
-                        **request.template,
-                        NodeBuildScriptEntryPointField.alias: build_script.entry_point,
-                        NodeBuildScriptOutputDirectoriesField.alias: build_script.output_directories,
-                        NodeBuildScriptOutputFilesField.alias: build_script.output_files,
-                        NodeBuildScriptExtraEnvVarsField.alias: build_script.extra_env_vars,
-                        NodeBuildScriptExtraCaches.alias: build_script.extra_caches,
-                        NodePackageDependenciesField.alias: [
-                            file_tgt.address.spec,
-                            *(tgt.address.spec for tgt in third_party_tgts),
-                            *request.template.get("dependencies", []),
-                            package_target.address.spec,
-                        ],
-                    },
+                    build_script_fields,
                     request.generator.address.create_generated(build_script.entry_point),
                     union_membership,
                 )
