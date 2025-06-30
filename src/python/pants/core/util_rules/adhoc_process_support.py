@@ -17,6 +17,7 @@ from typing import TypeVar
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.build_graph.address import Address
+from pants.core.environments.rules import EnvironmentNameRequest, resolve_environment_name
 from pants.core.goals.package import (
     EnvironmentAwarePackageRequest,
     PackageFieldSet,
@@ -24,7 +25,6 @@ from pants.core.goals.package import (
 )
 from pants.core.goals.run import RunFieldSet, RunInSandboxRequest
 from pants.core.target_types import FileSourceField
-from pants.core.util_rules.environments import EnvironmentNameRequest, resolve_environment_name
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine import process

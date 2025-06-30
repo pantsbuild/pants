@@ -17,7 +17,7 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.pex import PexRequest, VenvPexProcess, create_venv_pex
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
-from pants.core.util_rules.environments import determine_bootstrap_environment
+from pants.core.environments.rules import determine_bootstrap_environment
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.environment import EnvironmentName
