@@ -17,6 +17,7 @@ from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolRequest
 from pants.backend.typescript.subsystem import TypeScriptSubsystem
 from pants.backend.typescript.target_types import TypeScriptSourceField, TypeScriptTestSourceField
 from pants.backend.typescript.tsconfig import AllTSConfigs
+from pants.build_graph.address import Address
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.core.target_types import FileSourceField
 from pants.engine.fs import EMPTY_DIGEST, Digest, DigestSubset, GlobMatchErrorBehavior, PathGlobs
@@ -26,7 +27,13 @@ from pants.engine.internals.selectors import Get, concurrently
 from pants.engine.intrinsics import execute_process, merge_digests, path_globs_to_digest
 from pants.engine.process import Process
 from pants.engine.rules import collect_rules, implicitly, rule
-from pants.engine.target import AllTargets, FieldSet, HydrateSourcesRequest, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import (
+    AllTargets,
+    FieldSet,
+    HydrateSourcesRequest,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+)
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
@@ -41,6 +48,7 @@ async def _load_cached_typescript_artifacts(project) -> Digest:
         # Cache .tsbuildinfo files for incremental state
         cache_globs.append(f"{workspace_pkg.root_dir}/tsconfig.tsbuildinfo")
         # Cache output directories that TypeScript --build generates
+        # TODO: How to handle different output directories?
         cache_globs.append(f"{workspace_pkg.root_dir}/dist/**/*")
 
     cached_artifacts = await path_globs_to_digest(
@@ -60,6 +68,9 @@ async def _extract_typescript_artifacts_for_caching(
         # Extract .tsbuildinfo files for incremental state
         output_globs.append(f"{workspace_pkg.root_dir}/tsconfig.tsbuildinfo")
         # Extract output directories that TypeScript --build generates
+        # PR_NOTE: Currently hardcoded to 'dist' but TypeScript projects may use different
+        # output directories (e.g., 'build', 'lib', 'out'). This could be improved by
+        # parsing tsconfig.json's outDir/declarationDir settings.
         output_globs.append(f"{workspace_pkg.root_dir}/dist/**/*")
 
     artifacts_digest = await Get(
@@ -71,6 +82,60 @@ async def _extract_typescript_artifacts_for_caching(
     )
 
     return artifacts_digest
+
+
+async def _collect_config_files_for_project(
+    project,  # NodeJSProject
+    all_package_json: AllPackageJson,
+    all_ts_configs: AllTSConfigs,
+) -> list[str]:
+    """Collect all configuration files needed for TypeScript compilation in a project.
+
+    This includes:
+    - package.json files (for dependencies and module resolution)
+    - tsconfig.json files (for TypeScript compiler configuration)
+    - Package manager config files (.npmrc, .pnpmrc, pnpm-workspace.yaml)
+
+    PR_NOTE: We need to look for config files declared as explicit file targets because:
+    1. Package manager config files (.npmrc, .pnpmrc) affect how dependencies are resolved
+    2. Workspace config files (pnpm-workspace.yaml) define monorepo structure
+    3. These files might not be auto-discovered by AllPackageJson/AllTSConfigs if they
+       don't follow standard naming or if users explicitly manage them as file targets
+    """
+    config_files = []
+
+    # Add discovered package.json files
+    project_package_jsons = [
+        pkg for pkg in all_package_json if pkg.root_dir.startswith(project.root_dir)
+    ]
+    for pkg_json in project_package_jsons:
+        config_files.append(pkg_json.file)
+
+    # Add discovered tsconfig.json files
+    project_ts_configs = [
+        config for config in all_ts_configs if config.path.startswith(project.root_dir)
+    ]
+    for ts_config in project_ts_configs:
+        config_files.append(ts_config.path)
+
+    # Find package manager config files declared as explicit file targets
+    # This is necessary for files like .npmrc that affect dependency resolution
+    project_root_address = Address(project.root_dir)
+    transitive_targets = await Get(
+        TransitiveTargets, TransitiveTargetsRequest([project_root_address])
+    )
+
+    for target in transitive_targets.closure:
+        if target.has_field(FileSourceField):
+            file_path = target[FileSourceField].file_path
+            file_name = file_path.split("/")[-1]
+            # Check for package manager config files
+            if file_name in (".npmrc", ".pnpmrc", "pnpm-workspace.yaml") and file_path.startswith(
+                project.root_dir
+            ):
+                config_files.append(file_path)
+
+    return config_files
 
 
 @dataclass(frozen=True)
@@ -98,13 +163,11 @@ class TypeScriptTestCheckRequest(CheckRequest):
 
 
 async def _typecheck_single_project(
-    project,  # NodeJSProject - can't import due to circular imports
+    project,  # NodeJSProject - can't import due to circular imports. #TODO: Is there a way around this?
     subsystem: TypeScriptSubsystem,
     global_options: GlobalOptions,
 ) -> CheckResult:
     """Type check a single TypeScript project."""
-    # PR_NOTE: Find all TypeScript targets within this project using Pants' target knowledge
-    # This replaces glob-based file discovery with proper target-based source discovery
     all_targets = await Get(AllTargets)
 
     # Find all TypeScript targets
@@ -158,57 +221,15 @@ async def _typecheck_single_project(
             partition_description=f"TypeScript check on {project.root_dir} (no targets)",
         )
 
-    # PR_NOTE: Dynamically discover configuration files using Pants' target-based discovery
-    # This replaces hard-coded config file paths with comprehensive target-based discovery
-    all_package_json = await Get(AllPackageJson)
-    all_ts_configs = await Get(AllTSConfigs)
-
-    # Find package.json files within this project
-    project_package_jsons = [
-        pkg for pkg in all_package_json if pkg.root_dir.startswith(project.root_dir)
-    ]
-
-    # Find tsconfig.json files within this project
-    project_ts_configs = [
-        config for config in all_ts_configs if config.path.startswith(project.root_dir)
-    ]
-
-    # Build list of config file paths from discovered targets
-    config_files = []
-
-    # Add discovered package.json files
-    for pkg_json in project_package_jsons:
-        config_files.append(pkg_json.file)
-
-    # Add discovered tsconfig.json files
-    for ts_config in project_ts_configs:
-        config_files.append(ts_config.path)
-
-    # PR_NOTE: Use target-based discovery for package manager config files
-    # Users must declare config files as file() targets in BUILD files
-    # TODO: Future enhancement - JavaScript backend should provide automatic target generation
-    # for .npmrc, .pnpmrc, pnpm-workspace.yaml (see FUTURE_ENHANCEMENTS.md)
-
-    # Find config files declared as explicit file targets
-    from pants.build_graph.address import Address
-
-    project_root_address = Address(project.root_dir)
-    transitive_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequest([project_root_address])
+    # Collect all config files needed for TypeScript compilation
+    all_package_json, all_ts_configs = await concurrently(
+        Get(AllPackageJson),
+        Get(AllTSConfigs),
     )
 
-    # Look for package manager config files declared as targets
-    config_file_targets = []
-    for target in transitive_targets.closure:
-        if target.has_field(FileSourceField):
-            file_path = target[FileSourceField].file_path
-            file_name = file_path.split("/")[-1]
-            if file_name in (".npmrc", ".pnpmrc", "pnpm-workspace.yaml") and file_path.startswith(
-                project.root_dir
-            ):
-                config_file_targets.append(file_path)
-
-    config_files.extend(config_file_targets)
+    config_files = await _collect_config_files_for_project(
+        project, all_package_json, all_ts_configs
+    )
 
     # Get config file digests
     config_digests = []
@@ -236,13 +257,8 @@ async def _typecheck_single_project(
 
     # Determine which resolve to use for this TypeScript project
     # Use the project's root directory to get the correct resolve
-    # This follows the standard JavaScript backend pattern where the project resolve
-    # is determined by the project root, regardless of workspace structure.
-    # The JavaScript backend's RequestNodeResolve handles workspace resolution correctly:
     # - For monorepos: all workspaces share the parent project's lockfile/resolve
     # - For standalone projects: the project root contains the lockfile/resolve
-    from pants.build_graph.address import Address
-
     project_address = Address(project.root_dir)
     project_resolve = await Get(ChosenNodeResolve, RequestNodeResolve(project_address))
 
@@ -280,7 +296,6 @@ async def _typecheck_single_project(
         partition_description=f"TypeScript check on {project.root_dir} ({len(project_typescript_targets)} targets)",
         # Cache TypeScript artifacts via the report field - this enables incremental compilation
         report=typescript_artifacts_digest,
-        # PR_NOTE: Use output simplifier to clean up temporary paths in error messages
         output_simplifier=global_options.output_simplifier(),
     )
 
@@ -299,13 +314,11 @@ async def _typecheck_typescript_files(
     if not field_sets:
         return CheckResults([], checker_name=tool_name)
 
-    # Get source files for the specific field sets being checked
     target_sources = await concurrently(
         hydrate_sources(HydrateSourcesRequest(field_set.sources), **implicitly())
         for field_set in field_sets
     )
 
-    # Collect source files and their addresses
     all_source_files: list[str] = []
     target_addresses = set()
     for i, sources in enumerate(target_sources):
@@ -315,11 +328,7 @@ async def _typecheck_typescript_files(
     if not all_source_files:
         return CheckResults([], checker_name=tool_name)
 
-    # PR_NOTE: Discover which NodeJS projects contain the TypeScript targets
-    # This replaces the hard-coded examples/** path approach with dynamic project discovery
     all_projects = await Get(AllNodeJSProjects)
-
-    # Find owning packages for all TypeScript targets
     owning_packages = await concurrently(
         find_owning_package(OwningNodePackageRequest(address), **implicitly())
         for address in target_addresses
@@ -330,7 +339,6 @@ async def _typecheck_typescript_files(
     for i, owning_package in enumerate(owning_packages):
         address = list(target_addresses)[i]
         if owning_package.target:
-            # Find which NodeJS project contains this package
             package_directory = owning_package.target.address.spec_path
             owning_project = all_projects.project_for_directory(package_directory)
             if owning_project:
@@ -341,9 +349,6 @@ async def _typecheck_typescript_files(
     if not projects_to_check:
         logger.warning(f"No NodeJS projects found for TypeScript targets: {target_addresses}")
         return CheckResults([], checker_name=tool_name)
-
-    # PR_NOTE: Multi-project support - check each project concurrently
-    # This replaces the single project limitation with concurrent multi-project execution
 
     # Check all projects concurrently
     project_results = await concurrently(
