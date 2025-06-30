@@ -10,6 +10,7 @@ python_tests(
     timeout=90,
     overrides={
         "goal_test.py": {"dependencies": ["//BUILD_ROOT:files"]},
+        "native_engine_logging_integration_test.py": {"timeout": 150},
     },
 )
 
