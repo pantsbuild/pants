@@ -31,7 +31,6 @@ from pants.core.util_rules.source_files import (
     determine_source_files,
 )
 from pants.engine.internals.graph import transitive_targets
-from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests
 from pants.engine.intrinsics import add_prefix, merge_digests
 from pants.engine.process import fallible_to_exec_result_or_raise
@@ -95,7 +94,7 @@ async def install_node_packages_for_address(
     transitive_tgts = await transitive_targets(
         TransitiveTargetsRequest([target.address]), **implicitly()
     )
-    
+
     source_files = await _get_relevant_source_files(
         (tgt[SourcesField] for tgt in transitive_tgts.closure if tgt.has_field(SourcesField)),
         with_js=False,
@@ -113,7 +112,7 @@ async def install_node_packages_for_address(
             )
         )
     )
-    
+
     node_modules = await add_prefix(AddPrefix(install_result.output_digest, project_env.root_dir))
 
     return InstalledNodePackage(

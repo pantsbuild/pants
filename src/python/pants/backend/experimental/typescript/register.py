@@ -9,7 +9,7 @@ from pants.backend.tsx.target_types import (
     TSXTestsGeneratorTarget,
     TSXTestTarget,
 )
-from pants.backend.typescript.goals import tailor, check
+from pants.backend.typescript.goals import check, tailor
 from pants.backend.typescript.target_types import (
     TypeScriptSourcesGeneratorTarget,
     TypeScriptSourceTarget,

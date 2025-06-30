@@ -1,26 +1,22 @@
-import React from 'react';
+import React from "react";
 
 export interface ButtonProps {
   children: React.ReactNode;
   onClick?: () => void;
   disabled?: boolean;
-  variant?: 'primary' | 'secondary';
+  variant?: "primary" | "secondary";
 }
 
 export function Button({
   children,
   onClick,
   disabled = false,
-  variant = 'primary'
+  variant = "primary",
 }: ButtonProps): JSX.Element {
-  const className = `btn btn-${variant} ${disabled ? 'disabled' : ''}`;
-  
+  const className = `btn btn-${variant} ${disabled ? "disabled" : ""}`;
+
   return (
-    <button
-      className={className}
-      onClick={onClick}
-      disabled={disabled}
-    >
+    <button className={className} onClick={onClick} disabled={disabled}>
       {children}
     </button>
   );

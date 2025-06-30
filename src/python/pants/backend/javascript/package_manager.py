@@ -53,7 +53,15 @@ class PackageManager:
             version=version,
             lockfile_name="pnpm-lock.yaml",
             generate_lockfile_args=("install", "--lockfile-only"),
-            immutable_install_args=("install", "--frozen-lockfile", "--reporter=append-only", "--loglevel=debug", "--prefer-offline", "--force", "--store-dir=./.pnpm-store"),
+            immutable_install_args=(
+                "install",
+                "--frozen-lockfile",
+                "--reporter=append-only",
+                "--loglevel=debug",
+                "--prefer-offline",
+                "--force",
+                "--store-dir=./.pnpm-store",
+            ),
             workspace_specifier_arg="--filter",
             run_arg_separator=(
                 () if version is None or nodesemver.satisfies(version, ">=7") else ("--",)

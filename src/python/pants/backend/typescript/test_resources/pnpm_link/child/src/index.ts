@@ -1,3 +1,3 @@
 export function childFunction(): string {
-    return "Hello from child package!";
+  return "Hello from child package!";
 }

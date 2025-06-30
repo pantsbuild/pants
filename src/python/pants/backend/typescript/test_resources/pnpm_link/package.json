@@ -2,6 +2,7 @@
   "name": "parent-pkg",
   "version": "1.0.0",
   "type": "module",
+  "packageManager": "pnpm@9.15.0",
   "dependencies": {
     "child-pkg": "link:./child"
   },

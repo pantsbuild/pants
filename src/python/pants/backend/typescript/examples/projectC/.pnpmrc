@@ -1,3 +1,0 @@
-# pnpm configuration
-auto-install-peers=true
-strict-peer-dependencies=false

@@ -1,11 +1,11 @@
-import React from 'react';
-import type { User } from '@test/common-types';
+import React from "react";
+import type { User } from "@test/common-types";
 
 export interface ButtonProps {
   children: React.ReactNode;
   onClick?: () => void;
   disabled?: boolean;
-  variant?: 'primary' | 'secondary';
+  variant?: "primary" | "secondary";
   user?: User;
 }
 
@@ -13,11 +13,11 @@ export function Button({
   children,
   onClick,
   disabled = false,
-  variant = 'primary',
-  user
+  variant = "primary",
+  user,
 }: ButtonProps): JSX.Element {
-  const className = `btn btn-${variant} ${disabled ? 'disabled' : ''}`;
-  
+  const className = `btn btn-${variant} ${disabled ? "disabled" : ""}`;
+
   return (
     <button
       className={className}

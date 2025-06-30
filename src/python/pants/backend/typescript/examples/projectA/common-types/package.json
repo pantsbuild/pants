@@ -1,8 +1,0 @@
-{
-  "name": "@pants-example/common-types",
-  "version": "0.0.1",
-  "description": "Shared TypeScript type definitions",
-  "main": "./src/index.ts",
-  "private": true,
-  "type": "module"
-}

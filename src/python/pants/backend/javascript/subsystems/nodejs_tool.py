@@ -170,7 +170,6 @@ async def _run_tool_without_resolve(request: NodeJSToolRequest) -> Process:
 
 
 async def _run_tool_with_resolve(request: NodeJSToolRequest, resolve: str) -> Process:
-    
     resolves = await resolve_to_projects(**implicitly())
 
     if request.resolve not in resolves:
@@ -184,24 +183,25 @@ async def _run_tool_with_resolve(request: NodeJSToolRequest, resolve: str) -> Pr
     all_first_party = await resolve_to_first_party_node_package(**implicitly())
     package_for_resolve = all_first_party[resolve]
     project = resolves[resolve]
-    
+
     installed = await install_node_packages_for_address(
-        InstalledNodePackageRequest(package_for_resolve.address), 
-        **implicitly()
+        InstalledNodePackageRequest(package_for_resolve.address), **implicitly()
     )
-    # PR_NOTE: Merge the tool's input files (source code, config files) with the installed 
+    # PR_NOTE: Merge the tool's input files (source code, config files) with the installed
     # packages (node_modules). This is required for resolve-based execution where tools like
     # TypeScript need both their input files AND the installed dependencies in the sandbox.
     merged_input_digest = await merge_digests(
         MergeDigests([request.input_digest, installed.digest])
     )
-    
+
     # Add system binaries to PATH for tools that need them (like uname for TypeScript)
     extra_env_with_path = {
         **request.extra_env,
-        "PATH": f"/usr/bin:/bin:{request.extra_env.get('PATH', '')}" if request.extra_env.get('PATH') else "/usr/bin:/bin"
+        "PATH": f"/usr/bin:/bin:{request.extra_env.get('PATH', '')}"
+        if request.extra_env.get("PATH")
+        else "/usr/bin:/bin",
     }
-    
+
     return await setup_nodejs_project_environment_process(
         NodeJsProjectEnvironmentProcess(
             env=installed.project_env,

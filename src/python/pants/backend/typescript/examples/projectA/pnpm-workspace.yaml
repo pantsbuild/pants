@@ -1,8 +1,0 @@
-packages:
-  - 'common-types'
-  - 'shared-utils'  
-  - 'shared-components'
-  - 'main-app'
-nodeLinker: hoisted
-publicHoistPattern:
-  - "*"
