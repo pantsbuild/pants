@@ -72,7 +72,7 @@ def test_parse_address_family_empty() -> None:
             Parser(
                 build_root="",
                 registered_target_types=RegisteredTargetTypes({}),
-                union_membership=UnionMembership({}),
+                union_membership=UnionMembership.empty(),
                 object_aliases=BuildFileAliases(),
                 ignore_unrecognized_symbols=False,
             ),
@@ -81,7 +81,7 @@ def test_parse_address_family_empty() -> None:
             BuildFilePreludeSymbols(FrozenDict(), ()),
             AddressFamilyDir("/dev/null"),
             RegisteredTargetTypes({}),
-            UnionMembership({}),
+            UnionMembership.empty(),
             MaybeBuildFileDependencyRulesImplementation(None),
             SessionValues({CompleteEnvironmentVars: CompleteEnvironmentVars({})}),
         ],
@@ -122,7 +122,7 @@ def test_extend_synthetic_target() -> None:
             Parser(
                 build_root="",
                 registered_target_types=RegisteredTargetTypes({"resource": ResourceTarget}),
-                union_membership=UnionMembership({}),
+                union_membership=UnionMembership.empty(),
                 object_aliases=BuildFileAliases(),
                 ignore_unrecognized_symbols=False,
             ),
@@ -131,7 +131,7 @@ def test_extend_synthetic_target() -> None:
             BuildFilePreludeSymbols(FrozenDict(), ()),
             AddressFamilyDir("/foo"),
             RegisteredTargetTypes({"resource": ResourceTarget}),
-            UnionMembership({}),
+            UnionMembership.empty(),
             MaybeBuildFileDependencyRulesImplementation(None),
             SessionValues({CompleteEnvironmentVars: CompleteEnvironmentVars({})}),
         ],
@@ -223,7 +223,7 @@ def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
             Parser(
                 build_root="",
                 registered_target_types=RegisteredTargetTypes({"target": GenericTarget}),
-                union_membership=UnionMembership({}),
+                union_membership=UnionMembership.empty(),
                 object_aliases=BuildFileAliases(),
                 ignore_unrecognized_symbols=False,
             ),
@@ -946,7 +946,7 @@ def test_build_files_share_globals() -> None:
             Parser(
                 build_root="",
                 registered_target_types=RegisteredTargetTypes({}),
-                union_membership=UnionMembership({}),
+                union_membership=UnionMembership.empty(),
                 object_aliases=BuildFileAliases(),
                 ignore_unrecognized_symbols=False,
             ),

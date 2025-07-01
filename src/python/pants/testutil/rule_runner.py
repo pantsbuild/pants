@@ -858,7 +858,9 @@ def mock_console(
         global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
         colors = (
             options_bootstrapper.full_options_for_scopes(
-                [GlobalOptions.get_scope_info()], UnionMembership({}), allow_unknown_options=True
+                [GlobalOptions.get_scope_info()],
+                UnionMembership.empty(),
+                allow_unknown_options=True,
             )
             .for_global_scope()
             .colors

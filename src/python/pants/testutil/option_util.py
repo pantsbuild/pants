@@ -54,7 +54,9 @@ def create_dynamic_remote_options(
     env = CompleteEnvironmentVars({})
     oi = OptionsInitializer(ob, rule_runner.EXECUTOR)
     _build_config = oi.build_config(ob, env)
-    options = oi.options(ob, env, _build_config, union_membership=UnionMembership({}), raise_=False)
+    options = oi.options(
+        ob, env, _build_config, union_membership=UnionMembership.empty(), raise_=False
+    )
     return DynamicRemoteOptions.from_options(
         options, env, remote_auth_plugin_func=_build_config.remote_auth_plugin_func
     )[0]
