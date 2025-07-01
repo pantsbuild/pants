@@ -10,6 +10,19 @@ from textwrap import dedent
 import pytest
 
 from pants.build_graph.address import Address, ResolveError
+from pants.core.environments import rules as environments_rules
+from pants.core.environments.rules import (
+    AllEnvironmentTargets,
+    AmbiguousEnvironmentError,
+    ChosenLocalEnvironmentName,
+    EnvironmentName,
+    EnvironmentNameRequest,
+    NoFallbackEnvironmentError,
+    SingleEnvironmentNameRequest,
+    UnrecognizedEnvironmentError,
+    extract_process_config_from_environment,
+    resolve_environment_name,
+)
 from pants.core.environments.subsystems import EnvironmentsSubsystem
 from pants.core.environments.target_types import (
     CompatiblePlatformsField,
@@ -24,19 +37,6 @@ from pants.core.environments.target_types import (
     RemoteEnvironmentCacheBinaryDiscovery,
     RemoteEnvironmentTarget,
     RemoteExtraPlatformPropertiesField,
-)
-from pants.core.util_rules import environments
-from pants.core.util_rules.environments import (
-    AllEnvironmentTargets,
-    AmbiguousEnvironmentError,
-    ChosenLocalEnvironmentName,
-    EnvironmentName,
-    EnvironmentNameRequest,
-    NoFallbackEnvironmentError,
-    SingleEnvironmentNameRequest,
-    UnrecognizedEnvironmentError,
-    extract_process_config_from_environment,
-    resolve_environment_name,
 )
 from pants.engine.environment import LOCAL_ENVIRONMENT_MATCHER, ChosenLocalWorkspaceEnvironmentName
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
@@ -58,7 +58,7 @@ from pants.testutil.rule_runner import (
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            *environments.rules(),
+            *environments_rules.rules(),
             QueryRule(AllEnvironmentTargets, []),
             QueryRule(EnvironmentTarget, [EnvironmentName]),
             QueryRule(EnvironmentName, [EnvironmentNameRequest]),
@@ -363,9 +363,9 @@ def test_resolve_environment_name_local_and_docker_fallbacks(monkeypatch) -> Non
                 ),
             ],
             mock_calls={
-                "pants.core.util_rules.environments.determine_local_environment": mock_determine_local_environment,
-                "pants.core.util_rules.environments.determine_local_workspace_environment": mock_determine_local_workspace_environment,
-                "pants.core.util_rules.environments.get_target_for_environment_name": mock_get_target_for_environment_name,
+                "pants.core.environments.rules.determine_local_environment": mock_determine_local_environment,
+                "pants.core.environments.rules.determine_local_workspace_environment": mock_determine_local_workspace_environment,
+                "pants.core.environments.rules.get_target_for_environment_name": mock_get_target_for_environment_name,
             },
             mock_gets=[
                 MockGet(

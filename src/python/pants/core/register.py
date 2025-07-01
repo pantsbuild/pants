@@ -8,6 +8,7 @@ These are always activated and cannot be disabled.
 
 from pants.backend.codegen import export_codegen_goal
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.environments import rules as environments_rules
 from pants.core.environments.target_types import (
     DockerEnvironmentTarget,
     LocalEnvironmentTarget,
@@ -50,7 +51,6 @@ from pants.core.util_rules import (
     adhoc_binaries,
     archive,
     config_files,
-    environments,
     external_tool,
     source_files,
     stripped_source_files,
@@ -91,7 +91,7 @@ def rules():
         *anonymous_telemetry.rules(),
         *archive.rules(),
         *config_files.rules(),
-        *environments.rules(),
+        *environments_rules.rules(),
         *external_tool.rules(),
         *git.rules(),
         *source_files.rules(),

@@ -10,9 +10,9 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from string import Template
 
+from pants.core.environments.rules import EnvironmentNameRequest, resolve_environment_name
 from pants.core.util_rules import distdir
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.environments import EnvironmentNameRequest, resolve_environment_name
 from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, MergeDigests, Workspace

@@ -13,6 +13,7 @@ from typing import Any, TypeVar
 import pytest
 
 from pants.base.specs import Specs
+from pants.core.environments.rules import EnvironmentNameRequest
 from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.goals.fix import FixFilesRequest, FixTargetsRequest
 from pants.core.goals.fmt import FmtFilesRequest, FmtTargetsRequest
@@ -27,7 +28,6 @@ from pants.core.goals.lint import (
     lint,
 )
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.core.util_rules.partitions import PartitionerType, _EmptyMetadata
 from pants.engine.addresses import Address
 from pants.engine.fs import PathGlobs, SpecsPaths, Workspace
