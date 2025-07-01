@@ -17,7 +17,7 @@ This directory contains test project structures for TypeScript backend integrati
 
 ### 2. `complex_project/`
 **Purpose**: Multi-package workspace with cross-dependencies  
-**Package Managers**: ✅ npm, ✅ yarn, ❌ pnpm (needs special setup)  
+**Package Managers**: ✅ npm, ✅ yarn  
 **Use Cases**: Workspace dependency resolution, multiple project testing
 
 **Key Features**:
@@ -124,10 +124,7 @@ cd test_resources/complex_project
 npm install --package-lock-only
 
 # yarn workspace (use yarn 1.x)
-npx yarn@1.22.22 install  
-
-# pnpm workspace
-pnpm install --lockfile-only
+npx yarn@1.22.22 install
 ```
 
 #### pnpm Link Project
@@ -150,13 +147,3 @@ pnpm install --lockfile-only
 - **npm**: Works with all project structures
 - **yarn**: Works with basic and complex projects (use yarn 1.x lockfiles)  
 - **pnpm**: Works with basic and pnpm_link projects; complex workspace needs additional configuration
-
-## Integration with Pants Tests
-
-The test resources use combined fixtures that bundle project type with compatible package managers:
-
-- `basic_rule_runner` → basic_project with npm/pnpm/yarn
-- `workspace_rule_runner` → complex_project with npm/yarn only
-- `pnpm_rule_runner` → pnpm_link with pnpm only
-
-The helper function `_load_project_test_files(project_type)` loads the appropriate project and adds test directory prefixes to avoid conflicts during testing.

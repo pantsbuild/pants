@@ -53,15 +53,7 @@ class PackageManager:
             version=version,
             lockfile_name="pnpm-lock.yaml",
             generate_lockfile_args=("install", "--lockfile-only"),
-            immutable_install_args=(
-                "install",
-                "--frozen-lockfile",
-                "--reporter=append-only",
-                "--loglevel=debug",
-                "--prefer-offline",
-                "--force",
-                "--store-dir=./.pnpm-store",
-            ),
+            immutable_install_args=("install", "--frozen-lockfile"),
             workspace_specifier_arg="--filter",
             run_arg_separator=(
                 () if version is None or nodesemver.satisfies(version, ">=7") else ("--",)
@@ -69,9 +61,9 @@ class PackageManager:
             download_and_execute_args_template=("--package", "{package}", "dlx", "{executable}"),
             execute_args=("exec",),
             current_directory_args=("--prefix",),
-            extra_env=FrozenDict(),
+            extra_env=FrozenDict({"PNPM_HOME": "{chroot}/._pnpm_home"}),
             pack_archive_format="{}-{}.tgz",
-            extra_caches=FrozenDict(),
+            extra_caches=FrozenDict({"pnpm_home": "._pnpm_home"}),
         )
 
     @classmethod

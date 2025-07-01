@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import logging
 import os.path
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -36,9 +35,7 @@ from pants.engine.intrinsics import add_prefix, merge_digests
 from pants.engine.process import fallible_to_exec_result_or_raise
 from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.target import SourcesField, Target, TransitiveTargetsRequest
-from pants.engine.unions import UnionRule
-
-logger = logging.getLogger(__name__)
+from pants.engine.unions import UnionMembership, UnionRule
 
 
 @dataclass(frozen=True)
@@ -88,6 +85,8 @@ async def _get_relevant_source_files(
 @rule
 async def install_node_packages_for_address(
     req: InstalledNodePackageRequest,
+    union_membership: UnionMembership,
+    nodejs: nodejs.NodeJS,
 ) -> InstalledNodePackage:
     project_env = await get_nodejs_environment(NodeJSProjectEnvironmentRequest(req.address))
     target = project_env.ensure_target()
@@ -112,7 +111,6 @@ async def install_node_packages_for_address(
             )
         )
     )
-
     node_modules = await add_prefix(AddPrefix(install_result.output_digest, project_env.root_dir))
 
     return InstalledNodePackage(
