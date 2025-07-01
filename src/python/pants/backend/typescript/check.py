@@ -44,39 +44,48 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from pants.backend.javascript.nodejs_project import NodeJSProject
 
+# Common TypeScript output directory patterns found in real projects
+_COMMON_OUTPUT_DIRS = ["dist", "build", "lib", "out", "compiled", "bundles"]
 
-async def _load_cached_typescript_artifacts(project: NodeJSProject) -> Digest:
-    """Load cached .tsbuildinfo files and output files for incremental TypeScript compilation."""
-    cache_globs = []
+
+def _get_typescript_artifact_globs(
+    project: NodeJSProject, subsystem: TypeScriptSubsystem
+) -> list[str]:
+    """Get glob patterns for TypeScript build artifacts (.tsbuildinfo files and output
+    directories)."""
+    globs = []
+
+    # Use custom output directories if specified, otherwise use common patterns
+    output_dirs = subsystem.output_dirs if subsystem.output_dirs else _COMMON_OUTPUT_DIRS
+
     for workspace_pkg in project.workspaces:
-        # Cache .tsbuildinfo files for incremental state
-        cache_globs.append(f"{workspace_pkg.root_dir}/tsconfig.tsbuildinfo")
-        # Cache output directories that TypeScript --build generates
-        # TODO: How to handle different output directories?
-        cache_globs.append(f"{workspace_pkg.root_dir}/dist/**/*")
+        # .tsbuildinfo files for incremental compilation state
+        globs.append(f"{workspace_pkg.root_dir}/tsconfig.tsbuildinfo")
 
+        # Output directories - use configured or default patterns
+        for output_dir in output_dirs:
+            globs.append(f"{workspace_pkg.root_dir}/{output_dir}/**/*")
+
+    return globs
+
+
+async def _load_cached_typescript_artifacts(
+    project: NodeJSProject, subsystem: TypeScriptSubsystem
+) -> Digest:
+    """Load cached .tsbuildinfo files and output files for incremental TypeScript compilation."""
+    cache_globs = _get_typescript_artifact_globs(project, subsystem)
     cached_artifacts = await path_globs_to_digest(
         PathGlobs(cache_globs, glob_match_error_behavior=GlobMatchErrorBehavior.ignore),
         **implicitly(),
     )
-
     return cached_artifacts
 
 
 async def _extract_typescript_artifacts_for_caching(
-    project: NodeJSProject, process_output_digest: Digest
+    project: NodeJSProject, process_output_digest: Digest, subsystem: TypeScriptSubsystem
 ) -> Digest:
     """Extract .tsbuildinfo files and output files from TypeScript compilation for caching."""
-    output_globs = []
-    for workspace_pkg in project.workspaces:
-        # Extract .tsbuildinfo files for incremental state
-        output_globs.append(f"{workspace_pkg.root_dir}/tsconfig.tsbuildinfo")
-        # Extract output directories that TypeScript --build generates
-        # PR_NOTE: Currently hardcoded to 'dist' but TypeScript projects may use different
-        # output directories (e.g., 'build', 'lib', 'out'). This could be improved by
-        # parsing tsconfig.json's outDir/declarationDir settings.
-        output_globs.append(f"{workspace_pkg.root_dir}/dist/**/*")
-
+    output_globs = _get_typescript_artifact_globs(project, subsystem)
     artifacts_digest = await Get(
         Digest,
         DigestSubset(
@@ -84,7 +93,6 @@ async def _extract_typescript_artifacts_for_caching(
             PathGlobs(output_globs, glob_match_error_behavior=GlobMatchErrorBehavior.ignore),
         ),
     )
-
     return artifacts_digest
 
 
@@ -246,7 +254,7 @@ async def _typecheck_single_project(
 
     # Include cached .tsbuildinfo files and output files for incremental compilation
     # TypeScript --build uses these files to skip unchanged packages
-    cached_typescript_artifacts = await _load_cached_typescript_artifacts(project)
+    cached_typescript_artifacts = await _load_cached_typescript_artifacts(project, subsystem)
 
     # Merge workspace sources, config files, and cached TypeScript artifacts
     all_digests = (
@@ -291,7 +299,7 @@ async def _typecheck_single_project(
     # Cache TypeScript incremental build artifacts for faster subsequent runs
     # TypeScript --build generates .tsbuildinfo files and output files that enable incremental compilation
     typescript_artifacts_digest = await _extract_typescript_artifacts_for_caching(
-        project, result.output_digest
+        project, result.output_digest, subsystem
     )
 
     # Convert to CheckResult with caching support - single result for the project
