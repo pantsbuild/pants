@@ -244,13 +244,14 @@ async def _typecheck_single_project(
     )
 
     # Get config file digests
-    config_digests = []
-    for config_file in config_files:
-        config_digest = await path_globs_to_digest(
-            PathGlobs([config_file], glob_match_error_behavior=GlobMatchErrorBehavior.ignore),
+    config_digest = (
+        await path_globs_to_digest(
+            PathGlobs(config_files, glob_match_error_behavior=GlobMatchErrorBehavior.ignore),
             **implicitly(),
         )
-        config_digests.append(config_digest)
+        if config_files
+        else EMPTY_DIGEST
+    )
 
     # Include cached .tsbuildinfo files and output files for incremental compilation
     # TypeScript --build uses these files to skip unchanged packages
@@ -259,7 +260,7 @@ async def _typecheck_single_project(
     # Merge workspace sources, config files, and cached TypeScript artifacts
     all_digests = (
         [all_workspace_sources]
-        + config_digests
+        + ([config_digest] if config_digest != EMPTY_DIGEST else [])
         + ([cached_typescript_artifacts] if cached_typescript_artifacts != EMPTY_DIGEST else [])
     )
     input_digest = await merge_digests(MergeDigests(all_digests))
@@ -347,7 +348,7 @@ async def _typecheck_typescript_files(
     )
 
     # Group targets by their containing NodeJS project
-    projects_to_check: dict[NodeJSProject, list[object]] = {}
+    projects_to_check: dict[NodeJSProject, list[Address]] = {}
     for i, owning_package in enumerate(owning_packages):
         address = list(target_addresses)[i]
         if owning_package.target:

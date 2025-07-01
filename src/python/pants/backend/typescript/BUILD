@@ -5,7 +5,7 @@ python_sources()
 python_tests(
     name="tests",
     overrides={
-        "check_execution_test.py": {
+        "check_test.py": {
             "dependencies": ["./test_resources"],
             "timeout": 240,
         },
