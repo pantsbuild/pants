@@ -1,5 +1,2 @@
 packages:
-  - '*'
-nodeLinker: hoisted
-publicHoistPattern:
-  - "*"
+  - 'child'

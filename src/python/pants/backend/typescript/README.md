@@ -62,15 +62,52 @@ const fs = require("fs");                 // → Node.js built-in
 **Current Limitations**:
 - Type-only imports treated as regular dependencies (no impact on type checking)
 - Dynamic require with variables ignored (`require(variable)`)
-- No workspace package resolution yet (relies on package manager symlinks for type checking)
+- Workspace package resolution relies on package manager symlinks (requires proper workspace configuration for pnpm)
 
 ## Package Managers
 
 All major package managers supported with workspace configurations:
 
-- **npm**: Standard `workspaces` field
-- **pnpm**: Requires `link:` dependencies + hoisting config  
+- **npm**: Standard `workspaces` field in root package.json
+- **pnpm**: Requires `link:` protocol dependencies + `pnpm-workspace.yaml`  
 - **yarn**: Works out-of-box with Yarn Classic (1.x)
+
+### pnpm Workspace Setup
+
+pnpm requires special configuration for cross-package imports in TypeScript:
+
+For example, to migrate an existing npm/yarn workspace to pnpm:
+
+1. **Create `pnpm-workspace.yaml`**:
+   ```yaml
+   packages:
+     - 'packages/*'  # or list explicit package directories
+   ```
+
+2. **Update workspace dependencies** in package.json files:
+   ```json
+   // Before (npm/yarn)
+   {
+     "dependencies": {
+       "@myorg/shared": "workspace:*"
+     }
+   }
+   
+   // After (pnpm for TypeScript)
+   {
+     "dependencies": {
+       "@myorg/shared": "link:../shared"
+     }
+   }
+   ```
+
+3. **Regenerate lockfile**:
+   ```bash
+   rm pnpm-lock.yaml
+   pnpm install
+   ```
+
+The `link:` protocol creates symlinks that TypeScript can resolve for cross-package imports, enabling proper type checking across workspace packages.
 
 ## Configuration
 
@@ -95,8 +132,3 @@ Type checking operates at **project level** using TypeScript's `--build` mode:
 - Executes concurrent project-level type checking
 - Caches compilation artifacts for performance
 
-## Known Limitations
-
-- No file-level skip functionality (use TypeScript native `// @ts-ignore`)
-- Requires proper workspace configuration for cross-package imports
-- pnpm requires special hoisting configuration for workspace resolution

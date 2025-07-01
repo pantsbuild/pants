@@ -6,8 +6,12 @@ python_tests(
     name="tests",
     overrides={
         "check_test.py": {
-            "dependencies": ["./test_resources"],
-            "timeout": 240,
+            "dependencies": [":test_resources"]
         },
     },
+)
+
+resources(
+    name="test_resources",
+    sources=["test_resources/**/*"],
 )
