@@ -30,7 +30,7 @@ from pants.engine.process import (
     ProcessResultMetadata,
 )
 from pants.engine.target import FieldSet, MultipleSourcesField, Target, Targets
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 from pants.util.logging import LogLevel
@@ -155,7 +155,7 @@ def run_typecheck_rule(
     targets: list[Target],
     only: list[str] | None = None,
 ) -> tuple[int, str]:
-    union_membership = UnionMembership({CheckRequest: request_types})
+    union_membership = UnionMembership.from_rules(UnionRule(CheckRequest, t) for t in request_types)
     check_subsystem = create_subsystem(CheckSubsystem, only=only or [])
     rule_runner = RuleRunner(bootstrap_args=["-lwarn"])
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):

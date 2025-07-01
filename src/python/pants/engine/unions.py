@@ -3,14 +3,15 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, DefaultDict, Generic, TypeVar, cast, overload
+from typing import Any, Generic, TypeVar, cast, overload
 
-from pants.util.frozendict import FrozenDict
+from pants.engine.internals.native_engine import (  # noqa: F401 # re-export
+    UnionMembership as UnionMembership,
+)
+from pants.engine.internals.native_engine import UnionRule as UnionRule  # noqa: F401 # re-export
 from pants.util.memo import memoized_method
-from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 _T = TypeVar("_T", bound=type)
 
@@ -73,85 +74,6 @@ def union_in_scope_types(input_type: type) -> tuple[type, ...] | None:
     if not is_union(input_type):
         return None
     return cast("tuple[type, ...]", getattr(input_type, "_union_in_scope_types"))
-
-
-@dataclass(frozen=True)
-class UnionRule:
-    """Specify that an instance of `union_member` can be substituted wherever `union_base` is
-    used."""
-
-    union_base: type
-    union_member: type
-
-    def __post_init__(self) -> None:
-        if not is_union(self.union_base):
-            msg = (
-                f"The first argument must be a class annotated with @union "
-                f"(from pants.engine.unions), but was {self.union_base}."
-            )
-            if is_union(self.union_member):
-                msg += (
-                    "\n\nHowever, the second argument was annotated with `@union`. Did you "
-                    "switch the first and second arguments to `UnionRule()`?"
-                )
-            raise ValueError(msg)
-
-
-@dataclass(frozen=True)
-class UnionMembership:
-    union_rules: FrozenDict[type, FrozenOrderedSet[type]]
-
-    @classmethod
-    def from_rules(cls, rules: Iterable[UnionRule]) -> UnionMembership:
-        mapping: DefaultDict[type, OrderedSet[type]] = defaultdict(OrderedSet)
-        for rule in rules:
-            mapping[rule.union_base].add(rule.union_member)
-
-        return cls(mapping)
-
-    def __init__(self, union_rules: Mapping[type, Iterable[type]]) -> None:
-        object.__setattr__(
-            self,
-            "union_rules",
-            FrozenDict({base: FrozenOrderedSet(members) for base, members in union_rules.items()}),
-        )
-
-    def __contains__(self, union_type: _T) -> bool:
-        return union_type in self.union_rules
-
-    def __getitem__(self, union_type: _T) -> FrozenOrderedSet[_T]:
-        """Get all members of this union type.
-
-        If the union type does not exist because it has no members registered, this will raise an
-        IndexError.
-
-        Note that the type hint assumes that all union members will have subclassed the union type
-        - this is only a convention and is not actually enforced. So, you may have inaccurate type
-        hints.
-        """
-        return self.union_rules[union_type]  # type: ignore[return-value]
-
-    def get(self, union_type: _T) -> FrozenOrderedSet[_T]:
-        """Get all members of this union type.
-
-        If the union type does not exist because it has no members registered, return an empty
-        FrozenOrderedSet.
-
-        Note that the type hint assumes that all union members will have subclassed the union type
-        - this is only a convention and is not actually enforced. So, you may have inaccurate type
-        hints.
-        """
-        return self.union_rules.get(union_type, FrozenOrderedSet())  # type: ignore[return-value]
-
-    def is_member(self, union_type: type, putative_member: type) -> bool:
-        members = self.union_rules.get(union_type)
-        if members is None:
-            raise TypeError(f"Not a registered union type: {union_type}")
-        return putative_member in members
-
-    def has_members(self, union_type: type) -> bool:
-        """Check whether the union has an implementation or not."""
-        return bool(self.union_rules.get(union_type))
 
 
 @dataclass(frozen=True)

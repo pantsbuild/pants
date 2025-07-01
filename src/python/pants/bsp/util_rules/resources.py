@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TypeVar
 
@@ -23,7 +24,6 @@ from pants.engine.intrinsics import merge_digests
 from pants.engine.rules import _uncacheable_rule, collect_rules, implicitly, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.util.ordered_set import FrozenOrderedSet
 
 _logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ async def resources_bsp_target(
     union_membership: UnionMembership,
 ) -> BSPResourcesResult:
     targets = await resolve_bsp_build_target_addresses(request.bsp_target, **implicitly())
-    resources_request_types: FrozenOrderedSet[type[BSPResourcesRequest]] = union_membership.get(
+    resources_request_types: Sequence[type[BSPResourcesRequest]] = union_membership.get(
         BSPResourcesRequest
     )
     field_sets_by_request_type: dict[type[BSPResourcesRequest], set[FieldSet]] = defaultdict(set)
