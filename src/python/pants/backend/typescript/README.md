@@ -1,33 +1,90 @@
-# TypeScript Backend - Under Development!
+# TypeScript Backend
 
-The TypeScript backend is incomplete because it is under active development! Thus, it
-may not be used for any real TypeScript projects in production.
+Production-ready TypeScript backend for Pants with type checking support.
 
-## Functionality
+## Setup
 
-After enabling the `"pants.backend.experimental.typescript"` backend in the `pants.toml` file, you can:
+Enable in `pants.toml`:
+```toml
+[GLOBAL]
+backend_packages.add = [
+  "pants.backend.experimental.typescript"
+]
+```
 
-* run `pants tailor ::` to create `typescript_sources()` and `typescript_tests` target generators
+## Features
 
-## Dependency inference
+### Type Checking
+```bash
+pants check ::           # Check all TypeScript projects  
+pants check src/app::    # Check specific project
+```
 
-The dependencies are not yet fully discovered during dependency inference and support for all the import
-syntax variations is being added. See https://www.typescriptlang.org/docs/handbook/2/modules.html to learn more.
+**Supported**:
+- Multi-project concurrent type checking
+- Incremental compilation via `.tsbuildinfo` caching  
+- Workspace package resolution (npm, pnpm, yarn)
+- Project references and complex `tsconfig.json` configurations
+- Output directory caching (configurable via `[typescript].output_dirs`)
 
-Currently supported:
+### Target Generation  
+```bash
+pants tailor ::
+```
+Generates `typescript_sources()`, `typescript_tests()`, and `tsx_sources()` targets.
 
-* file-based imports
+### Dependency Inference
 
+**File imports**:
 ```typescript
-// in src/ts/index.ts
-import { x } from "./localModuleA";
-import { y } from "./localModuleB";
+import { utils } from "./utils";           // → utils.ts
+import { Button } from "../components";    // → components/index.ts  
 ```
 
-would be discovered as
+**Package imports**:
+```typescript  
+import { lodash } from "lodash";           // → package.json dependency
+import { types } from "@types/node";       // → package.json devDependency
+```
 
+**Workspace imports** (monorepo):
+```typescript
+import { shared } from "@workspace/shared"; // → workspace package
 ```
-$ pants dependencies src/ts/index.ts
-src/ts/localModuleA.ts
-src/ts/localModuleB.ts
+
+## Package Managers
+
+All major package managers supported with workspace configurations:
+
+- **npm**: Standard `workspaces` field
+- **pnpm**: Requires `link:` dependencies + hoisting config  
+- **yarn**: Works out-of-box with Yarn Classic (1.x)
+
+## Configuration
+
+### TypeScript Options
+```toml
+[typescript]  
+version = "typescript@5.8.2"      # Tool version
+output_dirs = ["dist", "build"]   # Override output directory patterns
+install_from_resolve = "frontend" # Use specific resolve
 ```
+
+### Package Manager Selection
+```bash
+pants --nodejs-package-manager=pnpm check ::
+```
+
+## Architecture
+
+Type checking operates at **project level** using TypeScript's `--build` mode:
+- Discovers projects via JavaScript backend integration
+- Groups targets by containing NodeJS project  
+- Executes concurrent project-level type checking
+- Caches compilation artifacts for performance
+
+## Known Limitations
+
+- No file-level skip functionality (use TypeScript native `// @ts-ignore`)
+- Requires proper workspace configuration for cross-package imports
+- pnpm requires special hoisting configuration for workspace resolution
