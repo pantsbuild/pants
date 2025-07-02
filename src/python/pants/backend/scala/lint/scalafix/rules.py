@@ -93,6 +93,7 @@ class ScalafixPartitionInfo:
     compile_classpath_entries: tuple[str, ...]
     rule_classpath_entries: tuple[str, ...]
     extra_immutable_input_digests: FrozenDict[str, Digest]
+    resolve_name: str
 
     @property
     def description(self) -> str:
@@ -241,6 +242,9 @@ async def _partition_scalafix(
                     **dict(rule_classpath.immutable_inputs(prefix=rulecp_relpath)),
                 }
             ),
+            resolve_name=classpath.classpath.resolve.name
+            if classpath.classpath
+            else jvm.default_resolve,
         )
 
     return Partitions(
@@ -301,7 +305,6 @@ async def _run_scalafix_process(
     merged_digest = await merge_digests(
         MergeDigests([partition_info.config_snapshot.digest, request.snapshot.digest])
     )
-
     return await execute_process(
         **implicitly(
             JvmProcess(
@@ -321,7 +324,12 @@ async def _run_scalafix_process(
                         else ()
                     ),
                     *(("--check",) if request.check_only else ()),
-                    *((f"--scalac-options={arg}" for arg in scalac.args) if scalac.args else ()),
+                    *(
+                        f"--scalac-options={arg}"
+                        for arg in (
+                            scalac.parsed_args_for_resolve(partition_info.resolve_name) or ()
+                        )
+                    ),
                     *(f"--files={file}" for file in request.snapshot.files),
                 ],
                 classpath_entries=partition_info.runtime_classpath_entries,

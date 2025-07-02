@@ -11,9 +11,9 @@ import pytest
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
+from pants.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 from pants.testutil.pants_integration_test import run_pants_with_workdir
 from pants.util.dirutil import read_file
-from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 
 pytestmark = pytest.mark.platform_specific_behavior
 

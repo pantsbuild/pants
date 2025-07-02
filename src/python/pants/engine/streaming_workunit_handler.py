@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from pants.base.specs import Specs
-from pants.core.util_rules.environments import determine_bootstrap_environment
+from pants.core.environments.rules import determine_bootstrap_environment
 from pants.engine.addresses import Addresses
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, DigestContents, FileDigest, Snapshot

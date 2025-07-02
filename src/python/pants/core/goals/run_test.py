@@ -11,6 +11,7 @@ from typing import cast
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
 
+from pants.core.environments.rules import EnvironmentNameRequest
 from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.goals.run import (
     Run,
@@ -22,7 +23,6 @@ from pants.core.goals.run import (
     run,
 )
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
-from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent, Workspace
 from pants.engine.internals.specs_rules import (
