@@ -43,6 +43,7 @@ from pants.engine.target import (
     AllTargets,
     Dependencies,
     DependenciesRequest,
+    DescriptionField,
     GeneratedTargets,
     GenerateTargetsRequest,
     InvalidFieldException,
@@ -52,6 +53,7 @@ from pants.engine.target import (
     SourcesField,
     StringField,
     StringSequenceField,
+    Tags,
     Target,
     TargetGenerator,
     Targets,
@@ -112,6 +114,8 @@ class NodeBuildScript(NodeScript):
     output_files: tuple[str, ...] = ()
     extra_caches: tuple[str, ...] = ()
     extra_env_vars: tuple[str, ...] = ()
+    description: str | None = None
+    tags: tuple[str, ...] = ()
 
     alias: ClassVar[str] = "node_build_script"
 
@@ -123,6 +127,8 @@ class NodeBuildScript(NodeScript):
         output_files: Iterable[str] = (),
         extra_caches: Iterable[str] = (),
         extra_env_vars: Iterable[str] = (),
+        description: str | None = None,
+        tags: Iterable[str] = (),
     ) -> NodeBuildScript:
         """A build script, mapped from the `scripts` section of a package.json file.
 
@@ -136,6 +142,8 @@ class NodeBuildScript(NodeScript):
             output_files=tuple(output_files),
             extra_caches=tuple(extra_caches),
             extra_env_vars=tuple(extra_env_vars),
+            description=description,
+            tags=tuple(tags),
         )
 
 
@@ -974,6 +982,8 @@ async def generate_node_package_targets(
                             *request.template.get("dependencies", []),
                             package_target.address.spec,
                         ],
+                        DescriptionField.alias: build_script.description,
+                        Tags.alias: build_script.tags,
                     },
                     request.generator.address.create_generated(build_script.entry_point),
                     union_membership,
