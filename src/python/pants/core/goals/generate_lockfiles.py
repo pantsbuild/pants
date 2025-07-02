@@ -17,8 +17,9 @@ from pants.engine.console import Console
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, goal_rule
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import merge_digests
+from pants.engine.rules import collect_rules, goal_rule, implicitly, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionMembership, union
 from pants.help.maybe_color import MaybeColor
@@ -57,6 +58,13 @@ class GenerateLockfile:
     resolve_name: str
     lockfile_dest: str
     diff: bool
+
+
+@rule(polymorphic=True)
+async def generate_lockfile(
+    req: GenerateLockfile, env_name: EnvironmentName
+) -> GenerateLockfileResult:
+    raise NotImplementedError()
 
 
 @dataclass(frozen=True)
@@ -105,6 +113,11 @@ class KnownUserResolveNames:
     requested_resolve_names_cls: type[RequestedUserResolveNames]
 
 
+@rule(polymorphic=True)
+async def get_known_user_resolve_names(req: KnownUserResolveNamesRequest) -> KnownUserResolveNames:
+    raise NotImplementedError()
+
+
 @union(in_scope_types=[EnvironmentName])
 class RequestedUserResolveNames(DeduplicatedCollection[str]):
     """The user resolves requested for a particular language ecosystem.
@@ -114,6 +127,13 @@ class RequestedUserResolveNames(DeduplicatedCollection[str]):
     """
 
     sort_input = True
+
+
+@rule(polymorphic=True)
+async def get_user_generate_lockfiles(
+    req: RequestedUserResolveNames, env_name: EnvironmentName
+) -> UserGenerateLockfiles:
+    raise NotImplementedError()
 
 
 class PackageVersion(Protocol):
@@ -504,8 +524,8 @@ async def generate_lockfiles_goal(
     console: Console,
     global_options: GlobalOptions,
 ) -> GenerateLockfilesGoal:
-    known_user_resolve_names = await MultiGet(
-        Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())
+    known_user_resolve_names = await concurrently(
+        get_known_user_resolve_names(request(), **implicitly())
         for request in union_membership.get(KnownUserResolveNamesRequest)
     )
     requested_user_resolve_names = determine_resolves_to_generate(
@@ -515,10 +535,11 @@ async def generate_lockfiles_goal(
 
     # This is the "planning" phase of lockfile generation. Currently this is all done in the local
     # environment, since there's not currently a clear mechanism to prescribe an environment.
-    all_specified_user_requests = await MultiGet(
-        Get(
-            UserGenerateLockfiles,
-            {resolve_names: RequestedUserResolveNames, local_environment.val: EnvironmentName},
+    all_specified_user_requests = await concurrently(
+        get_user_generate_lockfiles(
+            **implicitly(
+                {resolve_names: RequestedUserResolveNames, local_environment.val: EnvironmentName}
+            )
         )
         for resolve_names in requested_user_resolve_names
     )
@@ -545,20 +566,21 @@ async def generate_lockfiles_goal(
     else:
         all_requests = applicable_user_requests
 
-    results = await MultiGet(
-        Get(
-            GenerateLockfileResult,
-            {
-                req: GenerateLockfile,
-                _preferred_environment(req, local_environment.val): EnvironmentName,
-            },
+    results = await concurrently(
+        generate_lockfile(
+            **implicitly(
+                {
+                    req: GenerateLockfile,
+                    _preferred_environment(req, local_environment.val): EnvironmentName,
+                }
+            )
         )
         for req in all_requests
     )
 
     # Lockfiles are actually written here. This would be an acceptable place to handle conflict
     # resolution behaviour if we start executing requests in multiple environments.
-    merged_digest = await Get(Digest, MergeDigests(res.digest for res in results))
+    merged_digest = await merge_digests(MergeDigests(res.digest for res in results))
     workspace.write_digest(merged_digest)
 
     diffs: list[LockfileDiff] = []
