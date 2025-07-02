@@ -43,6 +43,7 @@ from pants.engine.target import (
     AllTargets,
     Dependencies,
     DependenciesRequest,
+    DescriptionField,
     GeneratedTargets,
     GenerateTargetsRequest,
     InvalidFieldException,
@@ -52,6 +53,7 @@ from pants.engine.target import (
     SourcesField,
     StringField,
     StringSequenceField,
+    Tags,
     Target,
     TargetGenerator,
     Targets,
@@ -965,26 +967,24 @@ async def generate_node_package_targets(
     build_script_tgts = []
     for build_script in request.generator[NodePackageScriptsField].build_scripts():
         if build_script.entry_point in scripts:
-            build_script_fields = {
-                **request.template,
-                NodeBuildScriptEntryPointField.alias: build_script.entry_point,
-                NodeBuildScriptOutputDirectoriesField.alias: build_script.output_directories,
-                NodeBuildScriptOutputFilesField.alias: build_script.output_files,
-                NodeBuildScriptExtraEnvVarsField.alias: build_script.extra_env_vars,
-                NodeBuildScriptExtraCaches.alias: build_script.extra_caches,
-                NodePackageDependenciesField.alias: [
-                    file_tgt.address.spec,
-                    *(tgt.address.spec for tgt in third_party_tgts),
-                    *request.template.get("dependencies", []),
-                    package_target.address.spec,
-                ],
-                NodeBuildScriptDescriptionField.alias: build_script.description,
-                NodeBuildScriptTagsField.alias: build_script.tags,
-            }
-
             build_script_tgts.append(
                 NodeBuildScriptTarget(
-                    build_script_fields,
+                    {
+                        **request.template,
+                        NodeBuildScriptEntryPointField.alias: build_script.entry_point,
+                        NodeBuildScriptOutputDirectoriesField.alias: build_script.output_directories,
+                        NodeBuildScriptOutputFilesField.alias: build_script.output_files,
+                        NodeBuildScriptExtraEnvVarsField.alias: build_script.extra_env_vars,
+                        NodeBuildScriptExtraCaches.alias: build_script.extra_caches,
+                        NodePackageDependenciesField.alias: [
+                            file_tgt.address.spec,
+                            *(tgt.address.spec for tgt in third_party_tgts),
+                            *request.template.get("dependencies", []),
+                            package_target.address.spec,
+                        ],
+                        DescriptionField.alias: build_script.description,
+                        Tags.alias: build_script.tags,
+                    },
                     request.generator.address.create_generated(build_script.entry_point),
                     union_membership,
                 )
