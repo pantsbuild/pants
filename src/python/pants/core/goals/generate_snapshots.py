@@ -7,7 +7,7 @@ import logging
 from abc import ABCMeta
 from dataclasses import dataclass
 
-from pants.core.util_rules.environments import EnvironmentNameRequest
+from pants.core.environments.rules import EnvironmentNameRequest
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem

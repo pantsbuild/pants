@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Any, ClassVar, Protocol, TypeVar, cast, final
 
 from pants.base.specs import Specs
+from pants.core.environments.rules import _warn_on_non_local_environments
 from pants.core.goals.multi_tool_goal_helper import (
     BatchSizeOption,
     OnlyOption,
@@ -18,7 +19,6 @@ from pants.core.goals.multi_tool_goal_helper import (
     write_reports,
 )
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.environments import _warn_on_non_local_environments
 from pants.core.util_rules.partitions import PartitionElementT, PartitionerType, PartitionMetadataT
 from pants.core.util_rules.partitions import Partitions as Partitions  # re-export
 from pants.core.util_rules.partitions import (

@@ -13,7 +13,7 @@ from pants.core.util_rules import distdir
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.fs import Digest, DigestContents, DigestEntries, FileDigest, FileEntry, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.engine_test import WorkunitTracker
+from pants.engine.internals.engine_testutil import WorkunitTracker
 from pants.engine.internals.native_engine import EMPTY_FILE_DIGEST, PyExecutor, PyStubCAS
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, goal_rule, rule

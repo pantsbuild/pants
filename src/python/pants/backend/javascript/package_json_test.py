@@ -178,6 +178,93 @@ def test_generates_build_script_targets(
     assert addresses == ["src/js#build", "src/js#ham", "src/js#src/js/package.json"]
 
 
+def test_generates_run_script_targets(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": dedent(
+                """\
+                package_json(
+                    scripts=[
+                        node_run_script(entry_point="start", extra_env_vars=["PORT=3000"])
+                    ]
+                )
+                """
+            ),
+            "src/js/package.json": json.dumps(
+                {"name": "ham", "version": "0.0.1", "scripts": {"start": "node server.js"}}
+            ),
+        }
+    )
+    addresses = sorted(str(tgt.address) for tgt in rule_runner.request(AllTargets, ()))
+    assert addresses == ["src/js#ham", "src/js#src/js/package.json", "src/js#start"]
+
+
+def test_run_script_missing_entry_point_error(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": dedent(
+                """\
+                package_json(
+                    scripts=[
+                        node_run_script(entry_point="missing-script")
+                    ]
+                )
+                """
+            ),
+            "src/js/package.json": json.dumps(
+                {"name": "ham", "version": "0.0.1", "scripts": {"start": "node server.js"}}
+            ),
+        }
+    )
+    with engine_error(
+        ValueError, contains="missing-script was not found in package.json#scripts section"
+    ):
+        rule_runner.request(AllTargets, ())
+
+
+def test_generates_multiple_run_script_targets(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": dedent(
+                """\
+                package_json(
+                    scripts=[
+                        node_run_script(entry_point="start"),
+                        node_run_script(entry_point="dev"),
+                        node_build_script(entry_point="build", output_directories=["dist/"]),
+                    ]
+                )
+                """
+            ),
+            "src/js/package.json": json.dumps(
+                {
+                    "name": "ham",
+                    "version": "0.0.1",
+                    "scripts": {
+                        "start": "node server.js",
+                        "dev": "nodemon server.js",
+                        "build": "tsc",
+                    },
+                }
+            ),
+        }
+    )
+    addresses = sorted(str(tgt.address) for tgt in rule_runner.request(AllTargets, ()))
+    assert addresses == [
+        "src/js#build",
+        "src/js#dev",
+        "src/js#ham",
+        "src/js#src/js/package.json",
+        "src/js#start",
+    ]
+
+
 def test_generates_default_test_script_field(
     rule_runner: RuleRunner,
 ) -> None:
