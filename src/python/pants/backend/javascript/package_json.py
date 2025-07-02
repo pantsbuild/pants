@@ -978,13 +978,9 @@ async def generate_node_package_targets(
                     *request.template.get("dependencies", []),
                     package_target.address.spec,
                 ],
+                NodeBuildScriptDescriptionField.alias: build_script.description,
+                NodeBuildScriptTagsField.alias: build_script.tags,
             }
-            # Add description if provided in the build script
-            if build_script.description is not None:
-                build_script_fields["description"] = build_script.description
-
-            if build_script.tags:
-                build_script_fields["tags"] = build_script.tags
 
             build_script_tgts.append(
                 NodeBuildScriptTarget(
