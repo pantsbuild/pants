@@ -525,7 +525,7 @@ async def generate_lockfiles_goal(
     global_options: GlobalOptions,
 ) -> GenerateLockfilesGoal:
     known_user_resolve_names = await concurrently(
-        get_known_user_resolve_names(request(), **implicitly())
+        get_known_user_resolve_names(**implicitly({request(): KnownUserResolveNamesRequest}))
         for request in union_membership.get(KnownUserResolveNamesRequest)
     )
     requested_user_resolve_names = determine_resolves_to_generate(
