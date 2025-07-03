@@ -127,8 +127,45 @@ pants --nodejs-package-manager=pnpm check ::
 ## Architecture
 
 Type checking operates at **project level** using TypeScript's `--build` mode:
-- Discovers projects via JavaScript backend integration
-- Groups targets by containing NodeJS project  
-- Executes concurrent project-level type checking
-- Caches compilation artifacts for performance
 
+### Why Project-Level with `--build` Mode
+
+TypeScript compilation operates at the **NodeJS project level** using `--build` mode and project references, which is the modern TypeScript compilation approach:
+
+1. **Cross-package imports**: Workspace packages import from each other (`@myorg/shared`)
+2. **Shared configuration**: Single root `tsconfig.json` coordinates all sub-projects
+3. **Dependency resolution**: Package manager resolves all workspace dependencies together
+4. **Incremental compilation**: TypeScript's `.tsbuildinfo` tracks project-wide incremental state
+5. **Modern architecture**: `--build` + project references is TypeScript's recommended approach for monorepos
+
+**Why `--build` + Project References (Modern)**:
+```json
+// Root tsconfig.json coordinates sub-projects
+{
+  "references": [
+    { "path": "./packages/shared" },
+    { "path": "./packages/app" }
+  ]
+}
+
+// Individual packages use "composite": true
+{
+  "compilerOptions": { "composite": true },
+  "references": [{ "path": "../shared" }]
+}
+```
+
+**Per-package compilation doesn't work** because:
+- TypeScript needs full workspace context for cross-package imports
+- Project references enable proper dependency ordering and caching
+- `--build` mode provides optimal incremental compilation across the entire project graph
+
+### Implementation Details
+
+- **Project Discovery**: Integrates with JavaScript backend's NodeJS project resolution
+- **Target Grouping**: Groups Pants targets by containing NodeJS project  
+- **Concurrent Execution**: Multiple projects type-checked in parallel
+- **Artifact Caching**: Caches `.tsbuildinfo` and output files for incremental compilation
+- **Configuration Respect**: Uses project's `tsconfig.json` and package manager setup
+
+  

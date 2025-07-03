@@ -1,0 +1,174 @@
+---
+title: Enabling TypeScript support
+sidebar_position: 0
+---
+
+TypeScript support currently allows you to check your TypeScript code (`.ts` and `.tsx`) for type errors.
+
+---
+
+:::caution TypeScript support is experimental
+TypeScript support is still experimental. There may be use cases that we aren't yet handling.
+Please [report issues](https://github.com/pantsbuild/pants/issues/new/choose) or 
+[discussion](https://github.com/pantsbuild/pants/discussions) so that we can better prioritize improvements.
+:::
+
+## Enabling the backend
+
+Enable the experimental TypeScript [backend](../../using-pants/key-concepts/backends.mdx) in your `pants.toml`:
+
+```toml title="pants.toml"
+[GLOBAL]
+backend_packages = [
+    "pants.backend.experimental.typescript",
+    "pants.backend.experimental.tsx",  # For .tsx files (React/JSX)
+]
+```
+
+This will register the new `typescript_source`, `typescript_sources`, `typescript_test`, `tsx_source`, `tsx_sources`, and `tsx_test` target types, as well as the `check` goal for TypeScript.
+
+:::note TypeScript builds on JavaScript support
+TypeScript support extends the [JavaScript backend](../../javascript/overview/enabling-javascript-support.mdx). 
+You'll need a Node.js installation and package manager setup similar to JavaScript projects.
+:::
+
+## Adding TypeScript files to your project
+
+A multi-package workspace might look something like this:
+
+```
+my-workspace/
+├── packages/
+│   ├── shared/
+│   │   ├── src/
+│   │   │   ├── utils.ts
+│   │   │   └── types.ts
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   └── BUILD
+│   ├── web-app/
+│   │   ├── src/
+│   │   │   ├── index.ts
+│   │   │   └── components/
+│   │   │       └── Button.tsx
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   └── BUILD
+├── package.json
+├── tsconfig.json
+└── BUILD
+```
+
+Add `BUILD` files to define TypeScript targets:
+
+```python title="packages/shared/BUILD"
+typescript_sources()
+```
+
+```python title="packages/web-app/BUILD" 
+typescript_sources()
+```
+
+```python title="BUILD"
+package_json()
+
+file(source="tsconfig.json")
+
+# Optional: Include package manager config files if present
+file(source=".npmrc")
+file(source="pnpm-workspace.yaml")
+```
+
+### Workspaces and project references
+
+For complex projects with multiple packages, TypeScript supports [project references](https://www.typescriptlang.org/docs/handbook/project-references.html):
+
+```json title="tsconfig.json"
+{
+  "references": [
+    { "path": "./packages/shared" },
+    { "path": "./packages/web-app" }
+  ]
+}
+```
+
+```json title="packages/shared/tsconfig.json"  
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "./dist",
+    "rootDir": "./src"
+  },
+  "include": ["src/**/*"]
+}
+```
+
+:::tip Project references enable better performance
+Project references with `"composite": true` enable incremental compilation and better dependency tracking across packages.
+:::
+
+## Running TypeScript type checking
+
+Use the `check` goal to type-check your TypeScript code:
+
+```
+❯ pants check ::
+✓ typescript succeeded.
+```
+
+
+## Package manager support
+
+TypeScript typechecking is supported with Yarn (v1), npm, and pnpm. You can specify the package manager to use with the `--nodejs-package-manager` option or by specifying it in package.json.
+
+:::note Workspace configuration for pnpm
+pnpm workspaces require special `link:` protocol dependencies for cross-package TypeScript imports:
+
+```yaml title="pnpm-workspace.yaml"
+packages:
+  - 'packages/*'
+```
+
+```json title="packages/app/package.json"
+{
+  "dependencies": {
+    "@myorg/shared": "link:../shared"
+  }
+}
+```
+
+The `link:` protocol creates symlinks that TypeScript can resolve for cross-package imports, enabling proper type checking across workspace packages.
+:::
+
+## Advanced configuration
+
+### Custom output directories
+
+Currently the backend expects compiled output in any of the following default output directories: `dist`, `build`, `lib`, `out`, `compiled`, and `bundles`. A future enhancement may read `tsconfig.json` to determine this automatically. The output directories can be overridden with:
+
+```toml title="pants.toml"
+[typescript]
+output_dirs = ["dist", "build", "lib"]
+```
+
+### TypeScript installation
+
+**Recommended**: Include TypeScript in your root `package.json`:
+
+```json title="package.json"
+{
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}
+```
+
+If TypeScript is not available in your project dependencies, Pants will automatically download and use a default version which can be overridden:
+
+```toml title="pants.toml"
+[typescript]
+version = "typescript@5.7.3"
+```
+
+
