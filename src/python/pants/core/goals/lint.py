@@ -29,12 +29,14 @@ from pants.core.util_rules.partitions import (
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import EMPTY_DIGEST, Digest, PathGlobs, SpecsPaths, Workspace
+from pants.engine.fs import EMPTY_DIGEST, Digest, PathGlobs, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.graph import filter_targets
 from pants.engine.internals.native_engine import Snapshot
+from pants.engine.internals.specs_rules import resolve_specs_paths
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
-from pants.engine.target import FieldSet, FilteredTargets
+from pants.engine.rules import Get, collect_rules, concurrently, goal_rule, implicitly
+from pants.engine.target import FieldSet
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.option_types import BoolOption
 from pants.util.collections import partition_sequentially
@@ -376,14 +378,12 @@ async def _get_partitions_by_request_type(
         if file_partitioner in core_partition_request_types
     ]
 
-    _get_targets = Get(
-        FilteredTargets,
-        Specs,
-        specs if target_partitioners else Specs.empty(),
+    _get_targets = filter_targets(
+        **implicitly({(specs if target_partitioners else Specs.empty()): Specs})
     )
-    _get_specs_paths = Get(SpecsPaths, Specs, specs if file_partitioners else Specs.empty())
+    _get_specs_paths = resolve_specs_paths(specs if file_partitioners else Specs.empty())
 
-    targets, specs_paths = await MultiGet(_get_targets, _get_specs_paths)
+    targets, specs_paths = await concurrently(_get_targets, _get_specs_paths)
 
     await _warn_on_non_local_environments(targets, f"the {subsystem.name} goal")
 
@@ -407,7 +407,7 @@ async def _get_partitions_by_request_type(
                 partition_files_type.PartitionRequest(specs_paths.files)  # type: ignore[arg-type]
             )
 
-    all_partitions = await MultiGet(
+    all_partitions = await concurrently(
         partition_request_get(request_type) for request_type in filtered_core_request_types
     )
     partitions_by_request_type = defaultdict(list)
@@ -468,7 +468,7 @@ async def lint(
         for request_type, partitions_list in partitions_by_request_type.items()
     }
 
-    formatter_snapshots = await MultiGet(
+    formatter_snapshots = await concurrently(
         Get(Snapshot, PathGlobs(elements))
         for request_type, batch in lint_batches_by_request_type.items()
         for elements, _ in batch
@@ -487,7 +487,7 @@ async def lint(
         for elements, key in batch
     ]
 
-    all_batch_results = await MultiGet(
+    all_batch_results = await concurrently(
         Get(LintResult, AbstractLintRequest.Batch, request) for request in batches
     )
 

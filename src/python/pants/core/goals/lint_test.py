@@ -383,21 +383,19 @@ def run_lint_rule(
                     mock=mock_lint_partition,
                 ),
                 MockGet(
-                    output_type=FilteredTargets,
-                    input_types=(Specs,),
-                    mock=lambda _: FilteredTargets(tuple(targets)),
-                ),
-                MockGet(
-                    output_type=SpecsPaths,
-                    input_types=(Specs,),
-                    mock=lambda _: SpecsPaths(("f.txt", "BUILD"), ()),
-                ),
-                MockGet(
                     output_type=Snapshot,
                     input_types=(PathGlobs,),
                     mock=lambda _: EMPTY_SNAPSHOT,
                 ),
             ],
+            mock_calls={
+                "pants.engine.internals.graph.filter_targets": lambda: FilteredTargets(
+                    tuple(targets)
+                ),
+                "pants.engine.internals.specs_rules.resolve_specs_paths": lambda _: SpecsPaths(
+                    ("f.txt", "BUILD"), ()
+                ),
+            },
             union_membership=union_membership,
             # We don't want temporary warnings to interfere with our expected output.
             show_warnings=False,
