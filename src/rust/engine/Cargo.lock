@@ -963,6 +963,7 @@ version = "0.2.0"
 source = "git+https://github.com/stuhood/deepsize.git?rev=5c8bee5443fcafe4aaa9274490d354412d0955c1#5c8bee5443fcafe4aaa9274490d354412d0955c1"
 dependencies = [
  "deepsize_derive",
+ "indexmap 1.9.3",
  "internment",
  "log",
  "smallvec",

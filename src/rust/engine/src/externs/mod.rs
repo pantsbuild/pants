@@ -40,6 +40,7 @@ pub mod scheduler;
 mod stdio;
 mod target;
 pub mod testutil;
+mod unions;
 pub mod workunits;
 
 pub fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {

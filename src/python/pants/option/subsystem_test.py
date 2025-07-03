@@ -3,7 +3,7 @@
 
 import pytest
 
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.errors import OptionsError
 from pants.option.option_types import BoolOption, StrListOption
 from pants.option.option_value_container import OptionValueContainer
@@ -71,7 +71,7 @@ def test_register_options_blessed(caplog) -> None:
         config_sources=[],
         known_scope_infos=[GoodToGo.get_scope_info()],
     )
-    GoodToGo.register_options_on_scope(options, UnionMembership({}))
+    GoodToGo.register_options_on_scope(options, UnionMembership.empty())
 
     assert not caplog.records, "The current blessed means of registering options should never warn."
 
@@ -94,7 +94,12 @@ def test_register_plugin_options() -> None:
     )
     Electrical.register_options_on_scope(
         options,
-        UnionMembership({Electrical.PluginOption: [LampPlugin, Blender]}),
+        UnionMembership.from_rules(
+            {
+                UnionRule(Electrical.PluginOption, LampPlugin),
+                UnionRule(Electrical.PluginOption, Blender),
+            }
+        ),
     )
 
     electrical_subsystem = Electrical(options.for_scope(Electrical.options_scope))

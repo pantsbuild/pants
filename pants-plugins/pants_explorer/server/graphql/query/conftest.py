@@ -45,7 +45,7 @@ def all_help_info(rule_runner: RuleRunner) -> AllHelpInfo:
     with rule_runner.pushd():
         all_help_info = HelpInfoExtracter.get_all_help_info(
             options=rule_runner.options_bootstrapper.full_options(
-                rule_runner.build_config, union_membership=UnionMembership({})
+                rule_runner.build_config, union_membership=UnionMembership.empty()
             ),
             union_membership=rule_runner.union_membership,
             consumed_scopes_mapper=fake_consumed_scopes_mapper,

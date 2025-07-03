@@ -6,6 +6,7 @@ import logging
 import time
 import uuid
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TypeVar
 
@@ -28,7 +29,6 @@ from pants.engine.intrinsics import merge_digests
 from pants.engine.rules import _uncacheable_rule, collect_rules, implicitly, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.util.ordered_set import FrozenOrderedSet
 
 _logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ async def compile_bsp_target(
     union_membership: UnionMembership,
 ) -> BSPCompileResult:
     targets = await resolve_bsp_build_target_addresses(request.bsp_target, **implicitly())
-    compile_request_types: FrozenOrderedSet[type[BSPCompileRequest]] = union_membership.get(
+    compile_request_types: Sequence[type[BSPCompileRequest]] = union_membership.get(
         BSPCompileRequest
     )
     field_sets_by_request_type: dict[type[BSPCompileRequest], set[FieldSet]] = defaultdict(set)
