@@ -61,7 +61,7 @@ fn test_fromfile_relative_to_buildroot() {
     let fromfile_relpath_str = format!("{}", fromfile_relpath_pathbuf.display());
     assert_eq!(
         Ok(Some("FOO".to_string())),
-        FromfileExpander::relative_to(BuildRoot::for_path(_tmpdir.into_path()))
+        FromfileExpander::relative_to(BuildRoot::for_path(_tmpdir.keep()))
             .expand(format!("@{}", fromfile_relpath_str))
     );
 }
