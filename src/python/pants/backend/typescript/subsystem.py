@@ -13,7 +13,11 @@ class TypeScriptSubsystem(NodeJSToolBase):
     name = "TypeScript"
     help = """TypeScript type checker (tsc)."""
 
-    default_version = "typescript@5.8.2"
+    # TypeScript always uses resolve-based execution (not download-and-execute)
+    # because it needs access to project dependencies for type checking
+    install_from_resolve = None
+    # The actual TypeScript version comes from the project's package.json dependencies.
+    default_version = "typescript@9.9.9"    
 
     skip = SkipOption("check")
 

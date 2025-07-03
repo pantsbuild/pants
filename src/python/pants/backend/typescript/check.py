@@ -267,20 +267,19 @@ async def _typecheck_single_project(
     # Use --build to compile all projects in workspace with project references
     args = ("--build",)
 
-    # Determine which resolve to use for this TypeScript project
-    # Use the project's root directory to get the correct resolve
-    # - For monorepos: all workspaces share the parent project's lockfile/resolve
-    # - For standalone projects: the project root contains the lockfile/resolve
-    project_address = Address(project.root_dir)
-    project_resolve = await Get(ChosenNodeResolve, RequestNodeResolve(project_address))
-
-    # Use the TypeScript subsystem's tool request with the discovered resolve
     tool_request = subsystem.request(
         args=args,
         input_digest=input_digest,
         description=f"Type-check TypeScript project {project.root_dir} ({len(project_typescript_targets)} targets)",
         level=LogLevel.DEBUG,
     )
+
+    # Determine which resolve to use for this TypeScript project
+    # Use the project's root directory to get the correct resolve
+    # - For monorepos: all workspaces share the parent project's lockfile/resolve
+    # - For standalone projects: the project root contains the lockfile/resolve
+    project_address = Address(project.root_dir)
+    project_resolve = await Get(ChosenNodeResolve, RequestNodeResolve(project_address))
 
     # Override the resolve to use the project's resolve instead of default
     tool_request_with_resolve = replace(tool_request, resolve=project_resolve.resolve_name)

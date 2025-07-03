@@ -451,7 +451,7 @@ async def node_process_environment(
 ) -> NodeJSProcessEnvironment:
     default_required_tools = ["sh", "bash"]
     tools_used_by_setup_scripts = ["mkdir", "rm", "touch", "which"]
-    pnpm_shim_tools = ["sed", "dirname"]
+    pnpm_shim_tools = ["sed", "dirname", "uname"]
 
     binary_shims = await get_nodejs_process_tools_shims(
         tools=[

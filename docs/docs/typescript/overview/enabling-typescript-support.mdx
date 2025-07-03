@@ -37,7 +37,7 @@ You'll need a Node.js installation and package manager setup similar to JavaScri
 A multi-package workspace might look something like this:
 
 ```
-my-workspace/
+my-project/
 ├── packages/
 │   ├── shared/
 │   │   ├── src/
@@ -71,13 +71,12 @@ typescript_sources()
 
 ```python title="BUILD"
 package_json()
-
-file(source="tsconfig.json")
-
-# Optional: Include package manager config files if present
-file(source=".npmrc")
-file(source="pnpm-workspace.yaml")
 ```
+
+`package.json`, `tsconfig.json`, and `pnpm-workspace.yaml` files are automatically discovered.
+
+Typescript *must* be installed in your project's dependencies.
+
 
 ### Workspaces and project references
 
@@ -151,24 +150,4 @@ Currently the backend expects compiled output in any of the following default ou
 [typescript]
 output_dirs = ["dist", "build", "lib"]
 ```
-
-### TypeScript installation
-
-**Recommended**: Include TypeScript in your root `package.json`:
-
-```json title="package.json"
-{
-  "devDependencies": {
-    "typescript": "^5.7.0"
-  }
-}
-```
-
-If TypeScript is not available in your project dependencies, Pants will automatically download and use a default version which can be overridden:
-
-```toml title="pants.toml"
-[typescript]
-version = "typescript@5.7.3"
-```
-
 

@@ -194,14 +194,6 @@ async def _run_tool_with_resolve(request: NodeJSToolRequest, resolve: str) -> Pr
         MergeDigests([request.input_digest, installed.digest])
     )
 
-    # Add system binaries to PATH for tools that need them (like uname for TypeScript)
-    extra_env_with_path = {
-        **request.extra_env,
-        "PATH": f"/usr/bin:/bin:{request.extra_env.get('PATH', '')}"
-        if request.extra_env.get("PATH")
-        else "/usr/bin:/bin",
-    }
-
     return await setup_nodejs_project_environment_process(
         NodeJsProjectEnvironmentProcess(
             env=installed.project_env,
@@ -212,7 +204,7 @@ async def _run_tool_with_resolve(request: NodeJSToolRequest, resolve: str) -> Pr
             output_directories=request.output_directories,
             per_package_caches=request.append_only_caches,
             timeout_seconds=request.timeout_seconds,
-            extra_env=FrozenDict(extra_env_with_path),
+            extra_env=FrozenDict(request.extra_env),
         ),
         **implicitly(),
     )

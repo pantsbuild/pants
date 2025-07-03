@@ -1,14 +1,16 @@
 # TypeScript Backend
 
-## Setup
+## Limitations
 
-Enable in `pants.toml`:
-```toml
-[GLOBAL]
-backend_packages.add = [
-  "pants.backend.experimental.typescript"
-]
-```
+### Install without resolve / Install from different resolve
+
+Needs discussion. These options currently aren't supported. 
+
+While NodeJSTool supports standalone tool installation, typescript needs dependencies (e.g. 3rd-party types) to work.
+I can't think of a real-world scenario where this would be required. 
+
+If you do attempt to run typechecking in a project without typescript installed, package manager error will be along the lines of
+`tsc not found`. We could wrap this error potentially, but don't it's worthwhile at this point.
 
 ## Features
 
@@ -62,7 +64,6 @@ const fs = require("fs");                 // → Node.js built-in
 **Current Limitations**:
 - Type-only imports treated as regular dependencies (no impact on type checking)
 - Dynamic require with variables ignored (`require(variable)`)
-- Workspace package resolution relies on package manager symlinks (requires proper workspace configuration for pnpm)
 
 ## Package Managers
 
