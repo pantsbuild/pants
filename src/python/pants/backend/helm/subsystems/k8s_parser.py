@@ -26,6 +26,7 @@ from pants.engine.intrinsics import create_digest, execute_process
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize, softwrap
+from pants.option.option_types import StrOption
 
 logger = logging.getLogger(__name__)
 
@@ -49,12 +50,22 @@ class HelmKubeParserSubsystem(PythonToolRequirementsBase):
 
     register_interpreter_constraints = True
 
+    crd = StrOption(help=softwrap(
+        f"""
+            Additional custom resource definitions be made available to all Helm processes
+            or during value interpolation.
+            """
+        ),
+        default=None
+    )
+
     default_lockfile_resource = (_HELM_K8S_PARSER_PACKAGE, "k8s_parser.lock")
 
 
 @dataclass(frozen=True)
 class _HelmKubeParserTool:
     pex: VenvPex
+    crd: str = None
 
 
 @rule
@@ -63,6 +74,7 @@ async def build_k8s_parser_tool(
     pex_environment: PexEnvironment,
 ) -> _HelmKubeParserTool:
     parser_sources = pkgutil.get_data(_HELM_K8S_PARSER_PACKAGE, _HELM_K8S_PARSER_SOURCE)
+    
     if not parser_sources:
         raise ValueError(
             f"Unable to find source to {_HELM_K8S_PARSER_SOURCE!r} in {_HELM_K8S_PARSER_PACKAGE}"
@@ -71,7 +83,19 @@ async def build_k8s_parser_tool(
     parser_file_content = FileContent(
         path="__k8s_parser.py", content=parser_sources, is_executable=True
     )
-    parser_digest = await create_digest(CreateDigest([parser_file_content]))
+
+    digest_sources = [parser_file_content]
+    if k8s_parser.crd:
+        crd_sources = open(k8s_parser.crd, 'rb').read()
+        if not crd_sources:
+            raise ValueError(
+                f"Unable to find source to crd_cron in {_HELM_K8S_PARSER_PACKAGE}"
+            )
+        parser_file_content_source = FileContent(
+            path="__crd_source.py", content=crd_sources, is_executable=False
+        )
+        digest_sources.append(parser_file_content_source)
+    parser_digest = await create_digest(CreateDigest(digest_sources))
 
     # We use copies of site packages because hikaru gets confused with symlinked packages
     # The core hikaru package tries to load the packages containing the kubernetes-versioned models
@@ -90,7 +114,7 @@ async def build_k8s_parser_tool(
         ),
         **implicitly(),
     )
-    return _HelmKubeParserTool(parser_pex)
+    return _HelmKubeParserTool(parser_pex, k8s_parser.crd)
 
 
 @dataclass(frozen=True)
@@ -139,7 +163,7 @@ async def parse_kube_manifest(
         **implicitly(
             VenvPexProcess(
                 tool.pex,
-                argv=[request.file.path],
+                argv=[request.file.path, tool.crd],
                 input_digest=file_digest,
                 description=f"Analyzing Kubernetes manifest {request.file.path}",
                 level=LogLevel.DEBUG,

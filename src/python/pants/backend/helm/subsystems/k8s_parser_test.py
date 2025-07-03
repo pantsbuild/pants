@@ -80,3 +80,4 @@ def test_parser_returns_no_image_refs(rule_runner: RuleRunner) -> None:
     )
 
     assert len(parsed_manifest.found_image_refs) == 0
+

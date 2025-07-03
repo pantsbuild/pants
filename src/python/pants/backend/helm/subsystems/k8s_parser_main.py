@@ -6,9 +6,30 @@ from __future__ import annotations
 import sys
 
 from hikaru import load_full_yaml  # pants: no-infer-dep
+from hikaru.crd import register_crd_class
 
+def _import_crd_source():
+    """Dynamically import the CRD source module."""
+    try:
+        import importlib
+        crd_module = importlib.import_module("__crd_source")
+        return getattr(crd_module, "CRD", None)
+    except ImportError as e:
+        print(f"Error: Failed to import CRD module: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error: Failed to register CRD: {e}", file=sys.stderr)
+        sys.exit(1)
 
 def main(args: list[str]):
+    crd = args[1] if len(args) > 1 else None
+    if crd:
+        crd_class = _import_crd_source()
+        if crd_class is None:
+            print("Error: CRD class not found in __crd_source.", file=sys.stderr)
+            sys.exit(1)
+        register_crd_class(crd_class, "crd", is_namespaced=False)
+    
     input_filename = args[0]
 
     found_image_refs: dict[tuple[int, str], str] = {}
