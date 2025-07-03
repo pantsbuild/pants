@@ -198,8 +198,7 @@ async def _typecheck_single_project(
     # Filter to targets that belong to the current project
     all_projects = await Get(AllNodeJSProjects)
     project_typescript_targets = []
-    for i, owning_package in enumerate(typescript_owning_packages):
-        target = typescript_targets[i]
+    for target, owning_package in zip(typescript_targets, typescript_owning_packages):
         if owning_package.target:
             package_directory = owning_package.target.address.spec_path
             target_project = all_projects.project_for_directory(package_directory)
@@ -349,8 +348,7 @@ async def _typecheck_typescript_files(
 
     # Group targets by their containing NodeJS project
     projects_to_check: dict[NodeJSProject, list[Address]] = {}
-    for i, owning_package in enumerate(owning_packages):
-        address = list(target_addresses)[i]
+    for address, owning_package in zip(target_addresses, owning_packages):
         if owning_package.target:
             package_directory = owning_package.target.address.spec_path
             owning_project = all_projects.project_for_directory(package_directory)
@@ -363,7 +361,7 @@ async def _typecheck_typescript_files(
         logger.warning(f"No NodeJS projects found for TypeScript targets: {target_addresses}")
         return CheckResults([], checker_name=tool_name)
 
-    # Check all projects concurrently
+    # Check all projects
     project_results = await concurrently(
         _typecheck_single_project(project, subsystem, global_options)
         for project in projects_to_check.keys()
