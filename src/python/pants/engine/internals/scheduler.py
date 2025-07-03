@@ -318,6 +318,9 @@ class Scheduler:
     def check_invalidation_watcher_liveness(self) -> None:
         native_engine.check_invalidation_watcher_liveness(self.py_scheduler)
 
+    def attach_session_to_invalidation_watcher(self, session: SchedulerSession) -> None:
+        native_engine.start_invalidation_watcher(session.py_session)
+
     def graph_len(self) -> int:
         return native_engine.graph_len(self.py_scheduler)
 

@@ -90,6 +90,9 @@ class GraphScheduler:
         console = Console(use_colors=use_colors, session=session if dynamic_ui else None)
         return GraphSession(session, console, self.goal_map)
 
+    def attach_invalidation_session(self, session: SchedulerSession) -> None:
+        self.scheduler.attach_session_to_invalidation_watcher(session)
+
 
 @dataclass(frozen=True)
 class GraphSession:
