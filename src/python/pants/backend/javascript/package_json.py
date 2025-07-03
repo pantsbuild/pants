@@ -798,8 +798,7 @@ async def parse_package_json(content: FileContent) -> PackageJson:
 
 @rule
 async def read_package_jsons(globs: PathGlobs) -> PackageJsonForGlobs:
-    snapshot = await digest_to_snapshot(**implicitly(globs))
-    digest_contents = await get_digest_contents(snapshot.digest)
+    digest_contents = await get_digest_contents(**implicitly(globs))
     return PackageJsonForGlobs(
         await concurrently(parse_package_json(digest_content) for digest_content in digest_contents)
     )
@@ -848,10 +847,9 @@ class PnpmWorkspaces(FrozenDict[PackageJson, PnpmWorkspaceGlobs]):
 
 @rule
 async def pnpm_workspace_files(pkgs: AllPackageJson) -> PnpmWorkspaces:
-    snapshot = await digest_to_snapshot(
+    digest_contents = await get_digest_contents(
         **implicitly(PathGlobs(os.path.join(pkg.root_dir, "pnpm-workspace.yaml") for pkg in pkgs))
     )
-    digest_contents = await get_digest_contents(snapshot.digest)
 
     async def parse_package_globs(content: FileContent) -> PnpmWorkspaceGlobs:
         parsed = yaml.safe_load(content.content) or {"packages": ("**",)}
