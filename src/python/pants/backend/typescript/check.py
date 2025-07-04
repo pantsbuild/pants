@@ -21,7 +21,7 @@ from pants.backend.typescript.tsconfig import AllTSConfigs
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.core.target_types import FileSourceField
-from pants.engine.fs import EMPTY_DIGEST, Digest, DigestSubset, GlobMatchErrorBehavior, PathGlobs
+from pants.engine.fs import EMPTY_DIGEST, Digest, DigestSubset, GlobMatchErrorBehavior, PathGlobs, Snapshot
 from pants.engine.internals.graph import hydrate_sources
 from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.internals.selectors import Get, concurrently
@@ -49,22 +49,43 @@ _COMMON_OUTPUT_DIRS = ["dist", "build", "lib", "out", "compiled", "bundles"]
 
 
 def _get_typescript_artifact_globs(
-    project: NodeJSProject, subsystem: TypeScriptSubsystem
+    project: NodeJSProject, subsystem: TypeScriptSubsystem, relative_to_workdir: bool = False
 ) -> list[str]:
     """Get glob patterns for TypeScript build artifacts (.tsbuildinfo files and output
-    directories)."""
+    directories).
+    
+    Args:
+        project: The NodeJS project being compiled
+        subsystem: TypeScript subsystem configuration
+        relative_to_workdir: If True, return paths relative to working directory (for extraction).
+                           If False, return absolute paths relative to build root (for caching).
+    """
     globs = []
 
     # Use custom output directories if specified, otherwise use common patterns
     output_dirs = subsystem.output_dirs if subsystem.output_dirs else _COMMON_OUTPUT_DIRS
 
     for workspace_pkg in project.workspaces:
-        # .tsbuildinfo files for incremental compilation state
-        globs.append(f"{workspace_pkg.root_dir}/tsconfig.tsbuildinfo")
-
-        # Output directories - use configured or default patterns
-        for output_dir in output_dirs:
-            globs.append(f"{workspace_pkg.root_dir}/{output_dir}/**/*")
+        if relative_to_workdir:
+            # Paths relative to the TypeScript working directory (for DigestSubset extraction)
+            # Case 1: Default location next to tsconfig.json (when no outDir specified)
+            globs.append("tsconfig.tsbuildinfo")
+            
+            # Case 2: Default location inside output directories (when outDir is specified)
+            for output_dir in output_dirs:
+                globs.append(f"{output_dir}/.tsbuildinfo")
+                # Also capture the compiled output itself
+                globs.append(f"{output_dir}/**/*")
+        else:
+            # Paths relative to build root (for caching glob patterns)
+            # Case 1: Default location next to tsconfig.json (when no outDir specified)
+            globs.append(f"{workspace_pkg.root_dir}/tsconfig.tsbuildinfo")
+            
+            # Case 2: Default location inside output directories (when outDir is specified)
+            for output_dir in output_dirs:
+                globs.append(f"{workspace_pkg.root_dir}/{output_dir}/.tsbuildinfo")
+                # Also capture the compiled output itself
+                globs.append(f"{workspace_pkg.root_dir}/{output_dir}/**/*")
 
     return globs
 
@@ -74,10 +95,12 @@ async def _load_cached_typescript_artifacts(
 ) -> Digest:
     """Load cached .tsbuildinfo files and output files for incremental TypeScript compilation."""
     cache_globs = _get_typescript_artifact_globs(project, subsystem)
+    logger.debug(f"Cache globs for project {project.root_dir}: {cache_globs}")
     cached_artifacts = await path_globs_to_digest(
         PathGlobs(cache_globs, glob_match_error_behavior=GlobMatchErrorBehavior.ignore),
         **implicitly(),
     )
+    logger.debug(f"Loaded cached artifacts digest: {cached_artifacts}")
     return cached_artifacts
 
 
@@ -85,7 +108,15 @@ async def _extract_typescript_artifacts_for_caching(
     project: NodeJSProject, process_output_digest: Digest, subsystem: TypeScriptSubsystem
 ) -> Digest:
     """Extract .tsbuildinfo files and output files from TypeScript compilation for caching."""
-    output_globs = _get_typescript_artifact_globs(project, subsystem)
+    output_globs = _get_typescript_artifact_globs(project, subsystem, relative_to_workdir=True)
+    logger.debug(f"Output globs for project {project.root_dir}: {output_globs}")
+    
+    # Debug: Log the input digest contents to see what files are available for extraction
+    input_snapshot = await Get(Snapshot, Digest, process_output_digest)
+    logger.debug(f"Process output digest contains {len(input_snapshot.files)} files:")
+    for file_path in sorted(input_snapshot.files):
+        logger.debug(f"  - {file_path}")
+    
     artifacts_digest = await Get(
         Digest,
         DigestSubset(
@@ -93,6 +124,17 @@ async def _extract_typescript_artifacts_for_caching(
             PathGlobs(output_globs, glob_match_error_behavior=GlobMatchErrorBehavior.ignore),
         ),
     )
+    
+    # Debug: Log the extracted digest contents
+    if artifacts_digest != EMPTY_DIGEST:
+        extracted_snapshot = await Get(Snapshot, Digest, artifacts_digest)
+        logger.debug(f"Extracted artifacts digest contains {len(extracted_snapshot.files)} files:")
+        for file_path in sorted(extracted_snapshot.files):
+            logger.debug(f"  - {file_path}")
+    else:
+        logger.debug("No artifacts extracted - empty digest returned")
+    
+    logger.debug(f"Final extracted artifacts digest: {artifacts_digest}")
     return artifacts_digest
 
 
@@ -111,6 +153,7 @@ async def _collect_config_files_for_project(
     We need to look for config files declared as explicit file targets because:
     1. Package manager config files (.npmrc, .pnpmrc) affect how dependencies are resolved
     2. Workspace config files (pnpm-workspace.yaml) define monorepo structure
+    # TODO: We need to follow this 3rd point up - are there edge cases we need to be concerned about? I'd like to see if our normal test cases pass without this.
     3. These files might not be auto-discovered by AllPackageJson/AllTSConfigs if they
        don't follow standard naming or if users explicitly manage them as file targets
     """
@@ -142,6 +185,7 @@ async def _collect_config_files_for_project(
             file_path = target[FileSourceField].file_path
             file_name = file_path.split("/")[-1]
             # Check for package manager config files
+            # TODO: if we do need this, consider extracting as a constant at least
             if file_name in (".npmrc", ".pnpmrc", "pnpm-workspace.yaml") and file_path.startswith(
                 project.root_dir
             ):
@@ -255,6 +299,10 @@ async def _typecheck_single_project(
     # Include cached .tsbuildinfo files and output files for incremental compilation
     # TypeScript --build uses these files to skip unchanged packages
     cached_typescript_artifacts = await _load_cached_typescript_artifacts(project, subsystem)
+    
+    # Debug logging for caching
+    logger.debug(f"Loading cached TypeScript artifacts for project {project.root_dir}")
+    logger.debug(f"Cached artifacts digest: {cached_typescript_artifacts}")
 
     # Merge workspace sources, config files, and cached TypeScript artifacts
     all_digests = (
@@ -289,23 +337,38 @@ async def _typecheck_single_project(
 
     # Set working directory to the project root where tsconfig.json is located
     working_directory = project.root_dir if project.root_dir != "." else None
-    process_with_workdir = (
-        replace(process, working_directory=working_directory) if working_directory else process
+    
+    # Configure output directories to capture TypeScript build artifacts
+    # This is essential for caching - Pants needs to know which directories contain
+    # files that should be captured in the output digest for incremental builds
+    output_dirs = subsystem.output_dirs if subsystem.output_dirs else _COMMON_OUTPUT_DIRS
+    output_directories = [output_dir for output_dir in output_dirs]
+    
+    process_with_outputs = replace(
+        process,
+        working_directory=working_directory,
+        output_directories=output_directories,
     )
 
-    result = await execute_process(process_with_workdir, **implicitly())
+    result = await execute_process(process_with_outputs, **implicitly())
 
     # Cache TypeScript incremental build artifacts for faster subsequent runs
     # TypeScript --build generates .tsbuildinfo files and output files that enable incremental compilation
     typescript_artifacts_digest = await _extract_typescript_artifacts_for_caching(
         project, result.output_digest, subsystem
     )
+    
+    # Debug logging for caching
+    logger.debug(f"Extracting TypeScript artifacts for caching in project {project.root_dir}")
+    logger.debug(f"Process output digest: {result.output_digest}")
+    logger.debug(f"Extracted artifacts digest: {typescript_artifacts_digest}")
 
     # Convert to CheckResult with caching support - single result for the project
     check_result = CheckResult.from_fallible_process_result(
         result,
         partition_description=f"TypeScript check on {project.root_dir} ({len(project_typescript_targets)} targets)",
         # Cache TypeScript artifacts via the report field - this enables incremental compilation
+        # TODO: is this documented anywhere? Is this definitely how Pants works?
         report=typescript_artifacts_digest,
         output_simplifier=global_options.output_simplifier(),
     )

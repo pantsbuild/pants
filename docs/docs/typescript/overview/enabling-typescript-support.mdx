@@ -96,6 +96,7 @@ For complex projects with multiple packages, TypeScript supports [project refere
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "composite": true,
+    "declaration": true,
     "outDir": "./dist",
     "rootDir": "./src"
   },
@@ -103,8 +104,13 @@ For complex projects with multiple packages, TypeScript supports [project refere
 }
 ```
 
-:::tip Project references enable better performance
-Project references with `"composite": true` enable incremental compilation and better dependency tracking across packages.
+:::tip Incremental compilation requirements
+For TypeScript incremental compilation caching to work with `tsc --build`, your `tsconfig.json` must include:
+
+- `"composite": true` - Enables `.tsbuildinfo` generation for incremental builds
+- `"declaration": true` - Required when composite is enabled (enforced by TypeScript)
+
+Project references with these options enable incremental compilation and better dependency tracking across packages.
 :::
 
 ## Running TypeScript type checking

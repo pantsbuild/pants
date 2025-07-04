@@ -4,7 +4,7 @@
 
 ### Install without resolve / Install from different resolve
 
-Needs discussion. These options currently aren't supported. 
+PR_NOTE: Needs discussion. These options currently aren't supported. 
 
 While NodeJSTool supports standalone tool installation, typescript needs dependencies (e.g. 3rd-party types) to work.
 I can't think of a real-world scenario where this would be required. 
@@ -109,21 +109,6 @@ For example, to migrate an existing npm/yarn workspace to pnpm:
    ```
 
 The `link:` protocol creates symlinks that TypeScript can resolve for cross-package imports, enabling proper type checking across workspace packages.
-
-## Configuration
-
-### TypeScript Options
-```toml
-[typescript]  
-version = "typescript@5.8.2"      # Tool version
-output_dirs = ["dist", "build"]   # Override output directory patterns
-install_from_resolve = "frontend" # Use specific resolve
-```
-
-### Package Manager Selection
-```bash
-pants --nodejs-package-manager=pnpm check ::
-```
 
 ## Architecture
 

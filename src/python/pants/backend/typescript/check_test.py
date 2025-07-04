@@ -341,3 +341,128 @@ def test_typescript_check_tsx_files(basic_rule_runner: tuple[RuleRunner, str, st
     assert results.results[0].exit_code == 0, (
         f"TypeScript check of TSX failed: {results.results[0].stdout}\n{results.results[0].stderr}"
     )
+
+
+def test_typescript_incremental_caching(basic_rule_runner: tuple[RuleRunner, str, str]) -> None:
+    """Test TypeScript incremental compilation caching mechanism by validating .tsbuildinfo file generation."""
+
+    rule_runner, test_project, _ = basic_rule_runner
+
+    test_files = _load_project_test_files(test_project)
+    rule_runner.write_files(test_files)
+
+    target = rule_runner.get_target(
+        Address("basic_project/src", target_name="ts_sources", relative_file_path="index.ts")
+    )
+    field_set = TypeScriptCheckFieldSet.create(target)
+    request = TypeScriptCheckRequest([field_set])
+
+    # Test that compilation succeeds and generates .tsbuildinfo files
+    results = rule_runner.request(CheckResults, [request])
+    assert len(results.results) == 1
+    assert results.results[0].exit_code == 0
+
+    result = results.results[0]
+    
+    # Validate that artifacts are being captured
+    assert result.report is not None, "CheckResult should have report field for caching"
+    
+    from pants.engine.fs import Digest, Snapshot
+    assert isinstance(result.report, Digest), "Report should be a Digest for caching"
+    
+    empty_digest_fingerprint = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    assert result.report.fingerprint != empty_digest_fingerprint, (
+        "❌ No TypeScript artifacts captured - caching infrastructure is broken"
+    )
+
+    # KEY TEST: Validate that .tsbuildinfo files are generated when caching is enabled
+    # This proves the incremental compilation infrastructure is working
+    snapshot = rule_runner.request(Snapshot, [result.report])
+    tsbuildinfo_files = [f for f in snapshot.files if f.endswith('.tsbuildinfo')]
+    
+    assert len(tsbuildinfo_files) > 0, (
+        f"❌ INCREMENTAL COMPILATION FAILURE: No .tsbuildinfo files found in compilation artifacts.\n"
+        f"This indicates that either:\n"
+        f"1. Cache loading is disabled (TypeScript can't generate incremental state without existing state)\n"
+        f"2. TypeScript compilation is not configured for incremental mode\n"
+        f"3. Our artifact extraction is not capturing .tsbuildinfo files\n"
+        f"Actual files captured: {sorted(snapshot.files)}"
+    )
+    
+    # Validate that we're capturing both .tsbuildinfo and compiled output
+    compiled_files = [f for f in snapshot.files if f.endswith(('.js', '.d.ts'))]
+    assert len(compiled_files) > 0, "❌ No compiled output files found"
+    
+    # Validate expected TypeScript incremental compilation artifacts are present
+    has_tsbuildinfo = any(f.endswith('.tsbuildinfo') for f in snapshot.files)
+    has_js_files = any(f.endswith('.js') for f in snapshot.files)
+    has_dts_files = any(f.endswith('.d.ts') for f in snapshot.files)
+    
+    assert has_tsbuildinfo, f"❌ Missing .tsbuildinfo files in: {sorted(snapshot.files)}"
+    assert has_js_files, f"❌ Missing .js files in: {sorted(snapshot.files)}"
+    assert has_dts_files, f"❌ Missing .d.ts files in: {sorted(snapshot.files)}"
+
+
+def test_typescript_incremental_caching_complex_project(
+    workspace_rule_runner: tuple[RuleRunner, str, str],
+) -> None:
+    """Test TypeScript incremental compilation caching with complex project (workspace structure)."""
+
+    rule_runner, test_project, _ = workspace_rule_runner
+
+    test_files = _load_project_test_files(test_project)
+    rule_runner.write_files(test_files)
+
+    # Get targets from different packages in the workspace
+    common_types_target = rule_runner.get_target(
+        Address("complex_project/common-types/src", relative_file_path="index.ts")
+    )
+    shared_utils_target = rule_runner.get_target(
+        Address(
+            "complex_project/shared-utils/src",
+            target_name="ts_sources",
+            relative_file_path="math.ts",
+        )
+    )
+    main_app_target = rule_runner.get_target(
+        Address("complex_project/main-app/src", relative_file_path="index.ts")
+    )
+
+    field_setA = TypeScriptCheckFieldSet.create(common_types_target)
+    field_setB = TypeScriptCheckFieldSet.create(shared_utils_target)
+    field_setC = TypeScriptCheckFieldSet.create(main_app_target)
+
+    request = TypeScriptCheckRequest([field_setA, field_setB, field_setC])
+
+    # First compilation - should succeed and create caching infrastructure
+    results_1 = rule_runner.request(CheckResults, [request])
+    assert len(results_1.results) >= 1
+    for result in results_1.results:
+        assert result.exit_code == 0
+
+    # Second compilation - should use cached artifacts
+    results_2 = rule_runner.request(CheckResults, [request])
+    assert len(results_2.results) >= 1
+    for result in results_2.results:
+        assert result.exit_code == 0
+
+    # Verify caching works for complex projects
+    # Note: Complex projects may have multiple results (one per project), 
+    # so we verify each result has proper caching
+    empty_digest_fingerprint = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    
+    for i, (first_result, second_result) in enumerate(zip(results_1.results, results_2.results)):
+        # Both results should have report field for caching
+        assert first_result.report is not None, f"Result {i+1} should have report field for caching"
+        assert second_result.report is not None, f"Result {i+1} should have report field for caching"
+        
+        if first_result.report.fingerprint == empty_digest_fingerprint:
+            assert False, f"Complex project caching is not working for result {i+1} - empty artifacts digest detected"
+        else:
+            # Both runs should produce identical cache artifacts
+            assert first_result.report == second_result.report, (
+                f"❌ CACHING FAILURE in result {i+1}: Cache digests should be identical.\n"
+                f"First run digest:  {first_result.report.fingerprint}\n"
+                f"Second run digest: {second_result.report.fingerprint}\n"
+                f"This indicates TypeScript is generating non-deterministic artifacts or our caching logic has issues."
+            )
