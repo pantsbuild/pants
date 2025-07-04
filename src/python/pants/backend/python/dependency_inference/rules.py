@@ -69,7 +69,6 @@ from pants.engine.target import (
     InferredDependencies,
 )
 from pants.engine.unions import UnionRule
-from pants.source.source_root import SourceRootRequest, get_source_root
 from pants.util.docutil import doc_url
 from pants.util.strutil import bullet_list, softwrap
 

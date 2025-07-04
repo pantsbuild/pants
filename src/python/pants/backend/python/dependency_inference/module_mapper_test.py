@@ -895,7 +895,7 @@ def test_resolving_ambiguity_by_filesystem_proximity(rule_runner: RuleRunner) ->
 
 def test_resolving_ambiguity_with_source_root_as_repo_root(rule_runner: RuleRunner) -> None:
     """Test ambiguity resolution when source root is the repo root.
-    
+
     This tests the fix for the issue where ambiguity_resolution = "by_source_root"
     doesn't work properly when the source root is the repository root.
     """
