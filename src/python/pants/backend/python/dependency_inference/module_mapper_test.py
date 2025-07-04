@@ -893,6 +893,74 @@ def test_resolving_ambiguity_by_filesystem_proximity(rule_runner: RuleRunner) ->
     ]
 
 
+def test_resolving_ambiguity_with_source_root_as_repo_root(rule_runner: RuleRunner) -> None:
+    """Test ambiguity resolution when source root is the repo root.
+    
+    This tests the fix for the issue where ambiguity_resolution = "by_source_root"
+    doesn't work properly when the source root is the repository root.
+    """
+    rule_runner.set_options(
+        [
+            "--source-root-patterns=['/']",  # Source root is repo root
+            "--python-infer-ambiguity-resolution=by_source_root",
+        ]
+    )
+    rule_runner.write_files(
+        {
+            "helloworld/greet/BUILD": dedent(
+                """\
+                python_sources()
+                python_requirement(name="rich", requirements=["rich==14.0.0"])
+                """
+            ),
+            "helloworld/translator/BUILD": dedent(
+                """\
+                python_sources()
+                python_requirement(name="rich", requirements=["rich==14.0.0"])
+                """
+            ),
+            "helloworld/translator/subdir/BUILD": dedent(
+                """\
+                python_sources()
+                python_requirement(name="rich", requirements=["rich==14.0.0"])
+                """
+            ),
+            "helloworld/translator/translator.py": "import rich",
+            "helloworld/translator/subdir/other.py": "import rich",
+        }
+    )
+
+    # When requesting from helloworld/translator/translator.py, should prefer
+    # helloworld/translator:rich over helloworld/greet:rich
+    owners = rule_runner.request(
+        PythonModuleOwners,
+        [PythonModuleOwnersRequest("rich", None, locality="helloworld/translator")],
+    )
+    assert list(owners.unambiguous) == [Address("helloworld/translator", target_name="rich")]
+    assert list(owners.ambiguous) == []
+
+    # When requesting from helloworld/translator/subdir/other.py, should prefer
+    # helloworld/translator/subdir:rich over the others
+    owners = rule_runner.request(
+        PythonModuleOwners,
+        [PythonModuleOwnersRequest("rich", None, locality="helloworld/translator/subdir")],
+    )
+    assert list(owners.unambiguous) == [Address("helloworld/translator/subdir", target_name="rich")]
+    assert list(owners.ambiguous) == []
+
+    # Without locality, should be ambiguous
+    owners = rule_runner.request(
+        PythonModuleOwners,
+        [PythonModuleOwnersRequest("rich", None, locality=None)],
+    )
+    assert list(owners.unambiguous) == []
+    assert set(owners.ambiguous) == {
+        Address("helloworld/greet", target_name="rich"),
+        Address("helloworld/translator", target_name="rich"),
+        Address("helloworld/translator/subdir", target_name="rich"),
+    }
+
+
 def test_map_module_considers_resolves(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

@@ -480,6 +480,7 @@ async def map_module_to_address(
         if possible_provider.ancestry == val[0]:
             val[1].append(possible_provider.provider)
 
+
     if request.locality:
         # For each provider type, if we have more than one provider left, prefer
         # the one with the closest common ancestor to the requester.
@@ -487,18 +488,39 @@ async def map_module_to_address(
             providers = val[1]
             if len(providers) < 2:
                 continue
-            providers_with_closest_common_ancestor: list[ModuleProvider] = []
-            closest_common_ancestor_len = 0
+            providers_with_best_match: list[ModuleProvider] = []
+            best_match_score = -1
             for provider in providers:
-                common_ancestor_len = len(
-                    os.path.commonpath([request.locality, provider.addr.spec_path])
-                )
-                if common_ancestor_len > closest_common_ancestor_len:
-                    closest_common_ancestor_len = common_ancestor_len
-                    providers_with_closest_common_ancestor = []
-                if common_ancestor_len == closest_common_ancestor_len:
-                    providers_with_closest_common_ancestor.append(provider)
-            providers[:] = providers_with_closest_common_ancestor
+                
+                # Normalize paths to use forward slashes consistently
+                normalized_locality = request.locality.replace("\\", "/")
+                normalized_provider_path = provider.addr.spec_path.replace("\\", "/")
+                
+                # Find common ancestor by comparing path segments
+                locality_parts = normalized_locality.split("/")
+                provider_parts = normalized_provider_path.split("/")
+                
+                # Count matching segments from the beginning
+                matching_segments = 0
+                for loc_part, prov_part in zip(locality_parts, provider_parts):
+                    if loc_part == prov_part:
+                        matching_segments += 1
+                    else:
+                        break
+                
+                # Calculate match score: prefer providers at the same directory level
+                # Score = (matching_segments * 1000) - abs(len(locality_parts) - len(provider_parts))
+                # This way, providers in the same directory get higher scores than subdirectories
+                depth_difference = abs(len(locality_parts) - len(provider_parts))
+                match_score = (matching_segments * 1000) - depth_difference
+                
+                
+                if match_score > best_match_score:
+                    best_match_score = match_score
+                    providers_with_best_match = []
+                if match_score == best_match_score:
+                    providers_with_best_match.append(provider)
+            providers[:] = providers_with_best_match
 
     remaining_providers: list[ModuleProvider] = list(
         itertools.chain(*[val[1] for val in type_to_closest_providers.values()])

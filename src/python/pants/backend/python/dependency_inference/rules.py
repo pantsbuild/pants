@@ -413,14 +413,13 @@ async def resolve_parsed_dependencies(
     )
 
     # Only set locality if needed, to avoid unnecessary rule graph memoization misses.
-    # When set, use the source root, which is useful in practice, but incurs fewer memoization
-    # misses than using the full spec_path.
+    # When set, use the spec_path of the requesting file's directory to properly resolve
+    # ambiguity based on proximity in the directory structure.
     locality = None
     if python_infer_subsystem.ambiguity_resolution == AmbiguityResolution.by_source_root:
-        source_root = await get_source_root(
-            SourceRootRequest.for_address(request.field_set.address)
-        )
-        locality = source_root.path
+        # Use the directory containing the requesting file, not just the source root
+        # This allows proper resolution when the source root is the repo root
+        locality = request.field_set.address.spec_path
 
     if parsed_imports:
         owners_per_import = await concurrently(
