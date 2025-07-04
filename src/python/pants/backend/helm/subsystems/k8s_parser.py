@@ -24,9 +24,9 @@ from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnTyp
 from pants.engine.fs import CreateDigest, FileContent, FileEntry
 from pants.engine.intrinsics import create_digest, execute_process
 from pants.engine.rules import collect_rules, implicitly, rule
+from pants.option.option_types import StrOption
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize, softwrap
-from pants.option.option_types import StrOption
 
 logger = logging.getLogger(__name__)
 
@@ -50,13 +50,14 @@ class HelmKubeParserSubsystem(PythonToolRequirementsBase):
 
     register_interpreter_constraints = True
 
-    crd = StrOption(help=softwrap(
-        f"""
+    crd = StrOption(
+        help=softwrap(
+            """
             Additional custom resource definitions be made available to all Helm processes
             or during value interpolation.
             """
         ),
-        default=None
+        default="",
     )
 
     default_lockfile_resource = (_HELM_K8S_PARSER_PACKAGE, "k8s_parser.lock")
@@ -65,7 +66,7 @@ class HelmKubeParserSubsystem(PythonToolRequirementsBase):
 @dataclass(frozen=True)
 class _HelmKubeParserTool:
     pex: VenvPex
-    crd: str = None
+    crd: str = ""
 
 
 @rule
@@ -74,7 +75,7 @@ async def build_k8s_parser_tool(
     pex_environment: PexEnvironment,
 ) -> _HelmKubeParserTool:
     parser_sources = pkgutil.get_data(_HELM_K8S_PARSER_PACKAGE, _HELM_K8S_PARSER_SOURCE)
-    
+
     if not parser_sources:
         raise ValueError(
             f"Unable to find source to {_HELM_K8S_PARSER_SOURCE!r} in {_HELM_K8S_PARSER_PACKAGE}"
@@ -85,12 +86,10 @@ async def build_k8s_parser_tool(
     )
 
     digest_sources = [parser_file_content]
-    if k8s_parser.crd:
-        crd_sources = open(k8s_parser.crd, 'rb').read()
+    if k8s_parser.crd != "":
+        crd_sources = open(k8s_parser.crd, "rb").read()
         if not crd_sources:
-            raise ValueError(
-                f"Unable to find source to crd_cron in {_HELM_K8S_PARSER_PACKAGE}"
-            )
+            raise ValueError(f"Unable to find source to crd_cron in {_HELM_K8S_PARSER_PACKAGE}")
         parser_file_content_source = FileContent(
             path="__crd_source.py", content=crd_sources, is_executable=False
         )
