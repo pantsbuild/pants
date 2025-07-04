@@ -108,7 +108,7 @@ async def _collect_config_files_for_project(
     - tsconfig.json files (for TypeScript compiler configuration)
     - Package manager config files (.npmrc, .pnpmrc, pnpm-workspace.yaml)
 
-    PR_NOTE: We need to look for config files declared as explicit file targets because:
+    We need to look for config files declared as explicit file targets because:
     1. Package manager config files (.npmrc, .pnpmrc) affect how dependencies are resolved
     2. Workspace config files (pnpm-workspace.yaml) define monorepo structure
     3. These files might not be auto-discovered by AllPackageJson/AllTSConfigs if they

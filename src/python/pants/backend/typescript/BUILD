@@ -5,9 +5,7 @@ python_sources()
 python_tests(
     name="tests",
     overrides={
-        "check_test.py": {
-            "dependencies": [":test_resources"]
-        },
+        "check_test.py": {"dependencies": [":test_resources"]},
     },
 )
 
