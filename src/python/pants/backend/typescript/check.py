@@ -149,6 +149,9 @@ async def _collect_config_files_for_project(
         config_files.append(ts_config.path)
 
     # Add file() targets that are dependencies of TypeScript targets
+    # Note: Package manager config files
+    # (.npmrc, .pnpmrc, pnpm-workspace.yaml) should be dependencies of package_json targets
+    # since they affect package installation, not TypeScript compilation directly.
     if typescript_targets:
         typescript_addresses = [target.address for target in typescript_targets]
         transitive_targets = await Get(

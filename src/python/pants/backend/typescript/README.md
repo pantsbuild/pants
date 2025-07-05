@@ -154,4 +154,56 @@ TypeScript compilation operates at the **NodeJS project level** using `--build` 
 - **Artifact Caching**: Caches `.tsbuildinfo` and output files for incremental compilation
 - **Configuration Respect**: Uses project's `tsconfig.json` and package manager setup
 
+## Process Flow
+
+The TypeScript backend follows a multi-stage process that separates package management from compilation:
+
+### 1. **Package Resolution Stage** (JavaScript Backend)
+   - **Trigger**: When a `package_json` target is encountered
+   - **Process**: Runs `npm/pnpm/yarn install` to resolve dependencies
+   - **Inputs**: 
+     - `package.json` files
+     - Lockfiles (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`)
+     - Package manager config files (`.npmrc`, `.pnpmrc`, `pnpm-workspace.yaml`)
+   - **Outputs**: 
+     - Populated `node_modules` directory
+     - Updated lockfile (if dependencies changed)
+   - **Caching**: Results are heavily cached based on input digest
+
+### 2. **TypeScript Compilation Stage** (TypeScript Backend)
+   - **Trigger**: When `pants check` is run on TypeScript targets
+   - **Process**: Runs `tsc --build` for type checking
+   - **Inputs**:
+     - TypeScript source files (`.ts`, `.tsx`)
+     - `tsconfig.json` files
+     - Pre-resolved `node_modules` from stage 1
+     - Cached `.tsbuildinfo` files (for incremental compilation)
+     - File targets declared as dependencies
+   - **Outputs**:
+     - Exit code (0 for success, non-zero for type errors)
+     - `.tsbuildinfo` files (incremental compilation state)
+     - Compiled JavaScript files (if `emitDeclarationOnly` is false)
+     - Declaration files (`.d.ts`)
+   - **Caching**: TypeScript artifacts are cached and restored for incremental builds
+
+### 4. **Configuration Files and Dependencies**
+
+For proper cache invalidation, configuration files must be declared as explicit file targets:
+
+```python
+# BUILD file
+package_json()
+
+# Declare package manager config files as file targets
+file(name="npmrc", source=".npmrc")
+file(name="pnpmrc", source=".pnpmrc") 
+
+# TypeScript targets can depend on these
+typescript_sources(
+    dependencies=[":npmrc"],  # If TypeScript needs specific registry config
+)
+```
+
+**Note**: While the TypeScript backend includes file targets in its dependency collection, changes to package manager config files (`.npmrc`, `.pnpmrc`) primarily affect the package resolution stage, not the TypeScript compilation output itself.
+
   

@@ -150,16 +150,14 @@ The `link:` protocol creates symlinks that TypeScript can resolve for cross-pack
 
 ### Package manager configuration
 
-TypeScript compilation includes package manager config files (.npmrc, .pnpmrc, pnpm-workspace.yaml) as inputs to ensure proper cache invalidation. These files affect how dependencies are resolved and how node_modules is structured. Corporate environments with private registries or custom proxy settings will work correctly. This behavior ensures TypeScript compilation uses the correct dependency environment configured by your package manager.
-
-To include package manager configuration files, you must explicitly declare them as file targets:
+To include package manager configuration files, declare them as file targets and add them as dependencies of `package_json`:
 
 ```python title="BUILD"
-package_json()
+package_json(dependencies=[":npmrc"])
 file(name="npmrc", source=".npmrc")  # Required for private registries or custom configs
 ```
 
-This explicit declaration ensures build reproducibility and prevents accidental inclusion of user-specific configuration files from outside the repository.
+Package manager configs must be dependencies of `package_json` (not `typescript_sources`) since they affect package installation, not TypeScript compilation directly.
 
 ### Custom output directories
 
