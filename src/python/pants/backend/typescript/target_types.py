@@ -69,6 +69,7 @@ class TypeScriptSourcesGeneratorTarget(TargetFilesGenerator):
     alias = "typescript_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
+        TypeScriptDependenciesField,
         TypeScriptSourcesGeneratorSourcesField,
         TypeScriptSourcesOverridesField,
     )
