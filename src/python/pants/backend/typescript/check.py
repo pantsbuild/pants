@@ -21,14 +21,7 @@ from pants.backend.typescript.tsconfig import AllTSConfigs
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.core.target_types import FileSourceField
-from pants.engine.fs import (
-    EMPTY_DIGEST,
-    Digest,
-    DigestSubset,
-    GlobMatchErrorBehavior,
-    PathGlobs,
-    Snapshot,
-)
+from pants.engine.fs import EMPTY_DIGEST, Digest, DigestSubset, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.internals.graph import hydrate_sources
 from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.internals.selectors import Get, concurrently

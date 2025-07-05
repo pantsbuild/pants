@@ -581,17 +581,17 @@ def test_file_targets_available_during_typescript_compilation(
             f"{test_project}/src/index.ts": textwrap.dedent("""
             // This import will fail if the file() target dependency is not working
             import config from '../config.json';
-            
+
             // Type checking ensures the import resolved correctly
             const message: string = config.message;
             const value: number = config.value;
-            
+
             console.log(`Message: ${message}, Value: ${value}`);
         """),
             # BUILD file with file target
             f"{test_project}/BUILD": textwrap.dedent("""
             package_json()
-            
+
             # Provides config.json as a dependency
             file(name="config_data", source="config.json")
         """),
@@ -626,5 +626,5 @@ def test_file_targets_available_during_typescript_compilation(
 
     if "Cannot find module '../config.json'" in result.stdout:
         assert False, (
-            f"CONFIRMED: File target dependency is not working - TypeScript cannot find config.json"
+            "CONFIRMED: File target dependency is not working - TypeScript cannot find config.json"
         )
