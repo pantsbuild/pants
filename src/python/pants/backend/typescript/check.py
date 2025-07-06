@@ -73,7 +73,7 @@ def _get_typescript_artifact_globs(
 
             # Case 2: Default location inside output directories (when outDir is specified)
             for output_dir in output_dirs:
-                globs.append(f"{output_dir}/.tsbuildinfo")
+                globs.append(f"{output_dir}/tsconfig.tsbuildinfo")
                 # Also capture the compiled output itself
                 globs.append(f"{output_dir}/**/*")
         else:
@@ -83,7 +83,7 @@ def _get_typescript_artifact_globs(
 
             # Case 2: Default location inside output directories (when outDir is specified)
             for output_dir in output_dirs:
-                globs.append(f"{workspace_pkg.root_dir}/{output_dir}/.tsbuildinfo")
+                globs.append(f"{workspace_pkg.root_dir}/{output_dir}/tsconfig.tsbuildinfo")
                 # Also capture the compiled output itself
                 globs.append(f"{workspace_pkg.root_dir}/{output_dir}/**/*")
 

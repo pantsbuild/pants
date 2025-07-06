@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import textwrap
+import time
 from pathlib import Path
 from typing import cast
 
@@ -472,6 +473,23 @@ def test_typescript_incremental_artifacts_generation(
     rule_runner, test_project, _ = basic_rule_runner
 
     test_files = _load_project_test_files(test_project)
+
+    # Workaround for TypeScript issue where identical timestamps in CI cause
+    # incremental compilation to be skipped. Force different timestamps on source files
+    # to ensure TypeScript recognizes changes and generates .tsbuildinfo files.
+    # See: https://github.com/microsoft/TypeScript/issues/54563
+    current_time = time.time()
+    for i, file_key in enumerate(
+        [
+            f"{test_project}/src/index.ts",
+            f"{test_project}/src/math.ts",
+            f"{test_project}/src/Button.tsx",
+        ]
+    ):
+        if file_key in test_files:
+            original_content = test_files[file_key]
+            test_files[file_key] = f"// Updated at {current_time + i}\n{original_content}"
+
     rule_runner.write_files(test_files)
 
     target = rule_runner.get_target(
