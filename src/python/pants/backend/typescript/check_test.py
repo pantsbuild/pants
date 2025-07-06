@@ -460,6 +460,7 @@ def test_typescript_incremental_caching_multi_project_workspace(
     _assert_identical_cache_results(results_1, results_2)
 
 
+@logging(level=LogLevel.DEBUG)
 def test_typescript_incremental_artifacts_generation(
     basic_rule_runner: tuple[RuleRunner, str, str],
 ) -> None:
@@ -498,12 +499,24 @@ def test_typescript_incremental_artifacts_generation(
     field_set = TypeScriptCheckFieldSet.create(target)
     request = TypeScriptCheckRequest([field_set])
 
+    # DEBUG: Log test files and tsconfig content
+    print(f"\n🔍 [DEBUG] Test project: {test_project}")
+    print(f"🔍 [DEBUG] Test files written: {sorted(test_files.keys())}")
+    if f"{test_project}/tsconfig.json" in test_files:
+        print("🔍 [DEBUG] tsconfig.json content:")
+        print(test_files[f"{test_project}/tsconfig.json"])
+
     # Run compilation once to generate incremental artifacts
     results = rule_runner.request(CheckResults, [request])
     assert len(results.results) == 1
     assert results.results[0].exit_code == 0
 
     result = results.results[0]
+
+    # DEBUG: Log compilation result details
+    print(f"\n🔍 [DEBUG] Compilation exit code: {result.exit_code}")
+    print(f"🔍 [DEBUG] Compilation stdout: {result.stdout}")
+    print(f"🔍 [DEBUG] Compilation stderr: {result.stderr}")
 
     # Validate that artifacts are being captured
     assert result.report is not None, "CheckResult should have report field for caching"
@@ -517,10 +530,24 @@ def test_typescript_incremental_artifacts_generation(
         "❌ No TypeScript artifacts captured - incremental compilation infrastructure may be broken"
     )
 
+    # DEBUG: Log artifact collection details
+    print(f"\n🔍 [DEBUG] Report digest fingerprint: {result.report.fingerprint}")
+
     # KEY TEST: Validate that .tsbuildinfo files are generated when incremental compilation is enabled
     # This proves TypeScript's --build mode is working and generating incremental compilation infrastructure
     snapshot = rule_runner.request(Snapshot, [result.report])
     tsbuildinfo_files = [f for f in snapshot.files if f.endswith(".tsbuildinfo")]
+
+    print(f"\n🔍 [DEBUG] All captured artifacts: {sorted(snapshot.files)}")
+    print(f"🔍 [DEBUG] .tsbuildinfo files found: {tsbuildinfo_files}")
+    print(f"🔍 [DEBUG] .js files: {[f for f in snapshot.files if f.endswith('.js')]}")
+    print(f"🔍 [DEBUG] .d.ts files: {[f for f in snapshot.files if f.endswith('.d.ts')]}")
+
+    # DEBUG: Check for any build info files with different naming patterns
+    potential_buildinfo_files = [
+        f for f in snapshot.files if "buildinfo" in f.lower() or "tsbuild" in f.lower()
+    ]
+    print(f"🔍 [DEBUG] Files containing 'buildinfo' or 'tsbuild': {potential_buildinfo_files}")
 
     assert len(tsbuildinfo_files) > 0, (
         f"❌ INCREMENTAL COMPILATION FAILURE: No .tsbuildinfo files found. "
