@@ -23,8 +23,10 @@ from pants.backend.typescript.target_types import (
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResults
 from pants.core.target_types import FileTarget
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import RuleRunner, logging
+from pants.util.logging import LogLevel
 
 
 @pytest.fixture(
@@ -66,6 +68,7 @@ def _create_rule_runner(package_manager: str) -> RuleRunner:
             FileTarget,
         ],
         objects=dict(package_json.build_file_aliases().objects),
+        # preserve_tmpdirs=True,
     )
     rule_runner.set_options(
         [
@@ -521,31 +524,27 @@ def test_typescript_incremental_artifacts_generation(
     assert has_dts_files, f"❌ Missing .d.ts files in: {sorted(snapshot.files)}"
 
 
+@logging(level=LogLevel.DEBUG)
 def test_package_manager_config_dependency_tracking(
     basic_rule_runner: tuple[RuleRunner, str, str],
 ) -> None:
-    """Test that package manager config files are properly tracked as dependencies.
+    """Test that .npmrc files declared as dependencies of package_json are properly tracked.
 
-    This test verifies that .npmrc files declared as dependencies of package_json targets are
-    properly included in package installation. Changes to .npmrc should invalidate the package
-    installation cache and affect compilation results.
+    This test verifies that when .npmrc files are declared as dependencies of package_json targets,
+    changes to .npmrc content are detected and cause package installation to behave accordingly.
     """
     rule_runner, test_project, package_manager = basic_rule_runner
-
-    # Skip this test for package managers that don't use .npmrc
-    if package_manager not in ("npm", "pnpm"):
-        pytest.skip(f"Package manager {package_manager} doesn't use .npmrc config")
-
     test_files = _load_project_test_files(test_project)
+    original_package_json = json.loads(test_files[f"{test_project}/package.json"])
 
-    # Step 1: Test with valid .npmrc
+    # Step 1: Start with valid .npmrc and proper dependency declaration
     test_files.update(
         {
             f"{test_project}/.npmrc": "registry=https://registry.npmjs.org/",
-            f"{test_project}/BUILD": textwrap.dedent("""
-            package_json(dependencies=[":npmrc"])
-            file(name="npmrc", source=".npmrc")
-        """),
+            f"{test_project}/BUILD": textwrap.dedent("""\
+                package_json(dependencies=[":npmrc"])
+                file(name="npmrc", source=".npmrc")
+                """),
         }
     )
 
@@ -557,64 +556,39 @@ def test_package_manager_config_dependency_tracking(
     field_set = TypeScriptCheckFieldSet.create(target)
     request = TypeScriptCheckRequest([field_set])
 
-    # First run with valid .npmrc should succeed
     results_1 = rule_runner.request(CheckResults, [request])
     assert len(results_1.results) == 1
-    assert results_1.results[0].exit_code == 0
+    assert results_1.results[0].exit_code == 0, (
+        f"First run should succeed with valid .npmrc. "
+        f"stdout: {results_1.results[0].stdout}, stderr: {results_1.results[0].stderr}"
+    )
 
-    # Step 2: Change .npmrc to malformed content and verify it causes failure
-    # Using malformed registry URL that causes npm to fail immediately with ERR_INVALID_URL
-    test_files[f"{test_project}/.npmrc"] = "registry=not-a-valid-url"
+    # Step 2: Change .npmrc to malformed content AND add new dependency to force package manager execution
+    # This ensures all package managers (including pnpm) must access the registry and encounter the invalid URL
+    original_package_json["devDependencies"] = original_package_json.get("devDependencies", {})
+    original_package_json["devDependencies"]["is-odd"] = (
+        "3.0.1"  # Update dep to force network access
+    )
+
+    test_files.update(
+        {
+            f"{test_project}/.npmrc": "registry=not-a-valid-url",
+            f"{test_project}/package.json": json.dumps(original_package_json, indent=2),
+        }
+    )
     rule_runner.write_files(test_files)
 
-    # Run compilation again with the malformed .npmrc
-    # If dependency tracking works: .npmrc change → package installation fails → compilation fails
-    # If dependency tracking broken: .npmrc ignored → package installation succeeds → compilation succeeds
+    # Second run with malformed .npmrc should fail due to dependency tracking
+    # Package managers must fetch new dependency from invalid registry → fail with ERR_INVALID_URL
+    with pytest.raises(ExecutionError) as exc_info:
+        rule_runner.request(CheckResults, [request])
 
-    from pants.engine.internals.scheduler import ExecutionError
-
-    try:
-        results_2 = rule_runner.request(CheckResults, [request])
-        # If we get here, the request succeeded despite malformed .npmrc
-        assert len(results_2.results) == 1
-
-        if package_manager == "pnpm":
-            # pnpm currently ignores .npmrc files when they're dependencies of package_json
-            # This is expected behavior for now
-            if results_2.results[0].exit_code == 0:
-                pytest.skip(f"pnpm ignores .npmrc files - dependency tracking not working for pnpm")
-            else:
-                print(f"✅ UNEXPECTED SUCCESS: pnpm detected malformed .npmrc")
-                print(
-                    f"   Exit code: {results_2.results[0].exit_code} (pnpm dependency tracking improved!)"
-                )
-        else:
-            # For npm and other package managers, this is unexpected - they should have failed
-            pytest.fail(
-                f"❌ DEPENDENCY TRACKING FAILURE: Expected package installation to fail due to malformed .npmrc.\n"
-                f"Package manager: {package_manager}\n"
-                f"Exit code: {results_2.results[0].exit_code}\n"
-                f"This means .npmrc changes are NOT being detected by package installation."
-            )
-
-    except ExecutionError as e:
-        # This is the expected behavior for npm - package installation fails due to malformed .npmrc
-        if package_manager == "npm":
-            print(
-                f"✅ DEPENDENCY TRACKING SUCCESS: malformed .npmrc caused npm package installation to fail"
-            )
-            print(f"   ExecutionError: Package installation failed as expected")
-            assert (
-                "npm error" in str(e)
-                or "ERR_INVALID_URL" in str(e)
-                or "failed with exit code 1" in str(e)
-            ), f"Expected npm-specific error message, got: {e}"
-        else:  # TODO: remove?
-            # For other package managers, we might also expect failures
-            print(
-                f"✅ DEPENDENCY TRACKING SUCCESS: malformed .npmrc caused {package_manager} to fail"
-            )
-            print(f"   ExecutionError: {e}")
+    # Verify the error is related to the malformed .npmrc
+    error_str = str(exc_info.value)
+    expected_errors = ["ERR_INVALID_URL", "failed with exit code 1", "Invalid URL"]
+    assert any(expected in error_str for expected in expected_errors), (
+        f"Expected {package_manager} error message to contain one of {expected_errors}, got: {exc_info.value}"
+    )
 
 
 def test_file_targets_available_during_typescript_compilation(
