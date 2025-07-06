@@ -414,7 +414,17 @@ def test_node_process_environment_variables_are_merged(
 def test_node_process_environment_with_tools(rule_runner: RuleRunner) -> None:
     def mock_get_binary_path(request: BinaryPathRequest) -> BinaryPaths:
         # These are the tools that are required by default for any nodejs process to work.
-        default_required_tools = ["sh", "bash", "mkdir", "rm", "touch", "which", "sed", "dirname", "uname"]
+        default_required_tools = [
+            "sh",
+            "bash",
+            "mkdir",
+            "rm",
+            "touch",
+            "which",
+            "sed",
+            "dirname",
+            "uname",
+        ]
         if request.binary_name in default_required_tools:
             return BinaryPaths(
                 request.binary_name, paths=[BinaryPath(f"/bin/{request.binary_name}")]
