@@ -143,7 +143,7 @@ pub(crate) async fn remove_old_images(
             tokio::spawn(async move {
                 match summary.id {
                     Some(container_id) => {
-                        log::debug!("Removing stale container {container_id} with {PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY} label");
+                        log::debug!("Removing stale container {container_id}");
                         docker
                         .remove_container(
                             container_id.as_str(),
