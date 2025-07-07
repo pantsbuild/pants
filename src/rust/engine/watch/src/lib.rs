@@ -5,6 +5,7 @@
 mod tests;
 
 use std::collections::HashSet;
+use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
 use std::thread;
@@ -101,29 +102,48 @@ impl InvalidationWatcher {
 
     ///
     /// Starts the background task that monitors watch events. Panics if called more than once.
+    /// Passing an ignore_provider will override the default ignorer.
     ///
-    pub fn start<I: Invalidatable>(&self, invalidatable: &Arc<I>) -> Result<(), String> {
+    pub fn start<I: Invalidatable, G: GitIgnoreProvider + Debug>(
+        &self,
+        invalidatable: &Arc<I>,
+        ignore_provider: Option<G>,
+    ) -> Result<(), String> {
         let mut inner = self.0.lock();
         let (ignorer, canonical_build_root, liveness_sender, watch_receiver) = inner
             .background_task_inputs
             .take()
             .expect("An InvalidationWatcher can only be started once.");
-
-        InvalidationWatcher::start_background_thread(
-            Arc::downgrade(invalidatable),
-            ignorer,
-            canonical_build_root,
-            liveness_sender,
-            watch_receiver,
-        )?;
+        if let Some(ignorer) = ignore_provider {
+            log::debug!(
+                "Starting InvalidationWatcher with ignore provider {:?}",
+                ignorer
+            );
+            InvalidationWatcher::start_background_thread(
+                Arc::downgrade(invalidatable),
+                ignorer,
+                canonical_build_root,
+                liveness_sender,
+                watch_receiver,
+            )?;
+        } else {
+            log::debug!("Starting InvalidationWatcher with static ignores");
+            InvalidationWatcher::start_background_thread(
+                Arc::downgrade(invalidatable),
+                StaticExcludes(ignorer),
+                canonical_build_root,
+                liveness_sender,
+                watch_receiver,
+            )?;
+        }
 
         Ok(())
     }
 
     // Public for testing purposes.
-    pub(crate) fn start_background_thread<I: Invalidatable>(
+    pub(crate) fn start_background_thread<I: Invalidatable, G: GitIgnoreProvider>(
         invalidatable: Weak<I>,
-        ignorer: Arc<GitignoreStyleExcludes>,
+        ignorer: G,
         canonical_build_root: PathBuf,
         liveness_sender: crossbeam_channel::Sender<String>,
         watch_receiver: Receiver<notify::Result<Event>>,
@@ -170,9 +190,9 @@ impl InvalidationWatcher {
     /// This method must not assume that it receives PreciseEvents, because construction does not
     /// validate that it is possible to enable them.
     ///
-    fn handle_event<I: Invalidatable>(
+    fn handle_event<I: Invalidatable, G: GitIgnoreProvider>(
         invalidatable: &I,
-        ignorer: &GitignoreStyleExcludes,
+        ignorer: &G,
         canonical_build_root: &Path,
         ev: Event,
     ) {
@@ -312,6 +332,19 @@ pub enum InvalidateCaller {
 pub trait Invalidatable: Send + Sync + 'static {
     fn invalidate(&self, paths: &HashSet<PathBuf>, caller: InvalidateCaller) -> usize;
     fn invalidate_all(&self, caller: InvalidateCaller) -> usize;
+}
+
+#[derive(Debug)]
+struct StaticExcludes(pub Arc<GitignoreStyleExcludes>);
+
+impl GitIgnoreProvider for StaticExcludes {
+    fn is_ignored_or_child_of_ignored_path(&self, path: &Path, is_dir: bool) -> bool {
+        self.0.is_ignored_or_child_of_ignored_path(path, is_dir)
+    }
+}
+
+pub trait GitIgnoreProvider: Send + Sync + 'static {
+    fn is_ignored_or_child_of_ignored_path(&self, path: &Path, is_dir: bool) -> bool;
 }
 
 ///

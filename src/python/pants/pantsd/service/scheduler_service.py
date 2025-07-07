@@ -59,6 +59,7 @@ class SchedulerService(PantsService):
         self._scheduler_session = self._scheduler.new_session(
             build_id="scheduler_service_session",
         )
+        self._graph_helper.attach_invalidation_session(self._scheduler_session)
         self._logger = logging.getLogger(__name__)
 
         # NB: We declare these as a single field so that they can be changed atomically.
