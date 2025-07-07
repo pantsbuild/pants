@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import json
 import textwrap
-import time
 from pathlib import Path
 from typing import cast
 
@@ -26,8 +25,7 @@ from pants.core.goals.check import CheckResults
 from pants.core.target_types import FileTarget
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
-from pants.testutil.rule_runner import RuleRunner, logging
-from pants.util.logging import LogLevel
+from pants.testutil.rule_runner import RuleRunner
 
 
 @pytest.fixture(
@@ -460,7 +458,6 @@ def test_typescript_incremental_caching_multi_project_workspace(
     _assert_identical_cache_results(results_1, results_2)
 
 
-@logging(level=LogLevel.DEBUG)
 def test_typescript_incremental_artifacts_generation(
     basic_rule_runner: tuple[RuleRunner, str, str],
 ) -> None:
@@ -474,23 +471,6 @@ def test_typescript_incremental_artifacts_generation(
     rule_runner, test_project, _ = basic_rule_runner
 
     test_files = _load_project_test_files(test_project)
-
-    # Workaround for TypeScript issue where identical timestamps in CI cause
-    # incremental compilation to be skipped. Force different timestamps on source files
-    # to ensure TypeScript recognizes changes and generates .tsbuildinfo files.
-    # See: https://github.com/microsoft/TypeScript/issues/54563
-    current_time = time.time()
-    for i, file_key in enumerate(
-        [
-            f"{test_project}/src/index.ts",
-            f"{test_project}/src/math.ts",
-            f"{test_project}/src/Button.tsx",
-        ]
-    ):
-        if file_key in test_files:
-            original_content = test_files[file_key]
-            test_files[file_key] = f"// Updated at {current_time + i}\n{original_content}"
-
     rule_runner.write_files(test_files)
 
     target = rule_runner.get_target(
@@ -499,24 +479,12 @@ def test_typescript_incremental_artifacts_generation(
     field_set = TypeScriptCheckFieldSet.create(target)
     request = TypeScriptCheckRequest([field_set])
 
-    # DEBUG: Log test files and tsconfig content
-    print(f"\n🔍 [DEBUG] Test project: {test_project}")
-    print(f"🔍 [DEBUG] Test files written: {sorted(test_files.keys())}")
-    if f"{test_project}/tsconfig.json" in test_files:
-        print("🔍 [DEBUG] tsconfig.json content:")
-        print(test_files[f"{test_project}/tsconfig.json"])
-
     # Run compilation once to generate incremental artifacts
     results = rule_runner.request(CheckResults, [request])
     assert len(results.results) == 1
     assert results.results[0].exit_code == 0
 
     result = results.results[0]
-
-    # DEBUG: Log compilation result details
-    print(f"\n🔍 [DEBUG] Compilation exit code: {result.exit_code}")
-    print(f"🔍 [DEBUG] Compilation stdout: {result.stdout}")
-    print(f"🔍 [DEBUG] Compilation stderr: {result.stderr}")
 
     # Validate that artifacts are being captured
     assert result.report is not None, "CheckResult should have report field for caching"
@@ -530,24 +498,10 @@ def test_typescript_incremental_artifacts_generation(
         "❌ No TypeScript artifacts captured - incremental compilation infrastructure may be broken"
     )
 
-    # DEBUG: Log artifact collection details
-    print(f"\n🔍 [DEBUG] Report digest fingerprint: {result.report.fingerprint}")
-
     # KEY TEST: Validate that .tsbuildinfo files are generated when incremental compilation is enabled
     # This proves TypeScript's --build mode is working and generating incremental compilation infrastructure
     snapshot = rule_runner.request(Snapshot, [result.report])
     tsbuildinfo_files = [f for f in snapshot.files if f.endswith(".tsbuildinfo")]
-
-    print(f"\n🔍 [DEBUG] All captured artifacts: {sorted(snapshot.files)}")
-    print(f"🔍 [DEBUG] .tsbuildinfo files found: {tsbuildinfo_files}")
-    print(f"🔍 [DEBUG] .js files: {[f for f in snapshot.files if f.endswith('.js')]}")
-    print(f"🔍 [DEBUG] .d.ts files: {[f for f in snapshot.files if f.endswith('.d.ts')]}")
-
-    # DEBUG: Check for any build info files with different naming patterns
-    potential_buildinfo_files = [
-        f for f in snapshot.files if "buildinfo" in f.lower() or "tsbuild" in f.lower()
-    ]
-    print(f"🔍 [DEBUG] Files containing 'buildinfo' or 'tsbuild': {potential_buildinfo_files}")
 
     assert len(tsbuildinfo_files) > 0, (
         f"❌ INCREMENTAL COMPILATION FAILURE: No .tsbuildinfo files found. "
@@ -569,7 +523,6 @@ def test_typescript_incremental_artifacts_generation(
     assert has_dts_files, f"❌ Missing .d.ts files in: {sorted(snapshot.files)}"
 
 
-@logging(level=LogLevel.DEBUG)
 def test_package_manager_config_dependency_tracking(
     basic_rule_runner: tuple[RuleRunner, str, str],
 ) -> None:

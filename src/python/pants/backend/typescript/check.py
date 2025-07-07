@@ -21,14 +21,7 @@ from pants.backend.typescript.tsconfig import AllTSConfigs
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.core.target_types import FileSourceField
-from pants.engine.fs import (
-    EMPTY_DIGEST,
-    Digest,
-    DigestSubset,
-    GlobMatchErrorBehavior,
-    PathGlobs,
-    Snapshot,
-)
+from pants.engine.fs import EMPTY_DIGEST, Digest, DigestSubset, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.internals.graph import hydrate_sources
 from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.internals.selectors import Get, concurrently
@@ -71,11 +64,6 @@ def _get_typescript_artifact_globs(
 
     # Use custom output directories if specified, otherwise use common patterns
     output_dirs = subsystem.output_dirs if subsystem.output_dirs else _COMMON_OUTPUT_DIRS
-
-    logger.debug(
-        f"[DEBUG] _get_typescript_artifact_globs: project={project.root_dir}, relative_to_workdir={relative_to_workdir}"
-    )
-    logger.debug(f"[DEBUG] Output directories: {output_dirs}")
 
     for workspace_pkg in project.workspaces:
         if relative_to_workdir:
@@ -125,15 +113,6 @@ async def _extract_typescript_artifacts_for_caching(
 ) -> Digest:
     """Extract .tsbuildinfo files and output files from TypeScript compilation for caching."""
     output_globs = _get_typescript_artifact_globs(project, subsystem, relative_to_workdir=True)
-
-    logger.debug(f"[DEBUG] _extract_typescript_artifacts_for_caching: Using globs: {output_globs}")
-
-    # DEBUG: See what files are available in the process output
-    process_output_snapshot = await Get(Snapshot, Digest, process_output_digest)
-    logger.debug(f"[DEBUG] Files in process output digest: {sorted(process_output_snapshot.files)}")
-    logger.debug(
-        f"[DEBUG] .tsbuildinfo files in output: {[f for f in process_output_snapshot.files if f.endswith('.tsbuildinfo')]}"
-    )
 
     artifacts_digest = await Get(
         Digest,
@@ -224,7 +203,6 @@ async def _typecheck_single_project(
     global_options: GlobalOptions,
 ) -> CheckResult:
     """Type check a single TypeScript project."""
-    logger.debug(f"[DEBUG] _typecheck_single_project: Starting for project {project.root_dir}")
     all_targets = await Get(AllTargets)
 
     # Find all TypeScript targets
@@ -312,12 +290,6 @@ async def _typecheck_single_project(
     # Use --build to compile all projects in workspace with project references
     args = ("--build",)
 
-    logger.debug(f"[DEBUG] TypeScript args: {args}")
-    logger.debug(f"[DEBUG] Working directory will be: {project.root_dir}")
-    logger.debug(
-        f"[DEBUG] Output directories configured: {subsystem.output_dirs if subsystem.output_dirs else _COMMON_OUTPUT_DIRS}"
-    )
-
     tool_request = subsystem.request(
         args=args,
         input_digest=input_digest,
@@ -356,21 +328,10 @@ async def _typecheck_single_project(
 
     result = await execute_process(process_with_outputs, **implicitly())
 
-    logger.debug(f"[DEBUG] TypeScript execution result: exit_code={result.exit_code}")
-    logger.debug(f"[DEBUG] TypeScript stdout: {result.stdout.decode() if result.stdout else ''}")
-    logger.debug(f"[DEBUG] TypeScript stderr: {result.stderr.decode() if result.stderr else ''}")
-
     # Cache TypeScript incremental build artifacts for faster subsequent runs
     # TypeScript --build generates .tsbuildinfo files and output files that enable incremental compilation
     typescript_artifacts_digest = await _extract_typescript_artifacts_for_caching(
         project, result.output_digest, subsystem
-    )
-
-    # DEBUG: Log what artifacts were extracted
-    artifacts_snapshot = await Get(Snapshot, Digest, typescript_artifacts_digest)
-    logger.debug(f"[DEBUG] Extracted TypeScript artifacts: {sorted(artifacts_snapshot.files)}")
-    logger.debug(
-        f"[DEBUG] Looking for .tsbuildinfo in: {[f for f in artifacts_snapshot.files if 'buildinfo' in f.lower()]}"
     )
 
     # Convert to CheckResult with caching support - single result for the project
