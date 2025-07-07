@@ -25,8 +25,8 @@ use bollard::service::CreateImageInfo;
 use bollard::volume::CreateVolumeOptions;
 use bollard::{Docker, errors::Error as DockerError};
 use bytes::{Bytes, BytesMut};
-use futures::future::join_all;
 use fs::RelativePath;
+use futures::future::join_all;
 use futures::stream::BoxStream;
 use futures::{FutureExt, StreamExt};
 use hashing::Digest;
@@ -54,6 +54,7 @@ pub(crate) const SANDBOX_BASE_PATH_IN_CONTAINER: &str = "/pants-sandbox";
 pub(crate) const NAMED_CACHES_BASE_PATH_IN_CONTAINER: &str = "/pants-named-caches";
 pub(crate) const IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER: &str = "/pants-immutable-inputs";
 pub(crate) const PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY: &str = "org.pantsbuild.environment";
+pub(crate) const PANTS_CONTAINER_BUILDROOT_LABEL_KEY: &str = "org.pantsbuild.buildroot";
 pub(crate) const CONTAINER_CLEANUP_TIMEOUT_SECONDS: u64 = 60;
 
 /// Process-wide image pull cache.
@@ -67,6 +68,7 @@ pub struct CommandRunner<'a> {
     store: Store,
     executor: Executor,
     docker: &'a DockerOnceCell,
+    build_root: PathBuf,
     work_dir_base: PathBuf,
     immutable_inputs: ImmutableInputs,
     pub(crate) container_cache: ContainerCache<'a>,
@@ -87,60 +89,6 @@ impl DockerOnceCell {
 
     pub fn initialized(&self) -> bool {
         self.cell.initialized()
-    }
-
-    async fn remove_old_images(docker: &Docker) -> Result<(), Vec<String>> {
-        let removal_tasks = docker
-            .list_containers(Some(ListContainersOptions::<&str> {
-                filters: hashmap!{"label" => vec![PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY], "status" => vec!["exited", "dead"]},
-                ..ListContainersOptions::default()
-            }))
-            .await
-            .map_err(|err| {
-                vec![format!(
-                    "An error occurred when listing docker containers\n\n{err}"
-                )]
-            })?
-            .into_iter()
-            .map(|summary| {
-                let docker = docker.clone();
-                tokio::spawn(async move {
-                    match summary.id {
-                        Some(container_id) => {
-                            log::debug!("Removing stale container {container_id} with {PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY} label");
-                            docker
-                            .remove_container(
-                                container_id.as_str(),
-                                Some(RemoveContainerOptions {
-                                    force: true,
-                                    ..RemoveContainerOptions::default()
-                                }),
-                            )
-                            .await
-                            .map_err(|err| {
-                                format!("Failed to remove container {container_id}:\n{err}")
-                            })
-                        },
-                        None => Err(format!(
-                            "No container id attached to summary:\n{summary:#?}"
-                        )),
-                    }
-                })
-            });
-        let errors: Vec<String> = join_all(removal_tasks)
-            .await
-            .into_iter()
-            .filter_map(|res| match res {
-                Ok(Ok(_)) => None,
-                Ok(Err(s)) => Some(s),
-                Err(je) => Some(je.to_string()),
-            })
-            .collect();
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
     }
 
     pub async fn get(&self) -> Result<&Docker, String> {
@@ -167,19 +115,67 @@ impl DockerOnceCell {
           }
           _ => return Err(format!("Unparseable API version `{}` returned by Docker.", &api_version)),
         }
-
-        let cleanup_docker = docker.clone();
-        tokio::spawn(async move {
-            let message = match tokio::time::timeout(Duration::from_secs(CONTAINER_CLEANUP_TIMEOUT_SECONDS), Self::remove_old_images(&cleanup_docker)).await {
-                Ok(Ok(_)) => return,
-                Ok(Err(removal_errors)) => format!("The following errors occurred when attempting to remove old containers:\n\n{}", removal_errors.join("\n\n")),
-                Err(_) => format!("Attempt to clean up old containers timed out after {CONTAINER_CLEANUP_TIMEOUT_SECONDS} seconds"),
-            };
-            log::warn!("{}", message)
-        });
         Ok(docker)
       })
       .await
+    }
+}
+
+pub(crate) async fn remove_old_images(
+    docker: &Docker,
+    build_root: &str,
+) -> Result<(), Vec<String>> {
+    let build_root_label = format!("{PANTS_CONTAINER_BUILDROOT_LABEL_KEY}={build_root}");
+    let removal_tasks = docker
+        .list_containers(Some(ListContainersOptions::<&str> {
+            filters: hashmap!{"label" => vec![PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY, build_root_label.as_str()], "status" => vec!["exited", "dead"]},
+            ..ListContainersOptions::default()
+        }))
+        .await
+        .map_err(|err| {
+            vec![format!(
+                "An error occurred when listing docker containers\n\n{err}"
+            )]
+        })?
+        .into_iter()
+        .map(|summary| {
+            let docker = docker.clone();
+            tokio::spawn(async move {
+                match summary.id {
+                    Some(container_id) => {
+                        log::debug!("Removing stale container {container_id} with {PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY} label");
+                        docker
+                        .remove_container(
+                            container_id.as_str(),
+                            Some(RemoveContainerOptions {
+                                force: true,
+                                ..RemoveContainerOptions::default()
+                            }),
+                        )
+                        .await
+                        .map_err(|err| {
+                            format!("Failed to remove container {container_id}:\n{err}")
+                        })
+                    },
+                    None => Err(format!(
+                        "No container id attached to summary:\n{summary:#?}"
+                    )),
+                }
+            })
+        });
+    let errors: Vec<String> = join_all(removal_tasks)
+        .await
+        .into_iter()
+        .filter_map(|res| match res {
+            Ok(Ok(_)) => None,
+            Ok(Err(s)) => Some(s),
+            Err(je) => Some(je.to_string()),
+        })
+        .collect();
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
     }
 }
 
@@ -435,6 +431,7 @@ impl<'a> CommandRunner<'a> {
         executor: Executor,
         docker: &'a DockerOnceCell,
         image_pull_cache: &'a ImagePullCache,
+        build_root: PathBuf,
         work_dir_base: PathBuf,
         immutable_inputs: ImmutableInputs,
     ) -> Result<Self, String> {
@@ -450,6 +447,7 @@ impl<'a> CommandRunner<'a> {
             store,
             executor,
             docker,
+            build_root,
             work_dir_base,
             immutable_inputs,
             container_cache,
@@ -485,6 +483,29 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
             };
             (image, &req.execution_environment.platform)
         };
+        if !self.docker.initialized() {
+            // First time initializing DockerOnceCell, therefore lets run old image cleanup here
+            let cleanup_docker = self.docker.get().await?.clone();
+            let build_root_str = self.build_root.to_str().unwrap().to_string();
+            tokio::spawn(async move {
+                let message = match tokio::time::timeout(
+                    Duration::from_secs(CONTAINER_CLEANUP_TIMEOUT_SECONDS),
+                    remove_old_images(&cleanup_docker, &build_root_str),
+                )
+                .await
+                {
+                    Ok(Ok(_)) => return,
+                    Ok(Err(removal_errors)) => format!(
+                        "The following errors occurred when attempting to remove old containers:\n\n{}",
+                        removal_errors.join("\n\n")
+                    ),
+                    Err(_) => format!(
+                        "Attempt to clean up old containers timed out after {CONTAINER_CLEANUP_TIMEOUT_SECONDS} seconds"
+                    ),
+                };
+                log::warn!("{}", message)
+            });
+        }
         let keep_sandboxes = req.execution_environment.local_keep_sandboxes;
         let mut errors: Vec<String> = vec![];
         while errors.len() < MAX_RUN_ATTEMPTS {
@@ -509,6 +530,7 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                         image_name,
                         image_platform,
                         &context.build_id,
+                        self.build_root.as_os_str().to_str().unwrap(), // This should always return Some(...) on Mac and Linux
                         mreq.execution_environment.name.as_ref().unwrap(),
                     )
                     .await?;
@@ -1116,6 +1138,7 @@ impl<'a> ContainerCache<'a> {
         image_name: &str,
         platform: &Platform,
         build_generation: &str,
+        build_root: &str,
         environment_name: &str,
     ) -> Result<(String, NamedCaches), String> {
         let docker = self.docker.get().await?.clone();
@@ -1144,7 +1167,7 @@ impl<'a> ContainerCache<'a> {
                     self.image_pull_cache.clone(),
                     work_dir_base,
                     immutable_inputs_base_dir,
-                    Some(hashmap! {PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY.to_string() => environment_name.to_string()}),
+                    Some(hashmap! {PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY.to_string() => environment_name.to_string(), PANTS_CONTAINER_BUILDROOT_LABEL_KEY.to_string() => build_root.to_string()}),
                 )
                 .await?;
 

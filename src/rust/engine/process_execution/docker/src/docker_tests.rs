@@ -1,8 +1,8 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use std::time::Duration;
 
@@ -10,7 +10,8 @@ use async_trait::async_trait;
 use bollard::container::{Config, RemoveContainerOptions};
 use bollard::{Docker, errors::Error as DockerError};
 use fs::{EMPTY_DIRECTORY_DIGEST, RelativePath};
-use maplit::{hashmap, hashset};
+use itertools::Itertools;
+use maplit::hashset;
 use parameterized::parameterized;
 use store::{ImmutableInputs, Store};
 use tempfile::TempDir;
@@ -19,8 +20,8 @@ use testutil::{owned_string_vec, relative_paths};
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::docker::{
-    ContainerCache, DockerOnceCell, ImagePullCache, PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY,
-    SANDBOX_BASE_PATH_IN_CONTAINER,
+    ContainerCache, DockerOnceCell, ImagePullCache, PANTS_CONTAINER_BUILDROOT_LABEL_KEY,
+    PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY, SANDBOX_BASE_PATH_IN_CONTAINER, remove_old_images,
 };
 use process_execution::local::KeepSandboxes;
 use process_execution::{
@@ -33,6 +34,9 @@ const IMAGE: &str = "busybox:1.34.1";
 
 /// Path to `sh` within the image.
 const SH_PATH: &str = "/bin/sh";
+
+/// Fake build_root to test label
+const FAKE_BUILD_ROOT: &str = "/fake/build/root";
 
 #[derive(PartialEq, Debug)]
 struct LocalTestResult {
@@ -76,35 +80,67 @@ macro_rules! skip_if_no_docker_available_in_macos_ci {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[cfg(unix)]
-async fn test_old_container_cleanup_on_init() {
+async fn test_remove_old_images() {
     skip_if_no_docker_available_in_macos_ci!();
 
     let docker = Docker::connect_with_local_defaults().unwrap();
-    let container_id = docker
-        .create_container::<&str, &str>(
+    // Only the first container ID should be removed
+    let container_ids = {
+        let mut ids: Vec<String> = vec![];
+        for tup in vec![Some("old"), None].iter().cartesian_product(vec![
+            Some(FAKE_BUILD_ROOT),
             None,
-            Config {
-                image: Some(IMAGE),
-                labels: Some(hashmap! {PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY => "old"}),
-                ..Config::default()
-            },
-        )
-        .await
-        .unwrap()
-        .id;
-    docker
-        .start_container::<&str>(&container_id, None)
-        .await
-        .unwrap();
-    docker.stop_container(&container_id, None).await.unwrap();
-    let docker_cell = DockerOnceCell::new();
-    docker_cell.get().await.unwrap();
-    // We have a 60 second timeout but cleanup up one container shouldn't take that long
-    tokio::time::sleep(Duration::from_secs(3)).await;
+            Some("/some/other/build/root"),
+        ]) {
+            let mut perm = HashMap::<&str, &str>::new();
+            if let Some(env_label) = tup.0 {
+                perm.insert(PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY, env_label);
+            }
+            if let Some(build_root_label) = tup.1 {
+                perm.insert(PANTS_CONTAINER_BUILDROOT_LABEL_KEY, build_root_label);
+            }
+            let container_id = docker
+                .create_container::<&str, &str>(
+                    None,
+                    Config {
+                        image: Some(IMAGE),
+                        labels: Some(perm),
+                        ..Config::default()
+                    },
+                )
+                .await
+                .unwrap()
+                .id;
+            docker
+                .start_container::<&str>(&container_id, None)
+                .await
+                .unwrap();
+            docker.stop_container(&container_id, None).await.unwrap();
+            ids.push(container_id);
+        }
+        ids
+    };
+    let result = remove_old_images(&docker, FAKE_BUILD_ROOT).await;
+    assert_eq!(result, Ok(()));
     assert!(matches!(
-        check_container_exists(&docker, &container_id).await,
+        check_container_exists(&docker, &container_ids[0]).await,
         Ok(false)
     ));
+    for container_id in &container_ids[1..] {
+        assert!(matches!(
+            check_container_exists(&docker, container_id).await,
+            Ok(true)
+        ));
+        let _ = ContainerCache::remove_container(
+            &docker,
+            container_id,
+            Some(RemoveContainerOptions {
+                force: true,
+                ..RemoveContainerOptions::default()
+            }),
+        )
+        .await;
+    }
 }
 
 fn platform_for_tests() -> Result<Platform, String> {
@@ -136,6 +172,7 @@ trait DockerCommandTestRunner: Send + Sync {
         executor: task_executor::Executor,
         docker: &'a DockerOnceCell,
         image_pull_cache: &'a ImagePullCache,
+        build_root: PathBuf,
         work_dir_base: PathBuf,
         immutable_inputs: ImmutableInputs,
     ) -> Result<crate::docker::CommandRunner<'a>, String>;
@@ -177,6 +214,7 @@ trait DockerCommandTestRunner: Send + Sync {
                 executor.clone(),
                 &docker,
                 &image_pull_cache,
+                Path::new(FAKE_BUILD_ROOT).to_path_buf(),
                 dir.clone(),
                 immutable_inputs,
             )
@@ -252,6 +290,7 @@ impl DockerCommandTestRunner for DefaultTestRunner {
         executor: task_executor::Executor,
         docker: &'a DockerOnceCell,
         image_pull_cache: &'a ImagePullCache,
+        build_root: PathBuf,
         work_dir_base: PathBuf,
         immutable_inputs: ImmutableInputs,
     ) -> Result<crate::docker::CommandRunner<'a>, String> {
@@ -260,6 +299,7 @@ impl DockerCommandTestRunner for DefaultTestRunner {
             executor,
             docker,
             image_pull_cache,
+            build_root,
             work_dir_base,
             immutable_inputs,
         )
@@ -330,6 +370,7 @@ impl DockerCommandTestRunner for ExistingContainerTestRunner {
         executor: task_executor::Executor,
         docker: &'a DockerOnceCell,
         image_pull_cache: &'a ImagePullCache,
+        build_root: PathBuf,
         work_dir_base: PathBuf,
         immutable_inputs: ImmutableInputs,
     ) -> Result<crate::docker::CommandRunner<'a>, String> {
@@ -338,13 +379,20 @@ impl DockerCommandTestRunner for ExistingContainerTestRunner {
             executor,
             docker,
             image_pull_cache,
+            build_root,
             work_dir_base,
             immutable_inputs,
         )?;
         match self.container_id.set(
             command_runner
                 .container_cache
-                .container_for_image(&self.image_name, &self.platform, "", "test")
+                .container_for_image(
+                    &self.image_name,
+                    &self.platform,
+                    "",
+                    FAKE_BUILD_ROOT,
+                    "test",
+                )
                 .await?,
         ) {
             Ok(()) => Ok(command_runner),
@@ -365,6 +413,7 @@ trait UnavailableContainerTestRunner: DockerCommandTestRunner {
         executor: task_executor::Executor,
         docker: &'a DockerOnceCell,
         image_pull_cache: &'a ImagePullCache,
+        build_root: PathBuf,
         work_dir_base: PathBuf,
         immutable_inputs: ImmutableInputs,
     ) -> Result<crate::docker::CommandRunner<'a>, String>;
@@ -382,6 +431,7 @@ impl<T: UnavailableContainerTestRunner> DockerCommandTestRunner for T {
         executor: task_executor::Executor,
         docker: &'a DockerOnceCell,
         image_pull_cache: &'a ImagePullCache,
+        build_root: PathBuf,
         work_dir_base: PathBuf,
         immutable_inputs: ImmutableInputs,
     ) -> Result<crate::docker::CommandRunner<'a>, String> {
@@ -391,6 +441,7 @@ impl<T: UnavailableContainerTestRunner> DockerCommandTestRunner for T {
                 executor,
                 docker,
                 image_pull_cache,
+                build_root,
                 work_dir_base,
                 immutable_inputs,
             )
@@ -431,6 +482,7 @@ impl UnavailableContainerTestRunner for MissingContainerTestRunner {
         executor: task_executor::Executor,
         docker: &'a DockerOnceCell,
         image_pull_cache: &'a ImagePullCache,
+        build_root: PathBuf,
         work_dir_base: PathBuf,
         immutable_inputs: ImmutableInputs,
     ) -> Result<crate::docker::CommandRunner<'a>, String> {
@@ -440,6 +492,7 @@ impl UnavailableContainerTestRunner for MissingContainerTestRunner {
                 executor,
                 docker,
                 image_pull_cache,
+                build_root,
                 work_dir_base,
                 immutable_inputs,
             )
@@ -1154,6 +1207,7 @@ impl UnavailableContainerTestRunner for ExitedContainerTestRunner {
         executor: task_executor::Executor,
         docker: &'a DockerOnceCell,
         image_pull_cache: &'a ImagePullCache,
+        build_root: PathBuf,
         work_dir_base: PathBuf,
         immutable_inputs: ImmutableInputs,
     ) -> Result<crate::docker::CommandRunner<'a>, String> {
@@ -1163,6 +1217,7 @@ impl UnavailableContainerTestRunner for ExitedContainerTestRunner {
                 executor,
                 docker,
                 image_pull_cache,
+                build_root,
                 work_dir_base,
                 immutable_inputs,
             )
@@ -1200,6 +1255,7 @@ async fn run_prune_container_test(runner: &dyn DockerCommandTestRunner) -> bool 
             executor,
             &docker,
             &image_pull_cache,
+            Path::new(FAKE_BUILD_ROOT).to_path_buf(),
             TempDir::new().unwrap().path().to_owned(),
             immutable_inputs,
         )
