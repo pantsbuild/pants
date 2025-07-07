@@ -310,8 +310,7 @@ async def _typecheck_single_project(
     input_digest = await merge_digests(MergeDigests(all_digests))
 
     # Use --build to compile all projects in workspace with project references
-    # TODO: Explicitly specify tsconfig.json path to ensure TypeScript finds it in CI
-    args = ("--build", "--force", "--verbose", "./tsconfig.json")
+    args = ("--build",)
 
     logger.debug(f"[DEBUG] TypeScript args: {args}")
     logger.debug(f"[DEBUG] Working directory will be: {project.root_dir}")
@@ -346,7 +345,8 @@ async def _typecheck_single_project(
     # This is essential for caching - Pants needs to know which directories contain
     # files that should be captured in the output digest for incremental builds
     output_dirs = subsystem.output_dirs if subsystem.output_dirs else _COMMON_OUTPUT_DIRS
-    output_directories = tuple(output_dirs)
+    # TypeScript composite projects generate .tsbuildinfo files in the project root by default
+    output_directories = (".",) + tuple(output_dirs)
 
     process_with_outputs = replace(
         process,
