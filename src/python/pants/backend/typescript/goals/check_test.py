@@ -14,8 +14,8 @@ from pants.backend.javascript import package_json
 from pants.backend.javascript.subsystems import nodejs_tool
 from pants.backend.javascript.target_types import JSSourcesGeneratorTarget
 from pants.backend.tsx.target_types import TSXSourcesGeneratorTarget, TSXTestsGeneratorTarget
-from pants.backend.typescript import check
-from pants.backend.typescript.check import TypeScriptCheckFieldSet, TypeScriptCheckRequest
+from pants.backend.typescript.goals import check
+from pants.backend.typescript.goals.check import TypeScriptCheckFieldSet, TypeScriptCheckRequest
 from pants.backend.typescript.target_types import (
     TypeScriptSourcesGeneratorTarget,
     TypeScriptTestsGeneratorTarget,
@@ -144,7 +144,7 @@ def pnpm_rule_runner(pnpm_project_test: tuple[str, str]) -> tuple[RuleRunner, st
 
 def _load_project_test_files(test_project: str) -> dict[str, str]:
     """Load test files for the specified project type."""
-    base_dir = Path(__file__).parent / "test_resources" / test_project
+    base_dir = Path(__file__).parent.parent / "test_resources" / test_project
     files = {}
 
     for file_path in base_dir.rglob("*"):

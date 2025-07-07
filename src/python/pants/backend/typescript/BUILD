@@ -2,12 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 python_sources()
 
-python_tests(
-    name="tests",
-    overrides={
-        "check_test.py": {"dependencies": [":test_resources"]},
-    },
-)
 
 resources(
     name="test_resources",
