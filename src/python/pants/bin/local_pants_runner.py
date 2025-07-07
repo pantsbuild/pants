@@ -12,7 +12,7 @@ from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE,
 from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.core.util_rules.environments import determine_bootstrap_environment
+from pants.core.environments.rules import determine_bootstrap_environment
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.goal import CurrentExecutingGoals
 from pants.engine.internals import native_engine

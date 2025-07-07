@@ -101,11 +101,13 @@ async def generate_python_from_protobuf(
         all_sources_stripped.snapshot.digest,
         empty_output_dir,
     ]
+
+    pyi_gen_option = "pyi_out:" if python_protobuf_subsystem.generate_type_stubs else ""
     protoc_argv = [
         os.path.join(protoc_relpath, downloaded_protoc_binary.exe),
-        "--python_out",
-        output_dir,
+        f"--python_out={pyi_gen_option}{output_dir}",
     ]
+
     complete_pex_env = pex_environment.in_sandbox(working_directory=None)
 
     if python_protobuf_subsystem.mypy_plugin:

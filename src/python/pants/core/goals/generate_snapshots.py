@@ -7,17 +7,14 @@ import logging
 from abc import ABCMeta
 from dataclasses import dataclass
 
-from pants.core.util_rules.environments import EnvironmentNameRequest
+from pants.core.environments.rules import EnvironmentNameRequest, resolve_environment_name
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import (
-    FieldSet,
-    NoApplicableTargetsBehavior,
-    TargetRootsToFieldSets,
-    TargetRootsToFieldSetsRequest,
-)
+from pants.engine.internals.specs_rules import find_valid_field_sets_for_target_roots
+from pants.engine.intrinsics import digest_to_snapshot
+from pants.engine.rules import collect_rules, concurrently, goal_rule, implicitly, rule
+from pants.engine.target import FieldSet, NoApplicableTargetsBehavior, TargetRootsToFieldSetsRequest
 from pants.engine.unions import UnionMembership, union
 
 logger = logging.getLogger(__name__)
@@ -33,6 +30,13 @@ class GenerateSnapshotsResult:
     snapshot: Snapshot
 
 
+@rule(polymorphic=True)
+async def generate_snapshots(
+    field_set: GenerateSnapshotsFieldSet, environment_name: EnvironmentName
+) -> GenerateSnapshotsResult:
+    raise NotImplementedError()
+
+
 @dataclass(frozen=True)
 class EnvironmentAwareGenerateSnapshotsRequest:
     """Request class to request a `GenerateSnapshotsResult` in an environment-aware fashion."""
@@ -41,17 +45,17 @@ class EnvironmentAwareGenerateSnapshotsRequest:
 
 
 @rule
-async def environment_await_generate_snapshots(
+async def environment_aware_generate_snapshots(
     request: EnvironmentAwareGenerateSnapshotsRequest,
 ) -> GenerateSnapshotsResult:
-    environment_name = await Get(
-        EnvironmentName,
-        EnvironmentNameRequest,
+    environment_name = await resolve_environment_name(
         EnvironmentNameRequest.from_field_set(request.field_set),
+        **implicitly(),
     )
-    result = await Get(
-        GenerateSnapshotsResult,
-        {request.field_set: GenerateSnapshotsFieldSet, environment_name: EnvironmentName},
+    result = await generate_snapshots(
+        **implicitly(
+            {request.field_set: GenerateSnapshotsFieldSet, environment_name: EnvironmentName}
+        )
     )
     return result
 
@@ -71,26 +75,26 @@ class GenerateSnapshots(Goal):
 
 
 @goal_rule
-async def generate_snapshots(workspace: Workspace) -> GenerateSnapshots:
-    target_roots_to_field_sets = await Get(
-        TargetRootsToFieldSets,
+async def generate_snapshots_goal(workspace: Workspace) -> GenerateSnapshots:
+    target_roots_to_field_sets = await find_valid_field_sets_for_target_roots(
         TargetRootsToFieldSetsRequest(
             GenerateSnapshotsFieldSet,
             goal_description=f"the `{GenerateSnapshotsSubsystem.name}` goal",
             no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
         ),
+        **implicitly(),
     )
 
     if not target_roots_to_field_sets.field_sets:
         return GenerateSnapshots(exit_code=0)
 
-    snapshot_results = await MultiGet(
-        Get(GenerateSnapshotsResult, EnvironmentAwareGenerateSnapshotsRequest(field_set))
+    snapshot_results = await concurrently(
+        environment_aware_generate_snapshots(EnvironmentAwareGenerateSnapshotsRequest(field_set))
         for field_set in target_roots_to_field_sets.field_sets
     )
 
-    all_snapshots = await Get(
-        Snapshot, MergeDigests([result.snapshot.digest for result in snapshot_results])
+    all_snapshots = await digest_to_snapshot(
+        **implicitly(MergeDigests([result.snapshot.digest for result in snapshot_results]))
     )
     workspace.write_digest(all_snapshots.digest)
     for file in all_snapshots.files:

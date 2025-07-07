@@ -52,7 +52,7 @@ class AllCCTargets(Targets):
 
 
 @rule(desc="Find all CC targets in project", level=LogLevel.DEBUG)
-def find_all_cc_targets(targets: AllTargets) -> AllCCTargets:
+async def find_all_cc_targets(targets: AllTargets) -> AllCCTargets:
     return AllCCTargets(tgt for tgt in targets if tgt.has_field(CCSourceField))
 
 

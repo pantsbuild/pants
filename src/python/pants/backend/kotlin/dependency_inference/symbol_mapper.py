@@ -31,7 +31,7 @@ class FirstPartyKotlinTargetsMappingRequest(FirstPartyMappingRequest):
 
 
 @rule(desc="Find all Kotlin targets in project", level=LogLevel.DEBUG)
-def find_all_kotlin_targets(targets: AllTargets) -> AllKotlinTargets:
+async def find_all_kotlin_targets(targets: AllTargets) -> AllKotlinTargets:
     return AllKotlinTargets(tgt for tgt in targets if tgt.has_field(KotlinSourceField))
 
 

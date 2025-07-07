@@ -10,6 +10,7 @@ from textwrap import dedent
 
 import pytest
 
+from pants.core.environments.rules import EnvironmentNameRequest
 from pants.core.goals.check import (
     Check,
     CheckRequest,
@@ -19,7 +20,6 @@ from pants.core.goals.check import (
     check,
 )
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, Workspace

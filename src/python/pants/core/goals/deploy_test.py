@@ -16,6 +16,7 @@ from pants.core.goals.publish import (
 )
 from pants.core.register import rules as core_rules
 from pants.engine import process
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.internals.graph import resolve_targets
 from pants.engine.internals.scheduler import ExecutionError
@@ -91,7 +92,9 @@ class MockDeployFieldSet(DeployFieldSet):
 
 
 @rule
-async def mock_package(request: MockPackageFieldSet) -> BuiltPackage:
+async def mock_package(
+    request: MockPackageFieldSet, environment_name: EnvironmentName
+) -> BuiltPackage:
     artifact = BuiltPackageArtifact(
         relpath=request.address.path_safe_spec,
         extra_log_lines=tuple(

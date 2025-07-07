@@ -114,7 +114,7 @@ class ResolveFieldDefaultFactoryRequest(FieldDefaultFactoryRequest):
 
 
 @rule
-def resolve_field_default_factory(
+async def resolve_field_default_factory(
     request: ResolveFieldDefaultFactoryRequest,
 ) -> FieldDefaultFactoryResult:
     return FieldDefaultFactoryResult(lambda f: f.value or _DEFAULT_RESOLVE)
@@ -1726,10 +1726,6 @@ def sources_rule_runner() -> RuleRunner:
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(SourcesPaths, [SourcesPathsRequest]),
         ],
-        # NB: The `graph` module masks the environment is most/all positions. We disable the
-        # inherent environment so that the positions which do require the environment are
-        # highlighted.
-        inherent_environment=None,
     )
 
 
