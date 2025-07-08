@@ -9,23 +9,30 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::str;
 use std::sync::Arc;
+use std::time::Duration;
 
 use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bollard::auth::DockerCredentials;
-use bollard::container::{CreateContainerOptions, LogOutput, RemoveContainerOptions};
+use bollard::container::{
+    CreateContainerOptions, ListContainersOptions, LogOutput, RemoveContainerOptions,
+};
 use bollard::exec::StartExecResults;
 use bollard::image::CreateImageOptions;
+use bollard::models::ContainerState;
+use bollard::secret::{ContainerInspectResponse, ContainerStateStatusEnum};
 use bollard::service::CreateImageInfo;
 use bollard::volume::CreateVolumeOptions;
 use bollard::{Docker, errors::Error as DockerError};
 use bytes::{Bytes, BytesMut};
 use fs::RelativePath;
+use futures::future::join_all;
 use futures::stream::BoxStream;
 use futures::{FutureExt, StreamExt};
 use hashing::Digest;
 use itertools::Itertools;
 use log::Level;
+use maplit::hashmap;
 use nails::execution::ExitCode;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
@@ -46,6 +53,9 @@ use process_execution::{
 pub(crate) const SANDBOX_BASE_PATH_IN_CONTAINER: &str = "/pants-sandbox";
 pub(crate) const NAMED_CACHES_BASE_PATH_IN_CONTAINER: &str = "/pants-named-caches";
 pub(crate) const IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER: &str = "/pants-immutable-inputs";
+pub(crate) const PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY: &str = "org.pantsbuild.environment";
+pub(crate) const PANTS_CONTAINER_BUILDROOT_LABEL_KEY: &str = "org.pantsbuild.buildroot";
+pub(crate) const CONTAINER_CLEANUP_TIMEOUT_SECONDS: u64 = 60;
 
 /// Process-wide image pull cache.
 pub static IMAGE_PULL_CACHE: Lazy<ImagePullCache> = Lazy::new(ImagePullCache::new);
@@ -58,6 +68,7 @@ pub struct CommandRunner<'a> {
     store: Store,
     executor: Executor,
     docker: &'a DockerOnceCell,
+    build_root: PathBuf,
     work_dir_base: PathBuf,
     immutable_inputs: ImmutableInputs,
     pub(crate) container_cache: ContainerCache<'a>,
@@ -104,10 +115,67 @@ impl DockerOnceCell {
           }
           _ => return Err(format!("Unparseable API version `{}` returned by Docker.", &api_version)),
         }
-
         Ok(docker)
       })
       .await
+    }
+}
+
+pub(crate) async fn remove_old_images(
+    docker: &Docker,
+    build_root: &str,
+) -> Result<(), Vec<String>> {
+    let build_root_label = format!("{PANTS_CONTAINER_BUILDROOT_LABEL_KEY}={build_root}");
+    let removal_tasks = docker
+        .list_containers(Some(ListContainersOptions::<&str> {
+            filters: hashmap!{"label" => vec![PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY, build_root_label.as_str()], "status" => vec!["exited", "dead"]},
+            ..ListContainersOptions::default()
+        }))
+        .await
+        .map_err(|err| {
+            vec![format!(
+                "An error occurred when listing docker containers\n\n{err}"
+            )]
+        })?
+        .into_iter()
+        .map(|summary| {
+            let docker = docker.clone();
+            tokio::spawn(async move {
+                match summary.id {
+                    Some(container_id) => {
+                        log::debug!("Removing stale container {container_id}");
+                        docker
+                        .remove_container(
+                            container_id.as_str(),
+                            Some(RemoveContainerOptions {
+                                force: true,
+                                ..RemoveContainerOptions::default()
+                            }),
+                        )
+                        .await
+                        .map_err(|err| {
+                            format!("Failed to remove container {container_id}:\n{err}")
+                        })
+                    },
+                    None => Err(format!(
+                        "No container id attached to summary:\n{summary:#?}"
+                    )),
+                }
+            })
+        });
+    let errors: Vec<String> = join_all(removal_tasks)
+        .await
+        .into_iter()
+        .filter_map(|res| match res {
+            Ok(Ok(_)) => None,
+            Ok(Err(s)) => Some(s),
+            Err(je) => Some(je.to_string()),
+        })
+        .collect();
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
     }
 }
 
@@ -363,6 +431,7 @@ impl<'a> CommandRunner<'a> {
         executor: Executor,
         docker: &'a DockerOnceCell,
         image_pull_cache: &'a ImagePullCache,
+        build_root: PathBuf,
         work_dir_base: PathBuf,
         immutable_inputs: ImmutableInputs,
     ) -> Result<Self, String> {
@@ -378,6 +447,7 @@ impl<'a> CommandRunner<'a> {
             store,
             executor,
             docker,
+            build_root,
             work_dir_base,
             immutable_inputs,
             container_cache,
@@ -413,6 +483,29 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
             };
             (image, &req.execution_environment.platform)
         };
+        if !self.docker.initialized() {
+            // First time initializing DockerOnceCell, therefore lets run old image cleanup here
+            let cleanup_docker = self.docker.get().await?.clone();
+            let build_root_str = self.build_root.to_str().unwrap().to_string();
+            tokio::spawn(async move {
+                let message = match tokio::time::timeout(
+                    Duration::from_secs(CONTAINER_CLEANUP_TIMEOUT_SECONDS),
+                    remove_old_images(&cleanup_docker, &build_root_str),
+                )
+                .await
+                {
+                    Ok(Ok(_)) => return,
+                    Ok(Err(removal_errors)) => format!(
+                        "The following errors occurred when attempting to remove old containers:\n\n{}",
+                        removal_errors.join("\n\n")
+                    ),
+                    Err(_) => format!(
+                        "Attempt to clean up old containers timed out after {CONTAINER_CLEANUP_TIMEOUT_SECONDS} seconds"
+                    ),
+                };
+                log::warn!("{}", message)
+            });
+        }
         let keep_sandboxes = req.execution_environment.local_keep_sandboxes;
         let mut errors: Vec<String> = vec![];
         while errors.len() < MAX_RUN_ATTEMPTS {
@@ -437,6 +530,8 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                         image_name,
                         image_platform,
                         &context.build_id,
+                        self.build_root.as_os_str().to_str().unwrap(), // This should always return Some(...) on Mac and Linux
+                        mreq.execution_environment.name.as_ref().unwrap(),
                     )
                     .await?;
                     // Compute the absolute working directory within the container, and update the env to
@@ -514,7 +609,8 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                 Err(CapturedWorkdirError::Retryable(message)) => {
                     errors.push(message);
                     self.container_cache
-                        .prune_container(image_name, image_platform);
+                        .prune_container(image_name, image_platform)
+                        .await;
                 }
                 _ => {
                     return process_result
@@ -563,9 +659,10 @@ impl CapturedWorkdir for CommandRunner<'_> {
             .await
             .map_err(|spawn_err: CommandSpawnError| -> CapturedWorkdirError {
                 match spawn_err.err {
-                    DockerError::DockerResponseServerError {
-                        status_code: 404, ..
-                    } => CapturedWorkdirError::Retryable(spawn_err.message),
+                    // Rather than trying to handle every possible error code, we just restart the container and retry any DockerResponseServerErrors
+                    DockerError::DockerResponseServerError { .. } => {
+                        CapturedWorkdirError::Retryable(spawn_err.message)
+                    }
                     _ => CapturedWorkdirError::Fatal(spawn_err.message),
                 }
             })
@@ -751,10 +848,10 @@ impl Command {
             self.spawn(docker, container_id)
                 .await
                 .map_err(|cse| match cse.err {
-                    DockerError::DockerResponseServerError {
-                        status_code: 404,
-                        message,
-                    } => CapturedWorkdirError::Retryable(message),
+                    // Rather than trying to handle every possible error code, we just restart the container and retry any DockerResponseServerErrors
+                    DockerError::DockerResponseServerError { message, .. } => {
+                        CapturedWorkdirError::Retryable(message)
+                    }
                     _ => CapturedWorkdirError::Fatal(cse.message),
                 })?;
         let mut stdout = BytesMut::with_capacity(8192);
@@ -778,7 +875,7 @@ pub(crate) struct ContainerCache<'a> {
     work_dir_base: String,
     immutable_inputs_base_dir: String,
     /// Cache that maps image name / platform to a cached container.
-    containers: Mutex<BTreeMap<(String, Platform), CachedContainer>>,
+    pub(crate) containers: Mutex<BTreeMap<(String, Platform), CachedContainer>>,
 }
 
 impl<'a> ContainerCache<'a> {
@@ -829,6 +926,7 @@ impl<'a> ContainerCache<'a> {
         image_pull_cache: ImagePullCache,
         work_dir_base: String,
         immutable_inputs_base_dir: String,
+        labels: Option<HashMap<String, String>>,
     ) -> Result<String, String> {
         // Pull the image.
         image_pull_cache
@@ -864,6 +962,7 @@ impl<'a> ContainerCache<'a> {
             image: Some(image_name.clone()),
             tty: Some(true),
             open_stdin: Some(true),
+            labels,
             ..bollard::container::Config::default()
         };
 
@@ -967,11 +1066,69 @@ impl<'a> ContainerCache<'a> {
         }
     }
 
-    /// Remove an old or missing container from the container cache - does not remove the actual container.
-    pub(crate) fn prune_container(&self, image_name: &str, platform: &Platform) {
-        let key = (image_name.to_string(), *platform);
-        let mut containers = self.containers.lock();
-        containers.remove(&key);
+    /// Remove an old or missing container from the container cache. Removes the actual container if it still exists.
+    pub(crate) async fn prune_container(&self, image_name: &str, platform: &Platform) {
+        let maybe_arc = {
+            self.containers
+                .lock()
+                .remove(&(image_name.to_string(), *platform))
+        };
+        if let Some(container_id) =
+            maybe_arc.and_then(|container_once_cell| container_once_cell.get().map(|t| t.0.clone()))
+        {
+            match self.docker.get().await.cloned() {
+                Ok(docker) => {
+                    tokio::spawn(async move {
+                        let check_state = async {
+                            match docker.inspect_container(&container_id, None).await {
+                                Ok(ContainerInspectResponse {
+                                    state: Some(ContainerState {
+                                        status: Some(status @ (ContainerStateStatusEnum::RUNNING
+                                            | ContainerStateStatusEnum::RESTARTING
+                                            | ContainerStateStatusEnum::CREATED
+                                            | ContainerStateStatusEnum::PAUSED)),
+                                            ..
+                                    }),
+                                    ..
+                                }) => Err(format!(
+                                    "Cannot prune container {container_id} with status {status}"
+                                )),
+                                Ok(ContainerInspectResponse { state: Some(ContainerState { status: Some(_), .. }), .. }) => Self::remove_container(&docker, &container_id, None)
+                                    .await
+                                    .map_err(|err| format!(
+                                        "An error occurred when trying to remove container {container_id}\n\n{err}"
+                                    )),
+                                Ok(ContainerInspectResponse { state: Some(ContainerState { status: None, .. }), .. }) => Err(format!(
+                                    "Cannot prune container {container_id} with unknown status"
+                                )),
+                                Ok(ContainerInspectResponse { state: None, .. }) => Err(format!(
+                                    "Cannot prune container {container_id}, container state was empty"
+                                )),
+                                Err(DockerError::DockerResponseServerError {
+                                    status_code: 404,
+                                    ..
+                                }) => Ok(()),
+                                Err(err) => Err(format!(
+                                    "Cannot prune container {container_id} because the following error occurred when trying to inspect container status:\n\n{err}"
+                                )),
+                            }
+                        };
+                        if let Err(msg) = check_state.await {
+                            log::warn!("{}", msg);
+                        }
+                    });
+                }
+                Err(err) => {
+                    log::warn!("Failed to remove container {container_id} due to error:\n\n{err}")
+                }
+            }
+        } else {
+            log::warn!(
+                "Container for image `{}` and platform `{:#?}` not found",
+                image_name,
+                platform
+            );
+        }
     }
 
     /// Return the container ID and NamedCaches for a container running `image_name` for use as a place
@@ -981,6 +1138,8 @@ impl<'a> ContainerCache<'a> {
         image_name: &str,
         platform: &Platform,
         build_generation: &str,
+        build_root: &str,
+        environment_name: &str,
     ) -> Result<(String, NamedCaches), String> {
         let docker = self.docker.get().await?.clone();
         let executor = self.executor.clone();
@@ -1008,6 +1167,7 @@ impl<'a> ContainerCache<'a> {
                     self.image_pull_cache.clone(),
                     work_dir_base,
                     immutable_inputs_base_dir,
+                    Some(hashmap! {PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY.to_string() => environment_name.to_string(), PANTS_CONTAINER_BUILDROOT_LABEL_KEY.to_string() => build_root.to_string()}),
                 )
                 .await?;
 
