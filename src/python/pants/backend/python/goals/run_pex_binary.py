@@ -18,7 +18,7 @@ from pants.util.logging import LogLevel
 @rule(level=LogLevel.DEBUG)
 async def create_pex_binary_run_request(field_set: PexBinaryFieldSet) -> RunRequest:
     pex_request = await package_pex_binary(field_set, **implicitly())
-    built_pex = await built_package_for_pex_from_targets_request(pex_request)
+    built_pex = await built_package_for_pex_from_targets_request(field_set, **implicitly())
 
     # We need a Python executable to fulfil `adhoc_tool`/`runnable_dependency` requests
     # as sandboxed processes will not have a `python` available on the `PATH`.

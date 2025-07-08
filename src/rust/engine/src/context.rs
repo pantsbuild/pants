@@ -297,6 +297,7 @@ impl Core {
             executor.clone(),
             &docker::DOCKER,
             &docker::IMAGE_PULL_CACHE,
+            build_root.to_path_buf(),
             local_execution_root_dir.to_path_buf(),
             immutable_inputs.clone(),
         )?);

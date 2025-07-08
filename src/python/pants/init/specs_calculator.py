@@ -7,7 +7,7 @@ from typing import cast
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import AddressLiteralSpec, FileLiteralSpec, RawSpecs, Specs
 from pants.base.specs_parser import SpecsParser
-from pants.core.util_rules.environments import determine_bootstrap_environment
+from pants.core.environments.rules import determine_bootstrap_environment
 from pants.core.util_rules.system_binaries import GitBinary
 from pants.engine.addresses import AddressInput
 from pants.engine.environment import EnvironmentName

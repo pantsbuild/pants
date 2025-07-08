@@ -15,6 +15,7 @@ fs = { path = "../../fs" }
 futures = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
+maplit = { workspace = true }
 nails = { workspace = true }
 store = { path = "../../fs/store" }
 task_executor = { path = "../../task_executor" }
@@ -32,7 +33,6 @@ shell-quote = { workspace = true }
 
 [dev-dependencies]
 env_logger = { workspace = true }
-maplit = { workspace = true }
 mock = { path = "../../testutil/mock" }
 parameterized = { workspace = true }
 parking_lot = { workspace = true }

@@ -17,6 +17,20 @@ python_sources(
 python_tests(
     name="tests",
     overrides={
-        "load_backends_integration_test.py": {"timeout": 900},
+        "load_backends_integration_test.py": {
+            "dependencies": [
+                "testprojects:pants_plugins_directory",
+            ],
+            "timeout": 900,
+        },
+        "logging_test.py": {"dependencies": ["//BUILD_ROOT:files"]},
+        ("options_initializer_test.py", "plugin_resolver_test.py"): {
+            "dependencies": [
+                "//BUILD_ROOT:files",
+                # These tests load `pants.toml`, which references many of these plugins.
+                "src/python/pants/bin:plugins",
+            ],
+        },
+        "plugin_resolver_test.py": {"timeout": 120},
     },
 )
