@@ -53,6 +53,7 @@ from pants.engine.target import (
     FieldDefaultFactoryRequest,
     FieldDefaultFactoryResult,
     FieldSet,
+    SequenceField,
     StringField,
     StringSequenceField,
     Target,
@@ -804,8 +805,15 @@ def resolve_environment_sensitive_option(name: str, subsystem: Subsystem.Environ
     maybe = options.get((type(subsystem), name))
     if maybe is None or maybe.value is None:
         return None
-    else:
-        return maybe.value
+
+    # For sequence fields, treat empty sequences as "not specified" to allow fallback
+    # to global configuration. This handles cases where environment fields are created
+    # with default empty values (e.g., () for StringSequenceField) but user didn't
+    # explicitly set any values.
+    if isinstance(maybe, SequenceField) and not maybe.value:
+        return None
+
+    return maybe.value
 
 
 @memoized

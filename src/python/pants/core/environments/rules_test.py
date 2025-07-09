@@ -6,6 +6,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from textwrap import dedent
+from typing import Any
 
 import pytest
 
@@ -22,6 +23,7 @@ from pants.core.environments.rules import (
     UnrecognizedEnvironmentError,
     extract_process_config_from_environment,
     resolve_environment_name,
+    resolve_environment_sensitive_option,
 )
 from pants.core.environments.subsystems import EnvironmentsSubsystem
 from pants.core.environments.target_types import (
@@ -44,6 +46,8 @@ from pants.engine.platform import Platform
 from pants.engine.process import ProcessCacheScope
 from pants.engine.target import FieldSet, OptionalSingleSourceField, Target
 from pants.option.global_options import GlobalOptions, KeepSandboxes
+from pants.option.option_types import ShellStrListOption
+from pants.option.subsystem import Subsystem
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import (
     MockGet,
@@ -555,3 +559,64 @@ def test_find_chosen_local_and_experimental_workspace_environments(rule_runner: 
 
     chosen_workspace_env = rule_runner.request(ChosenLocalWorkspaceEnvironmentName, [])
     assert chosen_workspace_env.val.val == "workspace"
+
+
+def test_empty_sequence_field_override_bug() -> None:
+    """Test that empty sequence fields don't override global configuration."""
+
+    class TestSubsystem(Subsystem):
+        options_scope = "test-subsystem"
+        help = "Test subsystem"
+
+        class EnvironmentAware(Subsystem.EnvironmentAware):
+            test_sequence_option = ShellStrListOption(help="Test sequence option")
+
+    rule_runner = RuleRunner(
+        target_types=[LocalEnvironmentTarget],
+        rules=[
+            *TestSubsystem.rules(),
+            *environments_rules.rules(),
+        ],
+    )
+
+    rule_runner.set_options(
+        [
+            "--test-subsystem-test-sequence-option=GLOBAL_VAR=global_value",
+            "--test-subsystem-test-sequence-option=TEST_VAR=test_value",
+        ]
+    )
+
+    rule_runner.write_files(
+        {
+            "BUILD": dedent("""\
+            local_environment(
+                name="test_env",
+                compatible_platforms=["linux_x86_64", "macos_arm64"],
+            )
+            """),
+        }
+    )
+
+    env_target = rule_runner.get_target(Address("", target_name="test_env"))
+
+    test_sequence_field: Any = None
+    for field_type in env_target.field_values:
+        field = env_target.field_values[field_type]
+        if hasattr(field, "alias") and field.alias == "test_subsystem_test_sequence_option":
+            test_sequence_field = field
+            break
+
+    assert test_sequence_field is not None, "Dynamic field creation not working"
+
+    assert test_sequence_field.value == ()
+
+    subsystem_class = test_sequence_field.subsystem
+    mock_env_aware = subsystem_class()
+    mock_env_aware.env_tgt = EnvironmentTarget("test_env", env_target)
+
+    result = resolve_environment_sensitive_option(
+        test_sequence_field.option_name,
+        mock_env_aware,
+    )
+
+    assert result is None, f"Expected None for empty sequence field, got {result}"
