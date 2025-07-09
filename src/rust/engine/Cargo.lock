@@ -564,7 +564,7 @@ dependencies = [
  "serde-untagged",
  "serde-value",
  "thiserror 1.0.69",
- "toml 0.8.23",
+ "toml",
  "unicode-xid",
  "url",
 ]
@@ -2764,7 +2764,7 @@ dependencies = [
  "shellexpand",
  "shlex",
  "tempfile",
- "toml 0.5.11",
+ "toml",
  "whoami",
 ]
 
@@ -4613,20 +4613,11 @@ dependencies = [
 
 [[package]]
 name = "toml"
-version = "0.5.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4f7f0dd8d50a853a531c426359045b1998f04219d88799810762cd4ad314234"
-dependencies = [
- "indexmap 1.9.3",
- "serde",
-]
-
-[[package]]
-name = "toml"
 version = "0.8.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc1beb996b9d83529a9e75c17a1686767d148d70663143c7854d8b4a09ced362"
 dependencies = [
+ "indexmap 2.9.0",
  "serde",
  "serde_spanned",
  "toml_datetime",
