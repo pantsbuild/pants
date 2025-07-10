@@ -92,12 +92,14 @@ def test_infers_esmodule_js_dependencies(rule_runner: RuleRunner) -> None:
                 import { y } from "./moduleB";
                 import { z } from "./moduleC";
                 import { w } from "./moduleD";
+                import { u } from "./moduleE";
                 """
             ),
             "src/js/moduleA.mjs": "",
             "src/js/moduleB.jsx": "",
             "src/js/moduleC.ts": "",
             "src/js/moduleD.tsx": "",
+            "src/js/moduleE.d.ts": "",
         }
     )
 
@@ -112,6 +114,7 @@ def test_infers_esmodule_js_dependencies(rule_runner: RuleRunner) -> None:
         Address("src/js", relative_file_path="moduleB.jsx", target_name="jsx"),
         Address("src/js", relative_file_path="moduleC.ts", target_name="ts"),
         Address("src/js", relative_file_path="moduleD.tsx", target_name="tsx"),
+        Address("src/js", relative_file_path="moduleE.d.ts", target_name="ts"),
     }
 
 
@@ -134,12 +137,14 @@ def test_infers_esmodule_js_dependencies_from_ancestor_files(rule_runner: RuleRu
                 import { y } from "../moduleB";
                 import { z } from "../moduleC";
                 import { w } from "../moduleD";
+                import { u } from "../moduleE";
                 """
             ),
             "src/js/moduleA.mjs": "",
             "src/js/moduleB.jsx": "",
             "src/js/moduleC.ts": "",
             "src/js/moduleD.tsx": "",
+            "src/js/moduleE.d.ts": "",
         }
     )
 
@@ -154,6 +159,7 @@ def test_infers_esmodule_js_dependencies_from_ancestor_files(rule_runner: RuleRu
         Address("src/js", relative_file_path="moduleB.jsx", target_name="jsx"),
         Address("src/js", relative_file_path="moduleC.ts", target_name="ts"),
         Address("src/js", relative_file_path="moduleD.tsx", target_name="tsx"),
+        Address("src/js", relative_file_path="moduleE.d.ts", target_name="ts"),
     }
 
 
