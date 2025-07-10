@@ -20,7 +20,7 @@ from pants.engine.unions import UnionMembership, union
 logger = logging.getLogger(__name__)
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 class GenerateSnapshotsFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary to generate snapshots from a target."""
 
