@@ -93,13 +93,18 @@ def test_infers_esmodule_js_dependencies(rule_runner: RuleRunner) -> None:
                 import { z } from "./moduleC";
                 import { w } from "./moduleD";
                 import { u } from "./moduleE";
+                import { v } from "./moduleF";
                 """
             ),
             "src/js/moduleA.mjs": "",
             "src/js/moduleB.jsx": "",
             "src/js/moduleC.ts": "",
             "src/js/moduleD.tsx": "",
+            # isolated .d.ts
             "src/js/moduleE.d.ts": "",
+            # separate .js and .d.ts
+            "src/js/moduleF.js": "",
+            "src/js/moduleF.d.ts": "",
         }
     )
 
@@ -115,6 +120,8 @@ def test_infers_esmodule_js_dependencies(rule_runner: RuleRunner) -> None:
         Address("src/js", relative_file_path="moduleC.ts", target_name="ts"),
         Address("src/js", relative_file_path="moduleD.tsx", target_name="tsx"),
         Address("src/js", relative_file_path="moduleE.d.ts", target_name="ts"),
+        Address("src/js", relative_file_path="moduleF.js", target_name="js"),
+        Address("src/js", relative_file_path="moduleF.d.ts", target_name="ts"),
     }
 
 
@@ -138,13 +145,18 @@ def test_infers_esmodule_js_dependencies_from_ancestor_files(rule_runner: RuleRu
                 import { z } from "../moduleC";
                 import { w } from "../moduleD";
                 import { u } from "../moduleE";
+                import { v } from "../moduleF";
                 """
             ),
             "src/js/moduleA.mjs": "",
             "src/js/moduleB.jsx": "",
             "src/js/moduleC.ts": "",
             "src/js/moduleD.tsx": "",
+            # isolated .d.ts
             "src/js/moduleE.d.ts": "",
+            # separate .js and .d.ts
+            "src/js/moduleF.js": "",
+            "src/js/moduleF.d.ts": "",
         }
     )
 
@@ -160,6 +172,8 @@ def test_infers_esmodule_js_dependencies_from_ancestor_files(rule_runner: RuleRu
         Address("src/js", relative_file_path="moduleC.ts", target_name="ts"),
         Address("src/js", relative_file_path="moduleD.tsx", target_name="tsx"),
         Address("src/js", relative_file_path="moduleE.d.ts", target_name="ts"),
+        Address("src/js", relative_file_path="moduleF.js", target_name="js"),
+        Address("src/js", relative_file_path="moduleF.d.ts", target_name="ts"),
     }
 
 
