@@ -7,8 +7,6 @@ import logging
 from abc import ABCMeta
 from dataclasses import dataclass
 
-from pants.core.environments.rules import EnvironmentNameRequest, resolve_environment_name
-from pants.engine.environment import EnvironmentName
 from pants.engine.fs import MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.specs_rules import find_valid_field_sets_for_target_roots
@@ -31,33 +29,8 @@ class GenerateSnapshotsResult:
 
 
 @rule(polymorphic=True)
-async def generate_snapshots(
-    field_set: GenerateSnapshotsFieldSet, environment_name: EnvironmentName
-) -> GenerateSnapshotsResult:
+async def generate_snapshots(field_set: GenerateSnapshotsFieldSet) -> GenerateSnapshotsResult:
     raise NotImplementedError()
-
-
-@dataclass(frozen=True)
-class EnvironmentAwareGenerateSnapshotsRequest:
-    """Request class to request a `GenerateSnapshotsResult` in an environment-aware fashion."""
-
-    field_set: GenerateSnapshotsFieldSet
-
-
-@rule
-async def environment_aware_generate_snapshots(
-    request: EnvironmentAwareGenerateSnapshotsRequest,
-) -> GenerateSnapshotsResult:
-    environment_name = await resolve_environment_name(
-        EnvironmentNameRequest.from_field_set(request.field_set),
-        **implicitly(),
-    )
-    result = await generate_snapshots(
-        **implicitly(
-            {request.field_set: GenerateSnapshotsFieldSet, environment_name: EnvironmentName}
-        )
-    )
-    return result
 
 
 class GenerateSnapshotsSubsystem(GoalSubsystem):
@@ -89,7 +62,7 @@ async def generate_snapshots_goal(workspace: Workspace) -> GenerateSnapshots:
         return GenerateSnapshots(exit_code=0)
 
     snapshot_results = await concurrently(
-        environment_aware_generate_snapshots(EnvironmentAwareGenerateSnapshotsRequest(field_set))
+        generate_snapshots(**implicitly({field_set: GenerateSnapshotsFieldSet}))
         for field_set in target_roots_to_field_sets.field_sets
     )
 
