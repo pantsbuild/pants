@@ -561,8 +561,8 @@ def test_find_chosen_local_and_experimental_workspace_environments(rule_runner: 
     assert chosen_workspace_env.val.val == "workspace"
 
 
-def test_empty_sequence_field_override_bug() -> None:
-    """Test that empty sequence fields don't override global configuration."""
+def test_sequence_field_inheritance() -> None:
+    """Test environment field inheritance for sequence fields."""
 
     class TestSubsystem(Subsystem):
         options_scope = "test-subsystem"
@@ -586,37 +586,82 @@ def test_empty_sequence_field_override_bug() -> None:
         ]
     )
 
-    rule_runner.write_files(
-        {
-            "BUILD": dedent("""\
+    def test_environment_resolution(
+        runner: RuleRunner,
+        env_name: str,
+        env_definition: str,
+        expected_result: Any,
+        description: str,
+    ):
+        runner.write_files(
+            {
+                f"{env_name}/BUILD": dedent(f"""\
             local_environment(
-                name="test_env",
+                name="{env_name}",
                 compatible_platforms=["linux_x86_64", "macos_arm64"],
+                {env_definition}
             )
-            """),
-        }
+            """)
+            }
+        )
+
+        env_target = runner.get_target(Address(env_name, target_name=env_name))
+
+        test_sequence_field: Any = None
+        for field_type in env_target.field_values:
+            field = env_target.field_values[field_type]
+            if hasattr(field, "alias") and field.alias == "test_subsystem_test_sequence_option":
+                test_sequence_field = field
+                break
+
+        assert test_sequence_field is not None
+
+        subsystem_class = test_sequence_field.subsystem
+        mock_env_aware = subsystem_class()
+        mock_env_aware.env_tgt = EnvironmentTarget(env_name, env_target)
+
+        result = resolve_environment_sensitive_option(
+            test_sequence_field.option_name,
+            mock_env_aware,
+        )
+
+        assert result == expected_result, f"{description}: Expected {expected_result}, got {result}"
+
+    test_environment_resolution(
+        rule_runner, "env1", "", None, "Field not specified - should inherit global config"
     )
 
-    env_target = rule_runner.get_target(Address("", target_name="test_env"))
-
-    test_sequence_field: Any = None
-    for field_type in env_target.field_values:
-        field = env_target.field_values[field_type]
-        if hasattr(field, "alias") and field.alias == "test_subsystem_test_sequence_option":
-            test_sequence_field = field
-            break
-
-    assert test_sequence_field is not None, "Dynamic field creation not working"
-
-    assert test_sequence_field.value == ()
-
-    subsystem_class = test_sequence_field.subsystem
-    mock_env_aware = subsystem_class()
-    mock_env_aware.env_tgt = EnvironmentTarget("test_env", env_target)
-
-    result = resolve_environment_sensitive_option(
-        test_sequence_field.option_name,
-        mock_env_aware,
+    test_environment_resolution(
+        rule_runner,
+        "env2",
+        "test_subsystem_test_sequence_option=[],",
+        (),
+        "Global values can be overridden with empty",
     )
 
-    assert result is None, f"Expected None for empty sequence field, got {result}"
+    test_environment_resolution(
+        rule_runner,
+        "env3",
+        'test_subsystem_test_sequence_option=["ENV_VAR=env_value"],',
+        ("ENV_VAR=env_value",),
+        "Field with values - should override global config",
+    )
+
+    # Set global options to empty to test inheritance from empty global
+    rule_runner.set_options([])
+
+    test_environment_resolution(
+        rule_runner,
+        "env4",
+        "",
+        None,
+        "Field not specified with empty global - should inherit empty global",
+    )
+
+    test_environment_resolution(
+        rule_runner,
+        "env5",
+        'test_subsystem_test_sequence_option=["NEW_VAR=new_value"],',
+        ("NEW_VAR=new_value",),
+        "Empty global can be overridden with values",
+    )

@@ -49,6 +49,7 @@ from pants.engine.intrinsics import docker_resolve_image
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, QueryRule, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
+    NO_VALUE,
     Field,
     FieldDefaultFactoryRequest,
     FieldDefaultFactoryResult,
@@ -765,20 +766,39 @@ def _add_option_field_for(
                 "value type."
             )
 
-    # The below class will never be used for static type checking outside of this function.
-    # so it's reasonably safe to use `ignore[name-defined]`. Ensure that all this remains valid
-    # if `_SIMPLE_OPTIONS` or `_LIST_OPTIONS` are ever modified.
-    class OptionField(field_type, _EnvironmentSensitiveOptionFieldMixin):  # type: ignore[valid-type, misc]
-        alias = f"{scope}_{snake_name}".replace("-", "_")
-        required = False
-        value: Any
-        help = (
+    class_attrs = {
+        "alias": f"{scope}_{snake_name}".replace("-", "_"),
+        "required": False,
+        "help": (
             f"Overrides the default value from the option `[{scope}].{snake_name}` when this "
             "environment target is active."
-        )
-        subsystem = env_aware_t
-        option_name = option.args[0]
+        ),
+        "subsystem": env_aware_t,
+        "option_name": option.args[0],
+    }
 
+    # For sequence fields, use special handling to distinguish "not specified" from "explicitly empty"
+    if issubclass(field_type, SequenceField):
+        class_attrs["none_is_valid_value"] = True
+
+        def compute_value(cls, raw_value: Any | None, address: Address) -> Any | None:
+            # When field is not specified in BUILD file, return None to indicate inheritance
+            if raw_value is NO_VALUE:
+                return None
+            # When explicitly set to empty list, return empty tuple (don't inherit)
+            elif raw_value == []:
+                return ()
+            # For other values, use normal field processing
+            else:
+                return field_type.compute_value(raw_value, address)
+
+        class_attrs["compute_value"] = classmethod(compute_value)
+
+    # Create the OptionField class dynamically
+    OptionField = cast(
+        "type[Field]",
+        type("OptionField", (field_type, _EnvironmentSensitiveOptionFieldMixin), class_attrs),
+    )
     setattr(OptionField, "__qualname__", f"{option_type.__qualname__}.{OptionField.__name__}")
 
     return [
@@ -804,13 +824,6 @@ def resolve_environment_sensitive_option(name: str, subsystem: Subsystem.Environ
 
     maybe = options.get((type(subsystem), name))
     if maybe is None or maybe.value is None:
-        return None
-
-    # For sequence fields, treat empty sequences as "not specified" to allow fallback
-    # to global configuration. This handles cases where environment fields are created
-    # with default empty values (e.g., () for StringSequenceField) but user didn't
-    # explicitly set any values.
-    if isinstance(maybe, SequenceField) and not maybe.value:
         return None
 
     return maybe.value
