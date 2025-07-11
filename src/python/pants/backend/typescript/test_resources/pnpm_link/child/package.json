@@ -1,0 +1,10 @@
+{
+  "name": "child-pkg",
+  "version": "1.0.0",
+  "type": "module",
+  "packageManager": "pnpm@9.15.0",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
