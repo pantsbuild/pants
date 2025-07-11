@@ -45,7 +45,7 @@ def create_scheduler(rules, validate=True):
         named_caches_dir="./.pants.d/named_caches",
         ca_certs_path=None,
         rules=rules,
-        union_membership=UnionMembership({}),
+        union_membership=UnionMembership.empty(),
         executor=PyExecutor(core_threads=2, max_threads=4),
         execution_options=DEFAULT_EXECUTION_OPTIONS,
         local_store_options=DEFAULT_LOCAL_STORE_OPTIONS,

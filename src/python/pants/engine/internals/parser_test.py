@@ -31,7 +31,7 @@ from pants.util.strutil import softwrap
 @pytest.fixture
 def defaults_parser_state() -> BuildFileDefaultsParserState:
     return BuildFileDefaultsParserState.create(
-        "", BuildFileDefaults({}), RegisteredTargetTypes({}), UnionMembership({})
+        "", BuildFileDefaults({}), RegisteredTargetTypes({}), UnionMembership.empty()
     )
 
 
@@ -39,7 +39,7 @@ def test_imports_banned(defaults_parser_state: BuildFileDefaultsParserState) -> 
     parser = Parser(
         build_root="",
         registered_target_types=RegisteredTargetTypes({}),
-        union_membership=UnionMembership({}),
+        union_membership=UnionMembership.empty(),
         object_aliases=BuildFileAliases(),
         ignore_unrecognized_symbols=False,
     )
@@ -69,7 +69,7 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
             registered_target_types=RegisteredTargetTypes(
                 {alias: GenericTarget for alias in ("tgt", *extra_targets)}
             ),
-            union_membership=UnionMembership({}),
+            union_membership=UnionMembership.empty(),
             object_aliases=build_file_aliases,
             ignore_unrecognized_symbols=False,
         )
@@ -104,7 +104,7 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
                 registered_target_types=RegisteredTargetTypes(
                     {alias: GenericTarget for alias in ("tgt", *extra_targets)}
                 ),
-                union_membership=UnionMembership({}),
+                union_membership=UnionMembership.empty(),
                 object_aliases=build_file_aliases,
                 ignore_unrecognized_symbols=True,
             )
@@ -140,7 +140,7 @@ def test_unrecognized_symbol_during_bootstrap_issue_19156(
     parser = Parser(
         build_root="",
         registered_target_types=RegisteredTargetTypes({"tgt": GenericTarget}),
-        union_membership=UnionMembership({}),
+        union_membership=UnionMembership.empty(),
         object_aliases=build_file_aliases,
         ignore_unrecognized_symbols=True,
     )
@@ -177,7 +177,7 @@ def test_unknown_target_for_defaults_during_bootstrap_issue_19445(
     parser = Parser(
         build_root="",
         registered_target_types=RegisteredTargetTypes({}),
-        union_membership=UnionMembership({}),
+        union_membership=UnionMembership.empty(),
         object_aliases=BuildFileAliases(),
         ignore_unrecognized_symbols=True,
     )
@@ -208,7 +208,7 @@ def test_unrecognized_symbol_in_prelude(
     parser = Parser(
         build_root="",
         registered_target_types=RegisteredTargetTypes({}),
-        union_membership=UnionMembership({}),
+        union_membership=UnionMembership.empty(),
         object_aliases=build_file_aliases,
         ignore_unrecognized_symbols=False,
     )

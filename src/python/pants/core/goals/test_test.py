@@ -73,7 +73,7 @@ from pants.engine.target import (
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
 )
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
 from pants.testutil.option_util import create_goal_subsystem, create_subsystem
@@ -296,13 +296,13 @@ def run_test_rule(
         port="5678",
     )
     workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
-    union_membership = UnionMembership(
+    union_membership = UnionMembership.from_rules(
         {
-            TestFieldSet: [MockTestFieldSet],
-            TestRequest: [request_type],
-            TestRequest.PartitionRequest: [request_type.PartitionRequest],
-            TestRequest.Batch: [request_type.Batch],
-            CoverageDataCollection: [MockCoverageDataCollection],
+            UnionRule(TestFieldSet, MockTestFieldSet),
+            UnionRule(TestRequest, request_type),
+            UnionRule(TestRequest.PartitionRequest, request_type.PartitionRequest),
+            UnionRule(TestRequest.Batch, request_type.Batch),
+            UnionRule(CoverageDataCollection, MockCoverageDataCollection),
         }
     )
 

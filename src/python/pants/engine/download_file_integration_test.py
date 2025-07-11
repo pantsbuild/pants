@@ -21,7 +21,7 @@ from pants.engine.fs import (
 )
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, run_rule_with_mocks
@@ -42,7 +42,7 @@ def global_options() -> GlobalOptions:
 
 
 def test_no_union_members(global_options: GlobalOptions) -> None:
-    union_membership = UnionMembership({})
+    union_membership = UnionMembership.empty()
     digest = run_rule_with_mocks(
         download_file,
         rule_args=[
@@ -96,7 +96,7 @@ def test_matches(scheme, authority, url, global_options: GlobalOptions) -> None:
             assert isinstance(self, UnionMember)
             return DOWNLOADS_EXPECTED_DIRECTORY_DIGEST
 
-    union_membership = UnionMembership({URLDownloadHandler: [UnionMember]})
+    union_membership = UnionMembership.from_rules({UnionRule(URLDownloadHandler, UnionMember)})
 
     digest = run_rule_with_mocks(
         download_file,
@@ -140,7 +140,7 @@ def test_doesnt_match(scheme, authority, url, global_options: GlobalOptions) -> 
         match_scheme = scheme
         match_authority = authority
 
-    union_membership = UnionMembership({URLDownloadHandler: [UnionMember]})
+    union_membership = UnionMembership.from_rules({UnionRule(URLDownloadHandler, UnionMember)})
 
     digest = run_rule_with_mocks(
         download_file,
@@ -171,7 +171,12 @@ def test_too_many_matches(global_options: GlobalOptions) -> None:
     class SchemeMatcher(URLDownloadHandler):
         match_scheme = "http"
 
-    union_membership = UnionMembership({URLDownloadHandler: [AuthorityMatcher, SchemeMatcher]})
+    union_membership = UnionMembership.from_rules(
+        {
+            UnionRule(URLDownloadHandler, AuthorityMatcher),
+            UnionRule(URLDownloadHandler, SchemeMatcher),
+        }
+    )
 
     with pytest.raises(Exception, match=r"Too many registered URL handlers"):
         run_rule_with_mocks(

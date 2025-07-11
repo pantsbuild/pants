@@ -38,7 +38,7 @@ def test_memory_summary() -> None:
     result = run_pants(["--stats-memory-summary", "--version"])
     result.assert_success()
     assert "Memory summary" in result.stderr
-    assert "pants.engine.unions.UnionMembership" in result.stderr
+    assert "builtins.UnionMembership" in result.stderr
 
 
 def test_writing_to_output_file_plain_text() -> None:

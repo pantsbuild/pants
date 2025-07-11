@@ -54,7 +54,7 @@ from pants.engine.target import (
     parse_shard_spec,
     targets_with_sources_types,
 )
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.testutil.pytest_util import no_exception
 from pants.util.frozendict import FrozenDict
@@ -189,7 +189,7 @@ def test_get_field() -> None:
     assert default_field_tgt[FortranExtensions].value or 123 == 123
 
     assert (
-        FortranTarget.class_get_field(FortranExtensions, union_membership=UnionMembership({}))
+        FortranTarget.class_get_field(FortranExtensions, union_membership=UnionMembership.empty())
         is FortranExtensions
     )
 
@@ -199,7 +199,7 @@ def test_get_field() -> None:
     assert UnrelatedField.__name__ in str(exc)
 
     with pytest.raises(KeyError) as exc:
-        FortranTarget.class_get_field(UnrelatedField, union_membership=UnionMembership({}))
+        FortranTarget.class_get_field(UnrelatedField, union_membership=UnionMembership.empty())
     assert UnrelatedField.__name__ in str(exc)
 
     assert default_field_tgt.get(UnrelatedField).value == UnrelatedField.default
@@ -219,7 +219,7 @@ def test_field_hydration_is_eager() -> None:
 
 
 def test_has_fields() -> None:
-    empty_union_membership = UnionMembership({})
+    empty_union_membership = UnionMembership.empty()
     tgt = FortranTarget({}, Address("", target_name="lib"))
 
     assert tgt.field_types == {FortranExtensions, FortranVersion}
@@ -371,7 +371,9 @@ def test_override_preexisting_field_via_new_target() -> None:
     assert custom_tgt.has_field(CustomFortranExtensions) is True
     assert custom_tgt.has_fields([FortranExtensions, CustomFortranExtensions]) is True
     assert (
-        CustomFortranTarget.class_get_field(FortranExtensions, union_membership=UnionMembership({}))
+        CustomFortranTarget.class_get_field(
+            FortranExtensions, union_membership=UnionMembership.empty()
+        )
         is CustomFortranExtensions
     )
 
@@ -1037,14 +1039,18 @@ def test_targets_with_sources_types() -> None:
     result = targets_with_sources_types(
         [Sources1],
         [tgt1, tgt2, codegen_tgt],
-        union_membership=UnionMembership({GenerateSourcesRequest: [GenSources]}),
+        union_membership=UnionMembership.from_rules(
+            {UnionRule(GenerateSourcesRequest, GenSources)}
+        ),
     )
     assert set(result) == {tgt1, codegen_tgt}
 
     result = targets_with_sources_types(
         [Sources2],
         [tgt1, tgt2, codegen_tgt],
-        union_membership=UnionMembership({GenerateSourcesRequest: [GenSources]}),
+        union_membership=UnionMembership.from_rules(
+            {UnionRule(GenerateSourcesRequest, GenSources)}
+        ),
     )
     assert set(result) == {tgt2}
 

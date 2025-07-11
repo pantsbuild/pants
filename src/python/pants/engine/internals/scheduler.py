@@ -679,7 +679,7 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
 
     # Compute a reverse index of union membership.
     member_type_to_base_types = defaultdict(list)
-    for base_type, member_types in union_membership.union_rules.items():
+    for base_type, member_types in union_membership.items():
         for member_type in member_types:
             member_type_to_base_types[member_type].append(base_type)
 
