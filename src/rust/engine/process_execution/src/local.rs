@@ -734,8 +734,7 @@ pub async fn prepare_workdir(
                 .await
                 .map_err(|e| {
                     format!(
-                        "materialize_directory() request to sandboxer process failed: {}",
-                        e
+                        "materialize_directory() request to sandboxer process failed: {e}"
                     )
                 })?;
         } else {

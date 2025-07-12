@@ -389,11 +389,8 @@ impl OptionParser {
         let arg_splitter = ArgSplitter::new(buildroot.as_path(), known_goals.unwrap_or_default());
         let fromfile_expander = FromfileExpander::relative_to(buildroot.clone());
 
-        let mut seed_values = HashMap::from_iter(
-            env.env
-                .iter()
-                .map(|(k, v)| (format!("env.{k}", k = k), v.clone())),
-        );
+        let mut seed_values =
+            HashMap::from_iter(env.env.iter().map(|(k, v)| (format!("env.{k}"), v.clone())));
 
         // We bootstrap options in several steps.
 
@@ -556,10 +553,7 @@ impl OptionParser {
                 if let Val::String(s) = v {
                     Ok((k, s))
                 } else {
-                    Err(format!(
-                        "Values in [cli.alias] must be strings. Got: {:?}",
-                        v
-                    ))
+                    Err(format!("Values in [cli.alias] must be strings. Got: {v:?}"))
                 }
             })
             .collect::<Result<HashMap<_, _>, String>>()?;
@@ -906,7 +900,7 @@ impl OptionParser {
                         config_reader
                             .validate(section_to_valid_keys)
                             .iter()
-                            .map(|err| format!("{} in {}", err, path)),
+                            .map(|err| format!("{err} in {path}")),
                     );
                 }
             }

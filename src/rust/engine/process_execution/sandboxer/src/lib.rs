@@ -282,13 +282,10 @@ impl SandboxerClient {
         for _ in 0..20 {
             tokio::time::sleep(sleep_time).await;
             slept += sleep_time;
-            debug!(
-                "Waited {:?} to connect to sandboxer at {:?}",
-                slept, socket_path
-            );
+            debug!("Waited {slept:?} to connect to sandboxer at {socket_path:?}");
             maybe_client = SandboxerClient::connect(socket_path).await;
             if maybe_client.is_ok() {
-                debug!("Connected to sandboxer at {:?}", socket_path);
+                debug!("Connected to sandboxer at {socket_path:?}");
                 break;
             }
         }
@@ -468,7 +465,7 @@ impl Sandboxer {
             .map(|rp| {
                 rp.to_str()
                     .map(str::to_string)
-                    .ok_or_else(|| format!("Path is not valid string: {:?}", rp))
+                    .ok_or_else(|| format!("Path is not valid string: {rp:?}"))
             })
             .collect::<Result<Vec<_>, _>>()?;
         let ret = self

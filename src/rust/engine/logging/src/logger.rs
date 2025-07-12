@@ -131,7 +131,7 @@ impl PantsLogger {
     /// the `log` crate.
     pub fn log_from_python(message: &str, python_level: u64, target: &str) -> Result<(), String> {
         let level: PythonLogLevel = python_level.try_into().map_err(|err| format!("{err}"))?;
-        log!(target: target, level.into(), "{}", message);
+        log!(target: target, level.into(), "{message}");
         Ok(())
     }
 

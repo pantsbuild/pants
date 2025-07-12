@@ -38,11 +38,9 @@ pub async fn execute_command(
     for raw_fd in &raw_io_fds {
         match nix::sys::termios::tcgetattr(*raw_fd) {
             Ok(termios) => tty_settings.push((raw_fd, termios)),
-            Err(err) => debug!(
-                "Failed to save terminal attributes for file descriptor {fd}: {err}",
-                fd = raw_fd,
-                err = err
-            ),
+            Err(err) => {
+                debug!("Failed to save terminal attributes for file descriptor {raw_fd}: {err}")
+            }
         }
         if connection_settings.dynamic_ui {
             if let Ok(path) = nix::unistd::ttyname(*raw_fd) {
@@ -67,11 +65,7 @@ pub async fn execute_command(
         if let Err(err) =
             nix::sys::termios::tcsetattr(*raw_fd, nix::sys::termios::SetArg::TCSADRAIN, &termios)
         {
-            debug!(
-                "Failed to restore terminal attributes for file descriptor {fd}: {err}",
-                fd = raw_fd,
-                err = err
-            );
+            debug!("Failed to restore terminal attributes for file descriptor {raw_fd}: {err}");
         }
     }
     nailgun_result.map_err(|error| match error {

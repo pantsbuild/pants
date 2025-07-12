@@ -261,7 +261,7 @@ impl Destination {
         );
         std::mem::drop(destination);
         self.console_clear();
-        log::warn!("{}", error_str);
+        log::warn!("{error_str}");
         self.write_stdout(content);
     }
 
@@ -329,7 +329,7 @@ impl Destination {
         );
         std::mem::drop(destination);
         self.console_clear();
-        log::warn!("{}", error_str);
+        log::warn!("{error_str}");
         self.write_stderr(content);
     }
 

@@ -164,8 +164,7 @@ impl PyOptionId {
             None => None,
             Some(s) => {
                 return Err(ParseError::new_err(format!(
-                    "Switch value should contain a single character, but was: {}",
-                    s
+                    "Switch value should contain a single character, but was: {s}"
                 )));
             }
         };

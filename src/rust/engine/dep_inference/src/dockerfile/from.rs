@@ -80,7 +80,7 @@ impl<'a> StageCollector<'a> {
     pub fn get_stage(self, stage_number: usize) -> String {
         self.stage
             .map(str::to_string)
-            .unwrap_or_else(|| format!("stage{}", stage_number))
+            .unwrap_or_else(|| format!("stage{stage_number}"))
     }
 }
 

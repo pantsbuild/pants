@@ -30,7 +30,7 @@ fn check_with_arg<T: PartialEq + Debug>(
     arg: &'static str,
 ) {
     match res {
-        Ok(actual) => assert_eq!(expected, actual, "{}", arg),
+        Ok(actual) => assert_eq!(expected, actual, "{arg}"),
         Err(s) => panic!("{}", s.render("test")),
     }
 }
@@ -39,7 +39,7 @@ fn check_str(expected: &str, input: &str) {
     // This is slightly convoluted: quoted strings appear as list items,
     // so we generate a list, and then extract the parsed string out of
     // the Result<Vec<ListEdit<String>>, ...> returned by parse_list().
-    let parsed = String::parse_list(format!("[{}]", input).as_str())
+    let parsed = String::parse_list(format!("[{input}]").as_str())
         .unwrap()
         .first()
         .unwrap()
@@ -173,9 +173,7 @@ fn test_parse_list_from_empty_string() {
         let actual = T::parse_list("").unwrap_err().render("foo");
         assert!(
             actual.contains(&expected),
-            "Error message `{}` did not contain `{}`",
-            actual,
-            expected
+            "Error message `{actual}` did not contain `{expected}`"
         );
     }
     check_err::<bool>();

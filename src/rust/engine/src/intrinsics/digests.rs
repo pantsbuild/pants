@@ -387,11 +387,11 @@ fn path_metadata_request(single_path: Value) -> PyGeneratorResponseNativeCall {
                 .map_err(|e| format!("Failed to get `namespace` for field: {e}"))?;
             match namespace {
                 PyPathNamespace::Workspace => SubjectPath::new_workspace(&path).map_err(|_| {
-                    format!("path_metadata_request error: path for PathNamespace.WORKSPACE must be a relative path. Instead, got `{}`", path)
+                    format!("path_metadata_request error: path for PathNamespace.WORKSPACE must be a relative path. Instead, got `{path}`")
                 }),
                 PyPathNamespace::System => SubjectPath::new_system(&path).map_err(|_| {
                     format!(
-                        "path_metadata_request error: path for PathNamespace.SYSTEM must be an absolute path. Instead, got `{}`", path
+                        "path_metadata_request error: path for PathNamespace.SYSTEM must be an absolute path. Instead, got `{path}`"
                     )
                 }),
             }

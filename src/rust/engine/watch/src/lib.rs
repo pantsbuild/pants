@@ -158,7 +158,7 @@ impl InvalidationWatcher {
                 };
 
                 // Log and send the exit code.
-                warn!("File watcher exiting with: {}", exit_msg);
+                warn!("File watcher exiting with: {exit_msg}");
                 let _ = liveness_sender.send(exit_msg);
             })
             .map_err(|e| format!("Failed to start fs-watcher thread: {e}"))
@@ -216,7 +216,7 @@ impl InvalidationWatcher {
                     &path_relative_to_build_root,
                     /* is_dir */ false,
                 ) {
-                    trace!("notify ignoring {:?}", path_relative_to_build_root);
+                    trace!("notify ignoring {path_relative_to_build_root:?}");
                     None
                 } else {
                     Some(path_relative_to_build_root)

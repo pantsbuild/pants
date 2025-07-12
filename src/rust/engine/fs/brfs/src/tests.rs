@@ -1,10 +1,7 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-use tempfile;
-use testutil;
 
 use crate::mount;
-use hashing;
 use store::Store;
 use testutil::{
     data::{TestData, TestDirectory},

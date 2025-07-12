@@ -88,7 +88,7 @@ impl Server {
         listener: TcpListener,
     ) {
         let exit_result = Self::accept_loop(executor, config, nail, should_exit, listener).await;
-        info!("Server exiting with {:?}", exit_result);
+        info!("Server exiting with {exit_result:?}");
         let _ = exited.send(exit_result);
     }
 
@@ -118,7 +118,7 @@ impl Server {
                 }
             };
 
-            debug!("Accepted connection: {:?}", tcp_stream);
+            debug!("Accepted connection: {tcp_stream:?}");
 
             // There is a slightly delicate dance here: we wait for a connection to have acquired the
             // ongoing connections lock before proceeding to the next iteration of the loop. This

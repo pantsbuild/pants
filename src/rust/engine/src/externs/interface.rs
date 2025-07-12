@@ -779,8 +779,8 @@ fn scheduler_create<'py>(
     ca_certs_path: Option<PathBuf>,
 ) -> PyO3Result<PyScheduler> {
     match fs::increase_limits() {
-        Ok(msg) => debug!("{}", msg),
-        Err(e) => warn!("{}", e),
+        Ok(msg) => debug!("{msg}"),
+        Err(e) => warn!("{e}"),
     }
     let types = types_ptr
         .borrow()
@@ -1122,7 +1122,7 @@ fn session_poll_workunits(
         })
     })
     .unwrap_or_else(|e| {
-        log::warn!("Panic in `session_poll_workunits`: {:?}", e);
+        log::warn!("Panic in `session_poll_workunits`: {e:?}");
         std::panic::resume_unwind(e);
     })
 }
@@ -1706,10 +1706,10 @@ fn maybe_set_panic_handler() {
             panic_str.push_str(&panic_location_str);
         }
 
-        error!("{}", panic_str);
+        error!("{panic_str}");
 
         let panic_file_bug_str = "Please set RUST_BACKTRACE=1, re-run, and then file a bug at https://github.com/pantsbuild/pants/issues.";
-        error!("{}", panic_file_bug_str);
+        error!("{panic_file_bug_str}");
     }));
 }
 

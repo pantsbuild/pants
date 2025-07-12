@@ -139,7 +139,7 @@ impl ShardedLmdb {
             mask.rotate_left(Self::shard_shift(shard_count) as u32)
         };
 
-        trace!("Initializing ShardedLmdb at root {:?}", root_path);
+        trace!("Initializing ShardedLmdb at root {root_path:?}");
         let mut lmdbs = HashMap::new();
 
         for (env, dir, environment_id) in
@@ -580,7 +580,7 @@ impl ShardedLmdb {
 
                                     if should_retry {
                                         let msg = format!("Input {read:?} changed while reading.");
-                                        log::debug!("{}", msg);
+                                        log::debug!("{msg}");
                                         return Err(StoreError::Retry(msg));
                                     }
 

@@ -152,9 +152,8 @@ impl crate::CommandRunner for CommandRunner {
                         }
                         Err(err) => {
                             debug!(
-                                "Error loading process execution result from local cache: {} \
-                - continuing to execute",
-                                err
+                                "Error loading process execution result from local cache: {err} \
+                - continuing to execute"
                             );
                             workunit.increment_counter(Metric::LocalCacheReadErrors, 1);
                             // Falling through to re-execute.
@@ -182,8 +181,7 @@ impl crate::CommandRunner for CommandRunner {
             in_workunit!("local_cache_write", Level::Trace, |workunit| async move {
                 if let Err(err) = self.store(&key, &result).await {
                     warn!(
-            "Error storing process execution result to local cache: {} - ignoring and continuing",
-            err
+            "Error storing process execution result to local cache: {err} - ignoring and continuing"
           );
                     workunit.increment_counter(Metric::LocalCacheWriteErrors, 1);
                 }
