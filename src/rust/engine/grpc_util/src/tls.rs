@@ -58,21 +58,21 @@ impl Config {
     ) -> Result<Self, String> {
         let root_ca_certs = root_ca_cert_file
             .map(|path| {
-                std::fs::read(path).map_err(|e| format!("Error reading root CA certs file: {}", e))
+                std::fs::read(path).map_err(|e| format!("Error reading root CA certs file: {e}"))
             })
             .transpose()?;
 
         let client_certs = client_certs_file
             .map(|path| {
                 std::fs::read(path)
-                    .map_err(|e| format!("Error reading client authentication certs file: {}", e))
+                    .map_err(|e| format!("Error reading client authentication certs file: {e}"))
             })
             .transpose()?;
 
         let client_key = client_key_file
             .map(|path| {
                 std::fs::read(path)
-                    .map_err(|e| format!("Error reading client authentication key file: {}", e))
+                    .map_err(|e| format!("Error reading client authentication key file: {e}"))
             })
             .transpose()?;
 
@@ -86,7 +86,7 @@ impl Config {
         }?;
 
         Self::new(root_ca_certs, mtls_data)
-            .map_err(|e| format!("failed parsing root CA certs: {}", e))
+            .map_err(|e| format!("failed parsing root CA certs: {e}"))
     }
 }
 

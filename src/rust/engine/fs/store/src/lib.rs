@@ -1038,7 +1038,7 @@ impl Store {
                         )
                         .await
                     {
-                        log::debug!("Missing file digest from remote store: {:?}", file_digest);
+                        log::debug!("Missing file digest from remote store: {file_digest:?}");
                         in_workunit!(
                             "missing_file_counter",
                             Level::Trace,
@@ -1113,10 +1113,8 @@ impl Store {
             Ok(size) => {
                 if size > target_size_bytes {
                     log::warn!(
-                        "Garbage collection attempted to shrink the store to {} bytes but {} bytes \
-            are currently in use.",
-                        target_size_bytes,
-                        size
+                        "Garbage collection attempted to shrink the store to {target_size_bytes} bytes but {size} bytes \
+            are currently in use."
                     )
                 }
                 Ok(())

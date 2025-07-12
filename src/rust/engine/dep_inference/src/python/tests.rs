@@ -311,8 +311,7 @@ fn assert_imports_strong_weak(code: &str, strong: &[&str], weak: &[&str]) {
         .collect::<HashSet<_>>();
     assert_eq!(
         expected_weak, found_weak,
-        "weak imports did not match, expected={:?} found={:?}",
-        expected_weak, found_weak
+        "weak imports did not match, expected={expected_weak:?} found={found_weak:?}"
     );
     let expected_strong = HashSet::from_iter(strong.iter().map(|s| s.to_string()));
     let found_strong = actual_strong
@@ -321,8 +320,7 @@ fn assert_imports_strong_weak(code: &str, strong: &[&str], weak: &[&str]) {
         .collect::<HashSet<_>>();
     assert_eq!(
         expected_strong, found_strong,
-        "strong imports did not match, expected={:?} found={:?}",
-        expected_strong, found_strong
+        "strong imports did not match, expected={expected_strong:?} found={found_strong:?}"
     );
 }
 
