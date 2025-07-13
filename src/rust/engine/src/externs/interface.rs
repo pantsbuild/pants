@@ -1314,9 +1314,12 @@ fn tasks_add_call<'py>(
     rule_id: String,
     explicit_args_arity: u16,
     vtable_entries: Option<Vec<(Bound<'py, PyType>, String)>>,
+    in_scope_types: Option<Vec<Bound<'py, PyType>>>,
 ) {
     let output = TypeId::new(output);
     let inputs = inputs.into_iter().map(|t| TypeId::new(&t)).collect();
+    let in_scope_types =
+        in_scope_types.map(|ist| ist.into_iter().map(|t| TypeId::new(&t)).collect());
     py_tasks.borrow_mut().0.get(py).borrow_mut().add_call(
         output,
         inputs,
@@ -1327,6 +1330,7 @@ fn tasks_add_call<'py>(
                 .map(|(k, v)| (TypeId::new(&k), RuleId::from_string(v)))
                 .collect()
         }),
+        in_scope_types,
     );
 }
 
