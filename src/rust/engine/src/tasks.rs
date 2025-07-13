@@ -251,9 +251,10 @@ impl Tasks {
             // and instead let the in-scope types be defined by the signature of the polymorphic
             // rule (i.e., they would be the explicit params in the signature other than the union
             // type). However this would require access to the rule's signature (which is distinct
-            // from the call's signature, as the call may omit params) both here and in gen_call()
-            // in task.rs. So for now we continue to use the legacy in_scope_types @union arg,
-            // and we can revisit once we're fully call-by-name.
+            // from the call's signature) both here and in gen_call() in task.rs. So for now we
+            // continue to use the legacy in_scope_types @union arg, and we can revisit once we're
+            // fully call-by-name.
+            // See https://github.com/pantsbuild/pants/issues/22483
             let in_scope_types = in_scope_types.unwrap_or_else(|| {
                 panic!("No in_scope_types passed in for a polymorphic call");
             });

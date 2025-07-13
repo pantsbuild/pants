@@ -761,8 +761,8 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
                     awaitable.input_types,
                     awaitable.rule_id,
                     awaitable.explicit_args_arity,
-                    None,
-                    None,
+                    vtable_entries=None,
+                    in_scope_types=None,
                 )
             else:
                 # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
