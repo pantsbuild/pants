@@ -262,7 +262,7 @@ class PutativeTargets(DeduplicatedCollection[PutativeTarget]):
 
 
 @rule(polymorphic=True)
-async def get_putative_targets(
+async def generate_putative_targets(
     req: PutativeTargetsRequest, env_name: EnvironmentName
 ) -> PutativeTargets:
     raise NotImplementedError()
@@ -655,7 +655,7 @@ async def tailor(
     dir_search_paths = tuple(sorted({os.path.dirname(f) for f in specs_paths.files}))
 
     putative_targets_results = await concurrently(
-        get_putative_targets(
+        generate_putative_targets(
             **implicitly(
                 {req_type(dir_search_paths): PutativeTargetsRequest, env_name: EnvironmentName}
             )

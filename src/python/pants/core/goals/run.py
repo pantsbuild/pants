@@ -156,7 +156,7 @@ class RunInSandboxRequest(RunRequest):
 
 
 @rule(polymorphic=True)
-async def get_run_in_sandbox_request(
+async def generate_run_in_sandbox_request(
     run_field_set: RunFieldSet, env_name: EnvironmentName
 ) -> RunInSandboxRequest:
     raise NotImplementedError()

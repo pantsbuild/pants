@@ -23,7 +23,7 @@ from pants.core.goals.package import (
     PackageFieldSet,
     environment_aware_package,
 )
-from pants.core.goals.run import RunFieldSet, get_run_in_sandbox_request
+from pants.core.goals.run import RunFieldSet, generate_run_in_sandbox_request
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.core.util_rules.system_binaries import BashBinary
@@ -272,7 +272,8 @@ async def _resolve_runnable_dependencies(
             )
 
     runnables = await concurrently(
-        get_run_in_sandbox_request(field_set[0], **implicitly()) for field_set in fspt.collection
+        generate_run_in_sandbox_request(**implicitly({field_set[0]: RunFieldSet}))
+        for field_set in fspt.collection
     )
 
     shims: list[FileContent] = []
@@ -457,7 +458,7 @@ async def create_tool_runner(
 
     # Must be run in target environment so that the binaries/envvars match the execution
     # environment when we actually run the process.
-    run_request = await get_run_in_sandbox_request(
+    run_request = await generate_run_in_sandbox_request(
         **implicitly({run_field_set: RunFieldSet, environment_name: EnvironmentName})
     )
 
