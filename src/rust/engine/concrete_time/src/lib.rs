@@ -80,7 +80,7 @@ impl TimeSpan {
         let duration = match end.checked_sub(start) {
             Some(d) => d,
             None => {
-                log::debug!("Invalid TimeSpan - start: {:?}, end: {:?}", start, end);
+                log::debug!("Invalid TimeSpan - start: {start:?}, end: {end:?}");
                 std::time::Duration::new(0, 0)
             }
         };

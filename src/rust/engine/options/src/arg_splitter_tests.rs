@@ -52,7 +52,7 @@ fn test_spec_detection() {
                 flags: vec![],
                 passthru: None
             },
-            shlex_and_split_args(build_root, &format!("pants {}", maybe_spec))
+            shlex_and_split_args(build_root, &format!("pants {maybe_spec}"))
         );
     }
 
@@ -67,7 +67,7 @@ fn test_spec_detection() {
                 flags: vec![],
                 passthru: None,
             },
-            shlex_and_split_args(build_root, &format!("pants {}", spec))
+            shlex_and_split_args(build_root, &format!("pants {spec}"))
         );
     }
 
@@ -98,13 +98,13 @@ fn test_spec_detection() {
 
     for spec in unambiguous_specs {
         assert_spec(Some(temp_dir.path()), spec);
-        assert_spec(Some(temp_dir.path()), &format!("-{}", spec));
+        assert_spec(Some(temp_dir.path()), &format!("-{spec}"));
     }
     for spec in directories_vs_goals {
         assert_goal(Some(temp_dir.path()), spec);
         File::create(temp_dir.path().join(Path::new(spec))).unwrap();
         assert_spec(Some(temp_dir.path()), spec);
-        assert_spec(Some(temp_dir.path()), &format!("-{}", spec));
+        assert_spec(Some(temp_dir.path()), &format!("-{spec}"));
     }
 }
 

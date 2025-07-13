@@ -47,7 +47,7 @@ impl<R: Rule> std::fmt::Display for Node<R> {
                 explicit_args_arity,
             } => {
                 let explicit_args_arity: Cow<str> = if *explicit_args_arity > 0 {
-                    format!(" <{}>", explicit_args_arity).into()
+                    format!(" <{explicit_args_arity}>").into()
                 } else {
                     "".into()
                 };
@@ -879,7 +879,7 @@ impl<R: Rule> Builder<R> {
                 };
 
             if looping {
-                log::trace!("{}", trace_str);
+                log::trace!("{trace_str}");
 
                 maybe_in_loop.insert(node_id);
                 if maybe_in_loop.len() > 5 {
@@ -957,7 +957,7 @@ impl<R: Rule> Builder<R> {
                 }
 
                 if looping {
-                    log::trace!("node: creating: {:?}", replacement_id);
+                    log::trace!("node: creating: {replacement_id:?}");
                 }
 
                 // Give all dependents edges to the new node.
@@ -972,7 +972,7 @@ impl<R: Rule> Builder<R> {
                         }
                     }
                     if looping {
-                        log::trace!("dependent edge: adding: ({:?}, {})", dependent_id, edge);
+                        log::trace!("dependent edge: adding: ({dependent_id:?}, {edge})");
                     }
                     graph.add_edge(*dependent_id, replacement_id, edge);
                 }

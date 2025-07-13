@@ -296,9 +296,7 @@ async fn credentials_for_image(
                     Ok(credential) => credential,
                     Err(e) => {
                         log::warn!(
-                            "Failed to retrieve Docker credentials for server `{}`: {}",
-                            server,
-                            e
+                            "Failed to retrieve Docker credentials for server `{server}`: {e}"
                         );
                         return Ok(None);
                     }
@@ -391,7 +389,7 @@ async fn pull_image(
                 let mut result_stream =
                     docker.create_image(Some(create_image_options), None, credentials);
                 while let Some(msg) = result_stream.next().await {
-                    log::trace!("pull {}: {:?}", image, msg);
+                    log::trace!("pull {image}: {msg:?}");
                     match msg {
                         Ok(msg) => match msg {
                             CreateImageInfo {
@@ -503,7 +501,7 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                         "Attempt to clean up old containers timed out after {CONTAINER_CLEANUP_TIMEOUT_SECONDS} seconds"
                     ),
                 };
-                log::warn!("{}", message)
+                log::warn!("{message}")
             });
         }
         let keep_sandboxes = req.execution_environment.local_keep_sandboxes;
@@ -1114,7 +1112,7 @@ impl<'a> ContainerCache<'a> {
                             }
                         };
                         if let Err(msg) = check_state.await {
-                            log::warn!("{}", msg);
+                            log::warn!("{msg}");
                         }
                     });
                 }
@@ -1123,11 +1121,7 @@ impl<'a> ContainerCache<'a> {
                 }
             }
         } else {
-            log::warn!(
-                "Container for image `{}` and platform `{:#?}` not found",
-                image_name,
-                platform
-            );
+            log::warn!("Container for image `{image_name}` and platform `{platform:#?}` not found");
         }
     }
 

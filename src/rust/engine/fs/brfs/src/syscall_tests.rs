@@ -6,7 +6,6 @@
 use super::mount;
 use super::tests::digest_to_filepath;
 use crate::tests::make_dirs;
-use libc;
 use std::ffi::CString;
 use std::path::Path;
 use store::Store;
@@ -38,7 +37,7 @@ async fn read_file_by_digest_exact_bytes() {
 
     unsafe {
         let fd = libc::open(path_to_cstring(&path).as_ptr(), 0);
-        assert!(fd > 0, "Bad fd {}", fd);
+        assert!(fd > 0, "Bad fd {fd}");
         let read_bytes = libc::read(fd, buf.as_mut_ptr() as *mut libc::c_void, buf.len());
         assert_eq!(test_bytes.len() as isize, read_bytes);
         assert_eq!(0, libc::close(fd));
@@ -52,7 +51,6 @@ fn path_to_cstring(path: &Path) -> CString {
 }
 
 fn make_buffer(size: usize) -> Vec<u8> {
-    let mut buf: Vec<u8> = Vec::new();
-    buf.resize(size, 0);
+    let buf: Vec<u8> = vec![0; size];
     buf
 }
