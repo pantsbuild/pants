@@ -591,7 +591,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
                 if strict_match_behavior.should_throw_on_error() {
                     return Err(Self::mk_error(&msg));
                 } else {
-                    warn!("{}", msg);
+                    warn!("{msg}");
                 }
             }
         }

@@ -256,7 +256,7 @@ impl Tasks {
             // Note that the Python code calling this function has already verified that there
             // is a relevant union type in the inputs, so this should never panic in practice.
             let union_type = inputs.iter().find(|t| t.is_union()).unwrap_or_else(|| {
-                panic!("No union argument found in inputs of call to {}", rule_id)
+                panic!("No union argument found in inputs of call to {rule_id}")
             });
             // Add calls for each vtable member. At runtime we'll select the relevant one.
             for (member_type, member_rule) in vtable_entries.iter() {

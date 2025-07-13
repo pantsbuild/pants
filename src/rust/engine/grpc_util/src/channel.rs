@@ -151,12 +151,12 @@ mod tests {
                 .unwrap();
         });
 
-        let uri = Uri::try_from(format!("http://{}", addr)).unwrap();
+        let uri = Uri::try_from(format!("http://{addr}")).unwrap();
 
         let mut channel = Channel::new(None, uri).await.unwrap();
 
         let request = Request::builder()
-            .uri(format!("http://{}", addr))
+            .uri(format!("http://{addr}"))
             .body(tonic::body::empty_body())
             .unwrap();
 
@@ -193,7 +193,7 @@ mod tests {
             server.serve(router().into_make_service()).await.unwrap();
         });
 
-        let uri = Uri::try_from(format!("https://{}", addr)).unwrap();
+        let uri = Uri::try_from(format!("https://{addr}")).unwrap();
 
         let mut tls_config = ClientConfig::builder()
             .with_root_certificates(RootCertStore::empty())
@@ -206,7 +206,7 @@ mod tests {
         let mut channel = Channel::new(Some(&tls_config), uri).await.unwrap();
 
         let request = Request::builder()
-            .uri(format!("https://{}", addr))
+            .uri(format!("https://{addr}"))
             .body(tonic::body::empty_body())
             .unwrap();
 
@@ -333,7 +333,7 @@ mod tests {
             server.serve(router().into_make_service()).await.unwrap();
         });
 
-        let uri = Uri::try_from(format!("https://{}", addr)).unwrap();
+        let uri = Uri::try_from(format!("https://{addr}")).unwrap();
 
         let mut tls_config =
             crate::tls::Config::new(Some(&cert_pem), Some((&cert_pem, &key_pem))).unwrap();
@@ -355,7 +355,7 @@ mod tests {
             0
         );
         let request = Request::builder()
-            .uri(format!("https://{}", addr))
+            .uri(format!("https://{addr}"))
             .body(tonic::body::empty_body())
             .unwrap();
 

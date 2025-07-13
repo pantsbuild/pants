@@ -43,7 +43,7 @@ fn test_expand_fromfile() {
     );
     assert_eq!(
         Ok(Some("FOO".to_string())),
-        expand(format!("@{}", fromfile_path_str))
+        expand(format!("@{fromfile_path_str}"))
     );
     assert_eq!(Ok(None), expand("@?/does/not/exist".to_string()));
     let err = expand("@/does/not/exist".to_string()).unwrap_err();
@@ -62,7 +62,7 @@ fn test_fromfile_relative_to_buildroot() {
     assert_eq!(
         Ok(Some("FOO".to_string())),
         FromfileExpander::relative_to(BuildRoot::for_path(_tmpdir.keep()))
-            .expand(format!("@{}", fromfile_relpath_str))
+            .expand(format!("@{fromfile_relpath_str}"))
     );
 }
 
