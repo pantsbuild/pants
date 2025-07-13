@@ -210,8 +210,7 @@ impl Provider {
                 // likely be a remote error too, because our write will be too short, but the local error is
                 // the interesting root cause)
                 return Err(ByteStoreError::Other(format!(
-                    "Uploading file with digest {:?}: failed to read local source: {}",
-                    digest, read_err
+                    "Uploading file with digest {digest:?}: failed to read local source: {read_err}"
                 )));
             }
 
@@ -272,8 +271,7 @@ impl Provider {
 
                 if !results.contains_key(&digest) {
                     return Err(format!(
-                        "Batch read returned unexpected digest {:?} in batch response",
-                        digest
+                        "Batch read returned unexpected digest {digest:?} in batch response"
                     ));
                 }
 

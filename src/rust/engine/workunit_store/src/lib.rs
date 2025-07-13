@@ -102,7 +102,7 @@ impl RunningWorkunitGraph {
     ) -> Option<Workunit> {
         match self.entries.entry(span_id) {
             hash_map::Entry::Vacant(_) => {
-                log::warn!("No previously-started workunit found for id: {}", span_id);
+                log::warn!("No previously-started workunit found for id: {span_id}");
                 None
             }
             hash_map::Entry::Occupied(mut entry) => {
@@ -130,7 +130,7 @@ impl RunningWorkunitGraph {
 
                 match workunit.state {
                     WorkunitState::Completed { .. } => {
-                        log::warn!("Workunit {} was already completed", span_id);
+                        log::warn!("Workunit {span_id} was already completed");
                     }
                     WorkunitState::Started { start_time, .. } => {
                         let time_span =
@@ -282,7 +282,7 @@ impl Workunit {
             "".to_string()
         };
 
-        log!(self.level, "{} {}{}", state, effective_identifier, message);
+        log!(self.level, "{state} {effective_identifier}{message}");
     }
 }
 
@@ -658,7 +658,7 @@ impl WorkunitStore {
         let start_time = match workunit.state {
             WorkunitState::Started { start_time, .. } => start_time,
             _ => {
-                log::warn!("Workunit {} was already completed", span_id);
+                log::warn!("Workunit {span_id} was already completed");
                 return;
             }
         };

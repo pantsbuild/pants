@@ -237,6 +237,7 @@ impl Tasks {
         rule_id: RuleId,
         explicit_args_arity: u16,
         vtable_entries: Option<HashMap<TypeId, RuleId>>,
+        in_scope_types: Option<Vec<TypeId>>,
     ) {
         let calls = &mut self
             .preparing
@@ -245,18 +246,23 @@ impl Tasks {
             .gets;
 
         if let Some(vtable_entries) = vtable_entries {
-            // This is a polymorphic call. In this case we set in_scope_params() to an empty vec,
-            // so that only the explicit params passed to the call are considered by the solver.
-            // This ensures stability of the API of the polymorphic rule (and also prevents the
-            // engine from having to do unnecessary solving for these calls).
-            // Once we are fully call-by-name we can deprecate and remove the `in_scope_types`
-            // keyword of the @union decorator, since for call-by-name we take the set of
-            // params from the call itself, as you'd expect.
+            // This is a polymorphic call, so in_scope_types must be provided by the caller.
+            // TODO: We would like to deprecate the in_scope_types argument to the @union decorator,
+            // and instead let the in-scope types be defined by the signature of the polymorphic
+            // rule (i.e., they would be the explicit params in the signature other than the union
+            // type). However this would require access to the rule's signature (which is distinct
+            // from the call's signature) both here and in gen_call() in task.rs. So for now we
+            // continue to use the legacy in_scope_types @union arg, and we can revisit once we're
+            // fully call-by-name.
+            // See https://github.com/pantsbuild/pants/issues/22483
+            let in_scope_types = in_scope_types.unwrap_or_else(|| {
+                panic!("No in_scope_types passed in for a polymorphic call");
+            });
 
             // Note that the Python code calling this function has already verified that there
             // is a relevant union type in the inputs, so this should never panic in practice.
             let union_type = inputs.iter().find(|t| t.is_union()).unwrap_or_else(|| {
-                panic!("No union argument found in inputs of call to {}", rule_id)
+                panic!("No union argument found in inputs of call to {rule_id}")
             });
             // Add calls for each vtable member. At runtime we'll select the relevant one.
             for (member_type, member_rule) in vtable_entries.iter() {
@@ -268,7 +274,7 @@ impl Tasks {
                 calls.push(
                     DependencyKey::for_known_rule(member_rule.clone(), output, explicit_args_arity)
                         .provided_params(member_rule_inputs)
-                        .in_scope_params(vec![]),
+                        .in_scope_params(in_scope_types.clone()),
                 );
             }
             self.vtable.insert(rule_id.clone(), vtable_entries);
@@ -277,7 +283,7 @@ impl Tasks {
             calls.push(
                 DependencyKey::for_known_rule(rule_id, output, explicit_args_arity)
                     .provided_params(inputs)
-                    .in_scope_params(vec![]),
+                    .in_scope_params(in_scope_types.clone()),
             );
         } else {
             calls.push(

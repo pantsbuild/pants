@@ -779,7 +779,7 @@ impl Core {
         // Shutdown the Sessions, which will prevent new work from starting and then await any ongoing
         // work.
         if let Err(msg) = self.sessions.shutdown(timeout).await {
-            log::warn!("During shutdown: {}", msg);
+            log::warn!("During shutdown: {msg}");
         }
         // Then clear the Graph to ensure that drop handlers run (particularly for running processes).
         self.graph.clear();
@@ -832,11 +832,7 @@ impl Invalidatable for InvalidatableGraph {
         let (level, caller) = caller_to_logging_info(caller);
         log!(
             level,
-            "{} invalidation: cleared {} and dirtied {} nodes for: {:?}",
-            caller,
-            cleared,
-            dirtied,
-            paths
+            "{caller} invalidation: cleared {cleared} and dirtied {dirtied} nodes for: {paths:?}"
         );
         cleared + dirtied
     }
@@ -847,10 +843,7 @@ impl Invalidatable for InvalidatableGraph {
         let (level, caller) = caller_to_logging_info(caller);
         log!(
             level,
-            "{} invalidation: cleared {} and dirtied {} nodes for all paths",
-            caller,
-            cleared,
-            dirtied
+            "{caller} invalidation: cleared {cleared} and dirtied {dirtied} nodes for all paths"
         );
         cleared + dirtied
     }
@@ -937,7 +930,7 @@ impl SessionCore {
                 // There are no live or invalidated sources of this Digest. Directly fail.
                 return result.map_err(|e| {
                     let suffix = if let Some(workunit_data) = workunit.workunit() {
-                        &format!(", with workunit: {:?}", workunit_data)
+                        &format!(", with workunit: {workunit_data:?}")
                     } else {
                         ""
                     };

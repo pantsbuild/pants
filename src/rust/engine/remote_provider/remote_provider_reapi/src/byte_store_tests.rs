@@ -220,9 +220,7 @@ fn assert_cas_store(cas: &StubCAS, testdata: &TestData, chunks: usize, chunk_siz
     for &size in write_message_sizes.iter() {
         assert!(
             size <= chunk_size,
-            "Size {} should have been <= {}",
-            size,
-            chunk_size
+            "Size {size} should have been <= {chunk_size}"
         );
     }
 }

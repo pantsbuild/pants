@@ -528,27 +528,24 @@ impl FromStr for ProcessConcurrency {
             let parts = s.split(',').collect::<Vec<_>>();
             if parts.len() != 2 {
                 return Err(format!(
-                    "Expected two values for concurrency range, got: {}",
-                    s
+                    "Expected two values for concurrency range, got: {s}"
                 ));
             }
             let min = parts[0]
                 .parse::<usize>()
-                .map_err(|e| format!("Invalid min value: {}", e))?;
+                .map_err(|e| format!("Invalid min value: {e}"))?;
             let max = parts[1]
                 .parse::<usize>()
-                .map_err(|e| format!("Invalid max value: {}", e))?;
+                .map_err(|e| format!("Invalid max value: {e}"))?;
 
             if min < 1 {
                 return Err(format!(
-                    "Minimum concurrency must be at least 1, got: {}",
-                    min
+                    "Minimum concurrency must be at least 1, got: {min}"
                 ));
             }
             if max < min {
                 return Err(format!(
-                    "Maximum concurrency must be at least the minimum concurrency, got: {} and {}",
-                    max, min
+                    "Maximum concurrency must be at least the minimum concurrency, got: {max} and {min}"
                 ));
             }
 
@@ -559,9 +556,9 @@ impl FromStr for ProcessConcurrency {
         } else {
             let exactly = s
                 .parse::<usize>()
-                .map_err(|e| format!("Invalid concurrency value: {}", e))?;
+                .map_err(|e| format!("Invalid concurrency value: {e}"))?;
             if exactly < 1 {
-                return Err(format!("Concurrency must be at least 1, got: {}", exactly));
+                return Err(format!("Concurrency must be at least 1, got: {exactly}"));
             }
             Ok(ProcessConcurrency::Range {
                 min: Some(exactly),
