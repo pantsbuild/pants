@@ -1318,10 +1318,8 @@ fn tasks_add_call<'py>(
 ) {
     let output = TypeId::new(output);
     let inputs = inputs.into_iter().map(|t| TypeId::new(&t)).collect();
-    let in_scope_types = in_scope_types.map(|ist|
-        ist.into_iter()
-        .map(|t| TypeId::new(&t))
-        .collect());
+    let in_scope_types =
+        in_scope_types.map(|ist| ist.into_iter().map(|t| TypeId::new(&t)).collect());
     py_tasks.borrow_mut().0.get(py).borrow_mut().add_call(
         output,
         inputs,
