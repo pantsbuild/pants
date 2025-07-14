@@ -785,12 +785,8 @@ def _add_option_field_for(
             # When field is not specified in BUILD file, return None to indicate inheritance
             if raw_value is NO_VALUE:
                 return None
-            # When explicitly set to empty list, return empty tuple (don't inherit)
-            elif raw_value == []:
-                return ()
             # For other values, use normal field processing
-            else:
-                return field_type.compute_value(raw_value, address)
+            return field_type.compute_value(raw_value, address)
 
         class_attrs["compute_value"] = classmethod(compute_value)
 
