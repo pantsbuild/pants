@@ -235,7 +235,7 @@ jobs:
     needs:
     - classify_changes
     runs-on:
-    - macos-13
+    - macos-14-large
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -515,7 +515,7 @@ jobs:
       contents: write
       id-token: write
     runs-on:
-    - macos-13
+    - macos-14-large
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -1925,7 +1925,7 @@ jobs:
     - bootstrap_pants_macos13_x86_64
     - classify_changes
     runs-on:
-    - macos-13
+    - macos-14-large
     steps:
     - name: Check out code
       uses: actions/checkout@v4

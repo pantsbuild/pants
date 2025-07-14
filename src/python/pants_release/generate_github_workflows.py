@@ -434,7 +434,7 @@ class Helper:
         # platforms without realizing it.
         ret = ["self-hosted"] if self.platform in SELF_HOSTED else []
         if self.platform == Platform.MACOS13_X86_64:
-            ret += ["macos-13"]
+            ret += ["macos-14-large"]
         elif self.platform == Platform.MACOS14_ARM64:
             ret += ["macos-14"]
         elif self.platform == Platform.LINUX_X86_64:
