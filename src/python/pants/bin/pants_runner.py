@@ -166,11 +166,12 @@ _MACOS_VERSION_BECOMES_UNSUPPORTED_IN = {
         13: "2.25.0.dev0",
         # adding new values here should update the phrasing of the message below
     },
-    # macos-13 will soon be the oldest (and only) github hosted runner for x86-64 (see https://github.com/pantsbuild/pants/issues/21333)
+    # macos-14 will soon be the oldest (and only) github hosted runner for x86-64 (see https://github.com/pantsbuild/pants/issues/21333)
     "x86_64": {
         10: "2.24.0.dev0",
         11: "2.24.0.dev0",
         12: "2.25.0.dev0",
+        13: "2.29.0.dev0",
         # adding new values here should update the phrasing of the message below
     },
 }
@@ -197,8 +198,8 @@ def _validate_macos_version(global_bootstrap_options: OptionValueContainer) -> N
             "using Pants on older macOS",
             softwrap(
                 f"""
-                Recent versions of Pants only support macOS 13 and newer (on x86-64) and macOS
-                14 and newer (on arm64), but this machine appears older ({platform.platform()}
+                Recent versions of Pants only support macOS 14 and newer, but this machine appears
+                older ({platform.platform()}
                 implies macOS version {macos_version}). This version also isn't permitted by your
                 `[GLOBAL].allow_deprecated_macos_versions` configuration
                 ({global_bootstrap_options.allow_deprecated_macos_versions}).
