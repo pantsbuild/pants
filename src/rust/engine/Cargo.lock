@@ -1603,7 +1603,7 @@ dependencies = [
  "async-trait",
  "async_value",
  "env_logger",
- "fixedbitset 0.4.2",
+ "fixedbitset 0.5.7",
  "fnv",
  "futures",
  "log",
