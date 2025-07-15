@@ -53,8 +53,16 @@ def scrape_release(
 ):
     scraped_releases.add(release.tag_name)
 
-    applicable_assets: list[GitReleaseAsset] = []
+    applicable_sha256_assets: list[GitReleaseAsset] = []
+    sha256sums_asset: GitReleaseAsset | None = None
+    applicable_release_assets_count = 0
     for asset in release.get_assets():
+        if asset.name == "SHA256SUMS":
+            if sha256sums_asset is not None:
+                raise ValueError("Found multiple release assets claiming to be SHA256SUMS file.")
+            sha256sums_asset = asset
+            continue
+
         # NB: From https://python-build-standalone.readthedocs.io/en/latest/running.html#obtaining-distributions
         # > Casual users will likely want to use the install_only archive,
         # > as most users do not need the build artifacts present in the full archive.
@@ -65,17 +73,33 @@ def scrape_release(
             )
         )
         if is_applicable:
-            applicable_assets.append(asset)
+            if asset.name.endswith(".sha256"):
+                applicable_sha256_assets.append(asset)
+            else:
+                asset_map[asset.name] = asset
+                applicable_release_assets_count += 1
 
-    print(f"-- Found {len(applicable_assets)} applicable asset(s).")
-    print("-- Scraping reported SHA256 hashes.")
+    print(f"-- Found {applicable_release_assets_count} applicable asset(s).")
 
-    for asset in applicable_assets:
-        if asset.name.endswith(".sha256"):
+    # Obtain the published SHA256 hashes for the release aasets.
+    if sha256sums_asset is not None:
+        print("-- Scraping reported SHA256 hashes from the release's SHA256SUMS file.")
+        sha256sums_content = requests.get(sha256sums_asset.browser_download_url).text
+        for sha256sum_line in sha256sums_content.splitlines():
+            sha256_hash, asset_name = re.split(r"\s+", sha256sum_line.strip())
+            if asset_name in asset_map:
+                if asset_name in sha256_map:
+                    raise ValueError(f"A SHA256 hash for {asset_name} was already discovered!")
+                sha256_map[asset_name] = sha256_hash
+    else:
+        if release.tag_name >= "20250708":
+            raise ValueError(
+                "PBS releases from 20250708 onwward only publish a SHA256SUMS file, but it was not found in the release."
+            )
+        print("-- Scraping reported SHA256 hashes from .sha256 files.")
+        for asset in applicable_sha256_assets:
             shasum = requests.get(asset.browser_download_url).text.strip()
             sha256_map[asset.name.removesuffix(".sha256")] = shasum
-        else:
-            asset_map[asset.name] = asset
 
 
 def get_releases_after_given_release(
