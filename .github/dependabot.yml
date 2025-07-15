@@ -1,7 +1,7 @@
 version: 2
 updates:
   - package-ecosystem: "cargo"
-    directory: "/src/rust/engine"
+    directory: "/src/rust"
     open-pull-requests-limit: 5
     rebase-strategy: auto
     labels:
