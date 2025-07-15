@@ -245,7 +245,7 @@ webpki = "0.22"
 whoami = "1.5.2"
 
 # NB: If a change to these versions requires cache busting, bump the version of
-# `src/rust/engine/dep_inference/Cargo.toml`.
+# `src/rust/dep_inference/Cargo.toml`.
 tree-sitter = "0.20.10"
 tree-sitter-typescript = "0.20.5"
 tree-sitter-python = "0.20.4"

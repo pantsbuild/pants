@@ -9,7 +9,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 source "${REPO_ROOT}/build-support/common.sh"
 
 # Defines:
-# + NATIVE_ROOT: The Rust code directory, ie: src/rust/engine.
+# + NATIVE_ROOT: The Rust code directory, ie: src/rust.
 # + MODE: Whether to run in debug or release mode.
 # + MODE_FLAG: The string to pass to Cargo to determine if we're in debug or release mode.
 # Exposes:
