@@ -10,8 +10,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, ClassVar, TypeVar, final
 
+from pants.core.environments.rules import _warn_on_non_local_environments
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
-from pants.core.util_rules.environments import _warn_on_non_local_environments
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, Workspace
@@ -153,6 +153,13 @@ class RunInSandboxRequest(RunRequest):
     implementors work to make sure their `RunRequest`-generating rules can be used in a hermetic
     context, or writing new custom rules. (See the Plugin Upgrade Guide for details).
     """
+
+
+@rule(polymorphic=True)
+async def generate_run_in_sandbox_request(
+    run_field_set: RunFieldSet, env_name: EnvironmentName
+) -> RunInSandboxRequest:
+    raise NotImplementedError()
 
 
 class RunSubsystem(GoalSubsystem):

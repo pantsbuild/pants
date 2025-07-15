@@ -43,7 +43,7 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
                 .sample_size(10)
                 .measurement_time(Duration::from_secs(30))
                 .bench_function(
-                    format!("materialize_directory({:?}, {}, {})", perms, count, size),
+                    format!("materialize_directory({perms:?}, {count}, {size})"),
                     |b| {
                         b.iter(|| {
                             // NB: We forget this child tempdir to avoid deleting things during the run.
@@ -99,7 +99,7 @@ pub fn criterion_benchmark_snapshot_capture(c: &mut Criterion) {
         cgroup
             .sample_size(10)
             .measurement_time(Duration::from_secs(30))
-            .bench_function(format!("snapshot_capture({:?})", params), |b| {
+            .bench_function(format!("snapshot_capture({params:?})"), |b| {
                 b.iter(|| {
                     for _ in 0..captures {
                         let _ = executor

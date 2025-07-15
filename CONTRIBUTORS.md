@@ -320,6 +320,7 @@ Created as part of the release process.
 + SergeKireev
 + Sergey Serebryakov
 + Seve Martinez
++ Shaked Kaplan
 + Shane Delmore
 + Shantanu Kumar
 + Shuo Li
@@ -391,6 +392,7 @@ Created as part of the release process.
 + hephex
 + jgartdele/del
 + lukevmorris
++ nikhila-dwarakanath-zocdoc
 + offsetcyan
 + okcleary
 + olivercoleman-switchdin

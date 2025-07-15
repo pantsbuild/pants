@@ -761,6 +761,9 @@ def run_rule_with_mocks(
             mock_call = mock_calls.get(rule_id)
             if mock_call:
                 unconsumed_mock_calls.discard(rule_id)
+                # Close the original, unmocked, coroutine, to prevent the "was never awaited"
+                # warning polluting stderr data that the test may examine.
+                res.close()
                 return mock_call(*args)
             raise AssertionError(f"No mock_call provided for {rule_id}.")
         elif isinstance(res, Call):

@@ -11,7 +11,7 @@ import pytest
 
 from pants.base.exceptions import IncorrectProductError
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import Get, MultiGet, implicitly, rule
+from pants.engine.rules import Get, MultiGet, concurrently, implicitly, rule
 from pants.engine.unions import UnionRule, union
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
@@ -204,9 +204,27 @@ class WrappedVehicle:
     vehicle: Vehicle
 
 
+@dataclass(frozen=True)
+class WrappedVehiclesByName:
+    vehicles: tuple[Vehicle, ...]
+
+
 @rule
 async def generic_num_wheels(wrapped_vehicle: WrappedVehicle) -> int:
     return await Get(int, Vehicle, wrapped_vehicle.vehicle)
+
+
+@rule(polymorphic=True)
+async def num_wheels_cbn(vehicle: Vehicle, _: Fuel) -> int:
+    raise NotImplementedError()
+
+
+@rule
+async def wrapped_num_wheels_cbn(wrapped_vehicles: WrappedVehiclesByName) -> int:
+    all_wheels = await concurrently(
+        num_wheels_cbn(**implicitly({vehicle: Vehicle})) for vehicle in wrapped_vehicles.vehicles
+    )
+    return sum(all_wheels)
 
 
 def test_union_rules_in_scope_via_query() -> None:
@@ -251,6 +269,26 @@ def test_union_rules_in_scope_computed() -> None:
     )
     assert rule_runner.request(int, [WrappedVehicle(Car())]) == 4
     assert rule_runner.request(int, [WrappedVehicle(Motorcycle())]) == 2
+
+
+def test_polymorphic_call_by_name() -> None:
+    @rule
+    async def fuel_singleton() -> Fuel:
+        return Fuel()
+
+    rule_runner = RuleRunner(
+        rules=[
+            car_num_wheels,
+            motorcycle_num_wheels,
+            UnionRule(Vehicle, Car),
+            UnionRule(Vehicle, Motorcycle),
+            num_wheels_cbn,
+            wrapped_num_wheels_cbn,
+            fuel_singleton,
+            QueryRule(int, [WrappedVehiclesByName]),
+        ],
+    )
+    assert rule_runner.request(int, [WrappedVehiclesByName((Car(), Motorcycle()))]) == 6
 
 
 # -----------------------------------------------------------------------------------------------

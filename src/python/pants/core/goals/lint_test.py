@@ -13,6 +13,7 @@ from typing import Any, TypeVar
 import pytest
 
 from pants.base.specs import Specs
+from pants.core.environments.rules import EnvironmentNameRequest
 from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.goals.fix import FixFilesRequest, FixTargetsRequest
 from pants.core.goals.fmt import FmtFilesRequest, FmtTargetsRequest
@@ -27,7 +28,6 @@ from pants.core.goals.lint import (
     lint,
 )
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.core.util_rules.partitions import PartitionerType, _EmptyMetadata
 from pants.engine.addresses import Address
 from pants.engine.fs import PathGlobs, SpecsPaths, Workspace
@@ -383,21 +383,19 @@ def run_lint_rule(
                     mock=mock_lint_partition,
                 ),
                 MockGet(
-                    output_type=FilteredTargets,
-                    input_types=(Specs,),
-                    mock=lambda _: FilteredTargets(tuple(targets)),
-                ),
-                MockGet(
-                    output_type=SpecsPaths,
-                    input_types=(Specs,),
-                    mock=lambda _: SpecsPaths(("f.txt", "BUILD"), ()),
-                ),
-                MockGet(
                     output_type=Snapshot,
                     input_types=(PathGlobs,),
                     mock=lambda _: EMPTY_SNAPSHOT,
                 ),
             ],
+            mock_calls={
+                "pants.engine.internals.graph.filter_targets": lambda: FilteredTargets(
+                    tuple(targets)
+                ),
+                "pants.engine.internals.specs_rules.resolve_specs_paths": lambda _: SpecsPaths(
+                    ("f.txt", "BUILD"), ()
+                ),
+            },
             union_membership=union_membership,
             # We don't want temporary warnings to interfere with our expected output.
             show_warnings=False,

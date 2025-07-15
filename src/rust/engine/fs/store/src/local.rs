@@ -311,7 +311,7 @@ impl ShardedFSDB {
                         .map_err(|e| format!("Failed to shutdown {tmp_path:?}: {e}"))?;
                     tokio::fs::set_permissions(&tmp_path, std::fs::Permissions::from_mode(0o555))
                         .await
-                        .map_err(|e| format!("Failed to set permissions on {:?}: {e}", tmp_path))?;
+                        .map_err(|e| format!("Failed to set permissions on {tmp_path:?}: {e}"))?;
                     // NB: Syncing metadata to disk ensures the `hard_link` we do later has the opportunity
                     // to succeed. Otherwise, if later when we try to `hard_link` the metadata isn't
                     // persisted to disk, we'll get `No such file or directory`.
@@ -430,7 +430,7 @@ impl UnderlyingByteStore for ShardedFSDB {
             if should_retry? {
                 attempts += 1;
                 let msg = format!("Input {src:?} changed while reading.");
-                log::debug!("{}", msg);
+                log::debug!("{msg}");
                 if attempts > 10 {
                     return Err(format!("Failed to store {src:?}."));
                 }

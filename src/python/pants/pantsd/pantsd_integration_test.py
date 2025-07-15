@@ -17,13 +17,10 @@ from textwrap import dedent
 import psutil
 import pytest
 
+from pants.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase, launch_waiter
 from pants.testutil.pants_integration_test import read_pants_log, setup_tmpdir, temporary_workdir
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, safe_open, safe_rmtree, touch
-from pants_test.pantsd.pantsd_integration_test_base import (
-    PantsDaemonIntegrationTestBase,
-    launch_waiter,
-)
 
 
 def launch_file_toucher(f):

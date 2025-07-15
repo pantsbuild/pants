@@ -3,12 +3,12 @@
 
 import re
 
+from pants.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 from pants.testutil.pants_integration_test import read_pants_log, run_pants, setup_tmpdir
-from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 
 
 def test_native_logging() -> None:
-    expected_msg = r"\[DEBUG\] Launching \d+ root"
+    expected_msg = r"\[DEBUG\] File handle limit is: \d+"
 
     with setup_tmpdir({"foo/BUILD": "target()"}) as tmpdir:
         pants_run = run_pants(

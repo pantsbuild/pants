@@ -3,7 +3,7 @@
 
 import itertools
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
 
@@ -25,6 +25,7 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.internals.engine_testutil import (
+    WorkunitTracker,
     assert_equal_with_printing,
     remove_locations_from_traceback,
 )
@@ -266,32 +267,6 @@ class TestEngine(SchedulerTestBase):
             "No installed QueryRules return the type MyFloat. Try registering QueryRule(MyFloat "
             "for MyInt)."
         ) in str(cm.value)
-
-
-@dataclass
-class WorkunitTracker(WorkunitsCallback):
-    """This class records every non-empty batch of started and completed workunits received from the
-    engine."""
-
-    finished_workunit_chunks: list[list[dict]] = field(default_factory=list)
-    started_workunit_chunks: list[list[dict]] = field(default_factory=list)
-    finished: bool = False
-
-    @property
-    def can_finish_async(self) -> bool:
-        return False
-
-    def __call__(self, **kwargs) -> None:
-        if kwargs["finished"] is True:
-            self.finished = True
-
-        started_workunits = kwargs.get("started_workunits")
-        if started_workunits:
-            self.started_workunit_chunks.append(started_workunits)
-
-        completed_workunits = kwargs.get("completed_workunits")
-        if completed_workunits:
-            self.finished_workunit_chunks.append(completed_workunits)
 
 
 def new_run_tracker() -> RunTracker:
