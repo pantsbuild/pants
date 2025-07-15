@@ -256,7 +256,7 @@ impl BuildResultFS {
             Ok(Some(inode)) => Ok(dir_attr_for(inode)),
             Ok(None) => Err(libc::ENOENT),
             Err(err) => {
-                error!("Error getting directory for digest {:?}: {}", digest, err);
+                error!("Error getting directory for digest {digest:?}: {err}");
                 Err(libc::EINVAL)
             }
         }
@@ -347,7 +347,7 @@ impl BuildResultFS {
                             {
                                 let child_digest =
                                     require_digest(digest.as_ref()).map_err(|err| {
-                                        error!("Error parsing digest: {:?}", err);
+                                        error!("Error parsing digest: {err:?}");
                                         libc::ENOENT
                                     })?;
                                 let maybe_child_inode = match filetype {
@@ -372,8 +372,7 @@ impl BuildResultFS {
                                     }
                                     Err(err) => {
                                         error!(
-                                            "Error reading child directory {:?}: {}",
-                                            child_digest, err
+                                            "Error reading child directory {child_digest:?}: {err}"
                                         );
                                         return Err(libc::EINVAL);
                                     }
@@ -384,7 +383,7 @@ impl BuildResultFS {
                         }
                         Err(StoreError::MissingDigest { .. }) => Err(libc::ENOENT),
                         Err(err) => {
-                            error!("Error loading directory {:?}: {}", digest, err);
+                            error!("Error loading directory {digest:?}: {err}");
                             Err(libc::EINVAL)
                         }
                     }
@@ -432,7 +431,7 @@ impl fuser::Filesystem for BuildResultFS {
                     Ok(digest) => self
                         .inode_for_file(digest, true)
                         .map_err(|err| {
-                            error!("Error loading file by digest {}: {}", digest_str, err);
+                            error!("Error loading file by digest {digest_str}: {err}");
                             libc::EINVAL
                         })
                         .and_then(|maybe_inode| {
@@ -441,14 +440,14 @@ impl fuser::Filesystem for BuildResultFS {
                                 .ok_or(libc::ENOENT)
                         }),
                     Err(err) => {
-                        warn!("Invalid digest for file in digest root: {}", err);
+                        warn!("Invalid digest for file in digest root: {err}");
                         Err(libc::ENOENT)
                     }
                 },
                 (DIRECTORY_ROOT, Some(digest_str)) => match digest_from_filepath(digest_str) {
                     Ok(digest) => self.dir_attr_for(digest),
                     Err(err) => {
-                        warn!("Invalid digest for directory in directory root: {}", err);
+                        warn!("Invalid digest for directory in directory root: {err}");
                         Err(libc::ENOENT)
                     }
                 },
@@ -468,10 +467,7 @@ impl fuser::Filesystem for BuildResultFS {
                                 .map_err(|err| match err {
                                     StoreError::MissingDigest { .. } => libc::ENOENT,
                                     err => {
-                                        error!(
-                                            "Error reading directory {:?}: {}",
-                                            parent_digest, err
-                                        );
+                                        error!("Error reading directory {parent_digest:?}: {err}");
                                         libc::EINVAL
                                     }
                                 })?;
@@ -482,7 +478,7 @@ impl fuser::Filesystem for BuildResultFS {
                             Node::Directory(directory_node) => {
                                 let digest = require_digest(directory_node.digest.as_ref())
                                     .map_err(|err| {
-                                        error!("Error parsing digest: {:?}", err);
+                                        error!("Error parsing digest: {err:?}");
                                         libc::ENOENT
                                     })?;
                                 self.dir_attr_for(digest)
@@ -490,15 +486,12 @@ impl fuser::Filesystem for BuildResultFS {
                             Node::File(file_node) => {
                                 let digest =
                                     require_digest(file_node.digest.as_ref()).map_err(|err| {
-                                        error!("Error parsing digest: {:?}", err);
+                                        error!("Error parsing digest: {err:?}");
                                         libc::ENOENT
                                     })?;
                                 self.inode_for_file(digest, file_node.is_executable)
                                     .map_err(|err| {
-                                        error!(
-                                            "Error loading file by digest {}: {}",
-                                            filename, err
-                                        );
+                                        error!("Error loading file by digest {filename}: {err}");
                                         libc::EINVAL
                                     })
                                     .and_then(|maybe_inode| {
@@ -588,7 +581,7 @@ impl fuser::Filesystem for BuildResultFS {
                                     }
                                 }
                                 err => {
-                                    error!("Error loading bytes for {:?}: {}", digest, err);
+                                    error!("Error loading bytes for {digest:?}: {err}");
                                     if let Some(reply) = maybe_reply {
                                         reply.error(libc::EINVAL);
                                     }
@@ -666,7 +659,7 @@ pub fn mount<P: AsRef<Path>>(
     let (sender, receiver) = channel();
     let brfs = BuildResultFS::new(sender, runtime, store);
 
-    debug!("About to spawn_mount with options {:?}", options);
+    debug!("About to spawn_mount with options {options:?}");
     let result = fuser::spawn_mount2(brfs, &mount_path, &options);
     // N.B.: The session won't be used by the caller, but we return it since a reference must be
     // maintained to prevent early dropping which unmounts the filesystem.
@@ -742,10 +735,7 @@ async fn main() {
         let token = match std::fs::read_to_string(oauth_path) {
             Ok(token) => token,
             Err(err) => {
-                error!(
-                    "Error reading oauth bearer token from {:?}: {}",
-                    oauth_path, err
-                );
+                error!("Error reading oauth bearer token from {oauth_path:?}: {err}");
                 std::process::exit(1);
             }
         };
@@ -780,6 +770,7 @@ async fn main() {
                 retries: 1,
                 concurrency_limit: *args.get_one("rpc-concurrency-limit").unwrap(),
                 batch_api_size_limit: *args.get_one("batch-api-size-limit").unwrap(),
+                batch_load_enabled: false,
             })
             .await
             .expect("Error making remote store"),
@@ -808,15 +799,12 @@ async fn main() {
 
     match mount(mount_path, store, runtime.clone()) {
         Err(err) => {
-            error!(
-                "Store {} failed to mount at {}: {}",
-                store_path, mount_path, err
-            );
+            error!("Store {store_path} failed to mount at {mount_path}: {err}");
             std::process::exit(1);
         }
         Ok((_, receiver)) => {
             match receiver.recv().unwrap() {
-                BRFSEvent::Init => debug!("Store {} mounted at {}", store_path, mount_path),
+                BRFSEvent::Init => debug!("Store {store_path} mounted at {mount_path}"),
                 BRFSEvent::Destroy => {
                     warn!("Externally unmounted before we could mount.");
                     return;
@@ -830,7 +818,7 @@ async fn main() {
                 match receiver.recv().unwrap_or(BRFSEvent::Destroy) {
                     BRFSEvent::Destroy => Some(Sig::Unmount),
                     event => {
-                        warn!("Received unexpected event {:?}", event);
+                        warn!("Received unexpected event {event:?}");
                         None
                     }
                 }
@@ -843,7 +831,7 @@ async fn main() {
             if let Some(sig) = shutdown_signal.next().await {
                 match sig {
                     Sig::Unmount => debug!("Externally unmounted"),
-                    sig => debug!("Received SIG{:?}", sig),
+                    sig => debug!("Received SIG{sig:?}"),
                 }
             }
         }

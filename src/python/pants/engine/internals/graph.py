@@ -10,27 +10,30 @@ import json
 import logging
 import os.path
 from collections import defaultdict
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Coroutine, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Any, DefaultDict, NamedTuple, Type, TypeVar, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
-from pants.build_graph.address import BuildFileAddressRequest, MaybeAddress, ResolveError
-from pants.engine.addresses import (
-    Address,
-    Addresses,
-    AddressInput,
-    BuildFileAddress,
-    UnparsedAddressInputs,
-)
+from pants.build_graph.address import BuildFileAddressRequest, ResolveError
+from pants.engine.addresses import Address, Addresses, AddressInput, UnparsedAddressInputs
 from pants.engine.collection import Collection
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
-from pants.engine.fs import EMPTY_SNAPSHOT, GlobMatchErrorBehavior, PathGlobs, Paths, Snapshot
+from pants.engine.fs import EMPTY_SNAPSHOT, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.internals import native_engine
-from pants.engine.internals.build_files import AddressFamilyDir
-from pants.engine.internals.mapper import AddressFamilies, AddressFamily
+from pants.engine.internals.build_files import (
+    AddressFamilyDir,
+    BuildFileOptions,
+    ensure_address_family,
+    find_build_file,
+    find_target_adaptor,
+    maybe_resolve_address,
+    parse_address_family,
+    resolve_address,
+)
+from pants.engine.internals.mapper import AddressFamilies, SpecsFilter
 from pants.engine.internals.native_engine import AddressParseException
 from pants.engine.internals.parametrize import Parametrize, _TargetParametrization
 from pants.engine.internals.parametrize import (  # noqa: F401
@@ -39,8 +42,13 @@ from pants.engine.internals.parametrize import (  # noqa: F401
 from pants.engine.internals.parametrize import (  # noqa: F401
     _TargetParametrizationsRequest as _TargetParametrizationsRequest,
 )
+from pants.engine.internals.synthetic_targets import (
+    SyntheticTargetsSpecPathsRequest,
+    get_synthetic_targets_spec_paths,
+)
 from pants.engine.internals.target_adaptor import SourceBlocks, TargetAdaptor, TargetAdaptorRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.intrinsics import digest_to_snapshot, path_globs_to_paths
+from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     AllTargets,
     AllUnexpandedTargets,
@@ -59,7 +67,6 @@ from pants.engine.target import (
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     FilteredTargets,
-    GeneratedSources,
     GeneratedTargets,
     GenerateSourcesRequest,
     GenerateTargetsRequest,
@@ -93,6 +100,8 @@ from pants.engine.target import (
     WrappedTarget,
     WrappedTargetRequest,
     _generate_file_level_targets,
+    generate_sources,
+    generate_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import GlobalOptions, UnmatchedBuildFileGlobs
@@ -112,29 +121,8 @@ logger = logging.getLogger(__name__)
 
 
 @rule(_masked_types=[EnvironmentName])
-async def resolve_unexpanded_targets(addresses: Addresses) -> UnexpandedTargets:
-    wrapped_targets = await MultiGet(
-        Get(
-            WrappedTarget,
-            WrappedTargetRequest(
-                a,
-                # Idiomatic rules should not be manually constructing `Addresses`. Instead, they
-                # should use `UnparsedAddressInputs` or `Specs` rules.
-                #
-                # It is technically more correct for us to require callers of
-                # `Addresses -> UnexpandedTargets` to specify a `description_of_origin`. But in
-                # practice, this dramatically increases boilerplate, and it should never be
-                # necessary.
-                #
-                # Note that this contrasts with an individual `Address`, which often is unverified
-                # because it can come from the rule `AddressInput -> Address`, which only verifies
-                # that it has legal syntax and does not check the address exists.
-                description_of_origin="<infallible>",
-            ),
-        )
-        for a in addresses
-    )
-    return UnexpandedTargets(wrapped_target.target for wrapped_target in wrapped_targets)
+async def filter_targets(targets: Targets, specs_filter: SpecsFilter) -> FilteredTargets:
+    return FilteredTargets(tgt for tgt in targets if specs_filter.matches(tgt))
 
 
 @rule
@@ -191,9 +179,8 @@ class _RequestAdaptorAndType:
 async def _determine_target_adaptor_and_type(
     req: _RequestAdaptorAndType, registered_target_types: RegisteredTargetTypes
 ) -> _AdaptorAndType:
-    target_adaptor = await Get(
-        TargetAdaptor,
-        TargetAdaptorRequest(req.address, description_of_origin=req.description_of_origin),
+    target_adaptor = await find_target_adaptor(
+        TargetAdaptorRequest(req.address, description_of_origin=req.description_of_origin)
     )
     target_type = registered_target_types.aliases_to_types.get(target_adaptor.type_alias, None)
     if target_type is None:
@@ -234,31 +221,6 @@ class ResolveAllTargetGeneratorRequests:
     of_type: type[TargetGenerator] | None = None
 
 
-@rule
-async def resolve_all_generator_target_requests(
-    req: ResolveAllTargetGeneratorRequests,
-) -> ResolvedTargetGeneratorRequests:
-    address_families = await Get(
-        AddressFamilies,
-        RawSpecsWithoutFileOwners(
-            recursive_globs=(RecursiveGlobSpec(""),),
-            description_of_origin="the `ResolveAllTargetGeneratorRequests` rule",
-        ),
-    )
-    results = await MultiGet(
-        Get(
-            ResolvedTargetGeneratorRequests,
-            ResolveTargetGeneratorRequests(address, req.description_of_origin),
-        )
-        for family in address_families
-        for address, target_adaptor in family.addresses_to_target_adaptors.items()
-        if not req.of_type or target_adaptor.type_alias == req.of_type.alias
-    )
-    return ResolvedTargetGeneratorRequests(
-        tuple(itertools.chain.from_iterable(result.requests for result in results))
-    )
-
-
 async def _parametrized_target_generators_with_templates(
     address: Address,
     target_adaptor: TargetAdaptor,
@@ -268,7 +230,9 @@ async def _parametrized_target_generators_with_templates(
 ) -> list[tuple[TargetGenerator, Mapping[str, Any]]]:
     # Pre-load field values from defaults for the target type being generated.
     if hasattr(target_type, "generated_target_cls"):
-        family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
+        family = (
+            await parse_address_family(**implicitly(AddressFamilyDir(address.spec_path)))
+        ).ensure()
         template_fields = dict(family.defaults.get(target_type.generated_target_cls.alias, {}))
     else:
         template_fields = {}
@@ -357,8 +321,8 @@ async def _target_generator_overrides(
         override_globs = OverridesField.to_path_globs(
             address, overrides_flattened, unmatched_build_file_globs
         )
-        override_paths = await MultiGet(
-            Get(Paths, PathGlobs, path_globs) for path_globs in override_globs
+        override_paths = await concurrently(
+            path_globs_to_paths(path_globs) for path_globs in override_globs
         )
         return OverridesField.flatten_paths(
             address, zip(override_paths, override_globs, overrides_flattened.values())
@@ -373,8 +337,8 @@ async def resolve_generator_target_requests(
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
     unmatched_build_file_globs: UnmatchedBuildFileGlobs,
 ) -> ResolvedTargetGeneratorRequests:
-    adaptor_and_type = await Get(
-        _AdaptorAndType, _RequestAdaptorAndType(req.address, req.description_of_origin)
+    adaptor_and_type = await _determine_target_adaptor_and_type(
+        _RequestAdaptorAndType(req.address, req.description_of_origin), **implicitly()
     )
     target_adaptor = adaptor_and_type.adaptor
     target_type = adaptor_and_type.target_type
@@ -416,13 +380,68 @@ async def resolve_generator_target_requests(
     )
 
 
+@rule(_masked_types=[EnvironmentName])
+async def address_families_from_raw_specs_without_file_owners(
+    specs: RawSpecsWithoutFileOwners,
+    build_file_options: BuildFileOptions,
+) -> AddressFamilies:
+    if not (specs.dir_literals or specs.dir_globs or specs.recursive_globs or specs.ancestor_globs):
+        return AddressFamilies()
+    # Resolve all globs.
+    build_file_globs, validation_globs = specs.to_build_file_path_globs_tuple(
+        build_patterns=build_file_options.patterns,
+        build_ignore_patterns=build_file_options.ignores,
+    )
+    build_file_paths, _ = await concurrently(
+        path_globs_to_paths(build_file_globs),
+        path_globs_to_paths(validation_globs),
+    )
+    dirnames = set(
+        await get_synthetic_targets_spec_paths(
+            SyntheticTargetsSpecPathsRequest(tuple(specs.glob_specs())), **implicitly()
+        )
+    )
+    dirnames.update(os.path.dirname(f) for f in build_file_paths.files)
+    return AddressFamilies(
+        await concurrently(
+            ensure_address_family(**implicitly(AddressFamilyDir(d))) for d in dirnames
+        )
+    )
+
+
+@rule
+async def resolve_all_generator_target_requests(
+    req: ResolveAllTargetGeneratorRequests,
+) -> ResolvedTargetGeneratorRequests:
+    address_families = await address_families_from_raw_specs_without_file_owners(
+        RawSpecsWithoutFileOwners(
+            recursive_globs=(RecursiveGlobSpec(""),),
+            description_of_origin="the `ResolveAllTargetGeneratorRequests` rule",
+        ),
+        **implicitly(),
+    )
+    results = await concurrently(
+        resolve_generator_target_requests(
+            ResolveTargetGeneratorRequests(address, req.description_of_origin), **implicitly()
+        )
+        for family in address_families
+        for address, target_adaptor in family.addresses_to_target_adaptors.items()
+        if not req.of_type or target_adaptor.type_alias == req.of_type.alias
+    )
+    return ResolvedTargetGeneratorRequests(
+        tuple(itertools.chain.from_iterable(result.requests for result in results))
+    )
+
+
 @rule
 async def resolve_target_parametrizations(
-    request: _TargetParametrizationsRequest, union_membership: UnionMembership
+    request: _TargetParametrizationsRequest,
+    union_membership: UnionMembership,
+    env_name: EnvironmentName,
 ) -> _TargetParametrizations:
     address = request.address
-    adaptor_and_type = await Get(
-        _AdaptorAndType, _RequestAdaptorAndType(request.address, request.description_of_origin)
+    adaptor_and_type = await _determine_target_adaptor_and_type(
+        _RequestAdaptorAndType(request.address, request.description_of_origin), **implicitly()
     )
     target_adaptor = adaptor_and_type.adaptor
     target_type = adaptor_and_type.target_type
@@ -430,13 +449,14 @@ async def resolve_target_parametrizations(
     parametrizations: list[_TargetParametrization] = []
     requests: ResolvedTargetGeneratorRequests | None = None
     if issubclass(target_type, TargetGenerator):
-        requests = await Get(
-            ResolvedTargetGeneratorRequests,
-            ResolveTargetGeneratorRequests(address, request.description_of_origin),
+        requests = await resolve_generator_target_requests(
+            ResolveTargetGeneratorRequests(address, request.description_of_origin), **implicitly()
         )
     if requests and requests.requests:
-        all_generated = await MultiGet(
-            Get(GeneratedTargets, GenerateTargetsRequest, generate_request)
+        all_generated = await concurrently(
+            generate_targets(
+                **implicitly({generate_request: GenerateTargetsRequest, env_name: EnvironmentName})
+            )
             for generate_request in requests.requests
         )
         parametrizations.extend(
@@ -449,6 +469,65 @@ async def resolve_target_parametrizations(
         )
 
     return _TargetParametrizations(parametrizations)
+
+
+@rule(_masked_types=[EnvironmentName])
+async def resolve_target(
+    request: WrappedTargetRequest,
+    target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
+    local_environment_name: ChosenLocalEnvironmentName,
+) -> WrappedTarget:
+    address = request.address
+    base_address = address.maybe_convert_to_target_generator()
+    parametrizations = await resolve_target_parametrizations(
+        **implicitly(
+            {
+                _TargetParametrizationsRequest(
+                    base_address, description_of_origin=request.description_of_origin
+                ): _TargetParametrizationsRequest,
+                local_environment_name.val: EnvironmentName,
+            }
+        )
+    )
+    target = parametrizations.get(address, target_types_to_generate_requests)
+    if target is None:
+        raise ResolveError(
+            softwrap(
+                f"""
+                The address `{address}` from {request.description_of_origin} was not generated by
+                the target `{base_address}`. Did you mean one of these addresses?
+
+                {bullet_list(str(t.address) for t in parametrizations.all)}
+                """
+            )
+        )
+    return WrappedTarget(target)
+
+
+@rule(_masked_types=[EnvironmentName])
+async def resolve_unexpanded_targets(addresses: Addresses) -> UnexpandedTargets:
+    wrapped_targets = await concurrently(
+        resolve_target(
+            WrappedTargetRequest(
+                a,
+                # Idiomatic rules should not be manually constructing `Addresses`. Instead, they
+                # should use `UnparsedAddressInputs` or `Specs` rules.
+                #
+                # It is technically more correct for us to require callers of
+                # `Addresses -> UnexpandedTargets` to specify a `description_of_origin`. But in
+                # practice, this dramatically increases boilerplate, and it should never be
+                # necessary.
+                #
+                # Note that this contrasts with an individual `Address`, which often is unverified
+                # because it can come from the rule `AddressInput -> Address`, which only verifies
+                # that it has legal syntax and does not check the address exists.
+                description_of_origin="<infallible>",
+            ),
+            **implicitly(),
+        )
+        for a in addresses
+    )
+    return UnexpandedTargets(wrapped_target.target for wrapped_target in wrapped_targets)
 
 
 _TargetType = TypeVar("_TargetType", bound=Target)
@@ -518,38 +597,6 @@ def _target_parametrizations(
         return _TargetParametrization(target, FrozenDict())
 
 
-@rule(_masked_types=[EnvironmentName])
-async def resolve_target(
-    request: WrappedTargetRequest,
-    target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
-    local_environment_name: ChosenLocalEnvironmentName,
-) -> WrappedTarget:
-    address = request.address
-    base_address = address.maybe_convert_to_target_generator()
-    parametrizations = await Get(
-        _TargetParametrizations,
-        {
-            _TargetParametrizationsRequest(
-                base_address, description_of_origin=request.description_of_origin
-            ): _TargetParametrizationsRequest,
-            local_environment_name.val: EnvironmentName,
-        },
-    )
-    target = parametrizations.get(address, target_types_to_generate_requests)
-    if target is None:
-        raise ResolveError(
-            softwrap(
-                f"""
-                The address `{address}` from {request.description_of_origin} was not generated by
-                the target `{base_address}`. Did you mean one of these addresses?
-
-                {bullet_list(str(t.address) for t in parametrizations.all)}
-                """
-            )
-        )
-    return WrappedTarget(target)
-
-
 @dataclass(frozen=True)
 class WrappedTargetForBootstrap:
     """Used to avoid a rule graph cycle when evaluating bootstrap targets.
@@ -569,12 +616,12 @@ async def resolve_target_for_bootstrapping(
     request: WrappedTargetRequest,
     union_membership: UnionMembership,
 ) -> WrappedTargetForBootstrap:
-    adaptor_and_type = await Get(
-        _AdaptorAndType,
+    adaptor_and_type = await _determine_target_adaptor_and_type(
         _RequestAdaptorAndType(
             request.address,
             description_of_origin=request.description_of_origin,
         ),
+        **implicitly(),
     )
     target_adaptor = adaptor_and_type.adaptor
     target_type = adaptor_and_type.target_type
@@ -609,24 +656,25 @@ async def resolve_targets(
         ):
             generator_targets.append(tgt)
             parametrizations_gets.append(
-                Get(
-                    _TargetParametrizations,
-                    {
-                        _TargetParametrizationsRequest(
-                            tgt.address.maybe_convert_to_target_generator(),
-                            # Idiomatic rules should not be manually creating `UnexpandedTargets`, so
-                            # we can be confident that the targets actually exist and the addresses
-                            # are already legitimate.
-                            description_of_origin="<infallible>",
-                        ): _TargetParametrizationsRequest,
-                        local_environment_name.val: EnvironmentName,
-                    },
+                resolve_target_parametrizations(
+                    **implicitly(
+                        {
+                            _TargetParametrizationsRequest(
+                                tgt.address.maybe_convert_to_target_generator(),
+                                # Idiomatic rules should not be manually creating `UnexpandedTargets`, so
+                                # we can be confident that the targets actually exist and the addresses
+                                # are already legitimate.
+                                description_of_origin="<infallible>",
+                            ): _TargetParametrizationsRequest,
+                            local_environment_name.val: EnvironmentName,
+                        }
+                    )
                 )
             )
         else:
             expanded_targets.add(tgt)
 
-    all_generated_targets = await MultiGet(parametrizations_gets)
+    all_generated_targets = await concurrently(parametrizations_gets)
     expanded_targets.update(
         tgt
         for generator, parametrizations in zip(generator_targets, all_generated_targets)
@@ -637,12 +685,13 @@ async def resolve_targets(
 
 @rule(desc="Find all targets in the project", level=LogLevel.DEBUG, _masked_types=[EnvironmentName])
 async def find_all_targets() -> AllTargets:
-    tgts = await Get(
-        Targets,
-        RawSpecsWithoutFileOwners(
-            recursive_globs=(RecursiveGlobSpec(""),),
-            description_of_origin="the `AllTargets` rule",
-        ),
+    tgts = await resolve_targets(
+        **implicitly(
+            RawSpecsWithoutFileOwners(
+                recursive_globs=(RecursiveGlobSpec(""),),
+                description_of_origin="the `AllTargets` rule",
+            )
+        )
     )
     return AllTargets(tgts)
 
@@ -653,11 +702,13 @@ async def find_all_targets() -> AllTargets:
     _masked_types=[EnvironmentName],
 )
 async def find_all_unexpanded_targets() -> AllUnexpandedTargets:
-    tgts = await Get(
-        UnexpandedTargets,
-        RawSpecsWithoutFileOwners(
-            recursive_globs=(RecursiveGlobSpec(""),), description_of_origin="the `AllTargets` rule"
-        ),
+    tgts = await resolve_unexpanded_targets(
+        **implicitly(
+            RawSpecsWithoutFileOwners(
+                recursive_globs=(RecursiveGlobSpec(""),),
+                description_of_origin="the `AllTargets` rule",
+            )
+        )
     )
     return AllUnexpandedTargets(tgts)
 
@@ -754,31 +805,33 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
     Unlike a traditional BFS algorithm, we batch each round of traversals via `MultiGet` for
     improved performance / concurrency.
     """
-    roots_as_targets = await Get(UnexpandedTargets, Addresses(request.tt_request.roots))
+    roots_as_targets = await resolve_unexpanded_targets(Addresses(request.tt_request.roots))
     visited: OrderedSet[Target] = OrderedSet()
     queued = FrozenOrderedSet(roots_as_targets)
     dependency_mapping: dict[Address, tuple[Address, ...]] = {}
     while queued:
         direct_dependencies: tuple[Collection[Target], ...]
         if request.expanded_targets:
-            direct_dependencies = await MultiGet(  # noqa: PNT30: this is inherently sequential
-                Get(
-                    Targets,
-                    DependenciesRequest(
-                        tgt.get(Dependencies),
-                        should_traverse_deps_predicate=request.tt_request.should_traverse_deps_predicate,
-                    ),
+            direct_dependencies = await concurrently(  # noqa: PNT30: this is inherently sequential
+                resolve_targets(
+                    **implicitly(
+                        DependenciesRequest(
+                            tgt.get(Dependencies),
+                            should_traverse_deps_predicate=request.tt_request.should_traverse_deps_predicate,
+                        )
+                    )
                 )
                 for tgt in queued
             )
         else:
-            direct_dependencies = await MultiGet(  # noqa: PNT30: this is inherently sequential
-                Get(
-                    UnexpandedTargets,
-                    DependenciesRequest(
-                        tgt.get(Dependencies),
-                        should_traverse_deps_predicate=request.tt_request.should_traverse_deps_predicate,
-                    ),
+            direct_dependencies = await concurrently(  # noqa: PNT30: this is inherently sequential
+                resolve_unexpanded_targets(
+                    **implicitly(
+                        DependenciesRequest(
+                            tgt.get(Dependencies),
+                            should_traverse_deps_predicate=request.tt_request.should_traverse_deps_predicate,
+                        )
+                    )
                 )
                 for tgt in queued
             )
@@ -805,6 +858,72 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
     )
 
 
+class SubprojectRoots(Collection[str]):
+    pass
+
+
+@rule
+async def extract_subproject_roots(global_options: GlobalOptions) -> SubprojectRoots:
+    return SubprojectRoots(global_options.subproject_roots)
+
+
+@rule(desc="Resolve addresses")
+async def resolve_unparsed_address_inputs(
+    request: UnparsedAddressInputs, subproject_roots: SubprojectRoots
+) -> Addresses:
+    address_inputs = []
+    invalid_addresses = []
+    for v in request.values:
+        try:
+            address_inputs.append(
+                AddressInput.parse(
+                    v,
+                    relative_to=request.relative_to,
+                    subproject_roots=subproject_roots,
+                    description_of_origin=request.description_of_origin,
+                )
+            )
+        except AddressParseException:
+            if not request.skip_invalid_addresses:
+                raise
+            invalid_addresses.append(v)
+
+    if request.skip_invalid_addresses:
+        maybe_addresses = await concurrently(maybe_resolve_address(ai) for ai in address_inputs)
+        valid_addresses = []
+        for maybe_address, address_input in zip(maybe_addresses, address_inputs):
+            if isinstance(maybe_address.val, Address):
+                valid_addresses.append(maybe_address.val)
+            else:
+                invalid_addresses.append(address_input.spec)
+
+        if invalid_addresses:
+            logger.debug(
+                softwrap(
+                    f"""
+                    Invalid addresses from {request.description_of_origin}:
+                    {sorted(invalid_addresses)}. Skipping them.
+                    """
+                )
+            )
+        return Addresses(valid_addresses)
+
+    addresses = await concurrently(
+        resolve_address(**implicitly({ai: AddressInput})) for ai in address_inputs
+    )
+    # Validate that the addresses exist. We do this eagerly here because
+    # `Addresses -> UnexpandedTargets` does not preserve the `description_of_origin`, so it would
+    # be too late, per https://github.com/pantsbuild/pants/issues/15858.
+    await concurrently(
+        resolve_target(
+            WrappedTargetRequest(addr, description_of_origin=request.description_of_origin),
+            **implicitly(),
+        )
+        for addr in addresses
+    )
+    return Addresses(addresses)
+
+
 @rule(desc="Resolve transitive targets", level=LogLevel.DEBUG, _masked_types=[EnvironmentName])
 async def transitive_targets(
     request: TransitiveTargetsRequest,
@@ -814,7 +933,9 @@ async def transitive_targets(
     """Find all the targets transitively depended upon by the target roots."""
     environment_name = local_environment_name.val
 
-    dependency_mapping = await Get(_DependencyMapping, _DependencyMappingRequest(request, True))
+    dependency_mapping = await transitive_dependency_mapping(
+        _DependencyMappingRequest(request, True)
+    )
     targets = (*dependency_mapping.roots_as_targets, *dependency_mapping.visited)
 
     # Apply any transitive excludes (`!!` ignores).
@@ -826,8 +947,8 @@ async def transitive_targets(
 
     transitive_exclude_addresses = []
     if unevaluated_transitive_excludes:
-        all_transitive_exclude_addresses = await MultiGet(
-            Get(Addresses, UnparsedAddressInputs, unparsed)
+        all_transitive_exclude_addresses = await concurrently(
+            resolve_unparsed_address_inputs(unparsed, **implicitly())
             for unparsed in unevaluated_transitive_excludes
         )
         transitive_exclude_addresses = [
@@ -848,7 +969,7 @@ async def transitive_targets(
             for tgt in targets
         }
 
-        results = await MultiGet(
+        results = await concurrently(
             Get(
                 TransitivelyExcludeDependencies,
                 {
@@ -865,7 +986,9 @@ async def transitive_targets(
             itertools.chain.from_iterable(addresses for addresses in results)
         )
 
-    transitive_excludes = await Get(Targets, Addresses(transitive_exclude_addresses))
+    transitive_excludes = await resolve_targets(
+        **implicitly(Addresses(transitive_exclude_addresses))
+    )
 
     return TransitiveTargets(
         tuple(dependency_mapping.roots_as_targets),
@@ -887,15 +1010,14 @@ async def coarsened_targets_request(addresses: Addresses) -> CoarsenedTargetsReq
 async def coarsened_targets(
     request: CoarsenedTargetsRequest, local_environment_name: ChosenLocalEnvironmentName
 ) -> CoarsenedTargets:
-    dependency_mapping = await Get(
-        _DependencyMapping,
+    dependency_mapping = await transitive_dependency_mapping(
         _DependencyMappingRequest(
             TransitiveTargetsRequest(
                 request.roots,
                 should_traverse_deps_predicate=request.should_traverse_deps_predicate,
             ),
             expanded_targets=request.expanded_targets,
-        ),
+        )
     )
     addresses_to_targets = {
         t.address: t for t in [*dependency_mapping.visited, *dependency_mapping.roots_as_targets]
@@ -1074,14 +1196,41 @@ class Owners(FrozenOrderedSet[Address]):
     pass
 
 
+@rule
+def find_source_blocks_owners(
+    request: TextBlocksOwnersRequest, mapping: FilenameTargetSourceBlocksMapping
+) -> Owners:
+    file_blocks = mapping.get(request.filename)
+    if not file_blocks:
+        return Owners()
+
+    owners = set()
+
+    # Let's say the rule is called to figure out which targets has changed given the `git diff` output.
+    # Then `request.source_blocks` is populated with source blocks parsed from `git diff` output
+    # and `file_blocks` is holding the list of all source blocks for the given `request.filename`.
+    # In order to get an answer we need to find an intersection for all pairs of blocks and return
+    # the targets they correspond to.
+    #
+    # TODO Use interval tree?
+    for request_block, target_blocks in itertools.product(request.text_blocks, file_blocks):
+        for target_block in target_blocks.source_blocks:
+            if not target_block.is_touched_by(request_block):
+                continue
+            owners.add(target_blocks.address)
+            break  # continue outer loop
+
+    return Owners(owners)
+
+
 @rule(desc="Find which targets own certain files", _masked_types=[EnvironmentName])
 async def find_owners(
     owners_request: OwnersRequest,
     local_environment_name: ChosenLocalEnvironmentName,
 ) -> Owners:
     block_owners: tuple[Owners, ...] = (
-        await MultiGet(
-            Get(Owners, TextBlocksOwnersRequest(filename, blocks))
+        await concurrently(
+            find_source_blocks_owners(TextBlocksOwnersRequest(filename, blocks), **implicitly())
             for filename, blocks in owners_request.sources_blocks.items()
         )
         if owners_request.sources_blocks
@@ -1089,7 +1238,7 @@ async def find_owners(
     )
 
     # Determine which of the sources are live and which are deleted.
-    sources_paths = await Get(Paths, PathGlobs(owners_request.sources))
+    sources_paths = await path_globs_to_paths(PathGlobs(owners_request.sources))
 
     live_files = FrozenOrderedSet(sources_paths.files)
     deleted_files = FrozenOrderedSet(s for s in owners_request.sources if s not in live_files)
@@ -1099,8 +1248,8 @@ async def find_owners(
     def create_live_and_deleted_gets(
         *, filter_by_global_options: bool
     ) -> tuple[
-        Get[FilteredTargets | Targets],
-        Get[UnexpandedTargets],
+        Coroutine[Any, Any, FilteredTargets | Targets],
+        Coroutine[Any, Any, UnexpandedTargets],
     ]:
         """Walk up the buildroot looking for targets that would conceivably claim changed sources.
 
@@ -1116,26 +1265,27 @@ async def find_owners(
             description_of_origin="<owners rule - unused>",
             unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
         )
-        live_get: Get[FilteredTargets | Targets] = (
-            Get(FilteredTargets, RawSpecsWithoutFileOwners, live_raw_specs)
+        live_get = (
+            filter_targets(**implicitly({live_raw_specs: RawSpecsWithoutFileOwners}))
             if filter_by_global_options
-            else Get(Targets, RawSpecsWithoutFileOwners, live_raw_specs)
+            else resolve_targets(**implicitly({live_raw_specs: RawSpecsWithoutFileOwners}))
         )
-        deleted_get = Get(
-            UnexpandedTargets,
-            RawSpecsWithoutFileOwners(
-                ancestor_globs=tuple(AncestorGlobSpec(directory=d) for d in deleted_dirs),
-                filter_by_global_options=filter_by_global_options,
-                description_of_origin="<owners rule - unused>",
-                unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
-            ),
+        deleted_get = resolve_unexpanded_targets(
+            **implicitly(
+                RawSpecsWithoutFileOwners(
+                    ancestor_globs=tuple(AncestorGlobSpec(directory=d) for d in deleted_dirs),
+                    filter_by_global_options=filter_by_global_options,
+                    description_of_origin="<owners rule - unused>",
+                    unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
+                ),
+            )
         )
         return live_get, deleted_get
 
     live_get, deleted_get = create_live_and_deleted_gets(
         filter_by_global_options=owners_request.filter_by_global_options
     )
-    live_candidate_tgts, deleted_candidate_tgts = await MultiGet(live_get, deleted_get)
+    live_candidate_tgts, deleted_candidate_tgts = await concurrently(live_get, deleted_get)
 
     result = set()
     unmatched_sources = set(owners_request.sources)
@@ -1148,12 +1298,11 @@ async def find_owners(
             candidate_tgts = deleted_candidate_tgts
             sources_set = deleted_files
 
-        build_file_addresses = await MultiGet(  # noqa: PNT30: requires triage
-            Get(
-                BuildFileAddress,
+        build_file_addresses = await concurrently(  # noqa: PNT30: requires triage
+            find_build_file(
                 BuildFileAddressRequest(
                     tgt.address, description_of_origin="<owners rule - cannot trigger>"
-                ),
+                )
             )
             for tgt in candidate_tgts
         )
@@ -1181,33 +1330,6 @@ async def find_owners(
         )
 
     return Owners(result.union(*block_owners))
-
-
-@rule
-async def find_source_blocks_owners(
-    request: TextBlocksOwnersRequest, mapping: FilenameTargetSourceBlocksMapping
-) -> Owners:
-    file_blocks = mapping.get(request.filename)
-    if not file_blocks:
-        return Owners()
-
-    owners = set()
-
-    # Let's say the rule is called to figure out which targets has changed given the `git diff` output.
-    # Then `request.source_blocks` is populated with source blocks parsed from `git diff` output
-    # and `file_blocks` is holding the list of all source blocks for the given `request.filename`.
-    # In order to get an answer we need to find an intersection for all pairs of blocks and return
-    # the targets they correspond to.
-    #
-    # TODO Use interval tree?
-    for request_block, target_blocks in itertools.product(request.text_blocks, file_blocks):
-        for target_block in target_blocks.source_blocks:
-            if not target_block.is_touched_by(request_block):
-                continue
-            owners.add(target_blocks.address)
-            break  # continue outer loop
-
-    return Owners(owners)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1269,6 +1391,7 @@ async def hydrate_sources(
     request: HydrateSourcesRequest,
     unmatched_build_file_globs: UnmatchedBuildFileGlobs,
     union_membership: UnionMembership,
+    env_name: EnvironmentName,
 ) -> HydratedSources:
     sources_field = request.field
 
@@ -1314,25 +1437,25 @@ async def hydrate_sources(
     # Now, hydrate the `globs`. Even if we are going to use codegen, we will need the original
     # protocol sources to be hydrated.
     path_globs = sources_field.path_globs(unmatched_build_file_globs)
-    snapshot = await Get(Snapshot, PathGlobs, path_globs)
+    snapshot = await digest_to_snapshot(**implicitly({path_globs: PathGlobs}))
     sources_field.validate_resolved_files(snapshot.files)
 
     # Finally, return if codegen is not in use; otherwise, run the relevant code generator.
     if not request.enable_codegen or generate_request_type is None:
         return HydratedSources(snapshot, sources_field.filespec, sources_type=sources_type)
-    wrapped_protocol_target = await Get(
-        WrappedTarget,
+    wrapped_protocol_target = await resolve_target(
         WrappedTargetRequest(
             sources_field.address,
             # It's only possible to hydrate sources on a target that we already know exists.
             description_of_origin="<infallible>",
         ),
+        **implicitly(),
     )
-    generated_sources = await Get(
-        GeneratedSources,
-        GenerateSourcesRequest,
-        generate_request_type(snapshot, wrapped_protocol_target.target),
+    req = generate_request_type(snapshot, wrapped_protocol_target.target)
+    generated_sources = await generate_sources(
+        **implicitly({req: GenerateSourcesRequest, env_name: EnvironmentName})
     )
+
     return HydratedSources(
         generated_sources.snapshot, sources_field.filespec, sources_type=sources_type
     )
@@ -1344,7 +1467,7 @@ async def resolve_source_paths(
 ) -> SourcesPaths:
     sources_field = request.field
     path_globs = sources_field.path_globs(unmatched_build_file_globs)
-    paths = await Get(Paths, PathGlobs, path_globs)
+    paths = await path_globs_to_paths(path_globs)
     sources_field.validate_resolved_files(paths.files)
     return SourcesPaths(files=paths.files, dirs=paths.dirs)
 
@@ -1352,15 +1475,6 @@ async def resolve_source_paths(
 # -----------------------------------------------------------------------------------------------
 # Resolve addresses, including the Dependencies field
 # -----------------------------------------------------------------------------------------------
-
-
-class SubprojectRoots(Collection[str]):
-    pass
-
-
-@rule
-async def extract_subproject_roots(global_options: GlobalOptions) -> SubprojectRoots:
-    return SubprojectRoots(global_options.subproject_roots)
 
 
 class ParsedDependencies(NamedTuple):
@@ -1406,8 +1520,7 @@ async def convert_dependencies_request_to_explicitly_provided_dependencies_reque
     request, we ensure that the cache key for ExplicitlyProvidedDependencies calculation does not
     include the predicate increasing the cache-hit rate.
     """
-    # TODO: Maybe require Get(ExplicitlyProvidedDependencies, ExplicitlyProvidedDependenciesRequest)
-    #       and deprecate Get(ExplicitlyProvidedDependencies, DependenciesRequest) via this rule.
+    # TODO: Maybe require determine_explicitly_provided_dependencies() and deprecate this rule.
     return ExplicitlyProvidedDependenciesRequest(request.field)
 
 
@@ -1450,8 +1563,12 @@ async def determine_explicitly_provided_dependencies(
         else:
             addresses.append(result)
 
-    parsed_includes = await MultiGet(Get(Address, AddressInput, ai) for ai in addresses)
-    parsed_ignores = await MultiGet(Get(Address, AddressInput, ai) for ai in ignored_addresses)
+    parsed_includes = await concurrently(
+        resolve_address(**implicitly({ai: AddressInput})) for ai in addresses
+    )
+    parsed_ignores = await concurrently(
+        resolve_address(**implicitly({ai: AddressInput})) for ai in ignored_addresses
+    )
     return ExplicitlyProvidedDependencies(
         request.field.address,
         FrozenOrderedSet(sorted(parsed_includes)),
@@ -1469,16 +1586,17 @@ async def _fill_parameters(
 ) -> tuple[Address, ...]:
     assert not isinstance(addresses, Iterator)
 
-    parametrizations = await MultiGet(
-        Get(
-            _TargetParametrizations,
-            {
-                _TargetParametrizationsRequest(
-                    address.maybe_convert_to_target_generator(),
-                    description_of_origin=f"the `{field_alias}` field of the target {consumer_tgt.address}",
-                ): _TargetParametrizationsRequest,
-                local_environment_name.val: EnvironmentName,
-            },
+    parametrizations = await concurrently(
+        resolve_target_parametrizations(
+            **implicitly(
+                {
+                    _TargetParametrizationsRequest(
+                        address.maybe_convert_to_target_generator(),
+                        description_of_origin=f"the `{field_alias}` field of the target {consumer_tgt.address}",
+                    ): _TargetParametrizationsRequest,
+                    local_environment_name.val: EnvironmentName,
+                }
+            )
         )
         for address in addresses
     )
@@ -1501,10 +1619,9 @@ async def resolve_dependencies(
     local_environment_name: ChosenLocalEnvironmentName,
 ) -> Addresses:
     environment_name = local_environment_name.val
-    wrapped_tgt = await Get(
-        WrappedTarget,
-        # It's only possible to find dependencies for a target that we already know exists.
+    wrapped_tgt = await resolve_target(
         WrappedTargetRequest(request.field.address, description_of_origin="<infallible>"),
+        **implicitly(),
     )
     tgt = wrapped_tgt.target
 
@@ -1515,8 +1632,8 @@ async def resolve_dependencies(
         return Addresses([])
 
     try:
-        explicitly_provided = await Get(
-            ExplicitlyProvidedDependencies, DependenciesRequest, request
+        explicitly_provided = await determine_explicitly_provided_dependencies(
+            **implicitly(request)
         )
     except Exception as e:
         raise InvalidFieldException(
@@ -1534,7 +1651,7 @@ async def resolve_dependencies(
             for inference_request_type in inference_request_types
             if inference_request_type.infer_from.is_applicable(tgt)
         ]
-        inferred = await MultiGet(
+        inferred = await concurrently(
             Get(
                 InferredDependencies,
                 {
@@ -1550,17 +1667,18 @@ async def resolve_dependencies(
     # If it's a target generator, inject dependencies on all of its generated targets.
     generated_addresses: tuple[Address, ...] = ()
     if target_types_to_generate_requests.is_generator(tgt) and not tgt.address.is_generated_target:
-        parametrizations = await Get(
-            _TargetParametrizations,
-            {
-                _TargetParametrizationsRequest(
-                    tgt.address.maybe_convert_to_target_generator(),
-                    description_of_origin=(
-                        f"the target generator {tgt.address.maybe_convert_to_target_generator()}"
-                    ),
-                ): _TargetParametrizationsRequest,
-                environment_name: EnvironmentName,
-            },
+        parametrizations = await resolve_target_parametrizations(
+            **implicitly(
+                {
+                    _TargetParametrizationsRequest(
+                        tgt.address.maybe_convert_to_target_generator(),
+                        description_of_origin=(
+                            f"the target generator {tgt.address.maybe_convert_to_target_generator()}"
+                        ),
+                    ): _TargetParametrizationsRequest,
+                    environment_name: EnvironmentName,
+                }
+            )
         )
         generated_addresses = tuple(parametrizations.generated_for(tgt.address).keys())
 
@@ -1603,19 +1721,21 @@ async def resolve_dependencies(
         if isinstance(field, SpecialCasedDependencies)
         and request.should_traverse_deps_predicate(tgt, field) == DepsTraversalBehavior.INCLUDE
     )
-    # We can't use the normal `Get(Addresses, UnparsedAddressInputs)` due to a graph cycle.
-    special_cased = await MultiGet(
-        Get(
-            Address,
-            AddressInput,
-            AddressInput.parse(
-                addr,
-                relative_to=tgt.address.spec_path,
-                subproject_roots=subproject_roots,
-                description_of_origin=(
-                    f"the `{special_cased_field.alias}` field from the target {tgt.address}"
-                ),
-            ),
+    # We can't use `resolve_unparsed_address_inputs()` directly due to a graph cycle.
+    special_cased = await concurrently(
+        resolve_address(
+            **implicitly(
+                {
+                    AddressInput.parse(
+                        addr,
+                        relative_to=tgt.address.spec_path,
+                        subproject_roots=subproject_roots,
+                        description_of_origin=(
+                            f"the `{special_cased_field.alias}` field from the target {tgt.address}"
+                        ),
+                    ): AddressInput
+                }
+            )
         )
         for special_cased_field in special_cased_fields
         for addr in special_cased_field.to_unparsed_address_inputs().values
@@ -1640,7 +1760,7 @@ async def resolve_dependencies(
     )
 
     # Validate dependencies.
-    _ = await MultiGet(
+    _ = await concurrently(
         Get(
             ValidatedDependencies,
             {
@@ -1658,63 +1778,6 @@ async def resolve_dependencies(
     return result
 
 
-@rule(desc="Resolve addresses")
-async def resolve_unparsed_address_inputs(
-    request: UnparsedAddressInputs, subproject_roots: SubprojectRoots
-) -> Addresses:
-    address_inputs = []
-    invalid_addresses = []
-    for v in request.values:
-        try:
-            address_inputs.append(
-                AddressInput.parse(
-                    v,
-                    relative_to=request.relative_to,
-                    subproject_roots=subproject_roots,
-                    description_of_origin=request.description_of_origin,
-                )
-            )
-        except AddressParseException:
-            if not request.skip_invalid_addresses:
-                raise
-            invalid_addresses.append(v)
-
-    if request.skip_invalid_addresses:
-        maybe_addresses = await MultiGet(
-            Get(MaybeAddress, AddressInput, ai) for ai in address_inputs
-        )
-        valid_addresses = []
-        for maybe_address, address_input in zip(maybe_addresses, address_inputs):
-            if isinstance(maybe_address.val, Address):
-                valid_addresses.append(maybe_address.val)
-            else:
-                invalid_addresses.append(address_input.spec)
-
-        if invalid_addresses:
-            logger.debug(
-                softwrap(
-                    f"""
-                    Invalid addresses from {request.description_of_origin}:
-                    {sorted(invalid_addresses)}. Skipping them.
-                    """
-                )
-            )
-        return Addresses(valid_addresses)
-
-    addresses = await MultiGet(Get(Address, AddressInput, ai) for ai in address_inputs)
-    # Validate that the addresses exist. We do this eagerly here because
-    # `Addresses -> UnexpandedTargets` does not preserve the `description_of_origin`, so it would
-    # be too late, per https://github.com/pantsbuild/pants/issues/15858.
-    await MultiGet(
-        Get(
-            WrappedTarget,
-            WrappedTargetRequest(addr, description_of_origin=request.description_of_origin),
-        )
-        for addr in addresses
-    )
-    return Addresses(addresses)
-
-
 # -----------------------------------------------------------------------------------------------
 # Dynamic Field defaults
 # -----------------------------------------------------------------------------------------------
@@ -1723,7 +1786,7 @@ async def resolve_unparsed_address_inputs(
 @rule
 async def field_defaults(union_membership: UnionMembership) -> FieldDefaults:
     requests = list(union_membership.get(FieldDefaultFactoryRequest))
-    factories = await MultiGet(
+    factories = await concurrently(
         Get(FieldDefaultFactoryResult, FieldDefaultFactoryRequest, impl()) for impl in requests
     )
     return FieldDefaults(
@@ -1764,8 +1827,8 @@ async def generate_file_targets(
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
     try:
-        sources_paths = await Get(
-            SourcesPaths, SourcesPathsRequest(request.generator[MultipleSourcesField])
+        sources_paths = await resolve_source_paths(
+            SourcesPathsRequest(request.generator[MultipleSourcesField]), **implicitly()
         )
     except Exception as e:
         tgt = request.generator

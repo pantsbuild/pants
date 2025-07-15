@@ -163,8 +163,8 @@ fn test_alias_cycle() {
         // The order in which we encounter the cycle depends on unstable HashMap iteration order,
         // so we don't know the exact error message we'll get, just that these two strings must
         // be in it.
-        assert!(err_msg.contains(&format!("{} -> {}", x, y)));
-        assert!(err_msg.contains(&format!("{} -> {}", y, x)));
+        assert!(err_msg.contains(&format!("{x} -> {y}")));
+        assert!(err_msg.contains(&format!("{y} -> {x}")));
     }
 
     do_test_cycle("cycle", "other_alias");
@@ -198,10 +198,9 @@ fn test_invalid_alias_name() {
     fn do_test(alias: &str) {
         assert_eq!(
             format!(
-                "Invalid alias in `[cli].alias` option: {}. May only contain alphanumerical \
+                "Invalid alias in `[cli].alias` option: {alias}. May only contain alphanumerical \
         letters and the separators `-` and `_`. Flags can be defined using `--`. \
-        A single dash is not allowed.",
-                alias
+        A single dash is not allowed."
             ),
             cli_alias::create_alias_map(None, &owned_map(hashmap! {alias => ""})).unwrap_err()
         )

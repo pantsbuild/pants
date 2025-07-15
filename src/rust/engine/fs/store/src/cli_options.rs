@@ -58,6 +58,10 @@ pub struct StoreCliOpt {
     #[arg(long, default_value = "4194304")]
     pub store_batch_api_size_limit: usize,
 
+    /// Enable batch load.
+    #[arg(long, default_value = "false")]
+    pub store_batch_load_enabled: bool,
+
     /// Extra header to pass on remote execution request.
     #[arg(long)]
     pub header: Vec<String>,
@@ -77,6 +81,7 @@ impl StoreCliOpt {
             store_rpc_retries: 0,
             store_rpc_concurrency: 0,
             store_batch_api_size_limit: 0,
+            store_batch_load_enabled: false,
             header: vec![],
         }
     }
@@ -107,6 +112,12 @@ impl StoreCliOpt {
         ) {
             args.push(flag.into());
             args.push(val.into());
+        }
+
+        fn push_arg_bool(args: &mut Vec<OsString>, flag: &str, val: bool) {
+            if val {
+                args.push(flag.into());
+            }
         }
 
         maybe_push_arg(&mut ret, "--local-store-path", &self.local_store_path);
@@ -146,6 +157,12 @@ impl StoreCliOpt {
             self.store_batch_api_size_limit,
         );
 
+        push_arg_bool(
+            &mut ret,
+            "--store-batch-load-enabled",
+            self.store_batch_load_enabled,
+        );
+
         for header in self.header.iter() {
             ret.push("--header".into());
             ret.push(header.into());
@@ -161,7 +178,7 @@ impl StoreCliOpt {
         let mut headers: BTreeMap<String, String> = collection_from_keyvalues(self.header.iter());
         if let Some(ref oauth_path) = oauth_bearer_token_path {
             let token = std::fs::read_to_string(oauth_path)
-                .map_err(|e| format!("Error reading oauth bearer token file: {}", e))?;
+                .map_err(|e| format!("Error reading oauth bearer token file: {e}"))?;
             headers.insert(
                 "authorization".to_owned(),
                 format!("Bearer {}", token.trim()),
@@ -197,6 +214,7 @@ impl StoreCliOpt {
                     retries: self.store_rpc_retries,
                     concurrency_limit: self.store_rpc_concurrency,
                     batch_api_size_limit: self.store_batch_api_size_limit,
+                    batch_load_enabled: self.store_batch_load_enabled,
                 })
                 .await
         } else {

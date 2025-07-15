@@ -186,7 +186,6 @@ async def compile_scala_source(
     compilation_output_dir = "__out"
     compilation_empty_dir = await create_digest(CreateDigest([Directory(compilation_output_dir)]))
     merged_digest = await merge_digests(MergeDigests([sources_digest, compilation_empty_dir]))
-
     compile_result = await execute_process(
         **implicitly(
             JvmProcess(
@@ -198,7 +197,7 @@ async def compile_scala_source(
                     ":".join(tool_classpath.classpath_entries(toolcp_relpath)),
                     *local_plugins.args(local_scalac_plugins_relpath),
                     *(("-classpath", classpath_arg) if classpath_arg else ()),
-                    *scalac.args,
+                    *scalac.parsed_args_for_resolve(request.resolve.name),
                     "-d",
                     compilation_output_dir,
                     *sorted(

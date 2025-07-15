@@ -19,34 +19,34 @@ from pants.core.goals.package import (
     EnvironmentAwarePackageRequest,
     OutputPathField,
     PackageFieldSet,
+    environment_aware_package,
 )
-from pants.core.util_rules.archive import ArchiveFormat, CreateArchive
+from pants.core.util_rules.archive import ArchiveFormat, CreateArchive, create_archive
 from pants.core.util_rules.archive import rules as archive_rules
 from pants.engine.addresses import Address, UnparsedAddressInputs
+from pants.engine.download_file import download_file
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
-    Digest,
     DownloadFile,
     FileDigest,
     FileEntry,
     MergeDigests,
     PathGlobs,
     RemovePrefix,
-    Snapshot,
 )
+from pants.engine.internals.graph import find_valid_field_sets, hydrate_sources, resolve_targets
+from pants.engine.intrinsics import digest_to_snapshot
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AllTargets,
     Dependencies,
     FieldSet,
-    FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     GeneratedSources,
     GenerateSourcesRequest,
-    HydratedSources,
     HydrateSourcesRequest,
     InvalidFieldTypeException,
     MultipleSourcesField,
@@ -58,7 +58,6 @@ from pants.engine.target import (
     StringField,
     Target,
     TargetFilesGenerator,
-    Targets,
     generate_file_based_overrides_field_help_message,
     generate_multiple_sources_field_help_message,
 )
@@ -306,17 +305,18 @@ async def _hydrate_asset_source(
     file_digest = FileDigest(source.sha256, source.len)
     # NB: This just has to run, we don't actually need the result because we know the Digest's
     # FileEntry metadata.
-    await Get(Digest, DownloadFile(source.url, file_digest))
-    snapshot = await Get(
-        Snapshot,
-        CreateDigest(
-            [
-                FileEntry(
-                    path=source_field.file_path,
-                    file_digest=file_digest,
-                )
-            ]
-        ),
+    await download_file(DownloadFile(source.url, file_digest), **implicitly())
+    snapshot = await digest_to_snapshot(
+        **implicitly(
+            CreateDigest(
+                [
+                    FileEntry(
+                        path=source_field.file_path,
+                        file_digest=file_digest,
+                    )
+                ]
+            )
+        )
     )
 
     return GeneratedSources(snapshot)
@@ -508,34 +508,36 @@ async def relocate_files(request: RelocateFilesViaCodegenRequest) -> GeneratedSo
     #  `files` target generator gets replaced by its generated `file` targets. That replacement is
     #  necessary because we only hydrate sources for `FileSourcesField`, which is only for the
     #  `file` target.  That's really subtle!
-    original_file_targets = await Get(
-        Targets,
-        UnparsedAddressInputs,
-        request.protocol_target.get(
-            RelocatedFilesOriginalTargetsField
-        ).to_unparsed_address_inputs(),
+    original_file_targets = await resolve_targets(
+        **implicitly(
+            {
+                request.protocol_target.get(
+                    RelocatedFilesOriginalTargetsField
+                ).to_unparsed_address_inputs(): UnparsedAddressInputs
+            }
+        )
     )
-    original_files_sources = await MultiGet(
-        Get(
-            HydratedSources,
+    original_files_sources = await concurrently(
+        hydrate_sources(
             HydrateSourcesRequest(
                 tgt.get(SourcesField),
                 for_sources_types=(FileSourceField,),
                 enable_codegen=True,
             ),
+            **implicitly(),
         )
         for tgt in original_file_targets
     )
-    snapshot = await Get(
-        Snapshot, MergeDigests(sources.snapshot.digest for sources in original_files_sources)
+    snapshot = await digest_to_snapshot(
+        **implicitly(MergeDigests(sources.snapshot.digest for sources in original_files_sources))
     )
 
     src_val = request.protocol_target.get(RelocatedFilesSrcField).value
     dest_val = request.protocol_target.get(RelocatedFilesDestField).value
     if src_val:
-        snapshot = await Get(Snapshot, RemovePrefix(snapshot.digest, src_val))
+        snapshot = await digest_to_snapshot(**implicitly(RemovePrefix(snapshot.digest, src_val)))
     if dest_val:
-        snapshot = await Get(Snapshot, AddPrefix(snapshot.digest, dest_val))
+        snapshot = await digest_to_snapshot(**implicitly(AddPrefix(snapshot.digest, dest_val)))
     return GeneratedSources(snapshot)
 
 
@@ -804,51 +806,52 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
     #  `files` target generator gets replaced by its generated `file` targets. That replacement is
     #  necessary because we only hydrate sources for `FileSourcesField`, which is only for the
     #  `file` target.  That's really subtle!
-    package_targets, file_targets = await MultiGet(
-        Get(Targets, UnparsedAddressInputs, field_set.packages.to_unparsed_address_inputs()),
-        Get(Targets, UnparsedAddressInputs, field_set.files.to_unparsed_address_inputs()),
+    package_targets, file_targets = await concurrently(
+        resolve_targets(**implicitly(field_set.packages.to_unparsed_address_inputs())),
+        resolve_targets(**implicitly(field_set.files.to_unparsed_address_inputs())),
     )
 
-    package_field_sets_per_target = await Get(
-        FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, package_targets)
+    package_field_sets_per_target = await find_valid_field_sets(
+        FieldSetsPerTargetRequest(PackageFieldSet, package_targets), **implicitly()
     )
-    packages = await MultiGet(
-        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
+    packages = await concurrently(
+        environment_aware_package(EnvironmentAwarePackageRequest(field_set))
         for field_set in package_field_sets_per_target.field_sets
     )
 
-    file_sources = await MultiGet(
-        Get(
-            HydratedSources,
+    file_sources = await concurrently(
+        hydrate_sources(
             HydrateSourcesRequest(
                 tgt.get(SourcesField),
                 for_sources_types=(FileSourceField,),
                 enable_codegen=True,
             ),
+            **implicitly(),
         )
         for tgt in file_targets
     )
 
-    input_snapshot = await Get(
-        Snapshot,
-        MergeDigests(
-            (
-                *(package.digest for package in packages),
-                *(sources.snapshot.digest for sources in file_sources),
+    input_snapshot = await digest_to_snapshot(
+        **implicitly(
+            MergeDigests(
+                (
+                    *(package.digest for package in packages),
+                    *(sources.snapshot.digest for sources in file_sources),
+                )
             )
-        ),
+        )
     )
 
     output_filename = field_set.output_path.value_or_default(
         file_ending=field_set.format_field.value
     )
-    archive = await Get(
-        Digest,
+    archive = await create_archive(
         CreateArchive(
             input_snapshot,
             output_filename=output_filename,
             format=ArchiveFormat(field_set.format_field.value),
         ),
+        **implicitly(),
     )
     return BuiltPackage(archive, (BuiltPackageArtifact(output_filename),))
 

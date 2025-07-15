@@ -116,7 +116,7 @@ impl ImmutableInputs {
 
             // Now that we've successfully initialized the destination, forget the TempDir so that it
             // is not cleaned up.
-            let _ = chroot.into_path();
+            let _ = chroot.keep();
 
             Ok(dest)
         })

@@ -734,8 +734,7 @@ pub async fn prepare_workdir(
                 .await
                 .map_err(|e| {
                     format!(
-                        "materialize_directory() request to sandboxer process failed: {}",
-                        e
+                        "materialize_directory() request to sandboxer process failed: {e}"
                     )
                 })?;
         } else {
@@ -805,7 +804,7 @@ impl AsyncDropSandbox {
     ///
     pub fn keep(&mut self, description: &str) {
         if let Some(workdir) = self.2.take() {
-            let preserved_path = workdir.into_path();
+            let preserved_path = workdir.keep();
             info!(
                 "Preserving local process execution dir {} for {}",
                 preserved_path.display(),

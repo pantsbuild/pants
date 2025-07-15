@@ -107,6 +107,7 @@ pub struct RemotingOptions {
     pub store_rpc_concurrency: usize,
     pub store_rpc_timeout: Duration,
     pub store_batch_api_size_limit: usize,
+    pub store_batch_load_enabled: bool,
     pub cache_warnings_behavior: RemoteCacheWarningsBehavior,
     pub cache_content_behavior: CacheContentBehavior,
     pub cache_rpc_concurrency: usize,
@@ -139,6 +140,7 @@ impl RemotingOptions {
             retries: self.store_rpc_retries,
             concurrency_limit: self.store_rpc_concurrency,
             batch_api_size_limit: self.store_batch_api_size_limit,
+            batch_load_enabled: self.store_batch_load_enabled,
         })
     }
 }
@@ -295,6 +297,7 @@ impl Core {
             executor.clone(),
             &docker::DOCKER,
             &docker::IMAGE_PULL_CACHE,
+            build_root.to_path_buf(),
             local_execution_root_dir.to_path_buf(),
             immutable_inputs.clone(),
         )?);
@@ -651,6 +654,7 @@ impl Core {
                 store_rpc_retries: remoting_opts.store_rpc_retries,
                 store_rpc_concurrency: remoting_opts.store_rpc_concurrency,
                 store_batch_api_size_limit: remoting_opts.store_batch_api_size_limit,
+                store_batch_load_enabled: remoting_opts.store_batch_load_enabled,
                 header: remoting_opts
                     .store_headers
                     .iter()
@@ -775,7 +779,7 @@ impl Core {
         // Shutdown the Sessions, which will prevent new work from starting and then await any ongoing
         // work.
         if let Err(msg) = self.sessions.shutdown(timeout).await {
-            log::warn!("During shutdown: {}", msg);
+            log::warn!("During shutdown: {msg}");
         }
         // Then clear the Graph to ensure that drop handlers run (particularly for running processes).
         self.graph.clear();
@@ -828,11 +832,7 @@ impl Invalidatable for InvalidatableGraph {
         let (level, caller) = caller_to_logging_info(caller);
         log!(
             level,
-            "{} invalidation: cleared {} and dirtied {} nodes for: {:?}",
-            caller,
-            cleared,
-            dirtied,
-            paths
+            "{caller} invalidation: cleared {cleared} and dirtied {dirtied} nodes for: {paths:?}"
         );
         cleared + dirtied
     }
@@ -843,10 +843,7 @@ impl Invalidatable for InvalidatableGraph {
         let (level, caller) = caller_to_logging_info(caller);
         log!(
             level,
-            "{} invalidation: cleared {} and dirtied {} nodes for all paths",
-            caller,
-            cleared,
-            dirtied
+            "{caller} invalidation: cleared {cleared} and dirtied {dirtied} nodes for all paths"
         );
         cleared + dirtied
     }
@@ -933,7 +930,7 @@ impl SessionCore {
                 // There are no live or invalidated sources of this Digest. Directly fail.
                 return result.map_err(|e| {
                     let suffix = if let Some(workunit_data) = workunit.workunit() {
-                        &format!(", with workunit: {:?}", workunit_data)
+                        &format!(", with workunit: {workunit_data:?}")
                     } else {
                         ""
                     };

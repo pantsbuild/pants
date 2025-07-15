@@ -102,7 +102,7 @@ impl ManagedChild {
             if self.check_child_has_exited()? {
                 return Ok(true);
             }
-            log::debug!("Waiting for {:?} to exit...", maybe_id);
+            log::debug!("Waiting for {maybe_id:?} to exit...");
             thread::sleep(GRACEFUL_SHUTDOWN_POLL_TIME);
         }
         // If we get here we have timed-out.
@@ -138,8 +138,7 @@ impl ManagedChild {
                 }
                 Err(e) => {
                     log::warn!(
-                        "An error occurred while waiting for graceful shutdown of process group ({}). Will try SIGKILL instead.",
-                        e
+                        "An error occurred while waiting for graceful shutdown of process group ({e}). Will try SIGKILL instead.",
                     );
                 }
             }

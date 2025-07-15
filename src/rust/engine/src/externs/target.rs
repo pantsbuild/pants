@@ -156,7 +156,7 @@ impl Field {
         )
         .unwrap();
         if let Ok(default) = self_.getattr("default") {
-            write!(result, ", default={})", default).unwrap();
+            write!(result, ", default={default})").unwrap();
         } else {
             write!(result, ")").unwrap();
         }

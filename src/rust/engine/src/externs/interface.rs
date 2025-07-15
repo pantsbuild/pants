@@ -44,7 +44,7 @@ use pyo3::types::{
 use pyo3::{Bound, IntoPyObject, PyAny, PyRef, create_exception};
 use regex::Regex;
 use remote::remote_cache::RemoteCacheWarningsBehavior;
-use rule_graph::{self, RuleGraph};
+use rule_graph::{self, RuleGraph, RuleId};
 use store::RemoteProvider;
 use task_executor::Executor;
 use tokio::sync::Mutex;
@@ -335,6 +335,7 @@ impl PyRemotingOptions {
         store_rpc_concurrency,
         store_rpc_timeout_millis,
         store_batch_api_size_limit,
+        store_batch_load_enabled,
         cache_warnings_behavior,
         cache_content_behavior,
         cache_rpc_concurrency,
@@ -360,6 +361,7 @@ impl PyRemotingOptions {
         store_rpc_concurrency: usize,
         store_rpc_timeout_millis: u64,
         store_batch_api_size_limit: usize,
+        store_batch_load_enabled: bool,
         cache_warnings_behavior: String,
         cache_content_behavior: String,
         cache_rpc_concurrency: usize,
@@ -392,6 +394,7 @@ impl PyRemotingOptions {
             store_rpc_concurrency,
             store_rpc_timeout: Duration::from_millis(store_rpc_timeout_millis),
             store_batch_api_size_limit,
+            store_batch_load_enabled,
             cache_warnings_behavior: RemoteCacheWarningsBehavior::from_str(
                 &cache_warnings_behavior,
             )
@@ -776,8 +779,8 @@ fn scheduler_create<'py>(
     ca_certs_path: Option<PathBuf>,
 ) -> PyO3Result<PyScheduler> {
     match fs::increase_limits() {
-        Ok(msg) => debug!("{}", msg),
-        Err(e) => warn!("{}", e),
+        Ok(msg) => debug!("{msg}"),
+        Err(e) => warn!("{e}"),
     }
     let types = types_ptr
         .borrow()
@@ -1119,7 +1122,7 @@ fn session_poll_workunits(
         })
     })
     .unwrap_or_else(|e| {
-        log::warn!("Panic in `session_poll_workunits`: {:?}", e);
+        log::warn!("Panic in `session_poll_workunits`: {e:?}");
         std::panic::resume_unwind(e);
     })
 }
@@ -1310,14 +1313,24 @@ fn tasks_add_call<'py>(
     inputs: Vec<Bound<'py, PyType>>,
     rule_id: String,
     explicit_args_arity: u16,
+    vtable_entries: Option<Vec<(Bound<'py, PyType>, String)>>,
+    in_scope_types: Option<Vec<Bound<'py, PyType>>>,
 ) {
     let output = TypeId::new(output);
     let inputs = inputs.into_iter().map(|t| TypeId::new(&t)).collect();
+    let in_scope_types =
+        in_scope_types.map(|ist| ist.into_iter().map(|t| TypeId::new(&t)).collect());
     py_tasks.borrow_mut().0.get(py).borrow_mut().add_call(
         output,
         inputs,
-        rule_id,
+        RuleId::from_string(rule_id),
         explicit_args_arity,
+        vtable_entries.map(|vte| {
+            vte.into_iter()
+                .map(|(k, v)| (TypeId::new(&k), RuleId::from_string(v)))
+                .collect()
+        }),
+        in_scope_types,
     );
 }
 
@@ -1697,10 +1710,10 @@ fn maybe_set_panic_handler() {
             panic_str.push_str(&panic_location_str);
         }
 
-        error!("{}", panic_str);
+        error!("{panic_str}");
 
         let panic_file_bug_str = "Please set RUST_BACKTRACE=1, re-run, and then file a bug at https://github.com/pantsbuild/pants/issues.";
-        error!("{}", panic_file_bug_str);
+        error!("{panic_file_bug_str}");
     }));
 }
 

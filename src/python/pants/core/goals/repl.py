@@ -8,7 +8,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import ClassVar
 
-from pants.core.util_rules.environments import _warn_on_non_local_environments
+from pants.core.environments.rules import _warn_on_non_local_environments
 from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.env_vars import CompleteEnvironmentVars

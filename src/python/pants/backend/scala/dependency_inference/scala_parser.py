@@ -291,7 +291,7 @@ async def create_analyze_scala_source_request(
     tgt = wrapped_tgt.target
     resolve = tgt[JvmResolveField].normalized_value(jvm)
     scala_version = scala_subsystem.version_for_resolve(resolve)
-    source3 = "-Xsource:3" in scalac.args
+    source3 = "-Xsource:3" in scalac.parsed_args_for_resolve(resolve)
 
     return AnalyzeScalaSourceRequest(source_files, scala_version, source3)
 

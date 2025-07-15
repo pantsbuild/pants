@@ -655,7 +655,7 @@ mod pycomparedbool_tests {
                 PyComparedBool(None)
                     .into_pyobject(py)
                     .unwrap()
-                    .is(&py.NotImplemented()),
+                    .is(py.NotImplemented()),
             );
         })
     }

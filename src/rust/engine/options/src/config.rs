@@ -39,8 +39,7 @@ pub(crate) fn interpolate_string(
         new_value.push_str(&value[last_match..m.start()]);
         let placeholder_name = &caps[1];
         let replacement = replacements.get(placeholder_name).ok_or(format!(
-            "Unknown value for placeholder `{}`",
-            placeholder_name
+            "Unknown value for placeholder `{placeholder_name}`"
         ))?;
         new_value.push_str(replacement);
         last_match = m.end();
@@ -370,13 +369,12 @@ impl ConfigReader {
             let section_table = section_table.as_table().unwrap();
             match section_to_valid_keys.get(section_name) {
                 None => {
-                    errors.push(format!("Invalid table name [{}]", section_name));
+                    errors.push(format!("Invalid table name [{section_name}]"));
                 }
                 Some(valid_keys) => {
                     for key in section_table.keys() {
                         if !(valid_keys.contains(key)) {
-                            errors
-                                .push(format!("Invalid option '{}' under [{}]", key, section_name));
+                            errors.push(format!("Invalid option '{key}' under [{section_name}]"));
                         }
                     }
                 }

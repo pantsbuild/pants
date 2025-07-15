@@ -11,7 +11,7 @@ import os.path
 import sys
 import typing
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Coroutine, Sequence
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Any, cast
@@ -28,7 +28,7 @@ from pants.build_graph.address import (
 )
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import DigestContents, FileContent, GlobMatchErrorBehavior, PathGlobs, Paths
+from pants.engine.fs import FileContent, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
 from pants.engine.internals.dep_rules import (
     BuildFileDependencyRules,
@@ -42,13 +42,16 @@ from pants.engine.internals.parser import (
     Parser,
     error_on_imports,
 )
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.internals.selectors import concurrently
 from pants.engine.internals.session import SessionValues
 from pants.engine.internals.synthetic_targets import (
-    SyntheticAddressMaps,
     SyntheticAddressMapsRequest,
+    get_synthetic_address_maps,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
-from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
+from pants.engine.intrinsics import get_digest_contents, path_globs_to_paths
+from pants.engine.rules import QueryRule, collect_rules, implicitly, rule
 from pants.engine.target import (
     DependenciesRuleApplication,
     DependenciesRuleApplicationRequest,
@@ -115,12 +118,13 @@ async def evaluate_preludes(
     build_file_options: BuildFileOptions,
     parser: Parser,
 ) -> BuildFilePreludeSymbols:
-    prelude_digest_contents = await Get(
-        DigestContents,
-        PathGlobs(
-            build_file_options.prelude_globs,
-            glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
-        ),
+    prelude_digest_contents = await get_digest_contents(
+        **implicitly(
+            PathGlobs(
+                build_file_options.prelude_globs,
+                glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
+            )
+        )
     )
     globals: dict[str, Any] = {
         # Later entries have precendence replacing conflicting keys from previous entries, so we
@@ -166,7 +170,7 @@ async def get_all_build_file_symbols_info(
 async def maybe_resolve_address(address_input: AddressInput) -> MaybeAddress:
     # Determine the type of the path_component of the input.
     if address_input.path_component:
-        paths = await Get(Paths, PathGlobs(globs=(address_input.path_component,)))
+        paths = await path_globs_to_paths(PathGlobs(globs=(address_input.path_component,)))
         is_file, is_dir = bool(paths.files), bool(paths.dirs)
     else:
         # It is an address in the root directory.
@@ -275,11 +279,11 @@ class BUILDFileEnvVarExtractor(ast.NodeVisitor):
 
 @rule(desc="Search for addresses in BUILD files")
 async def parse_address_family(
+    directory: AddressFamilyDir,
     parser: Parser,
     bootstrap_status: BootstrapStatus,
     build_file_options: BuildFileOptions,
     prelude_symbols: BuildFilePreludeSymbols,
-    directory: AddressFamilyDir,
     registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
     maybe_build_file_dependency_rules_implementation: MaybeBuildFileDependencyRulesImplementation,
@@ -289,17 +293,18 @@ async def parse_address_family(
 
     The AddressFamily may be empty, but it will not be None.
     """
-    digest_contents, all_synthetic_address_maps = await MultiGet(
-        Get(
-            DigestContents,
-            PathGlobs(
-                globs=(
-                    *(os.path.join(directory.path, p) for p in build_file_options.patterns),
-                    *(f"!{p}" for p in build_file_options.ignores),
+    digest_contents, all_synthetic_address_maps = await concurrently(
+        get_digest_contents(
+            **implicitly(
+                PathGlobs(
+                    globs=(
+                        *(os.path.join(directory.path, p) for p in build_file_options.patterns),
+                        *(f"!{p}" for p in build_file_options.ignores),
+                    )
                 )
             ),
         ),
-        Get(SyntheticAddressMaps, SyntheticAddressMapsRequest(directory.path)),
+        get_synthetic_address_maps(SyntheticAddressMapsRequest(directory.path), **implicitly()),
     )
     synthetic_address_maps = tuple(itertools.chain(all_synthetic_address_maps))
     if not digest_contents and not synthetic_address_maps:
@@ -310,8 +315,8 @@ async def parse_address_family(
     dependencies_rules: BuildFileDependencyRules | None = None
     parent_dirs = tuple(PurePath(directory.path).parents)
     if parent_dirs:
-        maybe_parents = await MultiGet(
-            Get(OptionalAddressFamily, AddressFamilyDir(str(parent_dir)))
+        maybe_parents = await concurrently(
+            parse_address_family(AddressFamilyDir(str(parent_dir)), **implicitly())
             for parent_dir in parent_dirs
         )
         for maybe_parent in maybe_parents:
@@ -343,18 +348,12 @@ async def parse_address_family(
 
     def _extract_env_vars(
         file_content: FileContent, extra_env: Sequence[str], env: CompleteEnvironmentVars
-    ) -> Get[EnvironmentVars]:
+    ) -> Coroutine[Any, Any, EnvironmentVars]:
         """For BUILD file env vars, we only ever consult the local systems env."""
         env_vars = (*BUILDFileEnvVarExtractor.get_env_vars(file_content), *extra_env)
-        return Get(
-            EnvironmentVars,
-            {
-                EnvironmentVarsRequest(env_vars): EnvironmentVarsRequest,
-                env: CompleteEnvironmentVars,
-            },
-        )
+        return environment_vars_subset(EnvironmentVarsRequest(env_vars), env)
 
-    all_env_vars = await MultiGet(
+    all_env_vars = await concurrently(
         _extract_env_vars(
             fc, prelude_symbols.referenced_env_vars, session_values[CompleteEnvironmentVars]
         )
@@ -499,7 +498,7 @@ async def parse_address_family(
 @rule
 async def find_build_file(request: BuildFileAddressRequest) -> BuildFileAddress:
     address = request.address
-    address_family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
+    address_family = await ensure_address_family(**implicitly(AddressFamilyDir(address.spec_path)))
     owning_address = address.maybe_convert_to_target_generator()
     if address_family.get_target_adaptor(owning_address) is None:
         raise ResolveError.did_you_mean(
@@ -539,7 +538,7 @@ async def find_target_adaptor(request: TargetAdaptorRequest) -> TargetAdaptor:
             "Generated targets are not defined in BUILD files, and so do not have "
             f"TargetAdaptors: {request}"
         )
-    address_family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
+    address_family = await ensure_address_family(**implicitly(AddressFamilyDir(address.spec_path)))
     target_adaptor = _get_target_adaptor(address, address_family, request.description_of_origin)
     return target_adaptor
 
@@ -563,8 +562,9 @@ async def _get_target_family_and_adaptor_for_dep_rules(
             {address.spec_path, _rules_path(address)} for address in addresses
         )
     )
-    maybe_address_families = await MultiGet(
-        Get(OptionalAddressFamily, AddressFamilyDir(rules_path)) for rules_path in rules_paths
+    maybe_address_families = await concurrently(
+        parse_address_family(AddressFamilyDir(rules_path), **implicitly())
+        for rules_path in rules_paths
     )
     maybe_families = {maybe.path: maybe for maybe in maybe_address_families}
 

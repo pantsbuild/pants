@@ -1,7 +1,7 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 use async_trait::async_trait;
@@ -21,7 +21,8 @@ use tokio_util::compat::{FuturesAsyncReadCompatExt, FuturesAsyncWriteCompatExt};
 use workunit_store::{Metric, ObservationMetric};
 
 use remote_provider_traits::{
-    ActionCacheProvider, ByteStoreProvider, LoadDestination, RemoteStoreOptions,
+    ActionCacheProvider, BatchLoadDestination, ByteStoreProvider, LoadDestination,
+    RemoteStoreOptions,
 };
 
 #[cfg(test)]
@@ -98,8 +99,7 @@ impl Provider {
         let Some(auth_header_value) = options.headers.get(AUTHORIZATION.as_str()) else {
             let existing_headers = options.headers.keys().collect::<Vec<_>>();
             return Err(format!(
-                "Expected to find '{}' header, but only found: {:?}. {}",
-                AUTHORIZATION, existing_headers, header_help_blurb,
+                "Expected to find '{AUTHORIZATION}' header, but only found: {existing_headers:?}. {header_help_blurb}",
             ));
         };
 
@@ -145,7 +145,7 @@ impl Provider {
         let reader = match self.operator.reader(&path).await {
             Ok(reader) => reader,
             Err(e) if e.kind() == opendal::ErrorKind::NotFound => return Ok(false),
-            Err(e) => return Err(format!("failed to read {}: {}", path, e)),
+            Err(e) => return Err(format!("failed to read {path}: {e}")),
         };
 
         // TODO: this pretends that the time-to-first-byte can be approximated by "time to create
@@ -161,14 +161,14 @@ impl Provider {
         let mut reader = match reader.into_futures_async_read(..).await {
             Ok(reader) => reader.compat(),
             Err(e) if e.kind() == opendal::ErrorKind::NotFound => return Ok(false),
-            Err(e) => return Err(format!("failed to convert reader for {}: {}", path, e)),
+            Err(e) => return Err(format!("failed to convert reader for {path}: {e}")),
         };
 
         match mode {
             LoadMode::Validate => {
                 let correct_digest = async_verified_copy(digest, false, &mut reader, destination)
                     .await
-                    .map_err(|e| format!("failed to read {}: {}", path, e))?;
+                    .map_err(|e| format!("failed to read {path}: {e}"))?;
 
                 if !correct_digest {
                     // TODO: include the actual digest here
@@ -178,7 +178,7 @@ impl Provider {
             LoadMode::NoValidate => {
                 tokio::io::copy(&mut reader, destination)
                     .await
-                    .map_err(|e| format!("failed to read {}: {}", path, e))?;
+                    .map_err(|e| format!("failed to read {path}: {e}"))?;
             }
         }
         Ok(true)
@@ -287,12 +287,24 @@ impl ByteStoreProvider for Provider {
             match result {
                 Ok(true) => Ok(None),
                 Ok(false) => Ok(Some(digest)),
-                Err(e) => Err(format!("failed to query {}: {}", path, e)),
+                Err(e) => Err(format!("failed to query {path}: {e}")),
             }
         }))
         .await?;
 
         Ok(existences.into_iter().flatten().collect())
+    }
+
+    fn batch_load_supported(&self) -> bool {
+        false
+    }
+
+    async fn load_batch(
+        &self,
+        _digests: Vec<Digest>,
+        _destination: &mut dyn BatchLoadDestination,
+    ) -> Result<HashMap<Digest, Result<bool, String>>, String> {
+        Err("load_batch not implemented for remote opendal provider".to_string())
     }
 }
 

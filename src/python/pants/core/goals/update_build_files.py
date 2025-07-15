@@ -46,7 +46,7 @@ from pants.engine.intrinsics import (
     path_globs_to_paths,
 )
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, collect_rules, concurrently, goal_rule, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, goal_rule, implicitly, rule
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.option_types import BoolOption, EnumOption
 from pants.util.docutil import bin_name, doc_url
@@ -102,6 +102,13 @@ class RewrittenBuildFileRequest(EngineAwareParameter):
 
     def green(self, s: str) -> str:
         return cast(str, green(s)) if self.colors_enabled else s
+
+
+@rule(polymorphic=True)
+async def rewrite_build_file(
+    req: RewrittenBuildFileRequest, env_name: EnvironmentName
+) -> RewrittenBuildFile:
+    raise NotImplementedError()
 
 
 class DeprecationFixerRequest(RewrittenBuildFileRequest):
@@ -179,6 +186,7 @@ async def update_build_files(
     workspace: Workspace,
     union_membership: UnionMembership,
     specs: Specs,
+    env_name: EnvironmentName,
 ) -> UpdateBuildFilesGoal:
     if not specs:
         if not specs.includes.from_change_detection:
@@ -252,10 +260,15 @@ async def update_build_files(
     build_file_to_change_descriptions: DefaultDict[str, list[str]] = defaultdict(list)
     for rewrite_request_cls in rewrite_request_classes:
         all_rewritten_files = await concurrently(  # noqa: PNT30: this is inherently sequential
-            Get(
-                RewrittenBuildFile,
-                RewrittenBuildFileRequest,
-                rewrite_request_cls(build_file, lines, colors_enabled=console._use_colors),
+            rewrite_build_file(
+                **implicitly(
+                    {
+                        rewrite_request_cls(
+                            build_file, lines, colors_enabled=console._use_colors
+                        ): RewrittenBuildFileRequest,
+                        env_name: EnvironmentName,
+                    }
+                ),
             )
             for build_file, lines in build_file_to_lines.items()
         )

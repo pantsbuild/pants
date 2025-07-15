@@ -5,10 +5,10 @@ import os
 import time
 
 from pants.base.build_environment import get_buildroot
+from pants.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 from pants.testutil.pants_integration_test import ensure_daemon, run_pants, setup_tmpdir
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import fast_relpath, safe_file_dump
-from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 
 
 @ensure_daemon

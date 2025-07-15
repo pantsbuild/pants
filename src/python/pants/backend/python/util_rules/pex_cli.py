@@ -42,7 +42,7 @@ class PexCli(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pex-tool/pex)."
 
-    default_version = "v2.37.0"
+    default_version = "v2.45.2"
     default_url_template = "https://github.com/pex-tool/pex/releases/download/{version}/pex"
     version_constraints = ">=2.13.0,<3.0"
 
@@ -59,10 +59,10 @@ class PexCli(TemplatedExternalTool):
     )
 
     default_known_versions = [
-        "v2.37.0|macos_x86_64|7c51adfaaef9c48ef41f36053b4c951d85a675c2723e821e12617793ae8f2275|4812111",
-        "v2.37.0|macos_arm64|7c51adfaaef9c48ef41f36053b4c951d85a675c2723e821e12617793ae8f2275|4812111",
-        "v2.37.0|linux_x86_64|7c51adfaaef9c48ef41f36053b4c951d85a675c2723e821e12617793ae8f2275|4812111",
-        "v2.37.0|linux_arm64|7c51adfaaef9c48ef41f36053b4c951d85a675c2723e821e12617793ae8f2275|4812111",
+        "v2.45.2|macos_x86_64|570a3d5ca306a39aa3a180bd4cf3e2661b7c74b0579422b34659246daf122384|4833957",
+        "v2.45.2|macos_arm64|570a3d5ca306a39aa3a180bd4cf3e2661b7c74b0579422b34659246daf122384|4833957",
+        "v2.45.2|linux_x86_64|570a3d5ca306a39aa3a180bd4cf3e2661b7c74b0579422b34659246daf122384|4833957",
+        "v2.45.2|linux_arm64|570a3d5ca306a39aa3a180bd4cf3e2661b7c74b0579422b34659246daf122384|4833957",
     ]
 
 
