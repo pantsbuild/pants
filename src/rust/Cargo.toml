@@ -1,0 +1,284 @@
+# NOTE: See `src/rust/.cargo/config` for `--cfg` flags enabled for these crates.
+# tokio_unstable is necessary for access to the `id`-related functions of tokio::task::JoinSet.
+# See https://docs.rs/tokio/1.21.1/tokio/task/struct.JoinSet.html#method.join_next_with_id.
+
+[profile.dev]
+# Increase the optimization level of the dev profile slightly, as otherwise `rule_graph`
+# solving takes prohibitively long.
+opt-level = 1
+
+[profile.release]
+# Enable only "line tables", which give line information in backtraces, but do not record information
+# about local variables.
+debug = 1
+# Optimise for the speed of our binary, rather than the speed of compilation.
+codegen-units = 1
+
+[workspace]
+resolver = "2"
+# These are the packages which are built/tested when the --all flag is passed to cargo.
+#
+# We need to explicitly list these, because otherwise the standalone tools
+# (e.g. fs_util) won't be included when we build/test things.
+members = [
+  "address",
+  "async_latch",
+  "async_value",
+  "cache",
+  "client",
+  "concrete_time",
+  "dep_inference",
+  "engine",
+  "fs",
+  "fs/brfs",
+  "fs/fs_util",
+  "fs/store",
+  "graph",
+  "grpc_util",
+  "hashing",
+  "stdio",
+  "logging",
+  "nailgun",
+  "options",
+  "pantsd",
+  "process_execution",
+  "process_execution/docker",
+  "process_execution/pe_nailgun",
+  "process_execution/remote",
+  "process_execution/sandboxer",
+  "process_executor",
+  "protos",
+  "remote_provider",
+  "remote_provider/remote_provider_opendal",
+  "remote_provider/remote_provider_reapi",
+  "remote_provider/remote_provider_traits",
+  "rule_graph",
+  "sharded_lmdb",
+  "task_executor",
+  "testutil",
+  "testutil/mock",
+  "testutil/local_cas",
+  "testutil/local_execution_server",
+  "tryfuture",
+  "ui",
+  "watch",
+  "workunit_store",
+]
+
+# These are the packages which are built/tested when no special selector flags are passed to cargo.
+#
+# This is the set of packages which are expected to work on any arbitrary system that checks out the code.
+# It should be exactly equivalent to members, except without any packages that require more system
+# configuration than we're comfortable doing in our bootstrap scripts.
+#
+# In particular, it does not contain the fs/brfs package, which will not compile without a fuse installation.
+# On Ubuntu, that means installing libfuse-dev. On OSX, that means installing OSXFUSE.
+default-members = [
+  "address",
+  "async_latch",
+  "async_value",
+  "cache",
+  "client",
+  "concrete_time",
+  "dep_inference",
+  "engine",
+  "fs",
+  "fs/fs_util",
+  "fs/store",
+  "graph",
+  "grpc_util",
+  "hashing",
+  "stdio",
+  "logging",
+  "nailgun",
+  "options",
+  "pantsd",
+  "process_execution",
+  "process_execution/docker",
+  "process_execution/pe_nailgun",
+  "process_execution/remote",
+  "process_execution/sandboxer",
+  "process_executor",
+  "protos",
+  "remote_provider",
+  "remote_provider/remote_provider_opendal",
+  "remote_provider/remote_provider_reapi",
+  "remote_provider/remote_provider_traits",
+  "rule_graph",
+  "sharded_lmdb",
+  "task_executor",
+  "testutil",
+  "testutil/mock",
+  "testutil/local_cas",
+  "testutil/local_execution_server",
+  "tryfuture",
+  "ui",
+  "watch",
+  "workunit_store",
+]
+
+# We set external dependency versions at the workspace level, so they are synced
+# across all crates.  A crate can use the version set here by setting `workspace = true`
+# instead of setting an explicit version. See:
+# https://doc.rust-lang.org/nightly/cargo/reference/specifying-dependencies.html#\
+#  inheriting-a-dependency-from-a-workspace
+[workspace.dependencies]
+arc-swap = "1.7"
+async-lock = "2.8"
+async-oncecell = "0.2"
+async-stream = "0.3"
+async-trait = "0.1"
+axum = "0.7"
+axum-server = "0.7"
+bincode = "1.3.3"
+bollard = "0.17.1"
+byteorder = "1.5"
+bytes = "1.10"
+chrono = "0.4.22"
+clap = "4.5"
+colored = "2.2.0"
+console = "0.15.8"
+criterion = "0.4"
+crossbeam-channel = "0.5"
+# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
+deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1" }
+derivative = "2.2"
+digest = "0.10"
+dirs-next = "2"
+docker_credential = "1.3"
+either = "1"
+env_logger = "0.10.2"
+errno = "0.3.6"
+fixedbitset = "0.4"
+fnv = "1.0.5"
+fs-set-times = "0.19"
+fuser = "0.11.1"
+futures = "0.3"
+futures-core = "^0.3.23"
+generic-array = "0.14"
+glob = "0.3.1"
+hdrhistogram = "7.5"
+hex = "0.4.3"
+http = "1"
+http-body = "1"
+http-body-util = "0.1"
+humansize = "1.1"
+hyper = "1"
+hyper-rustls = "0.27"
+hyper-util = "0.1"
+ignore = "0.4.23"
+indexmap = { version = "2.2", features = ["std", "serde"] }
+indicatif = "0.17.11"
+internment = "0.6"
+itertools = "0.10"
+libc = "0.2.171"
+lmdb-rkv = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "6ae7a552aa2c932c3ddf652a68cdde2fed547cbc" }
+log = "0.4.26"
+madvise = "0.1"
+maplit = "1.0.1"
+nails = "0.13"
+nix = "0.25"
+notify = { git = "https://github.com/pantsbuild/notify", rev = "276af0f3c5f300bfd534941386ba2f3b3a022df7" }
+num_cpus = "1"
+num_enum = "0.5"
+once_cell = "1.20"
+opendal = { version = "0.52.0", default-features = false, features = [
+  "services-memory",
+  "services-fs",
+  "services-ghac",
+] }
+os_pipe = "1.1"
+parameterized = "2.0.0"
+parking_lot = "0.12"
+peg = "0.8"
+petgraph = "0.6"
+pin-project = "1.1.5"
+pin-project-lite = "0.2"
+prodash = { git = "https://github.com/stuhood/prodash", rev = "stuhood/raw-messages-draft", version = "16", default-features = false, features = [
+  "progress-tree",
+  "render-line",
+  "render-line-termion",
+] }
+prost = "0.13"
+prost-build = "0.13"
+prost-types = "0.13"
+pyo3 = "0.25.1"
+pyo3-build-config = "0.25.1"
+rand = "0.8"
+regex = "1"
+rlimit = "0.8"
+rustls = "0.23"
+rustls-native-certs = "0.8"
+rustls-pemfile = "2.0"
+rustls-pki-types = "1.12"
+serde = "1.0.219"
+serde_derive = "1.0.98"
+serde_json = "1.0"
+serde_test = "1.0"
+serde_yaml = "0.9"
+sha2 = "0.10"
+shell-quote = "0.7"
+shellexpand = "2.1"
+shlex = "1.2.0"
+strum = "0.26"
+strum_macros = "0.26"
+sysinfo = "0.20.5"
+tempfile = "3.20.0"
+terminal_size = "0.1.15"
+time = "0.3.37"
+tokio = "1.32"
+tokio-retry2 = "0.5"
+tokio-rustls = "0.26"
+tokio-stream = "0.1"
+tokio-util = "0.7"
+toml = "0.8"
+tonic = "0.12"
+tonic-build = "0.12"
+tower = "0.5"
+tower-layer = "0.3"
+tower-service = "0.3"
+uname = "0.1.1"
+url = "2.5"
+uuid = "1.8.0"
+walkdir = "2"
+webpki = "0.22"
+whoami = "1.5.2"
+
+# NB: If a change to these versions requires cache busting, bump the version of
+# `src/rust/engine/dep_inference/Cargo.toml`.
+tree-sitter = "0.20.10"
+tree-sitter-typescript = "0.20.5"
+tree-sitter-python = "0.20.4"
+# TODO: Waiting on https://github.com/camdencheek/tree-sitter-dockerfile/pull/58.
+tree-sitter-dockerfile = { git = "https://github.com/tobni/tree-sitter-dockerfile.git", rev = "ce1cbc3537995f0d968c8bc6315b6a62d6faacde" }
+
+# Default lints adopted by most crates in this workspace.
+
+[workspace.lints.rust]
+warnings = { level = "deny", priority = 0 }
+
+# Enable all clippy lints except for many of the pedantic ones.
+[workspace.lints.clippy]
+all = { level = "deny", priority = 0 }
+
+default_trait_access = { level = "deny", priority = 1 }
+expl_impl_clone_on_copy = { level = "deny", priority = 1 }
+if_not_else = { level = "deny", priority = 1 }
+needless_continue = { level = "deny", priority = 1 }
+unseparated_literal_suffix = { level = "deny", priority = 1 }
+used_underscore_binding = { level = "deny", priority = 1 }
+
+# It is often more clear to show that nothing is being moved.
+match_ref_pats = { level = "allow", priority = 1 }
+
+# Subjective style.
+len_without_is_empty = { level = "allow", priority = 1 }
+redundant_field_names = { level = "allow", priority = 1 }
+too_many_arguments = { level = "allow", priority = 1 }
+
+# Default isn't as big a deal as people seem to think it is.
+new_without_default = { level = "allow", priority = 1 }
+new_ret_no_self = { level = "allow", priority = 1 }
+
+# Arc<Mutex> can be more clear than needing to grok Orderings:
+mutex_atomic = { level = "allow", priority = 1 }
