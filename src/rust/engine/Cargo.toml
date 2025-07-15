@@ -74,7 +74,7 @@ tokio-util = { workspace = true, features = ["io"] }
 tryfuture = { path = "../tryfuture" }
 ui = { path = "../ui" }
 url = { workspace = true }
-watch = { path = "watch" }
+watch = { path = "../watch" }
 workunit_store = { path = "../workunit_store" }
 remote = { path = "../process_execution/remote" }
 pe_nailgun = { path = "../process_execution/pe_nailgun" }
