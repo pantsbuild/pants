@@ -5,22 +5,6 @@ name = "engine"
 authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
-# NOTE: See `src/rust/engine/.cargo/config` for `--cfg` flags enabled for these crates.
-# tokio_unstable is necessary for access to the `id`-related functions of tokio::task::JoinSet.
-# See https://docs.rs/tokio/1.21.1/tokio/task/struct.JoinSet.html#method.join_next_with_id.
-
-[profile.dev]
-# Increase the optimization level of the dev profile slightly, as otherwise `rule_graph`
-# solving takes prohibitively long.
-opt-level = 1
-
-[profile.release]
-# Enable only "line tables", which give line information in backtraces, but do not record information
-# about local variables.
-debug = 1
-# Optimise for the speed of our binary, rather than the speed of compilation.
-codegen-units = 1
-
 [lib]
 crate-type = ["cdylib"]
 
