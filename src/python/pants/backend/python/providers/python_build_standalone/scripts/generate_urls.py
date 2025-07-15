@@ -123,6 +123,7 @@ def main() -> None:
 
         releases = get_all_releases_filtered()
     elif options.scrape_releases:
+        print(f"Only scraping releases: {', '.join(options.scrape_releases)}")
         releases = [pbs_repo.get_release(tag_name) for tag_name in options.scrape_releases]
     else:
         latest_scraped_release_name = max(scraped_releases)
