@@ -464,7 +464,7 @@ impl<R: Rule> RuleGraph<R> {
             "{}",
             queries_strs
                 .iter()
-                .map(|q| format!("    {}", q))
+                .map(|q| format!("    {q}"))
                 .collect::<Vec<String>>()
                 .join(",\n")
         )?;

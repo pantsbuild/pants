@@ -87,7 +87,7 @@ async fn test_remove_old_images() {
     // Only the first container ID should be removed
     let container_ids = {
         let mut ids: Vec<String> = vec![];
-        for tup in vec![Some("old"), None].iter().cartesian_product(vec![
+        for tup in [Some("old"), None].iter().cartesian_product(vec![
             Some(FAKE_BUILD_ROOT),
             None,
             Some("/some/other/build/root"),
@@ -1267,7 +1267,7 @@ async fn run_prune_container_test(runner: &dyn DockerCommandTestRunner) -> bool 
             .containers
             .lock()
             .get(&key)
-            .map(|x| x.clone())
+            .cloned()
     }
     .unwrap();
     let container_id = &should_be_container_entry.get().unwrap().0;

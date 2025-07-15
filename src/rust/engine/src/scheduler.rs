@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 
 use deepsize::DeepSizeOf;
 use futures::{FutureExt, future};
-use log::debug;
+use log::trace;
 use tokio::time;
 
 use crate::context::{Context, Core};
@@ -278,7 +278,7 @@ impl Scheduler {
         request: &ExecutionRequest,
         session: &Session,
     ) -> Result<Vec<Result<Value, Failure>>, ExecutionTermination> {
-        debug!(
+        trace!(
             "Launching {} roots (poll={}).",
             request.roots.len(),
             request.poll

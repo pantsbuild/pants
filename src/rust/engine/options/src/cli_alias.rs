@@ -16,10 +16,9 @@ fn validate_alias(
 ) -> Result<(), String> {
     if !VALID_ALIAS_RE.is_match(alias) {
         return Err(format!(
-            "Invalid alias in `[cli].alias` option: {}. May only contain alphanumerical \
+            "Invalid alias in `[cli].alias` option: {alias}. May only contain alphanumerical \
             letters and the separators `-` and `_`. Flags can be defined using `--`. \
-            A single dash is not allowed.",
-            alias
+            A single dash is not allowed."
         ));
     }
 
@@ -27,8 +26,7 @@ fn validate_alias(
         for (scope, args) in known_scopes_to_flags.iter() {
             if scope == alias {
                 return Err(format!(
-                    "Invalid alias in `[cli].alias` option: {}. This is already a registered goal or subsytem.",
-                    alias
+                    "Invalid alias in `[cli].alias` option: {alias}. This is already a registered goal or subsytem."
                 ));
             }
             if args.contains(alias) {
@@ -82,7 +80,7 @@ pub fn create_alias_map(
             if let Some(vs) = shlex::split(v) {
                 Ok((k.to_owned(), vs))
             } else {
-                Err(format!("Invalid value in `[cli].alias` option: {}. Failed to split according to shell rules: {}", k, v))
+                Err(format!("Invalid value in `[cli].alias` option: {k}. Failed to split according to shell rules: {v}"))
             }
         })
         .collect::<Result<_, _>>()?);

@@ -81,11 +81,12 @@ impl Task {
             .entry_for(&dependency_key)
             .or_else(|| {
                 // The Get might have involved a @union: if so, include its in_scope types in the
-                // lookup. This just means setting in_scope_params to non-None, to signal that
-                // in_scope types should be considered. For call-by-name the in_scope types are
-                // the explicit params passed to the call, and the in_scope_params field acts
-                // as a bool.
-                edges.entry_for(&dependency_key.in_scope_params(vec![]))
+                // lookup.
+                let in_scope_types = call
+                    .input_types
+                    .iter()
+                    .find_map(|t| t.union_in_scope_types())?;
+                edges.entry_for(&dependency_key.in_scope_params(in_scope_types))
             })
             .ok_or_else(|| {
                 // NB: The Python constructor for `Call()` will have already errored if

@@ -281,7 +281,7 @@ impl CommandRunner {
             }
 
             Some(Err(err)) => {
-                debug!("wait_on_operation_stream: got error: {:?}", err);
+                debug!("wait_on_operation_stream: got error: {err:?}");
                 let status_proto = StatusProto {
                     code: err.code() as i32,
                     message: err.message().to_string(),
@@ -416,7 +416,7 @@ impl CommandRunner {
                     &workunit_store,
                     WorkunitMetadata::default(),
                 ),
-                Err(s) => warn!("{}", s),
+                Err(s) => warn!("{s}"),
             }
         }
 
@@ -439,7 +439,7 @@ impl CommandRunner {
                     &workunit_store,
                     WorkunitMetadata::default(),
                 ),
-                Err(s) => warn!("{}", s),
+                Err(s) => warn!("{s}"),
             }
         }
 
@@ -462,7 +462,7 @@ impl CommandRunner {
                     &workunit_store,
                     WorkunitMetadata::default(),
                 ),
-                Err(s) => warn!("{}", s),
+                Err(s) => warn!("{s}"),
             }
         }
 
@@ -485,7 +485,7 @@ impl CommandRunner {
                     &workunit_store,
                     WorkunitMetadata::default(),
                 ),
-                Err(s) => warn!("{}", s),
+                Err(s) => warn!("{s}"),
             }
         }
     }
@@ -567,7 +567,7 @@ impl CommandRunner {
         environment: ProcessExecutionEnvironment,
         operation_or_status: OperationOrStatus,
     ) -> Result<FallibleProcessResultWithPlatform, ExecutionError> {
-        trace!("Got operation response: {:?}", operation_or_status);
+        trace!("Got operation response: {operation_or_status:?}");
 
         let status = match operation_or_status {
             OperationOrStatus::Operation(operation) => {
@@ -595,7 +595,7 @@ impl CommandRunner {
                     }
                 };
 
-                debug!("Got (nested) execute response: {:?}", execute_response);
+                debug!("Got (nested) execute response: {execute_response:?}");
 
                 if let Some(ref metadata) = execute_response
                     .result
@@ -731,7 +731,7 @@ impl CommandRunner {
                 let multiplier = thread_rng().gen_range(0..2_u32.pow(num_retries) + 1);
                 let sleep_time = self.retry_interval_duration * multiplier;
                 let sleep_time = sleep_time.min(MAX_BACKOFF_DURATION);
-                debug!("delaying {:?} before retry", sleep_time);
+                debug!("delaying {sleep_time:?} before retry");
                 tokio::time::sleep(sleep_time).await;
             }
 
@@ -848,7 +848,7 @@ impl CommandRunner {
                         // Check if the number of request attempts sent thus far have exceeded the number
                         // of retries allowed since the last successful connection. (There is no point in
                         // continually submitting a request if ultimately futile.)
-                        trace!("retryable error: {}", e);
+                        trace!("retryable error: {e}");
                         if num_retries >= MAX_RETRIES {
                             workunit.increment_counter(Metric::RemoteExecutionRPCErrors, 1);
                             return Err(format!(
@@ -862,8 +862,7 @@ impl CommandRunner {
                     }
                     ExecutionError::MissingRemoteDigests(missing_digests) => {
                         trace!(
-                            "Server reported missing digests; trying to upload: {:?}",
-                            missing_digests,
+                            "Server reported missing digests; trying to upload: {missing_digests:?}",
                         );
 
                         let _ = self

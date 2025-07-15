@@ -726,6 +726,8 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
                             # polymorphic rule for the union member.
                             if member_rule.output_type == awaitable.output_type:
                                 vtable_entries.append((member_type, member_rule.canonical_name))
+                        in_scope_types = union_in_scope_types(union)
+                        assert in_scope_types is not None
                         native_engine.tasks_add_call(
                             tasks,
                             awaitable.output_type,
@@ -733,6 +735,7 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
                             awaitable.rule_id,
                             awaitable.explicit_args_arity,
                             vtable_entries,
+                            in_scope_types,
                         )
                 else:
                     # This is a union Get.
@@ -758,7 +761,8 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
                     awaitable.input_types,
                     awaitable.rule_id,
                     awaitable.explicit_args_arity,
-                    None,
+                    vtable_entries=None,
+                    in_scope_types=None,
                 )
             else:
                 # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.

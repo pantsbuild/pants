@@ -143,7 +143,7 @@ impl ExecuteProcess {
                         Ok(Some(ProcessConcurrency::Range { min, max }))
                     }
                     Some(kind) if kind == "exclusive" => Ok(Some(ProcessConcurrency::Exclusive)),
-                    _ => Err(format!("Unknown ProcessConcurrency kind: {:?}", kind_opt)),
+                    _ => Err(format!("Unknown ProcessConcurrency kind: {kind_opt:?}")),
                 }
             }
         }?;

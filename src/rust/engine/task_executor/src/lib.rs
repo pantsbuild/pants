@@ -279,10 +279,7 @@ impl TailTasks {
         let inner = match &mut *guard {
             Some(inner) => inner,
             None => {
-                log::warn!(
-                    "Session end task `{}` submitted after session completed.",
-                    name
-                );
+                log::warn!("Session end task `{name}` submitted after session completed.");
                 return;
             }
         };
