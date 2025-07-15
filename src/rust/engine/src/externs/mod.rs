@@ -22,12 +22,14 @@ use std::sync::LazyLock;
 use logging::PythonLogLevel;
 use rule_graph::RuleId;
 
+use crate::externs::frozendict::FrozenDict;
 use crate::interning::Interns;
 use crate::python::{Failure, Key, TypeId, Value};
 
 mod address;
 pub mod dep_inference;
 pub mod engine_aware;
+mod frozendict;
 pub mod fs;
 mod interface;
 #[cfg(test)]
@@ -217,15 +219,15 @@ pub fn collect_iterable<'py>(value: &Bound<'py, PyAny>) -> Result<Vec<Bound<'py,
 pub fn getattr_from_str_frozendict<'py, T: for<'a> FromPyObject<'a, 'py>>(
     value: &Bound<'py, PyAny>,
     field: &str,
-) -> BTreeMap<String, T> {
-    let frozendict: Bound<PyAny> = getattr(value, field).unwrap();
-    let pydict: Bound<PyDict> = getattr(&frozendict, "_data").unwrap();
-    let result: BTreeMap<String, T> = pydict
-        .items()
-        .into_iter()
-        .map(|kv_pair| kv_pair.extract::<(String, T)>().unwrap())
-        .collect();
-    result
+) -> BTreeMap<String, T>
+where
+    for<'a> <T as FromPyObject<'a, 'py>>::Error: std::fmt::Debug,
+{
+    let frozendict: Bound<FrozenDict> = getattr(value, field).unwrap();
+    FrozenDict::iter(frozendict)
+        .unwrap()
+        .map(|(k, v)| (k.extract().unwrap(), v.extract().unwrap()))
+        .collect()
 }
 
 pub fn getattr_as_optional_string(
