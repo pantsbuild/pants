@@ -39,7 +39,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
-        key: Linux-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
+        key: Linux-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.88.0-*
 
           ~/.rustup/update-hashes
@@ -52,7 +52,7 @@ jobs:
       with:
         cache-bin: 'false'
         shared-key: engine
-        workspaces: src/rust/engine
+        workspaces: src/rust
     - id: get-engine-hash
       name: Get native engine hash
       run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
@@ -148,7 +148,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
-        key: Linux-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
+        key: Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.88.0-*
 
           ~/.rustup/update-hashes
@@ -161,7 +161,7 @@ jobs:
       with:
         cache-bin: 'false'
         shared-key: engine
-        workspaces: src/rust/engine
+        workspaces: src/rust
     - id: get-engine-hash
       name: Get native engine hash
       run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
@@ -267,7 +267,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
-        key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
+        key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.88.0-*
 
           ~/.rustup/update-hashes
@@ -280,7 +280,7 @@ jobs:
       with:
         cache-bin: 'false'
         shared-key: engine
-        workspaces: src/rust/engine
+        workspaces: src/rust
     - id: get-engine-hash
       name: Get native engine hash
       run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
@@ -547,7 +547,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
-        key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
+        key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.88.0-*
 
           ~/.rustup/update-hashes
@@ -560,7 +560,7 @@ jobs:
       with:
         cache-bin: 'false'
         shared-key: engine
-        workspaces: src/rust/engine
+        workspaces: src/rust
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
       with:
@@ -633,7 +633,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
-        key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
+        key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.88.0-*
 
           ~/.rustup/update-hashes
@@ -646,7 +646,7 @@ jobs:
       with:
         cache-bin: 'false'
         shared-key: engine
-        workspaces: src/rust/engine
+        workspaces: src/rust
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
       with:
