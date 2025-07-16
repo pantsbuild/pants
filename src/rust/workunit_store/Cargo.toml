@@ -15,7 +15,7 @@ log = { workspace = true }
 parking_lot = { workspace = true }
 petgraph = { workspace = true }
 rand = { workspace = true }
-smallvec = { version = "1", features = ["union"] }
+smallvec = { workspace = true, features = ["union"] }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 tokio = { workspace = true, features = ["rt", "sync"] }
