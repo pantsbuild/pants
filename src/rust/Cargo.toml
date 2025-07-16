@@ -206,7 +206,7 @@ pyo3 = "0.25.1"
 pyo3-build-config = "0.25.1"
 rand = "0.8"
 regex = "1"
-reqwest = "0.12"
+reqwest = { version = "0.12", default-features = false }
 rlimit = "0.8"
 rustls = "0.23"
 rustls-native-certs = "0.8"
