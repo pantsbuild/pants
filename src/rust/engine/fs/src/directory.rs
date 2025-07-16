@@ -446,7 +446,7 @@ impl DigestTrie {
 
         for (name_res, group) in &paths
             .into_iter()
-            .group_by(|s| first_path_component_to_name(s))
+            .chunk_by(|s| first_path_component_to_name(s))
         {
             let name = name_res?;
             let mut path_group: Vec<TypedPath> = group.collect();
@@ -1016,7 +1016,7 @@ impl DigestTrie {
 
         // Then group by name, and merge into an output list.
         let mut entries: Vec<Entry> = Vec::new();
-        for (name, group) in &input_entries.group_by(|e| e.name()) {
+        for (name, group) in &input_entries.chunk_by(|e| e.name()) {
             let mut group = group.peekable();
             let first = group.next().unwrap();
             if group.peek().is_none() {
