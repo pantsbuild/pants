@@ -13,7 +13,7 @@ internment = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 petgraph = { workspace = true }
-smallvec = { version = "1", features = ["union"] }
+smallvec = { workspace = true, features = ["union"] }
 
 [dev-dependencies]
 env_logger = { workspace = true }
