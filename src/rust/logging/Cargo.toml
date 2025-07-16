@@ -18,7 +18,7 @@ tokio = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 
 [build-dependencies]
-cargo_metadata = "0.20"
+cargo_metadata = "0.21"
 
 [lints]
 workspace = true
