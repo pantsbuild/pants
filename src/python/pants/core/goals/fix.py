@@ -6,7 +6,7 @@ from __future__ import annotations
 import itertools
 import logging
 from collections import defaultdict
-from collections.abc import Callable, Iterable, Iterator, Sequence
+from collections.abc import Callable, Coroutine, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from typing import Any, ClassVar, NamedTuple, Protocol, TypeVar
 
@@ -26,10 +26,11 @@ from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot, SnapshotDiff, Workspace
+from pants.engine.fs import MergeDigests, PathGlobs, Snapshot, SnapshotDiff, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.intrinsics import digest_to_snapshot, merge_digests
 from pants.engine.process import FallibleProcessResult, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.rules import collect_rules, concurrently, goal_rule, implicitly, rule
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.option_types import BoolOption
 from pants.util.collections import partition_sequentially
@@ -58,7 +59,7 @@ class FixResult(EngineAwareReturnType):
     ) -> FixResult:
         return FixResult(
             input=request.snapshot,
-            output=await Get(Snapshot, Digest, process_result.output_digest),
+            output=await digest_to_snapshot(process_result.output_digest),
             stdout=output_simplifier.simplify(process_result.stdout),
             stderr=output_simplifier.simplify(process_result.stderr),
             tool_name=request.tool_name,
@@ -256,11 +257,10 @@ async def _write_files(workspace: Workspace, batched_results: Iterable[_FixBatch
         # NB: this will fail if there are any conflicting changes, which we want to happen rather
         # than silently having one result override the other. In practice, this should never
         # happen due to us grouping each file's tools into a single digest.
-        merged_digest = await Get(
-            Digest,
+        merged_digest = await merge_digests(
             MergeDigests(
                 batched_result.results[-1].output.digest for batched_result in batched_results
-            ),
+            )
         )
         workspace.write_digest(merged_digest)
 
@@ -299,6 +299,34 @@ class _BatchableMultiToolGoalSubsystem(_MultiToolGoalSubsystem, Protocol):
     batch_size: BatchSizeOption
 
 
+@rule(polymorphic=True)
+async def _fix_batch(batch: AbstractFixRequest.Batch) -> FixResult:
+    raise NotImplementedError()
+
+
+@rule
+async def fix_batch(
+    request: _FixBatchRequest,
+) -> _FixBatchResult:
+    current_snapshot = await digest_to_snapshot(
+        **implicitly({PathGlobs(request[0].files): PathGlobs})
+    )
+
+    results = []
+    for request_type, tool_name, files, key in request:
+        batch = request_type(tool_name, files, key, current_snapshot)
+        result = await _fix_batch(  # noqa: PNT30: this is inherently sequential
+            **implicitly({batch: AbstractFixRequest.Batch})
+        )
+        results.append(result)
+
+        assert set(result.output.files) == set(batch.files), (
+            f"Expected {result.output.files} to match {batch.files}"
+        )
+        current_snapshot = result.output
+    return _FixBatchResult(tuple(results))
+
+
 async def _do_fix(
     core_request_types: Iterable[type[_CoreRequestType]],
     target_partitioners: Iterable[type[_TargetPartitioner]],
@@ -308,8 +336,10 @@ async def _do_fix(
     specs: Specs,
     workspace: Workspace,
     console: Console,
-    make_targets_partition_request_get: Callable[[_TargetPartitioner], Get[Partitions]],
-    make_files_partition_request_get: Callable[[_FilePartitioner], Get[Partitions]],
+    make_targets_partition_request_get: Callable[
+        [_TargetPartitioner], Coroutine[Any, Any, Partitions]
+    ],
+    make_files_partition_request_get: Callable[[_FilePartitioner], Coroutine[Any, Any, Partitions]],
 ) -> _GoalT:
     partitions_by_request_type = await _get_partitions_by_request_type(
         core_request_types,
@@ -362,9 +392,8 @@ async def _do_fix(
                     for request_type, partition_metadata in partition_infos
                 )
 
-    all_results = await MultiGet(
-        Get(_FixBatchResult, _FixBatchRequest, request)
-        for request in _make_disjoint_batch_requests()
+    all_results = await concurrently(
+        fix_batch(request) for request in _make_disjoint_batch_requests()
     )
 
     individual_results = list(
@@ -377,6 +406,16 @@ async def _do_fix(
     # Since the rules to produce FixResult should use ProcessResult, rather than
     # FallibleProcessResult, we assume that there were no failures.
     return goal_cls(exit_code=0)
+
+
+@rule(polymorphic=True)
+async def partition_targets(req: FixTargetsRequest.PartitionRequest) -> Partitions:
+    raise NotImplementedError()
+
+
+@rule(polymorphic=True)
+async def partition_files(req: FixFilesRequest.PartitionRequest) -> Partitions:
+    raise NotImplementedError()
 
 
 @goal_rule
@@ -409,30 +448,13 @@ async def fix(
         specs,
         workspace,
         console,
-        lambda request_type: Get(Partitions, FixTargetsRequest.PartitionRequest, request_type),
-        lambda request_type: Get(Partitions, FixFilesRequest.PartitionRequest, request_type),
+        lambda request_type: partition_targets(
+            **implicitly({request_type: FixTargetsRequest.PartitionRequest})
+        ),
+        lambda request_type: partition_files(
+            **implicitly({request_type: FixFilesRequest.PartitionRequest})
+        ),
     )
-
-
-@rule
-async def fix_batch(
-    request: _FixBatchRequest,
-) -> _FixBatchResult:
-    current_snapshot = await Get(Snapshot, PathGlobs(request[0].files))
-
-    results = []
-    for request_type, tool_name, files, key in request:
-        batch = request_type(tool_name, files, key, current_snapshot)
-        result = await Get(  # noqa: PNT30: this is inherently sequential
-            FixResult, AbstractFixRequest.Batch, batch
-        )
-        results.append(result)
-
-        assert set(result.output.files) == set(batch.files), (
-            f"Expected {result.output.files} to match {batch.files}"
-        )
-        current_snapshot = result.output
-    return _FixBatchResult(tuple(results))
 
 
 @rule(level=LogLevel.DEBUG)
