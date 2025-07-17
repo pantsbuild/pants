@@ -1734,6 +1734,12 @@ def _yaml_representer_pipes_if_multiline(dumper: PantsDumper, data: str) -> yaml
 PantsDumper.add_representer(str, _yaml_representer_pipes_if_multiline)
 
 
+def dump_yaml(data: object) -> str:
+    result = yaml.dump(data, Dumper=PantsDumper)
+    assert isinstance(result, str)
+    return result
+
+
 def merge_ok(pr_jobs: list[str]) -> Jobs:
     # Generate the "Merge OK" job that branch protection can monitor.
     # Note: A job skipped due to an "if" condition, or due to a failed dependency, counts as
@@ -1804,7 +1810,7 @@ def generate() -> dict[Path, str]:
     pr_jobs.update(merge_ok(sorted(pr_jobs.keys())))
 
     test_workflow_name = "Pull Request CI"
-    test_yaml = yaml.dump(
+    test_yaml = dump_yaml(
         {
             "name": test_workflow_name,
             "concurrency": {
@@ -1815,13 +1821,12 @@ def generate() -> dict[Path, str]:
             "jobs": pr_jobs,
             "env": global_env(),
         },
-        Dumper=PantsDumper,
     )
 
     ignore_advisories = " ".join(
         f"--ignore {adv_id}" for adv_id in CARGO_AUDIT_IGNORED_ADVISORY_IDS
     )
-    audit_yaml = yaml.dump(
+    audit_yaml = dump_yaml(
         {
             "name": "Cargo Audit",
             "on": {
@@ -1847,18 +1852,17 @@ def generate() -> dict[Path, str]:
     )
 
     cc_jobs, cc_inputs = cache_comparison_jobs_and_inputs()
-    cache_comparison_yaml = yaml.dump(
+    cache_comparison_yaml = dump_yaml(
         {
             "name": "Cache Comparison",
             # Kicked off manually.
             "on": {"workflow_dispatch": {"inputs": cc_inputs}},
             "jobs": cc_jobs,
         },
-        Dumper=PantsDumper,
     )
 
     release_jobs, release_inputs = release_jobs_and_inputs()
-    release_yaml = yaml.dump(
+    release_yaml = dump_yaml(
         {
             "name": "Release",
             "on": {
@@ -1867,22 +1871,20 @@ def generate() -> dict[Path, str]:
             },
             "jobs": release_jobs,
         },
-        Dumper=PantsDumper,
     )
 
     public_repos_output = public_repos()
-    public_repos_yaml = yaml.dump(
+    public_repos_yaml = dump_yaml(
         {
             "name": "Public repos tests",
             "run-name": public_repos_output.run_name,
             "on": {"workflow_dispatch": {"inputs": public_repos_output.inputs}},
             "jobs": public_repos_output.jobs,
         },
-        Dumper=PantsDumper,
     )
 
     clear_self_hosted_persistent_caches = clear_self_hosted_persistent_caches_jobs()
-    clear_self_hosted_persistent_caches_yaml = yaml.dump(
+    clear_self_hosted_persistent_caches_yaml = dump_yaml(
         {
             "name": "Clear persistent caches on long-lived self-hosted runners",
             "on": {"workflow_dispatch": {}},
