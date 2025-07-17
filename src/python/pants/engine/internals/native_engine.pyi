@@ -259,6 +259,51 @@ class Address:
     def __gt__(self, other: Any) -> bool: ...
 
 # ------------------------------------------------------------------------------
+# Union
+# ------------------------------------------------------------------------------
+
+class UnionRule:
+    union_base: type
+    union_member: type
+
+    def __init__(self, union_base: type, union_member: type) -> None: ...
+
+_T = TypeVar("_T", bound=type)
+
+class UnionMembership:
+    @staticmethod
+    def from_rules(rules: Iterable[UnionRule]) -> UnionMembership: ...
+    @staticmethod
+    def empty() -> UnionMembership: ...
+    def __contains__(self, union_type: _T) -> bool: ...
+    def __getitem__(self, union_type: _T) -> Sequence[_T]:
+        """Get all members of this union type.
+
+        If the union type does not exist because it has no members registered, this will raise an
+        IndexError.
+
+        Note that the type hint assumes that all union members will have subclassed the union type
+        - this is only a convention and is not actually enforced. So, you may have inaccurate type
+        hints.
+        """
+
+    def get(self, union_type: _T) -> Sequence[_T]:
+        """Get all members of this union type.
+
+        If the union type does not exist because it has no members registered, return an empty
+        Sequence.
+
+        Note that the type hint assumes that all union members will have subclassed the union type
+        - this is only a convention and is not actually enforced. So, you may have inaccurate type
+        hints.
+        """
+
+    def items(self) -> Iterable[tuple[type, Sequence[type]]]: ...
+    def is_member(self, union_type: type, putative_member: type) -> bool: ...
+    def has_members(self, union_type: type) -> bool:
+        """Check whether the union has an implementation or not."""
+
+# ------------------------------------------------------------------------------
 # Scheduler
 # ------------------------------------------------------------------------------
 

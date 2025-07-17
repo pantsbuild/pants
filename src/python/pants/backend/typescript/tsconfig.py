@@ -19,7 +19,7 @@ from pathlib import PurePath
 
 from pants.engine.collection import Collection
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
-from pants.engine.internals.selectors import Get, concurrently
+from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import get_digest_contents, path_globs_to_digest
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.util.frozendict import FrozenDict
@@ -52,11 +52,11 @@ class ParseTSConfigRequest:
     others: DigestContents
 
 
-async def _read_parent_config(
+def _get_parent_config_content(
     child_path: str,
     extends_path: str,
     others: DigestContents,
-) -> TSConfig | None:
+) -> FileContent | None:
     if child_path.endswith(".json"):
         relative = os.path.dirname(child_path)
     else:
@@ -73,9 +73,7 @@ async def _read_parent_config(
             f"pants could not locate {child_path}'s 'extends' at {relative}. Found: {[other.path for other in others]}."
         )
         return None
-    return await Get(  # Must be a Get until https://github.com/pantsbuild/pants/pull/21174 lands
-        TSConfig, ParseTSConfigRequest(parent, others)
-    )
+    return parent
 
 
 def _clean_tsconfig_contents(content: str) -> str:
@@ -127,7 +125,14 @@ async def parse_extended_ts_config(request: ParseTSConfigRequest) -> TSConfig:
     if not extends:
         return ts_config
 
-    extended_parent = await _read_parent_config(ts_config.path, extends, request.others)
+    parent_content = _get_parent_config_content(ts_config.path, extends, request.others)
+    if parent_content:
+        extended_parent = await parse_extended_ts_config(
+            ParseTSConfigRequest(parent_content, request.others)
+        )
+    else:
+        extended_parent = None
+
     if not extended_parent:
         return ts_config
     return TSConfig(

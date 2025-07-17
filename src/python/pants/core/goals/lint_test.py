@@ -34,7 +34,7 @@ from pants.engine.fs import PathGlobs, SpecsPaths, Workspace
 from pants.engine.internals.native_engine import EMPTY_SNAPSHOT, Snapshot
 from pants.engine.rules import QueryRule
 from pants.engine.target import Field, FieldSet, FilteredTargets, MultipleSourcesField, Target
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
 from pants.testutil.option_util import create_goal_subsystem
@@ -334,17 +334,19 @@ def run_lint_rule(
     skip_formatters: bool = False,
     skip_fixers: bool = False,
 ) -> tuple[int, str]:
-    union_membership = UnionMembership(
+    union_membership = UnionMembership.from_rules(
         {
-            AbstractLintRequest: lint_request_types,
-            AbstractLintRequest.Batch: [rt.Batch for rt in lint_request_types],
-            LintTargetsRequest.PartitionRequest: [
-                rt.PartitionRequest
+            *[UnionRule(AbstractLintRequest, t) for t in lint_request_types],
+            *[UnionRule(AbstractLintRequest.Batch, rt.Batch) for rt in lint_request_types],
+            *[
+                UnionRule(LintTargetsRequest.PartitionRequest, rt.PartitionRequest)
                 for rt in lint_request_types
                 if issubclass(rt, LintTargetsRequest)
             ],
-            LintFilesRequest.PartitionRequest: [
-                rt.PartitionRequest for rt in lint_request_types if issubclass(rt, LintFilesRequest)
+            *[
+                UnionRule(LintFilesRequest.PartitionRequest, rt.PartitionRequest)
+                for rt in lint_request_types
+                if issubclass(rt, LintFilesRequest)
             ],
         }
     )
@@ -355,11 +357,6 @@ def run_lint_rule(
         skip_formatters=skip_formatters,
         skip_fixers=skip_fixers,
     )
-
-    def mock_filter_targets(__implicitly: dict) -> FilteredTargets:
-        return FilteredTargets(
-            tuple(targets)
-        )
 
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
         result: Lint = run_rule_with_mocks(
@@ -373,7 +370,9 @@ def run_lint_rule(
                 DistDir(relpath=Path("dist")),
             ],
             mock_calls={
-                "pants.engine.internals.graph.filter_targets": mock_filter_targets,
+                "pants.engine.internals.graph.filter_targets": lambda __implicitly: FilteredTargets(
+                    tuple(targets)
+                ),
                 "pants.engine.internals.specs_rules.resolve_specs_paths": lambda _: SpecsPaths(
                     ("f.txt", "BUILD"), ()
                 ),

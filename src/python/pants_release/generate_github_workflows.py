@@ -312,7 +312,7 @@ def global_env() -> Env:
 
 
 def rust_channel() -> str:
-    with open("src/rust/engine/rust-toolchain") as fp:
+    with open("src/rust/rust-toolchain") as fp:
         rust_toolchain = toml.load(fp)
     return cast(str, rust_toolchain["toolchain"]["channel"])
 
@@ -518,7 +518,7 @@ class Helper:
                 "uses": action("cache"),
                 "with": {
                     "path": f"~/.rustup/toolchains/{rust_channel()}-*\n~/.rustup/update-hashes\n~/.rustup/settings.toml\n",
-                    "key": f"{self.platform_name()}-rustup-{hash_files('src/rust/engine/rust-toolchain')}-v2",
+                    "key": f"{self.platform_name()}-rustup-{hash_files('src/rust/rust-toolchain')}-v2",
                 },
             },
             {
@@ -531,7 +531,7 @@ class Helper:
                     # This will cause us to hit the 10GB limit much sooner, and also spend time uploading
                     # identical cache entries unnecessarily.
                     "shared-key": "engine",
-                    "workspaces": "src/rust/engine",
+                    "workspaces": "src/rust",
                     # A custom option from our fork of the action.
                     "cache-bin": "false",
                 },

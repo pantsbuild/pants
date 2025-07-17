@@ -14,11 +14,11 @@ num_enum = { workspace = true }
 parking_lot = { workspace = true }
 regex = { workspace = true }
 stdio = { path = "../stdio" }
-tokio = { version = "1.32" }
+tokio = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 
 [build-dependencies]
-cargo_metadata = "0.20"
+cargo_metadata = "0.21"
 
 [lints]
 workspace = true

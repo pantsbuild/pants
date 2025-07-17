@@ -44,7 +44,7 @@ class SchedulerTestBase:
             named_caches_dir=named_caches_dir,
             ca_certs_path=None,
             rules=rules,
-            union_membership=UnionMembership({}),
+            union_membership=UnionMembership.empty(),
             executor=self._executor,
             execution_options=DEFAULT_EXECUTION_OPTIONS,
             local_store_options=DEFAULT_LOCAL_STORE_OPTIONS,

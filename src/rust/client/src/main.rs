@@ -16,7 +16,7 @@ use strum_macros::{AsRefStr, EnumString, VariantNames};
 use options::{Args, BuildRoot, Env, OptionParser, option_id, render_choice};
 use pantsd::find_pantsd;
 
-// TODO(John Sirois): Maybe consolidate with PythonLogLevel in src/rust/engine/logging/src/lib.rs.
+// TODO(John Sirois): Maybe consolidate with PythonLogLevel in src/rust/logging/src/lib.rs.
 #[derive(AsRefStr, EnumString, VariantNames)]
 #[strum(serialize_all = "snake_case")]
 enum PythonLogLevel {
