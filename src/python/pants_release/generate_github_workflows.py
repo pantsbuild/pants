@@ -1710,28 +1710,28 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-# PyYAML will try by default to use anchors to deduplicate certain code. The alias
-# names are cryptic, though, like `&id002`, so we turn this feature off.
-class NoAliasDumper(yaml.SafeDumper):
+class PantsDumper(yaml.SafeDumper):
     def __init__(self, stream, width=None, **kwargs):
         # set a very wide width to effectively disable wrapping, which is generally distracting
         if width is None:
             width = 999999
         super().__init__(stream, width=width, **kwargs)
 
+    # PyYAML will try by default to use anchors to deduplicate certain code. The alias
+    # names are cryptic, though, like `&id002`, so we turn this feature off.
     def ignore_aliases(self, data):
         return True
 
 
 # Forcibly use | string literals for multi-line strings, much better than seeing a bunch of \n, or
 # empty lines, if a human need to read the generated file.
-def _yaml_representer_pipes_if_multiline(dumper: NoAliasDumper, data: str) -> yaml.Node:
+def _yaml_representer_pipes_if_multiline(dumper: PantsDumper, data: str) -> yaml.Node:
     if "\n" in data:
         return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
     return dumper.represent_str(data)
 
 
-NoAliasDumper.add_representer(str, _yaml_representer_pipes_if_multiline)
+PantsDumper.add_representer(str, _yaml_representer_pipes_if_multiline)
 
 
 def merge_ok(pr_jobs: list[str]) -> Jobs:
@@ -1815,7 +1815,7 @@ def generate() -> dict[Path, str]:
             "jobs": pr_jobs,
             "env": global_env(),
         },
-        Dumper=NoAliasDumper,
+        Dumper=PantsDumper,
     )
 
     ignore_advisories = " ".join(
@@ -1854,7 +1854,7 @@ def generate() -> dict[Path, str]:
             "on": {"workflow_dispatch": {"inputs": cc_inputs}},
             "jobs": cc_jobs,
         },
-        Dumper=NoAliasDumper,
+        Dumper=PantsDumper,
     )
 
     release_jobs, release_inputs = release_jobs_and_inputs()
@@ -1867,7 +1867,7 @@ def generate() -> dict[Path, str]:
             },
             "jobs": release_jobs,
         },
-        Dumper=NoAliasDumper,
+        Dumper=PantsDumper,
     )
 
     public_repos_output = public_repos()
@@ -1878,7 +1878,7 @@ def generate() -> dict[Path, str]:
             "on": {"workflow_dispatch": {"inputs": public_repos_output.inputs}},
             "jobs": public_repos_output.jobs,
         },
-        Dumper=NoAliasDumper,
+        Dumper=PantsDumper,
     )
 
     clear_self_hosted_persistent_caches = clear_self_hosted_persistent_caches_jobs()
