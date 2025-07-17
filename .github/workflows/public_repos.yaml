@@ -22,17 +22,16 @@ jobs:
       with:
         python-version: '3.9'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -107,17 +106,16 @@ jobs:
       with:
         python-version: '3.10'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -159,17 +157,16 @@ jobs:
       with:
         python-version: 3.9.15
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -245,28 +242,22 @@ jobs:
       with:
         python-version: '3.8'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - name: Run set-up
-      run: '
+      run: |2
 
-        sudo apt-get install gcc git make screen libffi-dev libssl-dev python3.8-dev
-        libldap2-dev libsasl2-dev
-
+        sudo apt-get install gcc git make screen libffi-dev libssl-dev python3.8-dev libldap2-dev libsasl2-dev
         # sudo apt-get install mongodb mongodb-server
-
         sudo apt-get install rabbitmq-server
-
-        '
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -342,17 +333,16 @@ jobs:
       with:
         python-version: '3.10'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -414,17 +404,16 @@ jobs:
       with:
         python-version: '3.10'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -476,17 +465,16 @@ jobs:
       with:
         python-version: '3.9'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -528,17 +516,16 @@ jobs:
       with:
         python-version: 3.11.4
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - name: Run set-up
       run: mkdir .tmp
     - env:
@@ -618,17 +605,16 @@ jobs:
       with:
         python-version: '3.10'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - name: Run set-up
       run: sudo apt-get install pkg-config libxml2-dev libxmlsec1-dev libxmlsec1-openssl
     - env:
@@ -672,17 +658,16 @@ jobs:
       with:
         python-version: '3.10'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -724,17 +709,16 @@ jobs:
       with:
         python-version: '3.10'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -791,17 +775,16 @@ jobs:
       with:
         node-version: '20'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -854,28 +837,22 @@ jobs:
         python-version: '3.10'
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
-      run: 'mkdir -p "${HOME}/.thrift"
-
-        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift
-        -o "${HOME}/.thrift/thrift"
-
+      run: |
+        mkdir -p "${HOME}/.thrift"
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
         chmod +x "${HOME}/.thrift/thrift"
-
         echo "${HOME}/.thrift" >> $GITHUB_PATH
-
-        '
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -950,17 +927,16 @@ jobs:
       with:
         python-version: '3.9'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -1036,17 +1012,16 @@ jobs:
       with:
         python-version: '3.8'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -1125,17 +1100,16 @@ jobs:
       with:
         go-version: 1.19.5
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -1210,17 +1184,16 @@ jobs:
       with:
         python-version: '3.10'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -1295,17 +1268,16 @@ jobs:
       with:
         python-version: '3.10'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -1380,17 +1352,16 @@ jobs:
       with:
         python-version: '3.9'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -1465,17 +1436,16 @@ jobs:
       with:
         python-version: '3.9'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -1540,17 +1510,16 @@ jobs:
       with:
         python-version: '3.9'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
