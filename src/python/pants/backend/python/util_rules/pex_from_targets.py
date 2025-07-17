@@ -605,8 +605,6 @@ async def _determine_requirements_for_pex_from_targets(
         )
 
     # Else, request the repository PEX and possibly subset it.
-    # TODO: Call by name fails with "@rule body at rule compile time", but moving it causes
-    # another failure in a different part of this function
     repository_pex_request = await get_repository_pex(
         _RepositoryPexRequest(
             request.addresses,
