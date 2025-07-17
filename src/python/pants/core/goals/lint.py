@@ -32,6 +32,7 @@ from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, Digest, PathGlobs, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.graph import filter_targets
+from pants.engine.internals.selectors import Get
 from pants.engine.internals.specs_rules import resolve_specs_paths
 from pants.engine.intrinsics import digest_to_snapshot
 from pants.engine.process import FallibleProcessResult
@@ -431,11 +432,6 @@ async def partition_files(req: LintFilesRequest.PartitionRequest) -> Partitions:
     raise NotImplementedError()
 
 
-@rule(polymorphic=True)
-async def lint_batch(batch: AbstractLintRequest.Batch) -> LintResult:
-    raise NotImplementedError()
-
-
 @goal_rule
 async def lint(
     console: Console,
@@ -511,7 +507,7 @@ async def lint(
     ]
 
     all_batch_results = await concurrently(
-        lint_batch(**implicitly({request: AbstractLintRequest.Batch})) for request in batches
+        Get(LintResult, AbstractLintRequest.Batch, request) for request in batches
     )
 
     core_request_types_by_batch_type = {
