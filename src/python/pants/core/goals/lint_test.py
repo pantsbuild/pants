@@ -13,8 +13,6 @@ from typing import Any, TypeVar
 import pytest
 
 from pants.base.specs import Specs
-from pants.core.environments.rules import EnvironmentNameRequest
-from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.goals.fix import FixFilesRequest, FixTargetsRequest
 from pants.core.goals.fmt import FmtFilesRequest, FmtTargetsRequest
 from pants.core.goals.lint import (
@@ -30,15 +28,15 @@ from pants.core.goals.lint import (
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.partitions import PartitionerType, _EmptyMetadata
 from pants.engine.addresses import Address
-from pants.engine.fs import PathGlobs, SpecsPaths, Workspace
-from pants.engine.internals.native_engine import EMPTY_SNAPSHOT, Snapshot
+from pants.engine.fs import SpecsPaths, Workspace
+from pants.engine.internals.native_engine import EMPTY_SNAPSHOT
 from pants.engine.rules import QueryRule
 from pants.engine.target import Field, FieldSet, FilteredTargets, MultipleSourcesField, Target
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
 from pants.testutil.option_util import create_goal_subsystem
-from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
+from pants.testutil.rule_runner import RuleRunner, mock_console, run_rule_with_mocks
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 
@@ -178,9 +176,7 @@ def _all_lint_requests() -> Iterable[type[MockLintRequest]]:
         yield from subclasses
 
 
-def mock_target_partitioner(
-    __implicitly: tuple
-) -> Partitions[MockLinterFieldSet, Any]:
+def mock_target_partitioner(__implicitly: tuple) -> Partitions[MockLinterFieldSet, Any]:
     request, typ = next(iter(__implicitly[0].items()))
     assert typ == LintTargetsRequest.PartitionRequest
     if type(request) is SkippedRequest.PartitionRequest:
@@ -193,6 +189,7 @@ def mock_target_partitioner(
         return Partitions.single_partition(fs.sources.globs for fs in request.field_sets)
 
     return Partitions.single_partition(request.field_sets)
+
 
 class MockFilesRequest(MockLintRequest, LintFilesRequest):
     @classproperty
