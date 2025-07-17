@@ -93,7 +93,7 @@ def run_export_rule(
 ) -> tuple[int, str]:
     resolves = resolves or []
     binaries = binaries or []
-    union_membership = UnionMembership({ExportRequest: [MockExportRequest]})
+    union_membership = UnionMembership.from_rules([UnionRule(ExportRequest, MockExportRequest)])
     with open(os.path.join(rule_runner.build_root, "somefile"), "wb") as fp:
         fp.write(b"SOMEFILE")
 

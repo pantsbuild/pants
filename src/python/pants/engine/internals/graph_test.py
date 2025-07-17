@@ -2113,7 +2113,7 @@ def test_transitive_excludes_error() -> None:
         bad_value="!!//:bad",
         address=Address("demo"),
         registered_target_types=[Valid1, Valid2, Invalid],
-        union_membership=UnionMembership({}),
+        union_membership=UnionMembership.empty(),
     )
     assert "Bad value '!!//:bad' in the `dependencies` field for demo:demo" in exc.args[0]
     assert "work with these target types: ['valid1', 'valid2']" in exc.args[0]

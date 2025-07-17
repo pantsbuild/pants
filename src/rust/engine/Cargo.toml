@@ -26,7 +26,7 @@ bytes = { workspace = true }
 cache = { path = "../cache" }
 concrete_time = { path = "../concrete_time" }
 crossbeam-channel = { workspace = true }
-deepsize = { workspace = true, features = ["internment", "smallvec"] }
+deepsize = { workspace = true, features = ["internment", "smallvec", "indexmap"] }
 dep_inference = { path = "../dep_inference" }
 derivative = { workspace = true }
 async-oncecell = { workspace = true }

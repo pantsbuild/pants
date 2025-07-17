@@ -6,7 +6,7 @@ from __future__ import annotations
 import dataclasses
 import json
 from dataclasses import dataclass
-from typing import ClassVar, cast
+from typing import ClassVar
 
 from pants.backend.go.go_sources.load_go_binary import LoadedGoBinaryRequest, setup_go_binary
 from pants.backend.go.target_type_rules import (
@@ -78,7 +78,6 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, union
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import bullet_list
 
 
@@ -286,9 +285,7 @@ def maybe_get_codegen_request_type(
 ) -> GoCodegenBuildRequest | None:
     if not tgt.has_field(SourcesField):
         return None
-    generate_request_types = cast(
-        FrozenOrderedSet[type[GoCodegenBuildRequest]], union_membership.get(GoCodegenBuildRequest)
-    )
+    generate_request_types = union_membership.get(GoCodegenBuildRequest)
     sources_field = tgt[SourcesField]
     relevant_requests = [
         req for req in generate_request_types if isinstance(sources_field, req.generate_from)
