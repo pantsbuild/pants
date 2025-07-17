@@ -40,8 +40,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -69,10 +68,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -175,8 +172,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -204,10 +200,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -266,8 +260,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -295,10 +288,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -536,8 +527,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -547,8 +537,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: 'Run `test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis_helper::`
-        with repo-default version (baseline)'
+      name: 'Run `test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis_helper::` with repo-default version (baseline)'
       run: ' pants test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis_helper::'
     - env:
         PANTS_VERSION: ''
@@ -566,10 +555,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -578,10 +565,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: 'Run `test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis_helper::`
-        with ${{ github.event.inputs.pants_version }}'
-      run: '${{ github.event.inputs.extra_env }} pants test :: -tests/agent/docker::
-        -tests/client/integration:: -tests/common/redis_helper::'
+      name: 'Run `test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis_helper::` with ${{ github.event.inputs.pants_version }}'
+      run: '${{ github.event.inputs.extra_env }} pants test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis_helper::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -750,8 +735,7 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: 'Run `package :: -directory_pull::` with ${{ github.event.inputs.pants_version
-        }}'
+      name: 'Run `package :: -directory_pull::` with ${{ github.event.inputs.pants_version }}'
       run: '${{ github.event.inputs.extra_env }} pants package :: -directory_pull::'
   pantsbuild_example-adhoc:
     env:
@@ -861,8 +845,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -890,10 +873,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -945,8 +926,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -974,10 +954,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -1030,8 +1008,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -1059,10 +1036,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -1118,8 +1093,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -1147,10 +1121,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -1202,8 +1174,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -1231,10 +1202,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -1286,8 +1255,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -1315,10 +1283,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -1370,8 +1336,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -1399,10 +1364,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -1454,8 +1417,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -1478,10 +1440,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -1528,8 +1488,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -1557,10 +1516,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -1589,5 +1546,4 @@ name: Public repos tests
         description: Pants version (for example, `2.16.0`, `2.18.0.dev1`)
         required: true
         type: string
-run-name: 'Public repos test: version ${{ github.event.inputs.pants_version }} ${{
-  github.event.inputs.extra_env }}'
+run-name: 'Public repos test: version ${{ github.event.inputs.pants_version }} ${{ github.event.inputs.extra_env }}'

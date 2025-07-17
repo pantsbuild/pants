@@ -1713,7 +1713,7 @@ def create_parser() -> argparse.ArgumentParser:
 # PyYAML will try by default to use anchors to deduplicate certain code. The alias
 # names are cryptic, though, like `&id002`, so we turn this feature off.
 class NoAliasDumper(yaml.SafeDumper):
-    def __init__(self, stream, width = None, **kwargs):
+    def __init__(self, stream, width=None, **kwargs):
         # set a very wide width to effectively disable wrapping, which is generally distracting
         if width is None:
             width = 999999
