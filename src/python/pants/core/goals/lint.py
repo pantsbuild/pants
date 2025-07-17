@@ -35,7 +35,7 @@ from pants.engine.internals.graph import filter_targets
 from pants.engine.internals.specs_rules import resolve_specs_paths
 from pants.engine.intrinsics import digest_to_snapshot
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, collect_rules, concurrently, goal_rule, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, goal_rule, implicitly, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.option_types import BoolOption
@@ -347,8 +347,8 @@ async def _get_partitions_by_request_type(
     file_partitioners: Iterable[type[_FilePartitioner]],
     subsystem: _MultiToolGoalSubsystem,
     specs: Specs,
-    # NB: Because the rule parser code will collect `Get`s from caller's scope, these allow the
-    # caller to customize the specific `Get`.
+    # NB: Because the rule parser code will collect rule calls from caller's scope, these allow the
+    # caller to customize the specific rule.
     make_targets_partition_request_get: Callable[
         [_TargetPartitioner], Coroutine[Any, Any, Partitions]
     ],
@@ -431,6 +431,11 @@ async def partition_files(req: LintFilesRequest.PartitionRequest) -> Partitions:
     raise NotImplementedError()
 
 
+@rule(polymorphic=True)
+async def lint_batch(batch: AbstractLintRequest.Batch) -> LintResult:
+    raise NotImplementedError()
+
+
 @goal_rule
 async def lint(
     console: Console,
@@ -506,7 +511,7 @@ async def lint(
     ]
 
     all_batch_results = await concurrently(
-        Get(LintResult, AbstractLintRequest.Batch, request) for request in batches
+        lint_batch(**implicitly({request: AbstractLintRequest.Batch})) for request in batches
     )
 
     core_request_types_by_batch_type = {

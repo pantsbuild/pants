@@ -179,8 +179,10 @@ def _all_lint_requests() -> Iterable[type[MockLintRequest]]:
 
 
 def mock_target_partitioner(
-    request: MockLintTargetsRequest.PartitionRequest,
+    __implicitly: tuple
 ) -> Partitions[MockLinterFieldSet, Any]:
+    request, typ = next(iter(__implicitly[0].items()))
+    assert typ == LintTargetsRequest.PartitionRequest
     if type(request) is SkippedRequest.PartitionRequest:
         return Partitions()
 
@@ -191,7 +193,6 @@ def mock_target_partitioner(
         return Partitions.single_partition(fs.sources.globs for fs in request.field_sets)
 
     return Partitions.single_partition(request.field_sets)
-
 
 class MockFilesRequest(MockLintRequest, LintFilesRequest):
     @classproperty
@@ -207,11 +208,15 @@ class MockFilesRequest(MockLintRequest, LintFilesRequest):
         return LintResult(0, "", "", cls.tool_name)
 
 
-def mock_file_partitioner(request: MockFilesRequest.PartitionRequest) -> Partitions[str, Any]:
+def mock_file_partitioner(__implicitly: dict) -> Partitions[str, Any]:
+    request, typ = next(iter(__implicitly[0].items()))
+    assert typ == LintFilesRequest.PartitionRequest
     return Partitions.single_partition(request.files)
 
 
-def mock_lint_partition(request: Any) -> LintResult:
+def mock_lint_partition(__implicitly: dict) -> LintResult:
+    request, typ = next(iter(__implicitly[0].items()))
+    assert typ == AbstractLintRequest.Batch
     request_type = {cls.Batch: cls for cls in _all_lint_requests()}[type(request)]
     return request_type.get_lint_result(request.elements)
 
@@ -350,6 +355,12 @@ def run_lint_rule(
         skip_formatters=skip_formatters,
         skip_fixers=skip_fixers,
     )
+
+    def mock_filter_targets(__implicitly: dict) -> FilteredTargets:
+        return FilteredTargets(
+            tuple(targets)
+        )
+
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
         result: Lint = run_rule_with_mocks(
             lint,
@@ -361,40 +372,15 @@ def run_lint_rule(
                 union_membership,
                 DistDir(relpath=Path("dist")),
             ],
-            mock_gets=[
-                MockGet(
-                    output_type=Partitions,
-                    input_types=(LintTargetsRequest.PartitionRequest,),
-                    mock=mock_target_partitioner,
-                ),
-                MockGet(
-                    output_type=EnvironmentTarget,
-                    input_types=(EnvironmentNameRequest,),
-                    mock=lambda _: EnvironmentTarget(None, None),
-                ),
-                MockGet(
-                    output_type=Partitions,
-                    input_types=(LintFilesRequest.PartitionRequest,),
-                    mock=mock_file_partitioner,
-                ),
-                MockGet(
-                    output_type=LintResult,
-                    input_types=(AbstractLintRequest.Batch,),
-                    mock=mock_lint_partition,
-                ),
-                MockGet(
-                    output_type=Snapshot,
-                    input_types=(PathGlobs,),
-                    mock=lambda _: EMPTY_SNAPSHOT,
-                ),
-            ],
             mock_calls={
-                "pants.engine.internals.graph.filter_targets": lambda: FilteredTargets(
-                    tuple(targets)
-                ),
+                "pants.engine.internals.graph.filter_targets": mock_filter_targets,
                 "pants.engine.internals.specs_rules.resolve_specs_paths": lambda _: SpecsPaths(
                     ("f.txt", "BUILD"), ()
                 ),
+                "pants.core.goals.lint.partition_targets": mock_target_partitioner,
+                "pants.core.goals.lint.partition_files": mock_file_partitioner,
+                "pants.core.goals.lint.lint_batch": mock_lint_partition,
+                "pants.engine.intrinsics.digest_to_snapshot": lambda __implicitly: EMPTY_SNAPSHOT,
             },
             union_membership=union_membership,
             # We don't want temporary warnings to interfere with our expected output.
