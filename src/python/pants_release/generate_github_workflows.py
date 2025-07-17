@@ -1717,6 +1717,17 @@ class NoAliasDumper(yaml.SafeDumper):
         return True
 
 
+# Forcibly use | string literals for multi-line strings, much better than seeing a bunch of \n, or
+# empty lines, if a human need to read the generated file.
+def _yaml_representer_pipes_if_multiline(dumper: NoAliasDumper, data: str) -> yaml.Node:
+    if "\n" in data:
+        return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
+    return dumper.represent_str(data)
+
+
+NoAliasDumper.add_representer(str, _yaml_representer_pipes_if_multiline)
+
+
 def merge_ok(pr_jobs: list[str]) -> Jobs:
     # Generate the "Merge OK" job that branch protection can monitor.
     # Note: A job skipped due to an "if" condition, or due to a failed dependency, counts as
