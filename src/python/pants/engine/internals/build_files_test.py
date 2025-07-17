@@ -82,7 +82,7 @@ def test_parse_address_family_empty() -> None:
             SessionValues({CompleteEnvironmentVars: CompleteEnvironmentVars({})}),
         ],
         mock_calls={
-            "pants.engine.intrinsics.get_digest_contents": lambda: DigestContents(
+            "pants.engine.intrinsics.get_digest_contents": lambda __implicitly: DigestContents(
                 [FileContent(path="/dev/null/BUILD", content=b"")]
             ),
             "pants.engine.internals.synthetic_targets.get_synthetic_address_maps": lambda _: SyntheticAddressMaps(),
@@ -121,7 +121,7 @@ def test_extend_synthetic_target() -> None:
             SessionValues({CompleteEnvironmentVars: CompleteEnvironmentVars({})}),
         ],
         mock_calls={
-            "pants.engine.intrinsics.get_digest_contents": lambda: DigestContents(
+            "pants.engine.intrinsics.get_digest_contents": lambda __implicitly: DigestContents(
                 [
                     FileContent(
                         path="/foo/BUILD.1", content=b"resource(name='aaa', description='a')"
@@ -132,7 +132,7 @@ def test_extend_synthetic_target() -> None:
                     ),
                 ]
             ),
-            "pants.engine.internals.synthetic_targets.get_synthetic_address_maps": lambda _: SyntheticAddressMaps(
+            "pants.engine.internals.synthetic_targets.get_synthetic_address_maps": lambda __implicitly: SyntheticAddressMaps(
                 [
                     SyntheticAddressMap.create(
                         "/foo/synthetic1",
@@ -149,7 +149,7 @@ def test_extend_synthetic_target() -> None:
                     ),
                 ]
             ),
-            "pants.engine.internals.build_files.parse_address_family": lambda _: OptionalAddressFamily(
+            "pants.engine.internals.build_files.parse_address_family": lambda __implicitly: OptionalAddressFamily(
                 "/",
                 address_family=AddressFamily.create(
                     "/",
@@ -198,15 +198,11 @@ def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
                 ignore_unrecognized_symbols=False,
             ),
         ],
-        mock_gets=[
-            MockGet(
-                output_type=DigestContents,
-                input_types=(PathGlobs,),
-                mock=lambda _: DigestContents(
-                    [FileContent(path="/dev/null/prelude", content=prelude_content.encode())]
-                ),
-            ),
-        ],
+        mock_calls={
+            "pants.engine.intrinsics.get_digest_contents": lambda __implicitly: DigestContents(
+                [FileContent(path="/dev/null/prelude", content=prelude_content.encode())]
+            )
+        },
     )
     return symbols
 
