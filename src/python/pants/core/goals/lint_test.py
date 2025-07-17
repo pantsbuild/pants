@@ -391,7 +391,7 @@ def run_lint_rule(
                 ),
             ],
             mock_calls={
-                "pants.engine.internals.graph.filter_targets": lambda: FilteredTargets(
+                "pants.engine.internals.graph.filter_targets": lambda __implicitly: FilteredTargets(
                     tuple(targets)
                 ),
                 "pants.engine.internals.specs_rules.resolve_specs_paths": lambda _: SpecsPaths(
