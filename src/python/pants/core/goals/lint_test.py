@@ -36,7 +36,7 @@ from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
 from pants.testutil.option_util import create_goal_subsystem
-from pants.testutil.rule_runner import RuleRunner, mock_console, run_rule_with_mocks
+from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 
@@ -211,9 +211,7 @@ def mock_file_partitioner(__implicitly: dict) -> Partitions[str, Any]:
     return Partitions.single_partition(request.files)
 
 
-def mock_lint_partition(__implicitly: dict) -> LintResult:
-    request, typ = next(iter(__implicitly[0].items()))
-    assert typ == AbstractLintRequest.Batch
+def mock_lint_partition(request: Any) -> LintResult:
     request_type = {cls.Batch: cls for cls in _all_lint_requests()}[type(request)]
     return request_type.get_lint_result(request.elements)
 
@@ -366,6 +364,13 @@ def run_lint_rule(
                 union_membership,
                 DistDir(relpath=Path("dist")),
             ],
+            mock_gets=[
+                MockGet(
+                    output_type=LintResult,
+                    input_types=(AbstractLintRequest.Batch,),
+                    mock=mock_lint_partition,
+                ),
+            ],
             mock_calls={
                 "pants.engine.internals.graph.filter_targets": lambda __implicitly: FilteredTargets(
                     tuple(targets)
@@ -375,7 +380,6 @@ def run_lint_rule(
                 ),
                 "pants.core.goals.lint.partition_targets": mock_target_partitioner,
                 "pants.core.goals.lint.partition_files": mock_file_partitioner,
-                "pants.core.goals.lint.lint_batch": mock_lint_partition,
                 "pants.engine.intrinsics.digest_to_snapshot": lambda __implicitly: EMPTY_SNAPSHOT,
             },
             union_membership=union_membership,
