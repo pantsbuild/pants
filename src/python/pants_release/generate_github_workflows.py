@@ -1701,13 +1701,20 @@ def clear_self_hosted_persistent_caches_jobs() -> Jobs:
 
 
 def add_telemetry_secret_env(workflow: dict[str, Any]) -> dict[str, Any]:
-    """Inject the Honeycomb API key into any job/step which runs Pants."""
+    """Inject the Honeycomb telemetry configuration into any job/step which runs Pants."""
     for job_config in workflow.get("jobs", {}).values():
         for step_config in job_config.get("steps", []):
             if "./pants" in step_config.get("run", ""):
                 if "env" not in step_config:
                     step_config["env"] = {}
-                step_config["env"]["HONEYCOMB_API_KEY"] = "${{ secrets.HONEYCOMB_API_KEY }}"
+
+                # Set the enable flag and API key based on the repository `OPENTELEMETRY_ENABLED`` variable.
+                step_config["env"]["PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED"] = gha_expr(
+                    "fromJSON(vars.OPENTELEMETRY_ENABLED) ? 'True' : 'False'"
+                )
+                step_config["env"]["HONEYCOMB_API_KEY"] = gha_expr(
+                    "fromJSON(vars.OPENTELEMETRY_ENABLED) ? secrets.HONEYCOMB_API_KEY : ''"
+                )
     return workflow
 
 

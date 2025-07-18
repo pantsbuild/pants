@@ -18,7 +18,6 @@ env_vars.add = [
 ]
 
 [shoalsoft-opentelemetry]
-enabled = true
 exporter_endpoint = "https://api.honeycomb.io"
 
 [shoalsoft-opentelemetry.exporter_headers]
