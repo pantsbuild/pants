@@ -11,7 +11,7 @@ jobs:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: "github.repository_owner == 'pantsbuild'"
+    if: github.repository_owner == 'pantsbuild'
     name: Build wheels (Linux-ARM64)
     needs:
     - release_info
@@ -32,7 +32,7 @@ jobs:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
     - name: Configure Git
-      run: "git config --global safe.directory \"$GITHUB_WORKSPACE\""
+      run: git config --global safe.directory "$GITHUB_WORKSPACE"
     - name: Install rustup
       run: |
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y --default-toolchain none
@@ -76,12 +76,12 @@ jobs:
         name: logs-wheels-and-pex-Linux-ARM64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
-    - if: "needs.release_info.outputs.is-release == 'true'"
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the pantsbuild.pants wheel
       uses: actions/attest-build-provenance@v2
       with:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants-*.whl
-    - if: "needs.release_info.outputs.is-release == 'true'"
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Rename the Pants Pex to its final name for upload
       run: |
         PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
@@ -91,12 +91,12 @@ jobs:
 
         mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
-    - if: "needs.release_info.outputs.is-release == 'true'"
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v2
       with:
         subject-path: dist/src.python.pants/*.pex
-    - if: "needs.release_info.outputs.is-release == 'true'"
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
       run: |
         curl -L --fail \
@@ -121,7 +121,7 @@ jobs:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: "github.repository_owner == 'pantsbuild'"
+    if: github.repository_owner == 'pantsbuild'
     name: Build wheels (Linux-x86_64)
     needs:
     - release_info
@@ -138,7 +138,7 @@ jobs:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
     - name: Configure Git
-      run: "git config --global safe.directory \"$GITHUB_WORKSPACE\""
+      run: git config --global safe.directory "$GITHUB_WORKSPACE"
     - name: Install rustup
       run: |
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y --default-toolchain none
@@ -186,12 +186,12 @@ jobs:
         name: logs-wheels-and-pex-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
-    - if: "needs.release_info.outputs.is-release == 'true'"
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the pantsbuild.pants wheel
       uses: actions/attest-build-provenance@v2
       with:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants-*.whl
-    - if: "needs.release_info.outputs.is-release == 'true'"
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Rename the Pants Pex to its final name for upload
       run: |
         PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
@@ -201,12 +201,12 @@ jobs:
 
         mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
-    - if: "needs.release_info.outputs.is-release == 'true'"
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v2
       with:
         subject-path: dist/src.python.pants/*.pex
-    - if: "needs.release_info.outputs.is-release == 'true'"
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
       run: |
         curl -L --fail \
@@ -223,12 +223,12 @@ jobs:
             -H "Content-Type: application/octet-stream" \
             "${{ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)" \
             --data-binary "@$WHL";
-    - if: "needs.release_info.outputs.is-release == 'true'"
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the pantsbuild.pants.testutil wheel
       uses: actions/attest-build-provenance@v2
       with:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants.testutil*.whl
-    - if: "needs.release_info.outputs.is-release == 'true'"
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Upload testutil Wheel
       run: |
         WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild.pants.testutil*.whl")
@@ -244,7 +244,7 @@ jobs:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: false
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: "github.repository_owner == 'pantsbuild'"
+    if: github.repository_owner == 'pantsbuild'
     name: Build wheels (macOS13-x86_64)
     needs:
     - release_info
@@ -281,7 +281,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
-        key: "macOS13-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2"
+        key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
           ~/.rustup/toolchains/1.88.0-*
           ~/.rustup/update-hashes
@@ -323,12 +323,12 @@ jobs:
         name: logs-wheels-and-pex-macOS13-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
-    - if: "needs.release_info.outputs.is-release == 'true'"
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the pantsbuild.pants wheel
       uses: actions/attest-build-provenance@v2
       with:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants-*.whl
-    - if: "needs.release_info.outputs.is-release == 'true'"
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Rename the Pants Pex to its final name for upload
       run: |
         PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
@@ -338,12 +338,12 @@ jobs:
 
         mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
-    - if: "needs.release_info.outputs.is-release == 'true'"
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v2
       with:
         subject-path: dist/src.python.pants/*.pex
-    - if: "needs.release_info.outputs.is-release == 'true'"
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
       run: |
         curl -L --fail \
@@ -366,7 +366,7 @@ jobs:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: false
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: "github.repository_owner == 'pantsbuild'"
+    if: github.repository_owner == 'pantsbuild'
     name: Build wheels (macOS14-ARM64)
     needs:
     - release_info
@@ -401,7 +401,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
-        key: "macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2"
+        key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
           ~/.rustup/toolchains/1.88.0-*
           ~/.rustup/update-hashes
@@ -443,12 +443,12 @@ jobs:
         name: logs-wheels-and-pex-macOS14-ARM64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
-    - if: "needs.release_info.outputs.is-release == 'true'"
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the pantsbuild.pants wheel
       uses: actions/attest-build-provenance@v2
       with:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants-*.whl
-    - if: "needs.release_info.outputs.is-release == 'true'"
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Rename the Pants Pex to its final name for upload
       run: |
         PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
@@ -458,12 +458,12 @@ jobs:
 
         mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
-    - if: "needs.release_info.outputs.is-release == 'true'"
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v2
       with:
         subject-path: dist/src.python.pants/*.pex
-    - if: "needs.release_info.outputs.is-release == 'true'"
+    - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
       run: |
         curl -L --fail \
@@ -484,7 +484,7 @@ jobs:
   publish:
     env:
       MODE: debug
-    if: "github.repository_owner == 'pantsbuild' && needs.release_info.outputs.is-release == 'true'"
+    if: github.repository_owner == 'pantsbuild' && needs.release_info.outputs.is-release == 'true'
     needs:
     - build_wheels_linux_x86_64
     - build_wheels_linux_arm64
@@ -520,7 +520,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
-        key: "Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2"
+        key: Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
           ~/.rustup/toolchains/1.88.0-*
           ~/.rustup/update-hashes
@@ -533,7 +533,7 @@ jobs:
         workspaces: src/rust
     - id: get-engine-hash
       name: Get native engine hash
-      run: "echo \"hash=$(./build-support/bin/rust/print_engine_hash.sh)\" >> $GITHUB_OUTPUT"
+      run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
       shell: bash
     - name: Cache native engine
       uses: actions/cache@v4
@@ -588,14 +588,14 @@ jobs:
         gh api -X POST "/repos/pantsbuild/wheels.pantsbuild.org/dispatches" -F event_type=github-pages
     - env:
         GH_TOKEN: ${{ secrets.WORKER_PANTS_PANTSBUILD_ORG_TRIGGER_PAT }}
-      if: "needs.release_info.outputs.is-release == 'true'"
+      if: needs.release_info.outputs.is-release == 'true'
       name: Trigger docs sync
       run: |
         RELEASE_TAG=${{ needs.release_info.outputs.build-ref }}
         RELEASE_VERSION="${RELEASE_TAG#release_}"
         gh workflow run sync_docs.yml -F "version=$RELEASE_VERSION" -F "reviewer=${{ github.actor }}" -R pantsbuild/pantsbuild.org
   release_info:
-    if: "github.repository_owner == 'pantsbuild'"
+    if: github.repository_owner == 'pantsbuild'
     name: Create draft release and output info
     outputs:
       build-ref: ${{ steps.get_info.outputs.build-ref }}
@@ -621,7 +621,7 @@ jobs:
         GH_REPO: ${{ github.repository }}
         GH_TOKEN: ${{ github.token }}
       id: make_draft_release
-      if: "github.repository_owner == 'pantsbuild' && steps.get_info.outputs.is-release == 'true'"
+      if: github.repository_owner == 'pantsbuild' && steps.get_info.outputs.is-release == 'true'
       name: Make GitHub Release
       run: |
         RELEASE_TAG=${{ steps.get_info.outputs.build-ref }}

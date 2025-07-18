@@ -7,14 +7,14 @@ concurrency:
   cancel-in-progress: true
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
 env:
-  PANTS_CONFIG_FILES: "+['pants.ci.toml']"
+  PANTS_CONFIG_FILES: +['pants.ci.toml']
   RUST_BACKTRACE: all
 jobs:
   bootstrap_pants_linux_arm64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: "(github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')"
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
     name: Bootstrap Pants, test Rust (Linux-ARM64)
     needs:
     - classify_changes
@@ -39,7 +39,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
-        key: "Linux-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2"
+        key: Linux-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
           ~/.rustup/toolchains/1.88.0-*
           ~/.rustup/update-hashes
@@ -52,7 +52,7 @@ jobs:
         workspaces: src/rust
     - id: get-engine-hash
       name: Get native engine hash
-      run: "echo \"hash=$(./build-support/bin/rust/print_engine_hash.sh)\" >> $GITHUB_OUTPUT"
+      run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
       shell: bash
     - name: Cache native engine
       uses: actions/cache@v4
@@ -97,7 +97,7 @@ jobs:
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
         TMPDIR: ${{ runner.temp }}
-      if: "needs.classify_changes.outputs.rust == 'true'"
+      if: needs.classify_changes.outputs.rust == 'true'
       name: Test Rust
       run: ./cargo test --locked --tests -- --nocapture
     timeout-minutes: 60
@@ -105,7 +105,7 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: "(github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')"
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
     name: Bootstrap Pants, test and lint Rust (Linux-x86_64)
     needs:
     - classify_changes
@@ -137,7 +137,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
-        key: "Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2"
+        key: Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
           ~/.rustup/toolchains/1.88.0-*
           ~/.rustup/update-hashes
@@ -150,7 +150,7 @@ jobs:
         workspaces: src/rust
     - id: get-engine-hash
       name: Get native engine hash
-      run: "echo \"hash=$(./build-support/bin/rust/print_engine_hash.sh)\" >> $GITHUB_OUTPUT"
+      run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
       shell: bash
     - name: Cache native engine
       uses: actions/cache@v4
@@ -201,7 +201,7 @@ jobs:
         ./pants run src/python/pants_release/generate_github_workflows.py -- --check
     - env:
         TMPDIR: ${{ runner.temp }}
-      if: "needs.classify_changes.outputs.rust == 'true'"
+      if: needs.classify_changes.outputs.rust == 'true'
       name: Test and lint Rust
       run: |-
         sudo apt-get install -y pkg-config fuse libfuse-dev
@@ -213,7 +213,7 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: "(github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')"
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
     name: Bootstrap Pants, test Rust (macOS13-x86_64)
     needs:
     - classify_changes
@@ -245,7 +245,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
-        key: "macOS13-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2"
+        key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
           ~/.rustup/toolchains/1.88.0-*
           ~/.rustup/update-hashes
@@ -258,7 +258,7 @@ jobs:
         workspaces: src/rust
     - id: get-engine-hash
       name: Get native engine hash
-      run: "echo \"hash=$(./build-support/bin/rust/print_engine_hash.sh)\" >> $GITHUB_OUTPUT"
+      run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
       shell: bash
     - name: Cache native engine
       uses: actions/cache@v4
@@ -303,7 +303,7 @@ jobs:
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
         TMPDIR: ${{ runner.temp }}
-      if: "needs.classify_changes.outputs.rust == 'true'"
+      if: needs.classify_changes.outputs.rust == 'true'
       name: Test Rust
       run: ./cargo test --locked --tests -- --nocapture
     timeout-minutes: 60
@@ -315,7 +315,7 @@ jobs:
       MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: "((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true' || needs.classify_changes.outputs.ci_config == 'true')) && (needs.classify_changes.outputs.no_code != 'true')"
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true' || needs.classify_changes.outputs.ci_config == 'true')) && (needs.classify_changes.outputs.no_code != 'true')
     name: Build wheels (Linux-ARM64)
     needs:
     - classify_changes
@@ -335,7 +335,7 @@ jobs:
       with:
         fetch-depth: 10
     - name: Configure Git
-      run: "git config --global safe.directory \"$GITHUB_WORKSPACE\""
+      run: git config --global safe.directory "$GITHUB_WORKSPACE"
     - name: Install rustup
       run: |
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y --default-toolchain none
@@ -388,7 +388,7 @@ jobs:
       MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: "((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true' || needs.classify_changes.outputs.ci_config == 'true')) && (needs.classify_changes.outputs.no_code != 'true')"
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true' || needs.classify_changes.outputs.ci_config == 'true')) && (needs.classify_changes.outputs.no_code != 'true')
     name: Build wheels (Linux-x86_64)
     needs:
     - classify_changes
@@ -404,7 +404,7 @@ jobs:
       with:
         fetch-depth: 10
     - name: Configure Git
-      run: "git config --global safe.directory \"$GITHUB_WORKSPACE\""
+      run: git config --global safe.directory "$GITHUB_WORKSPACE"
     - name: Install rustup
       run: |
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y --default-toolchain none
@@ -459,7 +459,7 @@ jobs:
       MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: "((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true' || needs.classify_changes.outputs.ci_config == 'true')) && (needs.classify_changes.outputs.no_code != 'true')"
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true' || needs.classify_changes.outputs.ci_config == 'true')) && (needs.classify_changes.outputs.no_code != 'true')
     name: Build wheels (macOS13-x86_64)
     needs:
     - classify_changes
@@ -495,7 +495,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
-        key: "macOS13-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2"
+        key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
           ~/.rustup/toolchains/1.88.0-*
           ~/.rustup/update-hashes
@@ -544,7 +544,7 @@ jobs:
       MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: "((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true' || needs.classify_changes.outputs.ci_config == 'true')) && (needs.classify_changes.outputs.no_code != 'true')"
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true' || needs.classify_changes.outputs.ci_config == 'true')) && (needs.classify_changes.outputs.no_code != 'true')
     name: Build wheels (macOS14-ARM64)
     needs:
     - classify_changes
@@ -578,7 +578,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
-        key: "macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2"
+        key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
           ~/.rustup/toolchains/1.88.0-*
           ~/.rustup/update-hashes
@@ -622,7 +622,7 @@ jobs:
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
   check_release_notes:
-    if: "github.repository_owner == 'pantsbuild'"
+    if: github.repository_owner == 'pantsbuild'
     name: Ensure PR has release notes
     needs:
     - classify_changes
@@ -631,7 +631,7 @@ jobs:
     steps:
     - env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      if: "github.event_name == 'pull_request' && !needs.classify_changes.outputs.notes"
+      if: github.event_name == 'pull_request' && !needs.classify_changes.outputs.notes
       name: Ensure appropriate label
       uses: mheap/github-action-required-labels@v4.0.0
       with:
@@ -651,7 +651,7 @@ jobs:
           Feel free to ask a maintainer for help if you are not sure what is appropriate!
         mode: minimum
   classify_changes:
-    if: "github.repository_owner == 'pantsbuild'"
+    if: github.repository_owner == 'pantsbuild'
     name: Classify changes
     outputs:
       ci_config: ${{ steps.classify.outputs.ci_config }}
@@ -689,7 +689,7 @@ jobs:
           echo "${i}=true" | tee -a $GITHUB_OUTPUT
         done
   lint_python:
-    if: "(github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')"
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
     name: Lint Python and Shell
     needs:
     - bootstrap_pants_linux_x86_64
@@ -777,7 +777,7 @@ jobs:
             exit 1
         fi
   set_merge_ok:
-    if: "always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')"
+    if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     name: Set Merge OK
     needs:
     - classify_changes
@@ -810,10 +810,10 @@ jobs:
     - ubuntu-22.04
     steps:
     - id: set_merge_ok
-      run: "echo 'merge_ok=true' >> ${GITHUB_OUTPUT}"
+      run: echo 'merge_ok=true' >> ${GITHUB_OUTPUT}
   test_python_linux_arm64:
     env: {}
-    if: "(github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')"
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
     name: Test Python (Linux-ARM64)
     needs:
     - bootstrap_pants_linux_arm64
@@ -875,7 +875,7 @@ jobs:
   test_python_linux_x86_64_0:
     env:
       PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
-    if: "(github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')"
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
     name: Test Python (Linux-x86_64) Shard 0/10
     needs:
     - bootstrap_pants_linux_x86_64
@@ -921,7 +921,7 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
-    - if: "runner.os == 'Linux'"
+    - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
         mkdir -p "${HOME}/.thrift"
@@ -976,7 +976,7 @@ jobs:
   test_python_linux_x86_64_1:
     env:
       PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
-    if: "(github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')"
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
     name: Test Python (Linux-x86_64) Shard 1/10
     needs:
     - bootstrap_pants_linux_x86_64
@@ -1022,7 +1022,7 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
-    - if: "runner.os == 'Linux'"
+    - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
         mkdir -p "${HOME}/.thrift"
@@ -1077,7 +1077,7 @@ jobs:
   test_python_linux_x86_64_2:
     env:
       PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
-    if: "(github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')"
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
     name: Test Python (Linux-x86_64) Shard 2/10
     needs:
     - bootstrap_pants_linux_x86_64
@@ -1123,7 +1123,7 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
-    - if: "runner.os == 'Linux'"
+    - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
         mkdir -p "${HOME}/.thrift"
@@ -1178,7 +1178,7 @@ jobs:
   test_python_linux_x86_64_3:
     env:
       PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
-    if: "(github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')"
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
     name: Test Python (Linux-x86_64) Shard 3/10
     needs:
     - bootstrap_pants_linux_x86_64
@@ -1224,7 +1224,7 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
-    - if: "runner.os == 'Linux'"
+    - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
         mkdir -p "${HOME}/.thrift"
@@ -1279,7 +1279,7 @@ jobs:
   test_python_linux_x86_64_4:
     env:
       PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
-    if: "(github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')"
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
     name: Test Python (Linux-x86_64) Shard 4/10
     needs:
     - bootstrap_pants_linux_x86_64
@@ -1325,7 +1325,7 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
-    - if: "runner.os == 'Linux'"
+    - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
         mkdir -p "${HOME}/.thrift"
@@ -1380,7 +1380,7 @@ jobs:
   test_python_linux_x86_64_5:
     env:
       PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
-    if: "(github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')"
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
     name: Test Python (Linux-x86_64) Shard 5/10
     needs:
     - bootstrap_pants_linux_x86_64
@@ -1426,7 +1426,7 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
-    - if: "runner.os == 'Linux'"
+    - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
         mkdir -p "${HOME}/.thrift"
@@ -1481,7 +1481,7 @@ jobs:
   test_python_linux_x86_64_6:
     env:
       PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
-    if: "(github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')"
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
     name: Test Python (Linux-x86_64) Shard 6/10
     needs:
     - bootstrap_pants_linux_x86_64
@@ -1527,7 +1527,7 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
-    - if: "runner.os == 'Linux'"
+    - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
         mkdir -p "${HOME}/.thrift"
@@ -1582,7 +1582,7 @@ jobs:
   test_python_linux_x86_64_7:
     env:
       PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
-    if: "(github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')"
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
     name: Test Python (Linux-x86_64) Shard 7/10
     needs:
     - bootstrap_pants_linux_x86_64
@@ -1628,7 +1628,7 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
-    - if: "runner.os == 'Linux'"
+    - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
         mkdir -p "${HOME}/.thrift"
@@ -1683,7 +1683,7 @@ jobs:
   test_python_linux_x86_64_8:
     env:
       PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
-    if: "(github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')"
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
     name: Test Python (Linux-x86_64) Shard 8/10
     needs:
     - bootstrap_pants_linux_x86_64
@@ -1729,7 +1729,7 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
-    - if: "runner.os == 'Linux'"
+    - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
         mkdir -p "${HOME}/.thrift"
@@ -1784,7 +1784,7 @@ jobs:
   test_python_linux_x86_64_9:
     env:
       PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
-    if: "(github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')"
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
     name: Test Python (Linux-x86_64) Shard 9/10
     needs:
     - bootstrap_pants_linux_x86_64
@@ -1830,7 +1830,7 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
-    - if: "runner.os == 'Linux'"
+    - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
         mkdir -p "${HOME}/.thrift"
@@ -1886,7 +1886,7 @@ jobs:
     env:
       ARCHFLAGS: -arch x86_64
       _PYTHON_HOST_PLATFORM: macosx-13.0-x86_64
-    if: "(github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')"
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
     name: Test Python (macOS13-x86_64)
     needs:
     - bootstrap_pants_macos13_x86_64
