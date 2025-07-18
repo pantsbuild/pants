@@ -1696,6 +1696,22 @@ def clear_self_hosted_persistent_caches_jobs() -> Jobs:
 
 
 # ----------------------------------------------------------------------
+# Telemetry
+# ----------------------------------------------------------------------
+
+
+def add_telemetry_secret_env(workflow: dict[str, Any]) -> dict[str, Any]:
+    """Inject the Honeycomb API key into any job/step which runs Pants."""
+    for job_config in workflow.get("jobs", {}).values():
+        for step_config in job_config.get("steps", []):
+            if "./pants" in step_config.get("run", ""):
+                if "env" not in step_config:
+                    step_config["env"] = {}
+                step_config["env"]["HONEYCOMB_API_KEY"] = "${{ secrets.HONEYCOMB_API_KEY }}"
+    return workflow
+
+
+# ----------------------------------------------------------------------
 # Main file
 # ----------------------------------------------------------------------
 
@@ -1794,6 +1810,10 @@ def merge_ok(pr_jobs: list[str]) -> Jobs:
 def generate() -> dict[Path, str]:
     """Generate all YAML configs with repo-relative paths."""
 
+    def render_workflow(workflow: dict[str, Any]) -> str:
+        add_telemetry_secret_env(workflow)
+        return f"{HEADER}\n\n{dump_yaml(workflow)}"
+
     pr_jobs = test_workflow_jobs()
     pr_jobs.update(**classify_changes())
     for key, val in pr_jobs.items():
@@ -1810,7 +1830,7 @@ def generate() -> dict[Path, str]:
     pr_jobs.update(merge_ok(sorted(pr_jobs.keys())))
 
     test_workflow_name = "Pull Request CI"
-    test_yaml = dump_yaml(
+    test_yaml = render_workflow(
         {
             "name": test_workflow_name,
             "concurrency": {
@@ -1826,7 +1846,7 @@ def generate() -> dict[Path, str]:
     ignore_advisories = " ".join(
         f"--ignore {adv_id}" for adv_id in CARGO_AUDIT_IGNORED_ADVISORY_IDS
     )
-    audit_yaml = dump_yaml(
+    audit_yaml = render_workflow(
         {
             "name": "Cargo Audit",
             "on": {
@@ -1852,7 +1872,7 @@ def generate() -> dict[Path, str]:
     )
 
     cc_jobs, cc_inputs = cache_comparison_jobs_and_inputs()
-    cache_comparison_yaml = dump_yaml(
+    cache_comparison_yaml = render_workflow(
         {
             "name": "Cache Comparison",
             # Kicked off manually.
@@ -1862,7 +1882,7 @@ def generate() -> dict[Path, str]:
     )
 
     release_jobs, release_inputs = release_jobs_and_inputs()
-    release_yaml = dump_yaml(
+    release_yaml = render_workflow(
         {
             "name": "Release",
             "on": {
@@ -1874,7 +1894,7 @@ def generate() -> dict[Path, str]:
     )
 
     public_repos_output = public_repos()
-    public_repos_yaml = dump_yaml(
+    public_repos_yaml = render_workflow(
         {
             "name": "Public repos tests",
             "run-name": public_repos_output.run_name,
@@ -1884,7 +1904,7 @@ def generate() -> dict[Path, str]:
     )
 
     clear_self_hosted_persistent_caches = clear_self_hosted_persistent_caches_jobs()
-    clear_self_hosted_persistent_caches_yaml = dump_yaml(
+    clear_self_hosted_persistent_caches_yaml = render_workflow(
         {
             "name": "Clear persistent caches on long-lived self-hosted runners",
             "on": {"workflow_dispatch": {}},
@@ -1893,14 +1913,14 @@ def generate() -> dict[Path, str]:
     )
 
     return {
-        Path(".github/workflows/audit.yaml"): f"{HEADER}\n\n{audit_yaml}",
-        Path(".github/workflows/cache_comparison.yaml"): f"{HEADER}\n\n{cache_comparison_yaml}",
-        Path(".github/workflows/test.yaml"): f"{HEADER}\n\n{test_yaml}",
-        Path(".github/workflows/release.yaml"): f"{HEADER}\n\n{release_yaml}",
-        Path(".github/workflows/public_repos.yaml"): f"{HEADER}\n\n{public_repos_yaml}",
+        Path(".github/workflows/audit.yaml"): audit_yaml,
+        Path(".github/workflows/cache_comparison.yaml"): cache_comparison_yaml,
+        Path(".github/workflows/test.yaml"): test_yaml,
+        Path(".github/workflows/release.yaml"): release_yaml,
+        Path(".github/workflows/public_repos.yaml"): public_repos_yaml,
         Path(
             ".github/workflows/clear_self_hosted_persistent_caches.yaml"
-        ): f"{HEADER}\n\n{clear_self_hosted_persistent_caches_yaml}",
+        ): clear_self_hosted_persistent_caches_yaml,
     }
 
 
