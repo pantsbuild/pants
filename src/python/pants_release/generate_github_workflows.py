@@ -1751,6 +1751,8 @@ class PantsDumper(yaml.SafeDumper):
 def _yaml_representer_pipes_if_multiline(dumper: PantsDumper, data: str) -> yaml.Node:
     if "\n" in data:
         return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
+    if "'" in data or '"' in data:
+        return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="double-quoted")
     return dumper.represent_str(data)
 
 
