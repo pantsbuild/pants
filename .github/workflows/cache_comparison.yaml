@@ -25,7 +25,7 @@ jobs:
     - env:
         BASE_REF: ${{ github.event.inputs.base_ref }}
         BUILD_COMMIT: ${{ github.event.inputs.build_commit }}
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_ARGS: ${{ github.event.inputs.pants_args }}
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
         SOURCE_DIFFSPEC: ${{ github.event.inputs.source_diffspec }}
@@ -37,7 +37,7 @@ jobs:
     - env:
         BASE_REF: ${{ github.event.inputs.base_ref }}
         BUILD_COMMIT: ${{ github.event.inputs.build_commit }}
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_ARGS: ${{ github.event.inputs.pants_args }}
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
         SOURCE_DIFFSPEC: ${{ github.event.inputs.source_diffspec }}

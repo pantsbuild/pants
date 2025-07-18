@@ -1713,7 +1713,7 @@ def add_telemetry_secret_env(workflow: dict[str, Any]) -> dict[str, Any]:
                     "fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False'"
                 )
                 step_config["env"]["HONEYCOMB_API_KEY"] = gha_expr(
-                    "fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || ''"
+                    "fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**'"
                 )
     return workflow
 

@@ -64,12 +64,12 @@ jobs:
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       name: Bootstrap Pants
       run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout ]]
     - env:
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       name: Run smoke tests
       run: |
@@ -162,12 +162,12 @@ jobs:
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       name: Bootstrap Pants
       run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout ]]
     - env:
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       name: Run smoke tests
       run: |
@@ -194,7 +194,7 @@ jobs:
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       name: Validate CI config
       run: |
@@ -270,12 +270,12 @@ jobs:
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       name: Bootstrap Pants
       run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout ]]
     - env:
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       name: Run smoke tests
       run: |
@@ -362,12 +362,12 @@ jobs:
     - name: Install Python headers
       run: yum install -y python3.11-devel
     - env:
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
     - env:
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       name: Build Pants PEX
       run: ./pants package src/python/pants:pants-pex
@@ -433,13 +433,13 @@ jobs:
       with:
         go-version: 1.19.5
     - env:
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
     - env:
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       name: Build Pants PEX
@@ -517,14 +517,14 @@ jobs:
         go-version: 1.19.5
     - env:
         ARCHFLAGS: -arch x86_64
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
         _PYTHON_HOST_PLATFORM: macosx-13.0-x86_64
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
     - env:
         ARCHFLAGS: -arch x86_64
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
         _PYTHON_HOST_PLATFORM: macosx-13.0-x86_64
       name: Build Pants PEX
@@ -600,14 +600,14 @@ jobs:
         go-version: 1.19.5
     - env:
         ARCHFLAGS: -arch arm64
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
         _PYTHON_HOST_PLATFORM: macosx-14.0-arm64
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
     - env:
         ARCHFLAGS: -arch arm64
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
         _PYTHON_HOST_PLATFORM: macosx-14.0-arm64
       name: Build Pants PEX
@@ -745,7 +745,7 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - env:
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       name: Lint
       run: |
@@ -846,7 +846,7 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - env:
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       name: Run Python tests
       run: |
@@ -855,7 +855,7 @@ jobs:
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       if: always()
       name: Upload test reports
@@ -947,7 +947,7 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - env:
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       name: Run Python test shard 0/10
       run: |
@@ -956,7 +956,7 @@ jobs:
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       if: always()
       name: Upload test reports
@@ -1048,7 +1048,7 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - env:
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       name: Run Python test shard 1/10
       run: |
@@ -1057,7 +1057,7 @@ jobs:
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       if: always()
       name: Upload test reports
@@ -1149,7 +1149,7 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - env:
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       name: Run Python test shard 2/10
       run: |
@@ -1158,7 +1158,7 @@ jobs:
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       if: always()
       name: Upload test reports
@@ -1250,7 +1250,7 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - env:
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       name: Run Python test shard 3/10
       run: |
@@ -1259,7 +1259,7 @@ jobs:
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       if: always()
       name: Upload test reports
@@ -1351,7 +1351,7 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - env:
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       name: Run Python test shard 4/10
       run: |
@@ -1360,7 +1360,7 @@ jobs:
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       if: always()
       name: Upload test reports
@@ -1452,7 +1452,7 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - env:
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       name: Run Python test shard 5/10
       run: |
@@ -1461,7 +1461,7 @@ jobs:
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       if: always()
       name: Upload test reports
@@ -1553,7 +1553,7 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - env:
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       name: Run Python test shard 6/10
       run: |
@@ -1562,7 +1562,7 @@ jobs:
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       if: always()
       name: Upload test reports
@@ -1654,7 +1654,7 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - env:
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       name: Run Python test shard 7/10
       run: |
@@ -1663,7 +1663,7 @@ jobs:
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       if: always()
       name: Upload test reports
@@ -1755,7 +1755,7 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - env:
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       name: Run Python test shard 8/10
       run: |
@@ -1764,7 +1764,7 @@ jobs:
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       if: always()
       name: Upload test reports
@@ -1856,7 +1856,7 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - env:
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       name: Run Python test shard 9/10
       run: |
@@ -1865,7 +1865,7 @@ jobs:
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       if: always()
       name: Upload test reports
@@ -1926,7 +1926,7 @@ jobs:
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
     - env:
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       name: Run Python tests
       run: |
@@ -1935,7 +1935,7 @@ jobs:
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '' }}"
+        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
       if: always()
       name: Upload test reports
