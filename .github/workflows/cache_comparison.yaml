@@ -25,9 +25,9 @@ jobs:
     - env:
         BASE_REF: ${{ github.event.inputs.base_ref }}
         BUILD_COMMIT: ${{ github.event.inputs.build_commit }}
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY }}
         PANTS_ARGS: ${{ github.event.inputs.pants_args }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
+        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED }}
         SOURCE_DIFFSPEC: ${{ github.event.inputs.source_diffspec }}
         SOURCE_DIFFSPEC_STEP: ${{ github.event.inputs.source_diffspec_step }}
       name: Prepare cache comparison
@@ -37,9 +37,9 @@ jobs:
     - env:
         BASE_REF: ${{ github.event.inputs.base_ref }}
         BUILD_COMMIT: ${{ github.event.inputs.build_commit }}
-        HONEYCOMB_API_KEY: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && secrets.HONEYCOMB_API_KEY || '**DISABLED**' }}"
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY }}
         PANTS_ARGS: ${{ github.event.inputs.pants_args }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: "${{ fromJSON(vars.OPENTELEMETRY_ENABLED) && 'True' || 'False' }}"
+        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED }}
         SOURCE_DIFFSPEC: ${{ github.event.inputs.source_diffspec }}
         SOURCE_DIFFSPEC_STEP: ${{ github.event.inputs.source_diffspec_step }}
       name: Run cache comparison
