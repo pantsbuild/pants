@@ -58,10 +58,12 @@ jobs:
         version: 23.x
     - name: Install Python headers
       run: yum install -y python3.11-devel
-    - env: {}
+    - env:
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY }}
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
-    - env: {}
+    - env:
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY }}
       name: Build Pants PEX
       run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
@@ -163,10 +165,12 @@ jobs:
       with:
         go-version: 1.19.5
     - env:
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY }}
         PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
     - env:
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY }}
         PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
       name: Build Pants PEX
       run: ./pants package src/python/pants:pants-pex
@@ -295,11 +299,13 @@ jobs:
         go-version: 1.19.5
     - env:
         ARCHFLAGS: -arch x86_64
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY }}
         _PYTHON_HOST_PLATFORM: macosx-13.0-x86_64
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
     - env:
         ARCHFLAGS: -arch x86_64
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY }}
         _PYTHON_HOST_PLATFORM: macosx-13.0-x86_64
       name: Build Pants PEX
       run: ./pants package src/python/pants:pants-pex
@@ -411,11 +417,13 @@ jobs:
         go-version: 1.19.5
     - env:
         ARCHFLAGS: -arch arm64
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY }}
         _PYTHON_HOST_PLATFORM: macosx-14.0-arm64
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
     - env:
         ARCHFLAGS: -arch arm64
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY }}
         _PYTHON_HOST_PLATFORM: macosx-14.0-arm64
       name: Build Pants PEX
       run: ./pants package src/python/pants:pants-pex
@@ -528,7 +536,9 @@ jobs:
           src/python/pants/bin/sandboxer
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
-    - name: Generate announcement
+    - env:
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY }}
+      name: Generate announcement
       run: |
         ./pants run src/python/pants_release/generate_release_announcement.py                         -- --output-dir=${{ runner.temp }}
     - env:
@@ -551,6 +561,7 @@ jobs:
     - env:
         GH_REPO: ${{ github.repository }}
         GH_TOKEN: ${{ github.token }}
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY }}
       name: Get release notes
       run: |
         ./pants run src/python/pants_release/changelog.py -- "${{ needs.release_info.outputs.build-ref }}" > notes.txt

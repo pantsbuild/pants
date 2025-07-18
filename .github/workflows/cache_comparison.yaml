@@ -25,6 +25,7 @@ jobs:
     - env:
         BASE_REF: ${{ github.event.inputs.base_ref }}
         BUILD_COMMIT: ${{ github.event.inputs.build_commit }}
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY }}
         PANTS_ARGS: ${{ github.event.inputs.pants_args }}
         SOURCE_DIFFSPEC: ${{ github.event.inputs.source_diffspec }}
         SOURCE_DIFFSPEC_STEP: ${{ github.event.inputs.source_diffspec_step }}
@@ -35,6 +36,7 @@ jobs:
     - env:
         BASE_REF: ${{ github.event.inputs.base_ref }}
         BUILD_COMMIT: ${{ github.event.inputs.build_commit }}
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY }}
         PANTS_ARGS: ${{ github.event.inputs.pants_args }}
         SOURCE_DIFFSPEC: ${{ github.event.inputs.source_diffspec }}
         SOURCE_DIFFSPEC_STEP: ${{ github.event.inputs.source_diffspec_step }}
