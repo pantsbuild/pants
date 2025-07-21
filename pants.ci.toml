@@ -1,5 +1,7 @@
 [GLOBAL]
 colors = true
+plugins.add = ["shoalsoft-pants-opentelemetry-plugin==0.4.0"]
+backend_packages.add = ["shoalsoft.pants_opentelemetry_plugin"]
 
 [test]
 report = true
@@ -14,3 +16,9 @@ env_vars.add = [
   # machines. See: https://github.com/giampaolo/psutil/issues/1832
   "ARCHFLAGS",
 ]
+
+[shoalsoft-opentelemetry]
+exporter_endpoint = "https://api.honeycomb.io"
+
+[shoalsoft-opentelemetry.exporter_headers]
+"x-honeycomb-team" = "%(env.HONEYCOMB_API_KEY)s"
