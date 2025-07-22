@@ -273,11 +273,11 @@ env_vars = [
 
 #### Image output configuration
 
-On your `docker_image` target, set `output={"type": "registry"}`. The default output type is "docker," which attempts to load the image into the local Docker engine.
+On your `docker_image` target, set `output={"type": "registry"}`. The default output type is "docker," which attempts to load the image into the local Docker engine's image store.
 
 ```python title="example/BUILD"
 docker_image(
-    name="my-app",
+    name="docker",
     output={"type": "registry"},
 )
 ```
