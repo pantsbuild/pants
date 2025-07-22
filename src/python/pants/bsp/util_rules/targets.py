@@ -61,7 +61,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.source.source_root import SourceRootsRequest, get_source_roots
 from pants.util.frozendict import FrozenDict
-from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import bullet_list
 
 _logger = logging.getLogger(__name__)
@@ -358,8 +358,8 @@ async def generate_one_bsp_build_target_request(
     field_sets_by_request_type: dict[type[BSPBuildTargetsMetadataRequest], OrderedSet[FieldSet]] = (
         defaultdict(OrderedSet)
     )
-    metadata_request_types: FrozenOrderedSet[type[BSPBuildTargetsMetadataRequest]] = (
-        union_membership.get(BSPBuildTargetsMetadataRequest)
+    metadata_request_types: Sequence[type[BSPBuildTargetsMetadataRequest]] = union_membership.get(
+        BSPBuildTargetsMetadataRequest
     )
     metadata_request_types_by_lang_id: dict[str, type[BSPBuildTargetsMetadataRequest]] = {}
     for metadata_request_type in metadata_request_types:
@@ -584,8 +584,8 @@ async def resolve_one_dependency_module(
     field_sets_by_request_type: dict[type[BSPDependencyModulesRequest], list[FieldSet]] = (
         defaultdict(list)
     )
-    dep_module_request_types: FrozenOrderedSet[type[BSPDependencyModulesRequest]] = (
-        union_membership.get(BSPDependencyModulesRequest)
+    dep_module_request_types: Sequence[type[BSPDependencyModulesRequest]] = union_membership.get(
+        BSPDependencyModulesRequest
     )
     for tgt in targets:
         for dep_module_request_type in dep_module_request_types:

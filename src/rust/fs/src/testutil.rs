@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 
-// NOTE: This method is not in the `src/rust/engine/testutil` crate because that will cause a cyclic
+// NOTE: This method is not in the `src/rust/testutil` crate because that will cause a cyclic
 // dependency between `fs` and `testutil` due to `testutil` using types from this `fs` crate in its
 // public interface.
 

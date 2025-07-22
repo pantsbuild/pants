@@ -188,7 +188,7 @@ class OptionsInitializer:
             )
             options = no_arg_bootstrapper.full_options(
                 build_config,
-                union_membership=UnionMembership({}),
+                union_membership=UnionMembership.empty(),
             )
             FlagErrorHelpPrinter(options).handle_unknown_flags(err)
             if raise_:

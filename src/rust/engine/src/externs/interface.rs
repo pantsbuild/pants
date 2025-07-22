@@ -77,6 +77,7 @@ fn native_engine(py: Python, m: &Bound<'_, PyModule>) -> PyO3Result<()> {
     externs::testutil::register(m)?;
     externs::workunits::register(m)?;
     externs::dep_inference::register(m)?;
+    externs::unions::register(py, m)?;
 
     m.add("PollTimeout", py.get_type::<PollTimeout>())?;
 

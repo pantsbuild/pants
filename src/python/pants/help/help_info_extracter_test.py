@@ -277,9 +277,9 @@ def test_get_all_help_info(tmp_path) -> None:
         known_scope_infos=[Global.get_scope_info(), Foo.get_scope_info(), Bar.get_scope_info()],
         include_derivation=True,
     )
-    Global.register_options_on_scope(options, UnionMembership({}))
-    Foo.register_options_on_scope(options, UnionMembership({}))
-    Bar.register_options_on_scope(options, UnionMembership({}))
+    Global.register_options_on_scope(options, UnionMembership.empty())
+    Foo.register_options_on_scope(options, UnionMembership.empty())
+    Bar.register_options_on_scope(options, UnionMembership.empty())
 
     @rule
     async def rule_info_test(foo: Foo) -> Target:  # type: ignore[empty-body]
@@ -296,7 +296,7 @@ def test_get_all_help_info(tmp_path) -> None:
 
     all_help_info = HelpInfoExtracter.get_all_help_info(
         options,
-        UnionMembership({}),
+        UnionMembership.empty(),
         fake_consumed_scopes_mapper,
         RegisteredTargetTypes({BazLibrary.alias: BazLibrary}),
         BuildFileSymbolsInfo.from_info(

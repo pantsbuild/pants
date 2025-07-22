@@ -27,7 +27,7 @@ from pants.engine.fs import CreateDigest, DigestContents, DownloadFile, FileCont
 from pants.engine.internals.native_engine import Digest
 from pants.engine.platform import Platform
 from pants.engine.rules import QueryRule
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.scope import Scope, ScopedOptions
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.pytest_util import no_exception
@@ -151,10 +151,12 @@ def test_export(rule_runner) -> None:
 
     Ensures we locate the class and prepare the Digest correctly
     """
-
     platform = Platform.linux_x86_64
-    union_membership = UnionMembership(
-        {ExportRequest: [ExportExternalToolRequest], ExportableTool: [TemplatedFooBar]}
+    union_membership = UnionMembership.from_rules(
+        {
+            UnionRule(ExportRequest, ExportExternalToolRequest),
+            UnionRule(ExportableTool, TemplatedFooBar),
+        }
     )
 
     templated_foobar = create_subsystem(
