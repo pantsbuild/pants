@@ -1710,9 +1710,11 @@ def add_telemetry_secret_env(workflow: dict[str, Any]) -> dict[str, Any]:
 
                 # Derive the enable flag based on the repository `OPENTELEMETRY_ENABLED` variable.
                 step_config["env"]["PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED"] = gha_expr(
-                    "vars.OPENTELEMETRY_ENABLED"
+                    "vars.OPENTELEMETRY_ENABLED || 'False'"
                 )
-                step_config["env"]["HONEYCOMB_API_KEY"] = gha_expr("secrets.HONEYCOMB_API_KEY")
+                step_config["env"]["HONEYCOMB_API_KEY"] = gha_expr(
+                    "secrets.HONEYCOMB_API_KEY || '--DISABLED--'"
+                )
     return workflow
 
 
