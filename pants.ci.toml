@@ -18,8 +18,9 @@ env_vars.add = [
 ]
 
 [shoalsoft-opentelemetry]
+finish_timeout = 10.0
 exporter_endpoint = "https://api.honeycomb.io"
-trace_link_template = "https://ui.honeycomb.io/pants-build/environments/ci/trace?trace_id={trace_id}&span={root_span_id}&trace_start_ts={trace_start_ms}&trace_end_ts={trace_end_ms}"
+trace_link_template = "https://ui.honeycomb.io/pants-build/environments/ci/trace?trace_id={trace_id}&span={root_span_id}"
 
 [shoalsoft-opentelemetry.exporter_headers]
 "x-honeycomb-team" = "%(env.HONEYCOMB_API_KEY)s"
