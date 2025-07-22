@@ -282,7 +282,10 @@ docker_image(
 )
 ```
 
-Don't run `pants publish` on the `docker_image` target when using a Kubernetes buildx driver. `pants package` which will upload the image directly to the registry due to the output type. The `pants publish` goal is designed for uploading local images to a registry, which isn't applicable when using remote buildx drivers.
+:::info The `pants publish` goal
+`pants publish` will not succeed on a `docker_image` target when using a Kubernetes buildx driver. `pants package` will upload the image directly to the registry due to the output type. The `pants publish` goal is designed for uploading local images to a registry, which isn't applicable when using remote buildx drivers.
+:::
+
 
 ### Build Docker image example
 
