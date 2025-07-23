@@ -1704,7 +1704,8 @@ def add_telemetry_secret_env(workflow: dict[str, Any]) -> dict[str, Any]:
     """Inject the Honeycomb telemetry configuration into any job/step which runs Pants."""
     for job_config in workflow.get("jobs", {}).values():
         for step_config in job_config.get("steps", []):
-            if "./pants" in step_config.get("run", ""):
+            run_config = step_config.get("run", "")
+            if "./pants" in run_config:
                 if "env" not in step_config:
                     step_config["env"] = {}
 
@@ -1715,6 +1716,12 @@ def add_telemetry_secret_env(workflow: dict[str, Any]) -> dict[str, Any]:
                 step_config["env"]["HONEYCOMB_API_KEY"] = gha_expr(
                     "secrets.HONEYCOMB_API_KEY || '--DISABLED--'"
                 )
+            elif "./cargo test" in run_config:
+                if "env" not in step_config:
+                    step_config["env"] = {}
+                step_config["env"]["PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED"] = "False"
+                step_config["env"]["HONEYCOMB_API_KEY"] = "--DISABLED--"
+
     return workflow
 
 

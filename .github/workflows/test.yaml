@@ -96,6 +96,8 @@ jobs:
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
+        HONEYCOMB_API_KEY: --DISABLED--
+        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: 'False'
         TMPDIR: ${{ runner.temp }}
       if: needs.classify_changes.outputs.rust == 'true'
       name: Test Rust
@@ -200,6 +202,8 @@ jobs:
       run: |
         ./pants run src/python/pants_release/generate_github_workflows.py -- --check
     - env:
+        HONEYCOMB_API_KEY: --DISABLED--
+        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: 'False'
         TMPDIR: ${{ runner.temp }}
       if: needs.classify_changes.outputs.rust == 'true'
       name: Test and lint Rust
@@ -302,6 +306,8 @@ jobs:
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
+        HONEYCOMB_API_KEY: --DISABLED--
+        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: 'False'
         TMPDIR: ${{ runner.temp }}
       if: needs.classify_changes.outputs.rust == 'true'
       name: Test Rust
