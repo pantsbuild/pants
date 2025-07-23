@@ -7,7 +7,9 @@ concurrency:
   cancel-in-progress: true
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
 env:
+  HONEYCOMB_API_KEY: --DISABLED--
   PANTS_CONFIG_FILES: +['pants.ci.toml']
+  PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: 'False'
   RUST_BACKTRACE: all
 jobs:
   bootstrap_pants_linux_arm64:
