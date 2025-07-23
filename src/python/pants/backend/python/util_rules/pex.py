@@ -41,24 +41,22 @@ from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfile,
     LoadedLockfileRequest,
     Lockfile,
-)
-from pants.backend.python.util_rules.pex_requirements import (
-    PexRequirements as PexRequirements,  # Explicit re-export.
-)
-from pants.backend.python.util_rules.pex_requirements import (
     Resolve,
     ResolvePexConfigRequest,
     determine_resolve_pex_config,
     get_lockfile_for_resolve,
+    is_pylock_path,
     load_lockfile,
     validate_metadata,
+)
+from pants.backend.python.util_rules.pex_requirements import (
+    PexRequirements as PexRequirements,  # Explicit re-export.
 )
 from pants.build_graph.address import Address
 from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.target_types import FileSourceField, ResourceSourceField
-from pants.core.util_rules.stripped_source_files import StrippedFileNameRequest
+from pants.core.util_rules.stripped_source_files import StrippedFileNameRequest, strip_file_name
 from pants.core.util_rules.stripped_source_files import rules as stripped_source_rules
-from pants.core.util_rules.stripped_source_files import strip_file_name
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
@@ -580,7 +578,11 @@ async def _setup_pex_requirements(
     )
     if loaded_lockfile:
         argv = (
-            ["--lock", loaded_lockfile.lockfile_path, *pex_lock_resolver_args]
+            [
+                "--pylock" if is_pylock_path(loaded_lockfile.lockfile_path) else "--lock",
+                loaded_lockfile.lockfile_path,
+                *pex_lock_resolver_args,
+            ]
             if loaded_lockfile.is_pex_native
             # We use pip to resolve a requirements.txt pseudo-lockfile, possibly with hashes.
             else [
@@ -655,7 +657,7 @@ async def _setup_pex_requirements(
             [loaded_lockfile.lockfile_digest],
             [
                 *reqs_info.req_strings,
-                "--lock",
+                "--pylock" if is_pylock_path(loaded_lockfile.lockfile_path) else "--lock",
                 loaded_lockfile.lockfile_path,
                 *pex_lock_resolver_args,
             ],
