@@ -1,6 +1,6 @@
 [GLOBAL]
 colors = true
-plugins.add = ["shoalsoft-pants-opentelemetry-plugin==0.4.1.dev0"]
+plugins.add = ["shoalsoft-pants-opentelemetry-plugin==0.4.1"]
 backend_packages.add = ["shoalsoft.pants_opentelemetry_plugin"]
 
 [test]
