@@ -18,11 +18,12 @@ Enable the experimental TypeScript [backend](../../using-pants/key-concepts/back
 ```toml title="pants.toml"
 [GLOBAL]
 backend_packages = [
+    "pants.backend.experimental.javascript",
     "pants.backend.experimental.typescript"
 ]
 ```
 
-This will register the new `typescript_source`, `typescript_sources`, `typescript_test`, `tsx_source`, `tsx_sources`, and `tsx_test` target types, as well as the `check` goal for TypeScript.
+This will register `typescript_source`, `typescript_sources`, `typescript_test`, `tsx_source`, `tsx_sources`, and `tsx_test` target types, as well as the `check` goal for TypeScript. If your setup has different requirements, do not hesitate to open a feature request at https://github.com/pantsbuild/pants/issues/new/choose.
 
 :::note TypeScript builds on JavaScript support
 TypeScript support extends the [JavaScript backend](../../javascript/overview/enabling-javascript-support.mdx). 
