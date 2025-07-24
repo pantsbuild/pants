@@ -25,7 +25,8 @@ from pants.core.goals.check import CheckResults
 from pants.core.target_types import FileTarget
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import RuleRunner, logging
+from pants.util.logging import LogLevel
 
 
 @pytest.fixture(
@@ -458,6 +459,7 @@ def test_typescript_incremental_caching_multi_project_workspace(
     _assert_identical_cache_results(results_1, results_2)
 
 
+@logging(level=LogLevel.DEBUG)
 def test_typescript_incremental_artifacts_generation(
     basic_rule_runner: tuple[RuleRunner, str, str],
 ) -> None:
@@ -498,8 +500,6 @@ def test_typescript_incremental_artifacts_generation(
         "❌ No TypeScript artifacts captured - incremental compilation infrastructure may be broken"
     )
 
-    # KEY TEST: Validate that .tsbuildinfo files are generated when incremental compilation is enabled
-    # This proves TypeScript's --build mode is working and generating incremental compilation infrastructure
     snapshot = rule_runner.request(Snapshot, [result.report])
     tsbuildinfo_files = [f for f in snapshot.files if f.endswith(".tsbuildinfo")]
 
@@ -509,11 +509,9 @@ def test_typescript_incremental_artifacts_generation(
         f"Actual files: {sorted(snapshot.files)}"
     )
 
-    # Validate that we're capturing both .tsbuildinfo and compiled output
     compiled_files = [f for f in snapshot.files if f.endswith((".js", ".d.ts"))]
     assert len(compiled_files) > 0, "❌ No compiled output files found"
 
-    # Validate expected TypeScript incremental compilation artifacts are present
     has_tsbuildinfo = any(f.endswith(".tsbuildinfo") for f in snapshot.files)
     has_js_files = any(f.endswith(".js") for f in snapshot.files)
     has_dts_files = any(f.endswith(".d.ts") for f in snapshot.files)
@@ -521,6 +519,80 @@ def test_typescript_incremental_artifacts_generation(
     assert has_tsbuildinfo, f"❌ Missing .tsbuildinfo files in: {sorted(snapshot.files)}"
     assert has_js_files, f"❌ Missing .js files in: {sorted(snapshot.files)}"
     assert has_dts_files, f"❌ Missing .d.ts files in: {sorted(snapshot.files)}"
+
+
+@logging(level=LogLevel.DEBUG)
+def test_typescript_incremental_artifacts_generation_workspace(
+    workspace_rule_runner: tuple[RuleRunner, str, str],
+) -> None:
+    """Test that TypeScript generates incremental compilation artifacts for multi-package workspaces.
+
+    Validates that TypeScript --build produces .tsbuildinfo files for each package in a workspace,
+    including the main project and all child packages. This ensures our artifact capture logic
+    correctly handles workspace structures where child packages have their own tsconfig.json files.
+    """
+
+    rule_runner, test_project, _ = workspace_rule_runner
+
+    test_files = _load_project_test_files(test_project)
+    rule_runner.write_files(test_files)
+
+    targets = [
+        rule_runner.get_target(
+            Address("complex_project/common-types/src", relative_file_path="index.ts")
+        ),
+        rule_runner.get_target(
+            Address(
+                "complex_project/shared-utils/src",
+                target_name="ts_sources",
+                relative_file_path="math.ts",
+            )
+        ),
+        rule_runner.get_target(
+            Address("complex_project/main-app/src", relative_file_path="index.ts")
+        ),
+    ]
+
+    field_sets = [TypeScriptCheckFieldSet.create(target) for target in targets]
+    request = TypeScriptCheckRequest(field_sets)
+
+    # Run compilation once to generate incremental artifacts
+    results = rule_runner.request(CheckResults, [request])
+    assert len(results.results) == 1
+    assert results.results[0].exit_code == 0
+
+    result = results.results[0]
+    assert result.report is not None, "CheckResult should have report field for caching"
+
+    from pants.engine.fs import Digest, Snapshot
+    assert isinstance(result.report, Digest), "Report should be a Digest for caching"
+
+    snapshot = rule_runner.request(Snapshot, [result.report])
+    tsbuildinfo_files = [f for f in snapshot.files if f.endswith(".tsbuildinfo")]
+    
+    expected_tsbuildinfo_files = [
+        "dist/tsconfig.tsbuildinfo",
+        "common-types/tsconfig.tsbuildinfo",
+        "shared-utils/tsconfig.tsbuildinfo",
+        "main-app/tsconfig.tsbuildinfo",
+    ]
+    
+    assert len(tsbuildinfo_files) >= len(expected_tsbuildinfo_files), (
+        f"❌ WORKSPACE INCREMENTAL COMPILATION FAILURE: Expected at least {len(expected_tsbuildinfo_files)} "
+        f".tsbuildinfo files for workspace packages, but found {len(tsbuildinfo_files)}. "
+        f"Actual files: {sorted(tsbuildinfo_files)}"
+    )
+    
+    for expected_file in expected_tsbuildinfo_files:
+        assert any(f.endswith(expected_file) for f in tsbuildinfo_files), (
+            f"❌ Missing .tsbuildinfo file for workspace package: {expected_file}. "
+            f"Found files: {sorted(tsbuildinfo_files)}"
+        )
+    js_files = [f for f in snapshot.files if f.endswith(".js")]
+    dts_files = [f for f in snapshot.files if f.endswith(".d.ts")]
+    
+    assert len(js_files) > 0, "❌ No compiled .js files found in workspace"
+    assert len(dts_files) > 0, "❌ No .d.ts files found in workspace"
 
 
 def test_package_manager_config_dependency_tracking(

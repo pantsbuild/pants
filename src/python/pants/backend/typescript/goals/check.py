@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pants.backend.javascript.nodejs_project import AllNodeJSProjects
@@ -21,7 +22,7 @@ from pants.backend.typescript.tsconfig import AllTSConfigs
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.core.target_types import FileSourceField
-from pants.engine.fs import EMPTY_DIGEST, Digest, DigestSubset, GlobMatchErrorBehavior, PathGlobs
+from pants.engine.fs import EMPTY_DIGEST, Digest, DigestSubset, GlobMatchErrorBehavior, PathGlobs, Snapshot
 from pants.engine.internals.graph import hydrate_sources
 from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.internals.selectors import Get, concurrently
@@ -48,58 +49,54 @@ if TYPE_CHECKING:
 # Common TypeScript output directory patterns found in real projects
 _COMMON_OUTPUT_DIRS = ["dist", "build", "lib", "out", "compiled", "bundles"]
 
+_TYPESCRIPT_OUTPUT_EXTENSIONS = [
+    ".js",
+    ".mjs",
+    ".cjs",
+    ".d.ts",
+    ".d.mts",
+    ".d.cts",
+    ".js.map",
+    ".mjs.map",
+    ".cjs.map",
+    ".d.ts.map",
+    ".d.mts.map",
+    ".d.cts.map",
+    ".tsbuildinfo",
+]
+
 
 def _get_typescript_artifact_globs(
-    project: NodeJSProject, subsystem: TypeScriptSubsystem, relative_to_workdir: bool = False
+    project: NodeJSProject, subsystem: TypeScriptSubsystem
 ) -> list[str]:
-    """Get glob patterns for TypeScript build artifacts (.tsbuildinfo files and output directories).
-
-    Args:
-        project: The NodeJS project being compiled
-        subsystem: TypeScript subsystem configuration
-        relative_to_workdir: If True, return paths relative to working directory (for extraction).
-                           If False, return absolute paths relative to build root (for caching).
+    """Get glob patterns for TypeScript build artifacts in output directories.
+    See https://www.typescriptlang.org/tsconfig/#tsBuildInfoFile for default locations (which in turn depends on other tsconfig settings).
     """
     globs = []
 
-    # Use custom output directories if specified, otherwise use common patterns
     output_dirs = subsystem.output_dirs if subsystem.output_dirs else _COMMON_OUTPUT_DIRS
+    project_root_path = Path(project.root_dir)
 
     for workspace_pkg in project.workspaces:
-        if relative_to_workdir:
-            # Paths relative to the TypeScript working directory (for DigestSubset extraction)
-            # Case 1: Default location next to tsconfig.json (when no outDir specified)
-            globs.append("tsconfig.tsbuildinfo")
-
-            # Case 2: Default location inside output directories (when outDir is specified)
-            for output_dir in output_dirs:
-                globs.append(f"{output_dir}/tsconfig.tsbuildinfo")
-                # Also capture the compiled output itself
-                globs.append(f"{output_dir}/**/*")
-
-            # Case 3: Catch any .tsbuildinfo files anywhere (comprehensive fallback)
-            globs.append("**/*.tsbuildinfo")
+        workspace_pkg_path = Path(workspace_pkg.root_dir)
+        
+        if workspace_pkg_path == project_root_path:
+            pkg_prefix = ""
         else:
-            # Paths relative to build root (for caching glob patterns)
-            # Case 1: Default location next to tsconfig.json (when no outDir specified)
-            globs.append(f"{workspace_pkg.root_dir}/tsconfig.tsbuildinfo")
+            relative_path = workspace_pkg_path.relative_to(project_root_path)
+            pkg_prefix = f"{relative_path.as_posix()}/"
 
-            # Case 2: Default location inside output directories (when outDir is specified)
-            for output_dir in output_dirs:
-                globs.append(f"{workspace_pkg.root_dir}/{output_dir}/tsconfig.tsbuildinfo")
-                # Also capture the compiled output itself
-                globs.append(f"{workspace_pkg.root_dir}/{output_dir}/**/*")
-
-            # Case 3: Catch any .tsbuildinfo files anywhere (comprehensive fallback)
-            globs.append(f"{workspace_pkg.root_dir}/**/*.tsbuildinfo")
-
+        globs.append(f"{pkg_prefix}tsconfig.tsbuildinfo")
+        
+        for output_dir in output_dirs:
+            for ext in _TYPESCRIPT_OUTPUT_EXTENSIONS:
+                globs.append(f"{pkg_prefix}{output_dir}/**/*{ext}")
     return globs
 
 
 async def _load_cached_typescript_artifacts(
     project: NodeJSProject, subsystem: TypeScriptSubsystem
 ) -> Digest:
-    """Load cached .tsbuildinfo files and output files for incremental TypeScript compilation."""
     cache_globs = _get_typescript_artifact_globs(project, subsystem)
     cached_artifacts = await path_globs_to_digest(
         PathGlobs(cache_globs, glob_match_error_behavior=GlobMatchErrorBehavior.ignore),
@@ -111,9 +108,8 @@ async def _load_cached_typescript_artifacts(
 async def _extract_typescript_artifacts_for_caching(
     project: NodeJSProject, process_output_digest: Digest, subsystem: TypeScriptSubsystem
 ) -> Digest:
-    """Extract .tsbuildinfo files and output files from TypeScript compilation for caching."""
-    output_globs = _get_typescript_artifact_globs(project, subsystem, relative_to_workdir=True)
-
+    output_globs = _get_typescript_artifact_globs(project, subsystem)
+    
     artifacts_digest = await Get(
         Digest,
         DigestSubset(
