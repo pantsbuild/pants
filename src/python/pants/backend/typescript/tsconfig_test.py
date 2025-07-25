@@ -192,3 +192,64 @@ def test_parses_tsconfig_non_json_standard() -> None:
         "data3": "foo,]"
         } """
     assert json.loads(_clean_tsconfig_contents(content)) == json.loads(content)
+
+
+def test_validate_tsconfig_outdir_missing() -> None:
+    ts_config = TSConfig(path="project/tsconfig.json", out_dir=None)
+    
+    with pytest.raises(ValueError) as exc_info:
+        ts_config.validate_outdir()
+    
+    error_message = str(exc_info.value)
+    assert "missing required 'outDir' setting" in error_message
+
+
+def test_validate_tsconfig_outdir_with_parent_references() -> None:
+    ts_config = TSConfig(path="project/tsconfig.json", out_dir="../dist")
+    
+    with pytest.raises(ValueError) as exc_info:
+        ts_config.validate_outdir()
+    
+    error_message = str(exc_info.value)
+    assert "uses '..' path components" in error_message
+    
+    # Test with multiple .. components
+    ts_config = TSConfig(path="project/tsconfig.json", out_dir="../../build")
+    
+    with pytest.raises(ValueError) as exc_info:
+        ts_config.validate_outdir()
+    
+    error_message = str(exc_info.value)
+    assert "uses '..' path components" in error_message
+    
+    # Test with .. in the middle of the path
+    ts_config = TSConfig(path="project/tsconfig.json", out_dir="./lib/../dist")
+    
+    with pytest.raises(ValueError) as exc_info:
+        ts_config.validate_outdir()
+    
+    error_message = str(exc_info.value)
+    assert "uses '..' path components" in error_message
+
+
+def test_validate_tsconfig_outdir_with_absolute_paths() -> None:
+    ts_config = TSConfig(path="project/tsconfig.json", out_dir="/tmp/build")
+    
+    with pytest.raises(ValueError) as exc_info:
+        ts_config.validate_outdir()
+    
+    error_message = str(exc_info.value)
+    assert "absolute outDir" in error_message
+
+
+def test_validate_tsconfig_outdir_valid() -> None:
+    valid_configs = [
+        TSConfig(path="project/tsconfig.json", out_dir="./dist"),
+        TSConfig(path="project/tsconfig.json", out_dir="dist"),
+        TSConfig(path="project/tsconfig.json", out_dir="./build"),
+        TSConfig(path="project/tsconfig.json", out_dir="./lib/output"),
+        TSConfig(path="project/tsconfig.json", out_dir="build/js"),
+    ]
+    
+    for ts_config in valid_configs:
+        ts_config.validate_outdir()

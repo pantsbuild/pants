@@ -157,12 +157,7 @@ file(name="npmrc", source=".npmrc")  # Required for private registries or custom
 
 Package manager configs must be dependencies of `package_json` (not `typescript_sources`) since they affect package installation, not TypeScript compilation directly.
 
-### Custom output directories
+### Output directory configuration
 
-Currently the backend expects compiled output in any of the following default output directories: `dist`, `build`, `lib`, `out`, `compiled`, and `bundles`. A future enhancement may read `tsconfig.json` to determine this automatically. The output directories can be overridden with:
-
-```toml title="pants.toml"
-[typescript]
-output_dirs = ["dist", "build", "lib"]
-```
-
+The TypeScript backend automatically detects output directories by reading the `outDir` setting from each `tsconfig.json` file in your project.
+`outDir` must be a relative path within the package directory (e.g., `"./dist"`, `"./build"`).

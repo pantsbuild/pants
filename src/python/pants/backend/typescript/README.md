@@ -25,7 +25,7 @@ pants check src/app::    # Check specific project
 - Incremental compilation via `.tsbuildinfo` caching  
 - Workspace package resolution (npm, pnpm, yarn)
 - Project references and complex `tsconfig.json` configurations
-- Output directory caching (configurable via `[typescript].output_dirs`)
+- Automatic output directory detection from `tsconfig.json` outDir settings
 
 ### Target Generation  
 ```bash

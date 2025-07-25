@@ -4,8 +4,7 @@
 from __future__ import annotations
 
 from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase
-from pants.option.option_types import SkipOption, StrListOption
-from pants.util.strutil import softwrap
+from pants.option.option_types import SkipOption
 
 
 class TypeScriptSubsystem(NodeJSToolBase):
@@ -20,21 +19,6 @@ class TypeScriptSubsystem(NodeJSToolBase):
     default_version = "typescript@9.9.9"
 
     skip = SkipOption("check")
-
-    output_dirs = StrListOption(
-        default=[],
-        advanced=True,
-        help=softwrap(
-            """
-            Override output directories to cache for incremental TypeScript builds.
-
-            If specified, these directories replace the default patterns entirely.
-            If empty, uses common patterns: dist, build, lib, out, compiled, bundles.
-
-            Example: ["my-custom-output", "generated-types"]
-            """
-        ),
-    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
