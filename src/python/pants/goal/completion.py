@@ -154,8 +154,9 @@ class CompletionBuiltinGoal(BuiltinGoal):
     def _get_previous_goal(self, args: list[str]) -> str | None:
         """Get the most recent goal in the command arguments, so options can be correctly applied.
 
-        A "goal" in the context of completions is simply an arg where the first character is alphanumeric.
-        This under-specifies the goal, because detecting whether an arg is an "actual" goal happens elsewhere.
+        A "goal" in the context of completions is simply an arg where the first character is
+        alphanumeric. This under-specifies the goal, because detecting whether an arg is an "actual"
+        goal happens elsewhere.
 
         :param args: The list of arguments to search for the previous goal.
         :return: The previous goal, or None if there is no previous goal.

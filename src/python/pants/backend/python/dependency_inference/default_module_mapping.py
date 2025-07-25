@@ -53,7 +53,7 @@ def two_groups_hyphens_two_replacements_with_suffix(
     second_group_replacement: PackageSeparator = PackageSeparator.NONE,
     custom_suffix: str = "",
 ) -> str:
-    """take two groups, and by default, the first will have '-' replaced with '.', the second will
+    """Take two groups, and by default, the first will have '-' replaced with '.', the second will
     have '-' replaced with '' e.g. google-cloud-foo-bar -> group1(google.cloud.)group2(foobar)
 
     >>> two_groups_hyphens_two_replacements_with_suffix(re.match(r"^(google-cloud-)([^.]+)", "google-cloud-foo-bar"))
@@ -75,14 +75,12 @@ first_group_hyphen_to_dot = partial(first_group_hyphen_to_separator, separator=P
 first_group_hyphen_to_underscore = partial(
     first_group_hyphen_to_separator, separator=PackageSeparator.UNDERSCORE
 )
+"""A mapping of Patterns and their replacements. will be used with `re.sub`. The match is either a
+string or a function`(str) -> str`; that takes a re.Match and returns the replacement. see re.sub
+for more information.
 
-"""
-A mapping of Patterns and their replacements. will be used with `re.sub`.
-The match is either a string or a function`(str) -> str`; that takes a re.Match and returns
-the replacement. see re.sub for more information
-
-then if an import in the python code is google.cloud.foo, then the package of
-google-cloud-foo will be used.
+then if an import in the python code is google.cloud.foo, then the package of google-cloud-foo will
+be used.
 """
 DEFAULT_MODULE_PATTERN_MAPPING: dict[re.Pattern, list[Callable[[Match[str]], str]]] = {
     re.compile(r"""^azure-.+"""): [all_hyphen_to_dot],

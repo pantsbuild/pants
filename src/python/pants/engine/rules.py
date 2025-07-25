@@ -91,11 +91,11 @@ def _make_rule(
     :param rule_type: The specific decorator used to declare the rule.
     :param return_type: The return/output type for the Rule. This must be a concrete Python type.
     :param parameter_types: A sequence of types that matches the number and order of arguments to
-                            the decorated function.
+        the decorated function.
     :param cacheable: Whether the results of executing the Rule should be cached as keyed by all of
-                      its inputs.
-    :param polymorphic: Whether the rule is an abstract base method for polymorphic dispatch via
-                        a union type.
+        its inputs.
+    :param polymorphic: Whether the rule is an abstract base method for polymorphic dispatch via a
+        union type.
     """
 
     is_goal_cls = issubclass(return_type, Goal)
@@ -214,10 +214,16 @@ class RuleDecoratorKwargs(TypedDict):
     canonical_name_suffix: NotRequired[str]
 
     desc: NotRequired[str]
-    """The rule's description as it appears in stacktraces/debugging. For goal rules, defaults to the goal name."""
+    """The rule's description as it appears in stacktraces/debugging.
+
+    For goal rules, defaults to the goal name.
+    """
 
     level: NotRequired[LogLevel]
-    """The logging level applied to this rule. Defaults to TRACE."""
+    """The logging level applied to this rule.
+
+    Defaults to TRACE.
+    """
 
     polymorphic: NotRequired[bool]
     """Whether this rule represents an abstract method for a union.
@@ -249,10 +255,16 @@ class RuleDecoratorKwargs(TypedDict):
     """
 
     _masked_types: NotRequired[Iterable[type[Any]]]
-    """Unstable. Internal Pants usage only."""
+    """Unstable.
+
+    Internal Pants usage only.
+    """
 
     _param_type_overrides: NotRequired[dict[str, type[Any]]]
-    """Unstable. Internal Pants usage only."""
+    """Unstable.
+
+    Internal Pants usage only.
+    """
 
 
 class _RuleDecoratorKwargs(RuleDecoratorKwargs):
@@ -263,6 +275,7 @@ class _RuleDecoratorKwargs(RuleDecoratorKwargs):
 
     cacheable: bool
     """Whether the results of this rule should be cached.
+
     Typically true for rules, false for goal_rules (see rules.py:_make_rule(...))
     """
 

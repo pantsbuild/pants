@@ -22,16 +22,15 @@ from pants.util.strutil import softwrap
 class InjectedNfpmPackageFields:
     """The injected fields that should be used instead of the target's fields.
 
-    Though any field can technically be provided (except "scripts" which is banned),
-    only nfpm package metadata fields will have an impact. Passing other fields are
-    silently ignored. For example, "dependencies", and "output_path" are not used
-    when generating nfpm config, so they will be ignored; "sources" is not a valid
-    field for nfpm package targets, so it will also be ignored.
+    Though any field can technically be provided (except "scripts" which is banned), only nfpm
+    package metadata fields will have an impact. Passing other fields are silently ignored. For
+    example, "dependencies", and "output_path" are not used when generating nfpm config, so they
+    will be ignored; "sources" is not a valid field for nfpm package targets, so it will also be
+    ignored.
 
-    The "scripts" field is special in that it has dependency inference tied to it.
-    If you write your own dependency inference rule (possibly based on a custom
-    field you've added to the nfpm package target), then you can pass
-    _allow_banned_fields=True to allow injection of the "scripts" field.
+    The "scripts" field is special in that it has dependency inference tied to it. If you write your
+    own dependency inference rule (possibly based on a custom field you've added to the nfpm package
+    target), then you can pass _allow_banned_fields=True to allow injection of the "scripts" field.
     """
 
     field_values: FrozenDict[type[Field], Field]
