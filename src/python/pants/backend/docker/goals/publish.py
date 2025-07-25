@@ -20,9 +20,10 @@ from pants.core.goals.publish import (
     PublishProcesses,
     PublishRequest,
 )
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.process import InteractiveProcess
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.env_vars import EnvironmentVarsRequest
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.process import InteractiveProcess, Process
+from pants.engine.rules import collect_rules, implicitly, rule
 
 logger = logging.getLogger(__name__)
 
@@ -74,13 +75,15 @@ async def push_docker_images(
             ]
         )
 
-    env = await Get(EnvironmentVars, EnvironmentVarsRequest(options_env_aware.env_vars))
+    env = await environment_vars_subset(
+        EnvironmentVarsRequest(options_env_aware.env_vars), **implicitly()
+    )
     skip_push_reasons: DefaultDict[str, DefaultDict[str, set[str]]] = defaultdict(
         lambda: defaultdict(set)
     )
     jobs: list[PublishPackages] = []
     refs: list[str] = []
-    processes: list[InteractiveProcess] = []
+    processes: list[Process | InteractiveProcess] = []
 
     for tag in tags:
         for registry in options.registries().registries.values():
@@ -92,7 +95,11 @@ async def push_docker_images(
                 break
         else:
             refs.append(tag)
-            processes.append(InteractiveProcess.from_process(docker.push_image(tag, env)))
+            push_process = docker.push_image(tag, env)
+            if options.publish_noninteractively:
+                processes.append(push_process)
+            else:
+                processes.append(InteractiveProcess.from_process(push_process))
 
     for ref, process in zip(refs, processes):
         jobs.append(

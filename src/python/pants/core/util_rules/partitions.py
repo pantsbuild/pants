@@ -6,16 +6,17 @@
 from __future__ import annotations
 
 import itertools
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Generic, Iterable, Protocol, TypeVar, overload
+from typing import Generic, Protocol, TypeVar, overload
 
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import FieldSet, SourcesField, SourcesPaths, SourcesPathsRequest
+from pants.engine.internals.graph import resolve_source_paths
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
+from pants.engine.target import FieldSet, SourcesField, SourcesPathsRequest
 from pants.util.memo import memoized
 from pants.util.meta import runtime_ignore_subscripts
 
@@ -69,8 +70,7 @@ class PartitionerType(Enum):
 
 class PartitionMetadata(Protocol):
     @property
-    def description(self) -> str | None:
-        ...
+    def description(self) -> str | None: ...
 
 
 class _EmptyMetadata:
@@ -125,15 +125,13 @@ class Partitions(Collection[Partition[PartitionElementT, PartitionMetadataT]]):
     @classmethod
     def single_partition(
         cls, elements: Iterable[PartitionElementT]
-    ) -> Partitions[PartitionElementT, _EmptyMetadata]:
-        ...
+    ) -> Partitions[PartitionElementT, _EmptyMetadata]: ...
 
     @overload
     @classmethod
     def single_partition(
         cls, elements: Iterable[PartitionElementT], *, metadata: PartitionMetadataT
-    ) -> Partitions[PartitionElementT, PartitionMetadataT]:
-        ...
+    ) -> Partitions[PartitionElementT, PartitionMetadataT]: ...
 
     @classmethod
     def single_partition(
@@ -222,8 +220,10 @@ def _single_partition_file_rules(cls) -> Iterable:
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
     ) -> Partitions[str, _EmptyMetadata]:
         assert sources_field_name is not None
-        all_sources_paths = await MultiGet(
-            Get(SourcesPaths, SourcesPathsRequest(getattr(field_set, sources_field_name)))
+        all_sources_paths = await concurrently(
+            resolve_source_paths(
+                SourcesPathsRequest(getattr(field_set, sources_field_name)), **implicitly()
+            )
             for field_set in request.field_sets
         )
 
@@ -286,8 +286,10 @@ def _partition_per_input_file_rules(cls) -> Iterable:
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
     ) -> Partitions[str, _EmptyMetadata]:
         assert sources_field_name is not None
-        all_sources_paths = await MultiGet(
-            Get(SourcesPaths, SourcesPathsRequest(getattr(field_set, sources_field_name)))
+        all_sources_paths = await concurrently(
+            resolve_source_paths(
+                SourcesPathsRequest(getattr(field_set, sources_field_name)), **implicitly()
+            )
             for field_set in request.field_sets
         )
 

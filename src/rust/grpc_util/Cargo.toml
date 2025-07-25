@@ -1,0 +1,51 @@
+[package]
+version = "0.0.1"
+edition = "2021"
+name = "grpc_util"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[dependencies]
+bytes = { workspace = true }
+either = { workspace = true }
+futures = { workspace = true }
+http = { workspace = true }
+http-body = { workspace = true }
+http-body-util = { workspace = true }
+hyper = { workspace = true }
+hyper-rustls = { workspace = true, features = ["http2"] }
+hyper-util = { workspace = true }
+itertools = { workspace = true }
+log = { workspace = true }
+pin-project = { workspace = true }
+pin-project-lite = { workspace = true }
+prost = { workspace = true }
+rand = { workspace = true }
+rustls = { workspace = true, features = ["logging"] }
+rustls-pki-types = { workspace = true }
+rustls-native-certs = { workspace = true }
+rustls-pemfile = { workspace = true }
+tokio = { workspace = true, features = ["net", "process", "rt-multi-thread", "sync", "time"] }
+tokio-rustls = { workspace = true }
+tokio-stream = { workspace = true }
+tokio-util = { workspace = true, features = ["codec"] }
+tonic = { workspace = true, features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
+tower = { workspace = true, features = ["limit", "timeout"] }
+tower-layer = { workspace = true }
+tower-service = { workspace = true }
+webpki = { workspace = true }
+workunit_store = { path = "../workunit_store" }
+
+[dev-dependencies]
+axum = { workspace = true }
+axum-server = { workspace = true, features = ["tls-rustls"] }
+async-trait = { workspace = true }
+parking_lot = { workspace = true }
+prost-types = { workspace = true }
+
+[build-dependencies]
+prost-build = { workspace = true }
+tonic-build = { workspace = true }
+
+[lints]
+workspace = true

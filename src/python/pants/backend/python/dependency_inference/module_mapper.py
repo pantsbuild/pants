@@ -9,10 +9,11 @@ import itertools
 import logging
 import os
 from collections import defaultdict
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from functools import total_ordering
 from pathlib import PurePath
-from typing import DefaultDict, Iterable, Mapping, Tuple
+from typing import DefaultDict
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
@@ -31,10 +32,10 @@ from pants.backend.python.target_types import (
     PythonResolveField,
     PythonSourceField,
 )
-from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
+from pants.core.util_rules.stripped_source_files import StrippedFileNameRequest, strip_file_name
 from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, concurrently, rule
 from pants.engine.target import AllTargets, Target
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.frozendict import FrozenDict
@@ -85,7 +86,7 @@ class AllPythonTargets:
 
 
 @rule(desc="Find all Python targets in project", level=LogLevel.DEBUG)
-def find_all_python_projects(all_targets: AllTargets) -> AllPythonTargets:
+async def find_all_python_projects(all_targets: AllTargets) -> AllPythonTargets:
     first_party = []
     third_party = []
     for tgt in all_targets:
@@ -103,7 +104,7 @@ def find_all_python_projects(all_targets: AllTargets) -> AllPythonTargets:
 
 
 class FirstPartyPythonMappingImpl(
-    FrozenDict[ResolveName, FrozenDict[str, Tuple[ModuleProvider, ...]]]
+    FrozenDict[ResolveName, FrozenDict[str, tuple[ModuleProvider, ...]]]
 ):
     """A mapping of each resolve name to the first-party module names contained and their owning
     addresses.
@@ -143,7 +144,7 @@ class FirstPartyPythonMappingImplMarker:
 @dataclass(frozen=True)
 class FirstPartyPythonModuleMapping:
     resolves_to_modules_to_providers: FrozenDict[
-        ResolveName, FrozenDict[str, Tuple[ModuleProvider, ...]]
+        ResolveName, FrozenDict[str, tuple[ModuleProvider, ...]]
     ]
 
     """A merged mapping of each resolve name to the first-party module names contained and their
@@ -201,7 +202,7 @@ class FirstPartyPythonModuleMapping:
 async def merge_first_party_module_mappings(
     union_membership: UnionMembership,
 ) -> FirstPartyPythonModuleMapping:
-    all_mappings = await MultiGet(
+    all_mappings = await concurrently(
         Get(
             FirstPartyPythonMappingImpl,
             FirstPartyPythonMappingImplMarker,
@@ -244,8 +245,8 @@ async def map_first_party_python_targets_to_modules(
     all_python_targets: AllPythonTargets,
     python_setup: PythonSetup,
 ) -> FirstPartyPythonMappingImpl:
-    stripped_file_per_target = await MultiGet(
-        Get(StrippedFileName, StrippedFileNameRequest(tgt[PythonSourceField].file_path))
+    stripped_file_per_target = await concurrently(
+        strip_file_name(StrippedFileNameRequest(tgt[PythonSourceField].file_path))
         for tgt in all_python_targets.first_party
     )
 
@@ -277,7 +278,7 @@ class ThirdPartyPythonModuleMapping:
     modules."""
 
     resolves_to_modules_to_providers: FrozenDict[
-        ResolveName, FrozenDict[str, Tuple[ModuleProvider, ...]]
+        ResolveName, FrozenDict[str, tuple[ModuleProvider, ...]]
     ]
 
     def _providers_for_resolve(
@@ -317,7 +318,7 @@ class ThirdPartyPythonModuleMapping:
 
 
 @functools.cache
-def generate_mappings_from_pattern(proj_name: str, is_type_stub: bool) -> Tuple[str, ...]:
+def generate_mappings_from_pattern(proj_name: str, is_type_stub: bool) -> tuple[str, ...]:
     """Generate a tuple of possible module mappings from a project name using a regex pattern.
 
     e.g. google-cloud-foo -> [google.cloud.foo, google.cloud.foo_v1, google.cloud.foo_v2]
@@ -374,10 +375,10 @@ async def map_third_party_modules_to_addresses(
             # NB: We don't use `canonicalize_project_name()` for the fallback value because we
             # want to preserve `.` in the module name. See
             # https://www.python.org/dev/peps/pep-0503/#normalized-names.
-            proj_name = canonicalize_project_name(req.project_name)
-            fallback_value = req.project_name.strip().lower().replace("-", "_")
+            proj_name = canonicalize_project_name(req.name)
+            fallback_value = req.name.strip().lower().replace("-", "_")
 
-            modules_to_add: Tuple[str, ...]
+            modules_to_add: tuple[str, ...]
             is_type_stub: bool
             if proj_name in DEFAULT_MODULE_MAPPING:
                 modules_to_add = DEFAULT_MODULE_MAPPING[proj_name]

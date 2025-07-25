@@ -25,8 +25,8 @@ from pants.backend.adhoc.target_types import (
     AdhocToolWorkspaceInvalidationSourcesField,
 )
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.test import RuntimePackageDependenciesField, TestTimeoutField
-from pants.core.util_rules.environments import EnvironmentField
 from pants.core.util_rules.system_binaries import BinaryPathTest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
@@ -68,7 +68,7 @@ class ShellGeneratorSettingsRequest(TargetFilesGeneratorSettingsRequest):
 
 
 @rule
-def generator_settings(
+async def generator_settings(
     _: ShellGeneratorSettingsRequest,
     shell_setup: ShellSetup,
 ) -> TargetFilesGeneratorSettings:
@@ -486,10 +486,15 @@ class ShellCommandRunTarget(Target):
 
 
 class ShellCommandTestTarget(Target):
-    alias = "experimental_test_shell_command"
+    alias = "test_shell_command"
+
+    deprecated_alias = "experimental_test_shell_command"
+    deprecated_alias_removal_version = "2.30.0.dev0"
+
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ShellCommandTestDependenciesField,
+        ShellCommandRunnableDependenciesField,
         ShellCommandCommandField,
         ShellCommandLogOutputField,
         ShellCommandSourcesField,
@@ -500,6 +505,10 @@ class ShellCommandTestTarget(Target):
         EnvironmentField,
         SkipShellCommandTestsField,
         ShellCommandWorkdirField,
+        ShellCommandOutputFilesField,
+        ShellCommandOutputDirectoriesField,
+        ShellCommandOutputRootDirField,
+        ShellCommandOutputsMatchMode,
     )
     help = help_text(
         """
@@ -507,15 +516,15 @@ class ShellCommandTestTarget(Target):
 
         Example BUILD file:
 
-            experimental_test_shell_command(
+            test_shell_command(
                 name="test",
                 tools=["test"],
                 command="test -r $CHROOT/some-data-file.txt",
                 execution_dependencies=["src/project/files:data"],
             )
 
-        The `command` may use either `{chroot}` on the command line, or the `$CHROOT`
-        environment variable to get the root directory for where any dependencies are located.
+        The `command` may use the `{chroot}` marker on the command line or in environment variables
+        to get the root directory where any dependencies are materialized during execution.
 
         In contrast to the `run_shell_command`, this target is intended to run shell commands as tests
         and will only run them via the `test` goal.

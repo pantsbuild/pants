@@ -14,8 +14,9 @@ from pants.core.goals.generate_snapshots import (
     GenerateSnapshotsFieldSet,
     GenerateSnapshotsResult,
 )
-from pants.engine.fs import CreateDigest, FileContent, Snapshot
-from pants.engine.rules import Get, rule
+from pants.engine.fs import CreateDigest, FileContent
+from pants.engine.intrinsics import digest_to_snapshot
+from pants.engine.rules import implicitly, rule
 from pants.engine.target import StringField, Target
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner
@@ -46,11 +47,12 @@ MOCK_SNAPSHOT_CONTENT = "mocked snapshot"
 async def mock_generate_snapshots(
     field_set: MockGenerateSnapshotsFieldSet,
 ) -> GenerateSnapshotsResult:
-    snapshot = await Get(
-        Snapshot,
-        CreateDigest(
-            [FileContent(path=MOCK_SNAPSHOT_FILENAME, content=MOCK_SNAPSHOT_CONTENT.encode())]
-        ),
+    snapshot = await digest_to_snapshot(
+        **implicitly(
+            CreateDigest(
+                [FileContent(path=MOCK_SNAPSHOT_FILENAME, content=MOCK_SNAPSHOT_CONTENT.encode())]
+            )
+        )
     )
     return GenerateSnapshotsResult(snapshot)
 

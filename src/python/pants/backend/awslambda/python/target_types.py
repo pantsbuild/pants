@@ -6,7 +6,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import ClassVar, Match, Optional, Tuple, cast
+from re import Match
+from typing import ClassVar, cast
 
 from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
 from pants.backend.python.util_rules.faas import (
@@ -21,8 +22,8 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSRuntimeField,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.package import OutputPathField
-from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address
 from pants.engine.rules import collect_rules
 from pants.engine.target import (
@@ -102,8 +103,9 @@ class PythonAwsLambdaFunctionRuntimes(Enum):
     PYTHON_310 = "python3.10"
     PYTHON_311 = "python3.11"
     PYTHON_312 = "python3.12"
+    PYTHON_313 = "python3.13"
 
-    def to_interpreter_version(self) -> Tuple[int, int]:
+    def to_interpreter_version(self) -> tuple[int, int]:
         """Returns the Python version implied by the runtime, as (major, minor)."""
         mo = cast(Match, re.match(PYTHON_RUNTIME_REGEX, self.value))
         return int(mo.group("major")), int(mo.group("minor"))
@@ -127,6 +129,8 @@ class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
         (PythonAwsLambdaFunctionRuntimes.PYTHON_311, FaaSArchitecture.ARM64): "3.11-arm64",
         (PythonAwsLambdaFunctionRuntimes.PYTHON_312, FaaSArchitecture.X86_64): "3.12-x86_64",
         (PythonAwsLambdaFunctionRuntimes.PYTHON_312, FaaSArchitecture.ARM64): "3.12-arm64",
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_313, FaaSArchitecture.X86_64): "3.13-x86_64",
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_313, FaaSArchitecture.ARM64): "3.13-arm64",
     }
 
     help = help_text(
@@ -150,7 +154,7 @@ class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
+    def compute_value(cls, raw_value: str | None, address: Address) -> str | None:
         value = super().compute_value(raw_value, address)
         if value is None:
             return None
@@ -165,7 +169,7 @@ class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
             )
         return value
 
-    def to_interpreter_version(self) -> Optional[Tuple[int, int]]:
+    def to_interpreter_version(self) -> tuple[int, int] | None:
         """Returns the Python version implied by the runtime, as (major, minor)."""
         if self.value is None:
             return None
@@ -241,7 +245,7 @@ class PythonAWSLambda(_AWSLambdaBaseTarget):
         f"""
         A self-contained Python function suitable for uploading to AWS Lambda.
 
-        See {doc_url('docs/python/integrations/aws-lambda')}.
+        See {doc_url("docs/python/integrations/aws-lambda")}.
         """
     )
 
@@ -258,7 +262,7 @@ class PythonAWSLambdaLayer(_AWSLambdaBaseTarget):
         f"""
         A Python layer suitable for uploading to AWS Lambda.
 
-        See {doc_url('docs/python/integrations/aws-lambda')}.
+        See {doc_url("docs/python/integrations/aws-lambda")}.
         """
     )
 

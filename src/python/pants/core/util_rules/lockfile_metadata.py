@@ -5,9 +5,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, ClassVar, Generic, Iterable, Tuple, Type, TypeVar, cast
+from typing import Any, ClassVar, Generic, TypeVar, cast
 
 from pants.util.docutil import bin_name
 from pants.util.ordered_set import FrozenOrderedSet
@@ -24,11 +25,11 @@ class LockfileScope(Enum):
 
 _LockfileMetadataSubclass = TypeVar("_LockfileMetadataSubclass", bound="LockfileMetadata")
 # N.B. the value type is `type[_LockfileMetadataSubclass]`
-_concrete_metadata_classes: dict[Tuple[LockfileScope, int], type] = {}
+_concrete_metadata_classes: dict[tuple[LockfileScope, int], type] = {}
 
 
 # Registrar types (pre-declaring to avoid repetition)
-RegisterClassForVersion = Callable[[Type["LockfileMetadata"]], Type["LockfileMetadata"]]
+RegisterClassForVersion = Callable[[type["LockfileMetadata"]], type["LockfileMetadata"]]
 
 
 def lockfile_metadata_registrar(scope: LockfileScope) -> Callable[[int], RegisterClassForVersion]:
@@ -43,7 +44,7 @@ def lockfile_metadata_registrar(scope: LockfileScope) -> Callable[[int], Registe
         The class must be a frozen dataclass
         """
 
-        def _dec(cls: Type[LockfileMetadata]) -> Type[LockfileMetadata]:
+        def _dec(cls: type[LockfileMetadata]) -> type[LockfileMetadata]:
             # Only frozen dataclasses may be registered as lockfile metadata:
             cls_dataclass_params = getattr(cls, "__dataclass_params__", None)
             if not cls_dataclass_params or not cls_dataclass_params.frozen:
@@ -215,7 +216,7 @@ class LockfileMetadata:
         `dict` containing the metadata attributes that should be stored in the lockfile.
         """
 
-        attrs: dict[Any, Tuple[Any, Type]] = {}  # attr name -> (value, where we first saw it)
+        attrs: dict[Any, tuple[Any, type]] = {}  # attr name -> (value, where we first saw it)
         for cls in reversed(self.__class__.__mro__[:-1]):
             new_attrs = cast(LockfileMetadata, cls).additional_header_attrs(self)
             for attr in new_attrs:

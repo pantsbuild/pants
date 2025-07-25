@@ -5,14 +5,14 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, DefaultDict
+from typing import Any, DefaultDict
 
 from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.core.util_rules.environments import EnvironmentsSubsystem
+from pants.core.environments.subsystems import EnvironmentsSubsystem
 from pants.engine.goal import GoalSubsystem
 from pants.engine.rules import Rule, RuleIndex
 from pants.engine.target import Target
@@ -189,9 +189,9 @@ class BuildConfiguration:
                     "Overwriting!".format(alias)
                 )
 
-            self._exposed_context_aware_object_factory_by_alias[
-                alias
-            ] = context_aware_object_factory
+            self._exposed_context_aware_object_factory_by_alias[alias] = (
+                context_aware_object_factory
+            )
 
         def register_subsystems(
             self, plugin_or_backend: str, subsystems: Iterable[type[Subsystem]]

@@ -11,7 +11,7 @@ import pytest
 
 from pants.base.exceptions import IncorrectProductError
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import Get, MultiGet, implicitly, rule
+from pants.engine.rules import Get, MultiGet, concurrently, implicitly, rule
 from pants.engine.unions import UnionRule, union
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
@@ -31,11 +31,11 @@ class B:
 
 
 @rule
-def consumes_a_and_b(a: A, b: B) -> str:
+async def consumes_a_and_b(a: A, b: B) -> str:
     return str(f"{a} and {b}")
 
 
-def test_use_params() -> None:
+async def test_use_params() -> None:
     rule_runner = RuleRunner(
         rules=[consumes_a_and_b, QueryRule(str, [A, B])],
         inherent_environment=None,
@@ -44,11 +44,11 @@ def test_use_params() -> None:
     # Confirm that we can pass in Params in order to provide multiple inputs to an execution.
     a, b = A(), B()
     result_str = rule_runner.request(str, [a, b])
-    assert result_str == consumes_a_and_b.rule.func(a, b)  # type: ignore[attr-defined]
+    assert result_str == await consumes_a_and_b.rule.func(a, b)  # type: ignore[attr-defined]
 
     # And confirm that a superset of Params is also accepted.
     result_str = rule_runner.request(str, [a, b, b"bytes aren't used by any rules"])
-    assert result_str == consumes_a_and_b.rule.func(a, b)  # type: ignore[attr-defined]
+    assert result_str == await consumes_a_and_b.rule.func(a, b)  # type: ignore[attr-defined]
 
     # But not a subset.
     expected_msg = "No installed QueryRules can compute str given input Params(A), but"
@@ -62,7 +62,7 @@ class C:
 
 
 @rule
-def transitive_b_c(c: C) -> B:
+async def transitive_b_c(c: C) -> B:
     return B()
 
 
@@ -110,7 +110,7 @@ def test_consumed_types(transitive_params_rule_runner: RuleRunner) -> None:
 
 
 @rule
-def boolean_and_int(i: int, b: bool) -> A:
+async def boolean_and_int(i: int, b: bool) -> A:
     return A()
 
 
@@ -134,7 +134,7 @@ async def b(i: int) -> B:
 
 
 @rule
-def c() -> C:
+async def c() -> C:
     return C()
 
 
@@ -190,12 +190,12 @@ class Motorcycle(Vehicle):
 
 
 @rule
-def car_num_wheels(car: Car, _: Fuel) -> int:
+async def car_num_wheels(car: Car, _: Fuel) -> int:
     return car.num_wheels()
 
 
 @rule
-def motorcycle_num_wheels(motorcycle: Motorcycle) -> int:
+async def motorcycle_num_wheels(motorcycle: Motorcycle) -> int:
     return motorcycle.num_wheels()
 
 
@@ -204,9 +204,27 @@ class WrappedVehicle:
     vehicle: Vehicle
 
 
+@dataclass(frozen=True)
+class WrappedVehiclesByName:
+    vehicles: tuple[Vehicle, ...]
+
+
 @rule
 async def generic_num_wheels(wrapped_vehicle: WrappedVehicle) -> int:
     return await Get(int, Vehicle, wrapped_vehicle.vehicle)
+
+
+@rule(polymorphic=True)
+async def num_wheels_cbn(vehicle: Vehicle, _: Fuel) -> int:
+    raise NotImplementedError()
+
+
+@rule
+async def wrapped_num_wheels_cbn(wrapped_vehicles: WrappedVehiclesByName) -> int:
+    all_wheels = await concurrently(
+        num_wheels_cbn(**implicitly({vehicle: Vehicle})) for vehicle in wrapped_vehicles.vehicles
+    )
+    return sum(all_wheels)
 
 
 def test_union_rules_in_scope_via_query() -> None:
@@ -235,7 +253,7 @@ def test_union_rules_in_scope_via_query() -> None:
 
 def test_union_rules_in_scope_computed() -> None:
     @rule
-    def fuel_singleton() -> Fuel:
+    async def fuel_singleton() -> Fuel:
         return Fuel()
 
     rule_runner = RuleRunner(
@@ -251,6 +269,26 @@ def test_union_rules_in_scope_computed() -> None:
     )
     assert rule_runner.request(int, [WrappedVehicle(Car())]) == 4
     assert rule_runner.request(int, [WrappedVehicle(Motorcycle())]) == 2
+
+
+def test_polymorphic_call_by_name() -> None:
+    @rule
+    async def fuel_singleton() -> Fuel:
+        return Fuel()
+
+    rule_runner = RuleRunner(
+        rules=[
+            car_num_wheels,
+            motorcycle_num_wheels,
+            UnionRule(Vehicle, Car),
+            UnionRule(Vehicle, Motorcycle),
+            num_wheels_cbn,
+            wrapped_num_wheels_cbn,
+            fuel_singleton,
+            QueryRule(int, [WrappedVehiclesByName]),
+        ],
+    )
+    assert rule_runner.request(int, [WrappedVehiclesByName((Car(), Motorcycle()))]) == 6
 
 
 # -----------------------------------------------------------------------------------------------
@@ -317,7 +355,7 @@ class SomeOutput:
 
 
 @rule
-def raise_an_exception(some_input: SomeInput) -> SomeOutput:
+async def raise_an_exception(some_input: SomeInput) -> SomeOutput:
     raise Exception(some_input.s)
 
 
@@ -352,14 +390,14 @@ GLOBAL_FLAG: bool = True
 
 
 @rule
-def raise_an_exception_upon_global_state(input_with_nothing: InputWithNothing) -> SomeOutput:
+async def raise_an_exception_upon_global_state(input_with_nothing: InputWithNothing) -> SomeOutput:
     if GLOBAL_FLAG:
         raise Exception("global flag is set!")
     return SomeOutput("asdf")
 
 
 @rule
-def return_a_wrong_product_type(input_with_nothing: InputWithNothing) -> A:
+async def return_a_wrong_product_type(input_with_nothing: InputWithNothing) -> A:
     return B()  # type: ignore[return-value]
 
 
@@ -425,7 +463,7 @@ def fn_raises():
 
 
 @rule(desc="Nested raise")
-def nested_raise() -> A:
+async def nested_raise() -> A:
     fn_raises()
     return A()
 
@@ -479,8 +517,10 @@ def test_trace_includes_nested_exception_traceback() -> None:
         Traceback (most recent call last):
           File LOCATION-INFO, in catch_and_reraise
             return await Get(SomeOutput, SomeInput(outer_input.s))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
           File LOCATION-INFO, in __await__
             result = yield self
+                     ^^^^^^^^^^
           File LOCATION-INFO, in raise_an_exception
             raise Exception(some_input.s)
         Exception: asdf

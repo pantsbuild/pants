@@ -17,46 +17,49 @@ use std::panic;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
+use std::sync::LazyLock;
 use std::time::Duration;
 
 use async_latch::AsyncLatch;
 use fnv::FnvHasher;
 use fs::DirectoryDigest;
-use futures::future::{self, FutureExt};
 use futures::Future;
+use futures::future::{self, FutureExt};
 use hashing::Digest;
-use log::{self, debug, error, warn, Log};
+use log::{self, Log, debug, error, warn};
 use logging::logger::PANTS_LOGGER;
 use logging::{Logger, PythonLogLevel};
 use petgraph::graph::{DiGraph, Graph};
 use process_execution::CacheContentBehavior;
 use pyo3::exceptions::{PyException, PyIOError, PyKeyboardInterrupt, PyValueError};
 use pyo3::prelude::{
-    pyclass, pyfunction, pymethods, pymodule, wrap_pyfunction, PyModule, PyObject,
-    PyResult as PyO3Result, Python, ToPyObject,
+    PyModule, PyObject, PyResult as PyO3Result, Python, pyclass, pyfunction, pymethods, pymodule,
+    wrap_pyfunction,
 };
+use pyo3::sync::GILProtected;
 use pyo3::types::{
     PyAnyMethods, PyBytes, PyDict, PyDictMethods, PyList, PyListMethods, PyModuleMethods, PyTuple,
     PyType,
 };
-use pyo3::{create_exception, Bound, IntoPy, PyAny, PyRef};
+use pyo3::{Bound, IntoPyObject, PyAny, PyRef, create_exception};
 use regex::Regex;
 use remote::remote_cache::RemoteCacheWarningsBehavior;
-use rule_graph::{self, RuleGraph};
+use rule_graph::{self, RuleGraph, RuleId};
 use store::RemoteProvider;
 use task_executor::Executor;
+use tokio::sync::Mutex;
 use workunit_store::{
     ArtifactOutput, ObservationMetric, UserMetadataItem, Workunit, WorkunitState, WorkunitStore,
     WorkunitStoreHandle,
 };
 
-use crate::externs::fs::{possible_store_missing_digest, PyFileDigest};
+use crate::externs::fs::{PyFileDigest, possible_store_missing_digest};
 use crate::externs::process::PyProcessExecutionEnvironment;
 use crate::intrinsics;
 use crate::{
-    externs, nodes, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination,
-    Failure, Function, Key, LocalStoreOptions, Params, RemotingOptions, Rule, Scheduler, Session,
-    SessionCore, Tasks, TypeId, Types, Value,
+    Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination, Failure, Function, Key,
+    LocalStoreOptions, Params, RemotingOptions, Rule, Scheduler, Session, SessionCore, Tasks,
+    TypeId, Types, Value, externs, nodes,
 };
 
 #[pymodule]
@@ -74,8 +77,9 @@ fn native_engine(py: Python, m: &Bound<'_, PyModule>) -> PyO3Result<()> {
     externs::testutil::register(m)?;
     externs::workunits::register(m)?;
     externs::dep_inference::register(m)?;
+    externs::unions::register(py, m)?;
 
-    m.add("PollTimeout", py.get_type_bound::<PollTimeout>())?;
+    m.add("PollTimeout", py.get_type::<PollTimeout>())?;
 
     m.add_class::<PyExecutionRequest>()?;
     m.add_class::<PyExecutionStrategyOptions>()?;
@@ -173,18 +177,18 @@ pub fn initialize() -> PyO3Result<()> {
 }
 
 #[pyclass]
-struct PyTasks(RefCell<Tasks>);
+struct PyTasks(GILProtected<RefCell<Tasks>>);
 
 #[pymethods]
 impl PyTasks {
     #[new]
     fn __new__() -> Self {
-        Self(RefCell::new(Tasks::new()))
+        Self(GILProtected::new(RefCell::new(Tasks::new())))
     }
 }
 
 #[pyclass]
-struct PyTypes(RefCell<Option<Types>>);
+struct PyTypes(GILProtected<RefCell<Option<Types>>>);
 
 #[pymethods]
 impl PyTypes {
@@ -221,10 +225,10 @@ impl PyTypes {
         parsed_javascript_deps_candidate_result: &Bound<'_, PyType>,
         py: Python,
     ) -> Self {
-        Self(RefCell::new(Some(Types {
-            directory_digest: TypeId::new(&py.get_type_bound::<externs::fs::PyDigest>()),
-            file_digest: TypeId::new(&py.get_type_bound::<externs::fs::PyFileDigest>()),
-            snapshot: TypeId::new(&py.get_type_bound::<externs::fs::PySnapshot>()),
+        Self(GILProtected::new(RefCell::new(Some(Types {
+            directory_digest: TypeId::new(&py.get_type::<externs::fs::PyDigest>()),
+            file_digest: TypeId::new(&py.get_type::<externs::fs::PyFileDigest>()),
+            snapshot: TypeId::new(&py.get_type::<externs::fs::PySnapshot>()),
             paths: TypeId::new(paths),
             path_metadata_request: TypeId::new(path_metadata_request),
             path_metadata_result: TypeId::new(path_metadata_result),
@@ -235,9 +239,9 @@ impl PyTypes {
             digest_contents: TypeId::new(digest_contents),
             digest_entries: TypeId::new(digest_entries),
             path_globs: TypeId::new(path_globs),
-            merge_digests: TypeId::new(&py.get_type_bound::<externs::fs::PyMergeDigests>()),
-            add_prefix: TypeId::new(&py.get_type_bound::<externs::fs::PyAddPrefix>()),
-            remove_prefix: TypeId::new(&py.get_type_bound::<externs::fs::PyRemovePrefix>()),
+            merge_digests: TypeId::new(&py.get_type::<externs::fs::PyMergeDigests>()),
+            add_prefix: TypeId::new(&py.get_type::<externs::fs::PyAddPrefix>()),
+            remove_prefix: TypeId::new(&py.get_type::<externs::fs::PyRemovePrefix>()),
             create_digest: TypeId::new(create_digest),
             digest_subset: TypeId::new(digest_subset),
             native_download_file: TypeId::new(native_download_file),
@@ -245,7 +249,7 @@ impl PyTypes {
             process: TypeId::new(process),
             process_result: TypeId::new(process_result),
             process_config_from_environment: TypeId::new(
-                &py.get_type_bound::<externs::process::PyProcessExecutionEnvironment>(),
+                &py.get_type::<externs::process::PyProcessExecutionEnvironment>(),
             ),
             process_result_metadata: TypeId::new(process_result_metadata),
             coroutine: TypeId::new(coroutine),
@@ -263,9 +267,9 @@ impl PyTypes {
                 parsed_javascript_deps_candidate_result,
             ),
             deps_request: TypeId::new(
-                &py.get_type_bound::<externs::dep_inference::PyNativeDependenciesRequest>(),
+                &py.get_type::<externs::dep_inference::PyNativeDependenciesRequest>(),
             ),
-        })))
+        }))))
     }
 }
 
@@ -289,7 +293,7 @@ impl PyExecutionStrategyOptions {
     fn __new__(
         local_parallelism: usize,
         remote_parallelism: usize,
-        local_keep_sandboxes: String,
+        use_sandboxer: bool,
         local_cache: bool,
         local_enable_nailgun: bool,
         remote_cache_read: bool,
@@ -301,10 +305,7 @@ impl PyExecutionStrategyOptions {
         Self(ExecutionStrategyOptions {
             local_parallelism,
             remote_parallelism,
-            local_keep_sandboxes: process_execution::local::KeepSandboxes::from_str(
-                &local_keep_sandboxes,
-            )
-            .unwrap(),
+            use_sandboxer,
             local_cache,
             local_enable_nailgun,
             remote_cache_read,
@@ -335,6 +336,7 @@ impl PyRemotingOptions {
         store_rpc_concurrency,
         store_rpc_timeout_millis,
         store_batch_api_size_limit,
+        store_batch_load_enabled,
         cache_warnings_behavior,
         cache_content_behavior,
         cache_rpc_concurrency,
@@ -360,6 +362,7 @@ impl PyRemotingOptions {
         store_rpc_concurrency: usize,
         store_rpc_timeout_millis: u64,
         store_batch_api_size_limit: usize,
+        store_batch_load_enabled: bool,
         cache_warnings_behavior: String,
         cache_content_behavior: String,
         cache_rpc_concurrency: usize,
@@ -392,6 +395,7 @@ impl PyRemotingOptions {
             store_rpc_concurrency,
             store_rpc_timeout: Duration::from_millis(store_rpc_timeout_millis),
             store_batch_api_size_limit,
+            store_batch_load_enabled,
             cache_warnings_behavior: RemoteCacheWarningsBehavior::from_str(
                 &cache_warnings_behavior,
             )
@@ -509,14 +513,14 @@ impl PySessionCancellationLatch {
 
 #[pyclass]
 struct PyNailgunServer {
-    server: RefCell<Option<nailgun::Server>>,
+    server: GILProtected<RefCell<Option<nailgun::Server>>>,
     executor: Executor,
 }
 
 #[pymethods]
 impl PyNailgunServer {
-    fn port(&self) -> PyO3Result<u16> {
-        let borrowed_server = self.server.borrow();
+    fn port(&self, py: Python<'_>) -> PyO3Result<u16> {
+        let borrowed_server = self.server.get(py).borrow();
         let server = borrowed_server.as_ref().ok_or_else(|| {
             PyException::new_err("Cannot get the port of a server that has already shut down.")
         })?;
@@ -525,7 +529,7 @@ impl PyNailgunServer {
 }
 
 #[pyclass]
-struct PyExecutionRequest(RefCell<ExecutionRequest>);
+struct PyExecutionRequest(GILProtected<RefCell<ExecutionRequest>>);
 
 #[pymethods]
 impl PyExecutionRequest {
@@ -538,7 +542,7 @@ impl PyExecutionRequest {
             timeout: timeout_in_ms.map(Duration::from_millis),
             ..ExecutionRequest::default()
         };
-        Self(RefCell::new(request))
+        Self(GILProtected::new(RefCell::new(request)))
     }
 }
 
@@ -626,9 +630,17 @@ fn nailgun_server_create(
         let executor = py_executor.0.clone();
         nailgun::Server::new(executor, port, move |exe: nailgun::RawFdExecution| {
             Python::with_gil(|py| {
+                let args_tuple = match PyTuple::new(py, exe.cmd.args) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        error!("PyTuple construction failure: {e:?}");
+                        return nailgun::ExitCode(1);
+                    }
+                };
+
                 let result = runner.bind(py).call1((
                     exe.cmd.command,
-                    PyTuple::new_bound(py, exe.cmd.args),
+                    args_tuple,
                     exe.cmd.env.into_iter().collect::<HashMap<String, String>>(),
                     exe.cmd.working_dir,
                     PySessionCancellationLatch(exe.cancelled),
@@ -658,17 +670,23 @@ fn nailgun_server_create(
         .block_on(server_future)
         .map_err(PyException::new_err)?;
     Ok(PyNailgunServer {
-        server: RefCell::new(Some(server)),
+        server: GILProtected::new(RefCell::new(Some(server))),
         executor: py_executor.0.clone(),
     })
 }
 
 #[pyfunction]
 fn nailgun_server_await_shutdown(
-    py: Python,
+    py: Python<'_>,
     nailgun_server_ptr: &Bound<'_, PyNailgunServer>,
 ) -> PyO3Result<()> {
-    if let Some(server) = nailgun_server_ptr.borrow().server.borrow_mut().take() {
+    if let Some(server) = nailgun_server_ptr
+        .borrow()
+        .server
+        .get(py)
+        .borrow_mut()
+        .take()
+    {
         let executor = nailgun_server_ptr.borrow().executor.clone();
         py.allow_threads(|| executor.block_on(server.shutdown()))
             .map_err(PyException::new_err)
@@ -733,6 +751,7 @@ fn hash_prefix_zero_bits(item: &str) -> u32 {
     py_tasks,
     types_ptr,
     build_root,
+    pants_workdir,
     local_execution_root_dir,
     named_caches_dir,
     ignore_patterns,
@@ -743,32 +762,35 @@ fn hash_prefix_zero_bits(item: &str) -> u32 {
     exec_strategy_opts,
     ca_certs_path
 ))]
-fn scheduler_create(
-    py_executor: &Bound<'_, externs::scheduler::PyExecutor>,
-    py_tasks: &Bound<'_, PyTasks>,
-    types_ptr: &Bound<'_, PyTypes>,
+fn scheduler_create<'py>(
+    py: Python<'py>,
+    py_executor: &Bound<'py, externs::scheduler::PyExecutor>,
+    py_tasks: &Bound<'py, PyTasks>,
+    types_ptr: &Bound<'py, PyTypes>,
     build_root: PathBuf,
+    pants_workdir: PathBuf,
     local_execution_root_dir: PathBuf,
     named_caches_dir: PathBuf,
     ignore_patterns: Vec<String>,
     use_gitignore: bool,
     watch_filesystem: bool,
-    remoting_options: &Bound<'_, PyRemotingOptions>,
-    local_store_options: &Bound<'_, PyLocalStoreOptions>,
-    exec_strategy_opts: &Bound<'_, PyExecutionStrategyOptions>,
+    remoting_options: &Bound<'py, PyRemotingOptions>,
+    local_store_options: &Bound<'py, PyLocalStoreOptions>,
+    exec_strategy_opts: &Bound<'py, PyExecutionStrategyOptions>,
     ca_certs_path: Option<PathBuf>,
 ) -> PyO3Result<PyScheduler> {
     match fs::increase_limits() {
-        Ok(msg) => debug!("{}", msg),
-        Err(e) => warn!("{}", e),
+        Ok(msg) => debug!("{msg}"),
+        Err(e) => warn!("{e}"),
     }
     let types = types_ptr
         .borrow()
         .0
+        .get(py)
         .borrow_mut()
         .take()
         .ok_or_else(|| PyException::new_err("An instance of PyTypes may only be used once."))?;
-    let tasks = py_tasks.borrow().0.replace(Tasks::new());
+    let tasks = py_tasks.borrow().0.get(py).replace(Tasks::new());
 
     // NOTE: Enter the Tokio runtime so that libraries like Tonic (for gRPC) are able to
     // use `tokio::spawn` since Python does not setup Tokio for the main thread. This also
@@ -783,6 +805,7 @@ fn scheduler_create(
                     tasks,
                     types,
                     build_root,
+                    pants_workdir,
                     ignore_patterns,
                     use_gitignore,
                     watch_filesystem,
@@ -815,7 +838,7 @@ async fn workunit_to_py_value(
         ))
     })?;
     let has_parent_ids = !workunit.parent_ids.is_empty();
-    let mut dict_entries = Python::with_gil(|py| {
+    let mut dict_entries = Python::with_gil(|py| -> PyO3Result<Vec<(Value, Value)>> {
         let mut dict_entries = vec![
             (
                 externs::store_utf8(py, "name"),
@@ -843,7 +866,7 @@ async fn workunit_to_py_value(
         }
         dict_entries.push((
             externs::store_utf8(py, "parent_ids"),
-            externs::store_tuple(py, parent_ids),
+            externs::store_tuple(py, parent_ids)?,
         ));
 
         match workunit.state {
@@ -890,8 +913,8 @@ async fn workunit_to_py_value(
                 externs::store_utf8(py, desc),
             ));
         }
-        dict_entries
-    });
+        Ok(dict_entries)
+    })?;
 
     let mut artifact_entries = Vec::new();
 
@@ -930,8 +953,8 @@ async fn workunit_to_py_value(
         let mut user_metadata_entries = Vec::with_capacity(metadata.user_metadata.len());
         for (user_metadata_key, user_metadata_item) in metadata.user_metadata.iter() {
             let value = match user_metadata_item {
-                UserMetadataItem::String(v) => v.into_py(py),
-                UserMetadataItem::Int(n) => n.into_py(py),
+                UserMetadataItem::String(v) => v.into_pyobject(py)?.to_owned().into_any().unbind(),
+                UserMetadataItem::Int(n) => n.into_pyobject(py)?.to_owned().into_any().unbind(),
                 UserMetadataItem::PyValue(py_val_handle) => (**py_val_handle)
                     .as_any()
                     .downcast_ref::<Value>()
@@ -940,7 +963,9 @@ async fn workunit_to_py_value(
                             "Failed to convert {py_val_handle:?} to a Value."
                         ))
                     })?
-                    .to_object(py),
+                    .into_pyobject(py)?
+                    .into_any()
+                    .unbind(),
             };
             user_metadata_entries.push((
                 externs::store_utf8(py, user_metadata_key.as_str()),
@@ -965,6 +990,38 @@ async fn workunit_to_py_value(
             artifact_entries.push((
                 externs::store_utf8(py, "stderr_digest"),
                 crate::nodes::Snapshot::store_file_digest(py, stderr_digest)
+                    .map_err(PyException::new_err)?,
+            ));
+        }
+
+        if let Some(command_digest) = metadata.remote_command {
+            artifact_entries.push((
+                externs::store_utf8(py, "remote_command_digest"),
+                crate::nodes::Snapshot::store_file_digest(py, command_digest)
+                    .map_err(PyException::new_err)?,
+            ));
+        }
+
+        if let Some(action_digest) = metadata.remote_action {
+            artifact_entries.push((
+                externs::store_utf8(py, "remote_action_digest"),
+                crate::nodes::Snapshot::store_file_digest(py, action_digest)
+                    .map_err(PyException::new_err)?,
+            ));
+        }
+
+        if let Some(local_command_digest) = metadata.local_command {
+            artifact_entries.push((
+                externs::store_utf8(py, "local_command_digest"),
+                crate::nodes::Snapshot::store_file_digest(py, local_command_digest)
+                    .map_err(PyException::new_err)?,
+            ));
+        }
+
+        if let Some(local_action_digest) = metadata.local_action {
+            artifact_entries.push((
+                externs::store_utf8(py, "local_action_digest"),
+                crate::nodes::Snapshot::store_file_digest(py, local_action_digest)
                     .map_err(PyException::new_err)?,
             ));
         }
@@ -1012,7 +1069,7 @@ async fn workunits_to_py_tuple_value(
         workunit_values.push(py_value);
     }
 
-    Ok(externs::store_tuple(py, workunit_values))
+    externs::store_tuple(py, workunit_values)
 }
 
 #[pyfunction]
@@ -1061,12 +1118,12 @@ fn session_poll_workunits(
                     completed,
                     &core,
                 ))?;
-                Ok(externs::store_tuple(py, vec![started_val, completed_val]).into())
+                Ok(externs::store_tuple(py, vec![started_val, completed_val])?.into())
             })
         })
     })
     .unwrap_or_else(|e| {
-        log::warn!("Panic in `session_poll_workunits`: {:?}", e);
+        log::warn!("Panic in `session_poll_workunits`: {e:?}");
         std::panic::resume_unwind(e);
     })
 }
@@ -1076,14 +1133,14 @@ fn session_run_interactive_process(
     py: Python,
     py_session: &Bound<'_, PySession>,
     interactive_process: PyObject,
-    process_config_from_environment: PyProcessExecutionEnvironment,
+    process_config_from_environment: &Bound<'_, PyProcessExecutionEnvironment>,
 ) -> PyO3Result<PyObject> {
     let core = py_session.borrow().0.core().clone();
     let session = &py_session.borrow().0;
     let context = core.graph.context(SessionCore::new(session.clone()));
 
     let interactive_process: Value = interactive_process.into();
-    let process_config = Value::new(process_config_from_environment.into_py(py));
+    let process_config = Value::from(process_config_from_environment.as_any());
 
     py.allow_threads(|| {
         core.executor.clone().block_on(nodes::task_context(
@@ -1130,7 +1187,7 @@ fn scheduler_live_items<'py>(
         .enter(|| py.allow_threads(|| scheduler.live_items(session)));
     let py_items = items
         .into_iter()
-        .map(|value| value.bind(py).to_object(py))
+        .map(|value| value.bind(py).clone().unbind())
         .collect();
     (py_items, sizes)
 }
@@ -1147,16 +1204,17 @@ fn scheduler_shutdown(py: Python, py_scheduler: &Bound<'_, PyScheduler>, timeout
 }
 
 #[pyfunction]
-fn scheduler_execute(
-    py: Python<'_>,
-    py_scheduler: &Bound<'_, PyScheduler>,
-    py_session: &Bound<'_, PySession>,
-    py_execution_request: &Bound<'_, PyExecutionRequest>,
+fn scheduler_execute<'py>(
+    py: Python<'py>,
+    py_scheduler: &Bound<'py, PyScheduler>,
+    py_session: &Bound<'py, PySession>,
+    py_execution_request: &Bound<'py, PyExecutionRequest>,
 ) -> PyO3Result<Vec<PyResult>> {
     let scheduler = &py_scheduler.borrow().0;
     let session = &py_session.borrow().0;
-    let execution_request_cell = &mut py_execution_request.borrow_mut().0;
-    let execution_request: &mut ExecutionRequest = execution_request_cell.get_mut();
+    let execution_request_cell_ref = py_execution_request.borrow();
+    let execution_request_cell = execution_request_cell_ref.0.get(py);
+    let execution_request: &mut ExecutionRequest = &mut execution_request_cell.borrow_mut();
 
     scheduler.core.executor.enter(|| {
         // TODO: A parent_id should be an explicit argument.
@@ -1179,15 +1237,17 @@ fn scheduler_execute(
 }
 
 #[pyfunction]
-fn execution_add_root_select(
-    py_scheduler: &Bound<'_, PyScheduler>,
-    py_execution_request: &Bound<'_, PyExecutionRequest>,
+fn execution_add_root_select<'py>(
+    py: Python<'py>,
+    py_scheduler: &Bound<'py, PyScheduler>,
+    py_execution_request: &Bound<'py, PyExecutionRequest>,
     param_vals: Vec<PyObject>,
-    product: &Bound<'_, PyType>,
+    product: &Bound<'py, PyType>,
 ) -> PyO3Result<()> {
     let scheduler = &py_scheduler.borrow().0;
-    let execution_request_cell = &mut py_execution_request.borrow_mut().0;
-    let execution_request: &mut ExecutionRequest = execution_request_cell.get_mut();
+    let execution_request_cell_ref = py_execution_request.borrow();
+    let execution_request_cell = execution_request_cell_ref.0.get(py);
+    let execution_request: &mut ExecutionRequest = &mut execution_request_cell.borrow_mut();
 
     scheduler.core.executor.enter(|| {
         let product = TypeId::new(product);
@@ -1202,12 +1262,13 @@ fn execution_add_root_select(
 }
 
 #[pyfunction]
-fn tasks_task_begin(
-    py_tasks: &Bound<'_, PyTasks>,
+fn tasks_task_begin<'py>(
+    py: Python<'py>,
+    py_tasks: &Bound<'py, PyTasks>,
     func: PyObject,
-    output_type: &Bound<'_, PyType>,
-    arg_types: Vec<(String, Bound<'_, PyType>)>,
-    masked_types: Vec<Bound<'_, PyType>>,
+    output_type: &Bound<'py, PyType>,
+    arg_types: Vec<(String, Bound<'py, PyType>)>,
+    masked_types: Vec<Bound<'py, PyType>>,
     side_effecting: bool,
     engine_aware_return_type: bool,
     cacheable: bool,
@@ -1225,7 +1286,7 @@ fn tasks_task_begin(
         .map(|(name, typ)| (name, TypeId::new(&typ.as_borrowed())))
         .collect();
     let masked_types = masked_types.into_iter().map(|t| TypeId::new(&t)).collect();
-    py_tasks.borrow_mut().0.borrow_mut().task_begin(
+    py_tasks.borrow_mut().0.get(py).borrow_mut().task_begin(
         func,
         output_type,
         side_effecting,
@@ -1241,44 +1302,63 @@ fn tasks_task_begin(
 }
 
 #[pyfunction]
-fn tasks_task_end(py_tasks: &Bound<'_, PyTasks>) {
-    py_tasks.borrow_mut().0.borrow_mut().task_end();
+fn tasks_task_end(py: Python<'_>, py_tasks: &Bound<'_, PyTasks>) {
+    py_tasks.borrow_mut().0.get(py).borrow_mut().task_end();
 }
 
 #[pyfunction]
-fn tasks_add_call(
-    py_tasks: &Bound<'_, PyTasks>,
-    output: &Bound<'_, PyType>,
-    inputs: Vec<Bound<'_, PyType>>,
+fn tasks_add_call<'py>(
+    py: Python<'py>,
+    py_tasks: &Bound<'py, PyTasks>,
+    output: &Bound<'py, PyType>,
+    inputs: Vec<Bound<'py, PyType>>,
     rule_id: String,
     explicit_args_arity: u16,
+    vtable_entries: Option<Vec<(Bound<'py, PyType>, String)>>,
+    in_scope_types: Option<Vec<Bound<'py, PyType>>>,
+) {
+    let output = TypeId::new(output);
+    let inputs = inputs.into_iter().map(|t| TypeId::new(&t)).collect();
+    let in_scope_types =
+        in_scope_types.map(|ist| ist.into_iter().map(|t| TypeId::new(&t)).collect());
+    py_tasks.borrow_mut().0.get(py).borrow_mut().add_call(
+        output,
+        inputs,
+        RuleId::from_string(rule_id),
+        explicit_args_arity,
+        vtable_entries.map(|vte| {
+            vte.into_iter()
+                .map(|(k, v)| (TypeId::new(&k), RuleId::from_string(v)))
+                .collect()
+        }),
+        in_scope_types,
+    );
+}
+
+#[pyfunction]
+fn tasks_add_get<'py>(
+    py: Python<'py>,
+    py_tasks: &Bound<'py, PyTasks>,
+    output: &Bound<'py, PyType>,
+    inputs: Vec<Bound<'py, PyType>>,
 ) {
     let output = TypeId::new(output);
     let inputs = inputs.into_iter().map(|t| TypeId::new(&t)).collect();
     py_tasks
         .borrow_mut()
         .0
+        .get(py)
         .borrow_mut()
-        .add_call(output, inputs, rule_id, explicit_args_arity);
+        .add_get(output, inputs);
 }
 
 #[pyfunction]
-fn tasks_add_get(
-    py_tasks: &Bound<'_, PyTasks>,
-    output: &Bound<'_, PyType>,
-    inputs: Vec<Bound<'_, PyType>>,
-) {
-    let output = TypeId::new(output);
-    let inputs = inputs.into_iter().map(|t| TypeId::new(&t)).collect();
-    py_tasks.borrow_mut().0.borrow_mut().add_get(output, inputs);
-}
-
-#[pyfunction]
-fn tasks_add_get_union(
-    py_tasks: &Bound<'_, PyTasks>,
-    output_type: &Bound<'_, PyType>,
-    input_types: Vec<Bound<'_, PyType>>,
-    in_scope_types: Vec<Bound<'_, PyType>>,
+fn tasks_add_get_union<'py>(
+    py: Python<'py>,
+    py_tasks: &Bound<'py, PyTasks>,
+    output_type: &Bound<'py, PyType>,
+    input_types: Vec<Bound<'py, PyType>>,
+    in_scope_types: Vec<Bound<'py, PyType>>,
 ) {
     let product = TypeId::new(output_type);
     let input_types = input_types.into_iter().map(|t| TypeId::new(&t)).collect();
@@ -1286,24 +1366,26 @@ fn tasks_add_get_union(
         .into_iter()
         .map(|t| TypeId::new(&t))
         .collect();
-    py_tasks
-        .borrow_mut()
-        .0
-        .borrow_mut()
-        .add_get_union(product, input_types, in_scope_types);
+    py_tasks.borrow_mut().0.get(py).borrow_mut().add_get_union(
+        product,
+        input_types,
+        in_scope_types,
+    );
 }
 
 #[pyfunction]
-fn tasks_add_query(
-    py_tasks: &Bound<'_, PyTasks>,
-    output_type: &Bound<'_, PyType>,
-    input_types: Vec<Bound<'_, PyType>>,
+fn tasks_add_query<'py>(
+    py: Python<'py>,
+    py_tasks: &Bound<'py, PyTasks>,
+    output_type: &Bound<'py, PyType>,
+    input_types: Vec<Bound<'py, PyType>>,
 ) {
     let product = TypeId::new(output_type);
     let params = input_types.into_iter().map(|t| TypeId::new(&t)).collect();
     py_tasks
         .borrow_mut()
         .0
+        .get(py)
         .borrow_mut()
         .query_add(product, params);
 }
@@ -1409,13 +1491,12 @@ fn session_get_observation_histograms<'py>(
                 .map_err(PyException::new_err)
         })?;
 
-        let encoded_observations = PyDict::new_bound(py);
+        let encoded_observations = PyDict::new(py);
         for (metric, encoded_histogram) in &observations {
-            encoded_observations
-                .set_item(metric, PyBytes::new_bound(py, &encoded_histogram[..]))?;
+            encoded_observations.set_item(metric, PyBytes::new(py, &encoded_histogram[..]))?;
         }
 
-        let result = PyDict::new_bound(py);
+        let result = PyDict::new(py);
         result.set_item("version", OBSERVATIONS_VERSION)?;
         result.set_item("histograms", encoded_observations)?;
         Ok(result)
@@ -1499,7 +1580,7 @@ fn rule_graph_consumed_types<'py>(
         Ok(subgraph
             .consumed_types()
             .into_iter()
-            .map(|type_id| type_id.as_py_type_bound(py))
+            .map(|type_id| type_id.as_py_type(py))
             .collect())
     })
 }
@@ -1511,11 +1592,16 @@ fn rule_graph_rule_gets<'py>(
 ) -> PyO3Result<Bound<'py, PyDict>> {
     let core = &py_scheduler.borrow().0.core;
     core.executor.enter(|| {
-        let result = PyDict::new_bound(py);
+        let result = PyDict::new(py);
         for (rule, rule_dependencies) in core.rule_graph.rule_dependencies() {
             let task = rule.0;
             let function = &task.func;
-            let mut dependencies = Vec::new();
+            #[allow(clippy::type_complexity)]
+            let mut dependencies: Vec<(
+                Bound<'_, PyType>,
+                Vec<Bound<'_, PyType>>,
+                pyo3::Py<PyAny>,
+            )> = Vec::new();
             for (dependency_key, rule) in rule_dependencies {
                 // NB: We are only migrating non-union Gets, which are those in the `gets` list
                 // which do not have `in_scope_params` marking them as being for unions, or a call
@@ -1531,18 +1617,21 @@ fn rule_graph_rule_gets<'py>(
                 let provided_params = dependency_key
                     .provided_params
                     .iter()
-                    .map(|p| p.as_py_type_bound(py))
+                    .map(|p| p.as_py_type(py))
                     .collect::<Vec<_>>();
                 dependencies.push((
-                    dependency_key.product.as_py_type_bound(py),
+                    dependency_key.product.as_py_type(py),
                     provided_params,
-                    function.0.value.into_py(py),
+                    function.0.value.into_pyobject(py)?.into_any().unbind(),
                 ));
             }
             if dependencies.is_empty() {
                 continue;
             }
-            result.set_item(function.0.value.into_py(py), dependencies.into_py(py))?;
+            result.set_item(
+                function.0.value.into_pyobject(py)?,
+                dependencies.into_pyobject(py)?,
+            )?;
         }
         Ok(result)
     })
@@ -1622,10 +1711,10 @@ fn maybe_set_panic_handler() {
             panic_str.push_str(&panic_location_str);
         }
 
-        error!("{}", panic_str);
+        error!("{panic_str}");
 
         let panic_file_bug_str = "Please set RUST_BACKTRACE=1, re-run, and then file a bug at https://github.com/pantsbuild/pants/issues.";
-        error!("{}", panic_file_bug_str);
+        error!("{panic_file_bug_str}");
     }));
 }
 
@@ -1680,23 +1769,22 @@ fn capture_snapshots(
         // TODO: A parent_id should be an explicit argument.
         session.workunit_store().init_thread_state(None);
 
-        let values = externs::collect_iterable_bound(path_globs_and_root_tuple_wrapper).unwrap();
+        let values = externs::collect_iterable(path_globs_and_root_tuple_wrapper).unwrap();
         let path_globs_and_roots = values
             .into_iter()
             .map(|value| {
-                let root: PathBuf = externs::getattr_bound(&value, "root")?;
+                let root: PathBuf = externs::getattr(&value, "root")?;
                 let path_globs = {
                     let path_globs_py_value =
-                        externs::getattr_bound::<Bound<'_, PyAny>>(&value, "path_globs")?;
-                    nodes::Snapshot::lift_prepared_path_globs_bound(&path_globs_py_value)
+                        externs::getattr::<Bound<'_, PyAny>>(&value, "path_globs")?;
+                    nodes::Snapshot::lift_prepared_path_globs(&path_globs_py_value)
                 };
                 let digest_hint = {
-                    let maybe_digest: Bound<'_, PyAny> =
-                        externs::getattr_bound(&value, "digest_hint")?;
+                    let maybe_digest: Bound<'_, PyAny> = externs::getattr(&value, "digest_hint")?;
                     if maybe_digest.is_none() {
                         None
                     } else {
-                        Some(nodes::lift_directory_digest_bound(&maybe_digest)?)
+                        Some(nodes::lift_directory_digest(&maybe_digest)?)
                     }
                 };
                 path_globs.map(|path_globs| (path_globs, root, digest_hint))
@@ -1741,9 +1829,9 @@ fn ensure_remote_has_recursive(
         let digests: Vec<Digest> = py_digests
             .iter()
             .map(|value| {
-                crate::nodes::lift_directory_digest_bound(&value)
+                crate::nodes::lift_directory_digest(&value)
                     .map(|dd| dd.as_digest())
-                    .or_else(|_| crate::nodes::lift_file_digest_bound(&value))
+                    .or_else(|_| crate::nodes::lift_file_digest(&value))
             })
             .collect::<Result<Vec<Digest>, _>>()
             .map_err(PyException::new_err)?;
@@ -1766,7 +1854,7 @@ fn ensure_directory_digest_persisted(
     let core = &py_scheduler.borrow().0.core;
     core.executor.enter(|| {
         let digest =
-            crate::nodes::lift_directory_digest_bound(py_digest).map_err(PyException::new_err)?;
+            crate::nodes::lift_directory_digest(py_digest).map_err(PyException::new_err)?;
 
         py.allow_threads(|| {
             core.executor
@@ -1801,7 +1889,7 @@ fn single_file_digests_to_bytes<'py>(
             .map(|values| values.into_iter().map(|val| val.into()).collect())
             .map_err(possible_store_missing_digest)?;
 
-        let output_list = PyList::new_bound(py, &bytes_values);
+        let output_list = PyList::new(py, &bytes_values)?;
         Ok(output_list)
     })
 }
@@ -1818,6 +1906,8 @@ fn ensure_path_doesnt_exist(path: &Path) -> io::Result<()> {
         Err(_) => std::fs::remove_dir_all(path),
     }
 }
+
+static GLOBAL_WORKSPACE_WRITE_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 #[pyfunction]
 fn write_digest(
@@ -1836,8 +1926,7 @@ fn write_digest(
         // TODO: A parent_id should be an explicit argument.
         session.workunit_store().init_thread_state(None);
 
-        let lifted_digest =
-            nodes::lift_directory_digest_bound(digest).map_err(PyValueError::new_err)?;
+        let lifted_digest = nodes::lift_directory_digest(digest).map_err(PyValueError::new_err)?;
 
         // Python will have already validated that path_prefix is a relative path.
         let path_prefix = Path::new(&path_prefix);
@@ -1856,16 +1945,33 @@ fn write_digest(
         }
 
         block_in_place_and_wait(py, || async move {
-            store
-                .materialize_directory(
-                    destination.clone(),
-                    &scheduler.core.build_root,
-                    lifted_digest.clone(),
-                    true, // Force everything we write to be mutable
-                    &BTreeSet::new(),
-                    fs::Permissions::Writable,
-                )
-                .await?;
+            {
+                // Although Workspace.write_digest() is typically used in @goal_rules, and so is not
+                // invoked concurrently, there are a handful of cases where we might need to write
+                // deeper inside the rule graph, and therefore may run into concurrency issues.
+                // One example is the bsp server, which may attempt to write build byproducts into
+                // the workspace for the IDE to consume, and in some cases may try and write the
+                // same files concurrently. Therefore we force all workspace writes to run in
+                // a critical section.
+                //
+                // Side note: When using Workspace.write_digest() outside a @goal_rule, you must
+                // take care to ensure that it always runs, and is not short-circuited by rule
+                // memoization, so that you can rely on the side effect always taking effect.
+                // This is typically done via an @_uncacheable_rule.
+                // This lock makes Workspace safe to use outside a @goal_rule, but does nothing to
+                // guarantee that it will run when you expect it to.
+                let _locked = GLOBAL_WORKSPACE_WRITE_LOCK.lock().await;
+                store
+                    .materialize_directory(
+                        destination.clone(),
+                        &scheduler.core.build_root,
+                        lifted_digest.clone(),
+                        true, // Force everything we write to be mutable
+                        &BTreeSet::new(),
+                        fs::Permissions::Writable,
+                    )
+                    .await?;
+            } // _locked released here.
 
             // Invalidate all the paths we've changed within `path_prefix`: both the paths we cleared and
             // the files we've just written to.

@@ -6,47 +6,35 @@ from __future__ import annotations
 import ast
 import dataclasses
 import difflib
+import importlib.metadata
 import inspect
 import itertools
 import json
 import re
 from collections import defaultdict, namedtuple
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from enum import Enum
 from functools import reduce
 from itertools import chain
 from pathlib import Path
-from typing import (
-    Any,
-    Callable,
-    DefaultDict,
-    Iterator,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
-    TypeVar,
-    Union,
-    cast,
-    get_type_hints,
-)
-
-import pkg_resources
+from typing import Any, DefaultDict, TypeVar, Union, cast, get_type_hints
 
 import pants.backend
 from pants.base import deprecated
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.core.util_rules.environments import option_field_name_for
+from pants.core.environments.rules import option_field_name_for
 from pants.engine.goal import GoalSubsystem
 from pants.engine.internals.parser import BuildFileSymbolInfo, BuildFileSymbolsInfo, Registrar
 from pants.engine.rules import Rule, TaskRule
 from pants.engine.target import Field, RegisteredTargetTypes, StringField, Target, TargetGenerator
 from pants.engine.unions import UnionMembership, UnionRule, is_union
 from pants.option.native_options import NativeOptionParser, parse_dest
+from pants.option.option_types import OptionInfo
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.options import Options
-from pants.option.parser import OptionValueHistory, Parser
 from pants.option.ranked_value import Rank, RankedValue
+from pants.option.registrar import OptionRegistrar, OptionValueHistory
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.util.frozendict import LazyFrozenDict
 from pants.util.strutil import first_paragraph, strval
@@ -145,7 +133,7 @@ class OptionScopeHelpInfo:
     description: str
     provider: str
     is_goal: bool  # True iff the scope belongs to a GoalSubsystem.
-    deprecated_scope: Optional[str]
+    deprecated_scope: str | None
     basic: tuple[OptionHelpInfo, ...]
     advanced: tuple[OptionHelpInfo, ...]
     deprecated: tuple[OptionHelpInfo, ...]
@@ -195,7 +183,9 @@ def pretty_print_type_hint(hint: Any) -> str:
         hint_str = hint.__name__
     else:
         hint_str = str(hint)
-    return hint_str.replace("typing.", "").replace("NoneType", "None")
+    return (
+        hint_str.replace("collections.abc.", "").replace("typing.", "").replace("NoneType", "None")
+    )
 
 
 @dataclass(frozen=True)
@@ -276,9 +266,9 @@ class TargetTypeHelpInfo:
             fields=tuple(
                 TargetFieldHelpInfo.create(
                     field,
-                    provider=""
-                    if get_field_type_provider is None
-                    else get_field_type_provider(field),
+                    provider=(
+                        "" if get_field_type_provider is None else get_field_type_provider(field)
+                    ),
                 )
                 for field in fields
                 if not field.alias.startswith("_") and field.removal_version is None
@@ -469,7 +459,7 @@ class AllHelpInfo:
         }
 
 
-ConsumedScopesMapper = Callable[[str], Tuple[str, ...]]
+ConsumedScopesMapper = Callable[[str], tuple[str, ...]]
 
 
 class HelpInfoExtracter:
@@ -508,7 +498,7 @@ class HelpInfoExtracter:
                     )
                 return HelpInfoExtracter(scope_info.scope).get_option_scope_help_info(
                     scope_info.description,
-                    options.get_parser(scope_info.scope),
+                    options.get_registrar(scope_info.scope),
                     options.native_parser.with_derivation(),
                     # `filter` should be treated as a subsystem for `help`, even though it still
                     # works as a goal for backwards compatibility.
@@ -528,7 +518,7 @@ class HelpInfoExtracter:
                         build_configuration.subsystem_to_providers.get(subsystem_cls),
                         subsystem_cls.__module__,
                     )
-                goal_subsystem_cls = cast(Type[GoalSubsystem], subsystem_cls)
+                goal_subsystem_cls = cast(type[GoalSubsystem], subsystem_cls)
                 return GoalHelpInfo(
                     goal_subsystem_cls.name,
                     scope_info.description,
@@ -914,20 +904,29 @@ class HelpInfoExtracter:
             }
             return backends
 
-        def discover_plugin_backends(entry_point_name: str) -> set[DiscoveredBackend]:
-            backends = {
+        def discover_plugin_backends(entry_point_name: str) -> frozenset[DiscoveredBackend]:
+            def get_dist_file(dist: importlib.metadata.Distribution, file_path: str):
+                try:
+                    return dist.locate_file(file_path)
+                except Exception as e:
+                    raise ValueError(
+                        f"Failed to locate file `{file_path}` in distribution `{dist}`: {e}"
+                    )
+
+            backends = frozenset(
                 DiscoveredBackend(
-                    entry_point.dist.project_name,
-                    entry_point.module_name,
+                    entry_point.dist.name,
+                    entry_point.module,
                     str(
-                        Path(entry_point.dist.location)
-                        / (entry_point.module_name.replace(".", "/") + ".py")
+                        get_dist_file(
+                            entry_point.dist, entry_point.module.replace(".", "/") + ".py"
+                        )
                     ),
                     True,
                 )
-                for entry_point in pkg_resources.iter_entry_points(entry_point_name)
+                for entry_point in importlib.metadata.entry_points().select(group=entry_point_name)
                 if entry_point.dist is not None
-            }
+            )
             return backends
 
         global_options = options.for_global_scope()
@@ -1003,22 +1002,20 @@ class HelpInfoExtracter:
     def get_option_scope_help_info(
         self,
         description: str,
-        parser: Parser,
+        registrar: OptionRegistrar,
         native_parser: NativeOptionParser,
         is_goal: bool,
         provider: str = "",
-        deprecated_scope: Optional[str] = None,
+        deprecated_scope: str | None = None,
     ) -> OptionScopeHelpInfo:
         """Returns an OptionScopeHelpInfo for the options parsed by the given parser."""
 
         basic_options = []
         advanced_options = []
         deprecated_options = []
-        for args, kwargs in parser.option_registrations_iter():
-            derivation = native_parser.get_derivation(
-                scope=parser.scope, registration_args=args, registration_kwargs=kwargs
-            )
-            # Massage the derivation structure returned by the NativeParser into an
+        for option_info in registrar.option_registrations_iter():
+            derivation = native_parser.get_derivation(registrar.scope, option_info)
+            # Massage the derivation structure returned by the NativeOptionParser into an
             # OptionValueHistory as returned by the legacy parser.
             # TODO: Once we get rid of the legacy parser we can probably simplify by
             #  using the native structure directly.
@@ -1027,8 +1024,8 @@ class HelpInfoExtracter:
             # Adding this constant, empty history entry is silly, but it appears in the
             # legacy parser's results as an implementation artifact, and we want to be
             # consistent with its tests until we get rid of it.
-            is_list = kwargs.get("type") == list
-            is_dict = kwargs.get("type") == dict
+            is_list = option_info.kwargs.get("type") == list
+            is_dict = option_info.kwargs.get("type") == dict
             empty_val: list | dict | None = [] if is_list else {} if is_dict else None
             empty_details = "" if (is_list or is_dict) else None
             ranked_values.append(RankedValue(Rank.NONE, empty_val, empty_details))
@@ -1036,11 +1033,11 @@ class HelpInfoExtracter:
             for value, rank, details in derivation:
                 ranked_values.append(RankedValue(rank, value, details or empty_details))
             history = OptionValueHistory(tuple(ranked_values))
-            ohi = self.get_option_help_info(args, kwargs)
+            ohi = self.get_option_help_info(option_info)
             ohi = dataclasses.replace(ohi, value_history=history)
             if ohi.deprecation_active:
                 deprecated_options.append(ohi)
-            elif kwargs.get("advanced"):
+            elif option_info.kwargs.get("advanced"):
                 advanced_options.append(ohi)
             else:
                 basic_options.append(ohi)
@@ -1056,13 +1053,13 @@ class HelpInfoExtracter:
             deprecated=tuple(deprecated_options),
         )
 
-    def get_option_help_info(self, args, kwargs):
+    def get_option_help_info(self, option_info: OptionInfo) -> OptionHelpInfo:
         """Returns an OptionHelpInfo for the option registered with the given (args, kwargs)."""
         display_args = []
         scoped_cmd_line_args = []
         unscoped_cmd_line_args = []
 
-        for arg in args:
+        for arg in option_info.args:
             is_short_arg = len(arg) == 2
             unscoped_cmd_line_args.append(arg)
             if self._scope_prefix:
@@ -1071,7 +1068,7 @@ class HelpInfoExtracter:
                 scoped_arg = arg
             scoped_cmd_line_args.append(scoped_arg)
 
-            if Parser.is_bool(kwargs):
+            if OptionRegistrar.is_bool(option_info.kwargs):
                 if is_short_arg:
                     display_args.append(scoped_arg)
                 else:
@@ -1080,18 +1077,18 @@ class HelpInfoExtracter:
                     scoped_cmd_line_args.append(f"--no-{sa_2}")
                     display_args.append(f"--[no-]{sa_2}")
             else:
-                metavar = self.compute_metavar(kwargs)
+                metavar = self.compute_metavar(option_info.kwargs)
                 separator = "" if is_short_arg else "="
                 display_args.append(f"{scoped_arg}{separator}{metavar}")
-                if kwargs.get("passthrough"):
-                    type_str = self.stringify_type(kwargs.get("member_type", str))
+                if option_info.kwargs.get("passthrough"):
+                    type_str = self.stringify_type(option_info.kwargs.get("member_type", str))
                     display_args.append(f"... -- [{type_str} [{type_str} [...]]]")
 
-        typ = kwargs.get("type", str)
-        default = self.compute_default(**kwargs)
-        help_msg = kwargs.get("help", "No help available.")
-        deprecation_start_version = kwargs.get("deprecation_start_version")
-        removal_version = kwargs.get("removal_version")
+        typ = option_info.kwargs.get("type", str)
+        default = self.compute_default(**option_info.kwargs)
+        help_msg = option_info.kwargs.get("help", "No help available.")
+        deprecation_start_version = option_info.kwargs.get("deprecation_start_version")
+        removal_version = option_info.kwargs.get("removal_version")
         deprecation_active = removal_version is not None and deprecated.is_deprecation_active(
             deprecation_start_version
         )
@@ -1106,10 +1103,10 @@ class HelpInfoExtracter:
             deprecated_message = (
                 f"{message_start}, {deprecated_tense} removed in version: {removal_version}."
             )
-        removal_hint = kwargs.get("removal_hint")
-        choices = self.compute_choices(kwargs)
+        removal_hint = option_info.kwargs.get("removal_hint")
+        choices = self.compute_choices(option_info.kwargs)
 
-        dest = parse_dest(*args, **kwargs)
+        dest = parse_dest(option_info)
         udest = dest.upper()
         if self._scope == GLOBAL_SCOPE:
             # Global options have 2-3 env var variants, e.g., --pants-workdir can be
@@ -1122,9 +1119,11 @@ class HelpInfoExtracter:
         else:
             env_var = f"PANTS_{_ENV_SANITIZER_RE.sub('_', self._scope.upper())}_{udest}"
 
-        target_field_name = f"{self._scope_prefix}_{option_field_name_for(args)}".replace("-", "_")
-        environment_aware = kwargs.get("environment_aware") is True
-        fromfile = kwargs.get("fromfile", False)
+        target_field_name = (
+            f"{self._scope_prefix}_{option_field_name_for(option_info.args)}".replace("-", "_")
+        )
+        environment_aware = option_info.kwargs.get("environment_aware") is True
+        fromfile = option_info.kwargs.get("fromfile", False)
 
         ret = OptionHelpInfo(
             display_args=tuple(display_args),

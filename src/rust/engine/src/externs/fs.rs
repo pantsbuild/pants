@@ -15,13 +15,14 @@ use pyo3::pybacked::PyBackedStr;
 use pyo3::types::{PyIterator, PyString, PyTuple, PyType};
 
 use fs::{
-    DirectoryDigest, FilespecMatcher, GlobExpansionConjunction, PathGlobs, PathMetadata,
-    StrictGlobMatching, EMPTY_DIRECTORY_DIGEST,
+    DirectoryDigest, EMPTY_DIRECTORY_DIGEST, FilespecMatcher, GlobExpansionConjunction, PathGlobs,
+    PathMetadata, StrictGlobMatching,
 };
-use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
+use hashing::{Digest, EMPTY_DIGEST, Fingerprint};
 use store::Snapshot;
 
 use crate::Failure;
+use crate::python::PyComparedBool;
 
 pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDigest>()?;
@@ -93,13 +94,13 @@ impl PyDigest {
         format!("{self}")
     }
 
-    fn __richcmp__(&self, other: &Bound<'_, PyDigest>, op: CompareOp, py: Python) -> PyObject {
+    fn __richcmp__(&self, other: &Bound<'_, PyDigest>, op: CompareOp) -> PyComparedBool {
         let other_digest = other.borrow();
-        match op {
-            CompareOp::Eq => (*self == *other_digest).into_py(py),
-            CompareOp::Ne => (*self != *other_digest).into_py(py),
-            _ => py.NotImplemented(),
-        }
+        PyComparedBool(match op {
+            CompareOp::Eq => Some(*self == *other_digest),
+            CompareOp::Ne => Some(*self != *other_digest),
+            _ => None,
+        })
     }
 
     #[getter]
@@ -138,13 +139,13 @@ impl PyFileDigest {
         )
     }
 
-    fn __richcmp__(&self, other: &Bound<'_, PyFileDigest>, op: CompareOp, py: Python) -> PyObject {
+    fn __richcmp__(&self, other: &Bound<'_, PyFileDigest>, op: CompareOp) -> PyComparedBool {
         let other_file_digest = other.borrow();
-        match op {
-            CompareOp::Eq => (*self == *other_file_digest).into_py(py),
-            CompareOp::Ne => (*self != *other_file_digest).into_py(py),
-            _ => py.NotImplemented(),
-        }
+        PyComparedBool(match op {
+            CompareOp::Eq => Some(*self == *other_file_digest),
+            CompareOp::Ne => Some(*self != *other_file_digest),
+            _ => None,
+        })
     }
 
     #[getter]
@@ -198,13 +199,13 @@ impl PySnapshot {
         ))
     }
 
-    fn __richcmp__(&self, other: &Bound<'_, PySnapshot>, op: CompareOp, py: Python) -> PyObject {
+    fn __richcmp__(&self, other: &Bound<'_, PySnapshot>, op: CompareOp) -> PyComparedBool {
         let other_digest = other.borrow().0.digest;
-        match op {
-            CompareOp::Eq => (self.0.digest == other_digest).into_py(py),
-            CompareOp::Ne => (self.0.digest != other_digest).into_py(py),
-            _ => py.NotImplemented(),
-        }
+        PyComparedBool(match op {
+            CompareOp::Eq => Some(self.0.digest == other_digest),
+            CompareOp::Ne => Some(self.0.digest != other_digest),
+            _ => None,
+        })
     }
 
     #[getter]
@@ -213,50 +214,54 @@ impl PySnapshot {
     }
 
     #[getter]
-    fn files<'py>(&self, py: Python<'py>) -> Bound<'py, PyTuple> {
+    fn files<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         let files = self.0.files();
-        PyTuple::new_bound(
+        PyTuple::new(
             py,
             files
                 .into_iter()
-                .map(|path| PyString::new_bound(py, &path.to_string_lossy()))
+                .map(|path| PyString::new(py, &path.to_string_lossy()))
                 .collect::<Vec<_>>(),
         )
     }
 
     #[getter]
-    fn dirs<'py>(&self, py: Python<'py>) -> Bound<'py, PyTuple> {
+    fn dirs<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         let dirs = self.0.directories();
-        PyTuple::new_bound(
+        PyTuple::new(
             py,
             dirs.into_iter()
-                .map(|path| PyString::new_bound(py, &path.to_string_lossy()))
+                .map(|path| PyString::new(py, &path.to_string_lossy()))
                 .collect::<Vec<_>>(),
         )
     }
 
     // NB: Prefix with underscore. The Python call will be hidden behind a helper which returns a much
     // richer type.
-    fn _diff<'py>(&self, other: &Bound<'py, PySnapshot>, py: Python<'py>) -> Bound<'py, PyTuple> {
+    fn _diff<'py>(
+        &self,
+        other: &Bound<'py, PySnapshot>,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyTuple>> {
         let result = self.0.tree.diff(&other.borrow().0.tree);
 
-        let into_tuple = |x: &Vec<PathBuf>| -> Bound<'py, PyTuple> {
-            PyTuple::new_bound(
+        let into_tuple = |x: &Vec<PathBuf>| -> PyResult<Bound<'py, PyTuple>> {
+            PyTuple::new(
                 py,
                 x.iter()
-                    .map(|path| PyString::new_bound(py, &path.to_string_lossy()))
+                    .map(|path| PyString::new(py, &path.to_string_lossy()))
                     .collect::<Vec<_>>(),
             )
         };
 
-        PyTuple::new_bound(
+        PyTuple::new(
             py,
             vec![
-                into_tuple(&result.our_unique_files),
-                into_tuple(&result.our_unique_dirs),
-                into_tuple(&result.their_unique_files),
-                into_tuple(&result.their_unique_dirs),
-                into_tuple(&result.changed_files),
+                into_tuple(&result.our_unique_files)?,
+                into_tuple(&result.our_unique_dirs)?,
+                into_tuple(&result.their_unique_files)?,
+                into_tuple(&result.their_unique_dirs)?,
+                into_tuple(&result.changed_files)?,
             ],
         )
     }
@@ -270,7 +275,7 @@ pub struct PyMergeDigests(pub Vec<DirectoryDigest>);
 impl PyMergeDigests {
     #[new]
     fn __new__(digests: &Bound<'_, PyAny>, _py: Python) -> PyResult<Self> {
-        let digests: PyResult<Vec<DirectoryDigest>> = PyIterator::from_bound_object(digests)?
+        let digests: PyResult<Vec<DirectoryDigest>> = PyIterator::from_object(digests)?
             .map(|v| {
                 let py_digest = v?.extract::<PyDigest>()?;
                 Ok(py_digest.0)
@@ -294,18 +299,13 @@ impl PyMergeDigests {
         format!("MergeDigests([{digests}])")
     }
 
-    fn __richcmp__(
-        &self,
-        other: &Bound<'_, PyMergeDigests>,
-        op: CompareOp,
-        py: Python,
-    ) -> PyObject {
+    fn __richcmp__(&self, other: &Bound<'_, PyMergeDigests>, op: CompareOp) -> PyComparedBool {
         let other = other.borrow();
-        match op {
-            CompareOp::Eq => (*self == *other).into_py(py),
-            CompareOp::Ne => (*self != *other).into_py(py),
-            _ => py.NotImplemented(),
-        }
+        PyComparedBool(match op {
+            CompareOp::Eq => Some(*self == *other),
+            CompareOp::Ne => Some(*self != *other),
+            _ => None,
+        })
     }
 }
 
@@ -341,13 +341,13 @@ impl PyAddPrefix {
         )
     }
 
-    fn __richcmp__(&self, other: &Bound<'_, PyAddPrefix>, op: CompareOp, py: Python) -> PyObject {
+    fn __richcmp__(&self, other: &Bound<'_, PyAddPrefix>, op: CompareOp) -> PyComparedBool {
         let other = other.borrow();
-        match op {
-            CompareOp::Eq => (*self == *other).into_py(py),
-            CompareOp::Ne => (*self != *other).into_py(py),
-            _ => py.NotImplemented(),
-        }
+        PyComparedBool(match op {
+            CompareOp::Eq => Some(*self == *other),
+            CompareOp::Ne => Some(*self != *other),
+            _ => None,
+        })
     }
 }
 
@@ -383,18 +383,13 @@ impl PyRemovePrefix {
         )
     }
 
-    fn __richcmp__(
-        &self,
-        other: &Bound<'_, PyRemovePrefix>,
-        op: CompareOp,
-        py: Python,
-    ) -> PyObject {
+    fn __richcmp__(&self, other: &Bound<'_, PyRemovePrefix>, op: CompareOp) -> PyComparedBool {
         let other = other.borrow();
-        match op {
-            CompareOp::Eq => (*self == *other).into_py(py),
-            CompareOp::Ne => (*self != *other).into_py(py),
-            _ => py.NotImplemented(),
-        }
+        PyComparedBool(match op {
+            CompareOp::Eq => Some(*self == *other),
+            CompareOp::Ne => Some(*self != *other),
+            _ => None,
+        })
     }
 }
 
@@ -474,22 +469,19 @@ impl PyFilespecMatcher {
         format!("FilespecMatcher(includes=['{includes}'], excludes=[{excludes}])",)
     }
 
-    fn __richcmp__(
-        &self,
-        other: &Bound<'_, PyFilespecMatcher>,
-        op: CompareOp,
-        py: Python,
-    ) -> PyObject {
+    fn __richcmp__(&self, other: &Bound<'_, PyFilespecMatcher>, op: CompareOp) -> PyComparedBool {
         let other = other.borrow();
-        match op {
-            CompareOp::Eq => (self.0.include_globs() == other.0.include_globs()
-                && self.0.exclude_globs() == other.0.exclude_globs())
-            .into_py(py),
-            CompareOp::Ne => (self.0.include_globs() != other.0.include_globs()
-                || self.0.exclude_globs() != other.0.exclude_globs())
-            .into_py(py),
-            _ => py.NotImplemented(),
-        }
+        PyComparedBool(match op {
+            CompareOp::Eq => Some(
+                self.0.include_globs() == other.0.include_globs()
+                    && self.0.exclude_globs() == other.0.exclude_globs(),
+            ),
+            CompareOp::Ne => Some(
+                self.0.include_globs() != other.0.include_globs()
+                    || self.0.exclude_globs() != other.0.exclude_globs(),
+            ),
+            _ => None,
+        })
     }
 
     fn matches(&self, paths: Vec<String>, py: Python) -> PyResult<Vec<String>> {
@@ -580,8 +572,18 @@ impl PyPathMetadata {
     }
 
     #[getter]
-    pub fn path(&self) -> PyResult<PathBuf> {
-        Ok(self.0.path.clone())
+    pub fn path(&self) -> PyResult<String> {
+        self.0
+            .path
+            .as_os_str()
+            .to_str()
+            .map(|s| s.to_string())
+            .ok_or_else(|| {
+                PyException::new_err(format!(
+                    "Could not convert PyPathMetadata.path `{}` to UTF8.",
+                    self.0.path.display()
+                ))
+            })
     }
 
     #[getter]
@@ -620,8 +622,22 @@ impl PyPathMetadata {
     }
 
     #[getter]
-    pub fn symlink_target(&self) -> PyResult<Option<PathBuf>> {
-        Ok(self.0.symlink_target.clone())
+    pub fn symlink_target(&self) -> PyResult<Option<String>> {
+        let Some(symlink_target) = self.0.symlink_target.as_ref() else {
+            return Ok(None);
+        };
+        Ok(Some(
+            symlink_target
+                .as_os_str()
+                .to_str()
+                .map(|s| s.to_string())
+                .ok_or_else(|| {
+                    PyException::new_err(format!(
+                        "Could not convert PyPathMetadata.symlink_target `{}` to UTF8.",
+                        symlink_target.display()
+                    ))
+                })?,
+        ))
     }
 
     pub fn copy(&self) -> PyResult<Self> {

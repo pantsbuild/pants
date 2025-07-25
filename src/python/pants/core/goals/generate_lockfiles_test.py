@@ -4,9 +4,9 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import asdict
-from typing import Any, Iterable
+from typing import Any
 from unittest.mock import Mock
 
 import pytest

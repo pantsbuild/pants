@@ -7,8 +7,9 @@ import json
 import logging
 import os.path
 from collections import namedtuple
+from collections.abc import Callable
 from textwrap import dedent
-from typing import Callable, ContextManager, cast
+from typing import ContextManager, cast
 
 import pytest
 
@@ -66,7 +67,7 @@ from pants.engine.process import (
     ProcessExecutionFailure,
     ProcessResultMetadata,
 )
-from pants.engine.target import InvalidFieldException, WrappedTarget, WrappedTargetRequest
+from pants.engine.target import InvalidFieldException, WrappedTarget
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.testutil.option_util import create_subsystem
@@ -152,6 +153,7 @@ def assert_build(
                     remote_execution=False,
                     remote_execution_extra_platform_properties=[],
                     execute_in_workspace=False,
+                    keep_sandboxes="never",
                 ),
                 "ran_locally",
                 0,
@@ -177,6 +179,7 @@ def assert_build(
         opts.setdefault("build_no_cache", False)
         opts.setdefault("use_buildx", False)
         opts.setdefault("env_vars", [])
+        opts.setdefault("suggest_renames", True)
 
         docker_options = create_subsystem(
             DockerOptions,
@@ -187,6 +190,9 @@ def assert_build(
 
     global_options = rule_runner.request(GlobalOptions, [])
 
+    union_membership = UnionMembership.from_rules(
+        [UnionRule(DockerImageTagsRequest, DockerImageTagsRequestPlugin)]
+    )
     result = run_rule_with_mocks(
         build_docker_image,
         rule_args=[
@@ -195,21 +201,13 @@ def assert_build(
             global_options,
             DockerBinary("/dummy/docker"),
             KeepSandboxes.never,
-            UnionMembership.from_rules(
-                [UnionRule(DockerImageTagsRequest, DockerImageTagsRequestPlugin)]
-            ),
+            union_membership,
         ],
+        mock_calls={
+            "pants.backend.docker.util_rules.docker_build_context.create_docker_build_context": build_context_mock,
+            "pants.engine.internals.graph.resolve_target": lambda _: WrappedTarget(tgt),
+        },
         mock_gets=[
-            MockGet(
-                output_type=DockerBuildContext,
-                input_types=(DockerBuildContextRequest,),
-                mock=build_context_mock,
-            ),
-            MockGet(
-                output_type=WrappedTarget,
-                input_types=(WrappedTargetRequest,),
-                mock=lambda _: WrappedTarget(tgt),
-            ),
             MockGet(
                 output_type=DockerImageTags,
                 input_types=(DockerImageTagsRequestPlugin,),
@@ -226,6 +224,8 @@ def assert_build(
                 mock=mock_get_info_file,
             ),
         ],
+        union_membership=union_membership,
+        show_warnings=False,
     )
 
     assert result.digest == EMPTY_DIGEST
@@ -1366,6 +1366,7 @@ def test_docker_build_labels_option(rule_runner: RuleRunner) -> None:
     )
 
 
+@pytest.mark.parametrize("suggest_renames", [True, False])
 @pytest.mark.parametrize(
     "context_root, copy_sources, build_context_files, expect_logged, fail_log_contains",
     [
@@ -1415,22 +1416,16 @@ def test_docker_build_labels_option(rule_runner: RuleRunner) -> None:
                 "docker/test/config/.a",
                 "docker/test/config/.conf.d/b",
             ),
+            [(logging.WARNING, "Docker build failed for `docker_image` docker/test:test.")],
             [
-                (
-                    logging.WARNING,
-                    (
-                        "Docker build failed for `docker_image` docker/test:test. "
-                        "There are files in the Docker build context that were not referenced by "
-                        "any `COPY` instruction (this is not an error):\n"
-                        "\n"
-                        "  * ..unusal-name\n"
-                        "  * .a\n"
-                        "  * .conf.d/b\n"
-                        "  * .rc\n"
-                    ),
-                )
+                "There are files in the Docker build context that were not referenced by "
+                "any `COPY` instruction (this is not an error):\n"
+                "\n"
+                "  * ..unusal-name\n"
+                "  * .a\n"
+                "  * .conf.d/b\n"
+                "  * .rc\n"
             ],
-            [],
         ),
     ],
 )
@@ -1442,11 +1437,16 @@ def test_docker_build_fail_logs(
     build_context_files: tuple[str, ...],
     expect_logged: list[tuple[int, str]] | None,
     fail_log_contains: list[str],
+    suggest_renames: bool,
 ) -> None:
     caplog.set_level(logging.INFO)
     rule_runner.write_files({"docker/test/BUILD": f"docker_image(context_root={context_root!r})"})
     build_context_files = ("docker/test/Dockerfile", *build_context_files)
     build_context_snapshot = rule_runner.make_snapshot_of_empty_files(build_context_files)
+    suggest_renames_arg = (
+        "--docker-suggest-renames" if suggest_renames else "--no-docker-suggest-renames"
+    )
+    rule_runner.set_options([suggest_renames_arg])
     with pytest.raises(ProcessExecutionFailure):
         assert_build(
             rule_runner,
@@ -1458,7 +1458,10 @@ def test_docker_build_fail_logs(
 
     assert_logged(caplog, expect_logged)
     for msg in fail_log_contains:
-        assert msg in caplog.records[0].message
+        if suggest_renames:
+            assert msg in caplog.records[0].message
+        else:
+            assert msg not in caplog.records[0].message
 
 
 @pytest.mark.parametrize(
@@ -1730,6 +1733,26 @@ def test_get_context_root(
                 #13 unpacking to my-host.com/repo:latest done
                 #13 DONE 0.1s
                 """
+            ),
+            "",
+        ),
+        # Buildkit with containerd-snapshotter 0.17.1 and disabled attestations
+        (
+            DockerBinary("/bin/docker", "1234", is_podman=False),
+            "sha256:6c3aff6414781126578b3e7b4a217682e89c616c0eac864d5b3ea7c87f1094d0",
+            dedent(
+                """\
+                    #24 exporting to image
+                    #24 exporting layers done
+                    #24 preparing layers for inline cache
+                    #24 preparing layers for inline cache 0.4s done
+                    #24 exporting manifest sha256:6c3aff6414781126578b3e7b4a217682e89c616c0eac864d5b3ea7c87f1094d0 0.0s done
+                    #24 exporting config sha256:af716170542d95134cb41b56e2dfea2c000b05b6fc4f440158ed9834ff96d1b4 0.0s done
+                    #24 naming to REDACTED:latest done
+                    #24 unpacking to REDACTED:latest 0.0s done
+                    #24 DONE 0.5s
+
+                    """
             ),
             "",
         ),

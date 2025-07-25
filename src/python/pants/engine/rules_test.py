@@ -2,11 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from textwrap import dedent
-from typing import Callable, List, Optional, Tuple, Type, Union, get_type_hints
+from typing import Any, get_type_hints
 
 import pytest
 
@@ -39,11 +40,12 @@ def create_scheduler(rules, validate=True):
         ignore_patterns=[],
         use_gitignore=False,
         build_root=str(Path.cwd()),
+        pants_workdir="./.pants.d/workdir",
         local_execution_root_dir=".",
         named_caches_dir="./.pants.d/named_caches",
         ca_certs_path=None,
         rules=rules,
-        union_membership=UnionMembership({}),
+        union_membership=UnionMembership.empty(),
         executor=PyExecutor(core_threads=2, max_threads=4),
         execution_options=DEFAULT_EXECUTION_OPTIONS,
         local_store_options=DEFAULT_LOCAL_STORE_OPTIONS,
@@ -52,7 +54,7 @@ def create_scheduler(rules, validate=True):
 
 
 def fmt_rule(
-    rule: Callable, *, gets: Optional[List[Tuple[str, str]]] = None, multiline: bool = False
+    rule: Callable, *, gets: list[tuple[str, str]] | None = None, multiline: bool = False
 ) -> str:
     """Generate the str that the engine will use for the rule.
 
@@ -86,8 +88,8 @@ def fmt_rule(
 @dataclass(frozen=True)
 class RuleFormatRequest:
     rule: Callable
-    for_param: Optional[Union[Type, Tuple[Type, ...]]] = None
-    gets: Optional[List[Tuple[str, str]]] = None
+    for_param: type | tuple[type, ...] | None = None
+    gets: list[tuple[str, str]] | None = None
 
     def format(self) -> str:
         msg = fmt_rule(self.rule, gets=self.gets, multiline=True)
@@ -111,10 +113,10 @@ class RuleFormatRequest:
 
 
 def fmt_param_edge(
-    param: Type,
-    product: Union[Type, Tuple[Type, ...]],
-    via_func: Union[Type, RuleFormatRequest],
-    return_func: Optional[RuleFormatRequest] = None,
+    param: type[Any],
+    product: type[Any] | tuple[type[Any], ...],
+    via_func: type[Any] | RuleFormatRequest,
+    return_func: RuleFormatRequest | None = None,
 ) -> str:
     if isinstance(via_func, type):
         via_func_str = f"Select({via_func.__name__})"
@@ -150,7 +152,7 @@ class GraphVertexType(Enum):
     intrinsic = "intrinsic"
     param = "param"
 
-    def graph_vertex_color_fmt_str(self) -> Optional[str]:
+    def graph_vertex_color_fmt_str(self) -> str | None:
         olive = "0.2214,0.7179,0.8528"
         gray = "0.576,0,0.6242"
         orange = "0.08,0.5,0.976"
@@ -172,9 +174,9 @@ class GraphVertexType(Enum):
 
 
 def fmt_non_param_edge(
-    subject: Union[Type, Callable, RuleFormatRequest],
-    product: Union[Type, Tuple[Type, ...]],
-    return_func: Optional[RuleFormatRequest] = None,
+    subject: type | Callable | RuleFormatRequest,
+    product: type | tuple[type, ...],
+    return_func: RuleFormatRequest | None = None,
     rule_type: GraphVertexType = GraphVertexType.task,
     append_for_product: bool = True,
 ) -> str:
@@ -283,13 +285,13 @@ class TestRule:
 
     def test_side_effecting_inputs(self) -> None:
         @goal_rule
-        def valid_rule(console: Console, b: str) -> Example:
+        async def valid_rule(console: Console, b: str) -> Example:
             return Example(exit_code=0)
 
         with pytest.raises(ValueError) as cm:
 
             @rule
-            def invalid_rule(console: Console, b: str) -> bool:
+            async def invalid_rule(console: Console, b: str) -> bool:
                 return False
 
         error_str = str(cm.value)
@@ -312,7 +314,7 @@ def test_rule_index_creation_fails_with_bad_declaration_type():
 class TestRuleArgumentAnnotation:
     def test_annotations_kwargs(self) -> None:
         @rule(level=LogLevel.INFO)
-        def a_named_rule(a: int, b: str) -> bool:
+        async def a_named_rule(a: int, b: str) -> bool:
             return False
 
         assert a_named_rule.rule is not None  # type: ignore[attr-defined]
@@ -324,7 +326,7 @@ class TestRuleArgumentAnnotation:
         assert a_named_rule.rule.level == LogLevel.INFO  # type: ignore[attr-defined]
 
         @rule(canonical_name="something_different", desc="Human readable desc")
-        def another_named_rule(a: int, b: str) -> bool:
+        async def another_named_rule(a: int, b: str) -> bool:
             return False
 
         assert a_named_rule.rule is not None  # type: ignore[attr-defined]
@@ -335,20 +337,20 @@ class TestRuleArgumentAnnotation:
     def test_bogus_rules(self) -> None:
         with pytest.raises(UnrecognizedRuleArgument):
 
-            @rule(bogus_kwarg="TOTALLY BOGUS!!!!!!")
-            def a_named_rule(a: int, b: str) -> bool:
+            @rule(bogus_kwarg="TOTALLY BOGUS!!!!!!")  # type: ignore
+            async def a_named_rule(a: int, b: str) -> bool:
                 return False
 
     def test_goal_rule_automatically_gets_desc_from_goal(self):
         @goal_rule
-        def some_goal_rule() -> Example:
+        async def some_goal_rule() -> Example:
             return Example(exit_code=0)
 
         assert some_goal_rule.rule.desc == "`example` goal"
 
     def test_can_override_goal_rule_name(self) -> None:
         @goal_rule(canonical_name="some_other_name")
-        def some_goal_rule() -> Example:
+        async def some_goal_rule() -> Example:
             return Example(exit_code=0)
 
         name = some_goal_rule.rule.canonical_name  # type: ignore[attr-defined]
@@ -358,7 +360,7 @@ class TestRuleArgumentAnnotation:
 class TestGraphVertexTypeAnnotation:
     def test_nominal(self):
         @rule
-        def dry(a: int, b: str, c: float) -> bool:
+        async def dry(a: int, b: str, c: float) -> bool:
             return False
 
         assert dry.rule is not None
@@ -367,28 +369,28 @@ class TestGraphVertexTypeAnnotation:
         with pytest.raises(MissingReturnTypeAnnotation):
 
             @rule
-            def dry(a: int, b: str, c: float):
+            async def dry(a: int, b: str, c: float):
                 return False
 
     def test_bad_return_annotation(self):
         with pytest.raises(MissingReturnTypeAnnotation):
 
             @rule
-            def dry(a: int, b: str, c: float) -> 42:
+            async def dry(a: int, b: str, c: float) -> 42:
                 return False
 
     def test_missing_parameter_annotation(self) -> None:
         with pytest.raises(MissingParameterTypeAnnotation):
 
             @rule
-            def dry(a: int, b, c: float) -> bool:
+            async def dry(a: int, b, c: float) -> bool:
                 return False
 
     def test_bad_parameter_annotation(self):
         with pytest.raises(MissingParameterTypeAnnotation):
 
             @rule
-            def dry(a: int, b: 42, c: float) -> bool:
+            async def dry(a: int, b: 42, c: float) -> bool:
                 return False
 
 
@@ -396,7 +398,7 @@ def test_goal_rule_not_properly_marked_goal_rule() -> None:
     with pytest.raises(TypeError) as exc:
 
         @rule
-        def normal_rule_trying_to_return_a_goal() -> Example:
+        async def normal_rule_trying_to_return_a_goal() -> Example:
             return Example(0)
 
     assert (
@@ -409,7 +411,7 @@ def test_goal_rule_not_returning_a_goal() -> None:
     with pytest.raises(TypeError) as exc:
 
         @goal_rule
-        def goal_rule_returning_a_non_goal() -> int:
+        async def goal_rule_returning_a_non_goal() -> int:
             return 0
 
     assert str(exc.value) == "An `@goal_rule` must return a subclass of `engine.goal.Goal`."
@@ -418,11 +420,11 @@ def test_goal_rule_not_returning_a_goal() -> None:
 class TestRuleGraph:
     def test_ruleset_with_ambiguity(self) -> None:
         @rule
-        def a_from_b_and_c(b: B, c: C) -> A:
+        async def a_from_b_and_c(b: B, c: C) -> A:
             return A()
 
         @rule
-        def a_from_c_and_b(c: C, b: B) -> A:
+        async def a_from_c_and_b(c: C, b: B) -> A:
             return A()
 
         rules = [a_from_b_and_c, a_from_c_and_b, QueryRule(A, (B, C))]
@@ -444,7 +446,7 @@ class TestRuleGraph:
 
     def test_ruleset_with_valid_root(self) -> None:
         @rule
-        def a_from_b(b: B) -> A:
+        async def a_from_b(b: B) -> A:
             return A()
 
         rules = [a_from_b, QueryRule(A, (B,))]
@@ -452,15 +454,14 @@ class TestRuleGraph:
 
     def test_ruleset_with_unreachable_root(self) -> None:
         @rule
-        def a_from_b(b: B) -> A:
+        async def a_from_b(b: B) -> A:
             return A()
 
         rules = [a_from_b, QueryRule(A, ())]
         with pytest.raises(Exception) as cm:
             create_scheduler(rules)
         assert (
-            "No installed rules return the type B, and it was not provided by potential "
-            "callers of "
+            "No installed rules return the type B, and it was not provided by potential callers of "
         ) in str(cm.value)
         assert (
             "If that type should be computed by a rule, ensure that that rule is installed."
@@ -477,11 +478,11 @@ class TestRuleGraph:
         # only the unfulfillable one should be in the errors.
 
         @rule
-        def a_from_c(c: C) -> A:
+        async def a_from_c(c: C) -> A:
             return A()
 
         @rule
-        def b_from_d(d: D) -> B:
+        async def b_from_d(d: D) -> B:
             return B()
 
         @rule
@@ -521,11 +522,11 @@ class TestRuleGraph:
         """Test that when one rule "shadows" another, we get an error."""
 
         @rule
-        def d_singleton() -> D:
+        async def d_singleton() -> D:
             return D()
 
         @rule
-        def d_for_b(b: B) -> D:
+        async def d_for_b(b: B) -> D:
             return D()
 
         rules = [d_singleton, d_for_b, QueryRule(D, (B,))]
@@ -546,7 +547,7 @@ class TestRuleGraph:
 
     def test_smallest_full_test(self) -> None:
         @rule
-        def a_from_suba(suba: SubA) -> A:
+        async def a_from_suba(suba: SubA) -> A:
             return A()
 
         rules = [a_from_suba, QueryRule(A, (SubA,))]
@@ -571,11 +572,11 @@ class TestRuleGraph:
 
     def test_smallest_full_test_multiple_root_subject_types(self) -> None:
         @rule
-        def a_from_suba(suba: SubA) -> A:
+        async def a_from_suba(suba: SubA) -> A:
             return A()
 
         @rule
-        def b_from_a(a: A) -> B:
+        async def b_from_a(a: A) -> B:
             return B()
 
         rules = [a_from_suba, QueryRule(A, (SubA,)), b_from_a, QueryRule(B, (A,))]
@@ -604,7 +605,7 @@ class TestRuleGraph:
 
     def test_single_rule_depending_on_subject_selection(self) -> None:
         @rule
-        def a_from_suba(suba: SubA) -> A:
+        async def a_from_suba(suba: SubA) -> A:
             return A()
 
         rules = [a_from_suba, QueryRule(A, (SubA,))]
@@ -629,11 +630,11 @@ class TestRuleGraph:
 
     def test_multiple_selects(self) -> None:
         @rule
-        def a_from_suba_and_b(suba: SubA, b: B) -> A:
+        async def a_from_suba_and_b(suba: SubA, b: B) -> A:
             return A()
 
         @rule
-        def b() -> B:
+        async def b() -> B:
             return B()
 
         rules = [a_from_suba_and_b, b, QueryRule(A, (SubA,))]
@@ -671,11 +672,11 @@ class TestRuleGraph:
             _ = await Get(B, C())  # noqa: F841
 
         @rule
-        def b_from_suba(suba: SubA) -> B:
+        async def b_from_suba(suba: SubA) -> B:
             return B()
 
         @rule
-        def suba_from_c(c: C) -> SubA:
+        async def suba_from_c(c: C) -> SubA:
             return SubA()
 
         rules = [a, b_from_suba, suba_from_c, QueryRule(A, (SubA,))]
@@ -703,11 +704,11 @@ class TestRuleGraph:
 
     def test_one_level_of_recursion(self) -> None:
         @rule
-        def a_from_b(b: B) -> A:
+        async def a_from_b(b: B) -> A:
             return A()
 
         @rule
-        def b_from_suba(suba: SubA) -> B:
+        async def b_from_suba(suba: SubA) -> B:
             return B()
 
         rules = [a_from_b, b_from_suba, QueryRule(A, (SubA,))]
@@ -735,15 +736,15 @@ class TestRuleGraph:
     @pytest.mark.no_error_if_skipped
     def test_noop_removal_in_subgraph(self) -> None:
         @rule
-        def a_from_c(c: C) -> A:
+        async def a_from_c(c: C) -> A:
             return A()
 
         @rule
-        def a() -> A:
+        async def a() -> A:
             return A()
 
         @rule
-        def b_singleton() -> B:
+        async def b_singleton() -> B:
             return B()
 
         rules = [a_from_c, a, b_singleton, QueryRule(A, (SubA,))]
@@ -771,11 +772,11 @@ class TestRuleGraph:
     @pytest.mark.no_error_if_skipped
     def test_noop_removal_full_single_subject_type(self) -> None:
         @rule
-        def a_from_c(c: C) -> A:
+        async def a_from_c(c: C) -> A:
             return A()
 
         @rule
-        def a() -> A:
+        async def a() -> A:
             return A()
 
         rules = [a_from_c, a, QueryRule(A, (SubA,))]
@@ -803,11 +804,11 @@ class TestRuleGraph:
     @pytest.mark.no_error_if_skipped
     def test_root_tuple_removed_when_no_matches(self) -> None:
         @rule
-        def a_from_c(c: C) -> A:
+        async def a_from_c(c: C) -> A:
             return A()
 
         @rule
-        def b_from_d_and_a(d: D, a: A) -> B:
+        async def b_from_d_and_a(d: D, a: A) -> B:
             return B()
 
         rules = [
@@ -842,15 +843,15 @@ class TestRuleGraph:
         # they should be removed from the graph.
 
         @rule
-        def b_from_c(c: C) -> B:
+        async def b_from_c(c: C) -> B:
             return B()
 
         @rule
-        def a_from_b(b: B) -> A:
+        async def a_from_b(b: B) -> A:
             return A()
 
         @rule
-        def a() -> A:
+        async def a() -> A:
             return A()
 
         rules = [
@@ -878,11 +879,11 @@ class TestRuleGraph:
 
     def test_matching_singleton(self) -> None:
         @rule
-        def a_from_suba(suba: SubA, b: B) -> A:
+        async def a_from_suba(suba: SubA, b: B) -> A:
             return A()
 
         @rule
-        def b_singleton() -> B:
+        async def b_singleton() -> B:
             return B()
 
         rules = [a_from_suba, b_singleton, QueryRule(A, (SubA,))]
@@ -911,15 +912,15 @@ class TestRuleGraph:
     @pytest.mark.no_error_if_skipped
     def test_depends_on_multiple_one_noop(self) -> None:
         @rule
-        def a_from_c(c: C) -> A:
+        async def a_from_c(c: C) -> A:
             return A()
 
         @rule
-        def a_from_suba(suba: SubA) -> A:
+        async def a_from_suba(suba: SubA) -> A:
             return A()
 
         @rule
-        def b_from_a(a: A) -> B:
+        async def b_from_a(a: A) -> B:
             return B()
 
         rules = [a_from_c, a_from_suba, b_from_a, QueryRule(A, (SubA,))]
@@ -945,15 +946,15 @@ class TestRuleGraph:
 
     def test_multiple_depend_on_same_rule(self) -> None:
         @rule
-        def a_from_suba(suba: SubA) -> A:
+        async def a_from_suba(suba: SubA) -> A:
             return A()
 
         @rule
-        def b_from_a(a: A) -> B:
+        async def b_from_a(a: A) -> B:
             return B()
 
         @rule
-        def c_from_a(a: A) -> C:
+        async def c_from_a(a: A) -> C:
             return C()
 
         rules = [
@@ -1014,11 +1015,23 @@ class TestRuleGraph:
                   */
                   // root entries
                 {fmt_non_param_edge(A, ())}
-                {fmt_non_param_edge(RuleFormatRequest(a, gets=[("B", "D")]), (), rule_type=GraphVertexType.singleton)}
+                {
+                    fmt_non_param_edge(
+                        RuleFormatRequest(a, gets=[("B", "D")]),
+                        (),
+                        rule_type=GraphVertexType.singleton,
+                    )
+                }
                 {fmt_non_param_edge(A, (), RuleFormatRequest(a, gets=[("B", "D")]))}
                   // internal entries
-                {fmt_non_param_edge(RuleFormatRequest(a, (), gets=[("B", "D")]), D, RuleFormatRequest(b_from_d),
-                                    append_for_product=False)}
+                {
+                    fmt_non_param_edge(
+                        RuleFormatRequest(a, (), gets=[("B", "D")]),
+                        D,
+                        RuleFormatRequest(b_from_d),
+                        append_for_product=False,
+                    )
+                }
                 {fmt_param_edge(D, D, RuleFormatRequest(b_from_d))}
                 }}"""
             ).strip(),
@@ -1069,6 +1082,6 @@ def test_param_type_overrides() -> None:
 
     with pytest.raises(MissingParameterTypeAnnotation, match="must be a type"):
 
-        @rule(_param_type_overrides={"param1": "A string"})
+        @rule(_param_type_overrides={"param1": "A string"})  # type: ignore
         async def protect_existence(param1) -> A:
             return A()

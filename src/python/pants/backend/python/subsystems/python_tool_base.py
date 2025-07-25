@@ -7,9 +7,10 @@ import importlib.resources
 import json
 import logging
 import os
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from functools import cache
-from typing import Callable, ClassVar, Iterable, Optional, Sequence
+from typing import ClassVar
 from urllib.parse import urlparse
 
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
@@ -23,11 +24,13 @@ from pants.backend.python.util_rules.pex_requirements import (
     Lockfile,
     PexRequirements,
     Resolve,
+    get_lockfile_for_resolve,
+    load_lockfile,
     strip_comments_from_pex_json_lockfile,
 )
 from pants.core.goals.resolves import ExportableTool
 from pants.engine.fs import Digest
-from pants.engine.internals.selectors import Get
+from pants.engine.rules import implicitly
 from pants.option.errors import OptionsError
 from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
@@ -193,7 +196,7 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
 
             If you would like to generate a lockfile for {resolve_name},
             follow the instructions for setting up lockfiles for tools
-            {doc_url('docs/python/overview/lockfiles#lockfiles-for-tools')}
+            {doc_url("docs/python/overview/lockfiles#lockfiles-for-tools")}
         """
         )
 
@@ -212,7 +215,7 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
 
     @classmethod
     @cache
-    def _default_package_name_and_version(cls) -> Optional[_PackageNameAndVersion]:
+    def _default_package_name_and_version(cls) -> _PackageNameAndVersion | None:
         if cls.default_lockfile_resource is None:
             return None
 
@@ -225,7 +228,9 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
                 lock_bytes = fp.read()
         elif parts.scheme == "resource":
             # The "netloc" in our made-up "resource://" scheme is the package.
-            lock_bytes = importlib.resources.read_binary(parts.netloc, lockfile_path)
+            lock_bytes = (
+                importlib.resources.files(parts.netloc).joinpath(lockfile_path).read_bytes()
+            )
         else:
             raise ValueError(
                 f"Unsupported scheme {parts.scheme} for lockfile URL: {lockfile.url} "
@@ -239,11 +244,11 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
         first_default_requirement = PipRequirement.parse(cls.default_requirements[0])
         return next(
             _PackageNameAndVersion(
-                name=first_default_requirement.project_name, version=requirement["version"]
+                name=first_default_requirement.name, version=requirement["version"]
             )
             for resolve in lockfile_contents["locked_resolves"]
             for requirement in resolve["locked_requirements"]
-            if requirement["project_name"] == first_default_requirement.project_name
+            if requirement["project_name"] == first_default_requirement.name
         )
 
     def pex_requirements(
@@ -391,8 +396,8 @@ async def get_loaded_lockfile(subsystem: PythonToolBase) -> LoadedLockfile:
     else:
         assert isinstance(requirements, PexRequirements)
         assert isinstance(requirements.from_superset, Resolve)
-        lockfile = await Get(Lockfile, Resolve, requirements.from_superset)
-    loaded_lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(lockfile))
+        lockfile = await get_lockfile_for_resolve(requirements.from_superset, **implicitly())
+    loaded_lockfile = await load_lockfile(LoadedLockfileRequest(lockfile), **implicitly())
     return loaded_lockfile
 
 

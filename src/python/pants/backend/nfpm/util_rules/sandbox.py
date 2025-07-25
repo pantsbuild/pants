@@ -42,6 +42,7 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionMembership
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 class _DepCategory(Enum):
@@ -101,7 +102,7 @@ class _NfpmSortedDeps:
         union_membership: UnionMembership,
     ) -> _NfpmSortedDeps:
         package_field_set_types = (
-            union_membership.get(PackageFieldSet) - NFPM_PACKAGE_FIELD_SET_TYPES
+            FrozenOrderedSet(union_membership.get(PackageFieldSet)) - NFPM_PACKAGE_FIELD_SET_TYPES
         )
 
         nfpm_content_from_dependency_targets: list[NfpmContentFile] = []

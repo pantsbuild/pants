@@ -8,28 +8,35 @@ import json
 import logging
 import os
 from collections import deque
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Any, Iterable, Sequence
+from typing import Any
 
-from pants.backend.go.dependency_inference import GoModuleImportPathsMapping
 from pants.backend.go.subsystems.gotest import GoTestSubsystem
-from pants.backend.go.target_type_rules import GoImportPathMappingRequest
+from pants.backend.go.target_type_rules import (
+    GoImportPathMappingRequest,
+    map_import_paths_to_packages,
+)
 from pants.backend.go.target_types import (
     GoPackageSourcesField,
     GoTestExtraEnvVarsField,
     GoTestTimeoutField,
     SkipGoTestsField,
 )
-from pants.backend.go.util_rules.build_opts import GoBuildOptions, GoBuildOptionsFromTargetRequest
+from pants.backend.go.util_rules.build_opts import (
+    GoBuildOptionsFromTargetRequest,
+    go_extract_build_options_from_target,
+)
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
-    BuiltGoPackage,
-    FallibleBuildGoPackageRequest,
-    FallibleBuiltGoPackage,
+    build_go_package,
+    required_built_go_package,
 )
 from pants.backend.go.util_rules.build_pkg_target import (
     BuildGoPackageRequestForStdlibRequest,
     BuildGoPackageTargetRequest,
+    setup_build_go_package_target_request,
+    setup_build_go_package_target_request_for_stdlib,
 )
 from pants.backend.go.util_rules.coverage import (
     GenerateCoverageSetupCodeRequest,
@@ -37,37 +44,48 @@ from pants.backend.go.util_rules.coverage import (
     GoCoverageConfig,
     GoCoverageData,
     GoCoverMode,
+    generate_go_coverage_setup_code,
 )
 from pants.backend.go.util_rules.first_party_pkg import (
-    FallibleFirstPartyPkgAnalysis,
-    FallibleFirstPartyPkgDigest,
     FirstPartyPkgAnalysis,
     FirstPartyPkgAnalysisRequest,
     FirstPartyPkgDigest,
     FirstPartyPkgDigestRequest,
+    analyze_first_party_package,
+    setup_first_party_pkg_digest,
 )
-from pants.backend.go.util_rules.go_mod import OwningGoMod, OwningGoModRequest
+from pants.backend.go.util_rules.go_mod import OwningGoModRequest, find_owning_go_mod
 from pants.backend.go.util_rules.goroot import GoRoot
-from pants.backend.go.util_rules.import_analysis import GoStdLibPackages, GoStdLibPackagesRequest
-from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
+from pants.backend.go.util_rules.import_analysis import (
+    GoStdLibPackagesRequest,
+    analyze_go_stdlib_packages,
+)
+from pants.backend.go.util_rules.link import LinkGoBinaryRequest, link_go_binary
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
-from pants.backend.go.util_rules.tests_analysis import GeneratedTestMain, GenerateTestMainRequest
+from pants.backend.go.util_rules.tests_analysis import (
+    GeneratedTestMain,
+    GenerateTestMainRequest,
+    generate_testmain,
+)
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestExtraEnv, TestFieldSet, TestRequest, TestResult, TestSubsystem
 from pants.core.target_types import FileSourceField
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
+from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_FILE_DIGEST, AddPrefix, Digest, MergeDigests
+from pants.engine.internals.graph import resolve_targets
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Snapshot
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.intrinsics import add_prefix, digest_to_snapshot, merge_digests
 from pants.engine.process import (
     Process,
     ProcessCacheScope,
-    ProcessResult,
-    ProcessResultWithRetries,
     ProcessWithRetries,
+    execute_process_or_raise,
+    execute_process_with_retry,
 )
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Dependencies, DependenciesRequest, SourcesField, Target, Targets
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
+from pants.engine.target import Dependencies, DependenciesRequest, SourcesField, Target
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -237,22 +255,27 @@ async def prepare_go_test_binary(
     request: PrepareGoTestBinaryRequest,
     analyzer: PackageAnalyzerSetup,
 ) -> FalliblePrepareGoTestBinaryResult:
-    go_mod_addr = await Get(OwningGoMod, OwningGoModRequest(request.field_set.address))
-    package_mapping, build_opts = await MultiGet(
-        Get(GoModuleImportPathsMapping, GoImportPathMappingRequest(go_mod_addr.address)),
-        Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(request.field_set.address)),
+    go_mod_addr = await find_owning_go_mod(
+        OwningGoModRequest(request.field_set.address), **implicitly()
+    )
+    package_mapping, build_opts = await concurrently(
+        map_import_paths_to_packages(
+            GoImportPathMappingRequest(go_mod_addr.address), **implicitly()
+        ),
+        go_extract_build_options_from_target(
+            GoBuildOptionsFromTargetRequest(request.field_set.address), **implicitly()
+        ),
     )
 
-    maybe_pkg_analysis, maybe_pkg_digest, dependencies = await MultiGet(
-        Get(
-            FallibleFirstPartyPkgAnalysis,
+    maybe_pkg_analysis, maybe_pkg_digest, dependencies = await concurrently(
+        analyze_first_party_package(
             FirstPartyPkgAnalysisRequest(request.field_set.address, build_opts=build_opts),
+            **implicitly(),
         ),
-        Get(
-            FallibleFirstPartyPkgDigest,
-            FirstPartyPkgDigestRequest(request.field_set.address, build_opts=build_opts),
+        setup_first_party_pkg_digest(
+            FirstPartyPkgDigestRequest(request.field_set.address, build_opts=build_opts)
         ),
-        Get(Targets, DependenciesRequest(request.field_set.dependencies)),
+        resolve_targets(**implicitly(DependenciesRequest(request.field_set.dependencies))),
     )
 
     def compilation_failure(
@@ -287,8 +310,7 @@ async def prepare_go_test_binary(
             ),
         )
 
-    testmain = await Get(
-        GeneratedTestMain,
+    testmain = await generate_testmain(
         GenerateTestMainRequest(
             digest=pkg_digest.digest,
             test_paths=FrozenOrderedSet(
@@ -315,25 +337,26 @@ async def prepare_go_test_binary(
             exit_code=0,
         )
 
-    testmain_analysis_input_digest = await Get(
-        Digest, MergeDigests([testmain.digest, analyzer.digest])
+    testmain_analysis_input_digest = await merge_digests(
+        MergeDigests([testmain.digest, analyzer.digest])
     )
-    testmain_analysis = await Get(
-        ProcessResult,
-        Process(
-            (analyzer.path, "."),
-            input_digest=testmain_analysis_input_digest,
-            description=f"Determine metadata for testmain for {request.field_set.address}",
-            level=LogLevel.DEBUG,
-            env={
-                "CGO_ENABLED": "1" if build_opts.cgo_enabled else "0",
-            },
-        ),
+
+    testmain_analysis = await execute_process_or_raise(
+        **implicitly(
+            Process(
+                (analyzer.path, "."),
+                input_digest=testmain_analysis_input_digest,
+                description=f"Determine metadata for testmain for {request.field_set.address}",
+                level=LogLevel.DEBUG,
+                env={
+                    "CGO_ENABLED": "1" if build_opts.cgo_enabled else "0",
+                },
+            ),
+        )
     )
     testmain_analysis_json = json.loads(testmain_analysis.stdout.decode())
 
-    stdlib_packages = await Get(
-        GoStdLibPackages,
+    stdlib_packages = await analyze_go_stdlib_packages(
         GoStdLibPackagesRequest(
             with_race_detector=build_opts.with_race_detector,
             cgo_enabled=build_opts.cgo_enabled,
@@ -348,12 +371,12 @@ async def prepare_go_test_binary(
 
         if dep_import_path in stdlib_packages:
             stdlib_build_request_gets.append(
-                Get(
-                    FallibleBuildGoPackageRequest,
+                setup_build_go_package_target_request_for_stdlib(
                     BuildGoPackageRequestForStdlibRequest(
                         import_path=dep_import_path,
                         build_opts=build_opts,
                     ),
+                    **implicitly(),
                 )
             )
             continue
@@ -381,13 +404,13 @@ async def prepare_go_test_binary(
                 f"in go_package at address '{request.field_set.address}'."
             )
 
-    fallible_testmain_import_build_requests = await MultiGet(
-        Get(
-            FallibleBuildGoPackageRequest,
+    fallible_testmain_import_build_requests = await concurrently(
+        setup_build_go_package_target_request(
             BuildGoPackageTargetRequest(
                 address=address,
                 build_opts=build_opts,
             ),
+            **implicitly(),
         )
         for address in sorted(inferred_dependencies)
     )
@@ -398,20 +421,20 @@ async def prepare_go_test_binary(
             return compilation_failure(build_request.exit_code, None, build_request.stderr)
         testmain_import_build_requests.append(build_request.request)
 
-    stdlib_build_requests = await MultiGet(stdlib_build_request_gets)
+    stdlib_build_requests = await concurrently(stdlib_build_request_gets)
     for build_request in stdlib_build_requests:
         assert build_request.request is not None
         testmain_import_build_requests.append(build_request.request)
 
     # Construct the build request for the package under test.
-    maybe_test_pkg_build_request = await Get(
-        FallibleBuildGoPackageRequest,
+    maybe_test_pkg_build_request = await setup_build_go_package_target_request(
         BuildGoPackageTargetRequest(
             request.field_set.address,
             for_tests=True,
             with_coverage=with_coverage,
             build_opts=build_opts,
         ),
+        **implicitly(),
     )
     if maybe_test_pkg_build_request.request is None:
         assert maybe_test_pkg_build_request.stderr is not None
@@ -426,14 +449,14 @@ async def prepare_go_test_binary(
     if testmain.has_xtests:
         # Build a synthetic package for xtests where the import path is the same as the package under test
         # but with "_test" appended.
-        maybe_xtest_pkg_build_request = await Get(
-            FallibleBuildGoPackageRequest,
+        maybe_xtest_pkg_build_request = await setup_build_go_package_target_request(
             BuildGoPackageTargetRequest(
                 request.field_set.address,
                 for_xtests=True,
                 with_coverage=with_coverage,
                 build_opts=build_opts,
             ),
+            **implicitly(),
         )
         if maybe_xtest_pkg_build_request.request is None:
             assert maybe_xtest_pkg_build_request.stderr is not None
@@ -460,14 +483,14 @@ async def prepare_go_test_binary(
         main_direct_deps.extend(coverage_transitive_deps)
 
         # Build the `main_direct_deps` when in coverage mode to obtain the "coverage variables" for those packages.
-        built_main_direct_deps = await MultiGet(
-            Get(BuiltGoPackage, BuildGoPackageRequest, build_req) for build_req in main_direct_deps
+        built_main_direct_deps = await concurrently(
+            required_built_go_package(**implicitly({build_req: BuildGoPackageRequest}))
+            for build_req in main_direct_deps
         )
         coverage_metadata = [
             pkg.coverage_metadata for pkg in built_main_direct_deps if pkg.coverage_metadata
         ]
-        coverage_setup_result = await Get(
-            GenerateCoverageSetupCodeResult,
+        coverage_setup_result = await generate_go_coverage_setup_code(
             GenerateCoverageSetupCodeRequest(
                 packages=FrozenOrderedSet(coverage_metadata),
                 cover_mode=request.coverage.coverage_mode,  # type: ignore[union-attr] # gated on with_coverage
@@ -476,13 +499,12 @@ async def prepare_go_test_binary(
         coverage_setup_digest = coverage_setup_result.digest
         coverage_setup_files = [GenerateCoverageSetupCodeResult.PATH]
 
-    testmain_input_digest = await Get(
-        Digest, MergeDigests([testmain.digest, coverage_setup_digest])
+    testmain_input_digest = await merge_digests(
+        MergeDigests([testmain.digest, coverage_setup_digest])
     )
 
     # Generate the synthetic main package which imports the test and/or xtest packages.
-    maybe_built_main_pkg = await Get(
-        FallibleBuiltGoPackage,
+    maybe_built_main_pkg = await build_go_package(
         BuildGoPackageRequest(
             import_path="main",
             pkg_name="main",
@@ -494,6 +516,7 @@ async def prepare_go_test_binary(
             direct_dependencies=tuple(main_direct_deps),
             minimum_go_version=pkg_analysis.minimum_go_version,
         ),
+        **implicitly(),
     )
     if maybe_built_main_pkg.output is None:
         assert maybe_built_main_pkg.stderr is not None
@@ -504,8 +527,7 @@ async def prepare_go_test_binary(
 
     main_pkg_a_file_path = built_main_pkg.import_paths_to_pkg_a_files["main"]
 
-    binary = await Get(
-        LinkedGoBinary,
+    binary = await link_go_binary(
         LinkGoBinaryRequest(
             input_digest=built_main_pkg.digest,
             archives=(main_pkg_a_file_path,),
@@ -514,6 +536,7 @@ async def prepare_go_test_binary(
             output_filename="./test_runner",  # TODO: Name test binary the way that `go` does?
             description=f"Link Go test binary for {request.field_set.address}",
         ),
+        **implicitly(),
     )
 
     return FalliblePrepareGoTestBinaryResult(
@@ -577,9 +600,8 @@ async def run_go_tests(
             coverage_packages=go_test_subsystem.coverage_packages,
         )
 
-    fallible_test_binary = await Get(
-        FalliblePrepareGoTestBinaryResult,
-        PrepareGoTestBinaryRequest(field_set=field_set, coverage=coverage),
+    fallible_test_binary = await prepare_go_test_binary(
+        PrepareGoTestBinaryRequest(field_set=field_set, coverage=coverage), **implicitly()
     )
 
     if fallible_test_binary.exit_code != 0:
@@ -602,21 +624,22 @@ async def run_go_tests(
     # This allows tests to open dependencies on `file` targets regardless of where they are
     # located. See https://dave.cheney.net/2016/05/10/test-fixtures-in-go.
     working_dir = field_set.address.spec_path
-    field_set_extra_env, dependencies, binary_with_prefix = await MultiGet(
-        Get(EnvironmentVars, EnvironmentVarsRequest(field_set.extra_env_vars.value or ())),
-        Get(Targets, DependenciesRequest(field_set.dependencies)),
-        Get(Digest, AddPrefix(test_binary.test_binary_digest, working_dir)),
+    field_set_extra_env, dependencies, binary_with_prefix = await concurrently(
+        environment_vars_subset(
+            EnvironmentVarsRequest(field_set.extra_env_vars.value or ()), **implicitly()
+        ),
+        resolve_targets(**implicitly(DependenciesRequest(field_set.dependencies))),
+        add_prefix(AddPrefix(test_binary.test_binary_digest, working_dir)),
     )
-    files_sources = await Get(
-        SourceFiles,
+    files_sources = await determine_source_files(
         SourceFilesRequest(
             (dep.get(SourcesField) for dep in dependencies),
             for_sources_types=(FileSourceField,),
             enable_codegen=True,
-        ),
+        )
     )
-    test_input_digest = await Get(
-        Digest, MergeDigests((binary_with_prefix, files_sources.snapshot.digest))
+    test_input_digest = await merge_digests(
+        MergeDigests((binary_with_prefix, files_sources.snapshot.digest))
     )
 
     extra_env = {
@@ -691,9 +714,8 @@ async def run_go_tests(
         output_files=output_files,
         level=LogLevel.DEBUG,
     )
-    results = await Get(
-        ProcessResultWithRetries,
-        ProcessWithRetries(go_test_process, test_subsystem.attempts_default),
+    results = await execute_process_with_retry(
+        ProcessWithRetries(go_test_process, test_subsystem.attempts_default)
     )
 
     coverage_data: GoCoverageData | None = None
@@ -711,10 +733,10 @@ async def run_go_tests(
     if output_files or output_test_binary:
         output_digest = results.last.output_digest
         if output_test_binary:
-            output_digest = await Get(
-                Digest, MergeDigests([output_digest, test_binary.test_binary_digest])
+            output_digest = await merge_digests(
+                MergeDigests([output_digest, test_binary.test_binary_digest])
             )
-        extra_output = await Get(Snapshot, Digest, output_digest)
+        extra_output = await digest_to_snapshot(output_digest)
 
     return TestResult.from_fallible_process_result(
         process_results=results.results,

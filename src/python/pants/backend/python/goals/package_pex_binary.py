@@ -3,7 +3,6 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Tuple
 
 from pants.backend.python.target_types import (
     PexArgsField,
@@ -30,11 +29,12 @@ from pants.backend.python.target_types import (
     PexStripEnvField,
     PexVenvHermeticScripts,
     PexVenvSitePackagesCopies,
-    ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
 )
-from pants.backend.python.util_rules.pex import CompletePlatforms, Pex
+from pants.backend.python.target_types_rules import resolve_pex_entry_point
+from pants.backend.python.util_rules.pex import create_pex, digest_complete_platforms
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,
@@ -42,8 +42,7 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior
-from pants.core.util_rules.environments import EnvironmentField
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -86,7 +85,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     def _execution_mode(self) -> PexExecutionMode:
         return PexExecutionMode(self.execution_mode.value)
 
-    def generate_additional_args(self, pex_binary_defaults: PexBinaryDefaults) -> Tuple[str, ...]:
+    def generate_additional_args(self, pex_binary_defaults: PexBinaryDefaults) -> tuple[str, ...]:
         args = []
         if self.emit_warnings.value_or_global_default(pex_binary_defaults) is False:
             args.append("--no-emit-warnings")
@@ -134,15 +133,13 @@ async def package_pex_binary(
     field_set: PexBinaryFieldSet,
     pex_binary_defaults: PexBinaryDefaults,
 ) -> PexFromTargetsRequestForBuiltPackage:
-    resolved_entry_point = await Get(
-        ResolvedPexEntryPoint, ResolvePexEntryPointRequest(field_set.entry_point)
+    resolved_entry_point = await resolve_pex_entry_point(
+        ResolvePexEntryPointRequest(field_set.entry_point)
     )
 
     output_filename = field_set.output_path.value_or_default(file_ending="pex")
 
-    complete_platforms = await Get(
-        CompletePlatforms, PexCompletePlatformsField, field_set.complete_platforms
-    )
+    complete_platforms = await digest_complete_platforms(field_set.complete_platforms)
 
     request = PexFromTargetsRequest(
         addresses=[field_set.address],
@@ -164,12 +161,12 @@ async def package_pex_binary(
 
 
 @rule
-async def built_pacakge_for_pex_from_targets_request(
-    request: PexFromTargetsRequestForBuiltPackage,
+async def built_package_for_pex_from_targets_request(
+    field_set: PexBinaryFieldSet,
 ) -> BuiltPackage:
-    pft_request = request.request
-    pex = await Get(Pex, PexFromTargetsRequest, pft_request)
-    return BuiltPackage(pex.digest, (BuiltPackageArtifact(pft_request.output_filename),))
+    pft_request = await package_pex_binary(field_set, **implicitly())
+    pex = await create_pex(**implicitly(pft_request.request))
+    return BuiltPackage(pex.digest, (BuiltPackageArtifact(pft_request.request.output_filename),))
 
 
 def rules():

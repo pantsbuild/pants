@@ -11,11 +11,12 @@ import socket
 import ssl
 import tarfile
 import time
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Optional, Set, Union
+from typing import Any
 
 import pytest
 
@@ -49,7 +50,8 @@ from pants.engine.fs import (
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.native_engine import PathMetadata, PathMetadataKind, PathNamespace
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import Get, goal_rule, rule
+from pants.engine.intrinsics import digest_to_snapshot
+from pants.engine.rules import goal_rule, implicitly, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import http_server, temporary_dir
@@ -408,7 +410,7 @@ def test_path_globs_symlink_loop(rule_runner: RuleRunner) -> None:
 def test_path_globs_to_digest_contents(rule_runner: RuleRunner) -> None:
     setup_fs_test_tar(rule_runner)
 
-    def get_contents(globs: Iterable[str]) -> Set[FileContent]:
+    def get_contents(globs: Iterable[str]) -> set[FileContent]:
         return set(rule_runner.request(DigestContents, [PathGlobs(globs)]))
 
     assert get_contents(["4.txt", "a/4.txt.ln"]) == {
@@ -425,7 +427,7 @@ def test_path_globs_to_digest_contents(rule_runner: RuleRunner) -> None:
 def test_path_globs_to_digest_entries(rule_runner: RuleRunner) -> None:
     setup_fs_test_tar(rule_runner)
 
-    def get_entries(globs: Iterable[str]) -> Set[Union[FileEntry, Directory, SymlinkEntry]]:
+    def get_entries(globs: Iterable[str]) -> set[FileEntry | Directory | SymlinkEntry]:
         return set(rule_runner.request(DigestEntries, [PathGlobs(globs)]))
 
     assert get_entries(["4.txt", "a/4.txt.ln"]) == {
@@ -1286,7 +1288,7 @@ class WorkspaceGoal(Goal):
 
 def test_workspace_in_goal_rule() -> None:
     @rule
-    def digest_request_singleton() -> DigestRequest:
+    async def digest_request_singleton() -> DigestRequest:
         fc = FileContent(path="a.txt", content=b"hello")
         return DigestRequest(CreateDigest([fc]))
 
@@ -1294,7 +1296,9 @@ def test_workspace_in_goal_rule() -> None:
     async def workspace_goal_rule(
         console: Console, workspace: Workspace, digest_request: DigestRequest
     ) -> WorkspaceGoal:
-        snapshot = await Get(Snapshot, CreateDigest, digest_request.create_digest)
+        snapshot = await digest_to_snapshot(
+            **implicitly({digest_request.create_digest: CreateDigest})
+        )
         workspace.write_digest(snapshot.digest)
         console.print_stdout(snapshot.files[0], end="")
         return WorkspaceGoal(exit_code=0)
@@ -1332,7 +1336,7 @@ def test_invalidated_after_parent_deletion(rule_runner: RuleRunner) -> None:
     """Test that FileContent is invalidated after deleting the parent directory."""
     setup_fs_test_tar(rule_runner)
 
-    def read_file() -> Optional[str]:
+    def read_file() -> str | None:
         digest_contents = rule_runner.request(DigestContents, [PathGlobs(["a/b/1.txt"])])
         if not digest_contents:
             return None
@@ -1491,8 +1495,8 @@ def test_snapshot_hash_and_eq() -> None:
 )
 def test_snapshot_diff(
     rule_runner: RuleRunner,
-    before: Dict[str, str],
-    after: Dict[str, str],
+    before: dict[str, str],
+    after: dict[str, str],
     expected_diff: SnapshotDiff,
 ) -> None:
     diff = SnapshotDiff.from_snapshots(

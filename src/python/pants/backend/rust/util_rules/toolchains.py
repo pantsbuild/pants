@@ -4,22 +4,22 @@ from __future__ import annotations
 
 import dataclasses
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.rust.subsystems.rust import RustSubsystem
 from pants.core.util_rules.system_binaries import (
     BinaryPath,
     BinaryPathRequest,
-    BinaryPaths,
     BinaryPathTest,
+    find_binary,
 )
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.internals.native_engine import Digest
-from pants.engine.internals.selectors import Get
+from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessCacheScope, ProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.process import Process, ProcessCacheScope, execute_process_or_raise
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.util.logging import LogLevel
 
 
@@ -64,13 +64,13 @@ class RustToolchainProcess:
 
 @rule
 async def find_rustup(rust_subsystem: RustSubsystem) -> RustupBinary:
-    env = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
+    env = await environment_vars_subset(EnvironmentVarsRequest(["PATH"]), **implicitly())
     request = BinaryPathRequest(
         binary_name="rustup",
         search_path=rust_subsystem.rustup_search_paths(env),
         test=BinaryPathTest(args=["-V"]),
     )
-    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    paths = await find_binary(request, **implicitly())
     first_path = paths.first_path_or_raise(request, rationale="invoke rustup, rust installer")
     return RustupBinary(first_path.path, first_path.fingerprint)
 
@@ -84,26 +84,34 @@ class RustBinaryPathRequest:
 async def rust_binary_path(
     request: RustBinaryPathRequest, rustup: RustupBinary, rust_subsystem: RustSubsystem
 ) -> BinaryPath:
-    which_result = await Get(
-        ProcessResult,
-        Process(
-            argv=(rustup.path, "which", f"--toolchain={rust_subsystem.toolchain}", request.binary),
-            description=f"Find path to Rust binary `{request.binary}` in toolchain `{rust_subsystem.toolchain}`",
-        ),
+    env = await environment_vars_subset(EnvironmentVarsRequest(["RUSTUP_HOME"]), **implicitly())
+    which_result = await execute_process_or_raise(
+        **implicitly(
+            Process(
+                argv=(
+                    rustup.path,
+                    "which",
+                    f"--toolchain={rust_subsystem.toolchain}",
+                    request.binary,
+                ),
+                env=env,
+                description=f"Find path to Rust binary `{request.binary}` in toolchain `{rust_subsystem.toolchain}`",
+            )
+        )
     )
     binary_full_path = which_result.stdout.decode().strip()
     binary_path_request = BinaryPathRequest(
         binary_name=os.path.basename(binary_full_path),
         search_path=[os.path.dirname(binary_full_path)],
     )
-    paths = await Get(BinaryPaths, BinaryPathRequest, binary_path_request)
+    paths = await find_binary(binary_path_request, **implicitly())
     binary_path = paths.first_path_or_raise(binary_path_request, rationale="invoke Rust")
     return binary_path
 
 
 @rule
 async def rust_toolchain_process(request: RustToolchainProcess) -> Process:
-    binary_path = await Get(BinaryPath, RustBinaryPathRequest(request.binary))
+    binary_path = await rust_binary_path(RustBinaryPathRequest(request.binary), **implicitly())
     return Process(
         argv=[binary_path.path, *request.args],
         description=request.description,
@@ -115,5 +123,5 @@ async def rust_toolchain_process(request: RustToolchainProcess) -> Process:
     )
 
 
-def rules():
+def rules() -> Iterable[Rule]:
     return collect_rules()

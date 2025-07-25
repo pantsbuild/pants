@@ -6,8 +6,9 @@ from __future__ import annotations
 import io
 import os
 from collections import abc
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any
 
 import toml
 
@@ -15,24 +16,28 @@ from pants.backend.python.subsystems import setuptools
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPexProcess, create_venv_pex
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.pex_requirements import EntireLockfile, PexRequirements
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.fs import (
     CreateDigest,
     Digest,
-    DigestContents,
     DigestSubset,
     FileContent,
     MergeDigests,
     PathGlobs,
     RemovePrefix,
-    Snapshot,
 )
-from pants.engine.internals.selectors import Get
-from pants.engine.process import ProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.intrinsics import (
+    create_digest,
+    digest_to_snapshot,
+    get_digest_contents,
+    merge_digests,
+    remove_prefix,
+)
+from pants.engine.process import fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.osutil import is_macos_big_sur
@@ -69,15 +74,16 @@ class BuildSystem:
 
 @rule
 async def find_build_system(request: BuildSystemRequest, _setuptools: Setuptools) -> BuildSystem:
-    digest_contents = await Get(
-        DigestContents,
-        DigestSubset(
-            request.digest,
-            PathGlobs(
-                globs=[os.path.join(request.working_directory, "pyproject.toml")],
-                glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
-            ),
-        ),
+    digest_contents = await get_digest_contents(
+        **implicitly(
+            DigestSubset(
+                request.digest,
+                PathGlobs(
+                    globs=[os.path.join(request.working_directory, "pyproject.toml")],
+                    glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
+                ),
+            )
+        )
     )
     ret = None
     if digest_contents:
@@ -201,23 +207,23 @@ def interpolate_backend_shim(dist_dir: str, request: DistBuildRequest) -> bytes:
 async def run_pep517_build(request: DistBuildRequest, python_setup: PythonSetup) -> DistBuildResult:
     # Note that this pex has no entrypoint. We use it to run our generated shim, which
     # in turn imports from and invokes the build backend.
-    build_backend_pex = await Get(
-        VenvPex,
-        PexRequest(
-            output_filename="build_backend.pex",
-            internal_only=True,
-            requirements=request.build_system.requires,
-            pex_path=request.extra_build_time_requirements,
-            interpreter_constraints=request.interpreter_constraints,
-        ),
+    build_backend_pex = await create_venv_pex(
+        **implicitly(
+            PexRequest(
+                output_filename="build_backend.pex",
+                internal_only=True,
+                requirements=request.build_system.requires,
+                pex_path=request.extra_build_time_requirements,
+                interpreter_constraints=request.interpreter_constraints,
+            )
+        )
     )
 
     # This is the setuptools dist directory, not Pants's, so we hardcode to dist/.
     dist_dir = "dist"
     backend_shim_name = "backend_shim.py"
     backend_shim_path = os.path.join(request.working_directory, backend_shim_name)
-    backend_shim_digest = await Get(
-        Digest,
+    backend_shim_digest = await create_digest(
         CreateDigest(
             [
                 FileContent(
@@ -225,10 +231,10 @@ async def run_pep517_build(request: DistBuildRequest, python_setup: PythonSetup)
                     interpolate_backend_shim(os.path.join(dist_dir, request.output_path), request),
                 ),
             ]
-        ),
+        )
     )
 
-    merged_digest = await Get(Digest, MergeDigests((request.input, backend_shim_digest)))
+    merged_digest = await merge_digests(MergeDigests((request.input, backend_shim_digest)))
 
     extra_env = {
         **(request.extra_build_time_env or {}),
@@ -237,22 +243,23 @@ async def run_pep517_build(request: DistBuildRequest, python_setup: PythonSetup)
     if python_setup.macos_big_sur_compatibility and is_macos_big_sur():
         extra_env["MACOSX_DEPLOYMENT_TARGET"] = "10.16"
 
-    result = await Get(
-        ProcessResult,
-        VenvPexProcess(
-            build_backend_pex,
-            argv=(backend_shim_name,),
-            input_digest=merged_digest,
-            extra_env=extra_env,
-            working_directory=request.working_directory,
-            output_directories=(dist_dir,),  # Relative to the working_directory.
-            description=(
-                f"Run {request.build_system.build_backend} for {request.target_address_spec}"
-                if request.target_address_spec
-                else f"Run {request.build_system.build_backend}"
-            ),
-            level=LogLevel.DEBUG,
-        ),
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            VenvPexProcess(
+                build_backend_pex,
+                argv=(backend_shim_name,),
+                input_digest=merged_digest,
+                extra_env=extra_env,
+                working_directory=request.working_directory,
+                output_directories=(dist_dir,),  # Relative to the working_directory.
+                description=(
+                    f"Run {request.build_system.build_backend} for {request.target_address_spec}"
+                    if request.target_address_spec
+                    else f"Run {request.build_system.build_backend}"
+                ),
+                level=LogLevel.DEBUG,
+            )
+        )
     )
     output_lines = result.stdout.decode().splitlines()
     paths = {}
@@ -263,8 +270,8 @@ async def run_pep517_build(request: DistBuildRequest, python_setup: PythonSetup)
                     request.output_path, line[len(dist_type) + 2 :].strip()
                 )
     # Note that output_digest paths are relative to the working_directory.
-    output_digest = await Get(Digest, RemovePrefix(result.output_digest, dist_dir))
-    output_snapshot = await Get(Snapshot, Digest, output_digest)
+    output_digest = await remove_prefix(RemovePrefix(result.output_digest, dist_dir))
+    output_snapshot = await digest_to_snapshot(output_digest)
     for dist_type, path in paths.items():
         if path not in output_snapshot.files:
             raise BuildBackendError(

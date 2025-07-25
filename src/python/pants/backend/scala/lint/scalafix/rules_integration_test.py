@@ -2,8 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from collections.abc import Callable
 from textwrap import dedent
-from typing import Any, Callable, TypeVar, overload
+from typing import Any, TypeVar, overload
 
 import pytest
 
@@ -94,8 +95,7 @@ def run_scalafix_fix(
     *,
     extra_options: list[str] = [],
     expected_partitions: None = None,
-) -> FixResult:
-    ...
+) -> FixResult: ...
 
 
 @overload
@@ -105,8 +105,7 @@ def run_scalafix_fix(
     *,
     extra_options: list[str] = [],
     expected_partitions: dict[str, tuple[str, ...]],
-) -> list[FixResult]:
-    ...
+) -> list[FixResult]: ...
 
 
 def run_scalafix_fix(
@@ -145,8 +144,7 @@ def run_scalafix_lint(
     *,
     extra_options: list[str] = [],
     expected_partitions: None = None,
-) -> LintResult:
-    ...
+) -> LintResult: ...
 
 
 @overload
@@ -156,8 +154,7 @@ def run_scalafix_lint(
     *,
     extra_options: list[str] = [],
     expected_partitions: dict[str, tuple[str, ...]],
-) -> list[LintResult]:
-    ...
+) -> list[LintResult]: ...
 
 
 def run_scalafix_lint(

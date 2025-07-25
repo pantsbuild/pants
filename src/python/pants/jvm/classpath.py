@@ -4,17 +4,19 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Iterator
 
 from pants.core.util_rules import system_binaries
 from pants.core.util_rules.system_binaries import UnzipBinary
 from pants.engine.fs import Digest, MergeDigests, RemovePrefix
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.intrinsics import merge_digests, remove_prefix
+from pants.engine.process import Process, execute_process_or_raise
+from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import CoarsenedTargets
 from pants.jvm.compile import ClasspathEntry, ClasspathEntryRequest, ClasspathEntryRequestFactory
 from pants.jvm.compile import rules as jvm_compile_rules
+from pants.jvm.resolve.coursier_fetch import select_coursier_resolve_for_targets
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.util.logging import LogLevel
 
@@ -77,10 +79,10 @@ async def classpath(
 ) -> Classpath:
     # Compute a single shared resolve for all of the roots, which will validate that they
     # are compatible with one another.
-    resolve = await Get(CoursierResolveKey, CoarsenedTargets, coarsened_targets)
+    resolve = await select_coursier_resolve_for_targets(coarsened_targets, **implicitly())
 
     # Then request classpath entries for each root.
-    classpath_entries = await MultiGet(
+    classpath_entries = await concurrently(
         Get(
             ClasspathEntry,
             ClasspathEntryRequest,
@@ -108,28 +110,31 @@ async def loose_classfiles(
     classpath_entry: ClasspathEntry, unzip_binary: UnzipBinary
 ) -> LooseClassfiles:
     dest_dir = "dest"
-    process_results = await MultiGet(
-        Get(
-            ProcessResult,
-            Process(
-                argv=[
-                    unzip_binary.path,
-                    "-d",
-                    dest_dir,
-                    filename,
-                ],
-                output_directories=(dest_dir,),
-                description=f"Extract {filename}",
-                immutable_input_digests=dict(ClasspathEntry.immutable_inputs([classpath_entry])),
-                level=LogLevel.TRACE,
-            ),
+    process_results = await concurrently(
+        execute_process_or_raise(
+            **implicitly(
+                Process(
+                    argv=[
+                        unzip_binary.path,
+                        "-d",
+                        dest_dir,
+                        filename,
+                    ],
+                    output_directories=(dest_dir,),
+                    description=f"Extract {filename}",
+                    immutable_input_digests=dict(
+                        ClasspathEntry.immutable_inputs([classpath_entry])
+                    ),
+                    level=LogLevel.TRACE,
+                )
+            )
         )
         for filename in ClasspathEntry.immutable_inputs_args([classpath_entry])
     )
 
-    merged_digest = await Get(Digest, MergeDigests(pr.output_digest for pr in process_results))
+    merged_digest = await merge_digests(MergeDigests(pr.output_digest for pr in process_results))
 
-    return LooseClassfiles(await Get(Digest, RemovePrefix(merged_digest, dest_dir)))
+    return LooseClassfiles(await remove_prefix(RemovePrefix(merged_digest, dest_dir)))
 
 
 def rules():

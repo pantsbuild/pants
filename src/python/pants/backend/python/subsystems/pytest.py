@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import os.path
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import (
@@ -19,10 +19,10 @@ from pants.backend.python.target_types import (
     PythonTestsXdistConcurrencyField,
     SkipPythonTestsField,
 )
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.resolves import ExportableTool
 from pants.core.goals.test import RuntimePackageDependenciesField, TestFieldSet
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.rules import collect_rules
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule

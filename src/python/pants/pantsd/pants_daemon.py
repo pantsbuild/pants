@@ -36,6 +36,8 @@ from pants.version import VERSION
 _SHUTDOWN_TIMEOUT_SECS = 3
 
 _PRESERVED_ENV_VARS = [
+    # Provides location of sandboxer binary.
+    "PANTS_SANDBOXER_BINARY_PATH",
     # Controls backtrace behavior for rust code.
     "RUST_BACKTRACE",
     # The environment variables consumed by the `bollard` crate as of
@@ -195,8 +197,10 @@ class PantsDaemon(PantsDaemonProcessManager):
         # Switch log output to the daemon's log stream, and empty `env` and `argv` to encourage all
         # further usage of those variables to happen via engine APIs and options.
         self._close_stdio(pants_log_path(PurePath(global_bootstrap_options.pants_workdir)))
-        with initialize_stdio(global_bootstrap_options), argv_as(tuple()), hermetic_environment_as(
-            *_PRESERVED_ENV_VARS
+        with (
+            initialize_stdio(global_bootstrap_options),
+            argv_as(tuple()),
+            hermetic_environment_as(*_PRESERVED_ENV_VARS),
         ):
             # Install signal and panic handling.
             ExceptionSink.install(
@@ -232,7 +236,7 @@ def launch_new_pantsd_instance():
     """An external entrypoint that spawns a new pantsd instance."""
 
     options_bootstrapper = OptionsBootstrapper.create(
-        env=os.environ, args=sys.argv, allow_pantsrc=True
+        args=sys.argv, env=os.environ, allow_pantsrc=True
     )
     daemon = PantsDaemon.create(options_bootstrapper)
     daemon.run_sync()

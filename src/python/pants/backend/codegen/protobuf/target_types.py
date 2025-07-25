@@ -40,7 +40,7 @@ class AllProtobufTargets(Targets):
 
 
 @rule(desc="Find all Protobuf targets in project", level=LogLevel.DEBUG)
-def find_all_protobuf_targets(targets: AllTargets) -> AllProtobufTargets:
+async def find_all_protobuf_targets(targets: AllTargets) -> AllProtobufTargets:
     return AllProtobufTargets(tgt for tgt in targets if tgt.has_field(ProtobufSourceField))
 
 
@@ -66,8 +66,8 @@ class ProtobufSourceTarget(Target):
         A single Protobuf file used to generate various languages.
 
         See language-specific docs:
-            Python: {doc_url('docs/python/integrations/protobuf-and-grpc')}
-            Go: {doc_url('docs/go/integrations/protobuf')}
+            Python: {doc_url("docs/python/integrations/protobuf-and-grpc")}
+            Go: {doc_url("docs/go/integrations/protobuf")}
         """
     )
 
@@ -82,7 +82,7 @@ class GeneratorSettingsRequest(TargetFilesGeneratorSettingsRequest):
 
 
 @rule
-def generator_settings(
+async def generator_settings(
     _: GeneratorSettingsRequest,
     protoc: Protoc,
 ) -> TargetFilesGeneratorSettings:

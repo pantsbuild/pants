@@ -19,24 +19,26 @@ from pants.core.goals.test import (
     TestSubsystem,
 )
 from pants.core.target_types import FileSourceField
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.addresses import Addresses
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
+from pants.engine.env_vars import EnvironmentVarsRequest
+from pants.engine.fs import DigestSubset, MergeDigests, PathGlobs, RemovePrefix
+from pants.engine.internals.graph import transitive_targets
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.intrinsics import digest_subset_to_digest, digest_to_snapshot, merge_digests
 from pants.engine.process import (
     InteractiveProcess,
-    Process,
     ProcessCacheScope,
-    ProcessResultWithRetries,
     ProcessWithRetries,
+    execute_process_with_retry,
 )
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import SourcesField, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
+from pants.engine.target import SourcesField, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
-from pants.jvm.classpath import Classpath
+from pants.jvm.classpath import classpath as classpath_get
 from pants.jvm.goals import lockfile
-from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
-from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.jdk_rules import JdkRequest, JvmProcess, jvm_process, prepare_jdk_environment
+from pants.jvm.resolve.coursier_fetch import ToolClasspathRequest, materialize_classpath_for_tool
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
@@ -90,26 +92,25 @@ async def setup_junit_for_target(
     test_subsystem: TestSubsystem,
     test_extra_env: TestExtraEnv,
 ) -> TestSetup:
-    jdk, transitive_tgts = await MultiGet(
-        Get(JdkEnvironment, JdkRequest, JdkRequest.from_field(request.field_set.jdk_version)),
-        Get(TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])),
+    jdk, transitive_tgts = await concurrently(
+        prepare_jdk_environment(**implicitly(JdkRequest.from_field(request.field_set.jdk_version))),
+        transitive_targets(TransitiveTargetsRequest([request.field_set.address]), **implicitly()),
     )
 
     lockfile_request = GenerateJvmLockfileFromTool.create(junit)
-    classpath, junit_classpath, files = await MultiGet(
-        Get(Classpath, Addresses([request.field_set.address])),
-        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
-        Get(
-            SourceFiles,
+    classpath, junit_classpath, files = await concurrently(
+        classpath_get(**implicitly(Addresses([request.field_set.address]))),
+        materialize_classpath_for_tool(ToolClasspathRequest(lockfile=lockfile_request)),
+        determine_source_files(
             SourceFilesRequest(
                 (dep.get(SourcesField) for dep in transitive_tgts.dependencies),
                 for_sources_types=(FileSourceField,),
                 enable_codegen=True,
-            ),
+            )
         ),
     )
 
-    input_digest = await Get(Digest, MergeDigests((*classpath.digests(), files.snapshot.digest)))
+    input_digest = await merge_digests(MergeDigests((*classpath.digests(), files.snapshot.digest)))
 
     toolcp_relpath = "__toolcp"
     extra_immutable_input_digests = {
@@ -131,8 +132,8 @@ async def setup_junit_for_target(
     if request.is_debug:
         extra_jvm_args.extend(jvm.debug_args)
 
-    field_set_extra_env = await Get(
-        EnvironmentVars, EnvironmentVarsRequest(request.field_set.extra_env_vars.value or ())
+    field_set_extra_env = await environment_vars_subset(
+        EnvironmentVarsRequest(request.field_set.extra_env_vars.value or ()), **implicitly()
     )
 
     process = JvmProcess(
@@ -171,18 +172,21 @@ async def run_junit_test(
 ) -> TestResult:
     field_set = batch.single_element
 
-    test_setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
-    process = await Get(Process, JvmProcess, test_setup.process)
-    process_results = await Get(
-        ProcessResultWithRetries, ProcessWithRetries(process, test_subsystem.attempts_default)
+    test_setup = await setup_junit_for_target(
+        TestSetupRequest(field_set, is_debug=False), **implicitly()
+    )
+    process = await jvm_process(**implicitly(test_setup.process))
+    process_results = await execute_process_with_retry(
+        ProcessWithRetries(process, test_subsystem.attempts_default)
     )
     reports_dir_prefix = test_setup.reports_dir_prefix
 
-    xml_result_subset = await Get(
-        Digest,
-        DigestSubset(process_results.last.output_digest, PathGlobs([f"{reports_dir_prefix}/**"])),
+    xml_result_subset = await digest_subset_to_digest(
+        DigestSubset(process_results.last.output_digest, PathGlobs([f"{reports_dir_prefix}/**"]))
     )
-    xml_results = await Get(Snapshot, RemovePrefix(xml_result_subset, reports_dir_prefix))
+    xml_results = await digest_to_snapshot(
+        **implicitly(RemovePrefix(xml_result_subset, reports_dir_prefix))
+    )
 
     return TestResult.from_fallible_process_result(
         process_results=process_results.results,
@@ -194,10 +198,12 @@ async def run_junit_test(
 
 @rule(level=LogLevel.DEBUG)
 async def setup_junit_debug_request(
-    batch: JunitTestRequest.Batch[JunitTestFieldSet, Any]
+    batch: JunitTestRequest.Batch[JunitTestFieldSet, Any],
 ) -> TestDebugRequest:
-    setup = await Get(TestSetup, TestSetupRequest(batch.single_element, is_debug=True))
-    process = await Get(Process, JvmProcess, setup.process)
+    setup = await setup_junit_for_target(
+        TestSetupRequest(batch.single_element, is_debug=True), **implicitly()
+    )
+    process = await jvm_process(**implicitly(setup.process))
     return TestDebugRequest(
         InteractiveProcess.from_process(process, forward_signals_to_process=False, restartable=True)
     )

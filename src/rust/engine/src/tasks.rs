@@ -1,7 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 use crate::python::{Function, TypeId};
 
@@ -144,6 +144,9 @@ pub struct DisplayInfo {
     pub level: Level,
 }
 
+// Map of base rule -> map of derived type to derived rule for that type.
+type VTable = HashMap<RuleId, HashMap<TypeId, RuleId>>;
+
 ///
 /// Registry of user Tasks.
 ///
@@ -151,6 +154,7 @@ pub struct DisplayInfo {
 pub struct Tasks {
     rules: IndexSet<Rule>,
     queries: IndexSet<Query<TypeId>>,
+    vtable: VTable,
     // Used during the construction of a rule.
     preparing: Option<Task>,
 }
@@ -169,8 +173,9 @@ impl Tasks {
     pub fn new() -> Tasks {
         Tasks {
             rules: IndexSet::default(),
-            preparing: None,
             queries: IndexSet::default(),
+            vtable: VTable::default(),
+            preparing: None,
         }
     }
 
@@ -180,6 +185,10 @@ impl Tasks {
 
     pub fn queries(&self) -> &IndexSet<Query<TypeId>> {
         &self.queries
+    }
+
+    pub fn vtable(&self) -> &VTable {
+        &self.vtable
     }
 
     ///
@@ -225,22 +234,63 @@ impl Tasks {
         &mut self,
         output: TypeId,
         inputs: Vec<TypeId>,
-        rule_id: String,
+        rule_id: RuleId,
         explicit_args_arity: u16,
+        vtable_entries: Option<HashMap<TypeId, RuleId>>,
+        in_scope_types: Option<Vec<TypeId>>,
     ) {
-        let gets = &mut self
+        let calls = &mut self
             .preparing
             .as_mut()
             .expect("Must `begin()` a task creation before adding calls!")
             .gets;
-        gets.push(
-            DependencyKey::for_known_rule(
-                RuleId::from_string(rule_id),
-                output,
-                explicit_args_arity,
-            )
-            .provided_params(inputs),
-        )
+
+        if let Some(vtable_entries) = vtable_entries {
+            // This is a polymorphic call, so in_scope_types must be provided by the caller.
+            // TODO: We would like to deprecate the in_scope_types argument to the @union decorator,
+            // and instead let the in-scope types be defined by the signature of the polymorphic
+            // rule (i.e., they would be the explicit params in the signature other than the union
+            // type). However this would require access to the rule's signature (which is distinct
+            // from the call's signature) both here and in gen_call() in task.rs. So for now we
+            // continue to use the legacy in_scope_types @union arg, and we can revisit once we're
+            // fully call-by-name.
+            // See https://github.com/pantsbuild/pants/issues/22483
+            let in_scope_types = in_scope_types.unwrap_or_else(|| {
+                panic!("No in_scope_types passed in for a polymorphic call");
+            });
+
+            // Note that the Python code calling this function has already verified that there
+            // is a relevant union type in the inputs, so this should never panic in practice.
+            let union_type = inputs.iter().find(|t| t.is_union()).unwrap_or_else(|| {
+                panic!("No union argument found in inputs of call to {rule_id}")
+            });
+            // Add calls for each vtable member. At runtime we'll select the relevant one.
+            for (member_type, member_rule) in vtable_entries.iter() {
+                let member_rule_inputs = inputs
+                    .iter()
+                    .map(|t| if t == union_type { member_type } else { t })
+                    .map(TypeId::clone)
+                    .collect::<Vec<TypeId>>();
+                calls.push(
+                    DependencyKey::for_known_rule(member_rule.clone(), output, explicit_args_arity)
+                        .provided_params(member_rule_inputs)
+                        .in_scope_params(in_scope_types.clone()),
+                );
+            }
+            self.vtable.insert(rule_id.clone(), vtable_entries);
+
+            // Add the polymorphic call itself.
+            calls.push(
+                DependencyKey::for_known_rule(rule_id, output, explicit_args_arity)
+                    .provided_params(inputs)
+                    .in_scope_params(in_scope_types.clone()),
+            );
+        } else {
+            calls.push(
+                DependencyKey::for_known_rule(rule_id, output, explicit_args_arity)
+                    .provided_params(inputs),
+            );
+        }
     }
 
     pub fn add_get(&mut self, output: TypeId, inputs: Vec<TypeId>) {

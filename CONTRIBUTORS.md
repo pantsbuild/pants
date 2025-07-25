@@ -1,5 +1,6 @@
 Created as part of the release process.
 
++ 0xG0nz0
 + A. Alonso Dominguez
 + APL
 + Aaron Mitchell
@@ -66,6 +67,7 @@ Created as part of the release process.
 + Constantin Ponfick
 + Craig Schertz
 + Cristian Matache
++ D. Luke Nelson
 + Damon Revoe
 + Dan Davydov
 + Dan Fabulich
@@ -78,6 +80,7 @@ Created as part of the release process.
 + Daniel Peebles
 + Daniel Wagner-Hall
 + Danny McClanahan
++ Darren Clark
 + Dave Brewster
 + David Katz
 + David Singleton
@@ -109,11 +112,13 @@ Created as part of the release process.
 + Facetoe
 + Fatin H
 + Fedor Korotkov
++ Felix Scherz
 + Filip Nikolovski
 + Fiona Condone
 + Flo
 + Florian Leibert
 + Fredrik Ekholdt
++ Fredrik Wärnsberg
 + Gabriel Gonzalez
 + Garrett Malmquist
 + Gary M. Josack
@@ -145,6 +150,7 @@ Created as part of the release process.
 + Jack Zhao
 + Jackson Davis
 + Jacob Floyd
++ Jake
 + Jake Donham
 + Jake Zerrer
 + Jakub Bujny
@@ -190,6 +196,8 @@ Created as part of the release process.
 + Jovial Joe Jayarson
 + Julio Batista Silva
 + Justin Trobec
++ Kacper
++ Kacper Krylowicz
 + KadenAgrey
 + Karin Lundberg
 + Kaushik Srenevasan
@@ -202,6 +210,7 @@ Created as part of the release process.
 + Kris Wilson
 + Krishna Vudata
 + Krishnan Chandra
++ Kristian Tashkov
 + Kushal Dave
 + Kyle Derr
 + Kyujin Cho
@@ -236,6 +245,7 @@ Created as part of the release process.
 + Mateo Rodriguez
 + Mathew Jennings
 + Mathieu Sabourin
++ Matt Alexander
 + Matt Dee
 + Matt Landis
 + Matt Olsen
@@ -311,6 +321,7 @@ Created as part of the release process.
 + SergeKireev
 + Sergey Serebryakov
 + Seve Martinez
++ Shaked Kaplan
 + Shane Delmore
 + Shantanu Kumar
 + Shuo Li
@@ -350,10 +361,12 @@ Created as part of the release process.
 + Travis Crawford
 + Troy Howard
 + Tushar Singh
++ Tyler Rhodes
 + Ugo Di Girolamo
 + Ulugbek Adilbekov
 + Viktor Kleen
 + Vincent Tavernier
++ Vito Laurenza
 + Walter Scheper
 + Wei An
 + Wilhelmina Drengwitz
@@ -367,6 +380,7 @@ Created as part of the release process.
 + Yoav Alon
 + Yuhan GUO
 + Yujie Chen
++ achrafmam2
 + andreaimprovised
 + azban
 + bianca rosa
@@ -374,9 +388,12 @@ Created as part of the release process.
 + csqzhang
 + csteiner
 + eugene yokota
++ fabric-peter
 + gyudoza
 + hephex
 + jgartdele/del
++ lukevmorris
++ nikhila-dwarakanath-zocdoc
 + offsetcyan
 + okcleary
 + olivercoleman-switchdin
@@ -387,4 +404,5 @@ Created as part of the release process.
 + twunderlich-grapl
 + wimax-grapl
 + yjabri
++ Éric Jacob
 + Ólafur Páll Geirsson

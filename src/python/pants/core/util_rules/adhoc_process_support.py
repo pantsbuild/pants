@@ -8,22 +8,28 @@ import json
 import logging
 import os
 import shlex
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from textwrap import dedent  # noqa: PNT20
-from typing import Iterable, Mapping, TypeVar, Union
+from typing import TypeVar
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.build_graph.address import Address
-from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
-from pants.core.goals.run import RunFieldSet, RunInSandboxRequest
+from pants.core.environments.rules import EnvironmentNameRequest, resolve_environment_name
+from pants.core.goals.package import (
+    EnvironmentAwarePackageRequest,
+    PackageFieldSet,
+    environment_aware_package,
+)
+from pants.core.goals.run import RunFieldSet, generate_run_in_sandbox_request
 from pants.core.target_types import FileSourceField
-from pants.core.util_rules.environments import EnvironmentNameRequest
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.core.util_rules.system_binaries import BashBinary
+from pants.engine import process
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -36,28 +42,42 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
     PathMetadataRequest,
-    PathMetadataResult,
-    Paths,
     Snapshot,
 )
+from pants.engine.internals.build_files import resolve_address
+from pants.engine.internals.graph import (
+    find_valid_field_sets,
+    resolve_target,
+    resolve_targets,
+    resolve_unparsed_address_inputs,
+    transitive_targets,
+)
 from pants.engine.internals.native_engine import AddressInput, PathMetadata, RemovePrefix
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.intrinsics import (
+    create_digest,
+    digest_subset_to_digest,
+    digest_to_snapshot,
+    execute_process,
+    merge_digests,
+    path_globs_to_paths,
+    path_metadata_request,
+    remove_prefix,
+)
 from pants.engine.process import (
     FallibleProcessResult,
     Process,
     ProcessCacheScope,
     ProcessResult,
     ProductDescription,
+    fallible_to_exec_result_or_raise,
 )
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
-    FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     SourcesField,
     Target,
-    Targets,
-    TransitiveTargets,
     TransitiveTargetsRequest,
-    WrappedTarget,
     WrappedTargetRequest,
 )
 from pants.util.frozendict import FrozenDict
@@ -88,6 +108,19 @@ class AdhocProcessRequest:
     use_working_directory_as_base_for_output_captures: bool = True
     outputs_match_error_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.error
     outputs_match_conjunction: GlobExpansionConjunction | None = GlobExpansionConjunction.all_match
+
+
+@dataclass(frozen=True)
+class PreparedAdhocProcessRequest:
+    original_request: AdhocProcessRequest
+    process: Process
+
+
+@dataclass(frozen=True)
+class FallibleAdhocProcessResult:
+    process_result: FallibleProcessResult
+    adjusted_digest: Digest
+    description: str
 
 
 @dataclass(frozen=True)
@@ -174,7 +207,7 @@ async def merge_extra_sandbox_contents(request: MergeExtraSandboxContents) -> Ex
         _safe_update(append_only_caches, addition.append_only_caches)
         _safe_update(extra_env, addition.extra_env)
 
-    digest = await Get(Digest, MergeDigests(digests))
+    digest = await merge_digests(MergeDigests(digests))
 
     return ExtraSandboxContents(
         digest=digest,
@@ -190,26 +223,41 @@ async def merge_extra_sandbox_contents(request: MergeExtraSandboxContents) -> Ex
 #
 
 
+@rule
+async def convert_fallible_adhoc_process_result(
+    fallible_result: FallibleAdhocProcessResult,
+) -> AdhocProcessResult:
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            {
+                fallible_result.process_result: FallibleProcessResult,
+                ProductDescription(fallible_result.description): ProductDescription,
+            }
+        )
+    )
+    return AdhocProcessResult(
+        process_result=result, adjusted_digest=fallible_result.adjusted_digest
+    )
+
+
 async def _resolve_runnable_dependencies(
     bash: BashBinary, deps: tuple[str, ...] | None, owning: Address, origin: str
 ) -> tuple[Digest, RunnableDependencies | None]:
     if not deps:
         return EMPTY_DIGEST, None
 
-    addresses = await Get(
-        Addresses,
+    addresses = await resolve_unparsed_address_inputs(
         UnparsedAddressInputs(
             (dep for dep in deps),
             owning_address=owning,
             description_of_origin=origin,
         ),
+        **implicitly(),
     )
 
-    targets = await Get(Targets, Addresses, addresses)
-
-    fspt = await Get(
-        FieldSetsPerTarget,
-        FieldSetsPerTargetRequest(RunFieldSet, targets),
+    targets = await resolve_targets(**implicitly({addresses: Addresses}))
+    fspt = await find_valid_field_sets(
+        FieldSetsPerTargetRequest(RunFieldSet, targets), **implicitly()
     )
 
     for address, field_set in zip(addresses, fspt.collection):
@@ -223,8 +271,9 @@ async def _resolve_runnable_dependencies(
                 )
             )
 
-    runnables = await MultiGet(
-        Get(RunInSandboxRequest, RunFieldSet, field_set[0]) for field_set in fspt.collection
+    runnables = await concurrently(
+        generate_run_in_sandbox_request(**implicitly({field_set[0]: RunFieldSet}))
+        for field_set in fspt.collection
     )
 
     shims: list[FileContent] = []
@@ -248,9 +297,9 @@ async def _resolve_runnable_dependencies(
             )
         )
 
-    merged_extras, shim_digest = await MultiGet(
-        Get(ExtraSandboxContents, MergeExtraSandboxContents(tuple(extras))),
-        Get(Digest, CreateDigest(shims)),
+    merged_extras, shim_digest = await concurrently(
+        merge_extra_sandbox_contents(MergeExtraSandboxContents(tuple(extras))),
+        create_digest(CreateDigest(shims)),
     )
 
     shim_digest_path = f"_runnable_dependency_shims_{shim_digest.fingerprint}"
@@ -279,20 +328,19 @@ async def resolve_execution_environment(
     # Always include the execution dependencies that were specified
     if raw_execution_dependencies is not None:
         _descr = f"the `execution_dependencies` from the target {target_address}"
-        execution_dependencies = await Get(
-            Addresses,
+        execution_dependencies = await resolve_unparsed_address_inputs(
             UnparsedAddressInputs(
                 raw_execution_dependencies,
                 owning_address=target_address,
                 description_of_origin=_descr,
             ),
+            **implicitly(),
         )
     else:
         execution_dependencies = Addresses(())
 
-    transitive = await Get(
-        TransitiveTargets,
-        TransitiveTargetsRequest(execution_dependencies),
+    transitive = await transitive_targets(
+        TransitiveTargetsRequest(execution_dependencies), **implicitly()
     )
 
     all_dependencies = (
@@ -300,23 +348,21 @@ async def resolve_execution_environment(
         *transitive.dependencies,
     )
 
-    sources, pkgs_per_target = await MultiGet(
-        Get(
-            SourceFiles,
+    sources, pkgs_per_target = await concurrently(
+        determine_source_files(
             SourceFilesRequest(
                 sources_fields=[tgt.get(SourcesField) for tgt in all_dependencies],
                 for_sources_types=(SourcesField, FileSourceField),
                 enable_codegen=True,
-            ),
+            )
         ),
-        Get(
-            FieldSetsPerTarget,
-            FieldSetsPerTargetRequest(PackageFieldSet, all_dependencies),
+        find_valid_field_sets(
+            FieldSetsPerTargetRequest(PackageFieldSet, all_dependencies), **implicitly()
         ),
     )
 
-    packages = await MultiGet(
-        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
+    packages = await concurrently(
+        environment_aware_package(EnvironmentAwarePackageRequest(field_set))
         for field_set in pkgs_per_target.field_sets
     )
 
@@ -325,11 +371,8 @@ async def resolve_execution_environment(
         bash, request.runnable_dependencies, target_address, _descr
     )
 
-    dependencies_digest = await Get(
-        Digest,
-        MergeDigests(
-            [sources.snapshot.digest, runnables_digest, *(pkg.digest for pkg in packages)]
-        ),
+    dependencies_digest = await merge_digests(
+        MergeDigests([sources.snapshot.digest, runnables_digest, *(pkg.digest for pkg in packages)])
     )
 
     return ResolvedExecutionDependencies(dependencies_digest, runnable_dependencies)
@@ -376,44 +419,47 @@ def _runnable_dependency_shim(
 async def create_tool_runner(
     request: ToolRunnerRequest,
 ) -> ToolRunner:
-    runnable_address = await Get(
-        Address,
-        AddressInput,
-        AddressInput.parse(
-            request.runnable_address_str,
-            relative_to=request.target.address.spec_path,
-            description_of_origin=f"Runnable target for {request.target.address.spec_path}",
-        ),
+    runnable_address = await resolve_address(
+        **implicitly(
+            {
+                AddressInput.parse(
+                    request.runnable_address_str,
+                    relative_to=request.target.address.spec_path,
+                    description_of_origin=f"Runnable target for {request.target.address.spec_path}",
+                ): AddressInput
+            }
+        )
     )
 
     addresses = Addresses((runnable_address,))
     addresses.expect_single()
 
-    runnable_targets = await Get(Targets, Addresses, addresses)
+    runnable_targets = await resolve_targets(**implicitly({addresses: Addresses}))
 
-    run_field_sets, environment_name, execution_environment = await MultiGet(
-        Get(FieldSetsPerTarget, FieldSetsPerTargetRequest(RunFieldSet, runnable_targets)),
-        Get(
-            EnvironmentName,
-            EnvironmentNameRequest,
-            EnvironmentNameRequest.from_target(request.target),
+    run_field_sets, environment_name = await concurrently(
+        find_valid_field_sets(
+            FieldSetsPerTargetRequest(RunFieldSet, runnable_targets), **implicitly()
         ),
-        Get(
-            ResolvedExecutionDependencies,
-            ResolveExecutionDependenciesRequest(
-                address=request.target.address,
-                execution_dependencies=request.execution_dependencies,
-                runnable_dependencies=request.runnable_dependencies,
-            ),
+        resolve_environment_name(
+            EnvironmentNameRequest.from_target(request.target), **implicitly()
         ),
+    )
+
+    req = ResolveExecutionDependenciesRequest(
+        address=request.target.address,
+        execution_dependencies=request.execution_dependencies,
+        runnable_dependencies=request.runnable_dependencies,
+    )
+    execution_environment = await resolve_execution_environment(
+        **implicitly({req: ResolveExecutionDependenciesRequest, environment_name: EnvironmentName}),
     )
 
     run_field_set: RunFieldSet = run_field_sets.field_sets[0]
 
     # Must be run in target environment so that the binaries/envvars match the execution
     # environment when we actually run the process.
-    run_request = await Get(
-        RunInSandboxRequest, {environment_name: EnvironmentName, run_field_set: RunFieldSet}
+    run_request = await generate_run_in_sandbox_request(
+        **implicitly({run_field_set: RunFieldSet, environment_name: EnvironmentName})
     )
 
     dependencies_digest = execution_environment.digest
@@ -445,9 +491,9 @@ async def create_tool_runner(
             )
         )
 
-    merged_extras, main_digest = await MultiGet(
-        Get(ExtraSandboxContents, MergeExtraSandboxContents(tuple(extra_sandbox_contents))),
-        Get(Digest, MergeDigests((dependencies_digest, run_request.digest))),
+    merged_extras, main_digest = await concurrently(
+        merge_extra_sandbox_contents(MergeExtraSandboxContents(tuple(extra_sandbox_contents))),
+        merge_digests(MergeDigests((dependencies_digest, run_request.digest))),
     )
 
     extra_env = dict(merged_extras.extra_env)
@@ -481,9 +527,8 @@ async def check_outputs(
     if outputs_match_mode is None:
         return
 
-    filtered_output_files_digests = await MultiGet(
-        Get(
-            Digest,
+    filtered_output_files_digests = await concurrently(
+        digest_subset_to_digest(
             DigestSubset(
                 output_digest,
                 PathGlobs(
@@ -495,9 +540,8 @@ async def check_outputs(
         for output_file in output_files
     )
 
-    filtered_output_directory_digests = await MultiGet(
-        Get(
-            Digest,
+    filtered_output_directory_digests = await concurrently(
+        digest_subset_to_digest(
             DigestSubset(
                 output_digest,
                 PathGlobs(
@@ -531,17 +575,17 @@ async def check_outputs(
             message += f"\n\nDirectories in output ({len(snapshot.dirs)} total):"
             dirs = sorted(snapshot.dirs, key=lambda x: x.count(os.pathsep))
             if len(dirs) > 15:
-                message += f" {', ' .join(dirs[0:15])}, ... (trimmed for brevity)"
+                message += f" {', '.join(dirs[0:15])}, ... (trimmed for brevity)"
             else:
-                message += f" {', ' .join(dirs)}"
+                message += f" {', '.join(dirs)}"
 
         if snapshot.files:
             message += f"\n\nFiles in output ({len(snapshot.files)} total):"
             files = sorted(snapshot.files, key=lambda x: x.count(os.pathsep))
             if len(files) > 15:
-                message += f" {', ' .join(files[0:15])}, ... (trimmed for brevity)"
+                message += f" {', '.join(files[0:15])}, ... (trimmed for brevity)"
             else:
-                message += f" {', ' .join(files)}"
+                message += f" {', '.join(files)}"
 
         if outputs_match_error_behavior == GlobMatchErrorBehavior.error:
             raise ValueError(message)
@@ -552,9 +596,11 @@ async def check_outputs(
         if not unused_output_files and not unused_output_directories:
             return
 
-        snapshot, wrapped_tgt = await MultiGet(
-            Get(Snapshot, Digest, output_digest),
-            Get(WrappedTarget, WrappedTargetRequest(address, "adhoc_process_support rule")),
+        snapshot, wrapped_tgt = await concurrently(
+            digest_to_snapshot(output_digest),
+            resolve_target(
+                WrappedTargetRequest(address, "adhoc_process_support rule"), **implicitly()
+            ),
         )
         warn_or_raise(
             f"The `{wrapped_tgt.target.alias}` target at `{address}` is configured with `outputs_match_mode` set to `all` "
@@ -567,9 +613,9 @@ async def check_outputs(
     unused_count = len(unused_output_files) + len(unused_output_directories)
     if total_count == 0 or unused_count < total_count:
         return
-    snapshot, wrapped_tgt = await MultiGet(
-        Get(Snapshot, Digest, output_digest),
-        Get(WrappedTarget, WrappedTargetRequest(address, "adhoc_process_support rule")),
+    snapshot, wrapped_tgt = await concurrently(
+        digest_to_snapshot(output_digest),
+        resolve_target(WrappedTargetRequest(address, "adhoc_process_support rule"), **implicitly()),
     )
     warn_or_raise(
         f"The `{wrapped_tgt.target.alias}` target at `{address}` is configured with `outputs_match_mode` set to `any` "
@@ -579,25 +625,17 @@ async def check_outputs(
 
 
 @rule
-async def run_adhoc_process(
-    request: AdhocProcessRequest,
-) -> AdhocProcessResult:
-    process = await Get(Process, AdhocProcessRequest, request)
+async def run_prepared_adhoc_process(
+    prepared_request: PreparedAdhocProcessRequest,
+) -> FallibleAdhocProcessResult:
+    request = prepared_request.original_request
 
-    fallible_result = await Get(FallibleProcessResult, Process, process)
+    result = await execute_process(prepared_request.process, **implicitly())
 
     log_on_errors = request.log_on_process_errors or FrozenDict()
-    error_to_log = log_on_errors.get(fallible_result.exit_code, None)
+    error_to_log = log_on_errors.get(result.exit_code, None)
     if error_to_log:
         logger.error(error_to_log)
-
-    result = await Get(
-        ProcessResult,
-        {
-            fallible_result: FallibleProcessResult,
-            ProductDescription(request.description): ProductDescription,
-        },
-    )
 
     if request.log_output:
         if result.stdout:
@@ -641,28 +679,28 @@ async def run_adhoc_process(
 
     if extra_contents:
         if request.use_working_directory_as_base_for_output_captures:
-            extra_digest = await Get(
-                Digest,
+            extra_digest = await create_digest(
                 CreateDigest(
                     FileContent(_parse_relative_file(name, working_directory), content)
                     for name, content in extra_contents.items()
-                ),
+                )
             )
         else:
-            extra_digest = await Get(
-                Digest,
-                CreateDigest(
-                    FileContent(name, content) for name, content in extra_contents.items()
-                ),
+            extra_digest = await create_digest(
+                CreateDigest(FileContent(name, content) for name, content in extra_contents.items())
             )
 
-        output_digest = await Get(Digest, MergeDigests((output_digest, extra_digest)))
+        output_digest = await merge_digests(MergeDigests((output_digest, extra_digest)))
 
     adjusted: Digest = output_digest
     if root_output_directory is not None:
-        adjusted = await Get(Digest, RemovePrefix(output_digest, root_output_directory))
+        adjusted = await remove_prefix(RemovePrefix(output_digest, root_output_directory))
 
-    return AdhocProcessResult(result, adjusted)
+    return FallibleAdhocProcessResult(
+        process_result=result,
+        adjusted_digest=adjusted,
+        description=request.description,
+    )
 
 
 # Compute a stable bytes value for a `PathMetadata` consisting of the values to be hashed.
@@ -691,10 +729,10 @@ def _path_metadata_to_bytes(m: PathMetadata | None) -> bytes:
 
 
 async def compute_workspace_invalidation_hash(path_globs: PathGlobs) -> str:
-    raw_paths = await Get(Paths, PathGlobs, path_globs)
+    raw_paths = await path_globs_to_paths(path_globs)
     paths = sorted([*raw_paths.files, *raw_paths.dirs])
-    metadata_results = await MultiGet(
-        Get(PathMetadataResult, PathMetadataRequest(path)) for path in paths
+    metadata_results = await concurrently(
+        path_metadata_request(PathMetadataRequest(path)) for path in paths
     )
 
     # Compute a stable hash of all of the metadatas since the hash value should be stable
@@ -716,9 +754,7 @@ async def compute_workspace_invalidation_hash(path_globs: PathGlobs) -> str:
 async def prepare_adhoc_process(
     request: AdhocProcessRequest,
     bash: BashBinary,
-) -> Process:
-    # currently only used directly by `experimental_test_shell_command`
-
+) -> PreparedAdhocProcessRequest:
     description = request.description
     address = request.address
     working_directory = parse_relative_directory(request.working_directory or "", address)
@@ -739,17 +775,17 @@ async def prepare_adhoc_process(
         )
         command_env["__PANTS_WORKSPACE_INVALIDATION_SOURCES_HASH"] = workspace_invalidation_hash
 
-    input_snapshot = await Get(Snapshot, Digest, request.input_digest)
+    input_snapshot = await digest_to_snapshot(request.input_digest)
 
     if not working_directory or working_directory in input_snapshot.dirs:
         # Needed to ensure that underlying filesystem does not change during run
         work_dir = EMPTY_DIGEST
     else:
-        work_dir = await Get(Digest, CreateDigest([Directory(working_directory)]))
+        work_dir = await create_digest(CreateDigest([Directory(working_directory)]))
 
-    input_digest = await Get(Digest, MergeDigests([request.input_digest, work_dir]))
+    input_digest = await merge_digests(MergeDigests([request.input_digest, work_dir]))
 
-    proc = Process(
+    process = Process(
         argv=argv,
         description=f"Running {description}",
         env=command_env,
@@ -764,9 +800,12 @@ async def prepare_adhoc_process(
     )
 
     if request.use_working_directory_as_base_for_output_captures:
-        return _output_at_build_root(proc, bash)
-    else:
-        return proc
+        process = _output_at_build_root(process, bash)
+
+    return PreparedAdhocProcessRequest(
+        original_request=request,
+        process=process,
+    )
 
 
 class PathEnvModifyMode(Enum):
@@ -806,8 +845,8 @@ async def prepare_env_vars(
         )
 
     if to_fetch:
-        fetched_env_vars = await Get(
-            EnvironmentVars, EnvironmentVarsRequest(tuple(sorted(to_fetch)))
+        fetched_env_vars = await environment_vars_subset(
+            EnvironmentVarsRequest(tuple(sorted(to_fetch))), **implicitly()
         )
         env_vars.update(fetched_env_vars)
 
@@ -858,7 +897,7 @@ def _output_at_build_root(process: Process, bash: BashBinary) -> Process:
     )
 
 
-def parse_relative_directory(workdir_in: str, relative_to: Union[Address, str]) -> str:
+def parse_relative_directory(workdir_in: str, relative_to: Address | str) -> str:
     """Convert the `workdir` field into something that can be understood by `Process`."""
 
     if isinstance(relative_to, Address):
@@ -887,4 +926,7 @@ def _parse_relative_file(file_in: str, relative_to: str) -> str:
 
 
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        *process.rules(),
+    )

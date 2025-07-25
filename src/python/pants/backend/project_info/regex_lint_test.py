@@ -146,7 +146,6 @@ class TestMultiMatcherTest:
         }
         with pytest.raises(
             ValueError,
-            match="required_matches uses unknown content "
-            "pattern names: unknown_content_pattern1",
+            match="required_matches uses unknown content pattern names: unknown_content_pattern1",
         ):
             MultiMatcher(ValidationConfig.from_dict(bad_config2))

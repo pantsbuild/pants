@@ -18,10 +18,10 @@ use log::warn;
 use parking_lot::Mutex;
 use pyo3::prelude::*;
 use task_executor::{Executor, TailTasks};
-use tokio::signal::unix::{signal, SignalKind};
+use tokio::signal::unix::{SignalKind, signal};
 use tokio::task::JoinHandle;
 use ui::ConsoleUI;
-use workunit_store::{format_workunit_duration_ms, RunId, WorkunitStore};
+use workunit_store::{RunId, WorkunitStore, format_workunit_duration_ms};
 
 // When enabled, the interval at which all stragglers that have been running for longer than a
 // threshold should be logged. The threshold might become configurable, but this might not need
@@ -317,7 +317,7 @@ impl Session {
             }
         };
         if let Err(e) = result {
-            warn!("{}", e);
+            warn!("{e}");
         }
     }
 
@@ -469,14 +469,14 @@ impl Sessions {
                     let cancelled = handle.cancelled.clone();
                     let cancellation_triggered = async move {
                         cancelled.triggered().await;
-                        log::info!("Shutdown completed: {:?}", build_id)
+                        log::info!("Shutdown completed: {build_id:?}")
                     };
                     (handle.build_id.clone(), cancellation_triggered)
                 })
                 .unzip();
 
             if !build_ids.is_empty() {
-                log::info!("Waiting for shutdown of: {:?}", build_ids);
+                log::info!("Waiting for shutdown of: {build_ids:?}");
                 tokio::time::timeout(timeout, future::join_all(cancellation_latches))
                     .await
                     .map_err(|_| format!("Some Sessions did not shutdown within {timeout:?}."))?;

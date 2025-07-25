@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import textwrap
-from typing import Iterable
+from collections.abc import Iterable
 
 import pytest
 
@@ -99,7 +99,7 @@ class PluginSetupKwargsRequest(SetupKwargsRequest):
 
 
 @rule
-def setup_kwargs_plugin(request: PluginSetupKwargsRequest) -> SetupKwargs:
+async def setup_kwargs_plugin(request: PluginSetupKwargsRequest) -> SetupKwargs:
     kwargs = {**request.explicit_kwargs, "plugin_demo": "hello world"}
     return SetupKwargs(kwargs, address=request.target.address)
 
@@ -172,7 +172,7 @@ def assert_chroot_error(
         )
     ex = excinfo.value
     assert len(ex.wrapped_exceptions) == 1
-    assert type(ex.wrapped_exceptions[0]) == exc_cls
+    assert type(ex.wrapped_exceptions[0]) is exc_cls
 
 
 def test_use_existing_setup_script(chroot_rule_runner) -> None:
@@ -1167,7 +1167,7 @@ def assert_owner_error(rule_runner, owned: Address, exc_cls: type[Exception]):
         )
     ex = excinfo.value
     assert len(ex.wrapped_exceptions) == 1
-    assert type(ex.wrapped_exceptions[0]) == exc_cls
+    assert type(ex.wrapped_exceptions[0]) is exc_cls
 
 
 def assert_no_owner(rule_runner: PythonRuleRunner, owned: Address):

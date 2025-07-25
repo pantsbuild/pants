@@ -6,22 +6,29 @@ import logging
 import time
 import uuid
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Type, TypeVar
+from typing import TypeVar
 
 from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPHandlerMapping
-from pants.bsp.spec.base import BuildTargetIdentifier, StatusCode, TaskId
+from pants.bsp.spec.base import StatusCode, TaskId
 from pants.bsp.spec.compile import CompileParams, CompileReport, CompileResult, CompileTask
 from pants.bsp.spec.task import TaskFinishParams, TaskStartParams
-from pants.bsp.util_rules.targets import BSPBuildTargetInternal, BSPCompileRequest, BSPCompileResult
+from pants.bsp.util_rules.targets import (
+    BSPBuildTargetInternal,
+    BSPCompileRequest,
+    BSPCompileResult,
+    resolve_bsp_build_target_addresses,
+    resolve_bsp_build_target_identifier,
+)
 from pants.engine.fs import Workspace
-from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import _uncacheable_rule, collect_rules, rule
-from pants.engine.target import FieldSet, Targets
+from pants.engine.internals.native_engine import EMPTY_DIGEST, MergeDigests
+from pants.engine.internals.selectors import Get, concurrently
+from pants.engine.intrinsics import merge_digests
+from pants.engine.rules import _uncacheable_rule, collect_rules, implicitly, rule
+from pants.engine.target import FieldSet
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.util.ordered_set import FrozenOrderedSet
 
 _logger = logging.getLogger(__name__)
 
@@ -52,11 +59,11 @@ async def compile_bsp_target(
     bsp_context: BSPContext,
     union_membership: UnionMembership,
 ) -> BSPCompileResult:
-    targets = await Get(Targets, BSPBuildTargetInternal, request.bsp_target)
-    compile_request_types: FrozenOrderedSet[Type[BSPCompileRequest]] = union_membership.get(
+    targets = await resolve_bsp_build_target_addresses(request.bsp_target, **implicitly())
+    compile_request_types: Sequence[type[BSPCompileRequest]] = union_membership.get(
         BSPCompileRequest
     )
-    field_sets_by_request_type: dict[Type[BSPCompileRequest], set[FieldSet]] = defaultdict(set)
+    field_sets_by_request_type: dict[type[BSPCompileRequest], set[FieldSet]] = defaultdict(set)
     for target in targets:
         for compile_request_type in compile_request_types:
             field_set_type = compile_request_type.field_set_type
@@ -78,7 +85,7 @@ async def compile_bsp_target(
         )
     )
 
-    compile_results = await MultiGet(
+    compile_results = await concurrently(
         Get(
             BSPCompileResult,
             BSPCompileRequest,
@@ -108,7 +115,7 @@ async def compile_bsp_target(
         )
     )
 
-    output_digest = await Get(Digest, MergeDigests([r.output_digest for r in compile_results]))
+    output_digest = await merge_digests(MergeDigests([r.output_digest for r in compile_results]))
 
     return BSPCompileResult(
         status=status,
@@ -121,24 +128,24 @@ async def bsp_compile_request(
     request: CompileParams,
     workspace: Workspace,
 ) -> CompileResult:
-    bsp_targets = await MultiGet(
-        Get(BSPBuildTargetInternal, BuildTargetIdentifier, bsp_target_id)
+    bsp_targets = await concurrently(
+        resolve_bsp_build_target_identifier(bsp_target_id, **implicitly())
         for bsp_target_id in request.targets
     )
 
-    compile_results = await MultiGet(
-        Get(
-            BSPCompileResult,
+    compile_results = await concurrently(
+        compile_bsp_target(
             CompileOneBSPTargetRequest(
                 bsp_target=bsp_target,
                 origin_id=request.origin_id,
                 arguments=request.arguments,
             ),
+            **implicitly(),
         )
         for bsp_target in bsp_targets
     )
 
-    output_digest = await Get(Digest, MergeDigests([r.output_digest for r in compile_results]))
+    output_digest = await merge_digests(MergeDigests([r.output_digest for r in compile_results]))
     if output_digest != EMPTY_DIGEST:
         workspace.write_digest(output_digest, path_prefix=".pants.d/bsp")
 

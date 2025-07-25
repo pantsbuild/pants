@@ -9,11 +9,11 @@ from pants.backend.python.lint.pyupgrade.skip_field import SkipPyUpgradeField
 from pants.backend.python.lint.pyupgrade.subsystem import PyUpgrade
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import VenvPexProcess, create_venv_pex
 from pants.core.goals.fix import FixResult, FixTargetsRequest
 from pants.core.util_rules.partitions import PartitionerType
-from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.intrinsics import execute_process
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import FieldSet, Target
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize, softwrap
@@ -40,7 +40,7 @@ class PyUpgradeRequest(FixTargetsRequest):
 
 @rule(desc="Fix with pyupgrade", level=LogLevel.DEBUG)
 async def pyupgrade_fix(request: PyUpgradeRequest.Batch, pyupgrade: PyUpgrade) -> FixResult:
-    pyupgrade_pex = await Get(VenvPex, PexRequest, pyupgrade.to_pex_request())
+    pyupgrade_pex = await create_venv_pex(**implicitly(pyupgrade.to_pex_request()))
 
     # NB: Pyupgrade isn't idempotent, but eventually converges. So keep running until it stops
     # changing code. See https://github.com/asottile/pyupgrade/issues/703
@@ -48,16 +48,17 @@ async def pyupgrade_fix(request: PyUpgradeRequest.Batch, pyupgrade: PyUpgrade) -
     # use the new file with the new digest. However that isn't the UX we want for our users.)
     input_digest = request.snapshot.digest
     for _ in range(10):  # Give the loop an upper bound to guard against infinite runs
-        result = await Get(  # noqa: PNT30: this is inherently sequential
-            FallibleProcessResult,
-            VenvPexProcess(
-                pyupgrade_pex,
-                argv=(*pyupgrade.args, *request.files),
-                input_digest=input_digest,
-                output_files=request.files,
-                description=f"Run pyupgrade on {pluralize(len(request.files), 'file')}.",
-                level=LogLevel.DEBUG,
-            ),
+        result = await execute_process(
+            **implicitly(
+                VenvPexProcess(
+                    pyupgrade_pex,
+                    argv=(*pyupgrade.args, *request.files),
+                    input_digest=input_digest,
+                    output_files=request.files,
+                    description=f"Run pyupgrade on {pluralize(len(request.files), 'file')}.",
+                    level=LogLevel.DEBUG,
+                )
+            )
         )
         if input_digest == result.output_digest:
             # Nothing changed, either due to failure or because it is fixed
@@ -79,8 +80,8 @@ async def pyupgrade_fix(request: PyUpgradeRequest.Batch, pyupgrade: PyUpgrade) -
 
 
 def rules():
-    return [
+    return (
         *collect_rules(),
         *PyUpgradeRequest.rules(),
         *pex.rules(),
-    ]
+    )

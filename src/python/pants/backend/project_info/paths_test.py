@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 from textwrap import dedent
-from typing import ClassVar, List
+from typing import ClassVar
 
 import pytest
 
@@ -86,7 +86,7 @@ def assert_paths(
     *,
     path_from: str,
     path_to: str,
-    expected: List[List[str]] | None = None,
+    expected: list[list[str]] | None = None,
 ) -> None:
     args = []
     if path_from:

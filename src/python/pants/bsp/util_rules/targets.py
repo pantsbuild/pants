@@ -5,9 +5,10 @@ from __future__ import annotations
 import itertools
 import logging
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import ClassVar, Generic, Sequence, Type, TypeVar
+from typing import ClassVar, Generic, TypeVar
 
 import toml
 
@@ -43,23 +44,24 @@ from pants.bsp.spec.targets import (
     WorkspaceBuildTargetsResult,
 )
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import DigestContents, PathGlobs, Workspace
+from pants.engine.fs import PathGlobs, Workspace
+from pants.engine.internals.graph import resolve_source_paths, resolve_targets
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import _uncacheable_rule, collect_rules, rule
+from pants.engine.internals.selectors import Get, concurrently
+from pants.engine.intrinsics import get_digest_contents, merge_digests
+from pants.engine.rules import _uncacheable_rule, collect_rules, implicitly, rule
 from pants.engine.target import (
     Field,
     FieldDefaults,
     FieldSet,
     SourcesField,
-    SourcesPaths,
     SourcesPathsRequest,
     Targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
-from pants.source.source_root import SourceRootsRequest, SourceRootsResult
+from pants.source.source_root import SourceRootsRequest, get_source_roots
 from pants.util.frozendict import FrozenDict
-from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import bullet_list
 
 _logger = logging.getLogger(__name__)
@@ -74,7 +76,7 @@ class BSPBuildTargetsMetadataRequest(Generic[_FS]):
 
     language_id: ClassVar[str]
     can_merge_metadata_from: ClassVar[tuple[str, ...]]
-    field_set_type: ClassVar[Type[_FS]]  # type: ignore[misc]
+    field_set_type: ClassVar[type[_FS]]  # type: ignore[misc]
 
     resolve_prefix: ClassVar[str]
     resolve_field: ClassVar[type[Field]]
@@ -147,13 +149,14 @@ async def parse_one_bsp_mapping(request: _ParseOneBSPMappingRequest) -> BSPBuild
 async def materialize_bsp_build_targets(bsp_goal: BSPGoal) -> BSPBuildTargets:
     definitions: dict[str, BSPTargetDefinition] = {}
     for config_file in bsp_goal.groups_config_files:
-        config_contents = await Get(  # noqa: PNT30: requires triage
-            DigestContents,
-            PathGlobs(
-                [config_file],
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin=f"BSP config file `{config_file}`",
-            ),
+        config_contents = await get_digest_contents(
+            **implicitly(
+                PathGlobs(
+                    [config_file],
+                    glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                    description_of_origin=f"BSP config file `{config_file}`",
+                )
+            )
         )
         if len(config_contents) == 0:
             raise ValueError(f"BSP targets config file `{config_file}` does not exist.")
@@ -201,8 +204,8 @@ async def materialize_bsp_build_targets(bsp_goal: BSPGoal) -> BSPBuildTargets:
                 resolve_filter=resolve_filter,
             )
 
-    bsp_internal_targets = await MultiGet(
-        Get(BSPBuildTargetInternal, _ParseOneBSPMappingRequest(name, definition))
+    bsp_internal_targets = await concurrently(
+        parse_one_bsp_mapping(_ParseOneBSPMappingRequest(name, definition))
         for name, definition in definitions.items()
     )
     target_mapping = dict(zip(definitions.keys(), bsp_internal_targets))
@@ -231,10 +234,8 @@ async def resolve_bsp_build_target_addresses(
     field_defaults: FieldDefaults,
 ) -> Targets:
     # NB: Using `RawSpecs` directly rather than `RawSpecsWithoutFileOwners` results in a rule graph cycle.
-    targets = await Get(
-        Targets,
-        RawSpecsWithoutFileOwners,
-        RawSpecsWithoutFileOwners.from_raw_specs(bsp_target.specs),
+    targets = await resolve_targets(
+        **implicitly(RawSpecsWithoutFileOwners.from_raw_specs(bsp_target.specs))
     )
     if bsp_target.definition.resolve_filter is None:
         return targets
@@ -267,17 +268,16 @@ async def resolve_bsp_build_target_addresses(
 async def resolve_bsp_build_target_source_roots(
     bsp_target: BSPBuildTargetInternal,
 ) -> BSPBuildTargetSourcesInfo:
-    targets = await Get(Targets, BSPBuildTargetInternal, bsp_target)
+    targets = await resolve_bsp_build_target_addresses(bsp_target, **implicitly())
     targets_with_sources = [tgt for tgt in targets if tgt.has_field(SourcesField)]
-    sources_paths = await MultiGet(
-        Get(SourcesPaths, SourcesPathsRequest(tgt[SourcesField])) for tgt in targets_with_sources
+    sources_paths = await concurrently(
+        resolve_source_paths(SourcesPathsRequest(tgt[SourcesField]), **implicitly())
+        for tgt in targets_with_sources
     )
     merged_source_files: set[str] = set()
     for sp in sources_paths:
         merged_source_files.update(sp.files)
-    source_roots_result = await Get(
-        SourceRootsResult, SourceRootsRequest, SourceRootsRequest.for_files(merged_source_files)
-    )
+    source_roots_result = await get_source_roots(SourceRootsRequest.for_files(merged_source_files))
     source_root_paths = {x.path for x in source_roots_result.path_to_root.values()}
     return BSPBuildTargetSourcesInfo(
         source_files=frozenset(merged_source_files),
@@ -345,7 +345,7 @@ async def generate_one_bsp_build_target_request(
     build_root: BuildRoot,
 ) -> GenerateOneBSPBuildTargetResult:
     # Find all Pants targets that are part of this BSP build target.
-    targets = await Get(Targets, BSPBuildTargetInternal, request.bsp_target)
+    targets = await resolve_bsp_build_target_addresses(request.bsp_target, **implicitly())
 
     # Determine whether the targets are compilable.
     can_compile = any(
@@ -355,12 +355,12 @@ async def generate_one_bsp_build_target_request(
     )
 
     # Classify the targets by the language backends that claim to provide metadata for them.
-    field_sets_by_request_type: dict[
-        type[BSPBuildTargetsMetadataRequest], OrderedSet[FieldSet]
-    ] = defaultdict(OrderedSet)
-    metadata_request_types: FrozenOrderedSet[
-        Type[BSPBuildTargetsMetadataRequest]
-    ] = union_membership.get(BSPBuildTargetsMetadataRequest)
+    field_sets_by_request_type: dict[type[BSPBuildTargetsMetadataRequest], OrderedSet[FieldSet]] = (
+        defaultdict(OrderedSet)
+    )
+    metadata_request_types: Sequence[type[BSPBuildTargetsMetadataRequest]] = union_membership.get(
+        BSPBuildTargetsMetadataRequest
+    )
     metadata_request_types_by_lang_id: dict[str, type[BSPBuildTargetsMetadataRequest]] = {}
     for metadata_request_type in metadata_request_types:
         previous = metadata_request_types_by_lang_id.get(metadata_request_type.language_id)
@@ -375,12 +375,12 @@ async def generate_one_bsp_build_target_request(
 
     for tgt in targets:
         for metadata_request_type in metadata_request_types:
-            field_set_type: Type[FieldSet] = metadata_request_type.field_set_type
+            field_set_type: type[FieldSet] = metadata_request_type.field_set_type
             if field_set_type.is_applicable(tgt):
                 field_sets_by_request_type[metadata_request_type].add(field_set_type.create(tgt))
 
     # Request each language backend to provide metadata for the BuildTarget, and then merge it.
-    metadata_results = await MultiGet(
+    metadata_results = await concurrently(
         Get(
             BSPBuildTargetsMetadataResult,
             BSPBuildTargetsMetadataRequest,
@@ -390,13 +390,13 @@ async def generate_one_bsp_build_target_request(
     )
     metadata = merge_metadata(list(zip(field_sets_by_request_type.keys(), metadata_results)))
 
-    digest = await Get(Digest, MergeDigests([r.digest for r in metadata_results]))
+    digest = await merge_digests(MergeDigests([r.digest for r in metadata_results]))
 
     # Determine "base directory" for this build target using source roots.
     # TODO: This actually has nothing to do with source roots. It should probably be computed as an ancestor
     # directory or else be configurable by the user. It is used as a hint in IntelliJ for where to place the
     # corresponding IntelliJ module.
-    source_info = await Get(BSPBuildTargetSourcesInfo, BSPBuildTargetInternal, request.bsp_target)
+    source_info = await resolve_bsp_build_target_source_roots(request.bsp_target)
     if source_info.source_roots:
         roots = [build_root.pathlib_path.joinpath(p) for p in source_info.source_roots]
     else:
@@ -437,11 +437,13 @@ async def bsp_workspace_build_targets(
     bsp_build_targets: BSPBuildTargets,
     workspace: Workspace,
 ) -> WorkspaceBuildTargetsResult:
-    bsp_target_results = await MultiGet(
-        Get(GenerateOneBSPBuildTargetResult, GenerateOneBSPBuildTargetRequest(target_internal))
+    bsp_target_results = await concurrently(
+        generate_one_bsp_build_target_request(
+            GenerateOneBSPBuildTargetRequest(target_internal), **implicitly()
+        )
         for target_internal in bsp_build_targets.targets_mapping.values()
     )
-    digest = await Get(Digest, MergeDigests([r.digest for r in bsp_target_results]))
+    digest = await merge_digests(MergeDigests([r.digest for r in bsp_target_results]))
     if digest != EMPTY_DIGEST:
         workspace.write_digest(digest, path_prefix=".pants.d/bsp")
 
@@ -477,8 +479,8 @@ async def materialize_bsp_build_target_sources(
     request: MaterializeBuildTargetSourcesRequest,
     build_root: BuildRoot,
 ) -> MaterializeBuildTargetSourcesResult:
-    bsp_target = await Get(BSPBuildTargetInternal, BuildTargetIdentifier, request.bsp_target_id)
-    source_info = await Get(BSPBuildTargetSourcesInfo, BSPBuildTargetInternal, bsp_target)
+    bsp_target = await resolve_bsp_build_target_identifier(request.bsp_target_id, **implicitly())
+    source_info = await resolve_bsp_build_target_source_roots(bsp_target)
 
     if source_info.source_roots:
         roots = [build_root.pathlib_path.joinpath(p) for p in source_info.source_roots]
@@ -503,8 +505,10 @@ async def materialize_bsp_build_target_sources(
 
 @rule
 async def bsp_build_target_sources(request: SourcesParams) -> SourcesResult:
-    sources_items = await MultiGet(
-        Get(MaterializeBuildTargetSourcesResult, MaterializeBuildTargetSourcesRequest(btgt))
+    sources_items = await concurrently(
+        materialize_bsp_build_target_sources(
+            MaterializeBuildTargetSourcesRequest(btgt), **implicitly()
+        )
         for btgt in request.targets
     )
     return SourcesResult(items=tuple(si.sources_item for si in sources_items))
@@ -541,7 +545,7 @@ async def bsp_dependency_sources(request: DependencySourcesParams) -> Dependency
 class BSPDependencyModulesRequest(Generic[_FS]):
     """Hook to allow language backends to provide dependency modules."""
 
-    field_set_type: ClassVar[Type[_FS]]  # type: ignore[misc]
+    field_set_type: ClassVar[type[_FS]]  # type: ignore[misc]
 
     field_sets: tuple[_FS, ...]
 
@@ -575,14 +579,14 @@ async def resolve_one_dependency_module(
     request: ResolveOneDependencyModuleRequest,
     union_membership: UnionMembership,
 ) -> ResolveOneDependencyModuleResult:
-    targets = await Get(Targets, BuildTargetIdentifier, request.bsp_target_id)
+    targets = await resolve_bsp_build_target_addresses(**implicitly(request.bsp_target_id))
 
-    field_sets_by_request_type: dict[
-        Type[BSPDependencyModulesRequest], list[FieldSet]
-    ] = defaultdict(list)
-    dep_module_request_types: FrozenOrderedSet[
-        Type[BSPDependencyModulesRequest]
-    ] = union_membership.get(BSPDependencyModulesRequest)
+    field_sets_by_request_type: dict[type[BSPDependencyModulesRequest], list[FieldSet]] = (
+        defaultdict(list)
+    )
+    dep_module_request_types: Sequence[type[BSPDependencyModulesRequest]] = union_membership.get(
+        BSPDependencyModulesRequest
+    )
     for tgt in targets:
         for dep_module_request_type in dep_module_request_types:
             field_set_type = dep_module_request_type.field_set_type
@@ -593,7 +597,7 @@ async def resolve_one_dependency_module(
     if not field_sets_by_request_type:
         return ResolveOneDependencyModuleResult(bsp_target_id=request.bsp_target_id)
 
-    responses = await MultiGet(
+    responses = await concurrently(
         Get(
             BSPDependencyModulesResult,
             BSPDependencyModulesRequest,
@@ -603,7 +607,7 @@ async def resolve_one_dependency_module(
     )
 
     modules = set(itertools.chain.from_iterable([r.modules for r in responses]))
-    digest = await Get(Digest, MergeDigests([r.digest for r in responses]))
+    digest = await merge_digests(MergeDigests([r.digest for r in responses]))
 
     return ResolveOneDependencyModuleResult(
         bsp_target_id=request.bsp_target_id,
@@ -617,11 +621,11 @@ async def resolve_one_dependency_module(
 async def bsp_dependency_modules(
     request: DependencyModulesParams, workspace: Workspace
 ) -> DependencyModulesResult:
-    responses = await MultiGet(
-        Get(ResolveOneDependencyModuleResult, ResolveOneDependencyModuleRequest(btgt))
+    responses = await concurrently(
+        resolve_one_dependency_module(ResolveOneDependencyModuleRequest(btgt), **implicitly())
         for btgt in request.targets
     )
-    output_digest = await Get(Digest, MergeDigests([r.digest for r in responses]))
+    output_digest = await merge_digests(MergeDigests([r.digest for r in responses]))
     workspace.write_digest(output_digest, path_prefix=".pants.d/bsp")
     return DependencyModulesResult(
         tuple(DependencyModulesItem(target=r.bsp_target_id, modules=r.modules) for r in responses)
@@ -639,7 +643,7 @@ async def bsp_dependency_modules(
 class BSPCompileRequest(Generic[_FS]):
     """Hook to allow language backends to compile targets."""
 
-    field_set_type: ClassVar[Type[_FS]]  # type: ignore[misc]
+    field_set_type: ClassVar[type[_FS]]  # type: ignore[misc]
 
     bsp_target: BSPBuildTargetInternal
     field_sets: tuple[_FS, ...]
@@ -669,7 +673,7 @@ class BSPCompileResult:
 class BSPResourcesRequest(Generic[_FS]):
     """Hook to allow language backends to provide resources for targets."""
 
-    field_set_type: ClassVar[Type[_FS]]  # type: ignore[misc]
+    field_set_type: ClassVar[type[_FS]]  # type: ignore[misc]
 
     bsp_target: BSPBuildTargetInternal
     field_sets: tuple[_FS, ...]

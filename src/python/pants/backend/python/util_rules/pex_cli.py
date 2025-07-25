@@ -6,8 +6,8 @@ from __future__ import annotations
 import dataclasses
 import logging
 import os.path
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Iterable, List, Mapping, Optional, Tuple
 
 from pants.backend.python.subsystems.python_native_code import PythonNativeCodeSubsystem
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -18,20 +18,20 @@ from pants.core.util_rules import adhoc_binaries, external_tool
 from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
-    ExternalToolRequest,
     TemplatedExternalTool,
+    download_external_tool,
 )
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests
-from pants.engine.internals.selectors import MultiGet
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import create_digest, merge_digests
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions, ca_certs_path_to_file_content
 from pants.option.option_types import ArgsListOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import classproperty
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ class PexCli(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pex-tool/pex)."
 
-    default_version = "v2.20.3"
+    default_version = "v2.45.2"
     default_url_template = "https://github.com/pex-tool/pex/releases/download/{version}/pex"
     version_constraints = ">=2.13.0,<3.0"
 
@@ -58,19 +58,12 @@ class PexCli(TemplatedExternalTool):
         ),
     )
 
-    @classproperty
-    def default_known_versions(cls):
-        return [
-            "|".join(
-                (
-                    cls.default_version,
-                    plat,
-                    "0100c2e0b9e5dd56b063c98176cdd11b6064c2439d0faefdd3d25453393ed9fb",
-                    "4315782",
-                )
-            )
-            for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
-        ]
+    default_known_versions = [
+        "v2.45.2|macos_x86_64|570a3d5ca306a39aa3a180bd4cf3e2661b7c74b0579422b34659246daf122384|4833957",
+        "v2.45.2|macos_arm64|570a3d5ca306a39aa3a180bd4cf3e2661b7c74b0579422b34659246daf122384|4833957",
+        "v2.45.2|linux_x86_64|570a3d5ca306a39aa3a180bd4cf3e2661b7c74b0579422b34659246daf122384|4833957",
+        "v2.45.2|linux_arm64|570a3d5ca306a39aa3a180bd4cf3e2661b7c74b0579422b34659246daf122384|4833957",
+    ]
 
 
 @dataclass(frozen=True)
@@ -78,10 +71,10 @@ class PexCliProcess:
     subcommand: tuple[str, ...]
     extra_args: tuple[str, ...]
     description: str = dataclasses.field(compare=False)
-    additional_input_digest: Optional[Digest]
-    extra_env: Optional[FrozenDict[str, str]]
-    output_files: Optional[Tuple[str, ...]]
-    output_directories: Optional[Tuple[str, ...]]
+    additional_input_digest: Digest | None
+    extra_env: FrozenDict[str, str] | None
+    output_files: tuple[str, ...] | None
+    output_directories: tuple[str, ...] | None
     level: LogLevel
     concurrency_available: int
     cache_scope: ProcessCacheScope
@@ -92,10 +85,10 @@ class PexCliProcess:
         subcommand: Iterable[str],
         extra_args: Iterable[str],
         description: str,
-        additional_input_digest: Optional[Digest] = None,
-        extra_env: Optional[Mapping[str, str]] = None,
-        output_files: Optional[Iterable[str]] = None,
-        output_directories: Optional[Iterable[str]] = None,
+        additional_input_digest: Digest | None = None,
+        extra_env: Mapping[str, str] | None = None,
+        output_files: Iterable[str] | None = None,
+        output_directories: Iterable[str] | None = None,
         level: LogLevel = LogLevel.INFO,
         concurrency_available: int = 0,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
@@ -126,7 +119,7 @@ class PexPEX(DownloadedExternalTool):
 
 @rule
 async def download_pex_pex(pex_cli: PexCli, platform: Platform) -> PexPEX:
-    pex_pex = await Get(DownloadedExternalTool, ExternalToolRequest, pex_cli.get_request(platform))
+    pex_pex = await download_external_tool(pex_cli.get_request(platform))
     return PexPEX(digest=pex_pex.digest, exe=pex_pex.exe)
 
 
@@ -143,19 +136,19 @@ async def setup_pex_cli_process(
     python_setup: PythonSetup,
 ) -> Process:
     tmpdir = ".tmp"
-    gets: List[Get] = [Get(Digest, CreateDigest([Directory(tmpdir)]))]
+    gets = [create_digest(CreateDigest([Directory(tmpdir)]))]
 
     cert_args = []
     if global_options.ca_certs_path:
         ca_certs_fc = ca_certs_path_to_file_content(global_options.ca_certs_path)
-        gets.append(Get(Digest, CreateDigest((ca_certs_fc,))))
+        gets.append(create_digest(CreateDigest((ca_certs_fc,))))
         cert_args = ["--cert", ca_certs_fc.path]
 
     digests_to_merge = [pex_pex.digest]
-    digests_to_merge.extend(await MultiGet(gets))
+    digests_to_merge.extend(await concurrently(gets))
     if request.additional_input_digest:
         digests_to_merge.append(request.additional_input_digest)
-    input_digest = await Get(Digest, MergeDigests(digests_to_merge))
+    input_digest = await merge_digests(MergeDigests(digests_to_merge))
 
     global_args = [
         # Ensure Pex and its subprocesses create temporary files in the process execution

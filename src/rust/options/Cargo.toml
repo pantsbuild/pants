@@ -1,0 +1,27 @@
+[package]
+version = "0.0.1"
+edition = "2021"
+name = "options"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[dependencies]
+itertools = { workspace = true }
+log = { workspace = true }
+maplit = { workspace = true }
+peg = { workspace = true }
+shellexpand = { workspace = true }
+toml = { workspace = true, features = ["preserve_order"] }
+regex = { workspace = true }
+whoami = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+parking_lot = { workspace = true }
+shlex = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

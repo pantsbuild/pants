@@ -3,7 +3,6 @@
 
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Optional
 
 from pants.backend.python.goals.run_helper import (
     _create_python_source_run_dap_request,
@@ -20,7 +19,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import Pex, PexRequest
+from pants.backend.python.util_rules.pex import create_pex
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import rules as pex_from_targets_rules
 from pants.core.goals.run import (
@@ -31,7 +30,6 @@ from pants.core.goals.run import (
     RunRequest,
 )
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
-from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.util.logging import LogLevel
 
@@ -51,7 +49,7 @@ class PythonSourceFieldSet(RunFieldSet):
             return python_setup.default_run_goal_use_sandbox
         return self._run_goal_use_sandbox.value
 
-    def _executable_main(self) -> Optional[Executable]:
+    def _executable_main(self) -> Executable | None:
         source = PurePath(self.source.value)
         source_name = source.stem if source.suffix == ".py" else source.name
         if not all(part.isidentifier() for part in source_name.split(".")):
@@ -101,17 +99,12 @@ async def create_python_source_debug_adapter_request(
     pex_env: PexEnvironment,
     python_setup: PythonSetup,
 ) -> RunDebugAdapterRequest:
-    debugpy_pex = await Get(
-        # NB: We fold the debugpy PEX into the normally constructed VenvPex so that debugpy is in the
-        # venv, but isn't the main entrypoint. Then we use PEX_* env vars to dynamically have debugpy
-        # be invoked in that VenvPex. Hence, a vanilla Pex.
-        Pex,
-        PexRequest,
+    debugpy_pex = await create_pex(
         debugpy.to_pex_request(
             interpreter_constraints=InterpreterConstraints.create_from_compatibility_fields(
                 [field_set.interpreter_constraints], python_setup
             )
-        ),
+        )
     )
 
     run_in_sandbox = field_set.should_use_sandbox(python_setup)

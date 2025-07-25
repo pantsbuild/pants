@@ -6,11 +6,11 @@ from __future__ import annotations
 import os
 import subprocess
 from pathlib import Path
-from typing import List, Tuple
 
 from _pytest.monkeypatch import MonkeyPatch
 
 from pants.base.build_root import BuildRoot
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.export import (
     Export,
     ExportRequest,
@@ -23,10 +23,9 @@ from pants.core.goals.export import (
 )
 from pants.core.goals.generate_lockfiles import KnownUserResolveNames, KnownUserResolveNamesRequest
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests, Workspace
+from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Workspace
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target, Targets
@@ -89,12 +88,12 @@ def list_files_with_paths(directory):
 def run_export_rule(
     rule_runner: RuleRunner,
     monkeypatch: MonkeyPatch,
-    resolves: List[str] | None = None,
-    binaries: List[str] | None = None,
-) -> Tuple[int, str]:
+    resolves: list[str] | None = None,
+    binaries: list[str] | None = None,
+) -> tuple[int, str]:
     resolves = resolves or []
     binaries = binaries or []
-    union_membership = UnionMembership({ExportRequest: [MockExportRequest]})
+    union_membership = UnionMembership.from_rules([UnionRule(ExportRequest, MockExportRequest)])
     with open(os.path.join(rule_runner.build_root, "somefile"), "wb") as fp:
         fp.write(b"SOMEFILE")
 
@@ -147,6 +146,9 @@ def run_export_rule(
                 DistDir(relpath=Path("dist")),
                 create_subsystem(ExportSubsystem, resolve=resolves, bin=binaries),
             ],
+            mock_calls={
+                "pants.engine.intrinsics.add_prefix": lambda *xs: rule_runner.request(Digest, xs),
+            },
             mock_gets=[
                 MockGet(
                     output_type=ExportResults,
@@ -154,7 +156,6 @@ def run_export_rule(
                     mock=do_mock_export,
                 ),
                 rule_runner.do_not_use_mock(Digest, (MergeDigests,)),
-                rule_runner.do_not_use_mock(Digest, (AddPrefix,)),
                 rule_runner.do_not_use_mock(EnvironmentVars, (EnvironmentVarsRequest,)),
                 rule_runner.do_not_use_mock(KnownUserResolveNames, (KnownUserResolveNamesRequest,)),
                 rule_runner.do_not_use_mock(Digest, (CreateDigest,)),

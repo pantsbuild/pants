@@ -6,8 +6,9 @@ import gzip
 import subprocess
 import tarfile
 import zipfile
+from collections.abc import Callable
 from io import BytesIO
-from typing import Callable, cast
+from typing import Literal, cast
 
 import pytest
 
@@ -72,10 +73,10 @@ def test_extract_zip(extract_from_file_info: ExtractorFixtureT, compression: int
     assert digest_contents == EXPECTED_DIGEST_CONTENTS
 
 
-@pytest.mark.parametrize("compression", ["", "gz", "bz2", "xz"])
+@pytest.mark.parametrize("compression", (None, "gz", "bz2", "xz"))
 def test_extract_tar(extract_from_file_info: ExtractorFixtureT, compression: str) -> None:
     io = BytesIO()
-    mode = f"w:{compression}" if compression else "w"
+    mode = cast(Literal["w", "w:gz", "w:bz2", "w:xz"], f"w:{compression}" if compression else "w")
     with tarfile.open(mode=mode, fileobj=io) as tf:
         for name, content in FILES.items():
             tarinfo = tarfile.TarInfo(name)
@@ -120,8 +121,8 @@ def test_extract_non_archive(rule_runner: RuleRunner) -> None:
     assert DigestContents([FileContent("test.sh", b"# A shell script")]) == digest_contents
 
 
-def test_create_zip_archive(rule_runner: RuleRunner) -> None:
-    output_filename = "demo/a.zip"
+@pytest.mark.parametrize("output_filename", ["demo/a.zip", "demo/a.whl", "demo/a"])
+def test_create_zip_archive(rule_runner: RuleRunner, output_filename: str) -> None:
     input_snapshot = rule_runner.make_snapshot(FILES)
     created_digest = rule_runner.request(
         Digest,
@@ -136,7 +137,9 @@ def test_create_zip_archive(rule_runner: RuleRunner) -> None:
         assert set(zf.namelist()) == set(FILES.keys())
 
     # We also use Pants to extract the created archive, which checks for idempotency.
-    extracted_archive = rule_runner.request(ExtractedArchive, [created_digest])
+    extracted_archive = rule_runner.request(
+        ExtractedArchive, [MaybeExtractArchiveRequest(digest=created_digest, use_suffix=".zip")]
+    )
     digest_contents = rule_runner.request(DigestContents, [extracted_archive.digest])
     assert digest_contents == EXPECTED_DIGEST_CONTENTS
 
@@ -158,7 +161,8 @@ def test_create_tar_archive(rule_runner: RuleRunner, format: ArchiveFormat) -> N
     io.write(digest_contents[0].content)
     io.seek(0)
     compression = "" if format == ArchiveFormat.TAR else f"{format.value[4:]}"  # Strip `tar.`.
-    with tarfile.open(fileobj=io, mode=f"r:{compression}") as tf:
+    mode = cast(Literal["r:", "r:gz", "r:xz", "r:bz2"], f"r:{compression}")
+    with tarfile.open(fileobj=io, mode=mode) as tf:
         assert set(tf.getnames()) == set(FILES.keys())
 
     # We also use Pants to extract the created archive, which checks for idempotency.
@@ -193,7 +197,8 @@ def test_create_tar_archive_in_root_dir(rule_runner: RuleRunner, format: Archive
     io.write(digest_contents[0].content)
     io.seek(0)
     compression = "" if format == ArchiveFormat.TAR else f"{format.value[4:]}"  # Strip `tar.`.
-    with tarfile.open(fileobj=io, mode=f"r:{compression}") as tf:
+    mode = cast(Literal["r:", "r:gz", "r:xz", "r:bz2"], f"r:{compression}")
+    with tarfile.open(fileobj=io, mode=mode) as tf:
         assert set(tf.getnames()) == set(FILES.keys())
 
     # We also use Pants to extract the created archive, which checks for idempotency.

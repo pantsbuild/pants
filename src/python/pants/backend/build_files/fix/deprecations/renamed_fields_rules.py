@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import tokenize
 from collections import defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import DefaultDict, Mapping
+from typing import DefaultDict
 
 from pants.backend.build_files.fix.base import FixBuildFilesRequest
 from pants.backend.build_files.fix.deprecations.base import FixBUILDFileRequest, FixedBUILDFile
@@ -49,7 +50,7 @@ class RenamedFieldTypes:
 
 
 @rule
-def determine_renamed_field_types(
+async def determine_renamed_field_types(
     target_types: RegisteredTargetTypes, union_membership: UnionMembership
 ) -> RenamedFieldTypes:
     target_field_renames: DefaultDict[str, dict[str, str]] = defaultdict(dict)
@@ -70,7 +71,7 @@ def determine_renamed_field_types(
 
 
 @rule
-def fix_single(
+async def fix_single(
     request: RenameFieldsInFileRequest,
     renamed_field_types: RenamedFieldTypes,
 ) -> FixedBUILDFile:

@@ -4,8 +4,8 @@
 use std::convert::TryFrom;
 use std::fmt::Display;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use async_trait::async_trait;
 use deepsize::DeepSizeOf;
@@ -16,17 +16,17 @@ use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use graph::{Node, NodeError};
 use internment::Intern;
 use process_execution::{self, ProcessCacheScope};
+use pyo3::Bound;
 use pyo3::prelude::{PyAny, Python};
 use pyo3::types::{PyAnyMethods, PyTypeMethods};
-use pyo3::Bound;
 use rule_graph::{DependencyKey, Query};
 use store::{self, StoreFileByDigest};
-use workunit_store::{in_workunit, Level};
+use workunit_store::{Level, in_workunit};
 
 use crate::context::{Context, SessionCore};
 use crate::externs;
 use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
-use crate::python::{display_sorted_in_parens, throw, Failure, Key, Params, TypeId, Value};
+use crate::python::{Failure, Key, Params, TypeId, Value, display_sorted_in_parens, throw};
 use crate::tasks::Rule;
 
 // Sub-modules for the differnt node kinds.
@@ -174,7 +174,7 @@ async fn select(
                 select_reentry(context, params, &reentry.query).await
             }
             &rule_graph::EntryWithDeps::Root(_) => {
-                panic!("Not a runtime-executable entry! {:?}", entry)
+                panic!("Not a runtime-executable entry! {entry:?}")
             }
         },
         &rule_graph::Entry::Param(type_id) => {
@@ -182,8 +182,7 @@ async fn select(
                 Ok(key.to_value())
             } else {
                 Err(throw(format!(
-                    "Expected a Param of type {} to be present, but had only: {}",
-                    type_id, params,
+                    "Expected a Param of type {type_id} to be present, but had only: {params}",
                 )))
             }
         }
@@ -220,12 +219,12 @@ fn select_reentry(
     .boxed()
 }
 
-pub fn lift_directory_digest_bound(digest: &Bound<'_, PyAny>) -> Result<DirectoryDigest, String> {
+pub fn lift_directory_digest(digest: &Bound<'_, PyAny>) -> Result<DirectoryDigest, String> {
     let py_digest: externs::fs::PyDigest = digest.extract().map_err(|e| format!("{e}"))?;
     Ok(py_digest.0)
 }
 
-pub fn lift_file_digest_bound(digest: &Bound<'_, PyAny>) -> Result<hashing::Digest, String> {
+pub fn lift_file_digest(digest: &Bound<'_, PyAny>) -> Result<hashing::Digest, String> {
     let py_file_digest: externs::fs::PyFileDigest = digest.extract().map_err(|e| format!("{e}"))?;
     Ok(py_file_digest.0)
 }
@@ -238,10 +237,10 @@ pub fn unmatched_globs_additional_context() -> Option<String> {
         )
     });
     Some(format!(
-    "\n\nDo the file(s) exist? If so, check if the file(s) are in your `.gitignore` or the global \
+        "\n\nDo the file(s) exist? If so, check if the file(s) are in your `.gitignore` or the global \
     `pants_ignore` option, which may result in Pants not being able to see the file(s) even though \
     they exist on disk. Refer to {url}."
-  ))
+    ))
 }
 
 ///
@@ -470,14 +469,10 @@ impl NodeKey {
         py: Python<'a>,
         params: &'a Params,
     ) -> impl Iterator<Item = &'a Key> + 'a {
-        let engine_aware_param_ty = context
-            .core
-            .types
-            .engine_aware_parameter
-            .as_py_type_bound(py);
+        let engine_aware_param_ty = context.core.types.engine_aware_parameter.as_py_type(py);
         params.keys().filter(move |key| {
             key.type_id()
-                .as_py_type_bound(py)
+                .as_py_type(py)
                 .is_subclass(&engine_aware_param_ty)
                 .unwrap_or(false)
         })
@@ -621,7 +616,10 @@ impl Node for NodeKey {
             path.push(path[0].clone());
         }
         let url = Python::with_gil(|py| {
-            externs::doc_url(py, "docs/using-pants/key-concepts/targets-and-build-files#dependencies-and-dependency-inference")
+            externs::doc_url(
+                py,
+                "docs/using-pants/key-concepts/targets-and-build-files#dependencies-and-dependency-inference",
+            )
         });
         throw(format!(
             "The dependency graph contained a cycle:\

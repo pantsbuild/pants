@@ -10,6 +10,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyType;
 
 use crate::externs::address::Address;
+use crate::python::PyComparedBool;
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Field>()?;
@@ -155,7 +156,7 @@ impl Field {
         )
         .unwrap();
         if let Ok(default) = self_.getattr("default") {
-            write!(result, ", default={})", default).unwrap();
+            write!(result, ", default={default})").unwrap();
         } else {
             write!(result, ")").unwrap();
         }
@@ -170,23 +171,23 @@ impl Field {
         ))
     }
 
-    fn __richcmp__(
-        self_: &Bound<'_, Self>,
-        other: &Bound<'_, PyAny>,
+    fn __richcmp__<'py>(
+        self_: &Bound<'py, Self>,
+        other: &Bound<'py, PyAny>,
         op: CompareOp,
         py: Python,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<PyComparedBool> {
         let is_eq = self_.get_type().eq(other.get_type())?
             && self_
                 .borrow()
                 .value
                 .bind(py)
                 .eq(&other.extract::<PyRef<Field>>()?.value)?;
-        match op {
-            CompareOp::Eq => Ok(is_eq.into_py(py)),
-            CompareOp::Ne => Ok((!is_eq).into_py(py)),
-            _ => Ok(py.NotImplemented()),
-        }
+        Ok(PyComparedBool(match op {
+            CompareOp::Eq => Some(is_eq),
+            CompareOp::Ne => Some(!is_eq),
+            _ => None,
+        }))
     }
 }
 
@@ -241,7 +242,7 @@ impl Field {
         };
 
         let alias = Self::cls_alias(cls)?;
-        let deprecated = PyModule::import_bound(py, "pants.base.deprecated")?;
+        let deprecated = PyModule::import(py, "pants.base.deprecated")?;
         deprecated.getattr("warn_or_error")?.call(
             (
                 removal_version,

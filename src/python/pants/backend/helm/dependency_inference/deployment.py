@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import fnmatch
 import logging
 import re
 from dataclasses import dataclass, field
@@ -18,28 +19,26 @@ from pants.backend.helm.dependency_inference.subsystem import (
     UnownedHelmDependencyUsage,
 )
 from pants.backend.helm.subsystems import k8s_parser
-from pants.backend.helm.subsystems.k8s_parser import ParsedKubeManifest, ParseKubeManifestRequest
+from pants.backend.helm.subsystems.k8s_parser import ParseKubeManifestRequest, parse_kube_manifest
 from pants.backend.helm.target_types import HelmDeploymentFieldSet
 from pants.backend.helm.target_types import rules as helm_target_types_rules
 from pants.backend.helm.util_rules import renderer
 from pants.backend.helm.util_rules.renderer import (
     HelmDeploymentCmd,
     HelmDeploymentRequest,
-    RenderedHelmFiles,
+    run_renderer,
 )
 from pants.backend.helm.utils.yaml import FrozenYamlIndex, MutableYamlIndex
 from pants.build_graph.address import MaybeAddress
 from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
-from pants.engine.fs import Digest, DigestEntries, FileEntry
+from pants.engine.fs import FileEntry
+from pants.engine.internals.build_files import maybe_resolve_address, resolve_address
+from pants.engine.internals.graph import determine_explicitly_provided_dependencies
 from pants.engine.internals.native_engine import AddressInput, AddressParseException
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import (
-    DependenciesRequest,
-    ExplicitlyProvidedDependencies,
-    InferDependenciesRequest,
-    InferredDependencies,
-)
+from pants.engine.intrinsics import get_digest_entries
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
+from pants.engine.target import DependenciesRequest, InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -74,21 +73,19 @@ class HelmDeploymentReport(EngineAwareReturnType):
 
 @rule(desc="Analyse Helm deployment", level=LogLevel.DEBUG)
 async def analyse_deployment(request: AnalyseHelmDeploymentRequest) -> HelmDeploymentReport:
-    rendered_deployment = await Get(
-        RenderedHelmFiles,
-        HelmDeploymentRequest(
-            cmd=HelmDeploymentCmd.RENDER,
-            field_set=request.field_set,
-            description=f"Rendering Helm deployment {request.field_set.address}",
-        ),
+    rendered_deployment = await run_renderer(
+        **implicitly(
+            HelmDeploymentRequest(
+                cmd=HelmDeploymentCmd.RENDER,
+                field_set=request.field_set,
+                description=f"Rendering Helm deployment {request.field_set.address}",
+            )
+        )
     )
 
-    rendered_entries = await Get(DigestEntries, Digest, rendered_deployment.snapshot.digest)
-    parsed_manifests = await MultiGet(
-        Get(
-            ParsedKubeManifest,
-            ParseKubeManifestRequest(file=entry),
-        )
+    rendered_entries = await get_digest_entries(rendered_deployment.snapshot.digest)
+    parsed_manifests = await concurrently(
+        parse_kube_manifest(ParseKubeManifestRequest(file=entry), **implicitly())
         for entry in rendered_entries
         if isinstance(entry, FileEntry)
     )
@@ -136,32 +133,12 @@ class _FirstPartyHelmDeploymentMappingRequest(EngineAwareParameter):
 
 
 @rule
-async def first_party_helm_deployment_mapping(
-    request: FirstPartyHelmDeploymentMappingRequest,
-    helm_infer: HelmInferSubsystem,
-) -> FirstPartyHelmDeploymentMapping:
-    if not helm_infer.deployment_dependencies:
-        return FirstPartyHelmDeploymentMapping(
-            request.field_set.address,
-            FrozenYamlIndex.empty(),
-        )
-    # Use a small proxy rule to make sure we don't calculate AllDockerImageTargets
-    # if `[helm-infer].deployment_dependencies` is set to true.
-    return await Get(
-        FirstPartyHelmDeploymentMapping,
-        _FirstPartyHelmDeploymentMappingRequest(field_set=request.field_set),
-    )
-
-
-@rule
 async def _first_party_helm_deployment_mapping(
     request: _FirstPartyHelmDeploymentMappingRequest,
     docker_targets: AllDockerImageTargets,
     helm_infer: HelmInferSubsystem,
 ) -> FirstPartyHelmDeploymentMapping:
-    deployment_report = await Get(
-        HelmDeploymentReport, AnalyseHelmDeploymentRequest(request.field_set)
-    )
+    deployment_report = await analyse_deployment(AnalyseHelmDeploymentRequest(request.field_set))
 
     def image_ref_to_address_input(image_ref: str) -> tuple[str, AddressInput] | None:
         try:
@@ -176,8 +153,8 @@ async def _first_party_helm_deployment_mapping(
     indexed_address_inputs = deployment_report.image_refs.transform_values(
         image_ref_to_address_input
     )
-    maybe_addresses = await MultiGet(
-        Get(MaybeAddress, AddressInput, ai) for _, ai in indexed_address_inputs.values()
+    maybe_addresses = await concurrently(
+        maybe_resolve_address(ai) for _, ai in indexed_address_inputs.values()
     )
 
     docker_target_addresses = {tgt.address for tgt in docker_targets}
@@ -196,6 +173,23 @@ async def _first_party_helm_deployment_mapping(
     return FirstPartyHelmDeploymentMapping(
         address=request.field_set.address,
         indexed_docker_addresses=indexed_docker_addresses,
+    )
+
+
+@rule
+async def first_party_helm_deployment_mapping(
+    request: FirstPartyHelmDeploymentMappingRequest,
+    helm_infer: HelmInferSubsystem,
+) -> FirstPartyHelmDeploymentMapping:
+    if not helm_infer.deployment_dependencies:
+        return FirstPartyHelmDeploymentMapping(
+            request.field_set.address,
+            FrozenYamlIndex.empty(),
+        )
+    # Use a small proxy rule to make sure we don't calculate AllDockerImageTargets
+    # if `[helm-infer].deployment_dependencies` is set to true.
+    return await _first_party_helm_deployment_mapping(
+        _FirstPartyHelmDeploymentMappingRequest(field_set=request.field_set), **implicitly()
     )
 
 
@@ -256,17 +250,10 @@ class ImageReferenceResolver:
         else:
             image_name = parsed.group("repository")
 
-        # Putting this wildcard check after parsing
-        # will mean that we don't approve things that don't look like docker images.
-        if "*" in self.helm_infer.external_docker_images:
-            return True
-        if (
-            image_name in self.helm_infer.external_docker_images
-            or image_ref in self.helm_infer.external_docker_images
-        ):
-            return True
-
-        return False
+        return any(
+            (fnmatch.fnmatch(image_name, pattern) or fnmatch.fnmatch(image_ref, pattern))
+            for pattern in self.helm_infer.external_docker_images
+        )
 
     def _handle_missing_docker_image(self, message):
         self.errors.append(message)
@@ -303,18 +290,18 @@ async def inject_deployment_dependencies(
     request: InferHelmDeploymentDependenciesRequest,
     infer_subsystem: HelmInferSubsystem,
 ) -> InferredDependencies:
-    get_address = Get(Address, AddressInput, request.field_set.chart.to_address_input())
-    get_explicit_deps = Get(
-        ExplicitlyProvidedDependencies,
-        DependenciesRequest(request.field_set.dependencies),
+    get_address = resolve_address(
+        **implicitly({request.field_set.chart.to_address_input(): AddressInput})
+    )
+    get_explicit_deps = determine_explicitly_provided_dependencies(
+        **implicitly(DependenciesRequest(request.field_set.dependencies))
     )
 
-    chart_address, explicitly_provided_deps, mapping = await MultiGet(
+    chart_address, explicitly_provided_deps, mapping = await concurrently(
         get_address,
         get_explicit_deps,
-        Get(
-            FirstPartyHelmDeploymentMapping,
-            FirstPartyHelmDeploymentMappingRequest(request.field_set),
+        first_party_helm_deployment_mapping(
+            FirstPartyHelmDeploymentMappingRequest(request.field_set), **implicitly()
         ),
     )
 

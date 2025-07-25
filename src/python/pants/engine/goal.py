@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Type, cast
-
-from typing_extensions import final
+from typing import TYPE_CHECKING, ClassVar, cast, final
 
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.unions import UnionMembership
@@ -33,7 +32,7 @@ class GoalSubsystem(Subsystem):
 
     ```
     @rule
-    def list(console: Console, list_subsystem: ListSubsystem) -> List:
+    async def list(console: Console, list_subsystem: ListSubsystem) -> List:
       transitive = list_subsystem.transitive
       documented = list_subsystem.documented
       ...
@@ -94,19 +93,19 @@ class Goal:
         f""" Indicates that the goal chooses the environments to use to execute rules within the goal.
 
         This requires migration work to be done by the goal author. See
-        {doc_url('docs/writing-plugins/common-plugin-tasks/plugin-upgrade-guide')}.
+        {doc_url("docs/writing-plugins/common-plugin-tasks/plugin-upgrade-guide")}.
         """
         USES_ENVIRONMENTS = 3
 
     exit_code: int
-    subsystem_cls: ClassVar[Type[GoalSubsystem]]
+    subsystem_cls: ClassVar[type[GoalSubsystem]]
 
     f"""Indicates that a Goal has been migrated to compute EnvironmentNames to build targets in.
 
     All goals in `pantsbuild/pants` should be migrated before the 2.15.x branch is cut, but end
     user goals have until `2.17.0.dev4` to migrate.
 
-    See {doc_url('docs/writing-plugins/common-plugin-tasks/plugin-upgrade-guide')}.
+    See {doc_url("docs/writing-plugins/common-plugin-tasks/plugin-upgrade-guide")}.
     """
     environment_behavior: ClassVar[EnvironmentBehavior]
 

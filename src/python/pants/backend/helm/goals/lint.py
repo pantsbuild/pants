@@ -14,12 +14,12 @@ from pants.backend.helm.target_types import (
     HelmSkipLintField,
 )
 from pants.backend.helm.util_rules import tool
-from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
+from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest, get_helm_chart
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.goals.lint import LintResult, LintTargetsRequest, Partitions
 from pants.core.util_rules.partitions import Partition
-from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.intrinsics import execute_process
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,9 @@ async def partition_helm_lint(
     field_sets = tuple(
         field_set for field_set in request.field_sets if not field_set.skip_lint.value
     )
-    charts = await MultiGet(Get(HelmChart, HelmChartRequest(field_set)) for field_set in field_sets)
+    charts = await concurrently(
+        get_helm_chart(HelmChartRequest(field_set), **implicitly()) for field_set in field_sets
+    )
     return Partitions(
         Partition((field_set,), chart) for chart, field_set in zip(charts, field_sets)
     )
@@ -70,13 +72,14 @@ async def run_helm_lint(
     if quiet:
         argv.append("--quiet")
 
-    process_result = await Get(
-        FallibleProcessResult,
-        HelmProcess(
-            argv,
-            extra_immutable_input_digests=chart.immutable_input_digests,
-            description=f"Linting chart: {chart.info.name}",
-        ),
+    process_result = await execute_process(
+        **implicitly(
+            HelmProcess(
+                argv,
+                extra_immutable_input_digests=chart.immutable_input_digests,
+                description=f"Linting chart: {chart.info.name}",
+            )
+        )
     )
     return LintResult.create(request, process_result)
 

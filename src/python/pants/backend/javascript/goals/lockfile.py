@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import os.path
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.javascript import nodejs_project_environment
 from pants.backend.javascript.nodejs_project import AllNodeJSProjects, NodeJSProject
@@ -24,10 +24,10 @@ from pants.core.goals.generate_lockfiles import (
     UserGenerateLockfiles,
 )
 from pants.core.goals.tailor import TailorGoal
-from pants.engine.internals.native_engine import AddPrefix, Digest
-from pants.engine.internals.selectors import Get
-from pants.engine.process import ProcessResult
-from pants.engine.rules import Rule, collect_rules, rule
+from pants.engine.internals.native_engine import AddPrefix
+from pants.engine.intrinsics import add_prefix
+from pants.engine.process import fallible_to_exec_result_or_raise
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.util.docutil import bin_name
 from pants.util.ordered_set import FrozenOrderedSet
@@ -111,16 +111,17 @@ async def setup_user_lockfile_requests(
 async def generate_lockfile_from_package_jsons(
     request: GeneratePackageLockJsonFile,
 ) -> GenerateLockfileResult:
-    result = await Get(
-        ProcessResult,
-        NodeJsProjectEnvironmentProcess(
-            env=NodeJsProjectEnvironment.from_root(request.project),
-            args=request.project.generate_lockfile_args,
-            description=f"generate {request.project.lockfile_name} for '{request.resolve_name}'.",
-            output_files=(request.project.lockfile_name,),
-        ),
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            NodeJsProjectEnvironmentProcess(
+                env=NodeJsProjectEnvironment.from_root(request.project),
+                args=request.project.generate_lockfile_args,
+                description=f"generate {request.project.lockfile_name} for '{request.resolve_name}'.",
+                output_files=(request.project.lockfile_name,),
+            )
+        )
     )
-    output_digest = await Get(Digest, AddPrefix(result.output_digest, request.project.root_dir))
+    output_digest = await add_prefix(AddPrefix(result.output_digest, request.project.root_dir))
     return GenerateLockfileResult(output_digest, request.resolve_name, request.lockfile_dest)
 
 

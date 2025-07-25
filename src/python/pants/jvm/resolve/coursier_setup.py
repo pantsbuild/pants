@@ -6,23 +6,25 @@ from __future__ import annotations
 import os
 import shlex
 import textwrap
+from collections.abc import Iterable
 from dataclasses import dataclass
 from hashlib import sha256
-from typing import ClassVar, Iterable, Tuple
+from typing import ClassVar
 
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
-    ExternalToolRequest,
     TemplatedExternalTool,
+    download_external_tool,
 )
 from pants.core.util_rules.system_binaries import BashBinary, MkdirBinary
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
+from pants.engine.intrinsics import create_digest, merge_digests
 from pants.engine.platform import Platform
 from pants.engine.process import Process
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import collect_rules, concurrently, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import StrListOption, StrOption
 from pants.util.frozendict import FrozenDict
@@ -239,10 +241,10 @@ class Coursier:
 
 @dataclass(frozen=True)
 class CoursierFetchProcess:
-    args: Tuple[str, ...]
+    args: tuple[str, ...]
     input_digest: Digest
-    output_directories: Tuple[str, ...]
-    output_files: Tuple[str, ...]
+    output_directories: tuple[str, ...]
+    output_files: tuple[str, ...]
     description: str
 
 
@@ -288,13 +290,8 @@ async def setup_coursier(
 
     post_process_stderr = POST_PROCESS_COURSIER_STDERR_SCRIPT.format(python_path=python.path)
 
-    downloaded_coursier_get = Get(
-        DownloadedExternalTool,
-        ExternalToolRequest,
-        coursier_subsystem.get_request(platform),
-    )
-    wrapper_scripts_digest_get = Get(
-        Digest,
+    downloaded_coursier_get = download_external_tool(coursier_subsystem.get_request(platform))
+    wrapper_scripts_digest_get = create_digest(
         CreateDigest(
             [
                 FileContent(
@@ -313,23 +310,22 @@ async def setup_coursier(
                     is_executable=True,
                 ),
             ]
-        ),
+        )
     )
 
-    downloaded_coursier, wrapper_scripts_digest = await MultiGet(
+    downloaded_coursier, wrapper_scripts_digest = await concurrently(
         downloaded_coursier_get, wrapper_scripts_digest_get
     )
 
     return Coursier(
         coursier=downloaded_coursier,
-        _digest=await Get(
-            Digest,
+        _digest=await merge_digests(
             MergeDigests(
                 [
                     downloaded_coursier.digest,
                     wrapper_scripts_digest,
                 ]
-            ),
+            )
         ),
         repos=FrozenOrderedSet(coursier_subsystem.repos),
         jvm_index=coursier_subsystem.jvm_index,

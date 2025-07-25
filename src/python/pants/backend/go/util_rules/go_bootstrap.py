@@ -3,16 +3,15 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Collection
 from dataclasses import dataclass
-from typing import Collection
 
 from pants.backend.go.subsystems.golang import GolangSubsystem
+from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.util_rules import asdf, search_paths
 from pants.core.util_rules.asdf import AsdfPathString, AsdfToolPathsResult
-from pants.core.util_rules.environments import EnvironmentTarget
-from pants.core.util_rules.search_paths import ValidatedSearchPaths, ValidateSearchPathsRequest
-from pants.engine.env_vars import PathEnvironmentVariable
-from pants.engine.internals.selectors import Get
+from pants.core.util_rules.search_paths import ValidateSearchPathsRequest, validate_search_paths
+from pants.engine.internals.platform_rules import environment_path_variable
 from pants.engine.rules import collect_rules, rule
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -40,7 +39,7 @@ async def _go_search_paths(
         AsdfPathString.LOCAL.value: asdf_result.local_tool_paths,
     }
 
-    path_variables = await Get(PathEnvironmentVariable)
+    path_variables = await environment_path_variable()
     expanded: list[str] = []
     for s in paths:
         if s == "<PATH>":
@@ -57,8 +56,7 @@ async def _go_search_paths(
 async def resolve_go_bootstrap(
     golang_subsystem: GolangSubsystem, golang_env_aware: GolangSubsystem.EnvironmentAware
 ) -> GoBootstrap:
-    search_paths = await Get(
-        ValidatedSearchPaths,
+    search_paths = await validate_search_paths(
         ValidateSearchPathsRequest(
             env_tgt=golang_env_aware.env_tgt,
             search_paths=tuple(golang_env_aware.raw_go_search_paths),
@@ -66,7 +64,7 @@ async def resolve_go_bootstrap(
             environment_key="golang_go_search_paths",
             is_default=golang_env_aware._is_default("_go_search_paths"),
             local_only=FrozenOrderedSet((AsdfPathString.STANDARD, AsdfPathString.LOCAL)),
-        ),
+        )
     )
     paths = await _go_search_paths(golang_env_aware.env_tgt, golang_subsystem, search_paths)
 

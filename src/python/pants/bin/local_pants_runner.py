@@ -12,7 +12,7 @@ from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE,
 from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.core.util_rules.environments import determine_bootstrap_environment
+from pants.core.environments.rules import determine_bootstrap_environment
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.goal import CurrentExecutingGoals
 from pants.engine.internals import native_engine
@@ -102,21 +102,14 @@ class LocalPantsRunner:
         run_tracker = RunTracker(options_bootstrapper.args, options)
         native_engine.maybe_set_panic_handler()
 
-        # Option values are usually computed lazily on demand, but command line options are
-        # eagerly computed for validation.
         with options_initializer.handle_unknown_flags(options_bootstrapper, env, raise_=True):
             # Verify CLI flags.
             if not build_config.allow_unknown_options:
                 options.verify_args()
 
-            for scope, values in options.scope_to_flags.items():
-                if values:
-                    # Only compute values if there were any command line options presented.
-                    options.for_scope(scope)
-
         # Verify configs.
         if global_bootstrap_options.verify_config:
-            options.verify_configs(options_bootstrapper.config)
+            options.verify_configs()
 
         # If we're running with the daemon, we'll be handed a warmed Scheduler, which we use
         # to initialize a session here.
@@ -125,7 +118,7 @@ class LocalPantsRunner:
             dynamic_remote_options, _ = DynamicRemoteOptions.from_options(
                 options, env, remote_auth_plugin_func=build_config.remote_auth_plugin_func
             )
-            bootstrap_options = options.bootstrap_option_values()
+            bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
             assert bootstrap_options is not None
             scheduler = EngineInitializer.setup_graph(
                 bootstrap_options, build_config, dynamic_remote_options, executor

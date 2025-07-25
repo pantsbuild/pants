@@ -19,7 +19,6 @@ from pants.backend.shell.target_types import (
 )
 from pants.core.goals.test import (
     BuildPackageDependenciesRequest,
-    BuiltPackageDependencies,
     RuntimePackageDependenciesField,
     TestDebugRequest,
     TestExtraEnv,
@@ -27,28 +26,31 @@ from pants.core.goals.test import (
     TestRequest,
     TestResult,
     TestSubsystem,
+    build_runtime_package_dependencies,
 )
 from pants.core.target_types import FileSourceField, ResourceSourceField
-from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.external_tool import download_external_tool
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.core.util_rules.system_binaries import (
     BinaryNotFoundError,
     BinaryPath,
     BinaryPathRequest,
-    BinaryPaths,
+    find_binary,
 )
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, MergeDigests
+from pants.engine.fs import CreateDigest, FileContent, MergeDigests
+from pants.engine.internals.graph import transitive_targets as transitive_targets_get
+from pants.engine.intrinsics import create_digest, get_digest_contents, merge_digests
 from pants.engine.platform import Platform
 from pants.engine.process import (
     InteractiveProcess,
     Process,
     ProcessCacheScope,
-    ProcessResultWithRetries,
     ProcessWithRetries,
+    execute_process_with_retry,
 )
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import SourcesField, Target, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
+from pants.engine.target import SourcesField, Target, TransitiveTargetsRequest
 from pants.option.global_options import GlobalOptions
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
@@ -95,7 +97,7 @@ def add_source_shunit2(fc: FileContent, binary_name: str) -> FileContent:
     # NB: We always run tests from the build root, so we source `shunit2` relative to there.
     source_line = f"source ./{binary_name}".encode()
 
-    lines = []
+    lines: list[bytes] = []
     already_had_source = False
     for line in fc.content.splitlines():
         if SOURCE_SHUNIT2_REGEX.search(line):
@@ -147,7 +149,7 @@ async def determine_shunit2_shell(
         search_path=shell_setup.executable_search_path,
         test=tgt_shell.binary_path_test,
     )
-    paths = await Get(BinaryPaths, BinaryPathRequest, path_request)
+    paths = await find_binary(path_request, **implicitly())
     first_path = paths.first_path
     if not first_path:
         raise BinaryNotFoundError.from_request(
@@ -165,45 +167,44 @@ async def setup_shunit2_for_target(
     shunit2: Shunit2,
     platform: Platform,
 ) -> TestSetup:
-    shunit2_script, transitive_targets, built_package_dependencies = await MultiGet(
-        Get(DownloadedExternalTool, ExternalToolRequest, shunit2.get_request(platform)),
-        Get(TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])),
-        Get(
-            BuiltPackageDependencies,
-            BuildPackageDependenciesRequest(request.field_set.runtime_package_dependencies),
+    shunit2_script, transitive_targets, built_package_dependencies = await concurrently(
+        download_external_tool(shunit2.get_request(platform)),
+        transitive_targets_get(
+            TransitiveTargetsRequest([request.field_set.address]), **implicitly()
+        ),
+        build_runtime_package_dependencies(
+            BuildPackageDependenciesRequest(request.field_set.runtime_package_dependencies)
         ),
     )
 
-    dependencies_source_files_request = Get(
-        SourceFiles,
+    dependencies_source_files_request = determine_source_files(
         SourceFilesRequest(
             (tgt.get(SourcesField) for tgt in transitive_targets.dependencies),
             for_sources_types=(ShellSourceField, FileSourceField, ResourceSourceField),
             enable_codegen=True,
-        ),
+        )
     )
-    dependencies_source_files, field_set_sources = await MultiGet(
+    dependencies_source_files, field_set_sources = await concurrently(
         dependencies_source_files_request,
-        Get(SourceFiles, SourceFilesRequest([request.field_set.sources])),
+        determine_source_files(SourceFilesRequest([request.field_set.sources])),
     )
 
-    field_set_digest_content = await Get(DigestContents, Digest, field_set_sources.snapshot.digest)
+    field_set_digest_content = await get_digest_contents(field_set_sources.snapshot.digest)
     # `ShellTestSourceField` validates that there's exactly one file.
     test_file_content = field_set_digest_content[0]
     updated_test_file_content = add_source_shunit2(test_file_content, shunit2_script.exe)
 
-    updated_test_digest, runner = await MultiGet(
-        Get(Digest, CreateDigest([updated_test_file_content])),
-        Get(
-            Shunit2Runner,
+    updated_test_digest, runner = await concurrently(
+        create_digest(CreateDigest([updated_test_file_content])),
+        determine_shunit2_shell(
             Shunit2RunnerRequest(
                 request.field_set.address, test_file_content, request.field_set.shell
             ),
+            **implicitly(),
         ),
     )
 
-    input_digest = await Get(
-        Digest,
+    input_digest = await merge_digests(
         MergeDigests(
             (
                 shunit2_script.digest,
@@ -211,7 +212,7 @@ async def setup_shunit2_for_target(
                 dependencies_source_files.snapshot.digest,
                 *(pkg.digest for pkg in built_package_dependencies),
             )
-        ),
+        )
     )
 
     env_dict = {
@@ -250,9 +251,9 @@ async def run_tests_with_shunit2(
 ) -> TestResult:
     field_set = batch.single_element
 
-    setup = await Get(TestSetup, TestSetupRequest(field_set))
-    results = await Get(
-        ProcessResultWithRetries, ProcessWithRetries(setup.process, test_subsystem.attempts_default)
+    setup = await setup_shunit2_for_target(TestSetupRequest(field_set), **implicitly())
+    results = await execute_process_with_retry(
+        ProcessWithRetries(setup.process, test_subsystem.attempts_default)
     )
     return TestResult.from_fallible_process_result(
         process_results=results.results,
@@ -264,9 +265,9 @@ async def run_tests_with_shunit2(
 
 @rule(desc="Setup Shunit2 to run interactively", level=LogLevel.DEBUG)
 async def setup_shunit2_debug_test(
-    batch: Shunit2TestRequest.Batch[Shunit2FieldSet, Any]
+    batch: Shunit2TestRequest.Batch[Shunit2FieldSet, Any],
 ) -> TestDebugRequest:
-    setup = await Get(TestSetup, TestSetupRequest(batch.single_element))
+    setup = await setup_shunit2_for_target(TestSetupRequest(batch.single_element), **implicitly())
     return TestDebugRequest(
         InteractiveProcess.from_process(
             setup.process, forward_signals_to_process=False, restartable=True
@@ -275,7 +276,7 @@ async def setup_shunit2_debug_test(
 
 
 def rules():
-    return [
+    return (
         *collect_rules(),
         *Shunit2TestRequest.rules(),
-    ]
+    )

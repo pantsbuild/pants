@@ -1,21 +1,22 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from dataclasses import dataclass
-from typing import Union
 
-from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
+from pants.backend.terraform.dependencies import (
+    prepare_terraform_invocation,
+    terraform_fieldset_to_init_request,
+)
 from pants.backend.terraform.target_types import (
-    TerraformDeploymentFieldSet,
     TerraformDeploymentTarget,
     TerraformFieldSet,
     TerraformModuleTarget,
-    TerraformRootModuleField,
 )
-from pants.backend.terraform.tool import TerraformProcess
+from pants.backend.terraform.tool import TerraformCommand, TerraformProcess
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.internals.native_engine import MergeDigests
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import execute_process, merge_digests
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import BoolField, Target
 from pants.engine.unions import UnionRule
 from pants.option.option_types import SkipOption
@@ -49,20 +50,6 @@ class TerraformCheckRequest(CheckRequest):
     tool_name = TerraformValidateSubsystem.options_scope
 
 
-def terraform_fieldset_to_init_request(
-    terraform_fieldset: Union[TerraformDeploymentFieldSet, TerraformFieldSet]
-) -> TerraformInitRequest:
-    if isinstance(terraform_fieldset, TerraformDeploymentFieldSet):
-        deployment = terraform_fieldset
-        return TerraformInitRequest(deployment.root_module, deployment.dependencies)
-    if isinstance(terraform_fieldset, TerraformFieldSet):
-        module = terraform_fieldset
-        return TerraformInitRequest(
-            TerraformRootModuleField(module.address.spec, module.address),
-            module.dependencies,
-        )
-
-
 @rule
 async def terraform_check(
     request: TerraformCheckRequest, subsystem: TerraformValidateSubsystem
@@ -70,31 +57,43 @@ async def terraform_check(
     if subsystem.skip:
         return CheckResults([], checker_name=request.tool_name)
 
-    initialised_terraforms = await MultiGet(
-        Get(
-            TerraformInitResponse,
-            TerraformInitRequest,
-            terraform_fieldset_to_init_request(deployment),
-        )
+    terraform_deployments = await concurrently(
+        prepare_terraform_invocation(terraform_fieldset_to_init_request(deployment))
         for deployment in request.field_sets
     )
 
-    results = await MultiGet(
-        Get(
-            FallibleProcessResult,
-            TerraformProcess(
-                args=("validate",),
-                input_digest=deployment.sources_and_deps,
-                output_files=tuple(deployment.terraform_files.files),
-                description=f"Run `terraform validate` on module {deployment.chdir} with {pluralize(len(deployment.terraform_files.files), 'file')}.",
-                chdir=deployment.chdir,
-            ),
+    all_sources_and_deps = await concurrently(
+        merge_digests(
+            MergeDigests(
+                [
+                    deployment.terraform_sources.snapshot.digest,
+                    deployment.dependencies_files.snapshot.digest,
+                ]
+            )
         )
-        for deployment in initialised_terraforms
+        for deployment in terraform_deployments
+    )
+
+    results = await concurrently(
+        execute_process(
+            **implicitly(
+                TerraformProcess(
+                    cmds=(
+                        deployment.init_cmd.to_args(),
+                        TerraformCommand(("validate",)),
+                    ),
+                    input_digest=sources_and_deps,
+                    output_files=tuple(deployment.terraform_sources.files),
+                    description=f"Run `terraform validate` on module {deployment.chdir} with {pluralize(len(deployment.terraform_sources.files), 'file')}.",
+                    chdir=deployment.chdir,
+                )
+            )
+        )
+        for deployment, sources_and_deps in zip(terraform_deployments, all_sources_and_deps)
     )
 
     check_results = []
-    for deployment, result, field_set in zip(initialised_terraforms, results, request.field_sets):
+    for deployment, result, field_set in zip(terraform_deployments, results, request.field_sets):
         check_results.append(
             CheckResult.from_fallible_process_result(
                 result, partition_description=f"`terraform validate` on `{field_set.address}`"

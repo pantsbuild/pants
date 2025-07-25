@@ -10,8 +10,9 @@ import re
 import shlex
 import textwrap
 from collections import abc
+from collections.abc import Callable, Iterable, Mapping
 from logging import Logger
-from typing import Any, Callable, Iterable, Mapping, TypeVar
+from typing import Any, TypeVar
 
 import colors
 from typing_extensions import ParamSpec
@@ -198,7 +199,7 @@ def bullet_list(elements: Iterable[str], max_elements: int = -1) -> str:
         elements = tuple(elements)
         if len(elements) > max_elements:
             elements = elements[: max_elements - 1] + (
-                f"... and {len(elements)-max_elements+1} more",
+                f"... and {len(elements) - max_elements + 1} more",
             )
 
     sep = "\n  * "

@@ -5,8 +5,16 @@
 
 These are always activated and cannot be disabled.
 """
+
 from pants.backend.codegen import export_codegen_goal
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.environments import rules as environments_rules
+from pants.core.environments.target_types import (
+    DockerEnvironmentTarget,
+    LocalEnvironmentTarget,
+    LocalWorkspaceEnvironmentTarget,
+    RemoteEnvironmentTarget,
+)
 from pants.core.goals import (
     check,
     deploy,
@@ -43,18 +51,11 @@ from pants.core.util_rules import (
     adhoc_binaries,
     archive,
     config_files,
-    environments,
     external_tool,
     source_files,
     stripped_source_files,
     subprocess_environment,
     system_binaries,
-)
-from pants.core.util_rules.environments import (
-    DockerEnvironmentTarget,
-    LocalEnvironmentTarget,
-    LocalWorkspaceEnvironmentTarget,
-    RemoteEnvironmentTarget,
 )
 from pants.core.util_rules.wrap_source import wrap_source_rule_and_target
 from pants.engine.internals.parametrize import Parametrize
@@ -90,7 +91,7 @@ def rules():
         *anonymous_telemetry.rules(),
         *archive.rules(),
         *config_files.rules(),
-        *environments.rules(),
+        *environments_rules.rules(),
         *external_tool.rules(),
         *git.rules(),
         *source_files.rules(),

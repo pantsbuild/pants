@@ -9,8 +9,9 @@ from pants.backend.codegen.export_codegen_goal import ExportCodegen
 from pants.backend.codegen.export_codegen_goal import rules as write_codegen_rules
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules import distdir
-from pants.engine.fs import CreateDigest, FileContent, Snapshot
-from pants.engine.rules import Get, rule
+from pants.engine.fs import CreateDigest, FileContent
+from pants.engine.intrinsics import digest_to_snapshot
+from pants.engine.rules import implicitly, rule
 from pants.engine.target import (
     GeneratedSources,
     GenerateSourcesRequest,
@@ -66,13 +67,17 @@ class Gen1DuplicatedRequest(GenerateSourcesRequest):
 
 @rule
 async def gen1(_: Gen1Request) -> GeneratedSources:
-    result = await Get(Snapshot, CreateDigest([FileContent("assets/README.md", b"Hello!")]))
+    result = await digest_to_snapshot(
+        **implicitly(CreateDigest([FileContent("assets/README.md", b"Hello!")]))
+    )
     return GeneratedSources(result)
 
 
 @rule
 async def gen2(_: Gen2Request) -> GeneratedSources:
-    result = await Get(Snapshot, CreateDigest([FileContent("src/haskell/app.hs", b"10 * 4")]))
+    result = await digest_to_snapshot(
+        **implicitly(CreateDigest([FileContent("src/haskell/app.hs", b"10 * 4")]))
+    )
     return GeneratedSources(result)
 
 
@@ -83,7 +88,9 @@ async def gen_no_export(_: GenNoExportRequest) -> GeneratedSources:
 
 @rule
 async def gen1_duplicated(_: Gen1DuplicatedRequest) -> GeneratedSources:
-    result = await Get(Snapshot, CreateDigest([FileContent("assets/DUPLICATED.md", b"Hello!")]))
+    result = await digest_to_snapshot(
+        **implicitly(CreateDigest([FileContent("assets/DUPLICATED.md", b"Hello!")]))
+    )
     return GeneratedSources(result)
 
 

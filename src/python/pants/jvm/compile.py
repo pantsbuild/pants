@@ -7,9 +7,10 @@ import logging
 import os
 from abc import ABCMeta
 from collections import defaultdict, deque
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import ClassVar, Iterable, Iterator, Sequence
+from typing import ClassVar
 
 from pants.core.target_types import (
     FilesGeneratingSourcesField,
@@ -20,9 +21,9 @@ from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.selectors import Get
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules, concurrently, rule
 from pants.engine.target import (
     CoarsenedTarget,
     Field,
@@ -193,7 +194,9 @@ class ClasspathEntryRequestFactory:
 
 
 @rule
-def calculate_jvm_request_types(union_membership: UnionMembership) -> ClasspathEntryRequestFactory:
+async def calculate_jvm_request_types(
+    union_membership: UnionMembership,
+) -> ClasspathEntryRequestFactory:
     cpe_impls = union_membership.get(ClasspathEntryRequest)
 
     impls_by_source: dict[type[Field], type[ClasspathEntryRequest]] = {}
@@ -397,7 +400,7 @@ class ClasspathDependenciesRequest:
 
 
 @rule
-def required_classfiles(fallible_result: FallibleClasspathEntry) -> ClasspathEntry:
+async def required_classfiles(fallible_result: FallibleClasspathEntry) -> ClasspathEntry:
     if fallible_result.result == CompileResult.SUCCEEDED:
         assert fallible_result.output
         return fallible_result.output
@@ -408,7 +411,7 @@ def required_classfiles(fallible_result: FallibleClasspathEntry) -> ClasspathEnt
 
 
 @rule
-def classpath_dependency_requests(
+async def classpath_dependency_requests(
     classpath_entry_request: ClasspathEntryRequestFactory, request: ClasspathDependenciesRequest
 ) -> ClasspathEntryRequests:
     def ignore_because_generated(coarsened_dep: CoarsenedTarget) -> bool:
@@ -442,7 +445,7 @@ def classpath_dependency_requests(
 @rule
 async def compile_classpath_entries(requests: ClasspathEntryRequests) -> FallibleClasspathEntries:
     return FallibleClasspathEntries(
-        await MultiGet(
+        await concurrently(
             Get(FallibleClasspathEntry, ClasspathEntryRequest, request) for request in requests
         )
     )

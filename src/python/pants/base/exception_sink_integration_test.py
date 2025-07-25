@@ -6,20 +6,19 @@ import re
 import signal
 import time
 from pathlib import Path
-from typing import List, Tuple
 
 import pytest
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
+from pants.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 from pants.testutil.pants_integration_test import run_pants_with_workdir
 from pants.util.dirutil import read_file
-from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 
 pytestmark = pytest.mark.platform_specific_behavior
 
 
-def lifecycle_stub_cmdline() -> List[str]:
+def lifecycle_stub_cmdline() -> list[str]:
     # Load the testprojects pants-plugins to get some testing tasks and subsystems.
     testproject_backend_src_dir = os.path.join(
         get_buildroot(), "testprojects/pants-plugins/src/python"
@@ -36,7 +35,7 @@ def lifecycle_stub_cmdline() -> List[str]:
     return lifecycle_stub_cmdline
 
 
-def get_log_file_paths(workdir: str, pid: int) -> Tuple[str, str]:
+def get_log_file_paths(workdir: str, pid: int) -> tuple[str, str]:
     pid_specific_log_file = ExceptionSink.exceptions_log_path(for_pid=pid, in_dir=workdir)
     assert os.path.isfile(pid_specific_log_file)
 
@@ -69,9 +68,7 @@ process title: ([^\n]+)
 sys\\.argv: ([^\n]+)
 pid: {pid}
 Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
-""".format(
-        pid=pid, signum=signum, signame=signame
-    )
+""".format(pid=pid, signum=signum, signame=signame)
     assert re.search(regex_str, contents)
 
 
@@ -86,7 +83,7 @@ def test_logs_unhandled_exception(tmp_path: Path) -> None:
     pants_run.assert_failure()
 
     regex = "exception during import!"
-    assert re.search(regex, pants_run.stderr)
+    assert re.search(regex, pants_run.stderr), f"Regex not found in log: {pants_run.stderr}"
 
     pid_specific_log_file, shared_log_file = get_log_file_paths(tmp_path.as_posix(), pants_run.pid)
     assert_unhandled_exception_log_matches(pants_run.pid, read_file(pid_specific_log_file))

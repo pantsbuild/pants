@@ -5,11 +5,14 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import Iterable, Mapping, cast
+from collections.abc import Iterable, Mapping
+from typing import cast
 
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
 
+from pants.core.environments.rules import EnvironmentNameRequest
+from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.goals.run import (
     Run,
     RunDebugAdapterRequest,
@@ -20,7 +23,6 @@ from pants.core.goals.run import (
     run,
 )
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
-from pants.core.util_rules.environments import EnvironmentNameRequest, EnvironmentTarget
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent, Workspace
 from pants.engine.internals.specs_rules import (
@@ -34,7 +36,7 @@ from pants.engine.target import (
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
 )
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.testutil.option_util import create_goal_subsystem, create_subsystem
 from pants.testutil.rule_runner import (
@@ -136,11 +138,8 @@ def single_target_run(
                     mock=rule_runner.run_interactive_process,
                 ),
             ],
-            union_membership=UnionMembership(
-                {
-                    RunFieldSet: [TestRunFieldSet],
-                    RunDebugAdapterRequest: [TestRunFieldSet],
-                },
+            union_membership=UnionMembership.from_rules(
+                {UnionRule(RunFieldSet, TestRunFieldSet)},
             ),
         )
 

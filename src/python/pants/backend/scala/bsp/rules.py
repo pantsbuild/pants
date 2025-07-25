@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import logging
 import textwrap
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
 from pants.backend.scala.bsp.spec import (
     ScalaBuildTarget,
@@ -20,18 +20,18 @@ from pants.backend.scala.bsp.spec import (
     ScalaTestClassesResult,
 )
 from pants.backend.scala.compile.scalac_plugins import (
-    ScalaPlugins,
     ScalaPluginsForTargetRequest,
     ScalaPluginsRequest,
-    ScalaPluginTargetsForTarget,
+    fetch_plugins,
+    resolve_scala_plugins_for_target,
 )
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scalac import Scalac
 from pants.backend.scala.target_types import ScalaFieldSet, ScalaSourceField
 from pants.backend.scala.util_rules.versions import (
     ScalaArtifactsForVersionRequest,
-    ScalaArtifactsForVersionResult,
     ScalaVersion,
+    resolve_scala_artifacts_for_version,
 )
 from pants.base.build_root import BuildRoot
 from pants.bsp.protocol import BSPHandlerMapping
@@ -48,15 +48,18 @@ from pants.bsp.util_rules.targets import (
     BSPDependencyModulesResult,
     BSPResourcesRequest,
     BSPResourcesResult,
+    resolve_bsp_build_target_addresses,
 )
 from pants.core.util_rules.system_binaries import BashBinary, ReadlinkBinary
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests, Workspace
+from pants.engine.internals.graph import coarsened_targets as coarsened_targets_get
 from pants.engine.internals.native_engine import Snapshot
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import _uncacheable_rule, collect_rules, rule
-from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, Targets
+from pants.engine.internals.selectors import Get, concurrently
+from pants.engine.intrinsics import add_prefix, create_digest, digest_to_snapshot, merge_digests
+from pants.engine.process import Process, execute_process_or_raise
+from pants.engine.rules import _uncacheable_rule, collect_rules, implicitly, rule
+from pants.engine.target import CoarsenedTarget, FieldSet
 from pants.engine.unions import UnionRule
 from pants.jvm.bsp.compile import _jvm_bsp_compile, jvm_classes_directory
 from pants.jvm.bsp.compile import rules as jvm_compile_rules
@@ -64,14 +67,16 @@ from pants.jvm.bsp.resources import _jvm_bsp_resources
 from pants.jvm.bsp.resources import rules as jvm_resources_rules
 from pants.jvm.bsp.spec import JvmBuildTarget, MavenDependencyModule, MavenDependencyModuleArtifact
 from pants.jvm.compile import ClasspathEntry, ClasspathEntryRequest, ClasspathEntryRequestFactory
-from pants.jvm.jdk_rules import DefaultJdk, JdkEnvironment, JdkRequest
+from pants.jvm.jdk_rules import DefaultJdk, JdkRequest, prepare_jdk_environment
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
 from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.resolve.coursier_fetch import (
     CoursierLockfileEntry,
     CoursierResolvedLockfile,
-    ToolClasspath,
     ToolClasspathRequest,
+    get_coursier_lockfile_for_resolve,
+    materialize_classpath_for_tool,
+    select_coursier_resolve_for_targets,
 )
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
@@ -124,9 +129,9 @@ async def collect_thirdparty_modules(
     request: ThirdpartyModulesRequest,
     classpath_entry_request: ClasspathEntryRequestFactory,
 ) -> ThirdpartyModules:
-    coarsened_targets = await Get(CoarsenedTargets, Addresses, request.addresses)
-    resolve = await Get(CoursierResolveKey, CoarsenedTargets, coarsened_targets)
-    lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, resolve)
+    coarsened_targets = await coarsened_targets_get(**implicitly(request.addresses))
+    resolve = await select_coursier_resolve_for_targets(coarsened_targets, **implicitly())
+    lockfile = await get_coursier_lockfile_for_resolve(resolve)
 
     applicable_lockfile_entries: dict[CoursierLockfileEntry, CoarsenedTarget] = {}
     for ct in coarsened_targets.coarsened_closure():
@@ -143,7 +148,7 @@ async def collect_thirdparty_modules(
                 continue
             applicable_lockfile_entries[entry] = ct
 
-    classpath_entries = await MultiGet(
+    classpath_entries = await concurrently(
         Get(
             ClasspathEntry,
             ClasspathEntryRequest,
@@ -152,7 +157,7 @@ async def collect_thirdparty_modules(
         for target in applicable_lockfile_entries.values()
     )
 
-    resolve_digest = await Get(Digest, MergeDigests(cpe.digest for cpe in classpath_entries))
+    resolve_digest = await merge_digests(MergeDigests(cpe.digest for cpe in classpath_entries))
 
     return ThirdpartyModules(
         resolve,
@@ -162,12 +167,11 @@ async def collect_thirdparty_modules(
 
 
 async def _materialize_scala_runtime_jars(scala_version: ScalaVersion) -> Snapshot:
-    scala_artifacts = await Get(
-        ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(scala_version)
+    scala_artifacts = await resolve_scala_artifacts_for_version(
+        ScalaArtifactsForVersionRequest(scala_version)
     )
 
-    tool_classpath = await Get(
-        ToolClasspath,
+    tool_classpath = await materialize_classpath_for_tool(
         ToolClasspathRequest(
             artifact_requirements=ArtifactRequirements.from_coordinates(
                 scala_artifacts.all_coordinates
@@ -175,9 +179,8 @@ async def _materialize_scala_runtime_jars(scala_version: ScalaVersion) -> Snapsh
         ),
     )
 
-    return await Get(
-        Snapshot,
-        AddPrefix(tool_classpath.content.digest, f"jvm/scala-runtime/{scala_version}"),
+    return await digest_to_snapshot(
+        **implicitly(AddPrefix(tool_classpath.content.digest, f"jvm/scala-runtime/{scala_version}"))
     )
 
 
@@ -220,10 +223,10 @@ async def bsp_resolve_scala_metadata(
     # The maximum JDK version will be compatible with all the specified targets
     jdk_requests = [JdkRequest.from_field(version) for version in jdk_versions]
     jdk_request = max(jdk_requests, key=_jdk_request_sort_key(jvm))
-    jdk = await Get(JdkEnvironment, JdkRequest, jdk_request)
+    jdk = await prepare_jdk_environment(**implicitly({jdk_request: JdkRequest}))
 
     if any(i.version == DefaultJdk.SYSTEM for i in jdk_requests):
-        system_jdk = await Get(JdkEnvironment, JdkRequest, JdkRequest.SYSTEM)
+        system_jdk = await prepare_jdk_environment(**implicitly({JdkRequest.SYSTEM: JdkRequest}))
         if system_jdk.jre_major_version > jdk.jre_major_version:
             jdk = system_jdk
 
@@ -236,8 +239,7 @@ async def bsp_resolve_scala_metadata(
         {jdk.java_home_command}
         """
     )
-    leak_sandbox_path_digest = await Get(
-        Digest,
+    leak_sandbox_path_digest = await create_digest(
         CreateDigest(
             [
                 FileContent(
@@ -246,24 +248,25 @@ async def bsp_resolve_scala_metadata(
                     is_executable=True,
                 ),
             ]
-        ),
+        )
     )
 
-    leaked_paths = await Get(
-        ProcessResult,
-        Process(
-            [
-                bash.path,
-                cmd,
-            ],
-            input_digest=leak_sandbox_path_digest,
-            immutable_input_digests=jdk.immutable_input_digests,
-            env=jdk.env,
-            use_nailgun=(),
-            description="Report JDK cache paths for BSP",
-            append_only_caches=jdk.append_only_caches,
-            level=LogLevel.TRACE,
-        ),
+    leaked_paths = await execute_process_or_raise(
+        **implicitly(
+            Process(
+                [
+                    bash.path,
+                    cmd,
+                ],
+                input_digest=leak_sandbox_path_digest,
+                immutable_input_digests=jdk.immutable_input_digests,
+                env=jdk.env,
+                use_nailgun=(),
+                description="Report JDK cache paths for BSP",
+                append_only_caches=jdk.append_only_caches,
+                level=LogLevel.TRACE,
+            )
+        )
     )
 
     cache_dir, jdk_home = leaked_paths.stdout.decode().strip().split("\n")
@@ -301,7 +304,12 @@ async def bsp_resolve_scala_metadata(
 
 def _jdk_request_sort_key(
     jvm: JvmSubsystem,
-) -> Callable[[JdkRequest,], tuple[int, ...]]:
+) -> Callable[
+    [
+        JdkRequest,
+    ],
+    tuple[int, ...],
+]:
     def sort_key_function(request: JdkRequest) -> tuple[int, ...]:
         if request == JdkRequest.SYSTEM:
             return (-1,)
@@ -340,30 +348,32 @@ class HandleScalacOptionsResult:
 async def handle_bsp_scalac_options_request(
     request: HandleScalacOptionsRequest, build_root: BuildRoot, workspace: Workspace, scalac: Scalac
 ) -> HandleScalacOptionsResult:
-    targets = await Get(Targets, BuildTargetIdentifier, request.bsp_target_id)
-    thirdparty_modules = await Get(
-        ThirdpartyModules, ThirdpartyModulesRequest(Addresses(tgt.address for tgt in targets))
+    targets = await resolve_bsp_build_target_addresses(**implicitly(request.bsp_target_id))
+    thirdparty_modules = await collect_thirdparty_modules(
+        ThirdpartyModulesRequest(Addresses(tgt.address for tgt in targets)), **implicitly()
     )
     resolve = thirdparty_modules.resolve
 
-    scalac_plugin_targets = await MultiGet(
-        Get(ScalaPluginTargetsForTarget, ScalaPluginsForTargetRequest(tgt, resolve.name))
+    scalac_plugin_targets = await concurrently(
+        resolve_scala_plugins_for_target(
+            ScalaPluginsForTargetRequest(tgt, resolve.name), **implicitly()
+        )
         for tgt in targets
     )
 
     local_plugins_prefix = f"jvm/resolves/{resolve.name}/plugins"
-    local_plugins = await Get(
-        ScalaPlugins, ScalaPluginsRequest.from_target_plugins(scalac_plugin_targets, resolve)
+    local_plugins = await fetch_plugins(
+        ScalaPluginsRequest.from_target_plugins(scalac_plugin_targets, resolve)
     )
 
     thirdparty_modules_prefix = f"jvm/resolves/{resolve.name}/lib"
-    thirdparty_modules_digest, local_plugins_digest = await MultiGet(
-        Get(Digest, AddPrefix(thirdparty_modules.merged_digest, thirdparty_modules_prefix)),
-        Get(Digest, AddPrefix(local_plugins.classpath.digest, local_plugins_prefix)),
+    thirdparty_modules_digest, local_plugins_digest = await concurrently(
+        add_prefix(AddPrefix(thirdparty_modules.merged_digest, thirdparty_modules_prefix)),
+        add_prefix(AddPrefix(local_plugins.classpath.digest, local_plugins_prefix)),
     )
 
-    resolve_digest = await Get(
-        Digest, MergeDigests([thirdparty_modules_digest, local_plugins_digest])
+    resolve_digest = await merge_digests(
+        MergeDigests([thirdparty_modules_digest, local_plugins_digest])
     )
     workspace.write_digest(resolve_digest, path_prefix=".pants.d/bsp")
 
@@ -378,7 +388,10 @@ async def handle_bsp_scalac_options_request(
     return HandleScalacOptionsResult(
         ScalacOptionsItem(
             target=request.bsp_target_id,
-            options=(*local_plugins.args(local_plugins_prefix), *scalac.args),
+            options=(
+                *local_plugins.args(local_plugins_prefix),
+                *scalac.parsed_args_for_resolve(resolve.name),
+            ),
             classpath=classpath,
             class_directory=build_root.pathlib_path.joinpath(
                 f".pants.d/bsp/{jvm_classes_directory(request.bsp_target_id)}"
@@ -389,8 +402,9 @@ async def handle_bsp_scalac_options_request(
 
 @rule
 async def bsp_scalac_options_request(request: ScalacOptionsParams) -> ScalacOptionsResult:
-    results = await MultiGet(
-        Get(HandleScalacOptionsResult, HandleScalacOptionsRequest(btgt)) for btgt in request.targets
+    results = await concurrently(
+        handle_bsp_scalac_options_request(HandleScalacOptionsRequest(btgt), **implicitly())
+        for btgt in request.targets
     )
     return ScalacOptionsResult(items=tuple(result.item for result in results))
 
@@ -461,14 +475,13 @@ async def scala_bsp_dependency_modules(
     request: ScalaBSPDependencyModulesRequest,
     build_root: BuildRoot,
 ) -> BSPDependencyModulesResult:
-    thirdparty_modules = await Get(
-        ThirdpartyModules,
-        ThirdpartyModulesRequest(Addresses(fs.address for fs in request.field_sets)),
+    thirdparty_modules = await collect_thirdparty_modules(
+        ThirdpartyModulesRequest(Addresses(fs.address for fs in request.field_sets)), **implicitly()
     )
     resolve = thirdparty_modules.resolve
 
-    resolve_digest = await Get(
-        Digest, AddPrefix(thirdparty_modules.merged_digest, f"jvm/resolves/{resolve.name}/lib")
+    resolve_digest = await add_prefix(
+        AddPrefix(thirdparty_modules.merged_digest, f"jvm/resolves/{resolve.name}/lib")
     )
 
     modules = [

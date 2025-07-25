@@ -4,11 +4,12 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
+use process_execution::{Platform, ProcessExecutionEnvironment, ProcessExecutionStrategy};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::{PyAssertionError, PyValueError};
 use pyo3::prelude::*;
 
-use process_execution::{Platform, ProcessExecutionEnvironment, ProcessExecutionStrategy};
+use crate::python::PyComparedBool;
 
 pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyProcessExecutionEnvironment>()?;
@@ -32,7 +33,8 @@ impl PyProcessExecutionEnvironment {
         remote_execution_extra_platform_properties,
         execute_in_workspace,
         environment_name,
-        docker_image
+        docker_image,
+        keep_sandboxes,
     ))]
     fn __new__(
         platform: String,
@@ -41,6 +43,7 @@ impl PyProcessExecutionEnvironment {
         execute_in_workspace: bool,
         environment_name: Option<String>,
         docker_image: Option<String>,
+        keep_sandboxes: String,
     ) -> PyResult<Self> {
         let platform = Platform::try_from(platform).map_err(PyValueError::new_err)?;
         let strategy = match (docker_image, remote_execution, execute_in_workspace) {
@@ -57,11 +60,15 @@ impl PyProcessExecutionEnvironment {
                 "docker_image cannot be set at the same time as remote_execution",
             )),
         }?;
+        let local_keep_sandboxes = keep_sandboxes
+            .parse()
+            .map_err(|e| PyValueError::new_err(format!("Failed to parse keep_sandboxes: {e}")))?;
         Ok(Self {
             environment: ProcessExecutionEnvironment {
                 name: environment_name,
                 platform,
                 strategy,
+                local_keep_sandboxes,
             },
         })
     }
@@ -83,14 +90,13 @@ impl PyProcessExecutionEnvironment {
         &self,
         other: &Bound<'_, PyProcessExecutionEnvironment>,
         op: CompareOp,
-        py: Python,
-    ) -> PyObject {
+    ) -> PyComparedBool {
         let other = other.borrow();
-        match op {
-            CompareOp::Eq => (*self == *other).into_py(py),
-            CompareOp::Ne => (*self != *other).into_py(py),
-            _ => py.NotImplemented(),
-        }
+        PyComparedBool(match op {
+            CompareOp::Eq => Some(*self == *other),
+            CompareOp::Ne => Some(*self != *other),
+            _ => None,
+        })
     }
 
     #[getter]

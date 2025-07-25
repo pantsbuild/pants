@@ -4,25 +4,29 @@ from __future__ import annotations
 
 import dataclasses
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable
 
 from pants.backend.javascript import install_node_package, nodejs_project_environment
 from pants.backend.javascript.install_node_package import (
-    InstalledNodePackage,
     InstalledNodePackageRequest,
+    install_node_packages_for_address,
 )
-from pants.backend.javascript.nodejs_project_environment import NodeJsProjectEnvironmentProcess
+from pants.backend.javascript.nodejs_project_environment import (
+    NodeJsProjectEnvironmentProcess,
+    setup_nodejs_project_environment_process,
+)
 from pants.backend.javascript.package_json import (
     NodePackageNameField,
     NodePackageTestScriptField,
     NodeTestScript,
-    OwningNodePackage,
     OwningNodePackageRequest,
+    find_owning_package,
 )
 from pants.backend.javascript.subsystems.nodejstest import NodeJSTest
 from pants.backend.javascript.target_types import JSRuntimeSourceField, JSTestRuntimeSourceField
+from pants.backend.typescript.target_types import TypeScriptSourceField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.build_graph.address import Address
 from pants.core.goals.test import (
@@ -43,26 +47,18 @@ from pants.core.target_types import AssetSourceField
 from pants.core.util_rules import source_files
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.partitions import Partition, PartitionerType, Partitions
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
+from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.fs import DigestSubset, GlobExpansionConjunction
 from pants.engine.internals import graph, platform_rules
-from pants.engine.internals.native_engine import Digest, MergeDigests, Snapshot
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import (
-    Process,
-    ProcessCacheScope,
-    ProcessResultWithRetries,
-    ProcessWithRetries,
-)
-from pants.engine.rules import Rule, collect_rules, rule
-from pants.engine.target import (
-    Dependencies,
-    SourcesField,
-    Target,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-)
+from pants.engine.internals.graph import transitive_targets
+from pants.engine.internals.native_engine import MergeDigests, Snapshot
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import digest_to_snapshot, merge_digests
+from pants.engine.process import ProcessCacheScope, ProcessWithRetries, execute_process_with_retry
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
+from pants.engine.target import Dependencies, SourcesField, Target, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.util.dirutil import fast_relpath
 from pants.util.frozendict import FrozenDict
@@ -111,7 +107,7 @@ class TestMetadata:
 
     @property
     def description(self) -> str:
-        return f'{self.owning_target[NodePackageNameField].value} {self.compatibility_tag or ""}'
+        return f"{self.owning_target[NodePackageNameField].value} {self.compatibility_tag or ''}"
 
 
 @rule(desc="Partition NodeJS tests", level=LogLevel.DEBUG)
@@ -120,8 +116,8 @@ async def partition_nodejs_tests(
 ) -> Partitions[JSTestFieldSet, TestMetadata]:
     partitions = []
     compatible_tests = defaultdict(list)
-    owning_packages = await MultiGet(
-        Get(OwningNodePackage, OwningNodePackageRequest(field_set.address))
+    owning_packages = await concurrently(
+        find_owning_package(OwningNodePackageRequest(field_set.address))
         for field_set in request.field_sets
     )
     for field_set, owning_package in zip(request.field_sets, owning_packages):
@@ -150,31 +146,37 @@ async def run_javascript_tests(
 ) -> TestResult:
     field_sets = batch.elements
     metadata = batch.partition_metadata
-    installation_get = Get(
-        InstalledNodePackage,
-        InstalledNodePackageRequest(metadata.owning_target.address),
+    installation_get = install_node_packages_for_address(
+        InstalledNodePackageRequest(metadata.owning_target.address), **implicitly()
     )
-    transitive_tgts_get = Get(
-        TransitiveTargets, TransitiveTargetsRequest(field_set.address for field_set in field_sets)
+    transitive_tgts_get = transitive_targets(
+        TransitiveTargetsRequest(field_set.address for field_set in field_sets), **implicitly()
     )
 
-    field_set_source_files_get = Get(
-        SourceFiles, SourceFilesRequest(field_set.source for field_set in field_sets)
+    field_set_source_files_get = determine_source_files(
+        SourceFilesRequest(field_set.source for field_set in field_sets)
     )
-    target_env_vars_get = Get(EnvironmentVars, EnvironmentVarsRequest(metadata.extra_env_vars))
-    installation, transitive_tgts, field_set_source_files, target_env_vars = await MultiGet(
+    target_env_vars_get = environment_vars_subset(
+        EnvironmentVarsRequest(metadata.extra_env_vars), **implicitly()
+    )
+    installation, transitive_tgts, field_set_source_files, target_env_vars = await concurrently(
         installation_get, transitive_tgts_get, field_set_source_files_get, target_env_vars_get
     )
 
-    sources = await Get(
-        SourceFiles,
+    sources = await determine_source_files(
         SourceFilesRequest(
             (tgt.get(SourcesField) for tgt in transitive_tgts.closure),
             enable_codegen=True,
-            for_sources_types=[JSRuntimeSourceField, AssetSourceField],
-        ),
+            for_sources_types=[
+                JSRuntimeSourceField,
+                TypeScriptSourceField,
+                AssetSourceField,
+            ],
+        )
     )
-    merged_digest = await Get(Digest, MergeDigests([sources.snapshot.digest, installation.digest]))
+    merged_digest = await merge_digests(
+        MergeDigests([sources.snapshot.digest, installation.digest])
+    )
 
     def relative_package_dir(file: str) -> str:
         return fast_relpath(file, installation.project_env.package_dir())
@@ -201,9 +203,8 @@ async def run_javascript_tests(
                 timeout_seconds = timeout
     file_description = field_sets[0].address.spec
     if len(field_sets) > 1:
-        file_description += f"+ {pluralize(len(field_sets)  - 1, 'other file')}"
-    process = await Get(
-        Process,
+        file_description += f"+ {pluralize(len(field_sets) - 1, 'other file')}"
+    process = await setup_nodejs_project_environment_process(
         NodeJsProjectEnvironmentProcess(
             installation.project_env,
             args=(
@@ -226,22 +227,25 @@ async def run_javascript_tests(
                 for directory in output_directories or ()
             ),
         ),
+        **implicitly(),
     )
     if test.force:
         process = dataclasses.replace(process, cache_scope=ProcessCacheScope.PER_SESSION)
 
-    results = await Get(
-        ProcessResultWithRetries, ProcessWithRetries(process, test.attempts_default)
-    )
+    results = await execute_process_with_retry(ProcessWithRetries(process, test.attempts_default))
     coverage_data: JSCoverageData | None = None
     if test.use_coverage:
-        coverage_snapshot = await Get(
-            Snapshot,
-            DigestSubset(
-                results.last.output_digest,
-                test_script.coverage_globs(installation.project_env.relative_workspace_directory()),
-            ),
+        coverage_snapshot = await digest_to_snapshot(
+            **implicitly(
+                DigestSubset(
+                    results.last.output_digest,
+                    test_script.coverage_globs(
+                        installation.project_env.relative_workspace_directory()
+                    ),
+                )
+            )
         )
+
         coverage_data = JSCoverageData(
             coverage_snapshot,
             tuple(field_set.address for field_set in field_sets),
@@ -265,25 +269,26 @@ async def collect_coverage_reports(
         (
             file,
             report,
-            Get(
-                Snapshot,
-                DigestSubset(
-                    report.snapshot.digest,
-                    NodeTestScript.coverage_globs_for(
-                        report.working_directory,
-                        (file,),
-                        report.output_directories,
-                        GlobMatchErrorBehavior.error,
-                        GlobExpansionConjunction.all_match,
-                        description_of_origin="the JS coverage report collection rule",
-                    ),
-                ),
+            digest_to_snapshot(
+                **implicitly(
+                    DigestSubset(
+                        report.snapshot.digest,
+                        NodeTestScript.coverage_globs_for(
+                            report.working_directory,
+                            (file,),
+                            report.output_directories,
+                            GlobMatchErrorBehavior.error,
+                            GlobExpansionConjunction.all_match,
+                            description_of_origin="the JS coverage report collection rule",
+                        ),
+                    )
+                )
             ),
         )
         for report in coverage_reports
         for file in report.output_files
     ]
-    snapshots = await MultiGet(get for _, _, get in gets_per_data)
+    snapshots = await concurrently(get for _, _, get in gets_per_data)
     return CoverageReports(
         tuple(
             _get_report(

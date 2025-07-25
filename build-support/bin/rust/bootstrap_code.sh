@@ -9,7 +9,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 source "${REPO_ROOT}/build-support/common.sh"
 
 # Defines:
-# + NATIVE_ROOT: The Rust code directory, ie: src/rust/engine.
+# + NATIVE_ROOT: The Rust code directory, ie: src/rust.
 # + MODE: Whether to run in debug or release mode.
 # + MODE_FLAG: The string to pass to Cargo to determine if we're in debug or release mode.
 # Exposes:
@@ -32,9 +32,11 @@ esac
 
 readonly NATIVE_ENGINE_BINARY="native_engine.so"
 export NATIVE_CLIENT_BINARY="${REPO_ROOT}/src/python/pants/bin/native_client"
+export NATIVE_SANDBOXER_BINARY="${REPO_ROOT}/src/python/pants/bin/sandboxer"
 readonly NATIVE_ENGINE_RESOURCE="${REPO_ROOT}/src/python/pants/engine/internals/${NATIVE_ENGINE_BINARY}"
 readonly NATIVE_ENGINE_RESOURCE_METADATA="${NATIVE_ENGINE_RESOURCE}.metadata"
 readonly NATIVE_CLIENT_TARGET="${NATIVE_ROOT}/target/${MODE}/pants"
+readonly NATIVE_SANDBOXER_TARGET="${NATIVE_ROOT}/target/${MODE}/sandboxer"
 
 function _build_native_code() {
   banner "Building native code..."
@@ -43,7 +45,8 @@ function _build_native_code() {
     --features=extension-module \
     ${MODE_FLAG} \
     -p engine \
-    -p client || die
+    -p client \
+    -p sandboxer || die
 }
 
 function bootstrap_native_code() {
@@ -55,7 +58,7 @@ function bootstrap_native_code() {
     engine_version_in_metadata="$(sed -n 's/^engine_version: //p' "${NATIVE_ENGINE_RESOURCE_METADATA}")"
   fi
 
-  if [[ -f "${NATIVE_ENGINE_RESOURCE}" && -f "${NATIVE_CLIENT_BINARY}" &&
+  if [[ -f "${NATIVE_ENGINE_RESOURCE}" && -f "${NATIVE_CLIENT_BINARY}" && -f "${NATIVE_SANDBOXER_BINARY}" &&
     "${engine_version_calculated}" == "${engine_version_in_metadata}" ]]; then
     return 0
   fi
@@ -70,7 +73,12 @@ function bootstrap_native_code() {
 
   # If bootstrapping the native client fails, don't attempt to run Pants afterwards.
   if [[ ! -f "${NATIVE_CLIENT_TARGET}" ]]; then
-    die "Failed to build native client."
+    die "Failed to build native client, file missing at ${NATIVE_CLIENT_TARGET}."
+  fi
+
+  # If bootstrapping the sandboxer fails, don't attempt to run Pants afterwards.
+  if [[ ! -f "${NATIVE_SANDBOXER_TARGET}" ]]; then
+    die "Failed to build native sandboxer, file missing at ${NATIVE_SANDBOXER_TARGET}."
   fi
 
   # Pick up Cargo.lock changes if any caused by the `cargo build`.
@@ -82,6 +90,7 @@ function bootstrap_native_code() {
   rm -f "${NATIVE_ENGINE_RESOURCE}" "${NATIVE_CLIENT_BINARY}"
   cp "${native_binary}" "${NATIVE_ENGINE_RESOURCE}"
   cp "${NATIVE_CLIENT_TARGET}" "${NATIVE_CLIENT_BINARY}"
+  cp "${NATIVE_SANDBOXER_TARGET}" "${NATIVE_SANDBOXER_BINARY}"
 
   # Create the accompanying metadata file.
   local -r metadata_file=$(mktemp -t pants.native_engine.metadata.XXXXXX)

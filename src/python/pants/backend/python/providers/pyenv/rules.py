@@ -10,24 +10,21 @@ from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.core.goals.resolves import ExportableTool
 from pants.core.goals.run import RunRequest
 from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
-from pants.core.util_rules.external_tool import (
-    DownloadedExternalTool,
-    ExternalToolRequest,
-    TemplatedExternalTool,
-)
+from pants.core.util_rules.external_tool import TemplatedExternalTool, download_external_tool
 from pants.core.util_rules.external_tool import rules as external_tools_rules
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP, EnvironmentVarsRequest
 from pants.engine.fs import CreateDigest, FileContent
-from pants.engine.internals.native_engine import Digest, MergeDigests
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.native_engine import MergeDigests
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import create_digest, merge_digests
 from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessCacheScope, ProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.process import Process, ProcessCacheScope, fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import StrListOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import classproperty
 from pants.util.strutil import softwrap, stable_hash
 
 PYENV_NAMED_CACHE = ".pyenv"
@@ -61,17 +58,16 @@ class PyenvPythonProviderSubsystem(TemplatedExternalTool):
         """
     )
 
-    default_version = "2.4.7"
+    default_version = "2.5.3"
     default_url_template = "https://github.com/pyenv/pyenv/archive/refs/tags/v{version}.tar.gz"
 
     class EnvironmentAware:
         installation_extra_env_vars = StrListOption(
             help=softwrap(
-                """
+                f"""
                 Additional environment variables to include when running `pyenv install`.
 
-                Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
-                `ENV_VAR` to copy the value of a variable in Pants's own environment.
+                {EXTRA_ENV_VARS_USAGE_HELP}
 
                 This is especially useful if you want to use an optimized Python (E.g. setting
                 `PYTHON_CONFIGURE_OPTS='--enable-optimizations --with-lto'` and
@@ -86,19 +82,16 @@ class PyenvPythonProviderSubsystem(TemplatedExternalTool):
             ),
         )
 
-    @classproperty
-    def default_known_versions(cls):
-        return [
-            "|".join(
-                (
-                    cls.default_version,
-                    plat,
-                    "0c0137963dd3c4b356663a3a152a64815e5e4364f131f2976a2731a13ab1de4d",
-                    "799490",
-                )
-            )
-            for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
-        ]
+    default_known_versions = [
+        "2.5.3|macos_x86_64|2068872d4f3174d697bcfd602ada3dc2b7764e84f73be7850c0de86fbf00f69e|1335821",
+        "2.5.3|macos_arm64|2068872d4f3174d697bcfd602ada3dc2b7764e84f73be7850c0de86fbf00f69e|1335821",
+        "2.5.3|linux_x86_64|2068872d4f3174d697bcfd602ada3dc2b7764e84f73be7850c0de86fbf00f69e|1335821",
+        "2.5.3|linux_arm64|2068872d4f3174d697bcfd602ada3dc2b7764e84f73be7850c0de86fbf00f69e|1335821",
+        "2.4.7|macos_x86_64|0c0137963dd3c4b356663a3a152a64815e5e4364f131f2976a2731a13ab1de4d|799490",
+        "2.4.7|macos_arm64|0c0137963dd3c4b356663a3a152a64815e5e4364f131f2976a2731a13ab1de4d|799490",
+        "2.4.7|linux_x86_64|0c0137963dd3c4b356663a3a152a64815e5e4364f131f2976a2731a13ab1de4d|799490",
+        "2.4.7|linux_arm64|0c0137963dd3c4b356663a3a152a64815e5e4364f131f2976a2731a13ab1de4d|799490",
+    ]
 
     def generate_exe(self, plat: Platform) -> str:
         """Returns the path to the tool executable.
@@ -123,17 +116,16 @@ async def get_pyenv_install_info(
     platform: Platform,
     bootstrap_python: PythonBuildStandaloneBinary,
 ) -> RunRequest:
-    env_vars, pyenv = await MultiGet(
-        Get(
-            EnvironmentVars,
+    env_vars, pyenv = await concurrently(
+        environment_vars_subset(
             EnvironmentVarsRequest(("PATH",) + pyenv_env_aware.installation_extra_env_vars),
+            **implicitly(),
         ),
-        Get(DownloadedExternalTool, ExternalToolRequest, pyenv_subsystem.get_request(platform)),
+        download_external_tool(pyenv_subsystem.get_request(platform)),
     )
     installation_env_vars = {key: name for key, name in env_vars.items() if key != "PATH"}
     installation_fingerprint = stable_hash(installation_env_vars)
-    install_script_digest = await Get(
-        Digest,
+    install_script_digest = await create_digest(
         CreateDigest(
             [
                 # NB: We use a bash script for the hot-path to keep overhead minimal, but a Python
@@ -197,10 +189,10 @@ async def get_pyenv_install_info(
                     is_executable=True,
                 ),
             ]
-        ),
+        )
     )
 
-    digest = await Get(Digest, MergeDigests([install_script_digest, pyenv.digest]))
+    digest = await merge_digests(MergeDigests([install_script_digest, pyenv.digest]))
     return RunRequest(
         digest=digest,
         args=["./install_python_shim.sh"],
@@ -229,10 +221,10 @@ async def get_python(
     platform: Platform,
     pyenv_subsystem: PyenvPythonProviderSubsystem,
 ) -> PythonExecutable:
-    env_vars, pyenv, pyenv_install = await MultiGet(
-        Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"])),
-        Get(DownloadedExternalTool, ExternalToolRequest, pyenv_subsystem.get_request(platform)),
-        Get(RunRequest, PyenvInstallInfoRequest()),
+    env_vars, pyenv, pyenv_install = await concurrently(
+        environment_vars_subset(EnvironmentVarsRequest(["PATH"]), **implicitly()),
+        download_external_tool(pyenv_subsystem.get_request(platform)),
+        get_pyenv_install_info(PyenvInstallInfoRequest(), **implicitly()),
     )
 
     # Determine the lowest major/minor version supported according to the interpreter constraints.
@@ -245,13 +237,14 @@ async def get_python(
         )
 
     # Find the highest patch version given the major/minor version that is known to our version of pyenv.
-    pyenv_latest_known_result = await Get(
-        ProcessResult,
-        Process(
-            [pyenv.exe, "latest", "--known", major_minor_to_use_str],
-            input_digest=pyenv.digest,
-            description=f"Choose specific version for Python {major_minor_to_use_str}",
-            env={"PATH": env_vars.get("PATH", "")},
+    pyenv_latest_known_result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            Process(
+                [pyenv.exe, "latest", "--known", major_minor_to_use_str],
+                input_digest=pyenv.digest,
+                description=f"Choose specific version for Python {major_minor_to_use_str}",
+                env={"PATH": env_vars.get("PATH", "")},
+            )
         ),
     )
     major_to_use, minor_to_use, latest_known_patch = _major_minor_patch_to_int(
@@ -292,19 +285,20 @@ async def get_python(
     #   then stores this information so that it can use the same compiler when compiling extension
     #   modules. Therefore caching the compiled Python is somewhat unsafe (especially for a remote
     #   cache). See also https://github.com/pantsbuild/pants/issues/10769.
-    result = await Get(
-        ProcessResult,
-        Process(
-            pyenv_install.args + (major_minor_patch_to_use_str,),
-            level=LogLevel.DEBUG,
-            input_digest=pyenv_install.digest,
-            description=f"Install Python {major_minor_patch_to_use_str}",
-            append_only_caches=pyenv_install.append_only_caches,
-            env=pyenv_install.extra_env,
-            # Don't cache, we want this to always be run so that we can assume for the rest of the
-            # session the named_cache destination for this Python is valid, as the Python ecosystem
-            # mainly assumes absolute paths for Python interpreters.
-            cache_scope=ProcessCacheScope.PER_SESSION,
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            Process(
+                pyenv_install.args + (major_minor_patch_to_use_str,),
+                level=LogLevel.DEBUG,
+                input_digest=pyenv_install.digest,
+                description=f"Install Python {major_minor_patch_to_use_str}",
+                append_only_caches=pyenv_install.append_only_caches,
+                env=pyenv_install.extra_env,
+                # Don't cache, we want this to always be run so that we can assume for the rest of the
+                # session the named_cache destination for this Python is valid, as the Python ecosystem
+                # mainly assumes absolute paths for Python interpreters.
+                cache_scope=ProcessCacheScope.PER_SESSION,
+            )
         ),
     )
 

@@ -5,16 +5,14 @@ print_stacktrace = true
 pythonpath = ["%(buildroot)s/pants-plugins"]
 backend_packages.add = [
   "pants.backend.build_files.fix.deprecations",
-  "pants.backend.build_files.fmt.black",
+  "pants.backend.build_files.fmt.ruff",
   "pants.backend.python",
-  "pants.backend.experimental.python.packaging.pyoxidizer",
   "pants.backend.python.lint.autoflake",
-  "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.flake8",
   "pants.backend.python.lint.isort",
-  "pants.backend.python.typecheck.mypy",
   "pants.backend.python.lint.pyupgrade",
+  "pants.backend.python.typecheck.mypy",
   "pants.backend.python.mixed_interpreter_constraints",
   "pants.backend.shell",
   "pants.backend.shell.lint.shellcheck",
@@ -29,6 +27,7 @@ backend_packages.add = [
   "pants.backend.experimental.javascript",
   "pants.backend.experimental.javascript.lint.prettier",
   "pants.backend.experimental.python",
+  "pants.backend.experimental.python.lint.ruff.format",
   "pants.backend.experimental.python.packaging.pyoxidizer",
   "pants.backend.experimental.scala",
   "pants.backend.experimental.scala.lint.scalafmt",
@@ -43,9 +42,6 @@ backend_packages.add = [
   "internal_plugins.releases",
   "internal_plugins.test_lockfile_fixtures",
 ]
-plugins = [
-  "hdrhistogram", # For use with `--stats-log`.
-]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
 # path but not consumed by python, and additionally add the rust code.
@@ -54,15 +50,15 @@ pantsd_invalidation_globs.add = [
   "!BUILD",
   "!src/python/pants_release/**",
   # NB: The `target` directory is ignored via `pants_ignore` below.
-  "src/rust/engine/**/*.rs",
-  "src/rust/engine/**/*.toml",
+  "src/rust/**/*.rs",
+  "src/rust/**/*.toml",
 ]
 # Path patterns to ignore for filesystem operations on top of the builtin patterns.
 pants_ignore.add = [
   # venv directories under build-support.
   "/build-support/*.venv/",
   # We shouldn't walk or watch the rust compiler artifacts because it is slow.
-  "/src/rust/engine/target",
+  "/src/rust/target",
   # We want to .gitignore Java .class files, but pants should pay attention to them.
   "!*.class",
   # We also want to override the .gitignore'd pants.pex file
@@ -71,7 +67,7 @@ pants_ignore.add = [
   "/docs/node_modules",
   # We have Pants stuff in here
   "!.github/",
-  "!/src/rust/engine/.cargo",
+  "!/src/rust/.cargo",
 ]
 
 build_ignore.add = [
@@ -135,7 +131,7 @@ ignore_adding_targets = [
 ]
 
 [update-build-files]
-# We use `pants.backend.build_files.fmt.black`
+# We use `pants.backend.build_files.fmt.ruff`
 fmt = false
 
 [pex]
@@ -150,7 +146,7 @@ emit_warnings = true
 # + src/python/pants/testutil:testutil_wheel
 # And update the PythonBuildStandalone version/URL:
 # + src/python/pants/core/subsystems/python_bootstrap.py
-interpreter_constraints = ["==3.9.*"]
+interpreter_constraints = ["==3.11.*"]
 macos_big_sur_compatibility = true
 enable_resolves = true
 pip_version = "latest"
@@ -160,6 +156,7 @@ python-default = "3rdparty/python/user_reqs.lock"
 flake8 = "3rdparty/python/flake8.lock"
 mypy = "3rdparty/python/mypy.lock"
 pytest = "3rdparty/python/pytest.lock"
+pbs-script = "3rdparty/python/pbs-script-requirements.lock"
 
 [python-infer]
 assets = true
@@ -206,7 +203,7 @@ requirements = ["//3rdparty/python:mypy"]
 
 
 [coverage-py]
-interpreter_constraints = ["==3.9.*"]
+interpreter_constraints = ["==3.11.*"]
 
 [preamble]
 template_by_globs = "@build-support/preambles/config.yaml"
@@ -215,7 +212,7 @@ template_by_globs = "@build-support/preambles/config.yaml"
 diff = true
 
 [pyupgrade]
-args = ["--keep-runtime-typing", "--py38-plus"]
+args = ["--keep-runtime-typing", "--py311-plus"]
 
 
 [jvm]

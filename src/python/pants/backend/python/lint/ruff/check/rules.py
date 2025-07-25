@@ -17,11 +17,13 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules import pex
 from pants.core.goals.fix import FixResult, FixTargetsRequest
-from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.goals.lint import REPORT_DIR, LintResult, LintTargetsRequest
 from pants.core.util_rules.partitions import PartitionerType
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
+from pants.engine.fs import DigestSubset, PathGlobs, RemovePrefix
+from pants.engine.intrinsics import digest_subset_to_digest, remove_prefix
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
@@ -88,21 +90,25 @@ async def ruff_lint(
     ruff: Ruff,
     platform: Platform,
 ) -> LintResult:
-    source_files = await Get(
-        SourceFiles, SourceFilesRequest(field_set.source for field_set in request.elements)
+    source_files = await determine_source_files(
+        SourceFilesRequest(field_set.source for field_set in request.elements)
     )
     result = await run_ruff(
         RunRuffRequest(snapshot=source_files.snapshot, mode=RuffMode.LINT),
         ruff,
         platform,
     )
-    return LintResult.create(request, result)
+    report_digest = await digest_subset_to_digest(
+        DigestSubset(result.output_digest, PathGlobs([f"{REPORT_DIR}/**"]))
+    )
+    report = await remove_prefix(RemovePrefix(report_digest, REPORT_DIR))
+    return LintResult.create(request, result, report=report)
 
 
 def rules():
-    return [
+    return (
         *collect_rules(),
         *RuffFixRequest.rules(),
         *RuffLintRequest.rules(),
         *pex.rules(),
-    ]
+    )

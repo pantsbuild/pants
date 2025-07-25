@@ -3,10 +3,9 @@
 
 import itertools
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
-from typing import List, Optional, Tuple
 
 import pytest
 
@@ -26,6 +25,7 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.internals.engine_testutil import (
+    WorkunitTracker,
     assert_equal_with_printing,
     remove_locations_from_traceback,
 )
@@ -68,7 +68,7 @@ def fn_raises(x):
 
 
 @rule
-def nested_raise(x: B) -> A:  # type: ignore[return]
+async def nested_raise(x: B) -> A:  # type: ignore[return]
     fn_raises(x)
 
 
@@ -96,7 +96,7 @@ class MyFloat:
 
 
 @rule
-def upcast(n: MyInt) -> MyFloat:
+async def upcast(n: MyInt) -> MyFloat:
     return MyFloat(float(n.val))
 
 
@@ -154,7 +154,7 @@ async def rule_three(o: Omega) -> Beta:
 
 
 @rule(desc="Rule number 4", level=LogLevel.INFO)
-def rule_four(a: Alpha) -> Gamma:
+async def rule_four(a: Alpha) -> Gamma:
     """This rule should be invoked in the body of `rule_two` and therefore its workunit should be a
     child of `rule_two`'s workunit."""
     return Gamma()
@@ -175,7 +175,7 @@ async def rule_B(o: Omega) -> Alpha:
 
 
 @rule(desc="Rule C", level=LogLevel.INFO)
-def rule_C(e: Epsilon) -> Alpha:
+async def rule_C(e: Epsilon) -> Alpha:
     return Alpha()
 
 
@@ -269,32 +269,6 @@ class TestEngine(SchedulerTestBase):
         ) in str(cm.value)
 
 
-@dataclass
-class WorkunitTracker(WorkunitsCallback):
-    """This class records every non-empty batch of started and completed workunits received from the
-    engine."""
-
-    finished_workunit_chunks: List[List[dict]] = field(default_factory=list)
-    started_workunit_chunks: List[List[dict]] = field(default_factory=list)
-    finished: bool = False
-
-    @property
-    def can_finish_async(self) -> bool:
-        return False
-
-    def __call__(self, **kwargs) -> None:
-        if kwargs["finished"] is True:
-            self.finished = True
-
-        started_workunits = kwargs.get("started_workunits")
-        if started_workunits:
-            self.started_workunit_chunks.append(started_workunits)
-
-        completed_workunits = kwargs.get("completed_workunits")
-        if completed_workunits:
-            self.finished_workunit_chunks.append(completed_workunits)
-
-
 def new_run_tracker() -> RunTracker:
     # NB: A RunTracker usually observes "all options" (`full_options_for_scopes`), but it only
     # actually directly consumes bootstrap options.
@@ -310,7 +284,7 @@ def run_tracker() -> RunTracker:
 class TestStreamingWorkunit(SchedulerTestBase):
     def _fixture_for_rules(
         self, tmp_path: Path, rules, max_workunit_verbosity: LogLevel = LogLevel.INFO
-    ) -> Tuple[SchedulerSession, WorkunitTracker, StreamingWorkunitHandler]:
+    ) -> tuple[SchedulerSession, WorkunitTracker, StreamingWorkunitHandler]:
         scheduler = self.mk_scheduler(
             tmp_path,
             rules,
@@ -495,7 +469,7 @@ class TestStreamingWorkunit(SchedulerTestBase):
                 return self._level
 
         @rule(desc="a_rule")
-        def a_rule(n: int) -> ModifiedOutput:
+        async def a_rule(n: int) -> ModifiedOutput:
             return ModifiedOutput(val=n, _level=LogLevel.ERROR)
 
         scheduler, tracker, handler = self._fixture_for_rules(
@@ -522,7 +496,7 @@ class TestStreamingWorkunit(SchedulerTestBase):
                 return {"example": "thing"}
 
         @rule
-        def a_rule(_: ModifiedMetadata) -> int:
+        async def a_rule(_: ModifiedMetadata) -> int:
             return 1
 
         scheduler, tracker, handler = self._fixture_for_rules(
@@ -547,14 +521,14 @@ class TestStreamingWorkunit(SchedulerTestBase):
         # If level() returns None, the engine shouldn't try to set
         # a new workunit level.
         class ModifiedOutput(EngineAwareReturnType):
-            _level: Optional[LogLevel]
+            _level: LogLevel | None
             val: int
 
             def level(self):
                 return self._level
 
         @rule(desc="a_rule")
-        def a_rule(n: int) -> ModifiedOutput:
+        async def a_rule(n: int) -> ModifiedOutput:
             return ModifiedOutput(val=n, _level=None)
 
         scheduler, tracker, handler = self._fixture_for_rules(
@@ -583,7 +557,7 @@ class TestStreamingWorkunit(SchedulerTestBase):
                 return {"some_arbitrary_key": EMPTY_SNAPSHOT}
 
         @rule(desc="a_rule")
-        def a_rule(n: int) -> Output:
+        async def a_rule(n: int) -> Output:
             return Output(val=n)
 
         scheduler, tracker, handler = self._fixture_for_rules(
@@ -611,7 +585,7 @@ class TestStreamingWorkunit(SchedulerTestBase):
                 return {"k1": 1, "k2": "a string", "k3": [1, 2, 3]}
 
         @rule(desc="a_rule")
-        def a_rule(n: int) -> Output:
+        async def a_rule(n: int) -> Output:
             return Output(val=n)
 
         scheduler, tracker, handler = self._fixture_for_rules(
@@ -644,7 +618,7 @@ class TestStreamingWorkunit(SchedulerTestBase):
                 return {10: "foo", "other_key": "other value"}
 
         @rule(desc="a_rule")
-        def a_rule(n: int) -> Output:
+        async def a_rule(n: int) -> Output:
             return Output(val=n)
 
         scheduler, tracker, handler = self._fixture_for_rules(
@@ -680,7 +654,7 @@ class Output(EngineAwareReturnType):
 
 
 @rule(desc="a_rule", level=LogLevel.DEBUG)
-def a_rule(input: ComplicatedInput) -> Output:
+async def a_rule(input: ComplicatedInput) -> Output:
     return Output(snapshot_1=input.snapshot_1, snapshot_2=input.snapshot_2)
 
 

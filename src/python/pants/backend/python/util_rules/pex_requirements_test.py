@@ -190,8 +190,7 @@ def test_validate_lockfiles(
 
     reqs_desc = comma_separated_list(f"`{rs}`" for rs in req_strings)
     contains(
-        f"You are consuming {reqs_desc} from the `a` lockfile at lock.txt "
-        "with incompatible inputs"
+        f"You are consuming {reqs_desc} from the `a` lockfile at lock.txt with incompatible inputs"
     )
     contains(
         "The lockfile does not provide all the necessary requirements",
@@ -209,7 +208,7 @@ def test_validate_lockfiles(
     contains("The `no_binary` arguments have changed", if_=invalid_no_binary)
     contains("The `manylinux` argument has changed", if_=invalid_manylinux)
 
-    contains("./pants generate-lockfiles --resolve=a`")
+    contains("pants generate-lockfiles --resolve=a`")
 
 
 def test_is_probably_pex_json_lockfile():

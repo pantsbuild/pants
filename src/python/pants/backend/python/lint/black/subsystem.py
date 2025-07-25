@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import os.path
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.python.lint.black.skip_field import SkipBlackField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
@@ -42,9 +42,10 @@ class Black(PythonToolBase):
 
     default_main = ConsoleScript("black")
     default_requirements = [
-        "black>=22.6.0,<24",
+        "black>=22.6.0,<25",
         'typing-extensions>=3.10.0.0; python_version < "3.10"',
     ]
+    default_interpreter_constraints = ["CPython>=3.8,<4"]
 
     register_interpreter_constraints = True
 

@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator, Protocol
+from typing import Any, Protocol
 
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.env_vars import CompleteEnvironmentVars
@@ -17,6 +18,7 @@ from pants.init.options_initializer import OptionsInitializer
 from pants.option.global_options import AuthPluginResult, DynamicRemoteOptions
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.options_diff import summarize_dynamic_options_diff, summarize_options_map_diff
 from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import GLOBAL_SCOPE
 from pants.pantsd.service.pants_service import PantsServices
@@ -29,8 +31,7 @@ class PantsServicesConstructor(Protocol):
         self,
         bootstrap_options: OptionValueContainer,
         graph_scheduler: GraphScheduler,
-    ) -> PantsServices:
-        ...
+    ) -> PantsServices: ...
 
 
 class PantsDaemonCore:
@@ -56,8 +57,8 @@ class PantsDaemonCore:
 
         self._scheduler: GraphScheduler | None = None
         self._services: PantsServices | None = None
-        self._fingerprint: str | None = None
 
+        self._prior_options_map: dict[str, Any] | None = None
         self._prior_dynamic_remote_options: DynamicRemoteOptions | None = None
         self._prior_auth_plugin_result: AuthPluginResult | None = None
 
@@ -86,7 +87,6 @@ class PantsDaemonCore:
 
     def _initialize(
         self,
-        options_fingerprint: str,
         bootstrap_options: OptionValueContainer,
         build_config: BuildConfiguration,
         dynamic_remote_options: DynamicRemoteOptions,
@@ -98,7 +98,7 @@ class PantsDaemonCore:
         """
         try:
             logger.info(
-                f"{scheduler_restart_explanation}: reinitializing scheduler..."
+                f"{scheduler_restart_explanation}. Reinitializing scheduler..."
                 if scheduler_restart_explanation
                 else "Initializing scheduler..."
             )
@@ -109,7 +109,6 @@ class PantsDaemonCore:
             )
 
             self._services = self._services_constructor(bootstrap_options, self._scheduler)
-            self._fingerprint = options_fingerprint
             logger.info("Scheduler initialized.")
         except Exception as e:
             self._kill_switch.set()
@@ -142,43 +141,37 @@ class PantsDaemonCore:
             self._prior_auth_plugin_result,
             remote_auth_plugin_func=build_config.remote_auth_plugin_func,
         )
-        remote_options_changed = (
-            self._prior_dynamic_remote_options is not None
-            and dynamic_remote_options != self._prior_dynamic_remote_options
-        )
-        if remote_options_changed:
-            scheduler_restart_explanation = "Remote cache/execution options updated"
+        remote_options_changed = dynamic_remote_options != self._prior_dynamic_remote_options
+        if self._prior_dynamic_remote_options is not None and remote_options_changed:
+            diff = summarize_dynamic_options_diff(
+                self._prior_dynamic_remote_options, dynamic_remote_options
+            )
+            scheduler_restart_explanation = f"Remote cache/execution options updated: {diff}"
 
-        # Compute the fingerprint of the bootstrap options. Note that unlike
-        # PantsDaemonProcessManager (which fingerprints only `daemon=True` options), this
-        # fingerprints all fingerprintable options in the bootstrap options, which are
-        # all used to construct a Scheduler.
-        options_fingerprint = OptionsFingerprinter.combined_options_fingerprint_for_scope(
+        options_map = OptionsFingerprinter.options_map_for_scope(
             GLOBAL_SCOPE,
             options_bootstrapper.bootstrap_options,
         )
-        bootstrap_options_changed = (
-            self._fingerprint is not None and options_fingerprint != self._fingerprint
-        )
-        if bootstrap_options_changed:
-            scheduler_restart_explanation = "Initialization options changed"
+        bootstrap_options_changed = options_map != self._prior_options_map
+        if self._prior_options_map is not None and bootstrap_options_changed:
+            diff = summarize_options_map_diff(self._prior_options_map, options_map)
+            scheduler_restart_explanation = f"Initialization options changed: {diff}"
 
         with self._lifecycle_lock:
             if self._scheduler is None or scheduler_restart_explanation:
-                # The fingerprint mismatches, either because this is the first run (and there is no
-                # fingerprint) or because relevant options have changed. Create a new scheduler
-                # and services.
-                bootstrap_options = options.bootstrap_option_values()
+                # No existing options to compare (first run) or options have changed. Create a new
+                # scheduler and services.
+                bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
                 assert bootstrap_options is not None
                 with self._handle_exceptions():
                     self._initialize(
-                        options_fingerprint,
                         bootstrap_options,
                         build_config,
                         dynamic_remote_options,
                         scheduler_restart_explanation,
                     )
 
+            self._prior_options_map = options_map
             self._prior_dynamic_remote_options = dynamic_remote_options
             self._prior_auth_plugin_result = auth_plugin_result
 

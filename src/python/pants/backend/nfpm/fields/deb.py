@@ -3,8 +3,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from enum import Enum
-from typing import ClassVar, Iterable, Optional
+from typing import ClassVar
 
 from pants.backend.nfpm.fields._relationships import NfpmPackageRelationshipsField
 from pants.backend.nfpm.fields.all import NfpmDependencies
@@ -154,8 +155,8 @@ class NfpmDebTriggersField(DictStringToStringSequenceField):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[dict[str, Iterable[str]]], address: Address
-    ) -> Optional[FrozenDict[str, tuple[str, ...]]]:
+        cls, raw_value: dict[str, Iterable[str]] | None, address: Address
+    ) -> FrozenDict[str, tuple[str, ...]] | None:
         value_or_default = super().compute_value(raw_value, address)
         # only certain keys are allowed in this dictionary.
         if value_or_default and not cls.valid_keys.issuperset(value_or_default.keys()):
@@ -200,8 +201,8 @@ class NfpmDebProvidesField(NfpmPackageRelationshipsField):
 
         For example, these declare virtual packages foo and bar.
 
-        - "foo"
-        - "bar (=1.0.0)"
+          - "foo"
+          - "bar (=1.0.0)"
 
         If several packages declare the same '{NfpmDebProvidesField.alias}',
         then they might need to declare that they conflict with each other
@@ -225,9 +226,9 @@ class NfpmDebDependsField(NfpmPackageRelationshipsField):
         in parentheses) or use `|` to specify package alternatives that equally
         satisfy a dependency.
 
-        - "git"
-        - "libc6 (>= 2.2.1)"
-        - "default-mta | mail-transport-agent"
+          - "git"
+          - "libc6 (>= 2.2.1)"
+          - "default-mta | mail-transport-agent"
 
         Make sure to include package dependencies of this package as well as any
         packages required by the `postinstall`, `postupgrade`, or `preremove` scripts.
@@ -314,8 +315,8 @@ class NfpmDebConflictsField(NfpmPackageRelationshipsField):
         foo (version 2.5 or less) and bar packages, so they must be uninstalled
         before this package can be installed.
 
-        - "foo (<2.6)"
-        - "bar"
+          - "foo (<2.6)"
+          - "bar"
 
         See: https://www.debian.org/doc/debian-policy/ch-relationships.html#conflicting-binary-packages-conflicts
         """
@@ -341,8 +342,8 @@ class NfpmDebBreaksField(NfpmPackageRelationshipsField):
         only if foo version 2.5 or less is installed and it breaks package bar
         no matter what version is installed.
 
-        - "foo (<2.6)"
-        - "bar"
+          - "foo (<2.6)"
+          - "bar"
 
         See: https://www.debian.org/doc/debian-policy/ch-relationships.html#packages-which-break-other-packages-breaks
         """
@@ -388,15 +389,15 @@ class NfpmDebScriptsField(NfpmPackageScriptsField):
         The script types are the names used by nFPM. For reference, Debian
         uses the following file names instead:
 
-            | nFPM script | Debian file |
-            +-------------+-------------+
-            | preinstall  | preinst     |
-            | postinstall | postinst    |
-            | preremove   | prerm       |
-            | postremove  | postrm      |
-            | config      | config      |
-            | templates   | templates   |
-            | rules       | rules       |
+        | nFPM script | Debian file |
+        +-------------+-------------+
+        | preinstall  | preinst     |
+        | postinstall | postinst    |
+        | preremove   | prerm       |
+        | postremove  | postrm      |
+        | config      | config      |
+        | templates   | templates   |
+        | rules       | rules       |
 
         The `pre*` and `post*` scripts are used by `dpkg` at various stages of
         installing, upgrading, and removing the deb package.

@@ -6,11 +6,12 @@ from __future__ import annotations
 import importlib.resources
 import subprocess
 import sys
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import Iterable, List, cast
+from typing import cast
 from unittest.mock import Mock
 
 import pytest
@@ -561,7 +562,7 @@ def create_dists(workdir: Path, project: Project, *projects: Project) -> PurePat
 
 
 def requirements(rule_runner: PythonRuleRunner, pex: Pex) -> list[str]:
-    return cast(List[str], get_all_data(rule_runner, pex).info["requirements"])
+    return cast(list[str], get_all_data(rule_runner, pex).info["requirements"])
 
 
 def test_constraints_validation(tmp_path: Path, rule_runner: PythonRuleRunner) -> None:
@@ -675,7 +676,7 @@ def test_constraints_validation(tmp_path: Path, rule_runner: PythonRuleRunner) -
     assert isinstance(pex_req2_reqs.from_superset, Pex)
     repository_pex = pex_req2_reqs.from_superset
     assert not get_all_data(rule_runner, repository_pex).info["strip_pex_env"]
-    assert ["Foo._-BAR==1.0.0", "bar==5.5.5", "baz==2.2.2", "foorl", "qux==3.4.5"] == requirements(
+    assert ["Foo._-BAR==1.0.0", "bar==5.5.5", "baz==2.2.2", url_req, "qux==3.4.5"] == requirements(
         rule_runner, repository_pex
     )
 
@@ -921,9 +922,9 @@ def test_lockfile_requirements_selection(
         mode_files.update({"3rdparty/python/default.lock": setuptools_poetry_lockfile})
     else:
         assert mode == ResolveMode.pex
-        lock_content = importlib.resources.read_binary(
-            "pants.backend.python.subsystems", "setuptools.lock"
-        )
+        lock_content = (
+            importlib.resources.files("pants.backend.python.subsystems") / "setuptools.lock"
+        ).read_bytes()
         mode_files.update({"3rdparty/python/default.lock": lock_content})
 
     rule_runner.write_files(mode_files)

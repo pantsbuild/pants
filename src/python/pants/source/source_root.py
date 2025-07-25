@@ -6,15 +6,16 @@ from __future__ import annotations
 import itertools
 import logging
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable
 
 from pants.build_graph.address import Address
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import PathGlobs, Paths
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.fs import PathGlobs
+from pants.engine.intrinsics import path_globs_to_paths
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import Target
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
@@ -126,7 +127,7 @@ class SourceRootConfig(Subsystem):
 
             Use `/` to signify that the buildroot itself is a source root.
 
-            See {doc_url('docs/using-pants/key-concepts/source-roots')}.
+            See {doc_url("docs/using-pants/key-concepts/source-roots")}.
             """
         ),
         advanced=True,
@@ -223,48 +224,6 @@ class OptionalSourceRootsResult:
 
 
 @rule
-async def get_optional_source_roots(
-    source_roots_request: SourceRootsRequest,
-) -> OptionalSourceRootsResult:
-    """Rule to request source roots that may not exist."""
-    # A file cannot be a source root, so request for its parent.
-    # In the typical case, where we have multiple files with the same parent, this can
-    # dramatically cut down on the number of engine requests.
-    dirs: set[PurePath] = set(source_roots_request.dirs)
-    file_to_dir: dict[PurePath, PurePath] = {
-        file: file.parent for file in source_roots_request.files
-    }
-    dirs.update(file_to_dir.values())
-
-    roots = await MultiGet(Get(OptionalSourceRoot, SourceRootRequest(d)) for d in dirs)
-    dir_to_root = dict(zip(dirs, roots))
-
-    path_to_optional_root: dict[PurePath, OptionalSourceRoot] = {}
-    for d in source_roots_request.dirs:
-        path_to_optional_root[d] = dir_to_root[d]
-    for f, d in file_to_dir.items():
-        path_to_optional_root[f] = dir_to_root[d]
-
-    return OptionalSourceRootsResult(path_to_optional_root=FrozenDict(path_to_optional_root))
-
-
-@rule
-async def get_source_roots(source_roots_request: SourceRootsRequest) -> SourceRootsResult:
-    """Convenience rule to allow callers to request SourceRoots that must exist.
-
-    That way callers don't have to unpack OptionalSourceRoots if they know they expect a SourceRoot
-    to exist and are willing to error if it doesn't.
-    """
-    osrr = await Get(OptionalSourceRootsResult, SourceRootsRequest, source_roots_request)
-    path_to_root = {}
-    for path, osr in osrr.path_to_optional_root.items():
-        if osr.source_root is None:
-            raise NoSourceRootError(path)
-        path_to_root[path] = osr.source_root
-    return SourceRootsResult(path_to_root=FrozenDict(path_to_root))
-
-
-@rule
 async def get_optional_source_root(
     source_root_request: SourceRootRequest, source_root_config: SourceRootConfig
 ) -> OptionalSourceRoot:
@@ -290,16 +249,60 @@ async def get_optional_source_root(
                 raise InvalidMarkerFileError(
                     f"Marker filename must be a base name: {marker_filename}"
                 )
-        paths = await Get(Paths, PathGlobs([str(path / mf) for mf in marker_filenames]))
+        paths = await path_globs_to_paths(PathGlobs([str(path / mf) for mf in marker_filenames]))
         if len(paths.files) > 0:
             return OptionalSourceRoot(SourceRoot(str(path)))
 
     # The requested path itself is not a source root, but maybe its parent is.
     if str(path) != ".":
-        return await Get(OptionalSourceRoot, SourceRootRequest(path.parent))
+        return await get_optional_source_root(SourceRootRequest(path.parent), **implicitly())
 
     # The requested path is not under a source root.
     return OptionalSourceRoot(None)
+
+
+@rule
+async def get_optional_source_roots(
+    source_roots_request: SourceRootsRequest,
+) -> OptionalSourceRootsResult:
+    """Rule to request source roots that may not exist."""
+    # A file cannot be a source root, so request for its parent.
+    # In the typical case, where we have multiple files with the same parent, this can
+    # dramatically cut down on the number of engine requests.
+    dirs: set[PurePath] = set(source_roots_request.dirs)
+    file_to_dir: dict[PurePath, PurePath] = {
+        file: file.parent for file in source_roots_request.files
+    }
+    dirs.update(file_to_dir.values())
+
+    roots = await concurrently(
+        get_optional_source_root(SourceRootRequest(d), **implicitly()) for d in dirs
+    )
+    dir_to_root = dict(zip(dirs, roots))
+
+    path_to_optional_root: dict[PurePath, OptionalSourceRoot] = {}
+    for d in source_roots_request.dirs:
+        path_to_optional_root[d] = dir_to_root[d]
+    for f, d in file_to_dir.items():
+        path_to_optional_root[f] = dir_to_root[d]
+
+    return OptionalSourceRootsResult(path_to_optional_root=FrozenDict(path_to_optional_root))
+
+
+@rule
+async def get_source_roots(source_roots_request: SourceRootsRequest) -> SourceRootsResult:
+    """Convenience rule to allow callers to request SourceRoots that must exist.
+
+    That way callers don't have to unpack OptionalSourceRoots if they know they expect a SourceRoot
+    to exist and are willing to error if it doesn't.
+    """
+    osrr = await get_optional_source_roots(source_roots_request)
+    path_to_root = {}
+    for path, osr in osrr.path_to_optional_root.items():
+        if osr.source_root is None:
+            raise NoSourceRootError(path)
+        path_to_root[path] = osr.source_root
+    return SourceRootsResult(path_to_root=FrozenDict(path_to_root))
 
 
 @rule
@@ -309,7 +312,7 @@ async def get_source_root(source_root_request: SourceRootRequest) -> SourceRoot:
     That way callers don't have to unpack an OptionalSourceRoot if they know they expect a
     SourceRoot to exist and are willing to error if it doesn't.
     """
-    optional_source_root = await Get(OptionalSourceRoot, SourceRootRequest, source_root_request)
+    optional_source_root = await get_optional_source_root(source_root_request, **implicitly())
     if optional_source_root.source_root is None:
         raise NoSourceRootError(source_root_request.path)
     return optional_source_root.source_root
@@ -339,19 +342,25 @@ async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
         marker_file_matches.add(f"**/{marker_filename}")
 
     # Match the patterns against actual files, to find the roots that actually exist.
-    pattern_paths, marker_paths = await MultiGet(
-        Get(Paths, PathGlobs(globs=sorted(pattern_matches))),
-        Get(Paths, PathGlobs(globs=sorted(marker_file_matches))),
+    pattern_paths, marker_paths = await concurrently(
+        path_globs_to_paths(PathGlobs(globs=sorted(pattern_matches))),
+        path_globs_to_paths(PathGlobs(globs=sorted(marker_file_matches))),
     )
 
-    responses = await MultiGet(
+    responses = await concurrently(
         itertools.chain(
-            (Get(OptionalSourceRoot, SourceRootRequest(PurePath(d))) for d in pattern_paths.dirs),
+            (
+                get_optional_source_root(SourceRootRequest(PurePath(d)), **implicitly())
+                for d in pattern_paths.dirs
+            ),
             # We don't technically need to issue a SourceRootRequest for the marker files,
             # since we know that their immediately enclosing dir is a source root by definition.
             # However we may as well verify this formally, so that we're not replicating that
             # logic here.
-            (Get(OptionalSourceRoot, SourceRootRequest(PurePath(f))) for f in marker_paths.files),
+            (
+                get_optional_source_root(SourceRootRequest(PurePath(f)), **implicitly())
+                for f in marker_paths.files
+            ),
         )
     )
     all_source_roots = {

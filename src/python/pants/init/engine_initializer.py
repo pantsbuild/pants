@@ -3,18 +3,21 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, ClassVar, Iterable, Mapping, cast
+from typing import Any, ClassVar, cast
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.core.util_rules import environments, system_binaries
-from pants.core.util_rules.environments import determine_bootstrap_environment
+from pants.core.environments import rules as environments_rules
+from pants.core.environments.rules import determine_bootstrap_environment
+from pants.core.util_rules import system_binaries
 from pants.engine import desktop, download_file, fs, intrinsics, process
 from pants.engine.console import Console
 from pants.engine.environment import EnvironmentName
@@ -193,6 +196,13 @@ class EngineInitializer:
         build_root = get_buildroot()
         executor = executor or GlobalOptions.create_py_executor(bootstrap_options)
         execution_options = ExecutionOptions.from_options(bootstrap_options, dynamic_remote_options)
+        if is_bootstrap:
+            # Don't spawn a single-use sandboxer process that will then get preempted by a
+            # post-bootstrap one created by pantsd. This is fine: our plugin resolving sequence
+            # isn't susceptible to the race condition that the sandboxer solves.
+            # TODO: Are we sure? In any case we plan to replace the plugin resolver and
+            #  get rid of the bootstrap scheduler, so this should be moot soon enough.
+            execution_options = dataclasses.replace(execution_options, use_sandboxer=False)
         local_store_options = LocalStoreOptions.from_options(bootstrap_options)
         return EngineInitializer.setup_graph_extended(
             build_configuration,
@@ -205,6 +215,7 @@ class EngineInitializer:
             named_caches_dir=bootstrap_options.named_caches_dir,
             ca_certs_path=bootstrap_options.ca_certs_path,
             build_root=build_root,
+            pants_workdir=bootstrap_options.pants_workdir,
             include_trace_on_error=bootstrap_options.print_stacktrace,
             engine_visualize_to=bootstrap_options.engine_visualize_to,
             watch_filesystem=bootstrap_options.watch_filesystem,
@@ -222,6 +233,7 @@ class EngineInitializer:
         local_store_options: LocalStoreOptions,
         local_execution_root_dir: str,
         named_caches_dir: str,
+        pants_workdir: str,
         ca_certs_path: str | None = None,
         build_root: str | None = None,
         include_trace_on_error: bool = True,
@@ -238,7 +250,7 @@ class EngineInitializer:
         execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
 
         @rule
-        def parser_singleton() -> Parser:
+        async def parser_singleton() -> Parser:
             return Parser(
                 build_root=build_root_path,
                 registered_target_types=registered_target_types,
@@ -248,27 +260,27 @@ class EngineInitializer:
             )
 
         @rule
-        def bootstrap_status() -> BootstrapStatus:
+        async def bootstrap_status() -> BootstrapStatus:
             return BootstrapStatus(is_bootstrap)
 
         @rule
-        def build_configuration_singleton() -> BuildConfiguration:
+        async def build_configuration_singleton() -> BuildConfiguration:
             return build_configuration
 
         @rule
-        def registered_target_types_singleton() -> RegisteredTargetTypes:
+        async def registered_target_types_singleton() -> RegisteredTargetTypes:
             return registered_target_types
 
         @rule
-        def union_membership_singleton() -> UnionMembership:
+        async def union_membership_singleton() -> UnionMembership:
             return union_membership
 
         @rule
-        def build_root_singleton() -> BuildRoot:
+        async def build_root_singleton() -> BuildRoot:
             return cast(BuildRoot, BuildRoot.instance)
 
         @rule
-        def current_executing_goals(session_values: SessionValues) -> CurrentExecutingGoals:
+        async def current_executing_goals(session_values: SessionValues) -> CurrentExecutingGoals:
             return session_values.get(CurrentExecutingGoals) or CurrentExecutingGoals()
 
         # Create a Scheduler containing graph and filesystem rules, with no installed goals.
@@ -286,7 +298,7 @@ class EngineInitializer:
                 *specs_rules.rules(),
                 *options_parsing.rules(),
                 *process.rules(),
-                *environments.rules(),
+                *environments_rules.rules(),
                 *system_binaries.rules(),
                 *platform_rules.rules(),
                 *changed_rules(),
@@ -317,9 +329,11 @@ class EngineInitializer:
                 *(
                     QueryRule(
                         goal_type,
-                        environment_selecting_goal_param_types
-                        if goal_type._selects_environments()
-                        else GraphSession.goal_param_types,
+                        (
+                            environment_selecting_goal_param_types
+                            if goal_type._selects_environments()
+                            else GraphSession.goal_param_types
+                        ),
                     )
                     for goal_type in goal_map.values()
                 ),
@@ -339,6 +353,7 @@ class EngineInitializer:
             ignore_patterns=pants_ignore_patterns,
             use_gitignore=use_gitignore,
             build_root=build_root_path,
+            pants_workdir=pants_workdir,
             local_execution_root_dir=ensure_absolute_path(local_execution_root_dir),
             named_caches_dir=ensure_absolute_path(named_caches_dir),
             ca_certs_path=ensure_optional_absolute_path(ca_certs_path),

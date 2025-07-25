@@ -5,25 +5,26 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.cc.subsystems.compiler import CCSubsystem, ExternalCCSubsystem
 from pants.backend.cc.target_types import CCLanguage
-from pants.core.util_rules.archive import ExtractedArchive
+from pants.core.util_rules.archive import maybe_extract_archive
 from pants.core.util_rules.archive import rules as archive_rules
 from pants.core.util_rules.system_binaries import (
     BinaryNotFoundError,
     BinaryPathRequest,
-    BinaryPaths,
     BinaryPathTest,
+    find_binary,
 )
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import DownloadFile
+from pants.engine.download_file import download_file
+from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest
+from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.platform import Platform
 from pants.engine.process import Process
-from pants.engine.rules import Get, Rule, collect_rules, rule
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
@@ -73,13 +74,13 @@ async def _executable_path(binary_names: Iterable[str], search_paths: Iterable[s
     """Find the path to an executable by checking whether the executable supports a version
     option."""
     for name in binary_names:
-        binary_paths = await Get(  # noqa: PNT30: requires triage
-            BinaryPaths,
-            BinaryPathRequest(
+        binary_paths = await find_binary(
+            BinaryPathRequest(  # noqa: PNT30: requires triage
                 binary_name=name,
                 search_path=search_paths,
                 test=BinaryPathTest(args=["-v"]),
             ),
+            **implicitly(),
         )
 
         if not binary_paths or not binary_paths.first_path:
@@ -97,8 +98,8 @@ async def _setup_downloadable_toolchain(
     """Set up a toolchain from a downloadable archive."""
 
     download_file_request = subsystem.get_request(platform).download_file_request
-    maybe_archive_digest = await Get(Digest, DownloadFile, download_file_request)
-    extracted_archive = await Get(ExtractedArchive, Digest, maybe_archive_digest)
+    maybe_archive_digest = await download_file(download_file_request, **implicitly())
+    extracted_archive = await maybe_extract_archive(**implicitly(maybe_archive_digest))
 
     # Populate the toolchain for C or C++ accordingly
     if request.language == CCLanguage.CXX:
@@ -126,7 +127,7 @@ async def _setup_system_toolchain(
     raw_search_paths = list(subsystem.search_paths)
     if "<PATH>" in raw_search_paths:
         i = raw_search_paths.index("<PATH>")
-        env = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
+        env = await environment_vars_subset(EnvironmentVarsRequest(["PATH"]), **implicitly())
         system_path = env.get("PATH", "")
         raw_search_paths[i : i + 1] = system_path.split(os.pathsep)
 
@@ -180,7 +181,7 @@ async def setup_cc_process(request: CCProcess) -> Process:
     This rule will load the C/C++ toolchain based on the requested language. It will then return a
     Process that can be run to compile or link a C/C++ source file.
     """
-    toolchain = await Get(CCToolchain, CCToolchainRequest(request.language))
+    toolchain = await setup_cc_toolchain(CCToolchainRequest(request.language), **implicitly())
 
     # TODO: What if this is for linking instead of compiling?
     # TODO: From tdyas: Should there then be a CCCompilerProcess and CCLinkerProcess?

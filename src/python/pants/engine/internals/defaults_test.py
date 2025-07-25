@@ -4,7 +4,8 @@
 from __future__ import annotations
 
 from collections import namedtuple
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 import pytest
 
@@ -69,7 +70,7 @@ def registered_target_types() -> RegisteredTargetTypes:
 
 @pytest.fixture
 def union_membership() -> UnionMembership:
-    return UnionMembership({})
+    return UnionMembership.empty()
 
 
 def test_assumptions(

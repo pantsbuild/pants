@@ -9,7 +9,12 @@ python_sources(
     dependencies=[":hcl2_parser", ":lockfile"],
 )
 
-python_sources(name="hcl2_parser", sources=["hcl2_parser.py"])
+python_sources(
+    name="hcl2_parser",
+    sources=["hcl2_parser.py"],
+    # Skip pyupgrade to avoid breaking tests running Python 3.8
+    skip_pyupgrade=True,
+)
 
 resource(name="lockfile", source="hcl2.lock")
 

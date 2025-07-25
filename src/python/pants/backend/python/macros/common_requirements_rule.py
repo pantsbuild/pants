@@ -6,7 +6,8 @@ from __future__ import annotations
 import itertools
 import logging
 import os
-from typing import Callable, Iterable, cast
+from collections.abc import Callable, Iterable
+from typing import cast
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
@@ -28,9 +29,11 @@ from pants.core.target_types import (
     TargetGeneratorSourcesHelperTarget,
 )
 from pants.engine.addresses import Address
-from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
-from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
-from pants.engine.rules import Get
+from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs
+from pants.engine.internals.build_files import find_target_adaptor
+from pants.engine.internals.target_adaptor import TargetAdaptorRequest
+from pants.engine.intrinsics import get_digest_contents
+from pants.engine.rules import implicitly
 from pants.engine.target import (
     Dependencies,
     GenerateTargetsRequest,
@@ -86,8 +89,7 @@ async def _generate_requirements(
             os.path.dirname(lockfile),
             target_name=synthetic_lockfile_target_name(resolve),
         )
-        target_adaptor = await Get(
-            TargetAdaptor,
+        target_adaptor = await find_target_adaptor(
             TargetAdaptorRequest(
                 description_of_origin=f"{generator.alias} lockfile dep for the {resolve} resolve",
                 address=lockfile_address,
@@ -110,13 +112,14 @@ async def _generate_requirements(
                 )
             )
 
-    digest_contents = await Get(
-        DigestContents,
-        PathGlobs(
-            [requirements_full_path],
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin=f"{generator}'s field `{SingleSourceField.alias}`",
-        ),
+    digest_contents = await get_digest_contents(
+        **implicitly(
+            PathGlobs(
+                [requirements_full_path],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                description_of_origin=f"{generator}'s field `{SingleSourceField.alias}`",
+            )
+        )
     )
 
     module_mapping = generator[ModuleMappingField].value
@@ -150,9 +153,7 @@ async def _generate_requirements(
         )
 
     requirements = parse_requirements_callback(digest_contents[0].content, requirements_full_path)
-    grouped_requirements = itertools.groupby(
-        requirements, lambda parsed_req: parsed_req.project_name
-    )
+    grouped_requirements = itertools.groupby(requirements, lambda parsed_req: parsed_req.name)
     result = tuple(
         generate_tgt(project_name, parsed_reqs_)
         for project_name, parsed_reqs_ in grouped_requirements

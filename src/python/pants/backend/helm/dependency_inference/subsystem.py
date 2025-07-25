@@ -38,7 +38,7 @@ class HelmInferSubsystem(Subsystem):
         default=UnownedHelmDependencyUsage.RaiseError,
         help=softwrap(
             """
-            How to handle inferred dependencies that don't have an inferrable owner.
+            How to handle inferred dependencies that don't have an inferable owner.
 
             Usually when an import cannot be inferred, it represents an issue like Pants not being
             properly configured, e.g. targets not set up. Often, missing dependencies will result
@@ -67,8 +67,9 @@ class HelmInferSubsystem(Subsystem):
             )
             ```
 
-            Use the value '*' to disable this check.
-            This will limit Pants's ability to warn on unknown docker images.
+            Use Python fnmatch glob syntax (ex: 'docker.io/*') to disable this
+            check for certain images or patterns.  This will limit Pants's
+            ability to warn on unknown docker images.
             """
         ),
     )

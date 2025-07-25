@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 import pytest
 
@@ -126,7 +126,7 @@ def test_get_no_index_call_no_subject_call_allowed() -> None:
 
 def test_byname() -> None:
     @rule
-    def rule1(arg: int) -> int:
+    async def rule1(arg: int) -> int:
         return arg
 
     @rule

@@ -39,14 +39,16 @@ from pants.backend.go.util_rules.build_pkg_target import (
     BuildGoPackageRequestForStdlibRequest,
     BuildGoPackageTargetRequest,
     GoCodegenBuildRequest,
+    setup_build_go_package_target_request,
 )
-from pants.backend.go.util_rules.go_mod import OwningGoMod, OwningGoModRequest
+from pants.backend.go.util_rules.go_mod import OwningGoModRequest, find_owning_go_mod
 from pants.backend.go.util_rules.import_analysis import GoStdLibPackages, GoStdLibPackagesRequest
 from pants.core.target_types import FilesGeneratorTarget, FileSourceField, FileTarget
-from pants.engine.addresses import Address, Addresses
-from pants.engine.fs import CreateDigest, Digest, FileContent, Snapshot
-from pants.engine.internals.selectors import MultiGet
-from pants.engine.rules import Get, QueryRule, rule
+from pants.engine.addresses import Address
+from pants.engine.fs import CreateDigest, FileContent, Snapshot
+from pants.engine.internals.graph import resolve_dependencies
+from pants.engine.intrinsics import create_digest
+from pants.engine.rules import QueryRule, concurrently, implicitly, rule
 from pants.engine.target import AllTargets, Dependencies, DependenciesRequest
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner
@@ -73,8 +75,8 @@ async def map_import_paths(
 ) -> GoModuleImportPathsMappings:
     file_targets = [tgt for tgt in all_targets if tgt.has_field(FileSourceField)]
 
-    owning_go_mod_targets = await MultiGet(
-        Get(OwningGoMod, OwningGoModRequest(tgt.address)) for tgt in file_targets
+    owning_go_mod_targets = await concurrently(
+        find_owning_go_mod(OwningGoModRequest(tgt.address), **implicitly()) for tgt in file_targets
     )
 
     import_paths_by_module: dict[Address, dict[str, set[Address]]] = defaultdict(
@@ -125,14 +127,15 @@ async def generate_from_file(request: GoCodegenBuildFilesRequest) -> FallibleBui
         }
         """
     )
-    digest = await Get(Digest, CreateDigest([FileContent("codegen/f.go", content.encode())]))
+    digest = await create_digest(CreateDigest([FileContent("codegen/f.go", content.encode())]))
 
-    deps = await Get(Addresses, DependenciesRequest(request.target[Dependencies]))
+    deps = await resolve_dependencies(
+        DependenciesRequest(request.target[Dependencies]), **implicitly()
+    )
     assert len(deps) == 1
     assert deps[0].generated_name == "github.com/google/uuid"
-    thirdparty_dep = await Get(
-        FallibleBuildGoPackageRequest,
-        BuildGoPackageTargetRequest(deps[0], build_opts=GoBuildOptions()),
+    thirdparty_dep = await setup_build_go_package_target_request(
+        BuildGoPackageTargetRequest(deps[0], build_opts=GoBuildOptions()), **implicitly()
     )
     assert thirdparty_dep.request is not None
 
@@ -201,9 +204,9 @@ def assert_built(
     actual = dict(built_package.import_paths_to_pkg_a_files)
     for import_path, pkg_archive_path in expected.items():
         assert import_path in actual, f"expected {import_path} to be in build output"
-        assert (
-            actual[import_path] == expected[import_path]
-        ), "expected package archive paths to match"
+        assert actual[import_path] == expected[import_path], (
+            "expected package archive paths to match"
+        )
     assert set(expected.values()).issubset(set(result_files))
 
 

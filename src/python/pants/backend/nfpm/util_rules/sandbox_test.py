@@ -44,11 +44,11 @@ from pants.core.target_types import (
 )
 from pants.core.target_types import rules as core_target_type_rules
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, DigestContents, DigestEntries
-from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, Snapshot
+from pants.engine.fs import CreateDigest, DigestEntries
+from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import QueryRule, rule
+from pants.engine.intrinsics import digest_to_snapshot, get_digest_contents
+from pants.engine.rules import QueryRule, implicitly, rule
 from pants.engine.target import GeneratedSources, GenerateSourcesRequest, SingleSourceField, Target
 from pants.engine.unions import UnionRule
 from pants.testutil.pytest_util import no_exception
@@ -186,12 +186,12 @@ class MockCodegenGenerateSourcesRequest(GenerateSourcesRequest):
 @rule
 async def do_codegen(request: MockCodegenGenerateSourcesRequest) -> GeneratedSources:
     # Generate a file with the same contents as each input file.
-    input_files = await Get(DigestContents, Digest, request.protocol_sources.digest)
+    input_files = await get_digest_contents(request.protocol_sources.digest)
     generated_files = [
         dataclasses.replace(input_file, path=input_file.path + ".generated")
         for input_file in input_files
     ]
-    result = await Get(Snapshot, CreateDigest(generated_files))
+    result = await digest_to_snapshot(**implicitly(CreateDigest(generated_files)))
     return GeneratedSources(result)
 
 
@@ -326,48 +326,72 @@ def rule_runner() -> RuleRunner:
         pytest.param(
             "apk",
             NfpmApkPackageFieldSet,
-            ["codegen:generated", "contents:files", "package:package"],
+            [
+                "codegen:generated",
+                "contents:files",
+                "package:package",
+                "package:output_path_package",
+            ],
             {},
             {
                 "codegen/foobar.codegen.generated",
                 "contents/sandbox-file.txt",
                 "package/archive.tar",
+                "relative_to_build_root.tar",
             },
             id="apk-codegen-and-package",
         ),
         pytest.param(
             "archlinux",
             NfpmArchlinuxPackageFieldSet,
-            ["codegen:generated", "contents:files", "package:package"],
+            [
+                "codegen:generated",
+                "contents:files",
+                "package:package",
+                "package:output_path_package",
+            ],
             {},
             {
                 "codegen/foobar.codegen.generated",
                 "contents/sandbox-file.txt",
                 "package/archive.tar",
+                "relative_to_build_root.tar",
             },
             id="archlinux-codegen-and-package",
         ),
         pytest.param(
             "deb",
             NfpmDebPackageFieldSet,
-            ["codegen:generated", "contents:files", "package:package"],
+            [
+                "codegen:generated",
+                "contents:files",
+                "package:package",
+                "package:output_path_package",
+            ],
             {},
             {
                 "codegen/foobar.codegen.generated",
                 "contents/sandbox-file.txt",
                 "package/archive.tar",
+                "relative_to_build_root.tar",
             },
             id="deb-codegen-and-package",
         ),
         pytest.param(
             "rpm",
             NfpmRpmPackageFieldSet,
-            ["codegen:generated", "contents:files", "package:package"],
+            [
+                "codegen:generated",
+                "contents:files",
+                "package:package",
+                "package:output_path_package",
+            ],
             {},
             {
                 "codegen/foobar.codegen.generated",
                 "contents/sandbox-file.txt",
                 "package/archive.tar",
+                "relative_to_build_root.tar",
             },
             id="rpm-codegen-and-package",
         ),
@@ -422,7 +446,7 @@ def test_populate_nfpm_content_sandbox(
                     name="{_PKG_NAME}",
                     package_name="{_PKG_NAME}",
                     version="{_PKG_VERSION}",
-                    {'' if packager != 'deb' else 'maintainer="Foo Bar <deb@example.com>",'}
+                    {"" if packager != "deb" else 'maintainer="Foo Bar <deb@example.com>",'}
                     dependencies={repr(dependencies)},
                     scripts={repr(scripts)},
                 )
@@ -458,6 +482,18 @@ def test_populate_nfpm_content_sandbox(
                     src="archive.tar",
                     dst="/opt/foo/archive.tar",
                     dependencies=[":archive"],
+                )
+                archive(
+                    name="output_path_archive",
+                    format="tar",
+                    output_path="relative_to_build_root.tar",
+                    files=[":file"],
+                )
+                nfpm_content_file(
+                    name="output_path_package",
+                    src="relative_to_build_root.tar",
+                    dst="/opt/foo/relative_to_build_root.tar",
+                    dependencies=[":output_path_archive"],
                 )
                 """
             ),
@@ -497,16 +533,16 @@ def test_populate_nfpm_content_sandbox(
                 )
                 """
             ),
-            **{
-                path: ""
-                for path in [
+            **dict.fromkeys(
+                [
                     "scripts/postinstall.sh",
                     "scripts/apk-postupgrade.sh",
                     "scripts/arch-postupgrade.sh",
                     "scripts/deb-config.sh",
                     "scripts/rpm-verify.sh",
-                ]
-            },
+                ],
+                "",
+            ),
         }
     )
 

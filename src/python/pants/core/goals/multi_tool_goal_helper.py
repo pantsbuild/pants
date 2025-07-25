@@ -5,7 +5,8 @@ from __future__ import annotations
 
 import logging
 import os.path
-from typing import Iterable, Mapping, Protocol, Sequence, TypeVar
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Protocol, TypeVar
 
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.fs import EMPTY_DIGEST, Digest, Workspace
@@ -103,18 +104,15 @@ def determine_specified_tool_ids(
 
 class _ResultWithReport(Protocol):
     @property
-    def report(self) -> Digest:
-        ...
+    def report(self) -> Digest: ...
 
     @property
-    def partition_description(self) -> str | None:
-        ...
+    def partition_description(self) -> str | None: ...
 
 
 class _ResultsWithReports(Protocol):
     @property
-    def results(self) -> Sequence[_ResultWithReport]:
-        ...
+    def results(self) -> Sequence[_ResultWithReport]: ...
 
 
 _R = TypeVar("_R", bound=_ResultsWithReports)

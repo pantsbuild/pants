@@ -2,14 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pathlib import Path
-from typing import List
 
 import pytest
 
 from pants.testutil.pants_integration_test import run_pants
 
 
-def discover_backends() -> List[str]:
+def discover_backends() -> list[str]:
     register_pys = Path().glob("src/python/**/register.py")
     backends = {
         str(register_py.parent).replace("src/python/", "").replace("/", ".")
@@ -20,7 +19,7 @@ def discover_backends() -> List[str]:
     return sorted(backends - always_activated)
 
 
-def assert_backends_load(backends: List[str]) -> None:
+def assert_backends_load(backends: list[str]) -> None:
     run_pants(
         ["--no-verify-config", "help-all"], config={"GLOBAL": {"backend_packages": backends}}
     ).assert_success(f"Failed to load: {backends}")
@@ -47,3 +46,20 @@ def test_each_distinct_backend_loads(backend) -> None:
     else:
         backend = [backend]
     assert_backends_load(backend)
+
+
+def test_plugin_with_dependencies() -> None:
+    testproject_backend_pkg_name = "test_pants_plugin"
+
+    pants_run = run_pants(
+        [
+            "--no-pantsd",
+            f"--backend-packages=['{testproject_backend_pkg_name}']",
+            "help",
+        ],
+        config={"GLOBAL": {"pythonpath": ["%(buildroot)s/testprojects/pants-plugins/src/python"]}},
+        extra_env={
+            "_IMPORT_REQUIREMENT": "True",
+        },
+    )
+    pants_run.assert_success()

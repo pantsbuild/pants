@@ -21,7 +21,7 @@ use crate::context::{Context, Core};
 use crate::downloads;
 use crate::externs;
 use crate::externs::fs::PyFileDigest;
-use crate::python::{throw, Key};
+use crate::python::{Key, throw};
 
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct DownloadedFile(pub Key);
@@ -99,16 +99,16 @@ impl DownloadedFile {
             Python::with_gil(|py| {
                 let py_download_file_val = self.0.to_value();
                 let py_download_file = py_download_file_val.bind(py);
-                let url_str: String = externs::getattr_bound(py_download_file, "url")
+                let url_str: String = externs::getattr(py_download_file, "url")
                     .map_err(|e| format!("Failed to get `url` for field: {e}"))?;
                 let auth_headers =
-                    externs::getattr_from_str_frozendict_bound(py_download_file, "auth_headers");
+                    externs::getattr_from_str_frozendict(py_download_file, "auth_headers");
                 let py_file_digest: PyFileDigest =
-                    externs::getattr_bound(py_download_file, "expected_digest")?;
+                    externs::getattr(py_download_file, "expected_digest")?;
                 let retry_delay_duration: Duration =
-                    externs::getattr_bound(py_download_file, "retry_error_duration")?;
+                    externs::getattr(py_download_file, "retry_error_duration")?;
                 let max_attempts: NonZeroUsize =
-                    externs::getattr_bound(py_download_file, "max_attempts")?;
+                    externs::getattr(py_download_file, "max_attempts")?;
                 Ok::<_, String>((
                     url_str,
                     py_file_digest.0,

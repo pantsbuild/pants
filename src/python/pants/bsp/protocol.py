@@ -19,7 +19,7 @@ from pylsp_jsonrpc.streams import (  # type: ignore[import-untyped]
 
 from pants.bsp.context import BSPContext
 from pants.bsp.spec.notification import BSPNotification
-from pants.core.util_rules.environments import determine_bootstrap_environment
+from pants.core.environments.rules import determine_bootstrap_environment
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Workspace
 from pants.engine.internals.scheduler import SchedulerSession
@@ -31,13 +31,11 @@ _logger = logging.getLogger(__name__)
 
 class BSPRequestTypeProtocol(Protocol):
     @classmethod
-    def from_json_dict(cls, d: dict[str, Any]) -> Any:
-        ...
+    def from_json_dict(cls, d: dict[str, Any]) -> Any: ...
 
 
 class BSPResponseTypeProtocol(Protocol):
-    def to_json_dict(self) -> dict[str, Any]:
-        ...
+    def to_json_dict(self) -> dict[str, Any]: ...
 
 
 @union(in_scope_types=[EnvironmentName])

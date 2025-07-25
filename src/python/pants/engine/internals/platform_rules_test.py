@@ -9,11 +9,11 @@ from unittest.mock import Mock
 import pytest
 
 from pants.build_graph.address import Address
-from pants.core.util_rules.environments import (
+from pants.core.environments.subsystems import EnvironmentsSubsystem
+from pants.core.environments.target_types import (
     DockerEnvironmentTarget,
     DockerImageField,
     DockerPlatformField,
-    EnvironmentsSubsystem,
     EnvironmentTarget,
     LocalEnvironmentTarget,
     RemoteEnvironmentTarget,
@@ -31,7 +31,7 @@ from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.option.global_options import GlobalOptions
 from pants.testutil.option_util import create_subsystem
-from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
+from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 
 
 @pytest.mark.platform_specific_behavior
@@ -127,9 +127,9 @@ def test_complete_env_vars() -> None:
                 global_options,
                 env_subsystem,
             ],
-            mock_gets=[
-                MockGet(output_type=ProcessResult, input_types=(Process,), mock=mock_env_process)
-            ],
+            mock_calls={
+                "pants.engine.process.fallible_to_exec_result_or_raise": mock_env_process,
+            },
         )
         assert dict(result) == {expected_env: "true"}
 
@@ -175,13 +175,9 @@ def test_get_environment_paths(env: dict[str, str], expected_entries: list[str])
 
     paths = run_rule_with_mocks(
         environment_path_variable,
-        mock_gets=[
-            MockGet(
-                output_type=EnvironmentVars,
-                input_types=(CompleteEnvironmentVars, EnvironmentVarsRequest),
-                mock=mock_environment_vars_subset,
-            )
-        ],
+        mock_calls={
+            "pants.engine.internals.platform_rules.environment_vars_subset": mock_environment_vars_subset,
+        },
     )
     assert list(paths) == expected_entries
 

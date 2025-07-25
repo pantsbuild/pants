@@ -6,12 +6,13 @@ from __future__ import annotations
 import json
 import shlex
 import unittest.mock
+from collections.abc import Callable
 from contextlib import contextmanager
 from enum import Enum
 from functools import partial
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Callable, Dict, cast
+from typing import Any, cast
 
 import pytest
 import toml
@@ -21,7 +22,6 @@ from packaging.version import Version
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import CodeRemovedError, warn_or_error
 from pants.engine.fs import FileContent
-from pants.option.config import Config
 from pants.option.custom_types import UnsetBool, file_option, shell_str, target_option
 from pants.option.errors import (
     BooleanConversionError,
@@ -40,9 +40,8 @@ from pants.option.errors import (
 )
 from pants.option.global_options import GlobalOptions
 from pants.option.native_options import parse_dest
-from pants.option.option_types import StrOption
+from pants.option.option_types import OptionInfo, StrOption
 from pants.option.options import Options
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.options_fingerprinter import OptionEncoder
 from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
@@ -78,11 +77,13 @@ def create_options(
     extra_scope_infos: list[ScopeInfo] | None = None,
 ) -> Options:
     options = Options.create(
+        args=["pants", *(args or ())],
         env=env or {},
-        config=Config.load([FileContent("pants.toml", toml.dumps(config or {}).encode())]),
-        known_scope_infos=[*(ScopeInfo(scope) for scope in scopes), *(extra_scope_infos or ())],
-        native_options_config_discovery=False,
-        args=["./pants", *(args or ())],
+        config_sources=[FileContent("pants.toml", toml.dumps(config or {}).encode())],
+        known_scope_infos=[
+            *(ScopeInfo(scope, is_goal=scope != GLOBAL_SCOPE) for scope in scopes),
+            *(extra_scope_infos or ()),
+        ],
     )
     register_fn(options)
     return options
@@ -452,13 +453,11 @@ def test_scope_deprecation(caplog) -> None:
 def _create_config(
     config: dict[str, dict[str, str]] | None = None,
     config2: dict[str, dict[str, str]] | None = None,
-) -> Config:
-    return Config.load(
-        [
-            FileContent("test_config.toml", toml.dumps(config or {}).encode()),
-            FileContent("test_config2.toml", toml.dumps(config2 or {}).encode()),
-        ]
-    )
+) -> list[FileContent]:
+    return [
+        FileContent("test_config.toml", toml.dumps(config or {}).encode()),
+        FileContent("test_config2.toml", toml.dumps(config2 or {}).encode()),
+    ]
 
 
 def _parse(
@@ -467,17 +466,15 @@ def _parse(
     env: dict[str, str] | None = None,
     config: dict[str, dict[str, Any]] | None = None,
     config2: dict[str, dict[str, Any]] | None = None,
-    bootstrap_option_values=None,
     allow_unknown_options=False,
 ) -> Options:
-    args = ["./pants", *shlex.split(flags)]
+    args = ["pants", *shlex.split(flags)]
+
     options = Options.create(
-        env=env or {},
-        config=_create_config(config, config2),
-        native_options_config_discovery=False,
-        known_scope_infos=_known_scope_infos,
         args=args,
-        bootstrap_option_values=bootstrap_option_values,
+        env=env or {},
+        config_sources=_create_config(config, config2),
+        known_scope_infos=_known_scope_infos,
         allow_unknown_options=allow_unknown_options,
     )
     _register(options)
@@ -485,26 +482,28 @@ def _parse(
 
 
 _known_scope_infos = [
-    ScopeInfo(scope)
-    for scope in (
-        GLOBAL_SCOPE,
-        "anotherscope",
-        "compile",
-        "compile.java",
-        "stale",
-        "test",
-        "test.junit",
-        "passconsumer",
-        "simple",
-        "simple-dashed",
-        "scoped.a.bit",
-        "scoped.and-dashed",
-        "fromfile",
-        "fingerprinting",
-        "enum-opt",
-        "separate-enum-opt-scope",
-        "other-enum-scope",
-    )
+    ScopeInfo(GLOBAL_SCOPE),
+    *[
+        ScopeInfo(scope, is_goal=True)
+        for scope in (
+            "anotherscope",
+            "compile",
+            "compile.java",
+            "stale",
+            "test",
+            "test.junit",
+            "passconsumer",
+            "simple",
+            "simple-dashed",
+            "scoped.a.bit",
+            "scoped.and-dashed",
+            "fromfile",
+            "fingerprinting",
+            "enum-opt",
+            "separate-enum-opt-scope",
+            "other-enum-scope",
+        )
+    ],
 ]
 
 
@@ -629,9 +628,9 @@ def _register(options):
 def test_env_var_of_type_int() -> None:
     create_options_object = partial(
         Options.create,
-        config=_create_config(),
+        config_sources=_create_config(),
         known_scope_infos=_known_scope_infos,
-        args=shlex.split("./pants"),
+        args=shlex.split("pants"),
     )
     options = create_options_object(env={"PANTS_FOO_BAR": "123"})
     options.register(GLOBAL_SCOPE, "--foo-bar", type=int)
@@ -1010,17 +1009,17 @@ def test_choices() -> None:
 
 
 def test_parse_dest() -> None:
-    assert "thing" == parse_dest("--thing")
-    assert "other_thing" == parse_dest("--thing", dest="other_thing")
+    assert "thing" == parse_dest(OptionInfo(("--thing",), {}))
+    assert "other_thing" == parse_dest(OptionInfo(("--thing",), {"dest": "other_thing"}))
 
 
 def test_validation() -> None:
     def assert_error(expected_error, *args, **kwargs):
         with pytest.raises(expected_error):
             options = Options.create(
-                args=["./pants"],
+                args=["pants"],
                 env={},
-                config=_create_config(),
+                config_sources=_create_config(),
                 known_scope_infos=[global_scope()],
             )
             options.register(GLOBAL_SCOPE, *args, **kwargs)
@@ -1041,10 +1040,10 @@ def test_validation() -> None:
 
 def test_shadowing() -> None:
     options = Options.create(
+        args=["pants"],
         env={},
-        config=_create_config(),
+        config_sources=_create_config(),
         known_scope_infos=[global_scope(), task("bar"), intermediate("foo"), task("foo.bar")],
-        args=["./pants"],
     )
     options.register("", "--opt1")
     options.register("foo", "--opt2")
@@ -1057,35 +1056,13 @@ def test_is_known_scope() -> None:
     assert not options.is_known_scope("nonexistent_scope")
 
 
-def test_file_spec_args() -> None:
-    with temporary_file(binary_mode=False) as tmp:
-        tmp.write(
-            dedent(
-                """
-                foo
-                bar
-                """
-            )
-        )
-        tmp.flush()
-        # Note that we prevent loading a real pants.toml during get_bootstrap_options().
-        flags = f'--spec-files={tmp.name} --pants-config-files="[]" compile morx:tgt fleem:tgt'
-        bootstrapper = OptionsBootstrapper.create(
-            env={}, args=shlex.split(f"./pants {flags}"), allow_pantsrc=False
-        )
-        bootstrap_options = bootstrapper.bootstrap_options.for_global_scope()
-        options = _parse(flags=flags, bootstrap_option_values=bootstrap_options)
-        sorted_specs = sorted(options.specs)
-        assert ["bar", "fleem:tgt", "foo", "morx:tgt"] == sorted_specs
-
-
 def test_passthru_args_subsystems_and_goals():
     # Test that passthrough args are applied.
     options = Options.create(
+        args=["pants", "test", "target", "--", "bar", "--baz", "@dont_fromfile_expand_me"],
         env={},
-        config=_create_config(),
+        config_sources=_create_config(),
         known_scope_infos=[global_scope(), task("test"), subsystem("passconsumer")],
-        args=["./pants", "test", "target", "--", "bar", "--baz", "@dont_fromfile_expand_me"],
     )
     options.register("passconsumer", "--passthing", passthrough=True, type=list, member_type=str)
 
@@ -1097,10 +1074,10 @@ def test_passthru_args_subsystems_and_goals():
 def test_at_most_one_goal_with_passthru_args():
     with pytest.raises(Options.AmbiguousPassthroughError) as exc:
         Options.create(
+            args=["pants", "test", "fmt", "path/to/target", "--", "bar", "--baz"],
             env={},
-            config=_create_config(),
+            config_sources=_create_config(),
             known_scope_infos=[global_scope(), task("test"), task("fmt")],
-            args=["./pants", "test", "fmt", "target", "--", "bar", "--baz"],
         )
     assert (
         "Specifying multiple goals (in this case: ['test', 'fmt']) along with passthrough args"
@@ -1111,14 +1088,8 @@ def test_at_most_one_goal_with_passthru_args():
 def test_passthru_args_not_interpreted():
     # Test that passthrough args are not interpreted.
     options = Options.create(
-        env={},
-        config=_create_config(
-            {"consumer": {"shlexed": ["from config"], "string": ["from config"]}}
-        ),
-        native_options_config_discovery=False,
-        known_scope_infos=[global_scope(), task("test"), subsystem("consumer")],
         args=[
-            "./pants",
+            "pants",
             "--consumer-shlexed=a",
             "--consumer-string=b",
             "test",
@@ -1126,6 +1097,11 @@ def test_passthru_args_not_interpreted():
             "[bar]",
             "multi token from passthrough",
         ],
+        env={},
+        config_sources=_create_config(
+            {"consumer": {"shlexed": ["from config"], "string": ["from config"]}}
+        ),
+        known_scope_infos=[global_scope(), task("test"), subsystem("consumer")],
     )
     options.register("consumer", "--shlexed", passthrough=True, type=list, member_type=shell_str)
     options.register("consumer", "--string", passthrough=True, type=list, member_type=str)
@@ -1508,7 +1484,7 @@ def test_pants_global_with_default() -> None:
     # This cast shouldn't be necessary - likely a bug in MyPy. Once this gets fixed, MyPy will
     # tell us that we can remove the cast.
     config = cast(
-        Dict[str, Dict[str, Any]],
+        dict[str, dict[str, Any]],
         {"DEFAULT": {"num": "99"}, "GLOBAL": {"store_true_flag": True}},
     )
     global_options = _parse(config=config).for_global_scope()
@@ -1518,10 +1494,10 @@ def test_pants_global_with_default() -> None:
 
 def test_double_registration() -> None:
     options = Options.create(
+        args=shlex.split("pants"),
         env={},
-        config=_create_config(),
+        config_sources=_create_config(),
         known_scope_infos=_known_scope_infos,
-        args=shlex.split("./pants"),
     )
     options.register(GLOBAL_SCOPE, "--foo-bar")
     with pytest.raises(OptionAlreadyRegistered):

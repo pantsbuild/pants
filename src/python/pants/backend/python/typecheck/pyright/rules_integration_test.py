@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from textwrap import dedent
-from typing import Iterable
 
 import pytest
 
@@ -92,8 +92,8 @@ UNDEFINED_VARIABLE_TOML_CONFIG = dedent(
     """
 )
 
-PYRIGHT_VERSION = "1.1.383"
-PYRIGHT_INTEGRITY_HASH = "sha512-b540vUDWGXFlVwhxREgCrvKYT9bnUUPiDtSv5s7sUGxIokTxc06bPC2vfnGunUqaUu6hgIqlv1GRFdOKIEb09A=="
+PYRIGHT_VERSION = "1.1.396"
+PYRIGHT_INTEGRITY_HASH = "sha512-+/8GN9ZRlqS/EFUjSW3yb2FN9XF7KjGpnLVYLtfTPDiiH+tfua898acKenUTGYbdfvSf7J0GD/g1b5RItnyYPw=="
 PYRIGHT_LOCKFILE = json.dumps(
     {
         "name": "@the-company/project",

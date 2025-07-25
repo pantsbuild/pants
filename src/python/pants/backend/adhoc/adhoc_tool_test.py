@@ -14,16 +14,14 @@ from pants.backend.adhoc.run_system_binary import rules as run_system_binary_rul
 from pants.backend.adhoc.target_types import AdhocToolTarget, SystemBinaryTarget
 from pants.backend.python.goals.run_python_source import rules as run_python_source_rules
 from pants.backend.python.target_types import PythonSourceTarget
+from pants.core.environments.target_types import LocalWorkspaceEnvironmentTarget
 from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget
 from pants.core.target_types import rules as core_target_type_rules
 from pants.core.util_rules import archive, source_files
-from pants.core.util_rules.adhoc_process_support import AdhocProcessRequest
-from pants.core.util_rules.environments import LocalWorkspaceEnvironmentTarget
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.process import Process
 from pants.engine.target import (
     GeneratedSources,
     GenerateSourcesRequest,
@@ -45,7 +43,6 @@ def rule_runner() -> PythonRuleRunner:
             *run_python_source_rules(),
             *run_system_binary_rules(),
             QueryRule(GeneratedSources, [GenerateFilesFromAdhocToolRequest]),
-            QueryRule(Process, [AdhocProcessRequest]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
         ],

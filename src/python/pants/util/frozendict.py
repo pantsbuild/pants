@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Iterable, Iterator, Mapping, TypeVar, cast, overload
+from collections.abc import Callable, Iterable, Iterator, Mapping
+from typing import Any, TypeVar, cast, overload
 
 from pants.util.memo import memoized_method
 from pants.util.strutil import softwrap
@@ -21,16 +22,13 @@ class FrozenDict(Mapping[K, V]):
     """
 
     @overload
-    def __init__(self, __items: Iterable[tuple[K, V]], **kwargs: V) -> None:
-        ...
+    def __init__(self, __items: Iterable[tuple[K, V]], **kwargs: V) -> None: ...
 
     @overload
-    def __init__(self, __other: Mapping[K, V], **kwargs: V) -> None:
-        ...
+    def __init__(self, __other: Mapping[K, V], **kwargs: V) -> None: ...
 
     @overload
-    def __init__(self, **kwargs: V) -> None:
-        ...
+    def __init__(self, **kwargs: V) -> None: ...
 
     def __init__(self, *item: Mapping[K, V] | Iterable[tuple[K, V]], **kwargs: V) -> None:
         """Creates a `FrozenDict` with arguments accepted by `dict` that also must be hashable."""
@@ -149,16 +147,13 @@ class LazyFrozenDict(FrozenDict[K, V]):
     @overload
     def __init__(
         self, __items: Iterable[tuple[K, Callable[[], V]]], **kwargs: Callable[[], V]
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @overload
-    def __init__(self, __other: Mapping[K, Callable[[], V]], **kwargs: Callable[[], V]) -> None:
-        ...
+    def __init__(self, __other: Mapping[K, Callable[[], V]], **kwargs: Callable[[], V]) -> None: ...
 
     @overload
-    def __init__(self, **kwargs: Callable[[], V]) -> None:
-        ...
+    def __init__(self, **kwargs: Callable[[], V]) -> None: ...
 
     def __init__(
         self,

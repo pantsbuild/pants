@@ -11,49 +11,20 @@ from typing import ContextManager
 import pytest
 
 from pants.base.build_environment import get_buildroot
-from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.native_engine import PyRemotingOptions
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.unions import UnionMembership
-from pants.init.options_initializer import OptionsInitializer
 from pants.option.errors import OptionsError
-from pants.option.global_options import DynamicRemoteOptions, GlobalOptions, RemoteProvider
+from pants.option.global_options import (
+    DynamicRemoteOptions,
+    ExecutionOptions,
+    GlobalOptions,
+    RemoteProvider,
+)
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil import rule_runner
-from pants.testutil.option_util import create_options_bootstrapper
+from pants.testutil.option_util import create_dynamic_remote_options
 from pants.testutil.pytest_util import no_exception
 from pants.util.dirutil import safe_mkdir_for
-
-
-def create_dynamic_remote_options(
-    *,
-    initial_headers: dict[str, str] | None = None,
-    address: str | None = "grpc://fake.url:10",
-    token_path: str | None = None,
-    plugin: str | None = None,
-) -> DynamicRemoteOptions:
-    if initial_headers is None:
-        initial_headers = {}
-    args = [
-        "--remote-cache-read",
-        f"--remote-execution-address={address}",
-        f"--remote-store-address={address}",
-        f"--remote-store-headers={initial_headers}",
-        f"--remote-execution-headers={initial_headers}",
-        "--remote-instance-name=main",
-    ]
-    if token_path:
-        args.append(f"--remote-oauth-bearer-token=@{token_path}")
-    if plugin:
-        args.append(f"--backend-packages={plugin}")
-    ob = create_options_bootstrapper(args)
-    env = CompleteEnvironmentVars({})
-    oi = OptionsInitializer(ob, rule_runner.EXECUTOR)
-    _build_config = oi.build_config(ob, env)
-    options = oi.options(ob, env, _build_config, union_membership=UnionMembership({}), raise_=False)
-    return DynamicRemoteOptions.from_options(
-        options, env, remote_auth_plugin_func=_build_config.remote_auth_plugin_func
-    )[0]
+from pants.version import VERSION
 
 
 def test_dynamic_remote_options_oauth_bearer_token_with_path(tmp_path: Path) -> None:
@@ -146,12 +117,30 @@ def test_execution_options_remote_addresses() -> None:
         create_dynamic_remote_options(address=f"https:://{host}")
 
 
+_DEFAULT_USER_AGENT = f"pants/{VERSION}"
+
+
+@pytest.mark.parametrize(
+    ("input", "expected"),
+    [
+        ({}, {"user-agent": _DEFAULT_USER_AGENT}),
+        ({"user-agent": "same case"}, {"user-agent": "same case"}),
+        ({"User-Agent": "title case"}, {"User-Agent": "title case"}),
+        ({"not-user-agent": "foo"}, {"user-agent": _DEFAULT_USER_AGENT, "not-user-agent": "foo"}),
+    ],
+)
+def test_execution_options_with_user_agent_should_match_table(
+    input: dict[str, str], expected: dict[str, str]
+) -> None:
+    assert ExecutionOptions.with_user_agent(input) == expected
+
+
 def test_invalidation_globs() -> None:
     # Confirm that an un-normalized relative path in the pythonpath is filtered out, and that an
     # empty entry (i.e.: a relative path for the current directory) doesn't cause an error.
     suffix = "something-ridiculous"
     ob = OptionsBootstrapper.create(
-        env={}, args=[f"--pythonpath=../{suffix}", "--pythonpath="], allow_pantsrc=False
+        args=[f"--pythonpath=../{suffix}", "--pythonpath="], env={}, allow_pantsrc=False
     )
     globs = GlobalOptions.compute_pantsd_invalidation_globs(
         get_buildroot(), ob.bootstrap_options.for_global_scope()
@@ -270,6 +259,7 @@ def test_remote_provider_matches_rust_enum(
         store_rpc_concurrency=0,
         store_rpc_timeout_millis=0,
         store_batch_api_size_limit=0,
+        store_batch_load_enabled=False,
         cache_warnings_behavior="ignore",
         cache_content_behavior="validate",
         cache_rpc_concurrency=0,

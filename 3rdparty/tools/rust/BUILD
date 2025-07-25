@@ -42,7 +42,7 @@ shell_command(
 shell_command(
     name="cargo",
     command="""
-        mv ../../../src/rust/engine/rust-toolchain rust-toolchain
+        mv ../../../src/rust/rust-toolchain rust-toolchain
         ./shims/bin/rustup set profile minimal
         ./shims/bin/cargo version
         mv toolchains/* cargo
@@ -51,7 +51,7 @@ shell_command(
     tools=["mv"],
     execution_dependencies=[
         ":cargo-shim",
-        "src/rust/engine:rust-toolchain",
+        "src/rust:rust-toolchain",
     ],
     output_directories=["cargo"],
     timeout=600,

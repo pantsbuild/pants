@@ -1,0 +1,30 @@
+[package]
+name = "fs_util"
+version = "0.0.1"
+edition = "2021"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[dependencies]
+protos = { path = "../../protos" }
+bytes = { workspace = true }
+clap = { workspace = true, features = ["string"] }
+env_logger = { workspace = true }
+grpc_util = { path = "../../grpc_util" }
+fs = { path = ".." }
+futures = { workspace = true }
+hashing = { path = "../../hashing" }
+log = { workspace = true }
+parking_lot = { workspace = true }
+prost = { workspace = true }
+rand = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_derive = { workspace = true }
+store = { path = "../store" }
+task_executor = { path = "../../task_executor" }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+workunit_store = { path = "../../workunit_store" }
+
+[lints]
+workspace = true

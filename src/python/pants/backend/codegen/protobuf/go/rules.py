@@ -25,7 +25,10 @@ from pants.backend.go.dependency_inference import (
     GoModuleImportPathsMappings,
     GoModuleImportPathsMappingsHook,
 )
-from pants.backend.go.target_type_rules import GoImportPathMappingRequest
+from pants.backend.go.target_type_rules import (
+    GoImportPathMappingRequest,
+    map_import_paths_to_packages,
+)
 from pants.backend.go.target_types import GoOwningGoModAddressField, GoPackageSourcesField
 from pants.backend.go.util_rules import (
     assembly,
@@ -45,48 +48,53 @@ from pants.backend.go.util_rules.build_pkg import (
 from pants.backend.go.util_rules.build_pkg_target import (
     BuildGoPackageTargetRequest,
     GoCodegenBuildRequest,
+    required_build_go_package_request,
 )
 from pants.backend.go.util_rules.first_party_pkg import FallibleFirstPartyPkgAnalysis
-from pants.backend.go.util_rules.go_mod import OwningGoMod, OwningGoModRequest
+from pants.backend.go.util_rules.go_mod import OwningGoModRequest, find_owning_go_mod
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.backend.python.util_rules import pex
 from pants.build_graph.address import Address
-from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
+from pants.core.util_rules.external_tool import download_external_tool
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
+from pants.core.util_rules.stripped_source_files import strip_source_roots
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
     Digest,
-    DigestContents,
     Directory,
     FileContent,
     MergeDigests,
     RemovePrefix,
-    Snapshot,
 )
+from pants.engine.internals.graph import hydrate_sources, resolve_source_paths, transitive_targets
 from pants.engine.internals.native_engine import EMPTY_DIGEST
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import (
+    create_digest,
+    digest_to_snapshot,
+    execute_process,
+    get_digest_contents,
+    merge_digests,
+    remove_prefix,
+)
 from pants.engine.platform import Platform
-from pants.engine.process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.process import Process, fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
     GeneratedSources,
     GenerateSourcesRequest,
-    HydratedSources,
     HydrateSourcesRequest,
-    SourcesPaths,
     SourcesPathsRequest,
-    TransitiveTargets,
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import (
-    SourceRoot,
     SourceRootRequest,
     SourceRootsRequest,
-    SourceRootsResult,
+    get_source_root,
+    get_source_roots,
 )
 from pants.util.dirutil import group_by_dir
 from pants.util.frozendict import FrozenDict
@@ -132,20 +140,20 @@ async def map_import_paths_of_all_go_protobuf_targets(
     _request: ProtobufGoModuleImportPathsMappingsHook,
     all_protobuf_targets: AllProtobufTargets,
 ) -> GoModuleImportPathsMappings:
-    sources = await MultiGet(
-        Get(
-            HydratedSources,
+    sources = await concurrently(
+        hydrate_sources(
             HydrateSourcesRequest(
                 tgt[ProtobufSourceField],
                 for_sources_types=(ProtobufSourceField,),
                 enable_codegen=True,
             ),
+            **implicitly(),
         )
         for tgt in all_protobuf_targets
     )
 
-    all_contents = await MultiGet(
-        Get(DigestContents, Digest, source.snapshot.digest) for source in sources
+    all_contents = await concurrently(
+        get_digest_contents(source.snapshot.digest) for source in sources
     )
 
     go_protobuf_mapping_metadata = []
@@ -162,10 +170,12 @@ async def map_import_paths_of_all_go_protobuf_targets(
         if not import_path:
             continue
 
-        owning_go_mod_gets.append(Get(OwningGoMod, OwningGoModRequest(tgt.address)))
+        owning_go_mod_gets.append(
+            find_owning_go_mod(OwningGoModRequest(tgt.address), **implicitly())
+        )
         go_protobuf_mapping_metadata.append((import_path, tgt.address))
 
-    owning_go_mod_targets = await MultiGet(owning_go_mod_gets)
+    owning_go_mod_targets = await concurrently(owning_go_mod_gets)
 
     import_paths_by_module: dict[Address, dict[str, set[Address]]] = defaultdict(
         lambda: defaultdict(set)
@@ -229,51 +239,58 @@ async def setup_full_package_build_request(
     protoc_relpath = "__protoc"
     protoc_go_plugin_relpath = "__protoc_gen_go"
 
-    transitive_targets, downloaded_protoc_binary, empty_output_dir = await MultiGet(
-        Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses)),
-        Get(DownloadedExternalTool, ExternalToolRequest, protoc.get_request(platform)),
-        Get(Digest, CreateDigest([Directory(output_dir)])),
+    (
+        transitive_targets_for_protobuf_source,
+        downloaded_protoc_binary,
+        empty_output_dir,
+    ) = await concurrently(
+        transitive_targets(TransitiveTargetsRequest(request.addresses), **implicitly()),
+        download_external_tool(protoc.get_request(platform)),
+        create_digest(CreateDigest([Directory(output_dir)])),
     )
 
-    go_mod_addr = await Get(OwningGoMod, OwningGoModRequest(transitive_targets.roots[0].address))
-    package_mapping = await Get(
-        GoModuleImportPathsMapping, GoImportPathMappingRequest(go_mod_addr.address)
+    go_mod_addr = await find_owning_go_mod(
+        OwningGoModRequest(transitive_targets_for_protobuf_source.roots[0].address), **implicitly()
+    )
+    package_mapping = await map_import_paths_to_packages(
+        GoImportPathMappingRequest(go_mod_addr.address), **implicitly()
     )
 
-    all_sources = await Get(
-        SourceFiles,
+    all_sources = await determine_source_files(
         SourceFilesRequest(
             sources_fields=(
                 tgt[ProtobufSourceField]
-                for tgt in transitive_targets.closure
+                for tgt in transitive_targets_for_protobuf_source.closure
                 if tgt.has_field(ProtobufSourceField)
             ),
             for_sources_types=(ProtobufSourceField,),
             enable_codegen=True,
-        ),
+        )
     )
-    source_roots, input_digest = await MultiGet(
-        Get(SourceRootsResult, SourceRootsRequest, SourceRootsRequest.for_files(all_sources.files)),
-        Get(Digest, MergeDigests([all_sources.snapshot.digest, empty_output_dir])),
+    source_roots, input_digest = await concurrently(
+        get_source_roots(SourceRootsRequest.for_files(all_sources.files)),
+        merge_digests(MergeDigests([all_sources.snapshot.digest, empty_output_dir])),
     )
 
     source_root_paths = sorted({sr.path for sr in source_roots.path_to_root.values()})
 
-    pkg_sources = await MultiGet(
-        Get(SourcesPaths, SourcesPathsRequest(tgt[ProtobufSourceField]))
-        for tgt in transitive_targets.roots
+    pkg_sources = await concurrently(
+        resolve_source_paths(SourcesPathsRequest(tgt[ProtobufSourceField]), **implicitly())
+        for tgt in transitive_targets_for_protobuf_source.roots
     )
     pkg_files = sorted({f for ps in pkg_sources for f in ps.files})
 
     maybe_grpc_plugin_args = []
-    if any(tgt.get(ProtobufGrpcToggleField).value for tgt in transitive_targets.roots):
+    if any(
+        tgt.get(ProtobufGrpcToggleField).value
+        for tgt in transitive_targets_for_protobuf_source.roots
+    ):
         maybe_grpc_plugin_args = [
             f"--go-grpc_out={output_dir}",
             "--go-grpc_opt=paths=source_relative",
         ]
 
-    gen_result = await Get(
-        FallibleProcessResult,
+    gen_result = await execute_process(
         Process(
             argv=[
                 os.path.join(protoc_relpath, downloaded_protoc_binary.exe),
@@ -296,6 +313,7 @@ async def setup_full_package_build_request(
             level=LogLevel.DEBUG,
             output_directories=(output_dir,),
         ),
+        **implicitly(),
     )
     if gen_result.exit_code != 0:
         return FallibleBuildGoPackageRequest(
@@ -306,7 +324,7 @@ async def setup_full_package_build_request(
         )
 
     # Ensure that the generated files are in a single package directory.
-    gen_sources = await Get(Snapshot, Digest, gen_result.output_digest)
+    gen_sources = await digest_to_snapshot(gen_result.output_digest)
     files_by_dir = group_by_dir(gen_sources.files)
     if len(files_by_dir) != 1:
         return FallibleBuildGoPackageRequest(
@@ -317,16 +335,15 @@ async def setup_full_package_build_request(
                 f"""
                 Expected Go files generated from Protobuf sources to be output to a single directory.
                 - import path: {request.import_path}
-                - protobuf files: {', '.join(pkg_files)}
+                - protobuf files: {", ".join(pkg_files)}
                 """
             ).strip(),
         )
     gen_dir = list(files_by_dir.keys())[0]
 
     # Analyze the generated sources.
-    input_digest = await Get(Digest, MergeDigests([gen_sources.digest, analyzer.digest]))
-    result = await Get(
-        FallibleProcessResult,
+    input_digest = await merge_digests(MergeDigests([gen_sources.digest, analyzer.digest]))
+    result = await execute_process(
         Process(
             (analyzer.path, gen_dir),
             input_digest=input_digest,
@@ -334,6 +351,7 @@ async def setup_full_package_build_request(
             level=LogLevel.DEBUG,
             env={"CGO_ENABLED": "0"},  # protobuf files should not have cgo!
         ),
+        **implicitly(),
     )
 
     # Parse the metadata from the analysis.
@@ -373,14 +391,16 @@ async def setup_full_package_build_request(
                             f"""
                             Multiple addresses match import of `{dep_import_path}`.
 
-                            addresses: {', '.join(str(a) for a in candidate_addresses.addresses)}
+                            addresses: {", ".join(str(a) for a in candidate_addresses.addresses)}
                             """
                         ).strip(),
                     )
                 dep_build_request_addrs.update(candidate_addresses.addresses)
 
-    dep_build_requests = await MultiGet(
-        Get(BuildGoPackageRequest, BuildGoPackageTargetRequest(addr, build_opts=request.build_opts))
+    dep_build_requests = await concurrently(
+        required_build_go_package_request(
+            **implicitly(BuildGoPackageTargetRequest(addr, build_opts=request.build_opts))
+        )
         for addr in sorted(dep_build_request_addrs)
     )
 
@@ -405,8 +425,10 @@ async def setup_build_go_package_request_for_protobuf(
     request: GoCodegenBuildProtobufRequest,
 ) -> FallibleBuildGoPackageRequest:
     # Hydrate the protobuf source to parse for the Go import path.
-    sources = await Get(HydratedSources, HydrateSourcesRequest(request.target[ProtobufSourceField]))
-    sources_content = await Get(DigestContents, Digest, sources.snapshot.digest)
+    sources = await hydrate_sources(
+        HydrateSourcesRequest(request.target[ProtobufSourceField]), **implicitly()
+    )
+    sources_content = await get_digest_contents(sources.snapshot.digest)
     assert len(sources_content) == 1
     import_path = parse_go_package_option(sources_content[0].content)
     if not import_path:
@@ -417,9 +439,11 @@ async def setup_build_go_package_request_for_protobuf(
             stderr=f"No import path was set in Protobuf file via `option go_package` directive for {request.target.address}.",
         )
 
-    go_mod_addr = await Get(OwningGoMod, OwningGoModRequest(request.target.address))
-    package_mapping = await Get(
-        GoModuleImportPathsMapping, GoImportPathMappingRequest(go_mod_addr.address)
+    go_mod_addr = await find_owning_go_mod(
+        OwningGoModRequest(request.target.address), **implicitly()
+    )
+    package_mapping = await map_import_paths_to_packages(
+        GoImportPathMappingRequest(go_mod_addr.address), **implicitly()
     )
 
     # Request the full build of the package. This indirection is necessary so that requests for two or more
@@ -438,13 +462,13 @@ async def setup_build_go_package_request_for_protobuf(
             ),
         )
 
-    return await Get(
-        FallibleBuildGoPackageRequest,
+    return await setup_full_package_build_request(
         _SetupGoProtobufPackageBuildRequest(
             addresses=protobuf_target_addrs_set_for_import_path.addresses,
             import_path=import_path,
             build_opts=request.build_opts,
         ),
+        **implicitly(),
     )
 
 
@@ -459,30 +483,37 @@ async def generate_go_from_protobuf(
     protoc_relpath = "__protoc"
     protoc_go_plugin_relpath = "__protoc_gen_go"
 
-    downloaded_protoc_binary, empty_output_dir, transitive_targets = await MultiGet(
-        Get(DownloadedExternalTool, ExternalToolRequest, protoc.get_request(platform)),
-        Get(Digest, CreateDigest([Directory(output_dir)])),
-        Get(TransitiveTargets, TransitiveTargetsRequest([request.protocol_target.address])),
+    (
+        downloaded_protoc_binary,
+        empty_output_dir,
+        transitive_targets_for_protobuf_source,
+    ) = await concurrently(
+        download_external_tool(protoc.get_request(platform)),
+        create_digest(CreateDigest([Directory(output_dir)])),
+        transitive_targets(
+            TransitiveTargetsRequest([request.protocol_target.address]), **implicitly()
+        ),
     )
 
     # NB: By stripping the source roots, we avoid having to set the value `--proto_path`
     # for Protobuf imports to be discoverable.
-    all_sources_stripped, target_sources_stripped = await MultiGet(
-        Get(
-            StrippedSourceFiles,
-            SourceFilesRequest(
-                tgt[ProtobufSourceField]
-                for tgt in transitive_targets.closure
-                if tgt.has_field(ProtobufSourceField)
-            ),
+    all_sources_stripped, target_sources_stripped = await concurrently(
+        strip_source_roots(
+            **implicitly(
+                SourceFilesRequest(
+                    tgt[ProtobufSourceField]
+                    for tgt in transitive_targets_for_protobuf_source.closure
+                    if tgt.has_field(ProtobufSourceField)
+                )
+            )
         ),
-        Get(
-            StrippedSourceFiles, SourceFilesRequest([request.protocol_target[ProtobufSourceField]])
+        strip_source_roots(
+            **implicitly(SourceFilesRequest([request.protocol_target[ProtobufSourceField]]))
         ),
     )
 
-    input_digest = await Get(
-        Digest, MergeDigests([all_sources_stripped.snapshot.digest, empty_output_dir])
+    input_digest = await merge_digests(
+        MergeDigests([all_sources_stripped.snapshot.digest, empty_output_dir])
     )
 
     maybe_grpc_plugin_args = []
@@ -492,40 +523,41 @@ async def generate_go_from_protobuf(
             "--go-grpc_opt=paths=source_relative",
         ]
 
-    result = await Get(
-        ProcessResult,
-        Process(
-            argv=[
-                os.path.join(protoc_relpath, downloaded_protoc_binary.exe),
-                f"--plugin=go={os.path.join('.', protoc_go_plugin_relpath, 'protoc-gen-go')}",
-                f"--plugin=go-grpc={os.path.join('.', protoc_go_plugin_relpath, 'protoc-gen-go-grpc')}",
-                f"--go_out={output_dir}",
-                "--go_opt=paths=source_relative",
-                *maybe_grpc_plugin_args,
-                *target_sources_stripped.snapshot.files,
-            ],
-            # Note: Necessary or else --plugin option needs absolute path.
-            env={"PATH": protoc_go_plugin_relpath},
-            input_digest=input_digest,
-            immutable_input_digests={
-                protoc_relpath: downloaded_protoc_binary.digest,
-                protoc_go_plugin_relpath: go_protoc_plugin.digest,
-            },
-            description=f"Generating Go sources from {request.protocol_target.address}.",
-            level=LogLevel.DEBUG,
-            output_directories=(output_dir,),
-        ),
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            Process(
+                argv=[
+                    os.path.join(protoc_relpath, downloaded_protoc_binary.exe),
+                    f"--plugin=go={os.path.join('.', protoc_go_plugin_relpath, 'protoc-gen-go')}",
+                    f"--plugin=go-grpc={os.path.join('.', protoc_go_plugin_relpath, 'protoc-gen-go-grpc')}",
+                    f"--go_out={output_dir}",
+                    "--go_opt=paths=source_relative",
+                    *maybe_grpc_plugin_args,
+                    *target_sources_stripped.snapshot.files,
+                ],
+                # Note: Necessary or else --plugin option needs absolute path.
+                env={"PATH": protoc_go_plugin_relpath},
+                input_digest=input_digest,
+                immutable_input_digests={
+                    protoc_relpath: downloaded_protoc_binary.digest,
+                    protoc_go_plugin_relpath: go_protoc_plugin.digest,
+                },
+                description=f"Generating Go sources from {request.protocol_target.address}.",
+                level=LogLevel.DEBUG,
+                output_directories=(output_dir,),
+            )
+        )
     )
 
-    normalized_digest, source_root = await MultiGet(
-        Get(Digest, RemovePrefix(result.output_digest, output_dir)),
-        Get(SourceRoot, SourceRootRequest, SourceRootRequest.for_target(request.protocol_target)),
+    normalized_digest, source_root = await concurrently(
+        remove_prefix(RemovePrefix(result.output_digest, output_dir)),
+        get_source_root(SourceRootRequest.for_target(request.protocol_target)),
     )
 
     source_root_restored = (
-        await Get(Snapshot, AddPrefix(normalized_digest, source_root.path))
+        await digest_to_snapshot(**implicitly(AddPrefix(normalized_digest, source_root.path)))
         if source_root.path != "."
-        else await Get(Snapshot, Digest, normalized_digest)
+        else await digest_to_snapshot(normalized_digest)
     )
     return GeneratedSources(source_root_restored)
 
@@ -570,48 +602,54 @@ google.golang.org/protobuf v1.27.1/go.mod h1:9q0QmTI4eRPtz6boOQmLYwt+qCgq0jsYwAQ
 
 @rule
 async def setup_go_protoc_plugin() -> _SetupGoProtocPlugin:
-    go_mod_digest = await Get(
-        Digest,
+    go_mod_digest = await create_digest(
         CreateDigest(
             [
                 FileContent("go.mod", GO_PROTOBUF_GO_MOD.encode()),
                 FileContent("go.sum", GO_PROTOBUF_GO_SUM.encode()),
             ]
-        ),
+        )
     )
 
-    download_sources_result = await Get(
-        ProcessResult,
-        GoSdkProcess(
-            ["mod", "download", "all"],
-            input_digest=go_mod_digest,
-            output_directories=("gopath",),
-            description="Download Go `protoc` plugin sources.",
-            allow_downloads=True,
-        ),
+    download_sources_result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            GoSdkProcess(
+                ["mod", "download", "all"],
+                input_digest=go_mod_digest,
+                output_directories=("gopath",),
+                description="Download Go `protoc` plugin sources.",
+                allow_downloads=True,
+            )
+        )
     )
 
-    go_plugin_build_result, go_grpc_plugin_build_result = await MultiGet(
-        Get(
-            ProcessResult,
-            GoSdkProcess(
-                ["install", "google.golang.org/protobuf/cmd/protoc-gen-go@v1.27.1"],
-                input_digest=download_sources_result.output_digest,
-                output_files=["gopath/bin/protoc-gen-go"],
-                description="Build Go protobuf plugin for `protoc`.",
-            ),
+    go_plugin_build_result, go_grpc_plugin_build_result = await concurrently(
+        fallible_to_exec_result_or_raise(
+            **implicitly(
+                GoSdkProcess(
+                    ["install", "google.golang.org/protobuf/cmd/protoc-gen-go@v1.27.1"],
+                    input_digest=download_sources_result.output_digest,
+                    output_files=["gopath/bin/protoc-gen-go"],
+                    description="Build Go protobuf plugin for `protoc`.",
+                    # Allow `go` to contact the Go module proxy since it will run its own build.
+                    allow_downloads=True,
+                )
+            )
         ),
-        Get(
-            ProcessResult,
-            GoSdkProcess(
-                [
-                    "install",
-                    "google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2.0",
-                ],
-                input_digest=download_sources_result.output_digest,
-                output_files=["gopath/bin/protoc-gen-go-grpc"],
-                description="Build Go gRPC protobuf plugin for `protoc`.",
-            ),
+        fallible_to_exec_result_or_raise(
+            **implicitly(
+                GoSdkProcess(
+                    [
+                        "install",
+                        "google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2.0",
+                    ],
+                    input_digest=download_sources_result.output_digest,
+                    output_files=["gopath/bin/protoc-gen-go-grpc"],
+                    description="Build Go gRPC protobuf plugin for `protoc`.",
+                    # Allow `go` to contact the Go module proxy since it will run its own build.
+                    allow_downloads=True,
+                )
+            )
         ),
     )
     if go_plugin_build_result.output_digest == EMPTY_DIGEST:
@@ -627,13 +665,12 @@ async def setup_go_protoc_plugin() -> _SetupGoProtocPlugin:
             f"stderr:\n{go_grpc_plugin_build_result.stderr.decode()}"
         )
 
-    merged_output_digests = await Get(
-        Digest,
+    merged_output_digests = await merge_digests(
         MergeDigests(
             [go_plugin_build_result.output_digest, go_grpc_plugin_build_result.output_digest]
-        ),
+        )
     )
-    plugin_digest = await Get(Digest, RemovePrefix(merged_output_digests, "gopath/bin"))
+    plugin_digest = await remove_prefix(RemovePrefix(merged_output_digests, "gopath/bin"))
     return _SetupGoProtocPlugin(plugin_digest)
 
 

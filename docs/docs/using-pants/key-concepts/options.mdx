@@ -355,13 +355,6 @@ PANTS_SCOPE_OPTION=@path/to/file.json
 pants --scope-option="@path/to/file.json"
 ```
 
-:::caution Gotcha: If you modify the value file, you must manually restart pantsd
-Until we resolve [this issue](https://github.com/pantsbuild/pants/issues/10360), changing
-the value in a file used with the `@` syntax as described above will not invalidate the build.
-For now, if such a file changes you will have to stop pantsd so that it will be restarted on
-the next invocation of pants. To do so, run `rm -r .pants.d/pids/` in the build root.
-:::
-
 ## `.pants.rc` file
 
 You can set up personal Pants config files, using the same TOML syntax as `pants.toml`. By default, Pants looks for the paths `/etc/pantsrc`, `~/.pants.rc`, and `.pants.rc` in the repository root.

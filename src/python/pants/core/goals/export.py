@@ -6,9 +6,10 @@ from __future__ import annotations
 import itertools
 import os
 from collections import defaultdict
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Mapping, Sequence, cast
+from typing import cast
 
 from pants.base.build_root import BuildRoot
 from pants.core.goals.generate_lockfiles import (
@@ -20,7 +21,7 @@ from pants.core.goals.resolves import ExportableTool, ExportMode
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.collection import Collection
 from pants.engine.console import Console
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -32,10 +33,16 @@ from pants.engine.fs import (
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.intrinsics import run_interactive_process
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.internals.selectors import Get, concurrently
+from pants.engine.intrinsics import (
+    add_prefix,
+    create_digest,
+    merge_digests,
+    run_interactive_process,
+)
 from pants.engine.process import InteractiveProcess
-from pants.engine.rules import collect_rules, goal_rule
+from pants.engine.rules import collect_rules, goal_rule, implicitly
 from pants.engine.target import FilteredTargets, Target
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import StrListOption
@@ -190,22 +197,24 @@ async def export(
         raise ExportError("The `export` goal does not take target specs.")
 
     requests = tuple(request_type(targets) for request_type in request_types)
-    all_results = await MultiGet(Get(ExportResults, ExportRequest, request) for request in requests)
+    all_results = await concurrently(
+        Get(ExportResults, ExportRequest, request) for request in requests
+    )
     flattened_results = sorted(
         (res for results in all_results for res in results), key=lambda res: res.resolve or ""
     )  # sorting provides predictable resolution in conflicts
 
-    prefixed_digests = await MultiGet(
-        Get(Digest, AddPrefix(result.digest, result.reldir)) for result in flattened_results
+    prefixed_digests = await concurrently(
+        add_prefix(AddPrefix(result.digest, result.reldir)) for result in flattened_results
     )
     output_dir = os.path.join(str(dist_dir.relpath), "export")
     for result in flattened_results:
         digest_root = os.path.join(build_root.path, output_dir, result.reldir)
         safe_rmtree(digest_root)
-    merged_digest = await Get(Digest, MergeDigests(prefixed_digests))
-    dist_digest = await Get(Digest, AddPrefix(merged_digest, output_dir))
+    merged_digest = await merge_digests(MergeDigests(prefixed_digests))
+    dist_digest = await add_prefix(AddPrefix(merged_digest, output_dir))
     workspace.write_digest(dist_digest)
-    environment = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
+    environment = await environment_vars_subset(EnvironmentVarsRequest(["PATH"]), **implicitly())
     resolves_exported = set()
     for result in flattened_results:
         result_dir = os.path.join(output_dir, result.reldir)
@@ -227,7 +236,7 @@ async def export(
     exported_bins_by_exporting_resolve, link_requests = await link_exported_executables(
         build_root, output_dir, flattened_results
     )
-    link_digest = await Get(Digest, CreateDigest, link_requests)
+    link_digest = await create_digest(link_requests)
     workspace.write_digest(link_digest)
 
     exported_bin_warnings = warn_exported_bin_conflicts(exported_bins_by_exporting_resolve)
@@ -238,7 +247,7 @@ async def export(
         (set(export_subsys.resolve) | set(export_subsys.binaries)) - resolves_exported
     )
     if unexported_resolves:
-        all_known_user_resolve_names = await MultiGet(
+        all_known_user_resolve_names = await concurrently(
             Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())
             for request in union_membership.get(KnownUserResolveNamesRequest)
         )

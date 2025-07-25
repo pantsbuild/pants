@@ -8,14 +8,15 @@ from pants.core.util_rules.source_files import SourceFiles
 from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.fs import DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
+from pants.engine.intrinsics import digest_subset_to_digest, digest_to_snapshot, remove_prefix
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import SourcesPaths
 from pants.source.source_root import (
-    SourceRoot,
     SourceRootRequest,
     SourceRootsRequest,
-    SourceRootsResult,
+    get_source_root,
+    get_source_roots,
 )
 from pants.source.source_root import rules as source_root_rules
 from pants.util.dirutil import fast_relpath
@@ -42,16 +43,14 @@ async def strip_source_roots(source_files: SourceFiles) -> StrippedSourceFiles:
 
     if source_files.unrooted_files:
         rooted_files = set(source_files.snapshot.files) - set(source_files.unrooted_files)
-        rooted_files_snapshot = await Get(
-            Snapshot, DigestSubset(source_files.snapshot.digest, PathGlobs(rooted_files))
+        rooted_files_snapshot = await digest_to_snapshot(
+            **implicitly(DigestSubset(source_files.snapshot.digest, PathGlobs(rooted_files)))
         )
     else:
         rooted_files_snapshot = source_files.snapshot
 
-    source_roots_result = await Get(
-        SourceRootsResult,
-        SourceRootsRequest,
-        SourceRootsRequest.for_files(rooted_files_snapshot.files),
+    source_roots_result = await get_source_roots(
+        SourceRootsRequest.for_files(rooted_files_snapshot.files)
     )
 
     source_roots_to_files = defaultdict(set)
@@ -63,28 +62,27 @@ async def strip_source_roots(source_files: SourceFiles) -> StrippedSourceFiles:
         if source_root == ".":
             resulting_snapshot = rooted_files_snapshot
         else:
-            resulting_snapshot = await Get(
-                Snapshot, RemovePrefix(rooted_files_snapshot.digest, source_root)
+            resulting_snapshot = await digest_to_snapshot(
+                **implicitly(RemovePrefix(rooted_files_snapshot.digest, source_root))
             )
     else:
-        digest_subsets = await MultiGet(
-            Get(Digest, DigestSubset(rooted_files_snapshot.digest, PathGlobs(files)))
+        digest_subsets = await concurrently(
+            digest_subset_to_digest(DigestSubset(rooted_files_snapshot.digest, PathGlobs(files)))
             for files in source_roots_to_files.values()
         )
-        resulting_digests = await MultiGet(
-            Get(Digest, RemovePrefix(digest, source_root))
+        resulting_digests = await concurrently(
+            remove_prefix(RemovePrefix(digest, source_root))
             for digest, source_root in zip(digest_subsets, source_roots_to_files.keys())
         )
-        resulting_snapshot = await Get(Snapshot, MergeDigests(resulting_digests))
+        resulting_snapshot = await digest_to_snapshot(**implicitly(MergeDigests(resulting_digests)))
 
     # Add the unrooted files back in.
     if source_files.unrooted_files:
-        unrooted_files_digest = await Get(
-            Digest,
-            DigestSubset(source_files.snapshot.digest, PathGlobs(source_files.unrooted_files)),
+        unrooted_files_digest = await digest_subset_to_digest(
+            DigestSubset(source_files.snapshot.digest, PathGlobs(source_files.unrooted_files))
         )
-        resulting_snapshot = await Get(
-            Snapshot, MergeDigests((resulting_snapshot.digest, unrooted_files_digest))
+        resulting_snapshot = await digest_to_snapshot(
+            **implicitly(MergeDigests((resulting_snapshot.digest, unrooted_files_digest)))
         )
 
     return StrippedSourceFiles(resulting_snapshot)
@@ -105,9 +103,7 @@ class StrippedFileNameRequest(EngineAwareParameter):
 
 @rule
 async def strip_file_name(request: StrippedFileNameRequest) -> StrippedFileName:
-    source_root = await Get(
-        SourceRoot, SourceRootRequest, SourceRootRequest.for_file(request.file_path)
-    )
+    source_root = await get_source_root(SourceRootRequest.for_file(request.file_path))
     return StrippedFileName(
         request.file_path
         if source_root.path == "."
@@ -126,9 +122,7 @@ class StrippedSourceFileNames(Collection[str]):
 async def strip_sources_paths(sources_paths: SourcesPaths) -> StrippedSourceFileNames:
     if not sources_paths.files:
         return StrippedSourceFileNames()
-    source_root = await Get(
-        SourceRoot, SourceRootRequest, SourceRootRequest.for_file(sources_paths.files[0])
-    )
+    source_root = await get_source_root(SourceRootRequest.for_file(sources_paths.files[0]))
     if source_root.path == ".":
         return StrippedSourceFileNames(sources_paths.files)
     return StrippedSourceFileNames(fast_relpath(f, source_root.path) for f in sources_paths.files)

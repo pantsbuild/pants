@@ -11,11 +11,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import ClassVar, Optional, cast
+from typing import ClassVar, cast
 
 from pants.backend.python.dependency_inference.module_mapper import (
-    PythonModuleOwners,
     PythonModuleOwnersRequest,
+    map_module_to_address,
 )
 from pants.backend.python.dependency_inference.rules import import_rules
 from pants.backend.python.dependency_inference.subsystem import (
@@ -28,34 +28,36 @@ from pants.backend.python.target_types import (
     PexLayout,
     PythonResolveField,
 )
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import CompletePlatforms, Pex, PexPlatforms
+from pants.backend.python.util_rules.pex import (
+    CompletePlatforms,
+    create_pex,
+    digest_complete_platform_addresses,
+)
 from pants.backend.python.util_rules.pex_from_targets import (
     InterpreterConstraintsRequest,
     PexFromTargetsRequest,
+    interpreter_constraints_for_targets,
 )
 from pants.backend.python.util_rules.pex_from_targets import rules as pex_from_targets_rules
-from pants.backend.python.util_rules.pex_venv import PexVenv, PexVenvLayout, PexVenvRequest
+from pants.backend.python.util_rules.pex_venv import PexVenvLayout, PexVenvRequest
+from pants.backend.python.util_rules.pex_venv import pex_venv as pex_venv_get
 from pants.backend.python.util_rules.pex_venv import rules as pex_venv_rules
-from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, OutputPathField
-from pants.engine.addresses import Address, UnparsedAddressInputs
+from pants.engine.addresses import Address
 from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
-    Digest,
     FileContent,
     GlobMatchErrorBehavior,
     PathGlobs,
-    Paths,
-    Snapshot,
 )
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.internals.graph import determine_explicitly_provided_dependencies
+from pants.engine.intrinsics import create_digest, digest_to_snapshot, path_globs_to_paths
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     AsyncFieldMixin,
     Dependencies,
     DependenciesRequest,
-    ExplicitlyProvidedDependencies,
     FieldSet,
     InferDependenciesRequest,
     InferredDependencies,
@@ -65,7 +67,7 @@ from pants.engine.target import (
     StringSequenceField,
 )
 from pants.engine.unions import UnionRule
-from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.source.source_root import SourceRootRequest, get_source_root
 from pants.util.docutil import doc_url
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import help_text, softwrap
@@ -132,7 +134,7 @@ class PythonFaaSHandlerField(StringField, AsyncFieldMixin):
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> str:
+    def compute_value(cls, raw_value: str | None, address: Address) -> str:
         value = cast(str, super().compute_value(raw_value, address))
         if ":" not in value:
             raise InvalidFieldException(
@@ -170,14 +172,14 @@ async def resolve_python_faas_handler(
 
     # Use the engine to validate that the file exists and that it resolves to only one file.
     full_glob = os.path.join(address.spec_path, path)
-    handler_paths = await Get(
-        Paths,
+    handler_paths = await path_globs_to_paths(
         PathGlobs(
             [full_glob],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             description_of_origin=f"{address}'s `{field_alias}` field",
-        ),
+        )
     )
+
     # We will have already raised if the glob did not match, i.e. if there were no files. But
     # we need to check if they used a file glob (`*` or `**`) that resolved to >1 file.
     if len(handler_paths.files) != 1:
@@ -187,11 +189,7 @@ async def resolve_python_faas_handler(
             f"name?\n\nAll matching files: {list(handler_paths.files)}."
         )
     handler_path = handler_paths.files[0]
-    source_root = await Get(
-        SourceRoot,
-        SourceRootRequest,
-        SourceRootRequest.for_file(handler_path),
-    )
+    source_root = await get_source_root(SourceRootRequest.for_file(handler_path))
     stripped_source_path = os.path.relpath(handler_path, source_root.path)
     module_base, _ = os.path.splitext(stripped_source_path)
     normalized_path = module_base.replace(os.path.sep, ".")
@@ -228,12 +226,11 @@ async def infer_faas_handler_dependency(
     if not python_infer_subsystem.entry_points:
         return InferredDependencies([])
 
-    explicitly_provided_deps, handler = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
-        Get(
-            ResolvedPythonFaaSHandler,
-            ResolvePythonFaaSHandlerRequest(request.field_set.handler),
+    explicitly_provided_deps, handler = await concurrently(
+        determine_explicitly_provided_dependencies(
+            **implicitly(DependenciesRequest(request.field_set.dependencies))
         ),
+        resolve_python_faas_handler(ResolvePythonFaaSHandlerRequest(request.field_set.handler)),
     )
 
     # Only set locality if needed, to avoid unnecessary rule graph memoization misses.
@@ -241,18 +238,18 @@ async def infer_faas_handler_dependency(
     # misses than using the full spec_path.
     locality = None
     if python_infer_subsystem.ambiguity_resolution == AmbiguityResolution.by_source_root:
-        source_root = await Get(
-            SourceRoot, SourceRootRequest, SourceRootRequest.for_address(request.field_set.address)
+        source_root = await get_source_root(
+            SourceRootRequest.for_address(request.field_set.address)
         )
         locality = source_root.path
 
-    owners = await Get(
-        PythonModuleOwners,
+    owners = await map_module_to_address(
         PythonModuleOwnersRequest(
             handler.module,
             resolve=request.field_set.resolve.normalized_value(python_setup),
             locality=locality,
         ),
+        **implicitly(),
     )
     address = request.field_set.address
     explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
@@ -351,9 +348,7 @@ def _format_platform_from_major_minor(py_major: int, py_minor: int) -> str:
 async def digest_complete_platforms(
     complete_platforms: PythonFaaSCompletePlatforms,
 ) -> CompletePlatforms:
-    return await Get(
-        CompletePlatforms, UnparsedAddressInputs, complete_platforms.to_unparsed_address_inputs()
-    )
+    return await digest_complete_platform_addresses(complete_platforms.to_unparsed_address_inputs())
 
 
 @dataclass(frozen=True)
@@ -369,12 +364,13 @@ class RuntimePlatformsRequest:
 @dataclass(frozen=True)
 class RuntimePlatforms:
     interpreter_version: None | tuple[int, int]
-    pex_platforms: PexPlatforms = PexPlatforms()
     complete_platforms: CompletePlatforms = CompletePlatforms()
 
 
 async def _infer_from_ics(request: RuntimePlatformsRequest) -> tuple[int, int]:
-    ics = await Get(InterpreterConstraints, InterpreterConstraintsRequest([request.address]))
+    ics = await interpreter_constraints_for_targets(
+        InterpreterConstraintsRequest([request.address]), **implicitly()
+    )
 
     # Future proofing: use naive non-universe-based IC requirement matching to determine if the
     # requirements cover exactly (and all patch versions of) one major.minor interpreter
@@ -418,9 +414,8 @@ async def _infer_from_ics(request: RuntimePlatformsRequest) -> tuple[int, int]:
 async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePlatforms:
     if request.complete_platforms.value is not None:
         # explicit complete platforms wins:
-        complete_platforms = await Get(
-            CompletePlatforms, PythonFaaSCompletePlatforms, request.complete_platforms
-        )
+
+        complete_platforms = await digest_complete_platforms(request.complete_platforms)
         # Don't bother trying to infer the runtime version if the user has provided their own
         # complete platform; they probably know what they're doing.
         return RuntimePlatforms(interpreter_version=None, complete_platforms=complete_platforms)
@@ -445,10 +440,7 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
         known_runtimes_str = ", ".join(
             FrozenOrderedSet(r.name for r in request.runtime.known_runtimes)
         )
-        warn_or_error(
-            # Replace this with an unconditional `InvalidTargetException`
-            "2.26.0.dev0",
-            "implicitly resolving platforms for unknown FaaS runtimes",
+        raise InvalidTargetException(
             softwrap(
                 f"""
                 Could not find a known runtime for the {version_adjective} Python version and machine architecture!
@@ -460,21 +452,20 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
                 To fix, please generate a `complete_platforms` file for the given Python version and
                 machine architecture, or specify a runtime that is known to Pants.
 
-                You can follow the instructions at {doc_url('docs/python/overview/pex#generating-the-complete_platforms-file')}
+                You can follow the instructions at {doc_url("docs/python/overview/pex#generating-the-complete_platforms-file")}
                 to generate a `complete_platforms` file for your Python version and machine
                 architecture.
                 """
             ),
-        )
-        return RuntimePlatforms(
-            interpreter_version=version,
-            pex_platforms=PexPlatforms((_format_platform_from_major_minor(*version),)),
-        )
+            description_of_origin=f"In the {request.target_name!r} target",
+        ) from None
 
     module = request.runtime.known_runtimes_complete_platforms_module()
 
-    content = importlib.resources.read_binary(module, file_name)
-    snapshot = await Get(Snapshot, CreateDigest([FileContent(file_name, content)]))
+    content = (importlib.resources.files(module) / file_name).read_bytes()
+    snapshot = await digest_to_snapshot(
+        **implicitly(CreateDigest([FileContent(file_name, content)]))
+    )
 
     return RuntimePlatforms(
         interpreter_version=version, complete_platforms=CompletePlatforms.from_snapshot(snapshot)
@@ -518,8 +509,7 @@ async def build_python_faas(
         *(request.pex_build_extra_args.value or ()),
     )
 
-    platforms_get = Get(
-        RuntimePlatforms,
+    platforms_get = infer_runtime_platforms(
         RuntimePlatformsRequest(
             address=request.address,
             target_name=request.target_name,
@@ -530,9 +520,9 @@ async def build_python_faas(
     )
 
     if request.handler:
-        platforms, handler = await MultiGet(
+        platforms, handler = await concurrently(
             platforms_get,
-            Get(ResolvedPythonFaaSHandler, ResolvePythonFaaSHandlerRequest(request.handler)),
+            resolve_python_faas_handler(ResolvePythonFaaSHandlerRequest(request.handler)),
         )
     else:
         platforms = await platforms_get
@@ -550,11 +540,10 @@ async def build_python_faas(
         reexported_handler_content = (
             f"from {handler.module} import {handler.func} as {reexported_handler_func}"
         )
-        additional_sources = await Get(
-            Digest,
+        additional_sources = await create_digest(
             CreateDigest(
                 [FileContent(reexported_handler_file, reexported_handler_content.encode())]
-            ),
+            )
         )
     else:
         additional_sources = EMPTY_DIGEST
@@ -567,7 +556,6 @@ async def build_python_faas(
         include_requirements=request.include_requirements,
         include_source_files=request.include_sources,
         output_filename=repository_filename,
-        platforms=platforms.pex_platforms,
         complete_platforms=platforms.complete_platforms,
         layout=PexLayout.PACKED,
         additional_args=additional_pex_args,
@@ -576,7 +564,7 @@ async def build_python_faas(
         warn_for_transitive_files_targets=True,
     )
 
-    pex_result = await Get(Pex, PexFromTargetsRequest, pex_request)
+    pex_result = await create_pex(**implicitly({pex_request: PexFromTargetsRequest}))
 
     layout = PexVenvLayout(request.layout.value)
 
@@ -584,12 +572,10 @@ async def build_python_faas(
         file_ending="zip" if layout is PexVenvLayout.FLAT_ZIPPED else None
     )
 
-    result = await Get(
-        PexVenv,
+    result = await pex_venv_get(
         PexVenvRequest(
             pex=pex_result,
             layout=layout,
-            platforms=platforms.pex_platforms,
             complete_platforms=platforms.complete_platforms,
             extra_args=request.pex3_venv_create_extra_args.value or (),
             prefix=request.prefix_in_artifact,

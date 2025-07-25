@@ -1,6 +1,6 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from typing import Iterator
+from collections.abc import Iterator
 
 from pants.util.pip_requirement import PipRequirement
 
@@ -16,5 +16,10 @@ def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[PipRequi
         line = line.strip().rstrip("\\")
         if not line or line.startswith(("#", "-")):
             continue
+
+        # Strip comments which are otherwise on a valid requirement line.
+        comment_pos = line.find("#")
+        if comment_pos != -1:
+            line = line[0:comment_pos].strip()
 
         yield PipRequirement.parse(line, description_of_origin=f"{rel_path} at line {i}")

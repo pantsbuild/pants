@@ -2,10 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Tuple
 
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.env_vars import EnvironmentVarsRequest
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
@@ -30,7 +30,7 @@ class SubprocessEnvironment(Subsystem):
                 Entries are either strings in the form `ENV_VAR=value` to set an explicit value;
                 or just `ENV_VAR` to copy the value from Pants's own environment.
 
-                See {doc_url('docs/using-pants/key-concepts/options#addremove-semantics')} for how to add and remove Pants's
+                See {doc_url("docs/using-pants/key-concepts/options#addremove-semantics")} for how to add and remove Pants's
                 default for this option.
                 """
             ),
@@ -38,7 +38,7 @@ class SubprocessEnvironment(Subsystem):
         )
 
         @property
-        def env_vars_to_pass_to_subprocesses(self) -> Tuple[str, ...]:
+        def env_vars_to_pass_to_subprocesses(self) -> tuple[str, ...]:
             return tuple(sorted(set(self._env_vars)))
 
 
@@ -52,8 +52,8 @@ async def get_subprocess_environment(
     subproc_env: SubprocessEnvironment.EnvironmentAware,
 ) -> SubprocessEnvironmentVars:
     return SubprocessEnvironmentVars(
-        await Get(
-            EnvironmentVars, EnvironmentVarsRequest(subproc_env.env_vars_to_pass_to_subprocesses)
+        await environment_vars_subset(
+            EnvironmentVarsRequest(subproc_env.env_vars_to_pass_to_subprocesses), **implicitly()
         )
     )
 

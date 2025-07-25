@@ -3,25 +3,25 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, DefaultDict, Generic, Iterable, Mapping, TypeVar, cast, overload
+from typing import Any, Generic, TypeVar, cast, overload
 
-from pants.util.frozendict import FrozenDict
+from pants.engine.internals.native_engine import (  # noqa: F401 # re-export
+    UnionMembership as UnionMembership,
+)
+from pants.engine.internals.native_engine import UnionRule as UnionRule  # noqa: F401 # re-export
 from pants.util.memo import memoized_method
-from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 _T = TypeVar("_T", bound=type)
 
 
 @overload
-def union(cls: _T, *, in_scope_types: None = None) -> _T:
-    ...
+def union(cls: _T, *, in_scope_types: None = None) -> _T: ...
 
 
 @overload
-def union(cls: None = None, *, in_scope_types: list[type]) -> Callable[[_T], _T]:
-    ...
+def union(cls: None = None, *, in_scope_types: list[type]) -> Callable[[_T], _T]: ...
 
 
 def union(
@@ -31,10 +31,9 @@ def union(
     polymorphism.
 
     Annotating a class with @union allows other classes to register a `UnionRule(BaseClass,
-    MemberClass)`. Then, you can use `await Get(Output, UnionBase, concrete_union_member)`. This
-    would be similar to writing `UnionRule(Output, ConcreteUnionMember,
-    concrete_union_member_instance)`, but allows you to write generic code without knowing what
-    concrete classes might later implement that union.
+    MemberClass)`. Then, you can use `Get(Output, BaseClass, member_class_instance)`. This
+    would be similar to writing `Get(Output, MemberClass, member_class_instance)`, but allows you
+    to write generic code without knowing what concrete classes might later implement that union.
 
     Often, union bases are abstract classes, but they need not be.
 
@@ -44,7 +43,7 @@ def union(
     which must already be in scope at callsites where the `@union` is used in a `Get`, and
     which are propagated to the callee.
 
-    See https://www.pantsbuild.org/docs/rules-api-unions.
+    See https://www.pantsbuild.org/stable/docs/writing-plugins/the-rules-api/union-rules-advanced.
     """
 
     def decorator(cls: _T) -> _T:
@@ -78,85 +77,6 @@ def union_in_scope_types(input_type: type) -> tuple[type, ...] | None:
 
 
 @dataclass(frozen=True)
-class UnionRule:
-    """Specify that an instance of `union_member` can be substituted wherever `union_base` is
-    used."""
-
-    union_base: type
-    union_member: type
-
-    def __post_init__(self) -> None:
-        if not is_union(self.union_base):
-            msg = (
-                f"The first argument must be a class annotated with @union "
-                f"(from pants.engine.unions), but was {self.union_base}."
-            )
-            if is_union(self.union_member):
-                msg += (
-                    "\n\nHowever, the second argument was annotated with `@union`. Did you "
-                    "switch the first and second arguments to `UnionRule()`?"
-                )
-            raise ValueError(msg)
-
-
-@dataclass(frozen=True)
-class UnionMembership:
-    union_rules: FrozenDict[type, FrozenOrderedSet[type]]
-
-    @classmethod
-    def from_rules(cls, rules: Iterable[UnionRule]) -> UnionMembership:
-        mapping: DefaultDict[type, OrderedSet[type]] = defaultdict(OrderedSet)
-        for rule in rules:
-            mapping[rule.union_base].add(rule.union_member)
-
-        return cls(mapping)
-
-    def __init__(self, union_rules: Mapping[type, Iterable[type]]) -> None:
-        object.__setattr__(
-            self,
-            "union_rules",
-            FrozenDict({base: FrozenOrderedSet(members) for base, members in union_rules.items()}),
-        )
-
-    def __contains__(self, union_type: _T) -> bool:
-        return union_type in self.union_rules
-
-    def __getitem__(self, union_type: _T) -> FrozenOrderedSet[_T]:
-        """Get all members of this union type.
-
-        If the union type does not exist because it has no members registered, this will raise an
-        IndexError.
-
-        Note that the type hint assumes that all union members will have subclassed the union type
-        - this is only a convention and is not actually enforced. So, you may have inaccurate type
-        hints.
-        """
-        return self.union_rules[union_type]  # type: ignore[return-value]
-
-    def get(self, union_type: _T) -> FrozenOrderedSet[_T]:
-        """Get all members of this union type.
-
-        If the union type does not exist because it has no members registered, return an empty
-        FrozenOrderedSet.
-
-        Note that the type hint assumes that all union members will have subclassed the union type
-        - this is only a convention and is not actually enforced. So, you may have inaccurate type
-        hints.
-        """
-        return self.union_rules.get(union_type, FrozenOrderedSet())  # type: ignore[return-value]
-
-    def is_member(self, union_type: type, putative_member: type) -> bool:
-        members = self.union_rules.get(union_type)
-        if members is None:
-            raise TypeError(f"Not a registered union type: {union_type}")
-        return type(putative_member) in members
-
-    def has_members(self, union_type: type) -> bool:
-        """Check whether the union has an implementation or not."""
-        return bool(self.union_rules.get(union_type))
-
-
-@dataclass(frozen=True)
 class _DistinctUnionTypePerSubclassGetter(Generic[_T]):
     _class: _T
     _in_scope_types: list[type] | None
@@ -183,15 +103,13 @@ class _DistinctUnionTypePerSubclassGetter(Generic[_T]):
 
 
 @overload
-def distinct_union_type_per_subclass(cls: _T, *, in_scope_types: None = None) -> _T:
-    ...
+def distinct_union_type_per_subclass(cls: _T, *, in_scope_types: None = None) -> _T: ...
 
 
 @overload
 def distinct_union_type_per_subclass(
     cls: None = None, *, in_scope_types: list[type]
-) -> Callable[[_T], _T]:
-    ...
+) -> Callable[[_T], _T]: ...
 
 
 def distinct_union_type_per_subclass(

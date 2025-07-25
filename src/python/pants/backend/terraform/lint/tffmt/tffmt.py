@@ -8,15 +8,14 @@ from typing import cast
 
 from pants.backend.terraform.partition import partition_files_by_directory
 from pants.backend.terraform.target_types import TerraformFieldSet
-from pants.backend.terraform.tool import TerraformProcess
+from pants.backend.terraform.tool import TerraformCommand, TerraformProcess
 from pants.backend.terraform.tool import rules as tool_rules
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.partitions import Partition
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.internals.selectors import Get
-from pants.engine.process import ProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
+from pants.engine.process import fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import pluralize
@@ -53,8 +52,8 @@ async def partition_tffmt(
     if tffmt.skip:
         return Partitions()
 
-    source_files = await Get(
-        SourceFiles, SourceFilesRequest([field_set.sources for field_set in request.field_sets])
+    source_files = await determine_source_files(
+        SourceFilesRequest([field_set.sources for field_set in request.field_sets])
     )
 
     return Partitions(
@@ -66,14 +65,22 @@ async def partition_tffmt(
 @rule(desc="Format with `terraform fmt`")
 async def tffmt_fmt(request: TffmtRequest.Batch, tffmt: TfFmtSubsystem) -> FmtResult:
     directory = cast(PartitionMetadata, request.partition_metadata).directory
-    result = await Get(
-        ProcessResult,
-        TerraformProcess(
-            args=("fmt", directory),
-            input_digest=request.snapshot.digest,
-            output_files=request.files,
-            description=f"Run `terraform fmt` on {pluralize(len(request.files), 'file')}.",
-        ),
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            TerraformProcess(
+                cmds=(
+                    TerraformCommand(
+                        (
+                            "fmt",
+                            directory,
+                        )
+                    ),
+                ),
+                input_digest=request.snapshot.digest,
+                output_files=request.files,
+                description=f"Run `terraform fmt` on {pluralize(len(request.files), 'file')}.",
+            )
+        )
     )
 
     return await FmtResult.create(request, result)

@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::borrow::Cow;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
@@ -15,7 +15,8 @@ use pyo3::pybacked::PyBackedStr;
 use pyo3::types::{PyDict, PyFrozenSet, PyType};
 
 use fnv::FnvHasher;
-use lazy_static::lazy_static;
+
+use crate::python::PyComparedBool;
 
 create_exception!(native_engine, AddressParseException, PyException);
 create_exception!(native_engine, InvalidAddressError, AddressParseException);
@@ -29,27 +30,24 @@ pub fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     m.add(
         "AddressParseException",
-        py.get_type_bound::<AddressParseException>(),
+        py.get_type::<AddressParseException>(),
     )?;
-    m.add(
-        "InvalidAddressError",
-        py.get_type_bound::<InvalidAddressError>(),
-    )?;
+    m.add("InvalidAddressError", py.get_type::<InvalidAddressError>())?;
     m.add(
         "InvalidSpecPathError",
-        py.get_type_bound::<InvalidSpecPathError>(),
+        py.get_type::<InvalidSpecPathError>(),
     )?;
     m.add(
         "InvalidTargetNameError",
-        py.get_type_bound::<InvalidTargetNameError>(),
+        py.get_type::<InvalidTargetNameError>(),
     )?;
     m.add(
         "InvalidParametersError",
-        py.get_type_bound::<InvalidParametersError>(),
+        py.get_type::<InvalidParametersError>(),
     )?;
     m.add(
         "UnsupportedWildcardError",
-        py.get_type_bound::<UnsupportedWildcardError>(),
+        py.get_type::<UnsupportedWildcardError>(),
     )?;
 
     m.add_class::<AddressInput>()?;
@@ -57,29 +55,24 @@ pub fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     m.add(
         "BANNED_CHARS_IN_TARGET_NAME",
-        PyFrozenSet::new_bound(py, BANNED_CHARS_IN_TARGET_NAME.iter())?,
+        PyFrozenSet::new(py, BANNED_CHARS_IN_TARGET_NAME.iter())?,
     )?;
     m.add(
         "BANNED_CHARS_IN_GENERATED_NAME",
-        PyFrozenSet::new_bound(py, BANNED_CHARS_IN_GENERATED_NAME.iter())?,
+        PyFrozenSet::new(py, BANNED_CHARS_IN_GENERATED_NAME.iter())?,
     )?;
     m.add(
         "BANNED_CHARS_IN_PARAMETERS",
-        PyFrozenSet::new_bound(py, BANNED_CHARS_IN_PARAMETERS.iter())?,
+        PyFrozenSet::new(py, BANNED_CHARS_IN_PARAMETERS.iter())?,
     )?;
 
     Ok(())
 }
 
-lazy_static! {
-  // `:`, `#`, `@` are used as delimiters already. Others are reserved for possible future needs.
-  pub static ref BANNED_CHARS_IN_TARGET_NAME: HashSet<char> =
-    [':', '#', '!', '@', '?', '/', '\\', '='].into();
-  pub static ref BANNED_CHARS_IN_GENERATED_NAME: HashSet<char> =
-    [':', '#', '!', '@', '?', '='].into();
-  pub static ref BANNED_CHARS_IN_PARAMETERS: HashSet<char> =
-    [':', '#', '!', '@', '?', '=', ',', ' '].into();
-}
+// `:`, `#`, `@` are used as delimiters already. Others are reserved for possible future needs.
+pub static BANNED_CHARS_IN_TARGET_NAME: [char; 8] = [':', '#', '!', '@', '?', '/', '\\', '='];
+pub static BANNED_CHARS_IN_GENERATED_NAME: [char; 6] = [':', '#', '!', '@', '?', '='];
+pub static BANNED_CHARS_IN_PARAMETERS: [char; 8] = [':', '#', '!', '@', '?', '=', ',', ' '];
 
 #[pyclass(name = "AddressInput")]
 #[derive(Debug, Hash, Eq, PartialEq)]
@@ -256,8 +249,17 @@ impl AddressInput {
     }
 
     #[getter]
-    fn path_component(&self) -> &Path {
-        &self.path_component
+    fn path_component(&self) -> PyResult<String> {
+        self.path_component
+            .as_os_str()
+            .to_str()
+            .map(|s| s.to_string())
+            .ok_or_else(|| {
+                PyException::new_err(format!(
+                    "Could not convert AddressInput.path_component `{}` to UTF8.",
+                    self.path_component.display()
+                ))
+            })
     }
 
     #[getter]
@@ -304,13 +306,13 @@ impl AddressInput {
                     // AddressSpec constructor because we weren't sure if the path_spec referred to a file
                     // vs. a directory.
                     return Err(InvalidTargetNameError::new_err(format!(
-            "Addresses for generated first-party targets in the build root must include \
+                        "Addresses for generated first-party targets in the build root must include \
              which target generator they come from, such as `{}:original_target`. However, \
              `{}` from {} did not have a target name.",
-            self.path_component.display(),
-            self.original_spec,
-            self.description_of_origin,
-          )));
+                        self.path_component.display(),
+                        self.original_spec,
+                        self.description_of_origin,
+                    )));
                 }
             }
         };
@@ -409,12 +411,12 @@ impl AddressInput {
         format!("{self:?}")
     }
 
-    fn __richcmp__(&self, other: &Self, op: CompareOp, py: Python) -> PyObject {
-        match op {
-            CompareOp::Eq => (self == other).into_py(py),
-            CompareOp::Ne => (self != other).into_py(py),
-            _ => py.NotImplemented(),
-        }
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> PyComparedBool {
+        PyComparedBool(match op {
+            CompareOp::Eq => Some(self == other),
+            CompareOp::Ne => Some(self != other),
+            _ => None,
+        })
     }
 }
 
@@ -479,12 +481,12 @@ impl Address {
                 .collect::<Vec<_>>();
             if !banned.is_empty() {
                 return Err(InvalidTargetNameError::new_err(format!(
-          "The generated name `{generated_name}` (defined in directory {}, the part after \
+                    "The generated name `{generated_name}` (defined in directory {}, the part after \
           `#`) contains banned characters (`{}`). Please replace \
            these characters with another separator character like `_`, `-`, or `/`.",
-          spec_path.display(),
-          banned.join(","),
-        )));
+                    spec_path.display(),
+                    banned.join(","),
+                )));
             }
         }
 
@@ -536,8 +538,17 @@ impl Address {
     }
 
     #[getter]
-    fn spec_path(&self) -> &Path {
-        &self.spec_path
+    fn spec_path(&self) -> PyResult<String> {
+        self.spec_path
+            .as_os_str()
+            .to_str()
+            .map(|s| s.to_string())
+            .ok_or_else(|| {
+                PyException::new_err(format!(
+                    "Could not convert Address.spec_path `{}` to UTF8.",
+                    self.spec_path.display()
+                ))
+            })
     }
 
     #[getter]
@@ -546,8 +557,21 @@ impl Address {
     }
 
     #[getter]
-    fn relative_file_path(&self) -> Option<&Path> {
-        self.relative_file_path.as_deref()
+    fn relative_file_path(&self) -> PyResult<Option<String>> {
+        match &self.relative_file_path {
+            Some(p) => Ok(Some(
+                p.as_os_str()
+                    .to_str()
+                    .map(|s| s.to_string())
+                    .ok_or_else(|| {
+                        PyException::new_err(format!(
+                            "Could not convert Address.relative_file_path `{}` to UTF8.",
+                            self.relative_file_path.as_ref().unwrap().display()
+                        ))
+                    })?,
+            )),
+            None => Ok(None),
+        }
     }
 
     #[getter]
@@ -580,9 +604,19 @@ impl Address {
     }
 
     #[getter]
-    fn filename(&self) -> PyResult<PathBuf> {
+    fn filename(&self) -> PyResult<String> {
         if let Some(relative_file_path) = self.relative_file_path.as_ref() {
-            Ok(self.spec_path.join(relative_file_path))
+            let full_path = self.spec_path.join(relative_file_path);
+            full_path
+                .as_os_str()
+                .to_str()
+                .map(|s| s.to_string())
+                .ok_or_else(|| {
+                    PyException::new_err(format!(
+                        "Could not convert Address.path_component `{}` to UTF8.",
+                        full_path.display()
+                    ))
+                })
         } else {
             Err(PyException::new_err(format!(
                 "Only a file Address (`self.is_file_target`) has a filename: {self}",
@@ -734,19 +768,21 @@ impl Address {
         }
     }
 
-    fn maybe_convert_to_target_generator(self_: PyRef<Self>, py: Python) -> PyObject {
+    fn maybe_convert_to_target_generator(self_: PyRef<Self>, py: Python) -> PyResult<PyObject> {
         if !self_.is_generated_target() && !self_.is_parametrized() {
-            return self_.into_py(py);
+            return Ok(self_.into_pyobject(py)?.into_any().unbind());
         }
 
-        Self {
+        Ok(Self {
             spec_path: self_.spec_path.clone(),
             target_name: self_.target_name.clone(),
             parameters: BTreeMap::default(),
             generated_name: None,
             relative_file_path: None,
         }
-        .into_py(py)
+        .into_pyobject(py)?
+        .into_any()
+        .unbind())
     }
 
     fn create_generated(&self, generated_name: String) -> PyResult<Self> {
@@ -786,7 +822,7 @@ impl Address {
     }
 
     fn metadata<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
-        let dict = PyDict::new_bound(py);
+        let dict = PyDict::new(py);
         dict.set_item(pyo3::intern!(py, "address"), self.spec())?;
         Ok(dict)
     }

@@ -2,20 +2,20 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import PurePath
-from typing import Mapping
 
 import pytest
 
-from pants.core.util_rules import asdf
-from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult, get_asdf_data_dir
-from pants.core.util_rules.environments import (
+from pants.core.environments.target_types import (
     DockerEnvironmentTarget,
     DockerImageField,
     EnvironmentTarget,
     LocalEnvironmentTarget,
     RemoteEnvironmentTarget,
 )
+from pants.core.util_rules import asdf
+from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult, get_asdf_data_dir
 from pants.core.util_rules.testutil import fake_asdf_root, materialize_indices
 from pants.engine.addresses import Address
 from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars
@@ -73,10 +73,12 @@ def get_asdf_paths(
     ),
 )
 def test_get_asdf_paths(
-    env_tgt_type: type[LocalEnvironmentTarget]
-    | type[DockerEnvironmentTarget]
-    | type[RemoteEnvironmentTarget]
-    | None,
+    env_tgt_type: (
+        type[LocalEnvironmentTarget]
+        | type[DockerEnvironmentTarget]
+        | type[RemoteEnvironmentTarget]
+        | None
+    ),
     should_have_values: bool,
 ) -> None:
     # 3.9.4 is intentionally "left out" so that it's only found if the "all installs" fallback is

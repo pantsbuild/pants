@@ -6,15 +6,16 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+from collections.abc import Callable, Iterator
 from functools import partial
 from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import Any, Callable, Iterator
+from typing import Any
 
 import pytest
 
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException, MaybeGitBinary
-from pants.engine.rules import Get, rule
+from pants.engine.rules import implicitly, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.contextutil import environment_as, pushd
 from pants.util.dirutil import touch
@@ -455,7 +456,7 @@ def test_worktree_invalidation(origin: Path) -> None:
 
         @rule
         async def worktree_id_string() -> str:
-            worktree = await Get(MaybeGitWorktree, GitWorktreeRequest())
+            worktree = await get_git_worktree(GitWorktreeRequest(), **implicitly())
             return str(id(worktree))
 
         rule_runner = RuleRunner(
@@ -597,9 +598,21 @@ def test_worktree_invalidation(origin: Path) -> None:
             ),
             {"empty": (Hunk(None, TextBlock(0, 0)),)},
         ],
+        [
+            (
+                b"diff --git a/file.txt b/file.txt\n"
+                b"index e69de29..9daeafb 100644\n"
+                b"--- a/file.txt\n"
+                b"+++ b/file.txt\n"
+                b"@@ -1 +1 @@\n"
+                b"-test\n"
+                b"+test\x90\n"
+            ),
+            {"file.txt": (Hunk(TextBlock(1, 1), TextBlock(1, 1)),)},
+        ],
     ],
 )
 def test_parse_unified_diff(diff, expected):
     wt = DiffParser()
-    actual = wt.parse_unified_diff(diff)
+    actual = wt.parse_unified_diff(diff.encode() if isinstance(diff, str) else diff)
     assert expected == actual

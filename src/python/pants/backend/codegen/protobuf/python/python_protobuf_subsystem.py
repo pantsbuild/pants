@@ -10,8 +10,8 @@ from pants.backend.codegen.protobuf.target_types import (
 )
 from pants.backend.codegen.utils import find_python_runtime_library_or_raise_error
 from pants.backend.python.dependency_inference.module_mapper import (
-    PythonModuleOwners,
     PythonModuleOwnersRequest,
+    map_module_to_address,
 )
 from pants.backend.python.dependency_inference.subsystem import (
     AmbiguityResolution,
@@ -19,12 +19,12 @@ from pants.backend.python.dependency_inference.subsystem import (
 )
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
 from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
-from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.source.source_root import SourceRootRequest, get_source_root
 from pants.util.docutil import doc_url
 from pants.util.strutil import help_text, softwrap
 
@@ -35,7 +35,7 @@ class PythonProtobufSubsystem(Subsystem):
         f"""
         Options related to the Protobuf Python backend.
 
-        See {doc_url('docs/python/integrations/protobuf-and-grpc')}.
+        See {doc_url("docs/python/integrations/protobuf-and-grpc")}.
         """
     )
 
@@ -59,12 +59,28 @@ class PythonProtobufSubsystem(Subsystem):
         ),
     )
 
+    generate_type_stubs = BoolOption(
+        default=False,
+        mutually_exclusive_group="typestubs",
+        help=softwrap(
+            """
+            If True, then configure `protoc` to also generate `.pyi` type stubs for each generated
+            Python file. This option will work wih any recent version of `protoc` and should
+            be preferred over the `--python-protobuf-mypy-plugin` option.
+            """
+        ),
+    )
+
     mypy_plugin = BoolOption(
         default=False,
+        mutually_exclusive_group="typestubs",
         help=softwrap(
             """
             Use the `mypy-protobuf` plugin (https://github.com/dropbox/mypy-protobuf) to also
             generate `.pyi` type stubs.
+
+            Please prefer the `--python-protobuf-generate-type-stubs` option over this option
+            since recent versions of `protoc` have the ability to directly generate type stubs.
             """
         ),
     )
@@ -144,19 +160,19 @@ async def infer_dependencies(
 
     locality = None
     if python_infer_subsystem.ambiguity_resolution == AmbiguityResolution.by_source_root:
-        source_root = await Get(
-            SourceRoot, SourceRootRequest, SourceRootRequest.for_address(request.field_set.address)
+        source_root = await get_source_root(
+            SourceRootRequest.for_address(request.field_set.address)
         )
         locality = source_root.path
 
     result = []
-    addresses_for_protobuf = await Get(
-        PythonModuleOwners,
+    addresses_for_protobuf = await map_module_to_address(
         PythonModuleOwnersRequest(
             "google.protobuf",
             resolve=resolve,
             locality=locality,
         ),
+        **implicitly(),
     )
 
     result.append(
@@ -174,13 +190,13 @@ async def infer_dependencies(
 
     if request.field_set.grpc_toggle.value:
         if python_protobuf.grpcio_plugin:
-            addresses_for_grpc = await Get(
-                PythonModuleOwners,
+            addresses_for_grpc = await map_module_to_address(
                 PythonModuleOwnersRequest(
                     "grpc",
                     resolve=resolve,
                     locality=locality,
                 ),
+                **implicitly(),
             )
 
             result.append(
@@ -198,13 +214,13 @@ async def infer_dependencies(
             )
 
         if python_protobuf.grpclib_plugin:
-            addresses_for_grpclib = await Get(
-                PythonModuleOwners,
+            addresses_for_grpclib = await map_module_to_address(
                 PythonModuleOwnersRequest(
                     "grpclib",
                     resolve=resolve,
                     locality=locality,
                 ),
+                **implicitly(),
             )
 
             result.append(

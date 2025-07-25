@@ -4,20 +4,21 @@
 from __future__ import annotations
 
 import configparser
+from collections.abc import MutableMapping
 from dataclasses import dataclass
 from enum import Enum
 from io import StringIO
 from pathlib import PurePath
-from typing import Any, MutableMapping, cast
+from typing import Any, cast
 
 import toml
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import VenvPex, VenvPexProcess, create_venv_pex
 from pants.backend.python.util_rules.python_sources import (
-    PythonSourceFiles,
     PythonSourceFilesRequest,
+    prepare_python_sources,
 )
 from pants.core.goals.resolves import ExportableTool
 from pants.core.goals.test import (
@@ -28,7 +29,7 @@ from pants.core.goals.test import (
     CoverageReports,
     FilesystemCoverageReport,
 )
-from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.core.util_rules.config_files import ConfigFilesRequest, find_config_file
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address
 from pants.engine.fs import (
@@ -36,15 +37,24 @@ from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
     Digest,
-    DigestContents,
     FileContent,
     MergeDigests,
     PathGlobs,
     Snapshot,
 )
-from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.internals.graph import transitive_targets as transitive_targets_get
+from pants.engine.intrinsics import (
+    add_prefix,
+    create_digest,
+    digest_to_snapshot,
+    execute_process,
+    get_digest_contents,
+    merge_digests,
+    path_globs_to_digest,
+)
+from pants.engine.process import ProcessExecutionFailure, fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
+from pants.engine.target import TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.global_options import KeepSandboxes
 from pants.option.option_types import (
@@ -336,9 +346,9 @@ def get_namespace_value_from_config(fc: FileContent) -> bool:
 
 @rule
 async def create_or_update_coverage_config(coverage: CoverageSubsystem) -> CoverageConfig:
-    config_files = await Get(ConfigFiles, ConfigFilesRequest, coverage.config_request)
+    config_files = await find_config_file(coverage.config_request)
     if config_files.snapshot.files:
-        digest_contents = await Get(DigestContents, Digest, config_files.snapshot.digest)
+        digest_contents = await get_digest_contents(config_files.snapshot.digest)
         file_content = _update_config(digest_contents[0])
     else:
         cp = configparser.ConfigParser()
@@ -349,7 +359,7 @@ async def create_or_update_coverage_config(coverage: CoverageSubsystem) -> Cover
         cp.write(stream)
         # We know that .coveragerc doesn't exist, so it's fine to create one.
         file_content = FileContent(".coveragerc", stream.getvalue().encode())
-    digest = await Get(Digest, CreateDigest([file_content]))
+    digest = await create_digest(CreateDigest([file_content]))
     return CoverageConfig(digest, file_content.path)
 
 
@@ -360,7 +370,7 @@ class CoverageSetup:
 
 @rule
 async def setup_coverage(coverage: CoverageSubsystem) -> CoverageSetup:
-    pex = await Get(VenvPex, PexRequest, coverage.to_pex_request())
+    pex = await create_venv_pex(**implicitly(coverage.to_pex_request()))
     return CoverageSetup(pex)
 
 
@@ -384,10 +394,10 @@ async def merge_coverage_data(
     for data in data_collection:
         path_prefix = data.addresses[0].path_safe_spec
         if len(data.addresses) > 1:
-            path_prefix = f"{path_prefix}+{len(data.addresses)-1}-others"
+            path_prefix = f"{path_prefix}+{len(data.addresses) - 1}-others"
 
         # We prefix each .coverage file with its corresponding address to avoid collisions.
-        coverage_digest_gets.append(Get(Digest, AddPrefix(data.digest, prefix=path_prefix)))
+        coverage_digest_gets.append(add_prefix(AddPrefix(data.digest, prefix=path_prefix)))
         coverage_data_file_paths.append(f"{path_prefix}/.coverage")
         addresses.extend(data.addresses)
 
@@ -396,7 +406,7 @@ async def merge_coverage_data(
         # have when running on real inputs, so that the reports are of the same type, and can be
         # merged successfully. Otherwise we may get "Can't combine arc data with line data" errors.
         # See https://github.com/pantsbuild/pants/issues/14542 .
-        config_contents = await Get(DigestContents, Digest, coverage_config.digest)
+        config_contents = await get_digest_contents(coverage_config.digest)
         branch = get_branch_value_from_config(config_contents[0]) if config_contents else False
         namespace_packages = (
             get_namespace_value_from_config(config_contents[0]) if config_contents else False
@@ -428,14 +438,12 @@ async def merge_coverage_data(
 
         no_op_exe_py_path = global_coverage_base_dir / "no-op-exe.py"
 
-        all_sources_digest, no_op_exe_py_digest, global_coverage_config_digest = await MultiGet(
-            Get(
-                Digest,
-                PathGlobs(globs=[f"{source_root.path}/**/*.py" for source_root in source_roots]),
+        all_sources_digest, no_op_exe_py_digest, global_coverage_config_digest = await concurrently(
+            path_globs_to_digest(
+                PathGlobs(globs=[f"{source_root.path}/**/*.py" for source_root in source_roots])
             ),
-            Get(Digest, CreateDigest([FileContent(path=str(no_op_exe_py_path), content=b"")])),
-            Get(
-                Digest,
+            create_digest(CreateDigest([FileContent(path=str(no_op_exe_py_path), content=b"")])),
+            create_digest(
                 CreateDigest(
                     [
                         FileContent(
@@ -443,50 +451,55 @@ async def merge_coverage_data(
                             content=global_coverage_config_content,
                         ),
                     ]
-                ),
+                )
             ),
         )
-        extra_sources_digest = await Get(
-            Digest, MergeDigests((all_sources_digest, no_op_exe_py_digest))
+        extra_sources_digest = await merge_digests(
+            MergeDigests((all_sources_digest, no_op_exe_py_digest))
         )
-        input_digest = await Get(
-            Digest, MergeDigests((extra_sources_digest, global_coverage_config_digest))
+        input_digest = await merge_digests(
+            MergeDigests((extra_sources_digest, global_coverage_config_digest))
         )
-        result = await Get(
-            ProcessResult,
-            VenvPexProcess(
-                coverage_setup.pex,
-                argv=("run", "--rcfile", str(global_coverage_config_path), str(no_op_exe_py_path)),
-                input_digest=input_digest,
-                output_files=(".coverage",),
-                description="Create base global Pytest coverage report.",
-                level=LogLevel.DEBUG,
-            ),
+        result = await fallible_to_exec_result_or_raise(
+            **implicitly(
+                VenvPexProcess(
+                    coverage_setup.pex,
+                    argv=(
+                        "run",
+                        "--rcfile",
+                        str(global_coverage_config_path),
+                        str(no_op_exe_py_path),
+                    ),
+                    input_digest=input_digest,
+                    output_files=(".coverage",),
+                    description="Create base global Pytest coverage report.",
+                    level=LogLevel.DEBUG,
+                )
+            )
         )
         coverage_digest_gets.append(
-            Get(
-                Digest, AddPrefix(digest=result.output_digest, prefix=str(global_coverage_base_dir))
-            )
+            add_prefix(AddPrefix(digest=result.output_digest, prefix=str(global_coverage_base_dir)))
         )
         coverage_data_file_paths.append(str(global_coverage_base_dir / ".coverage"))
     else:
         extra_sources_digest = EMPTY_DIGEST
 
-    input_digest = await Get(Digest, MergeDigests(await MultiGet(coverage_digest_gets)))
-    result = await Get(
-        ProcessResult,
-        VenvPexProcess(
-            coverage_setup.pex,
-            # We tell combine to keep the original input files, to aid debugging in the sandbox.
-            argv=("combine", "--keep", *sorted(coverage_data_file_paths)),
-            input_digest=input_digest,
-            output_files=(".coverage",),
-            description=f"Merge {len(coverage_data_file_paths)} Pytest coverage reports.",
-            level=LogLevel.DEBUG,
-        ),
+    input_digest = await merge_digests(MergeDigests(await concurrently(coverage_digest_gets)))
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            VenvPexProcess(
+                coverage_setup.pex,
+                # We tell combine to keep the original input files, to aid debugging in the sandbox.
+                argv=("combine", "--keep", *sorted(coverage_data_file_paths)),
+                input_digest=input_digest,
+                output_files=(".coverage",),
+                description=f"Merge {len(coverage_data_file_paths)} Pytest coverage reports.",
+                level=LogLevel.DEBUG,
+            )
+        )
     )
     return MergedCoverageData(
-        await Get(Digest, MergeDigests((result.output_digest, extra_sources_digest))),
+        await merge_digests(MergeDigests((result.output_digest, extra_sources_digest))),
         tuple(sorted(addresses)),
     )
 
@@ -501,31 +514,25 @@ async def generate_coverage_reports(
     distdir: DistDir,
 ) -> CoverageReports:
     """Takes all Python test results and generates a single coverage report."""
-    transitive_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequest(merged_coverage_data.addresses)
+    transitive_targets = await transitive_targets_get(
+        TransitiveTargetsRequest(merged_coverage_data.addresses), **implicitly()
     )
-    sources = await Get(
-        PythonSourceFiles,
-        # Coverage sometimes includes non-Python files in its `.coverage` data, so we
-        # include resources here. We don't include files because relocated_files targets
-        # may cause digest merge collisions. So anything you compute coverage over must
-        # be a source file or a resource.
-        PythonSourceFilesRequest(transitive_targets.closure, include_resources=True),
+    sources = await prepare_python_sources(
+        PythonSourceFilesRequest(transitive_targets.closure, include_resources=True), **implicitly()
     )
-    input_digest = await Get(
-        Digest,
+    input_digest = await merge_digests(
         MergeDigests(
             (
                 merged_coverage_data.coverage_data,
                 coverage_config.digest,
                 sources.source_files.snapshot.digest,
             )
-        ),
+        )
     )
 
-    pex_processes = []
+    pex_processes: list[VenvPexProcess] = []
     report_types = []
-    result_snapshot = await Get(Snapshot, Digest, merged_coverage_data.coverage_data)
+    result_snapshot = await digest_to_snapshot(merged_coverage_data.coverage_data)
     coverage_reports: list[CoverageReport] = []
     output_dir: PurePath = coverage_subsystem.output_dir(distdir)
     for report_type in coverage_subsystem.report:
@@ -564,8 +571,8 @@ async def generate_coverage_reports(
                 level=LogLevel.DEBUG,
             )
         )
-    results = await MultiGet(
-        Get(FallibleProcessResult, VenvPexProcess, process) for process in pex_processes
+    results = await concurrently(
+        execute_process(**implicitly({process: VenvPexProcess})) for process in pex_processes
     )
     for proc, res in zip(pex_processes, results):
         if res.exit_code not in {0, 2}:
@@ -582,7 +589,7 @@ async def generate_coverage_reports(
     # In practice if one result triggers --fail-under, they all will, but no need to rely on that.
     result_exit_codes = tuple(res.exit_code for res in results)
     result_stdouts = tuple(res.stdout for res in results)
-    result_snapshots = await MultiGet(Get(Snapshot, Digest, res.output_digest) for res in results)
+    result_snapshots = await concurrently(digest_to_snapshot(res.output_digest) for res in results)
 
     coverage_reports.extend(
         _get_coverage_report(output_dir, report_type, exit_code != 0, stdout, snapshot)

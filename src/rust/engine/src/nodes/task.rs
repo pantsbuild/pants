@@ -2,8 +2,8 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::fmt;
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 use deepsize::DeepSizeOf;
 use futures::future::{self, BoxFuture, FutureExt};
@@ -11,15 +11,15 @@ use graph::CompoundNode;
 use internment::Intern;
 use pyo3::prelude::{PyAnyMethods, PyErr, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
-use pyo3::{Bound, IntoPy, ToPyObject};
+use pyo3::{Bound, IntoPyObject};
 use rule_graph::DependencyKey;
-use workunit_store::{in_workunit, Level, RunningWorkunit};
+use workunit_store::{Level, RunningWorkunit, in_workunit};
 
-use super::{select, task_context, NodeKey, NodeResult, Params};
+use super::{NodeKey, NodeResult, Params, select, task_context};
 use crate::context::Context;
 use crate::externs::engine_aware::EngineAwareReturnType;
 use crate::externs::{self, GeneratorInput, GeneratorResponse};
-use crate::python::{throw, Failure, Key, TypeId, Value};
+use crate::python::{Failure, Key, TypeId, Value, throw};
 use crate::tasks::{self, Rule};
 
 #[derive(DeepSizeOf, Derivative, Clone)]
@@ -48,8 +48,25 @@ impl Task {
         call: externs::Call,
     ) -> NodeResult<Value> {
         let context = context.clone();
+        let implementation_rule = context
+            .core
+            .tasks
+            .vtable()
+            .get(&call.rule_id)
+            .and_then(|ve| {
+                call.inputs
+                    .iter()
+                    .map(|t| ve.get(t.type_id()))
+                    .find(Option::is_some)
+                    .flatten()
+            });
+
+        // If no implementation rule, use the base rule. Typically that will throw a
+        // relevant error, but could hypothetically provide a sensible default implementation.
+        let rule_id = implementation_rule.unwrap_or(&call.rule_id);
+
         let dependency_key =
-            DependencyKey::for_known_rule(call.rule_id.clone(), call.output_type, call.args_arity)
+            DependencyKey::for_known_rule(rule_id.clone(), call.output_type, call.args_arity)
                 .provided_params(call.inputs.iter().map(|t| *t.type_id()));
         params.extend(call.inputs.iter().cloned());
 
@@ -60,13 +77,25 @@ impl Task {
             .ok_or_else(|| throw(format!("No edges for task {entry:?} exist!")))?;
 
         // Find the entry for the Call.
-        let entry = edges.entry_for(&dependency_key).ok_or_else(|| {
-            // NB: The Python constructor for `Call()` will have already errored if
-            // `type(input) != input_type`.
-            throw(format!(
-                "{call} was not detected in your @rule body at rule compile time."
-            ))
-        })?;
+        let entry = edges
+            .entry_for(&dependency_key)
+            .or_else(|| {
+                // The Get might have involved a @union: if so, include its in_scope types in the
+                // lookup.
+                let in_scope_types = call
+                    .input_types
+                    .iter()
+                    .find_map(|t| t.union_in_scope_types())?;
+                edges.entry_for(&dependency_key.in_scope_params(in_scope_types))
+            })
+            .ok_or_else(|| {
+                // NB: The Python constructor for `Call()` will have already errored if
+                // `type(input) != input_type`.
+                throw(format!(
+                    "{call} was not detected in your @rule body at rule compile time. Make sure
+                    the callee is defined before the @rule body."
+                ))
+            })?;
         select(context, call.args, call.args_arity, params, entry).await
     }
 
@@ -218,9 +247,12 @@ impl Task {
                         .collect::<Vec<_>>();
                     match future::try_join_all(get_futures).await {
                         Ok(values) => {
-                            input = GeneratorInput::Arg(Python::with_gil(|py| {
-                                externs::store_tuple(py, values)
-                            }));
+                            let values_tuple_result =
+                                Python::with_gil(|py| externs::store_tuple(py, values));
+                            input = match values_tuple_result {
+                                Ok(t) => GeneratorInput::Arg(t),
+                                Err(err) => GeneratorInput::Err(err),
+                            }
                         }
                         Err(throw @ Failure::Throw { .. }) => {
                             input = GeneratorInput::Err(PyErr::from(throw));
@@ -282,7 +314,7 @@ impl Task {
                     // keywords. Otherwise, apply computed arguments as positional.
                     let res = if let Some(args) = args {
                         let args = args.value.bind(py).extract::<Bound<'_, PyTuple>>()?;
-                        let kwargs = PyDict::new_bound(py);
+                        let kwargs = PyDict::new(py);
                         for ((name, _), value) in self
                             .task
                             .args
@@ -294,14 +326,18 @@ impl Task {
                         }
                         func.call(args, Some(&kwargs))
                     } else {
-                        let args_tuple =
-                            PyTuple::new_bound(py, deps.iter().map(|v| v.to_object(py)));
+                        let deps = deps
+                            .iter()
+                            .map(|v| v.into_pyobject(py))
+                            .collect::<Result<Vec<_>, _>>()
+                            .map_err(|e| format!("Conversion error: {e:?}"))?;
+                        let args_tuple = PyTuple::new(py, deps)?;
                         func.call1(args_tuple)
                     };
 
                     res.map(|res| {
                         let type_id = TypeId::new(&res.get_type().as_borrowed());
-                        let val = Value::new(res.into_py(py));
+                        let val = Value::from(&res);
                         (val, type_id)
                     })
                     .map_err(Failure::from)

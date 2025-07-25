@@ -14,9 +14,9 @@
     "react-dom": "18.3.1"
   },
   "devDependencies": {
-    "@babel/preset-react": "7.24.7",
-    "esbuild": "0.23.0",
-    "jest": "^29.5.0"
+    "@babel/preset-react": "^7.26.3",
+    "esbuild": "^0.25.0",
+    "jest": "^29.7.0"
   },
   "jest": {
     "extensionsToTreatAsEsm": [

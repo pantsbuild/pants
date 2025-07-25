@@ -4,16 +4,16 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.go.go_sources import load_go_binary
-from pants.backend.go.go_sources.load_go_binary import LoadedGoBinary, LoadedGoBinaryRequest
+from pants.backend.go.go_sources.load_go_binary import LoadedGoBinaryRequest, setup_go_binary
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.internals.native_engine import Digest, MergeDigests
-from pants.engine.internals.selectors import Get
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Rule, collect_rules, rule
+from pants.engine.intrinsics import merge_digests
+from pants.engine.process import Process, execute_process_or_raise
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -63,9 +63,9 @@ class VendorModulesParserSetup:
 @rule
 async def setup_vendor_modules_txt_parser() -> VendorModulesParserSetup:
     output_name = "__go_parse_vendor__"
-    binary = await Get(
-        LoadedGoBinary,
+    binary = await setup_go_binary(
         LoadedGoBinaryRequest("parse_vendor_modules", ("parse.go", "semver.go"), output_name),
+        **implicitly(),
     )
     return VendorModulesParserSetup(
         digest=binary.digest,
@@ -78,14 +78,15 @@ async def parse_vendor_modules_metadata(
     request: ParseVendorModulesMetadataRequest,
     parser: VendorModulesParserSetup,
 ) -> ParseVendorModulesMetadataResult:
-    input_digest = await Get(Digest, MergeDigests([request.digest, parser.digest]))
-    result = await Get(
-        ProcessResult,
-        Process(
-            argv=(parser.path, request.path),
-            input_digest=input_digest,
-            description=f"Parse vendor modules list: `{request.path}`",
-            level=LogLevel.DEBUG,
+    input_digest = await merge_digests(MergeDigests([request.digest, parser.digest]))
+    result = await execute_process_or_raise(
+        **implicitly(
+            Process(
+                argv=(parser.path, request.path),
+                input_digest=input_digest,
+                description=f"Parse vendor modules list: `{request.path}`",
+                level=LogLevel.DEBUG,
+            )
         ),
     )
 

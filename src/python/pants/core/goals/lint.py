@@ -5,12 +5,12 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from collections.abc import Callable, Coroutine, Iterable, Iterator, Sequence
 from dataclasses import dataclass
-from typing import Any, Callable, ClassVar, Iterable, Iterator, Protocol, Sequence, TypeVar, cast
-
-from typing_extensions import final
+from typing import Any, ClassVar, Protocol, TypeVar, cast, final
 
 from pants.base.specs import Specs
+from pants.core.environments.rules import _warn_on_non_local_environments
 from pants.core.goals.multi_tool_goal_helper import (
     BatchSizeOption,
     OnlyOption,
@@ -19,7 +19,6 @@ from pants.core.goals.multi_tool_goal_helper import (
     write_reports,
 )
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.environments import _warn_on_non_local_environments
 from pants.core.util_rules.partitions import PartitionElementT, PartitionerType, PartitionMetadataT
 from pants.core.util_rules.partitions import Partitions as Partitions  # re-export
 from pants.core.util_rules.partitions import (
@@ -30,16 +29,19 @@ from pants.core.util_rules.partitions import (
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import EMPTY_DIGEST, Digest, PathGlobs, SpecsPaths, Workspace
+from pants.engine.fs import EMPTY_DIGEST, Digest, PathGlobs, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.native_engine import Snapshot
+from pants.engine.internals.graph import filter_targets
+from pants.engine.internals.selectors import Get
+from pants.engine.internals.specs_rules import resolve_specs_paths
+from pants.engine.intrinsics import digest_to_snapshot
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
-from pants.engine.target import FieldSet, FilteredTargets
+from pants.engine.rules import collect_rules, concurrently, goal_rule, implicitly, rule
+from pants.engine.target import FieldSet
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.option_types import BoolOption
 from pants.util.collections import partition_sequentially
-from pants.util.docutil import bin_name
+from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 from pants.util.strutil import Simplifier, softwrap
@@ -233,7 +235,29 @@ REPORT_DIR = "reports"
 
 class LintSubsystem(GoalSubsystem):
     name = "lint"
-    help = "Run linters/formatters/fixers in check mode."
+    help = softwrap(
+        f"""
+        Run linters/formatters/fixers in check mode.
+
+        This goal runs tools that check code quality/styling etc, without changing that code. This
+        includes running formatters and fixers, but instead of writing changes back to the
+        workspace, Pants treats any changes they would make as a linting failure.
+
+        See also:
+
+        - [The `fmt` goal]({doc_url("reference/goals/fix")} will save the the result of formatters
+          (code-editing tools that make only "syntactic" changes) back to the workspace.
+
+        - [The `fmt` goal]({doc_url("reference/goals/fix")} will save the the result of fixers
+          (code-editing tools that may make "semantic" changes too) back to the workspace.
+
+        - Documentation about linters for various ecosystems, such as:
+          [Python]({doc_url("docs/python/overview/linters-and-formatters")}), [Go]({doc_url("docs/go")}),
+          [JVM]({doc_url("jvm/java-and-scala#lint-and-format")}), [Shell]({doc_url("docs/shell")}),
+          [Docker]({doc_url("docs/docker#linting-dockerfiles-with-hadolint")}).
+
+        """
+    )
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
@@ -324,10 +348,12 @@ async def _get_partitions_by_request_type(
     file_partitioners: Iterable[type[_FilePartitioner]],
     subsystem: _MultiToolGoalSubsystem,
     specs: Specs,
-    # NB: Because the rule parser code will collect `Get`s from caller's scope, these allow the
-    # caller to customize the specific `Get`.
-    make_targets_partition_request_get: Callable[[_TargetPartitioner], Get[Partitions]],
-    make_files_partition_request_get: Callable[[_FilePartitioner], Get[Partitions]],
+    # NB: Because the rule parser code will collect rule calls from caller's scope, these allow the
+    # caller to customize the specific rule.
+    make_targets_partition_request_get: Callable[
+        [_TargetPartitioner], Coroutine[Any, Any, Partitions]
+    ],
+    make_files_partition_request_get: Callable[[_FilePartitioner], Coroutine[Any, Any, Partitions]],
 ) -> dict[type[_CoreRequestType], list[Partitions]]:
     specified_ids = determine_specified_tool_ids(
         subsystem.name,
@@ -355,18 +381,18 @@ async def _get_partitions_by_request_type(
         if file_partitioner in core_partition_request_types
     ]
 
-    _get_targets = Get(
-        FilteredTargets,
-        Specs,
-        specs if target_partitioners else Specs.empty(),
+    _get_targets = filter_targets(
+        **implicitly({(specs if target_partitioners else Specs.empty()): Specs})
     )
-    _get_specs_paths = Get(SpecsPaths, Specs, specs if file_partitioners else Specs.empty())
+    _get_specs_paths = resolve_specs_paths(specs if file_partitioners else Specs.empty())
 
-    targets, specs_paths = await MultiGet(_get_targets, _get_specs_paths)
+    targets, specs_paths = await concurrently(_get_targets, _get_specs_paths)
 
     await _warn_on_non_local_environments(targets, f"the {subsystem.name} goal")
 
-    def partition_request_get(request_type: type[AbstractLintRequest]) -> Get[Partitions]:
+    def partition_request_get(
+        request_type: type[AbstractLintRequest],
+    ) -> Coroutine[Any, Any, Partitions]:
         partition_request_type: type = getattr(request_type, "PartitionRequest")
         if partition_request_type in target_partitioners:
             partition_targets_type = cast(LintTargetsRequest, request_type)
@@ -386,7 +412,7 @@ async def _get_partitions_by_request_type(
                 partition_files_type.PartitionRequest(specs_paths.files)  # type: ignore[arg-type]
             )
 
-    all_partitions = await MultiGet(
+    all_partitions = await concurrently(
         partition_request_get(request_type) for request_type in filtered_core_request_types
     )
     partitions_by_request_type = defaultdict(list)
@@ -394,6 +420,16 @@ async def _get_partitions_by_request_type(
         partitions_by_request_type[request_type].append(partition)
 
     return partitions_by_request_type
+
+
+@rule(polymorphic=True)
+async def partition_targets(req: LintTargetsRequest.PartitionRequest) -> Partitions:
+    raise NotImplementedError()
+
+
+@rule(polymorphic=True)
+async def partition_files(req: LintFilesRequest.PartitionRequest) -> Partitions:
+    raise NotImplementedError()
 
 
 @goal_rule
@@ -420,8 +456,12 @@ async def lint(
         file_partitioners,
         lint_subsystem,
         specs,
-        lambda request_type: Get(Partitions, LintTargetsRequest.PartitionRequest, request_type),
-        lambda request_type: Get(Partitions, LintFilesRequest.PartitionRequest, request_type),
+        lambda request_type: partition_targets(
+            **implicitly({request_type: LintTargetsRequest.PartitionRequest})
+        ),
+        lambda request_type: partition_files(
+            **implicitly({request_type: LintFilesRequest.PartitionRequest})
+        ),
     )
 
     if not partitions_by_request_type:
@@ -447,8 +487,8 @@ async def lint(
         for request_type, partitions_list in partitions_by_request_type.items()
     }
 
-    formatter_snapshots = await MultiGet(
-        Get(Snapshot, PathGlobs(elements))
+    formatter_snapshots = await concurrently(
+        digest_to_snapshot(**implicitly({PathGlobs(elements): PathGlobs}))
         for request_type, batch in lint_batches_by_request_type.items()
         for elements, _ in batch
         if request_type._requires_snapshot
@@ -466,7 +506,7 @@ async def lint(
         for elements, key in batch
     ]
 
-    all_batch_results = await MultiGet(
+    all_batch_results = await concurrently(
         Get(LintResult, AbstractLintRequest.Batch, request) for request in batches
     )
 

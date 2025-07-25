@@ -6,9 +6,10 @@ from __future__ import annotations
 import json
 import os.path
 import zipfile
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Iterable, Iterator, Mapping
+from typing import Any
 
 from pants.backend.python.target_types import MainSpecification, PexLayout
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -31,26 +32,26 @@ from pants.util.strutil import softwrap
 
 @dataclass(frozen=True)
 class ExactRequirement:
-    project_name: str
+    name: str
     version: str
 
     @classmethod
     def parse(cls, requirement: str) -> ExactRequirement:
         req = PipRequirement.parse(requirement)
-        assert len(req.specs) == 1, softwrap(
+        assert len(req.specifier_set) == 1, softwrap(
             f"""
             Expected an exact requirement with only 1 specifier, given {requirement} with
-            {len(req.specs)} specifiers
+            {len(req.specifier_set)} specifiers
             """
         )
-        operator, version = req.specs[0]
-        assert operator == "==", softwrap(
+        specifier = next(iter(req.specifier_set))
+        assert specifier.operator == "==", softwrap(
             f"""
             Expected an exact requirement using only the '==' specifier, given {requirement}
-            using the {operator!r} operator
+            using the {specifier.operator!r} operator
             """
         )
-        return cls(project_name=req.project_name, version=version)
+        return cls(name=req.name, version=specifier.version)
 
 
 def parse_requirements(requirements: Iterable[str]) -> Iterator[ExactRequirement]:

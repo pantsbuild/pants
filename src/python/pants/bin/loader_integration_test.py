@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from typing import Union
 
 from pants.bin.pants_env_vars import (
     DAEMON_ENTRYPOINT,
@@ -86,7 +85,7 @@ def test_recursion_limit() -> None:
 
 
 def test_non_utf8_env_vars() -> None:
-    env: dict[Union[str, bytes], Union[str, bytes]] = {
+    env: dict[str | bytes, str | bytes] = {
         "FOO": b"B\xa5R",
         b"F\xa5O": "BAR",
     }

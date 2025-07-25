@@ -6,13 +6,14 @@ import os
 from dataclasses import dataclass
 from typing import ClassVar
 
-from pants.build_graph.address import Address, AddressInput
+from pants.build_graph.address import AddressInput
 from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE
 from pants.core.goals.resolves import ExportableTool
 from pants.engine.addresses import Addresses
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import Targets
+from pants.engine.internals.build_files import resolve_address
+from pants.engine.internals.graph import resolve_targets
+from pants.engine.internals.selectors import concurrently
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.jvm.resolve.common import (
     ArtifactRequirement,
     ArtifactRequirements,
@@ -155,14 +156,16 @@ async def gather_coordinates_for_jvm_lockfile(
                 f"""
                 The following values could not be parsed as an address nor as a JVM coordinate string.
                 The problematic inputs supplied to the `{request.option_name}` option were:
-                {', '.join(bad_artifact_inputs)}.
+                {", ".join(bad_artifact_inputs)}.
                 """
             )
         )
 
     # Gather coordinates from the provided addresses.
-    addresses = await MultiGet(Get(Address, AddressInput, ai) for ai in candidate_address_inputs)
-    all_supplied_targets = await Get(Targets, Addresses(addresses))
+    addresses = await concurrently(
+        resolve_address(**implicitly({ai: AddressInput})) for ai in candidate_address_inputs
+    )
+    all_supplied_targets = await resolve_targets(**implicitly(Addresses(addresses)))
     other_targets = []
     for tgt in all_supplied_targets:
         if JvmArtifactFieldSet.is_applicable(tgt):
@@ -176,7 +179,7 @@ async def gather_coordinates_for_jvm_lockfile(
                 f"""
                 The following addresses reference targets that are not `jvm_artifact` targets.
                 Please only supply the addresses of `jvm_artifact` for the `{request.option_name}`
-                option. The problematic addresses are: {', '.join(str(tgt.address) for tgt in other_targets)}.
+                option. The problematic addresses are: {", ".join(str(tgt.address) for tgt in other_targets)}.
                 """
             )
         )

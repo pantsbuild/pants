@@ -8,9 +8,10 @@ import logging
 import os
 import shutil
 import subprocess
+from collections.abc import Sequence
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Generic, Sequence, Type, TypeVar, cast
+from typing import Generic, TypeVar, cast
 
 from pants.backend.cc.lint.clangformat.subsystem import ClangFormat
 from pants.backend.codegen.avro.java.subsystem import AvroSubsystem
@@ -72,7 +73,7 @@ ToolBaseT = TypeVar("ToolBaseT")
 
 @dataclass
 class Tool(Generic[ToolBaseT]):
-    cls: Type[ToolBaseT]
+    cls: type[ToolBaseT]
     backend: str
 
     @property
@@ -89,13 +90,11 @@ class Tool(Generic[ToolBaseT]):
 
 
 @dataclass
-class PythonTool(Tool[PythonToolRequirementsBase]):
-    ...
+class PythonTool(Tool[PythonToolRequirementsBase]): ...
 
 
 @dataclass
-class JvmTool(Tool[JvmToolBase]):
-    ...
+class JvmTool(Tool[JvmToolBase]): ...
 
 
 all_python_tools = tuple(

@@ -8,10 +8,11 @@ import logging
 import os
 import re
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
 from itertools import chain
-from typing import Any, Iterable
+from typing import Any
 
 from pants.backend.helm.subsystems import post_renderer
 from pants.backend.helm.subsystems.post_renderer import HelmPostRenderer
@@ -21,9 +22,15 @@ from pants.backend.helm.target_types import (
     HelmDeploymentSourcesField,
 )
 from pants.backend.helm.util_rules import chart, tool
-from pants.backend.helm.util_rules.chart import FindHelmDeploymentChart, HelmChart, HelmChartRequest
-from pants.backend.helm.util_rules.tool import HelmProcess
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.backend.helm.util_rules.chart import (
+    FindHelmDeploymentChart,
+    HelmChart,
+    HelmChartRequest,
+    find_chart_for_deployment,
+    get_helm_chart,
+)
+from pants.backend.helm.util_rules.tool import HelmProcess, helm_process
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import (
@@ -40,8 +47,14 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.internals.native_engine import FileDigest
-from pants.engine.process import InteractiveProcess, Process, ProcessCacheScope, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.intrinsics import create_digest, digest_to_snapshot, merge_digests
+from pants.engine.process import (
+    InteractiveProcess,
+    ProcessCacheScope,
+    ProcessResult,
+    execute_process_or_raise,
+)
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize, softwrap
 
@@ -128,7 +141,7 @@ class _HelmDeploymentProcessWrapper(EngineAwareParameter, EngineAwareReturnType)
         msg = softwrap(
             f"""
             Built deployment process for {self.address} using chart {self.chart.address}
-            with{'out' if not self.output_directory else ''} a post-renderer stage
+            with{"out" if not self.output_directory else ""} a post-renderer stage
             """
         )
         if self.output_directory:
@@ -172,7 +185,7 @@ class RenderedHelmFiles(EngineAwareReturnType):
     def message(self) -> str | None:
         return softwrap(
             f"""
-            Generated {pluralize(len(self.snapshot.files), 'file')} from deployment {self.address}
+            Generated {pluralize(len(self.snapshot.files), "file")} from deployment {self.address}
             using chart {self.chart.address}.
             """
         )
@@ -211,12 +224,14 @@ async def _sort_value_file_names_for_evaluation(
         result.sort()
     else:
         # Break the list of filenames in subsets that follow the order given in the `sources` field
-        subset_snapshots = await MultiGet(
-            Get(
-                Snapshot,
-                DigestSubset(
-                    value_files_snapshot.digest, PathGlobs([os.path.join(base_path, glob_pattern)])
-                ),
+        subset_snapshots = await concurrently(
+            digest_to_snapshot(
+                **implicitly(
+                    DigestSubset(
+                        value_files_snapshot.digest,
+                        PathGlobs([os.path.join(base_path, glob_pattern)]),
+                    )
+                )
             )
             for glob_pattern in sources_field.globs
         )
@@ -243,7 +258,7 @@ async def _sort_value_file_names_for_evaluation(
         softwrap(
             f"""Value files for {address} would be evaluated using the following order:
 
-            {', '.join(result)}
+            {", ".join(result)}
             """
         )
     )
@@ -256,15 +271,14 @@ async def setup_render_helm_deployment_process(
     request: HelmDeploymentRequest,
 ) -> _HelmDeploymentProcessWrapper:
     value_files_prefix = "__values"
-    chart, value_files = await MultiGet(
-        Get(HelmChart, FindHelmDeploymentChart(request.field_set)),
-        Get(
-            SourceFiles,
+    chart, value_files = await concurrently(
+        find_chart_for_deployment(FindHelmDeploymentChart(request.field_set)),
+        determine_source_files(
             SourceFilesRequest(
                 sources_fields=[request.field_set.sources],
                 for_sources_types=[HelmDeploymentSourcesField],
                 enable_codegen=True,
-            ),
+            )
         ),
     )
 
@@ -275,7 +289,7 @@ async def setup_render_helm_deployment_process(
     output_directories = None
     if not request.post_renderer:
         output_dir = "__out"
-        output_digest = await Get(Digest, CreateDigest([Directory(output_dir)]))
+        output_digest = await create_digest(CreateDigest([Directory(output_dir)]))
         output_directories = [output_dir]
 
     # Sort the list of file names following a consistent ordering
@@ -303,7 +317,7 @@ async def setup_render_helm_deployment_process(
         immutable_input_digests.update(request.post_renderer.immutable_input_digests)
         append_only_caches.update(request.post_renderer.append_only_caches)
 
-    merged_digests = await Get(Digest, MergeDigests(input_digests))
+    merged_digests = await merge_digests(MergeDigests(input_digests))
 
     inline_values = request.field_set.values.value
     release_name = (
@@ -419,20 +433,22 @@ async def run_renderer(process_wrapper: _HelmDeploymentProcessWrapper) -> Render
         return [file_content(file_name, lines) for file_name, lines in rendered_files.items()]
 
     logger.debug(f"Rendering Helm files for {process_wrapper.address}")
-    result = await Get(ProcessResult, HelmProcess, process_wrapper.process)
+    result = await execute_process_or_raise(**implicitly({process_wrapper.process: HelmProcess}))
 
     output_snapshot = EMPTY_SNAPSHOT
     if not process_wrapper.output_directory:
         logger.debug(
             f"Parsing Helm rendered files from the process' output of {process_wrapper.address}."
         )
-        output_snapshot = await Get(Snapshot, CreateDigest(parse_renderer_output(result)))
+        output_snapshot = await digest_to_snapshot(
+            **implicitly(CreateDigest(parse_renderer_output(result)))
+        )
     else:
         logger.debug(
             f"Obtaining Helm rendered files from the process' output directory of {process_wrapper.address}."
         )
-        output_snapshot = await Get(
-            Snapshot, RemovePrefix(result.output_digest, process_wrapper.output_directory)
+        output_snapshot = await digest_to_snapshot(
+            **implicitly(RemovePrefix(result.output_digest, process_wrapper.output_directory))
         )
 
     return RenderedHelmFiles(
@@ -449,44 +465,47 @@ async def materialize_deployment_process_wrapper_into_interactive_process(
 ) -> InteractiveProcess:
     assert process_wrapper.is_side_effect
 
-    process = await Get(Process, HelmProcess, process_wrapper.process)
+    process = await helm_process(process_wrapper.process, **implicitly())
     return InteractiveProcess.from_process(process)
 
 
 @rule
 async def render_helm_chart(request: RenderHelmChartRequest) -> RenderedHelmFiles:
     output_dir = "__out"
-    chart, empty_output = await MultiGet(
-        Get(HelmChart, HelmChartRequest(request.field_set)),
-        Get(Digest, CreateDigest([Directory(output_dir)])),
+    chart, empty_output = await concurrently(
+        get_helm_chart(HelmChartRequest(request.field_set), **implicitly()),
+        create_digest(CreateDigest([Directory(output_dir)])),
     )
 
     release_name = request.release_name or request.field_set.address.target_name.replace("_", "-")
 
-    result = await Get(
-        ProcessResult,
-        HelmProcess(
-            argv=[
-                "template",
-                release_name,
-                chart.name,
-                *(
-                    ("--description", f'"{request.field_set.description.value}"')
-                    if request.field_set.description.value
-                    else ()
-                ),
-                "--output-dir",
-                output_dir,
-            ],
-            description=f"Rendering chart {request.field_set.address}",
-            input_digest=empty_output,
-            extra_immutable_input_digests=chart.immutable_input_digests,
-            output_directories=(output_dir,),
-            level=LogLevel.DEBUG,
-        ),
+    result = await execute_process_or_raise(
+        **implicitly(
+            HelmProcess(
+                argv=[
+                    "template",
+                    release_name,
+                    chart.name,
+                    *(
+                        ("--description", f'"{request.field_set.description.value}"')
+                        if request.field_set.description.value
+                        else ()
+                    ),
+                    "--output-dir",
+                    output_dir,
+                ],
+                description=f"Rendering chart {request.field_set.address}",
+                input_digest=empty_output,
+                extra_immutable_input_digests=chart.immutable_input_digests,
+                output_directories=(output_dir,),
+                level=LogLevel.DEBUG,
+            )
+        )
     )
 
-    output_snapshot = await Get(Snapshot, RemovePrefix(result.output_digest, output_dir))
+    output_snapshot = await digest_to_snapshot(
+        **implicitly(RemovePrefix(result.output_digest, output_dir))
+    )
     return RenderedHelmFiles(
         address=request.field_set.address,
         chart=chart,

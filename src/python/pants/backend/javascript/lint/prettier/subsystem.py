@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import os
-from typing import Iterable
+from collections.abc import Iterable
 
 from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase
 from pants.core.util_rules.config_files import ConfigFilesRequest
@@ -22,7 +22,7 @@ class Prettier(NodeJSToolBase):
         """
     )
 
-    default_version = "prettier@2.6.2"
+    default_version = "prettier@3.5.2"
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--version")

@@ -22,18 +22,20 @@ from pants.backend.docker.util_rules import (
 from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
+    create_docker_build_context,
 )
 from pants.backend.helm.dependency_inference.deployment import (
-    FirstPartyHelmDeploymentMapping,
     FirstPartyHelmDeploymentMappingRequest,
+    first_party_helm_deployment_mapping,
 )
 from pants.backend.helm.subsystems import post_renderer
 from pants.backend.helm.subsystems.post_renderer import SetupHelmPostRenderer
 from pants.backend.helm.target_types import HelmDeploymentFieldSet
 from pants.engine.addresses import Address, Addresses
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Targets, WrappedTarget, WrappedTargetRequest
+from pants.engine.internals.graph import resolve_target, resolve_targets
+from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.target import WrappedTargetRequest
 from pants.engine.unions import UnionMembership
 from pants.util.logging import LogLevel
 from pants.util.strutil import bullet_list, softwrap
@@ -55,12 +57,12 @@ class HelmDeploymentPostRendererRequest(EngineAwareParameter):
 async def _obtain_custom_image_tags(
     address: Address, union_membership: UnionMembership
 ) -> DockerImageTags:
-    wrapped_target = await Get(
-        WrappedTarget, WrappedTargetRequest(address, description_of_origin="<infallible>")
+    wrapped_target = await resolve_target(
+        WrappedTargetRequest(address, description_of_origin="<infallible>"), **implicitly()
     )
 
     image_tags_requests = union_membership.get(DockerImageTagsRequest)
-    found_image_tags = await MultiGet(
+    found_image_tags = await concurrently(
         Get(DockerImageTags, DockerImageTagsRequest, image_tags_request_cls(wrapped_target.target))
         for image_tags_request_cls in image_tags_requests
         if image_tags_request_cls.is_applicable(wrapped_target.target)
@@ -75,8 +77,8 @@ async def prepare_post_renderer_for_helm_deployment(
     union_membership: UnionMembership,
     docker_options: DockerOptions,
 ) -> SetupHelmPostRenderer:
-    mapping = await Get(
-        FirstPartyHelmDeploymentMapping, FirstPartyHelmDeploymentMappingRequest(request.field_set)
+    mapping = await first_party_helm_deployment_mapping(
+        FirstPartyHelmDeploymentMappingRequest(request.field_set), **implicitly()
     )
 
     docker_addresses = [addr for _, addr in mapping.indexed_docker_addresses.values()]
@@ -90,18 +92,18 @@ async def prepare_post_renderer_for_helm_deployment(
             """
         )
     )
-    docker_contexts = await MultiGet(
-        Get(
-            DockerBuildContext,
+    docker_contexts = await concurrently(
+        create_docker_build_context(
             DockerBuildContextRequest(
                 address=addr,
                 build_upstream_images=False,
             ),
+            **implicitly(),
         )
         for addr in docker_addresses
     )
 
-    docker_targets = await Get(Targets, Addresses(docker_addresses))
+    docker_targets = await resolve_targets(**implicitly(Addresses(docker_addresses)))
     field_sets = [DockerPackageFieldSet.create(tgt) for tgt in docker_targets]
 
     async def resolve_docker_image_ref(address: Address, context: DockerBuildContext) -> str | None:

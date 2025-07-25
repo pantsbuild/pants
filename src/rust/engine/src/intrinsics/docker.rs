@@ -1,11 +1,11 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use docker::docker::{ImagePullPolicy, ImagePullScope, DOCKER, IMAGE_PULL_CACHE};
+use docker::docker::{DOCKER, IMAGE_PULL_CACHE, ImagePullPolicy, ImagePullScope};
 use process_execution::Platform;
-use pyo3::prelude::{pyfunction, wrap_pyfunction, PyModule, PyResult, Python};
-use pyo3::types::{PyModuleMethods, PyString};
 use pyo3::Bound;
+use pyo3::prelude::{PyModule, PyResult, Python, pyfunction, wrap_pyfunction};
+use pyo3::types::{PyModuleMethods, PyString};
 
 use crate::externs::{self, PyGeneratorResponseNativeCall};
 use crate::nodes::task_get_context;
@@ -27,9 +27,8 @@ fn docker_resolve_image(docker_request: Value) -> PyGeneratorResponseNativeCall 
 
         let (image_name, platform) = Python::with_gil(|py| {
             let py_docker_request = docker_request.bind(py);
-            let image_name: String =
-                externs::getattr_bound(py_docker_request, "image_name").unwrap();
-            let platform: String = externs::getattr_bound(py_docker_request, "platform").unwrap();
+            let image_name: String = externs::getattr(py_docker_request, "image_name").unwrap();
+            let platform: String = externs::getattr(py_docker_request, "platform").unwrap();
             (image_name, platform)
         });
 
@@ -65,7 +64,7 @@ fn docker_resolve_image(docker_request: Value) -> PyGeneratorResponseNativeCall 
             externs::unsafe_call(
                 py,
                 docker_resolve_image_result,
-                &[Value::from(&PyString::new_bound(py, &image_id))],
+                &[Value::from(&PyString::new(py, &image_id))],
             )
         }))
     })

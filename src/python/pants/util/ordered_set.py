@@ -15,7 +15,8 @@ http://code.activestate.com/recipes/576694/.
 from __future__ import annotations
 
 import itertools
-from typing import AbstractSet, Any, Hashable, Iterable, Iterator, MutableSet, Set, TypeVar, cast
+from collections.abc import Hashable, Iterable, Iterator, MutableSet
+from typing import AbstractSet, Any, TypeVar, cast
 
 T = TypeVar("T")
 T_co = TypeVar("T_co", covariant=True)
@@ -30,7 +31,7 @@ class _AbstractOrderedSet(AbstractSet[T]):
         # in a ~20% performance increase for the constructor.
         #
         # NB: Dictionaries are ordered in Python 3.7+.
-        self._items: dict[T, None] = {v: None for v in iterable or ()}
+        self._items: dict[T, None] = dict.fromkeys(iterable) if iterable else {}
 
     def __len__(self) -> int:
         """Returns the number of unique elements in the set."""
@@ -190,7 +191,7 @@ class OrderedSet(_AbstractOrderedSet[T], MutableSet[T]):
         """Update this OrderedSet to remove items from another set, then add items from the other
         set that were not present in this set."""
         items_to_add = [item for item in other if item not in self]
-        items_to_remove = cast(Set[T], set(other))
+        items_to_remove = cast(set[T], set(other))
         self._items = {item: None for item in self._items.keys() if item not in items_to_remove}
         for item in items_to_add:
             self._items[item] = None

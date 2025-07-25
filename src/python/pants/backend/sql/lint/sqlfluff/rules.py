@@ -2,10 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Iterable, Tuple
-
-from typing_extensions import assert_never
+from typing import Any, assert_never
 
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPexProcess, create_venv_pex
@@ -73,7 +72,7 @@ async def run_sqlfluff(
         MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
     )
 
-    initial_args: Tuple[str, ...] = ()
+    initial_args: tuple[str, ...] = ()
     if request.mode is SqlfluffMode.FMT:
         initial_args = ("format",)
     elif request.mode is SqlfluffMode.FIX:

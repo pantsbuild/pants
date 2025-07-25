@@ -7,41 +7,40 @@ import os
 import re
 import shlex
 import string
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping
 
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules import first_party_pkg, goroot, sdk
-from pants.backend.go.util_rules.build_opts import GoBuildOptions, GoBuildOptionsFromTargetRequest
+from pants.backend.go.util_rules.build_opts import (
+    GoBuildOptionsFromTargetRequest,
+    go_extract_build_options_from_target,
+)
 from pants.backend.go.util_rules.first_party_pkg import (
-    FallibleFirstPartyPkgAnalysis,
-    FallibleFirstPartyPkgDigest,
     FirstPartyPkgAnalysis,
     FirstPartyPkgAnalysisRequest,
     FirstPartyPkgDigestRequest,
+    analyze_first_party_package,
+    setup_first_party_pkg_digest,
 )
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.build_graph.address import Address
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import (
-    CreateDigest,
-    DigestContents,
-    DigestEntries,
-    FileEntry,
-    SnapshotDiff,
-    Workspace,
-)
+from pants.engine.env_vars import EnvironmentVarsRequest
+from pants.engine.fs import CreateDigest, FileEntry, SnapshotDiff, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.native_engine import (
-    EMPTY_DIGEST,
-    AddPrefix,
-    Digest,
-    MergeDigests,
-    Snapshot,
+from pants.engine.internals.native_engine import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import (
+    add_prefix,
+    create_digest,
+    digest_to_snapshot,
+    get_digest_contents,
+    get_digest_entries,
+    merge_digests,
 )
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import collect_rules, goal_rule, rule
+from pants.engine.process import Process, execute_process_or_raise
+from pants.engine.rules import collect_rules, goal_rule, implicitly, rule
 from pants.engine.target import Targets
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
@@ -166,7 +165,7 @@ async def _run_generators(
     goroot: GoRoot,
     base_env: Mapping[str, str],
 ) -> Digest:
-    digest_contents = await Get(DigestContents, Digest, digest)
+    digest_contents = await get_digest_contents(digest)
     content: bytes | None = None
     for entry in digest_contents:
         if entry.path == os.path.join(dir_path, go_file):
@@ -220,19 +219,21 @@ async def _run_generators(
             args[i] = _expand_env(arg, env)
 
         # Invoke the subprocess and store its output for use as input root of next command (if any).
-        result = await Get(  # noqa: PNT30: this is inherently sequential
-            ProcessResult,
-            Process(
-                argv=args,
-                input_digest=digest,
-                working_directory=dir_path,
-                output_directories=["."],
-                env=env,
-                description=f"Process `go generate` directives in file: {os.path.join(dir_path, go_file)}",
+        result = await execute_process_or_raise(  # noqa: PNT30: this is inherently sequential
+            **implicitly(
+                Process(
+                    argv=args,
+                    input_digest=digest,
+                    working_directory=dir_path,
+                    output_directories=["."],
+                    env=env,
+                    description=f"Process `go generate` directives in file: {os.path.join(dir_path, go_file)}",
+                ),
             ),
         )
-        digest = await Get(  # noqa: PNT30: this is inherently sequential
-            Digest, AddPrefix(result.output_digest, dir_path)
+
+        digest = await add_prefix(  # noqa: PNT30: this is inherently sequential
+            AddPrefix(result.output_digest, dir_path)
         )
 
     return digest
@@ -246,11 +247,11 @@ class OverwriteMergeDigests:
 
 @rule
 async def merge_digests_with_overwrite(request: OverwriteMergeDigests) -> Digest:
-    orig_snapshot, new_snapshot, orig_digest_entries, new_digest_entries = await MultiGet(
-        Get(Snapshot, Digest, request.orig_digest),
-        Get(Snapshot, Digest, request.new_digest),
-        Get(DigestEntries, Digest, request.orig_digest),
-        Get(DigestEntries, Digest, request.new_digest),
+    orig_snapshot, new_snapshot, orig_digest_entries, new_digest_entries = await concurrently(
+        digest_to_snapshot(request.orig_digest),
+        digest_to_snapshot(request.new_digest),
+        get_digest_entries(request.orig_digest),
+        get_digest_entries(request.new_digest),
     )
 
     orig_snapshot_grouped = group_by_dir(orig_snapshot.files)
@@ -278,7 +279,7 @@ async def merge_digests_with_overwrite(request: OverwriteMergeDigests) -> Digest
         if isinstance(entry, FileEntry) and entry.path in new_files_to_keep:
             output_entries.append(entry)
 
-    digest = await Get(Digest, CreateDigest(output_entries))
+    digest = await create_digest(CreateDigest(output_entries))
     return digest
 
 
@@ -288,24 +289,25 @@ async def run_go_package_generators(
     goroot: GoRoot,
     subsystem: GoGenerateGoalSubsystem.EnvironmentAware,
 ) -> RunPackageGeneratorsResult:
-    build_opts = await Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(request.address))
-    fallible_analysis, env = await MultiGet(
-        Get(
-            FallibleFirstPartyPkgAnalysis,
+    build_opts = await go_extract_build_options_from_target(
+        GoBuildOptionsFromTargetRequest(request.address), **implicitly()
+    )
+    fallible_analysis, env = await concurrently(
+        analyze_first_party_package(
             FirstPartyPkgAnalysisRequest(
                 request.address, build_opts=build_opts, extra_build_tags=("generate",)
             ),
+            **implicitly(),
         ),
-        Get(EnvironmentVars, EnvironmentVarsRequest(subsystem.env_vars)),
+        environment_vars_subset(EnvironmentVarsRequest(subsystem.env_vars), **implicitly()),
     )
     if not fallible_analysis.analysis:
         raise ValueError(f"Analysis failure for {request.address}: {fallible_analysis.stderr}")
     analysis = fallible_analysis.analysis
     dir_path = analysis.dir_path if analysis.dir_path else "."
 
-    fallible_pkg_digest = await Get(
-        FallibleFirstPartyPkgDigest,
-        FirstPartyPkgDigestRequest(request.address, build_opts=build_opts),
+    fallible_pkg_digest = await setup_first_party_pkg_digest(
+        FirstPartyPkgDigestRequest(request.address, build_opts=build_opts)
     )
     if fallible_pkg_digest.pkg_digest is None:
         raise ValueError(
@@ -320,8 +322,8 @@ async def run_go_package_generators(
         output_digest_for_go_file = await _run_generators(
             analysis, pkg_digest.digest, dir_path, go_file, goroot, env
         )
-        output_digest = await Get(  # noqa: PNT30: requires triage
-            Digest, OverwriteMergeDigests(output_digest, output_digest_for_go_file)
+        output_digest = await merge_digests_with_overwrite(  # noqa: PNT30: requires triage
+            OverwriteMergeDigests(output_digest, output_digest_for_go_file)
         )
 
     return RunPackageGeneratorsResult(output_digest)
@@ -330,11 +332,11 @@ async def run_go_package_generators(
 @goal_rule
 async def go_generate(targets: Targets, workspace: Workspace) -> GoGenerateGoal:
     go_package_targets = [tgt for tgt in targets if tgt.has_field(GoPackageSourcesField)]
-    results = await MultiGet(
-        Get(RunPackageGeneratorsResult, RunPackageGeneratorsRequest(tgt.address))
+    results = await concurrently(
+        run_go_package_generators(RunPackageGeneratorsRequest(tgt.address), **implicitly())
         for tgt in go_package_targets
     )
-    output_digest = await Get(Digest, MergeDigests([r.digest for r in results]))
+    output_digest = await merge_digests(MergeDigests([r.digest for r in results]))
     workspace.write_digest(output_digest)
     return GoGenerateGoal(exit_code=0)
 

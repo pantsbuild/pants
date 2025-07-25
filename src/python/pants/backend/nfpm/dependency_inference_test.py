@@ -81,7 +81,7 @@ def test_infer_nfpm_package_scripts_dependencies(
                     name="{_PKG_NAME}",
                     package_name="{_PKG_NAME}",
                     version="{_PKG_VERSION}",
-                    {'' if packager != 'deb' else 'maintainer="Foo Bar <deb@example.com>",'}
+                    {"" if packager != "deb" else 'maintainer="Foo Bar <deb@example.com>",'}
                     scripts={scripts},
                 )
                 """
@@ -94,7 +94,7 @@ def test_infer_nfpm_package_scripts_dependencies(
                 )
                 """
             ),
-            **{path: "" for path in scripts_paths},
+            **dict.fromkeys(scripts_paths, ""),
         }
     )
 

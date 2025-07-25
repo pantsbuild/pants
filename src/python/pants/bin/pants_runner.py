@@ -6,8 +6,8 @@ import os
 import platform
 import sys
 import warnings
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import List, Mapping
 
 from packaging.version import Version
 
@@ -20,13 +20,14 @@ from pants.init.util import init_workdir
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.docutil import doc_url
-from pants.util.osutil import get_normalized_arch_name, is_macos_before_12, macos_major_version
+from pants.util.osutil import get_normalized_arch_name, macos_major_version
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
-# Pants 2.18 is using a new distribution model, that's supported (sans bugs) in 0.10.0.
-MINIMUM_SCIE_PANTS_VERSION = Version("0.10.0")
+# First version with working Python 3.11 support:
+# https://github.com/pantsbuild/scie-pants/releases/tag/v0.12.2
+MINIMUM_SCIE_PANTS_VERSION = Version("0.12.2")
 
 
 @dataclass(frozen=True)
@@ -34,7 +35,7 @@ class PantsRunner:
     """A higher-level runner that delegates runs to either a LocalPantsRunner or
     RemotePantsRunner."""
 
-    args: List[str]
+    args: list[str]
     env: Mapping[str, str]
 
     # This could be a bootstrap option, but it's preferable to keep these very limited to make it
@@ -72,7 +73,7 @@ class PantsRunner:
         self.scrub_pythonpath()
 
         options_bootstrapper = OptionsBootstrapper.create(
-            env=self.env, args=self.args, allow_pantsrc=True
+            args=self.args, env=self.env, allow_pantsrc=True
         )
         with warnings.catch_warnings(record=True):
             bootstrap_options = options_bootstrapper.bootstrap_options
@@ -83,10 +84,13 @@ class PantsRunner:
         stdin_fileno = sys.stdin.fileno()
         stdout_fileno = sys.stdout.fileno()
         stderr_fileno = sys.stderr.fileno()
-        with initialize_stdio(global_bootstrap_options), stdio_destination(
-            stdin_fileno=stdin_fileno,
-            stdout_fileno=stdout_fileno,
-            stderr_fileno=stderr_fileno,
+        with (
+            initialize_stdio(global_bootstrap_options),
+            stdio_destination(
+                stdin_fileno=stdin_fileno,
+                stdout_fileno=stdout_fileno,
+                stderr_fileno=stderr_fileno,
+            ),
         ):
             run_via_scie = "SCIE" in os.environ
             enable_scie_warnings = "NO_SCIE_WARNING" not in os.environ
@@ -115,11 +119,11 @@ class PantsRunner:
                         else "Run `PANTS_BOOTSTRAP_VERSION=report pants` to see the current version of the `pants` launcher binary"
                     )
                     warn_or_error(
-                        "2.18.0.dev6",
+                        "2.25.0.dev0",
                         f"using a `pants` launcher binary older than {MINIMUM_SCIE_PANTS_VERSION}",
                         softwrap(
                             f"""
-                            {current_version_text}, and see {doc_url("docs/getting-started/installing-pants")} for how to upgrade.
+                            {current_version_text}, and see {doc_url("docs/getting-started/installing-pants#upgrading-pants")} for how to upgrade.
                             """
                         ),
                     )
@@ -178,11 +182,6 @@ def _validate_macos_version(global_bootstrap_options: OptionValueContainer) -> N
     macos_version = macos_major_version()
     if macos_version is None:
         # Not macOS, no validation/deprecations required!
-        return
-
-    if global_bootstrap_options.allow_deprecated_macos_before_12 and is_macos_before_12():
-        # If someone has set this (deprecated) option, and the system is older than macOS 12,
-        # they'll don't want messages, so just skip.
         return
 
     arch_versions = _MACOS_VERSION_BECOMES_UNSUPPORTED_IN[get_normalized_arch_name()]
