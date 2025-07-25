@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
 """A script to automatically convert an INI Pants config file to TOML. There will still likely be
 some issues remaining which require manual fixes, but this script will automate most of the tedium.
 

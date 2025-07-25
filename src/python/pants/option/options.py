@@ -318,11 +318,11 @@ class Options:
     def _check_and_apply_deprecations(self, scope, values):
         """Checks whether a ScopeInfo has options specified in a deprecated scope.
 
-        There are two related cases here. Either:
-          1) The ScopeInfo has an associated deprecated_scope that was replaced with a non-deprecated
-             scope, meaning that the options temporarily live in two locations.
-          2) The entire ScopeInfo is deprecated (as in the case of deprecated SubsystemDependencies),
-             meaning that the options live in one location.
+        There are two related cases here. Either:   1) The ScopeInfo has an associated
+        deprecated_scope that was replaced with a non-deprecated      scope, meaning that the
+        options temporarily live in two locations.   2) The entire ScopeInfo is deprecated (as in
+        the case of deprecated SubsystemDependencies),      meaning that the options live in one
+        location.
 
         In the first case, this method has the side effect of merging options values from deprecated
         scopes into the given values.
@@ -373,8 +373,7 @@ class Options:
     ) -> OptionValueContainer:
         """Return the option values for the given scope.
 
-        Values are attributes of the returned object, e.g., options.foo.
-        Computed lazily per scope.
+        Values are attributes of the returned object, e.g., options.foo. Computed lazily per scope.
 
         :API: public
         :param scope: The scope to get options for.

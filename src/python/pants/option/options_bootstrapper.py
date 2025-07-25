@@ -53,9 +53,9 @@ class OptionsBootstrapper:
         :param args: An args array.
         :param env: An environment dictionary.
         :param allow_pantsrc: True to allow pantsrc files to be used. Unless tests are expecting to
-          consume pantsrc files, they should pass False in order to avoid reading files from
-          absolute paths. Production use-cases should pass True to allow options values to make the
-          decision of whether to respect pantsrc files.
+            consume pantsrc files, they should pass False in order to avoid reading files from
+            absolute paths. Production use-cases should pass True to allow options values to make
+            the decision of whether to respect pantsrc files.
         """
         args = tuple(args)
 
