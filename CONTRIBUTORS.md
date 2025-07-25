@@ -320,6 +320,7 @@ Created as part of the release process.
 + SergeKireev
 + Sergey Serebryakov
 + Seve Martinez
++ Shaked Kaplan
 + Shane Delmore
 + Shantanu Kumar
 + Shuo Li
