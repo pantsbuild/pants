@@ -1,17 +1,19 @@
 [GLOBAL]
+pants_version = "2.17.1"
 print_stacktrace = true
 
 # Enable our custom loose-source plugins.
 pythonpath = ["%(buildroot)s/pants-plugins"]
 backend_packages.add = [
   "pants.backend.build_files.fix.deprecations",
-  "pants.backend.build_files.fmt.ruff",
+  "pants.backend.build_files.fmt.black",
   "pants.backend.python",
+  "pants.backend.experimental.python.packaging.pyoxidizer",
   "pants.backend.python.lint.autoflake",
+  "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.flake8",
   "pants.backend.python.lint.isort",
-  "pants.backend.python.lint.pyupgrade",
   "pants.backend.python.typecheck.mypy",
   "pants.backend.python.mixed_interpreter_constraints",
   "pants.backend.shell",
@@ -27,20 +29,17 @@ backend_packages.add = [
   "pants.backend.experimental.javascript",
   "pants.backend.experimental.javascript.lint.prettier",
   "pants.backend.experimental.python",
-  "pants.backend.experimental.python.lint.ruff.format",
   "pants.backend.experimental.python.packaging.pyoxidizer",
   "pants.backend.experimental.scala",
   "pants.backend.experimental.scala.lint.scalafmt",
-  "pants.backend.experimental.scala.lint.scalafix",
   "pants.backend.experimental.scala.debug_goals",
   "pants.backend.experimental.tools.workunit_logger",
-  "pants.backend.experimental.typescript",
   "pants.backend.experimental.visibility",
   "pants.backend.tools.preamble",
-  "pants.backend.tools.taplo",
-  "pants_explorer.server",
-  "internal_plugins.releases",
-  "internal_plugins.test_lockfile_fixtures",
+  "pants.backend.tools.taplo"
+]
+plugins = [
+  "hdrhistogram", # For use with `--stats-log`.
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -50,15 +49,15 @@ pantsd_invalidation_globs.add = [
   "!BUILD",
   "!src/python/pants_release/**",
   # NB: The `target` directory is ignored via `pants_ignore` below.
-  "src/rust/**/*.rs",
-  "src/rust/**/*.toml",
+  "src/rust/engine/**/*.rs",
+  "src/rust/engine/**/*.toml",
 ]
 # Path patterns to ignore for filesystem operations on top of the builtin patterns.
 pants_ignore.add = [
   # venv directories under build-support.
   "/build-support/*.venv/",
   # We shouldn't walk or watch the rust compiler artifacts because it is slow.
-  "/src/rust/target",
+  "/src/rust/engine/target",
   # We want to .gitignore Java .class files, but pants should pay attention to them.
   "!*.class",
   # We also want to override the .gitignore'd pants.pex file
@@ -67,7 +66,6 @@ pants_ignore.add = [
   "/docs/node_modules",
   # We have Pants stuff in here
   "!.github/",
-  "!/src/rust/.cargo",
 ]
 
 build_ignore.add = [
@@ -82,10 +80,6 @@ unmatched_build_file_globs = "error"
 #   https://github.com/pantsbuild/pants/issues/16096.
 cache_content_behavior = "fetch"
 
-# Our current macOS 10.15 and 11 infrastructure is working okay, so for now (i.e. 2.24 dev
-# releases), we'll just keep building on them:
-allow_deprecated_macos_versions = ["10", "11"]
-
 [DEFAULT]
 # Tell `scie-pants` to use our `./pants` bootstrap script.
 delegate_bootstrap = true
@@ -95,7 +89,7 @@ enabled = true
 repo_id = "7775F8D5-FC58-4DBC-9302-D00AE4A1505F"
 
 [cli.alias]
---all-changed = "--changed-since=HEAD --changed-dependents=transitive"
+run-pyupgrade = "--backend-packages=pants.backend.experimental.python.lint.pyupgrade fmt"
 
 [source]
 root_patterns = [
@@ -107,138 +101,7 @@ root_patterns = [
   "/build-support/flake8",
   "/build-support/migration-support",
   "/pants-plugins",
-  # For `conftest.py`
   "/",
+  "pants_src/"
 ]
 
-[environments-preview.names]
-# We don't define any local environments because the options system covers our cases adequately.
-docker = "//:docker_env"
-# Used for iterating on remote-execution.
-remote = "//:buildgrid_remote"
-
-[tailor]
-build_file_header = """\
-# Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
-# Licensed under the Apache License, Version 2.0 (see LICENSE).
-"""
-ignore_paths = ["build-support/migration-support/BUILD"]
-ignore_adding_targets = [
-  "src/python/pants:__main__",
-  "src/python/pants/backend/docker/subsystems:dockerfile_wrapper_script",
-  "src/python/pants/backend/python/dependency_inference/scripts:dependency_parser0",
-  "src/python/pants/backend/terraform:hcl2_parser0",
-]
-
-[update-build-files]
-# We use `pants.backend.build_files.fmt.ruff`
-fmt = false
-
-[pex]
-venv_use_symlinks = true
-# This is off by default, but we want to dogfood it before switching on for everyone.
-emit_warnings = true
-
-[python]
-# N.B.: When upgrading to a new Python version, you must update the Pants
-# `python_distribution` targets, currently:
-# + src/python/pants:pants-packaged
-# + src/python/pants/testutil:testutil_wheel
-# And update the PythonBuildStandalone version/URL:
-# + src/python/pants/core/subsystems/python_bootstrap.py
-interpreter_constraints = ["==3.11.*"]
-macos_big_sur_compatibility = true
-enable_resolves = true
-pip_version = "latest"
-
-[python.resolves]
-python-default = "3rdparty/python/user_reqs.lock"
-flake8 = "3rdparty/python/flake8.lock"
-mypy = "3rdparty/python/mypy.lock"
-pytest = "3rdparty/python/pytest.lock"
-pbs-script = "3rdparty/python/pbs-script-requirements.lock"
-
-[python-infer]
-assets = true
-unowned_dependency_behavior = "error"
-
-[docformatter]
-args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
-
-[flake8]
-config = "build-support/flake8/.flake8"
-source_plugins = ["build-support/flake8"]
-install_from_resolve = "flake8"
-requirements = ["//3rdparty/python:flake8"]
-
-[shellcheck]
-args = ["--external-sources"]
-
-[shfmt]
-# See https://github.com/mvdan/sh/blob/master/cmd/shfmt/shfmt.1.scd#printer-flags.
-args = ["-i 2", "-ci", "-sr"]
-
-[pytest]
-args = ["--no-header", "-vv"]
-execution_slot_var = "TEST_EXECUTION_SLOT"
-install_from_resolve = "pytest"
-requirements = ["//3rdparty/python:pytest"]
-
-[test]
-extra_env_vars = [
-  # TODO: These are exposed to tests in order to allow for python interpreter discovery when
-  # Pants-tests-Pants: in particular, the [python] subsystem consumes them.
-  #   see https://github.com/pantsbuild/pants/issues/11638
-  "PYENV_ROOT",
-  "HOME",
-  "PATH",
-  # We'd always like complete backtraces in tests.
-  "RUST_BACKTRACE=1",
-]
-timeout_default = 60
-
-[mypy]
-install_from_resolve = "mypy"
-requirements = ["//3rdparty/python:mypy"]
-
-
-[coverage-py]
-interpreter_constraints = ["==3.11.*"]
-
-[preamble]
-template_by_globs = "@build-support/preambles/config.yaml"
-
-[generate-lockfiles]
-diff = true
-
-[pyupgrade]
-args = ["--keep-runtime-typing", "--py311-plus"]
-
-
-[jvm]
-default_resolve = "jvm_testprojects"
-
-[jvm.resolves]
-# A shared resolve for all testproject/example code. Because this is not shipped with Pants
-# binaries, it requires no isolation.
-jvm_testprojects = "3rdparty/jvm/testprojects.lockfile"
-# A resolve for the java_parser, which is shipped with Pants, and invoked with its own isolated
-# classpath. Consequently, we isolate it to its own lockfile.
-# Note: The jvm_artifact targets in this resolve must be kept in sync with the requirements
-# in `generate_java_parser_lockfile_request`.
-java_parser_dev = "src/python/pants/backend/java/dependency_inference/java_parser.lock"
-# Has the same isolation requirements as `java_parser`.
-# Note: The jvm_artifact targets in this resolve must be kept in sync with with the requirements
-# in `generate_scala_parser_lockfile_request`.
-scala_parser_dev = "src/python/pants/backend/scala/dependency_inference/scala_parser.lock"
-strip_jar_dev = "src/python/pants/jvm/strip_jar/strip_jar.lock"
-jar_tool_dev = "src/python/pants/jvm/jar_tool/jar_tool.lock"
-
-[scala]
-version_for_resolve = { "scala_parser_dev" = "2.13.8" }
-
-[scalac]
-args = ["-Yrangepos", "-Xlint:unused"]
-
-[scala-infer]
-force_add_siblings_as_dependencies = false
