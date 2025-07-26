@@ -1,0 +1,12 @@
+{
+  "name": "@test/main-app",
+  "version": "1.0.0",
+  "description": "Main application",
+  "main": "./src/index.ts",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@test/common-types": "*",
+    "@test/shared-utils": "*"
+  }
+}
