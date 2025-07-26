@@ -23,7 +23,7 @@ class FlagErrorHelpPrinter(MaybeColor):
             options,
             # We only care about the options-related help info, so we pass in
             # dummy values for the other arguments.
-            UnionMembership({}),
+            UnionMembership.empty(),
             lambda x: tuple(),
             RegisteredTargetTypes({}),
             BuildFileSymbolsInfo.from_info(),

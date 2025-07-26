@@ -24,6 +24,7 @@ from pants.backend.python.packaging.pyoxidizer.target_types import (
 )
 from pants.backend.python.target_types import GenerateSetupField, WheelField
 from pants.backend.python.util_rules.pex import PexProcess, create_pex, setup_pex_process
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,
@@ -32,7 +33,6 @@ from pants.core.goals.package import (
     environment_aware_package,
 )
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
-from pants.core.util_rules.environments import EnvironmentField
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests, RemovePrefix
 from pants.engine.internals.graph import find_valid_field_sets, hydrate_sources, resolve_targets
@@ -45,7 +45,7 @@ from pants.engine.intrinsics import (
 )
 from pants.engine.platform import Platform, PlatformError
 from pants.engine.process import Process, execute_process_or_raise
-from pants.engine.rules import Get, Rule, collect_rules, concurrently, implicitly, rule
+from pants.engine.rules import Rule, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     DependenciesRequest,
     FieldSetsPerTargetRequest,
@@ -232,7 +232,7 @@ async def run_pyoxidizer_binary(field_set: PyOxidizerFieldSet) -> RunRequest:
         # COPYING.txt is the default name later versions of pyoxidizer use to write an SBOM.
         return artifact_path.parent.name == "install" and artifact_path.name != "COPYING.txt"
 
-    binary = await Get(BuiltPackage, PackageFieldSet, field_set)
+    binary = await package_pyoxidizer_binary(**implicitly(field_set))
     executable_binaries = [
         artifact for artifact in binary.artifacts if is_executable_binary(artifact.relpath)
     ]

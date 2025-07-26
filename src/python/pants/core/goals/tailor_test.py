@@ -29,9 +29,10 @@ from pants.core.goals.tailor import (
     resolve_specs_with_build,
 )
 from pants.core.util_rules import source_files
-from pants.engine.fs import DigestContents, FileContent, PathGlobs, Paths
+from pants.engine.fs import DigestContents, FileContent
 from pants.engine.internals.build_files import extract_build_file_options
-from pants.engine.rules import Get, QueryRule, rule
+from pants.engine.intrinsics import path_globs_to_paths
+from pants.engine.rules import QueryRule, rule
 from pants.engine.target import MultipleSourcesField, Target
 from pants.engine.unions import UnionRule
 from pants.source.filespec import FilespecMatcher
@@ -78,7 +79,7 @@ class PutativeFortranTargetsRequest(PutativeTargetsRequest):
 async def find_fortran_targets(
     req: PutativeFortranTargetsRequest, all_owned_sources: AllOwnedSources
 ) -> PutativeTargets:
-    all_fortran_files = await Get(Paths, PathGlobs, req.path_globs("*.f90"))
+    all_fortran_files = await path_globs_to_paths(req.path_globs("*.f90"))
     unowned_shell_files = set(all_fortran_files.files) - set(all_owned_sources)
 
     tests_filespec_matcher = FilespecMatcher(FortranTestsSources.default, ())
@@ -117,7 +118,9 @@ class MockPutativeFortranModuleRequest(PutativeTargetsRequest):
 
 
 @rule
-def infer_fortran_module_dependency(_request: MockPutativeFortranModuleRequest) -> PutativeTargets:
+async def infer_fortran_module_dependency(
+    _request: MockPutativeFortranModuleRequest,
+) -> PutativeTargets:
     return PutativeTargets(
         [
             PutativeTarget.for_target_type(
@@ -137,7 +140,7 @@ def rule_runner() -> RuleRunner:
             find_fortran_targets,
             infer_fortran_module_dependency,
             UnionRule(PutativeTargetsRequest, PutativeFortranTargetsRequest),
-            QueryRule(PutativeTargets, (MockPutativeFortranModuleRequest,)),
+            UnionRule(PutativeTargetsRequest, MockPutativeFortranModuleRequest),
             QueryRule(UniquelyNamedPutativeTargets, (PutativeTargets,)),
             QueryRule(DisjointSourcePutativeTarget, (PutativeTarget,)),
             QueryRule(EditedBuildFiles, (EditBuildFilesRequest,)),
@@ -440,6 +443,8 @@ def test_tailor_rule_write_mode(rule_runner: RuleRunner) -> None:
           - Add my_fortran_lib target baz
         Updated conflict/BUILD:
           - Add my_fortran_lib target conflict0
+        Created dir/BUILD:
+          - Add fortran_module target dir
         Updated foo/BUILD:
           - Add fortran_tests target tests
         """
@@ -482,6 +487,8 @@ def test_tailor_rule_check_mode(rule_runner: RuleRunner) -> None:
         """\
         Would create baz/BUILD:
           - Add fortran_library target baz
+        Would create dir/BUILD:
+          - Add fortran_module target dir
         Would update foo/BUILD:
           - Add fortran_tests target tests
 

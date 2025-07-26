@@ -35,7 +35,7 @@ from pants.engine.intrinsics import (
     merge_digests,
 )
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
@@ -93,6 +93,7 @@ class ScalafixPartitionInfo:
     compile_classpath_entries: tuple[str, ...]
     rule_classpath_entries: tuple[str, ...]
     extra_immutable_input_digests: FrozenDict[str, Digest]
+    resolve_name: str
 
     @property
     def description(self) -> str:
@@ -122,7 +123,7 @@ async def _resolve_scalafix_rule_classpath(
     if not scalafix.rule_targets:
         return _MaybeClasspath(classpath=None)
 
-    classpath = await Get(Classpath, UnparsedAddressInputs, scalafix.rule_targets)
+    classpath = await classpath_get(**implicitly({scalafix.rule_targets: UnparsedAddressInputs}))
     return _MaybeClasspath(classpath)
 
 
@@ -241,6 +242,9 @@ async def _partition_scalafix(
                     **dict(rule_classpath.immutable_inputs(prefix=rulecp_relpath)),
                 }
             ),
+            resolve_name=classpath.classpath.resolve.name
+            if classpath.classpath
+            else jvm.default_resolve,
         )
 
     return Partitions(
@@ -255,17 +259,19 @@ async def _partition_scalafix(
 
 
 @rule
-def _scalafix_fix_partitions(
+async def _scalafix_fix_partitions(
     request: ScalafixFixRequest.PartitionRequest[ScalafixFieldSet],
-) -> _ScalafixPartitionRequest:
-    return _ScalafixPartitionRequest(request.field_sets)
+) -> Partitions:
+    ret = await _partition_scalafix(_ScalafixPartitionRequest(request.field_sets), **implicitly())
+    return ret
 
 
 @rule
 async def _scalafix_lint_partitions(
     request: ScalafixLintRequest.PartitionRequest[ScalafixFieldSet],
-) -> _ScalafixPartitionRequest:
-    return _ScalafixPartitionRequest(request.field_sets)
+) -> Partitions:
+    ret = await _partition_scalafix(_ScalafixPartitionRequest(request.field_sets), **implicitly())
+    return ret
 
 
 async def _restore_source_roots(source_roots_result: SourceRootsResult, digest: Digest) -> Snapshot:
@@ -301,7 +307,6 @@ async def _run_scalafix_process(
     merged_digest = await merge_digests(
         MergeDigests([partition_info.config_snapshot.digest, request.snapshot.digest])
     )
-
     return await execute_process(
         **implicitly(
             JvmProcess(
@@ -321,7 +326,12 @@ async def _run_scalafix_process(
                         else ()
                     ),
                     *(("--check",) if request.check_only else ()),
-                    *((f"--scalac-options={arg}" for arg in scalac.args) if scalac.args else ()),
+                    *(
+                        f"--scalac-options={arg}"
+                        for arg in (
+                            scalac.parsed_args_for_resolve(partition_info.resolve_name) or ()
+                        )
+                    ),
                     *(f"--files={file}" for file in request.snapshot.files),
                 ],
                 classpath_entries=partition_info.runtime_classpath_entries,

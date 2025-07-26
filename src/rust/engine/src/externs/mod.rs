@@ -40,6 +40,7 @@ pub mod scheduler;
 mod stdio;
 mod target;
 pub mod testutil;
+mod unions;
 pub mod workunits;
 
 pub fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -87,7 +88,7 @@ pub fn equals(h1: &Bound<'_, PyAny>, h2: &Bound<'_, PyAny>) -> bool {
     // between non-equal types to avoid legacy behavior like `assert True == 1`, which is very
     // surprising in interning, and would likely be surprising anywhere else in the engine where we
     // compare things.
-    if !h1.get_type().is(&h2.get_type()) {
+    if !h1.get_type().is(h2.get_type()) {
         return false;
     }
     h1.eq(h2).unwrap()
@@ -108,7 +109,7 @@ pub fn is_union(py: Python, v: &Bound<'_, PyType>) -> PyResult<bool> {
 
 /// If the given type is a @union, return its in-scope types.
 ///
-/// This function is also implemented in Python as `pants.engine.union.union_in_scope_types`.
+/// This function is also implemented in Python as `pants.engine.unions.union_in_scope_types`.
 pub fn union_in_scope_types<'py>(
     py: Python<'py>,
     v: &Bound<'py, PyType>,
@@ -570,6 +571,14 @@ impl PyGeneratorResponseCall {
             input_types,
             inputs,
         })))))
+    }
+
+    #[getter]
+    fn rule_id(&self, py: Python) -> PyResult<String> {
+        // TODO: Currently this is only called in test infrastructure (specifically, by
+        // rule_runner.py). But if this ends up being used in a performance sensitive
+        // code path, consider denormalizing the rule_id to avoid this copy.
+        Ok(self.borrow_inner(py)?.rule_id.as_str().to_owned())
     }
 
     #[getter]

@@ -12,7 +12,7 @@ from typing import Any, DefaultDict
 
 from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.core.util_rules.environments import EnvironmentsSubsystem
+from pants.core.environments.subsystems import EnvironmentsSubsystem
 from pants.engine.goal import GoalSubsystem
 from pants.engine.rules import Rule, RuleIndex
 from pants.engine.target import Target

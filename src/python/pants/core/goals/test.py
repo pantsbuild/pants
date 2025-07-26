@@ -16,15 +16,15 @@ from enum import Enum
 from pathlib import PurePath
 from typing import Any, ClassVar, TypeVar, cast
 
-from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
-from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
-from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
-from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.environments import (
+from pants.core.environments.rules import (
     ChosenLocalEnvironmentName,
     EnvironmentName,
     SingleEnvironmentNameRequest,
 )
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
+from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
+from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
+from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.partitions import (
     PartitionerType,
     PartitionMetadataT,

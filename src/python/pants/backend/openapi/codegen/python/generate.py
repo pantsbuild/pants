@@ -38,31 +38,37 @@ from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
     Digest,
-    DigestContents,
     DigestSubset,
     Directory,
     FileContent,
     MergeDigests,
     PathGlobs,
     RemovePrefix,
-    Snapshot,
 )
+from pants.engine.internals.graph import hydrate_sources
+from pants.engine.internals.graph import transitive_targets as transitive_targets_get
 from pants.engine.internals.native_engine import Address
-from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.intrinsics import (
+    create_digest,
+    digest_subset_to_digest,
+    digest_to_snapshot,
+    get_digest_contents,
+    merge_digests,
+    remove_prefix,
+)
+from pants.engine.process import fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     FieldSet,
     GeneratedSources,
     GenerateSourcesRequest,
-    HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
-    TransitiveTargets,
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.source.source_root import SourceRootRequest, get_source_root
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.pip_requirement import PipRequirement
@@ -108,9 +114,9 @@ async def compile_openapi_into_python(
     request: CompileOpenApiIntoPythonRequest,
 ) -> CompiledPythonFromOpenApi:
     output_dir = "__gen"
-    output_digest = await Get(Digest, CreateDigest([Directory(output_dir)]))
+    output_digest = await create_digest(CreateDigest([Directory(output_dir)]))
 
-    merged_digests = await Get(Digest, MergeDigests([request.input_digest, output_digest]))
+    merged_digests = await merge_digests(MergeDigests([request.input_digest, output_digest]))
 
     additional_properties: Iterable[str] = (
         itertools.chain(
@@ -138,14 +144,16 @@ async def compile_openapi_into_python(
         level=LogLevel.DEBUG,
     )
 
-    result = await Get(ProcessResult, OpenAPIGeneratorProcess, process)
-    normalized_digest = await Get(Digest, RemovePrefix(result.output_digest, output_dir))
-
-    requirements_digest, python_sources_digest = await MultiGet(
-        Get(Digest, DigestSubset(normalized_digest, PathGlobs(["requirements.txt"]))),
-        Get(Digest, DigestSubset(normalized_digest, PathGlobs(["**/*.py"]))),
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly({process: OpenAPIGeneratorProcess})
     )
-    requirements_contents = await Get(DigestContents, Digest, requirements_digest)
+    normalized_digest = await remove_prefix(RemovePrefix(result.output_digest, output_dir))
+
+    requirements_digest, python_sources_digest = await concurrently(
+        digest_subset_to_digest(DigestSubset(normalized_digest, PathGlobs(["requirements.txt"]))),
+        digest_subset_to_digest(DigestSubset(normalized_digest, PathGlobs(["**/*.py"]))),
+    )
+    requirements_contents = await get_digest_contents(requirements_digest)
     runtime_dependencies: tuple[PipRequirement, ...] = ()
     if len(requirements_contents) > 0:
         file = requirements_contents[0]
@@ -170,25 +178,24 @@ async def generate_python_from_openapi(
     if field_set.skip.value:
         return GeneratedSources(EMPTY_SNAPSHOT)
 
-    (document_sources, transitive_targets) = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(field_set.source)),
-        Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address])),
+    (document_sources, transitive_targets) = await concurrently(
+        hydrate_sources(HydrateSourcesRequest(field_set.source), **implicitly()),
+        transitive_targets_get(TransitiveTargetsRequest([field_set.address]), **implicitly()),
     )
 
-    document_dependencies = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(tgt[OpenApiSourceField]))
+    document_dependencies = await concurrently(
+        hydrate_sources(HydrateSourcesRequest(tgt[OpenApiSourceField]), **implicitly())
         for tgt in transitive_targets.dependencies
         if tgt.has_field(OpenApiSourceField)
     )
 
-    input_digest = await Get(
-        Digest,
+    input_digest = await merge_digests(
         MergeDigests(
             [
                 document_sources.snapshot.digest,
                 *[dependency.snapshot.digest for dependency in document_dependencies],
             ]
-        ),
+        )
     )
 
     gets = []
@@ -200,30 +207,29 @@ async def generate_python_from_openapi(
             )
 
         gets.append(
-            Get(
-                CompiledPythonFromOpenApi,
+            compile_openapi_into_python(
                 CompileOpenApiIntoPythonRequest(
                     file,
                     input_digest=input_digest,
                     description=f"Generating Python sources from OpenAPI definition {field_set.address}",
                     generator_name=generator_name,
                     additional_properties=field_set.additional_properties.value,
-                ),
+                )
             )
         )
 
-    compiled_sources = await MultiGet(gets)
+    compiled_sources = await concurrently(gets)
 
     logger.info("digests: %s", [sources.output_digest for sources in compiled_sources])
-    output_digest, source_root = await MultiGet(
-        Get(Digest, MergeDigests([sources.output_digest for sources in compiled_sources])),
-        Get(SourceRoot, SourceRootRequest, SourceRootRequest.for_target(request.protocol_target)),
+    output_digest, source_root = await concurrently(
+        merge_digests(MergeDigests([sources.output_digest for sources in compiled_sources])),
+        get_source_root(SourceRootRequest.for_target(request.protocol_target)),
     )
 
     source_root_restored = (
-        await Get(Snapshot, AddPrefix(output_digest, source_root.path))
+        await digest_to_snapshot(**implicitly(AddPrefix(output_digest, source_root.path)))
         if source_root.path != "."
-        else await Get(Snapshot, Digest, output_digest)
+        else await digest_to_snapshot(output_digest)
     )
     return GeneratedSources(source_root_restored)
 
@@ -290,21 +296,19 @@ async def infer_openapi_python_dependencies(
     # we use a sample OpenAPI spec to find out what are the runtime dependencies
     # for the given resolve and prevent creating a cycle in our rule engine.
     sample_spec_name = "__sample_spec.yaml"
-    sample_source_digest = await Get(
-        Digest,
+    sample_source_digest = await create_digest(
         CreateDigest(
             [FileContent(path=sample_spec_name, content=PETSTORE_SAMPLE_SPEC.encode("utf-8"))]
-        ),
+        )
     )
-    compiled_sources = await Get(
-        CompiledPythonFromOpenApi,
+    compiled_sources = await compile_openapi_into_python(
         CompileOpenApiIntoPythonRequest(
             input_file=sample_spec_name,
             input_digest=sample_source_digest,
             description=f"Inferring Python runtime dependencies for OpenAPI v{openapi_generator.version}",
             generator_name=request.field_set.generator_name.value,
             additional_properties=request.field_set.additional_properties.value,
-        ),
+        )
     )
 
     logger.info("Looking for thirdparty dependencies: %s", compiled_sources.runtime_dependencies)

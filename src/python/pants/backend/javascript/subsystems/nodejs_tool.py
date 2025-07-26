@@ -3,23 +3,35 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import ClassVar
 
 from pants.backend.javascript import install_node_package, nodejs_project_environment
 from pants.backend.javascript.install_node_package import (
-    InstalledNodePackage,
     InstalledNodePackageRequest,
+    install_node_packages_for_address,
 )
-from pants.backend.javascript.nodejs_project_environment import NodeJsProjectEnvironmentProcess
+from pants.backend.javascript.nodejs_project_environment import (
+    NodeJsProjectEnvironmentProcess,
+    setup_nodejs_project_environment_process,
+)
 from pants.backend.javascript.package_manager import PackageManager
-from pants.backend.javascript.resolve import FirstPartyNodePackageResolves, NodeJSProjectResolves
-from pants.backend.javascript.subsystems.nodejs import NodeJS, NodeJSToolProcess
+from pants.backend.javascript.resolve import (
+    resolve_to_first_party_node_package,
+    resolve_to_projects,
+)
+from pants.backend.javascript.subsystems.nodejs import (
+    NodeJS,
+    NodeJSToolProcess,
+    setup_node_tool_process,
+)
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import Get
+from pants.engine.intrinsics import merge_digests
 from pants.engine.process import Process
-from pants.engine.rules import Rule, collect_rules, rule
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import StrOption
 from pants.option.subsystem import Subsystem
@@ -37,6 +49,25 @@ class NodeJSToolBase(Subsystem):
         default=lambda cls: cls.default_version,
         help="Version string for the tool in the form package@version (e.g. prettier@3.5.2)",
     )
+
+    _binary_name = StrOption(
+        advanced=True,
+        default=None,
+        help="Override the binary to run for this tool. Defaults to the package name.",
+    )
+
+    @property
+    def binary_name(self) -> str:
+        """The binary name to run for this tool."""
+        if self._binary_name:
+            return self._binary_name
+
+        # For scoped packages (@scope/package), use the scope name (often matches the binary)
+        # For regular packages, use the full package name
+        match = re.match(r"^(?:@([^/]+)/[^@]+|([^@]+))", self.version)
+        if not match:
+            raise ValueError(f"Invalid npm package specification: {self.version}")
+        return match.group(1) or match.group(2)
 
     install_from_resolve = StrOption(
         advanced=True,
@@ -66,7 +97,8 @@ class NodeJSToolBase(Subsystem):
         extra_env: Mapping[str, str] | None = None,
     ) -> NodeJSToolRequest:
         return NodeJSToolRequest(
-            tool=self.version,
+            package=self.version,
+            binary_name=self.binary_name,
             resolve=self.install_from_resolve,
             args=args,
             input_digest=input_digest,
@@ -83,7 +115,8 @@ class NodeJSToolBase(Subsystem):
 
 @dataclass(frozen=True)
 class NodeJSToolRequest:
-    tool: str
+    package: str
+    binary_name: str
     resolve: str | None
     args: tuple[str, ...]
     input_digest: Digest
@@ -99,7 +132,6 @@ class NodeJSToolRequest:
 
 async def _run_tool_without_resolve(request: NodeJSToolRequest) -> Process:
     nodejs = await Get(NodeJS)
-
     pkg_manager_version = nodejs.package_managers.get(nodejs.package_manager)
     pkg_manager_and_version = nodejs.default_package_manager
     if pkg_manager_version is None or pkg_manager_and_version is None:
@@ -110,18 +142,21 @@ async def _run_tool_without_resolve(request: NodeJSToolRequest) -> Process:
                 f"""
                 Version for {nodejs.package_manager} has to be configured
                 in [{nodejs.options_scope}].package_managers when running
-                the tool '{request.tool}' without setting [{request.options_scope}].install_from_resolve.
+                the tool '{request.binary_name}' without setting [{request.options_scope}].install_from_resolve.
                 """
             )
         )
     pkg_manager = PackageManager.from_string(pkg_manager_and_version)
 
-    return await Get(
-        Process,
+    return await setup_node_tool_process(
         NodeJSToolProcess(
             pkg_manager.name,
             pkg_manager.version,
-            args=(*pkg_manager.download_and_execute_args, request.tool, *request.args),
+            args=pkg_manager.make_download_and_execute_args(
+                request.package,
+                request.binary_name,
+                request.args,
+            ),
             description=request.description,
             input_digest=request.input_digest,
             output_files=request.output_files,
@@ -130,11 +165,12 @@ async def _run_tool_without_resolve(request: NodeJSToolRequest) -> Process:
             timeout_seconds=request.timeout_seconds,
             extra_env=FrozenDict({**pkg_manager.extra_env, **request.extra_env}),
         ),
+        **implicitly(),
     )
 
 
 async def _run_tool_with_resolve(request: NodeJSToolRequest, resolve: str) -> Process:
-    resolves = await Get(NodeJSProjectResolves)
+    resolves = await resolve_to_projects(**implicitly())
 
     if request.resolve not in resolves:
         reason = (
@@ -144,30 +180,27 @@ async def _run_tool_with_resolve(request: NodeJSToolRequest, resolve: str) -> Pr
         )
         raise ValueError(f"{resolve} is not a named NodeJS resolve. {reason}")
 
-    all_first_party = await Get(FirstPartyNodePackageResolves)
+    all_first_party = await resolve_to_first_party_node_package(**implicitly())
     package_for_resolve = all_first_party[resolve]
     project = resolves[resolve]
-    installed = await Get(
-        InstalledNodePackage, InstalledNodePackageRequest(package_for_resolve.address)
+    installed = await install_node_packages_for_address(
+        InstalledNodePackageRequest(package_for_resolve.address), **implicitly()
     )
-    request_tool_without_version = request.tool.partition("@")[0]
-    return await Get(
-        Process,
+    return await setup_nodejs_project_environment_process(
         NodeJsProjectEnvironmentProcess(
             env=installed.project_env,
-            args=(
-                *project.package_manager.execute_args,
-                request_tool_without_version,
-                *request.args,
-            ),
+            args=(*project.package_manager.execute_args, request.binary_name, *request.args),
             description=request.description,
-            input_digest=await Get(Digest, MergeDigests([request.input_digest, installed.digest])),
+            input_digest=await merge_digests(
+                MergeDigests([request.input_digest, installed.digest])
+            ),
             output_files=request.output_files,
             output_directories=request.output_directories,
             per_package_caches=request.append_only_caches,
             timeout_seconds=request.timeout_seconds,
             extra_env=FrozenDict(request.extra_env),
         ),
+        **implicitly(),
     )
 
 

@@ -9,7 +9,7 @@ from typing import DefaultDict
 
 from pants.backend.codegen.thrift import thrift_parser
 from pants.backend.codegen.thrift.target_types import AllThriftTargets, ThriftSourceField
-from pants.backend.codegen.thrift.thrift_parser import ParsedThrift, ParsedThriftRequest
+from pants.backend.codegen.thrift.thrift_parser import ParsedThriftRequest, parse_thrift_file
 from pants.backend.python.dependency_inference.module_mapper import (
     FirstPartyPythonMappingImpl,
     FirstPartyPythonMappingImplMarker,
@@ -19,7 +19,7 @@ from pants.backend.python.dependency_inference.module_mapper import (
 )
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonResolveField
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import collect_rules, concurrently, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
@@ -39,8 +39,8 @@ async def map_thrift_to_python_modules(
     python_setup: PythonSetup,
     _: PythonThriftMappingMarker,
 ) -> FirstPartyPythonMappingImpl:
-    parsed_files = await MultiGet(
-        Get(ParsedThrift, ParsedThriftRequest(tgt[ThriftSourceField])) for tgt in thrift_targets
+    parsed_files = await concurrently(
+        parse_thrift_file(ParsedThriftRequest(tgt[ThriftSourceField])) for tgt in thrift_targets
     )
 
     resolves_to_modules_to_providers: DefaultDict[

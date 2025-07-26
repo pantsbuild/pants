@@ -259,6 +259,51 @@ class Address:
     def __gt__(self, other: Any) -> bool: ...
 
 # ------------------------------------------------------------------------------
+# Union
+# ------------------------------------------------------------------------------
+
+class UnionRule:
+    union_base: type
+    union_member: type
+
+    def __init__(self, union_base: type, union_member: type) -> None: ...
+
+_T = TypeVar("_T", bound=type)
+
+class UnionMembership:
+    @staticmethod
+    def from_rules(rules: Iterable[UnionRule]) -> UnionMembership: ...
+    @staticmethod
+    def empty() -> UnionMembership: ...
+    def __contains__(self, union_type: _T) -> bool: ...
+    def __getitem__(self, union_type: _T) -> Sequence[_T]:
+        """Get all members of this union type.
+
+        If the union type does not exist because it has no members registered, this will raise an
+        IndexError.
+
+        Note that the type hint assumes that all union members will have subclassed the union type
+        - this is only a convention and is not actually enforced. So, you may have inaccurate type
+        hints.
+        """
+
+    def get(self, union_type: _T) -> Sequence[_T]:
+        """Get all members of this union type.
+
+        If the union type does not exist because it has no members registered, return an empty
+        Sequence.
+
+        Note that the type hint assumes that all union members will have subclassed the union type
+        - this is only a convention and is not actually enforced. So, you may have inaccurate type
+        hints.
+        """
+
+    def items(self) -> Iterable[tuple[type, Sequence[type]]]: ...
+    def is_member(self, union_type: type, putative_member: type) -> bool: ...
+    def has_members(self, union_type: type) -> bool:
+        """Check whether the union has an implementation or not."""
+
+# ------------------------------------------------------------------------------
 # Scheduler
 # ------------------------------------------------------------------------------
 
@@ -602,6 +647,8 @@ class ProcessExecutionEnvironment:
         remote_execution: bool,
         remote_execution_extra_platform_properties: Sequence[tuple[str, str]],
         execute_in_workspace: bool,
+        # Must be a `KeepSandboxes` value
+        keep_sandboxes: str,
     ) -> None: ...
     def __eq__(self, other: ProcessExecutionEnvironment | Any) -> bool: ...
     def __hash__(self) -> int: ...
@@ -719,6 +766,8 @@ class PyStubCAS:
     @property
     def address(self) -> str: ...
     def remove(self, digest: FileDigest | Digest) -> bool: ...
+    def contains(self, digest: FileDigest | Digest) -> bool: ...
+    def contains_action_result(self, digest: FileDigest | Digest) -> bool: ...
     def action_cache_len(self) -> int: ...
 
 # ------------------------------------------------------------------------------
@@ -829,7 +878,13 @@ def tasks_task_begin(
 ) -> None: ...
 def tasks_task_end(tasks: PyTasks) -> None: ...
 def tasks_add_call(
-    tasks: PyTasks, output: type, inputs: Sequence[type], rule_id: str, explicit_args_arity: int
+    tasks: PyTasks,
+    output: type,
+    inputs: Sequence[type],
+    rule_id: str,
+    explicit_args_arity: int,
+    vtable_entries: Sequence[tuple[type, str]] | None,
+    in_scope_types: Sequence[type] | None,
 ) -> None: ...
 def tasks_add_get(tasks: PyTasks, output: type, inputs: Sequence[type]) -> None: ...
 def tasks_add_get_union(
@@ -851,6 +906,7 @@ def scheduler_create(
     tasks: PyTasks,
     types: PyTypes,
     build_root: str,
+    pants_workdir: str,
     local_execution_root_dir: str,
     named_caches_dir: str,
     ignore_patterns: Sequence[str],
@@ -919,6 +975,7 @@ _Output = TypeVar("_Output")
 _Input = TypeVar("_Input")
 
 class PyGeneratorResponseCall:
+    rule_id: str
     output_type: type
     input_types: Sequence[type]
     inputs: Sequence[Any]

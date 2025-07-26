@@ -18,6 +18,7 @@ from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.target_types import PexBinary, PythonSourcesGeneratorTarget
 from pants.backend.python.target_types_rules import rules as python_target_type_rules
 from pants.backend.python.util_rules import pex_from_targets
+from pants.core.environments.rules import ChosenLocalEnvironmentName, SingleEnvironmentNameRequest
 from pants.core.goals.test import (
     BuildPackageDependenciesRequest,
     BuiltPackageDependencies,
@@ -42,10 +43,6 @@ from pants.core.goals.test import (
 )
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.environments import (
-    ChosenLocalEnvironmentName,
-    SingleEnvironmentNameRequest,
-)
 from pants.core.util_rules.partitions import Partition, Partitions
 from pants.engine.addresses import Address
 from pants.engine.console import Console
@@ -76,7 +73,7 @@ from pants.engine.target import (
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
 )
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
 from pants.testutil.option_util import create_goal_subsystem, create_subsystem
@@ -110,6 +107,7 @@ def make_process_result_metadata(
             remote_execution=remote_execution,
             remote_execution_extra_platform_properties=[],
             execute_in_workspace=False,
+            keep_sandboxes="never",
         ),
         source,
         source_run_id,
@@ -298,13 +296,13 @@ def run_test_rule(
         port="5678",
     )
     workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
-    union_membership = UnionMembership(
+    union_membership = UnionMembership.from_rules(
         {
-            TestFieldSet: [MockTestFieldSet],
-            TestRequest: [request_type],
-            TestRequest.PartitionRequest: [request_type.PartitionRequest],
-            TestRequest.Batch: [request_type.Batch],
-            CoverageDataCollection: [MockCoverageDataCollection],
+            UnionRule(TestFieldSet, MockTestFieldSet),
+            UnionRule(TestRequest, request_type),
+            UnionRule(TestRequest.PartitionRequest, request_type.PartitionRequest),
+            UnionRule(TestRequest.Batch, request_type.Batch),
+            UnionRule(CoverageDataCollection, MockCoverageDataCollection),
         }
     )
 
@@ -325,11 +323,6 @@ def run_test_rule(
         _field_set: TestFieldSet, _environment_name: EnvironmentName
     ) -> TestDebugRequest:
         return TestDebugRequest(InteractiveProcess(["/bin/example"], input_digest=EMPTY_DIGEST))
-
-    def mock_debug_adapter_request(_: TestFieldSet) -> TestDebugAdapterRequest:
-        return TestDebugAdapterRequest(
-            InteractiveProcess(["/bin/example"], input_digest=EMPTY_DIGEST)
-        )
 
     def mock_coverage_report_generation(
         coverage_data_collection: MockCoverageDataCollection,
@@ -386,8 +379,8 @@ def run_test_rule(
                 ),
                 MockGet(
                     output_type=TestDebugAdapterRequest,
-                    input_types=(TestFieldSet,),
-                    mock=mock_debug_adapter_request,
+                    input_types=(TestRequest.Batch, EnvironmentName),
+                    mock=mock_debug_request,
                 ),
                 # Merge XML results.
                 MockGet(
@@ -412,6 +405,8 @@ def run_test_rule(
                 ),
             ],
             union_membership=union_membership,
+            # We don't want temporary warnings to interfere with our expected output.
+            show_warnings=False,
         )
         assert not stdio_reader.get_stdout()
         return result.exit_code, stdio_reader.get_stderr()

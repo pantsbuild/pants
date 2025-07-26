@@ -19,10 +19,9 @@ from pants.backend.javascript.package_manager import PackageManager
 from pants.backend.javascript.subsystems import nodejs
 from pants.backend.javascript.subsystems.nodejs import NodeJS, UserChosenNodeJSResolveAliases
 from pants.core.util_rules import stripped_source_files
-from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
+from pants.core.util_rules.stripped_source_files import StrippedFileNameRequest, strip_file_name
 from pants.engine.collection import Collection
 from pants.engine.internals.native_engine import MergeDigests
-from pants.engine.internals.selectors import Get
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.ordered_set import FrozenOrderedSet
@@ -179,7 +178,7 @@ class ProjectPaths:
 
 
 async def _get_default_resolve_name(path: str) -> str:
-    stripped = await Get(StrippedFileName, StrippedFileNameRequest(path))
+    stripped = await strip_file_name(StrippedFileNameRequest(path))
     return stripped.value.replace(os.path.sep, ".")
 
 
@@ -190,16 +189,20 @@ async def find_node_js_projects(
     nodejs: NodeJS,
     resolve_names: UserChosenNodeJSResolveAliases,
 ) -> AllNodeJSProjects:
-    # Note: If pnpm_workspace.yaml is present for an npm-managed project, it will override the package.json["workspaces"] setting, which is not intuitive
-    # pnpm_workspace.yaml should only be used for pnpm projects - see https://github.com/pantsbuild/pants/issues/21134
-    project_paths = (
-        (
-            ProjectPaths(pkg.root_dir, ["", *pkg.workspaces])
-            if pkg not in pnpm_workspaces
-            else ProjectPaths(pkg.root_dir, ["", *pnpm_workspaces[pkg].packages])
-        )
-        for pkg in package_workspaces
-    )
+    project_paths = []
+    for pkg in package_workspaces:
+        package_manager = pkg.package_manager or nodejs.default_package_manager
+        if (
+            package_manager and PackageManager.from_string(package_manager).name == "pnpm"
+        ):  # case for pnpm
+            if pkg in pnpm_workspaces:
+                project_paths.append(
+                    ProjectPaths(pkg.root_dir, ["", *pnpm_workspaces[pkg].packages])
+                )
+            else:
+                project_paths.append(ProjectPaths(pkg.root_dir, [""]))
+        else:  # case for npm, yarn
+            project_paths.append(ProjectPaths(pkg.root_dir, ["", *pkg.workspaces]))
 
     node_js_projects = {
         _TentativeProject(

@@ -7,21 +7,24 @@ from dataclasses import dataclass
 
 from pants.backend.codegen.thrift.apache.subsystem import ApacheThriftSubsystem
 from pants.backend.codegen.thrift.target_types import ThriftSourceField
-from pants.core.util_rules.environments import EnvironmentTarget
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.environments.target_types import EnvironmentTarget
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.core.util_rules.system_binaries import (
     BinaryNotFoundError,
     BinaryPathRequest,
-    BinaryPaths,
     BinaryPathTest,
+    find_binary,
 )
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
-from pants.source.source_root import SourceRootsRequest, SourceRootsResult
+from pants.engine.env_vars import EnvironmentVarsRequest
+from pants.engine.fs import CreateDigest, Directory, MergeDigests, RemovePrefix, Snapshot
+from pants.engine.internals.graph import transitive_targets as transitive_targets_get
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import create_digest, digest_to_snapshot, merge_digests
+from pants.engine.process import Process, execute_process_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.target import TransitiveTargetsRequest
+from pants.source.source_root import SourceRootsRequest, get_source_roots
 from pants.util.logging import LogLevel
 from pants.util.strutil import bullet_list, softwrap
 
@@ -53,39 +56,37 @@ async def generate_apache_thrift_sources(
 ) -> GeneratedThriftSources:
     output_dir = "_generated_files"
 
-    transitive_targets, empty_output_dir_digest = await MultiGet(
-        Get(TransitiveTargets, TransitiveTargetsRequest([request.thrift_source_field.address])),
-        Get(Digest, CreateDigest([Directory(output_dir)])),
+    transitive_targets, empty_output_dir_digest = await concurrently(
+        transitive_targets_get(
+            TransitiveTargetsRequest([request.thrift_source_field.address]), **implicitly()
+        ),
+        create_digest(CreateDigest([Directory(output_dir)])),
     )
 
-    transitive_sources, target_sources = await MultiGet(
-        Get(
-            SourceFiles,
+    transitive_sources, target_sources = await concurrently(
+        determine_source_files(
             SourceFilesRequest(
                 tgt[ThriftSourceField]
                 for tgt in transitive_targets.closure
                 if tgt.has_field(ThriftSourceField)
-            ),
+            )
         ),
-        Get(SourceFiles, SourceFilesRequest([request.thrift_source_field])),
+        determine_source_files(SourceFilesRequest([request.thrift_source_field])),
     )
 
-    sources_roots = await Get(
-        SourceRootsResult,
-        SourceRootsRequest,
-        SourceRootsRequest.for_files(transitive_sources.snapshot.files),
+    sources_roots = await get_source_roots(
+        SourceRootsRequest.for_files(transitive_sources.snapshot.files)
     )
     deduped_source_root_paths = sorted({sr.path for sr in sources_roots.path_to_root.values()})
 
-    input_digest = await Get(
-        Digest,
+    input_digest = await merge_digests(
         MergeDigests(
             [
                 transitive_sources.snapshot.digest,
                 target_sources.snapshot.digest,
                 empty_output_dir_digest,
             ]
-        ),
+        )
     )
 
     options_str = ""
@@ -106,18 +107,21 @@ async def generate_apache_thrift_sources(
         *target_sources.snapshot.files,
     ]
 
-    result = await Get(
-        ProcessResult,
-        Process(
-            args,
-            input_digest=input_digest,
-            output_directories=(output_dir,),
-            description=f"Generating {request.lang_name} sources from {request.thrift_source_field.address}.",
-            level=LogLevel.DEBUG,
+    result = await execute_process_or_raise(
+        **implicitly(
+            Process(
+                args,
+                input_digest=input_digest,
+                output_directories=(output_dir,),
+                description=f"Generating {request.lang_name} sources from {request.thrift_source_field.address}.",
+                level=LogLevel.DEBUG,
+            )
         ),
     )
 
-    output_snapshot = await Get(Snapshot, RemovePrefix(result.output_digest, output_dir))
+    output_snapshot = await digest_to_snapshot(
+        **implicitly(RemovePrefix(result.output_digest, output_dir))
+    )
     return GeneratedThriftSources(output_snapshot)
 
 
@@ -127,15 +131,15 @@ async def setup_thrift_tool(
     apache_thrift_env_aware: ApacheThriftSubsystem.EnvironmentAware,
     env_target: EnvironmentTarget,
 ) -> ApacheThriftSetup:
-    env = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
+    env = await environment_vars_subset(EnvironmentVarsRequest(["PATH"]), **implicitly())
     search_paths = apache_thrift_env_aware.thrift_search_paths(env)
-    all_thrift_binary_paths = await Get(
-        BinaryPaths,
+    all_thrift_binary_paths = await find_binary(
         BinaryPathRequest(
             search_path=search_paths,
             binary_name="thrift",
             test=BinaryPathTest(["-version"]),
         ),
+        **implicitly(),
     )
     if not all_thrift_binary_paths.paths:
         raise BinaryNotFoundError(
@@ -151,14 +155,15 @@ async def setup_thrift_tool(
             )
         )
 
-    version_results = await MultiGet(
-        Get(
-            ProcessResult,
-            Process(
-                (binary_path.path, "-version"),
-                description=f"Determine Apache Thrift version for {binary_path.path}",
-                level=LogLevel.DEBUG,
-                cache_scope=env_target.executable_search_path_cache_scope(),
+    version_results = await concurrently(
+        execute_process_or_raise(
+            **implicitly(
+                Process(
+                    (binary_path.path, "-version"),
+                    description=f"Determine Apache Thrift version for {binary_path.path}",
+                    level=LogLevel.DEBUG,
+                    cache_scope=env_target.executable_search_path_cache_scope(),
+                )
             ),
         )
         for binary_path in all_thrift_binary_paths.paths

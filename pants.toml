@@ -42,9 +42,6 @@ backend_packages.add = [
   "internal_plugins.releases",
   "internal_plugins.test_lockfile_fixtures",
 ]
-plugins = [
-  "hdrhistogram", # For use with `--stats-log`.
-]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
 # path but not consumed by python, and additionally add the rust code.
@@ -53,15 +50,15 @@ pantsd_invalidation_globs.add = [
   "!BUILD",
   "!src/python/pants_release/**",
   # NB: The `target` directory is ignored via `pants_ignore` below.
-  "src/rust/engine/**/*.rs",
-  "src/rust/engine/**/*.toml",
+  "src/rust/**/*.rs",
+  "src/rust/**/*.toml",
 ]
 # Path patterns to ignore for filesystem operations on top of the builtin patterns.
 pants_ignore.add = [
   # venv directories under build-support.
   "/build-support/*.venv/",
   # We shouldn't walk or watch the rust compiler artifacts because it is slow.
-  "/src/rust/engine/target",
+  "/src/rust/target",
   # We want to .gitignore Java .class files, but pants should pay attention to them.
   "!*.class",
   # We also want to override the .gitignore'd pants.pex file
@@ -70,7 +67,7 @@ pants_ignore.add = [
   "/docs/node_modules",
   # We have Pants stuff in here
   "!.github/",
-  "!/src/rust/engine/.cargo",
+  "!/src/rust/.cargo",
 ]
 
 build_ignore.add = [

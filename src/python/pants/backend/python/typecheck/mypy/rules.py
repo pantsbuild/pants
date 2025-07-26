@@ -25,20 +25,22 @@ from pants.backend.python.util_rules.partition import (
     _partition_by_interpreter_constraints_and_resolve,
 )
 from pants.backend.python.util_rules.pex import (
-    Pex,
     PexRequest,
-    PexResolveInfo,
     VenvPex,
     VenvPexProcess,
+    create_pex,
+    create_venv_pex,
+    determine_venv_pex_resolve_info,
+    setup_venv_pex_process,
 )
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.backend.python.util_rules.python_sources import (
-    PythonSourceFiles,
     PythonSourceFilesRequest,
+    prepare_python_sources,
 )
 from pants.base.build_root import BuildRoot
 from pants.core.goals.check import REPORT_DIR, CheckRequest, CheckResult, CheckResults
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.core.util_rules.system_binaries import (
     CpBinary,
     LnBinary,
@@ -47,9 +49,10 @@ from pants.core.util_rules.system_binaries import (
     MvBinary,
 )
 from pants.engine.collection import Collection
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, RemovePrefix
-from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.fs import CreateDigest, FileContent, MergeDigests, RemovePrefix
+from pants.engine.internals.graph import coarsened_targets as coarsened_targets_get
+from pants.engine.intrinsics import create_digest, execute_process, merge_digests, remove_prefix
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
@@ -94,7 +97,7 @@ async def _generate_argv(
     if python_version:
         args.append(f"--python-version={python_version}")
 
-    mypy_pex_info = await Get(PexResolveInfo, VenvPex, pex)
+    mypy_pex_info = await determine_venv_pex_resolve_info(pex)
     mypy_info = mypy_pex_info.find("mypy")
     assert mypy_info is not None
     if mypy_info.version > packaging.version.Version("0.700") and python_version is not None:
@@ -164,34 +167,34 @@ async def mypy_typecheck_partition(
         else mypy.interpreter_constraints
     )
 
-    roots_sources_get = Get(
-        SourceFiles,
-        SourceFilesRequest(fs.sources for fs in partition.field_sets),
+    roots_sources_get = determine_source_files(
+        SourceFilesRequest(fs.sources for fs in partition.field_sets)
     )
 
     # See `requirements_venv_pex` for how this will get wrapped in a `VenvPex`.
-    requirements_pex_get = Get(
-        Pex,
-        RequirementsPexRequest(
-            (fs.address for fs in partition.field_sets),
-            hardcoded_interpreter_constraints=partition.interpreter_constraints,
-        ),
+    requirements_pex_get = create_pex(
+        **implicitly(
+            RequirementsPexRequest(
+                (fs.address for fs in partition.field_sets),
+                hardcoded_interpreter_constraints=partition.interpreter_constraints,
+            )
+        )
     )
 
-    mypy_pex_get = Get(
-        VenvPex,
-        PexRequest,
-        mypy.to_pex_request(
-            interpreter_constraints=tool_interpreter_constraints,
-            extra_requirements=first_party_plugins.requirement_strings,
-        ),
+    mypy_pex_get = create_venv_pex(
+        **implicitly(
+            mypy.to_pex_request(
+                interpreter_constraints=tool_interpreter_constraints,
+                extra_requirements=first_party_plugins.requirement_strings,
+            )
+        )
     )
 
     (
         roots_sources,
         mypy_pex,
         requirements_pex,
-    ) = await MultiGet(
+    ) = await concurrently(
         roots_sources_get,
         mypy_pex_get,
         requirements_pex_get,
@@ -199,9 +202,8 @@ async def mypy_typecheck_partition(
 
     python_files = determine_python_files(roots_sources.snapshot.files)
     file_list_path = "__files.txt"
-    file_list_digest_request = Get(
-        Digest,
-        CreateDigest([FileContent(file_list_path, "\n".join(python_files).encode())]),
+    file_list_digest_request = create_digest(
+        CreateDigest([FileContent(file_list_path, "\n".join(python_files).encode())])
     )
 
     # This creates a venv with all the 3rd-party requirements used by the code. We tell MyPy to
@@ -211,20 +213,21 @@ async def mypy_typecheck_partition(
     # We could have directly asked the `PexFromTargetsRequest` to return a `VenvPex`, rather than
     # `Pex`, but that would mean missing out on sharing a cache with other goals like `test` and
     # `run`.
-    requirements_venv_pex_request = Get(
-        VenvPex,
-        PexRequest(
-            output_filename="requirements_venv.pex",
-            internal_only=True,
-            pex_path=[requirements_pex],
-            interpreter_constraints=partition.interpreter_constraints,
-        ),
+    requirements_venv_pex_request = create_venv_pex(
+        **implicitly(
+            PexRequest(
+                output_filename="requirements_venv.pex",
+                internal_only=True,
+                pex_path=[requirements_pex],
+                interpreter_constraints=partition.interpreter_constraints,
+            )
+        )
     )
-    closure_sources_get = Get(
-        PythonSourceFiles, PythonSourceFilesRequest(partition.root_targets.closure())
+    closure_sources_get = prepare_python_sources(
+        PythonSourceFilesRequest(partition.root_targets.closure()), **implicitly()
     )
 
-    closure_sources, requirements_venv_pex, file_list_digest = await MultiGet(
+    closure_sources, requirements_venv_pex, file_list_digest = await concurrently(
         closure_sources_get, requirements_venv_pex_request, file_list_digest_request
     )
 
@@ -233,6 +236,8 @@ async def mypy_typecheck_partition(
     )
     named_cache_dir = ".cache/mypy_cache"
     mypy_cache_dir = f"{named_cache_dir}/{sha256(build_root.path.encode()).hexdigest()}"
+    if partition.resolve_description:
+        mypy_cache_dir += f"/{partition.resolve_description}"
     run_cache_dir = ".tmp_cache/mypy_cache"
     argv = await _generate_argv(
         mypy,
@@ -243,8 +248,7 @@ async def mypy_typecheck_partition(
         python_version=py_version,
     )
 
-    script_runner_digest = await Get(
-        Digest,
+    script_runner_digest = await create_digest(
         CreateDigest(
             [
                 FileContent(
@@ -316,11 +320,10 @@ async def mypy_typecheck_partition(
                     is_executable=True,
                 )
             ]
-        ),
+        )
     )
 
-    merged_input_files = await Get(
-        Digest,
+    merged_input_files = await merge_digests(
         MergeDigests(
             [
                 file_list_digest,
@@ -330,7 +333,7 @@ async def mypy_typecheck_partition(
                 config_file.digest,
                 script_runner_digest,
             ]
-        ),
+        )
     )
 
     all_used_source_roots = sorted(
@@ -353,8 +356,7 @@ async def mypy_typecheck_partition(
         "MYPY_FORCE_TERMINAL_WIDTH": "642092230765939",
     }
 
-    process = await Get(
-        Process,
+    process = await setup_venv_pex_process(
         VenvPexProcess(
             mypy_pex,
             input_digest=merged_input_files,
@@ -364,10 +366,11 @@ async def mypy_typecheck_partition(
             level=LogLevel.DEBUG,
             append_only_caches={"mypy_cache": named_cache_dir},
         ),
+        **implicitly(),
     )
-    process = dataclasses.replace(process, argv=("__mypy_runner.sh",))
-    result = await Get(FallibleProcessResult, Process, process)
-    report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
+    process = dataclasses.replace(process, argv=("./__mypy_runner.sh",))
+    result = await execute_process(process, **implicitly())
+    report = await remove_prefix(RemovePrefix(result.output_digest, REPORT_DIR))
     return CheckResult.from_fallible_process_result(
         result,
         partition_description=partition.description(),
@@ -383,9 +386,9 @@ async def mypy_determine_partitions(
     resolve_and_interpreter_constraints_to_field_sets = (
         _partition_by_interpreter_constraints_and_resolve(request.field_sets, python_setup)
     )
-    coarsened_targets = await Get(
-        CoarsenedTargets,
+    coarsened_targets = await coarsened_targets_get(
         CoarsenedTargetsRequest(field_set.address for field_set in request.field_sets),
+        **implicitly(),
     )
     coarsened_targets_by_address = coarsened_targets.by_address()
 
@@ -412,9 +415,9 @@ async def mypy_typecheck(request: MyPyRequest, mypy: MyPy) -> CheckResults:
     if mypy.skip:
         return CheckResults([], checker_name=request.tool_name)
 
-    partitions = await Get(MyPyPartitions, MyPyRequest, request)
-    partitioned_results = await MultiGet(
-        Get(CheckResult, MyPyPartition, partition) for partition in partitions
+    partitions = await mypy_determine_partitions(request, **implicitly())
+    partitioned_results = await concurrently(
+        mypy_typecheck_partition(partition, **implicitly()) for partition in partitions
     )
     return CheckResults(partitioned_results, checker_name=request.tool_name)
 

@@ -24,18 +24,14 @@ from pathlib import Path
 
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import external_tool
-from pants.core.util_rules.external_tool import (
-    DownloadedExternalTool,
-    ExternalToolRequest,
-    TemplatedExternalTool,
-)
+from pants.core.util_rules.external_tool import TemplatedExternalTool, download_external_tool
 from pants.core.util_rules.system_binaries import BashBinary, MkdirBinary
 from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_DIGEST, Digest
-from pants.engine.internals.selectors import Get
+from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.platform import Platform
 from pants.engine.process import Process
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, StrListOption
 from pants.util.logging import LogLevel
@@ -407,10 +403,26 @@ class TerraformTool(TemplatedExternalTool):
 
 
 @dataclass(frozen=True)
-class TerraformProcess:
-    """A request to invoke Terraform."""
+class TerraformCommand:
+    """A single Terraform command to invoke (eg `terraform init`)"""
 
     args: tuple[str, ...]
+
+    def to_args(self, chdir):
+        return (
+            "__terraform/terraform",
+            f"-chdir={shlex.quote(chdir)}",
+        ) + self.args
+
+
+@dataclass(frozen=True)
+class TerraformProcess:
+    """A request to invoke Terraform.
+
+    Accepts multiple commands
+    """
+
+    cmds: tuple[TerraformCommand, ...]
     description: str
     input_digest: Digest = EMPTY_DIGEST
     output_files: tuple[str, ...] = ()
@@ -432,12 +444,10 @@ async def setup_terraform_process(
     mkdir: MkdirBinary,
     platform: Platform,
 ) -> Process:
-    downloaded_terraform = await Get(
-        DownloadedExternalTool,
-        ExternalToolRequest,
-        terraform.get_request(platform),
+    downloaded_terraform = await download_external_tool(terraform.get_request(platform))
+    env = await environment_vars_subset(
+        EnvironmentVarsRequest(terraform.extra_env_vars), **implicitly()
     )
-    env = await Get(EnvironmentVars, EnvironmentVarsRequest(terraform.extra_env_vars))
 
     extra_env_vars = {}
 
@@ -461,17 +471,13 @@ async def setup_terraform_process(
 
     # Initialise the Terraform provider cache, since Terraform expects the directory to already exist.
     initialize_provider_cache_cmd = (mkdir.path, "-p", tf_plugin_cache_dir)
-    run_terraform_cmd = (
-        "__terraform/terraform",
-        f"-chdir={shlex.quote(request.chdir)}",
-    ) + request.args
 
     return Process(
         argv=_make_launcher_script(
             bash,
             (
                 initialize_provider_cache_cmd,
-                run_terraform_cmd,
+                *[cmd.to_args(request.chdir) for cmd in request.cmds],
             ),
         ),
         input_digest=request.input_digest,

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
     PythonModuleOwnersRequest,
+    map_module_to_address,
 )
 from pants.backend.python.goals.pytest_runner import PytestPluginSetup, PytestPluginSetupRequest
 from pants.backend.python.target_types import (
@@ -24,9 +25,11 @@ from pants.backend.python.target_types import (
 )
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import CreateDigest, FileContent, PathGlobs, Paths
+from pants.engine.internals.graph import determine_explicitly_provided_dependencies, resolve_targets
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Address, Digest
-from pants.engine.internals.selectors import MultiGet
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import create_digest, path_globs_to_paths
+from pants.engine.rules import Get, collect_rules, implicitly, rule
 from pants.engine.target import (
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
@@ -95,14 +98,14 @@ async def get_filtered_entry_point_dependencies(
 ) -> EntryPointDependencies:
     # This is based on pants.backend.python.target_type_rules.infer_python_distribution_dependencies,
     # but handles multiple targets and filters the entry_points to just get the requested deps.
-    all_explicit_dependencies = await MultiGet(
-        Get(
-            ExplicitlyProvidedDependencies,
-            DependenciesRequest(tgt[PythonDistributionDependenciesField]),
+    all_explicit_dependencies = await concurrently(
+        determine_explicitly_provided_dependencies(
+            **implicitly(DependenciesRequest(tgt[PythonDistributionDependenciesField]))
         )
         for tgt in request.targets
     )
-    resolved_entry_points = await MultiGet(
+    # TODO: This is a circular import on call-by-name
+    resolved_entry_points = await concurrently(
         Get(
             ResolvedPythonDistributionEntryPoints,
             ResolvePythonDistributionEntryPointsRequest(tgt[PythonDistributionEntryPointsField]),
@@ -138,8 +141,10 @@ async def get_filtered_entry_point_dependencies(
                             explicitly_provided_deps,
                         )
                     )
-    filtered_module_owners = await MultiGet(
-        Get(PythonModuleOwners, PythonModuleOwnersRequest(entry_point.module, resolve=None))
+    filtered_module_owners = await concurrently(
+        map_module_to_address(
+            PythonModuleOwnersRequest(entry_point.module, resolve=None), **implicitly()
+        )
         for _, _, _, entry_point, _ in filtered_entry_point_modules
     )
 
@@ -168,13 +173,14 @@ async def _get_entry_point_deps_targets_and_predicates(
             "Please file an issue if you see this error. This rule helper must not "
             "be called with an empty entry_point_dependencies field."
         )
-    targets = await Get(
-        Targets,
-        UnparsedAddressInputs(
-            entry_point_deps.value.keys(),
-            owning_address=owning_address,
-            description_of_origin=f"{PythonTestsEntryPointDependenciesField.alias} from {owning_address}",
-        ),
+    targets = await resolve_targets(
+        **implicitly(
+            UnparsedAddressInputs(
+                entry_point_deps.value.keys(),
+                owning_address=owning_address,
+                description_of_origin=f"{PythonTestsEntryPointDependenciesField.alias} from {owning_address}",
+            )
+        )
     )
 
     requested_entry_points: dict[Target, set[str]] = {}
@@ -243,9 +249,8 @@ async def infer_entry_point_dependencies(
         request.field_set.address, entry_point_deps
     )
 
-    entry_point_dependencies = await Get(
-        EntryPointDependencies,
-        GetEntryPointDependenciesRequest(dist_targets, group_predicate, predicate),
+    entry_point_dependencies = await get_filtered_entry_point_dependencies(
+        GetEntryPointDependenciesRequest(dist_targets, group_predicate, predicate)
     )
     return InferredDependencies(entry_point_dependencies.addresses)
 
@@ -267,7 +272,8 @@ async def generate_entry_points_txt(request: GenerateEntryPointsTxtRequest) -> E
     if not request.targets:
         return EntryPointsTxt(EMPTY_DIGEST)
 
-    all_resolved_entry_points = await MultiGet(
+    # TODO: This is a circular import on call-by-name
+    all_resolved_entry_points = await concurrently(
         Get(
             ResolvedPythonDistributionEntryPoints,
             ResolvePythonDistributionEntryPointsRequest(tgt[PythonDistributionEntryPointsField]),
@@ -283,8 +289,9 @@ async def generate_entry_points_txt(request: GenerateEntryPointsTxtRequest) -> E
         }
         for tgt, resolved_eps in zip(request.targets, all_resolved_entry_points)
     ]
-    resolved_paths = await MultiGet(
-        Get(Paths, PathGlobs(module_candidate_paths)) for module_candidate_paths in possible_paths
+    resolved_paths = await concurrently(
+        path_globs_to_paths(PathGlobs(module_candidate_paths))
+        for module_candidate_paths in possible_paths
     )
 
     entry_points_by_path: dict[str, list[tuple[Target, ResolvedPythonDistributionEntryPoints]]] = (
@@ -339,7 +346,7 @@ async def generate_entry_points_txt(request: GenerateEntryPointsTxtRequest) -> E
     if not entry_points_txt_files:
         digest = EMPTY_DIGEST
     else:
-        digest = await Get(Digest, CreateDigest(entry_points_txt_files))
+        digest = await create_digest(CreateDigest(entry_points_txt_files))
     return EntryPointsTxt(digest)
 
 
@@ -368,9 +375,8 @@ async def generate_entry_points_txt_from_entry_point_dependencies(
         request.target.address, entry_point_deps
     )
 
-    entry_points_txt = await Get(
-        EntryPointsTxt,
-        GenerateEntryPointsTxtRequest(dist_targets, group_predicate, predicate),
+    entry_points_txt = await generate_entry_points_txt(
+        GenerateEntryPointsTxtRequest(dist_targets, group_predicate, predicate)
     )
     return PytestPluginSetup(entry_points_txt.digest)
 

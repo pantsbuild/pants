@@ -8,10 +8,11 @@ ansicolors==1.1.8
 chevron==0.14.0
 fasteners==0.16.3
 freezegun==1.2.1
+hdrhistogram==0.10.3
 ijson==3.2.3
 libcst==1.4.0
 packaging==24.2
-pex==2.33.1
+pex==2.45.2
 psutil==5.9.8
 # This should be compatible with pytest.py, although it can be looser so that we don't
 # over-constrain pantsbuild.pants.testutil
@@ -45,8 +46,8 @@ urllib3<2
 
 # These dependencies are only for debugging Pants itself (in VSCode/PyCharm respectively),
 # and should never be imported.
-debugpy==1.6.0
-pydevd-pycharm==203.5419.8
+debugpy==1.8.13
+pydevd-pycharm==251.23536.40 
 
 # These dependencies must only be used from the explorer backend, and no code outside that backend
 # may import anything from it, so these libraries are not ending up as requirements of Pants itself.

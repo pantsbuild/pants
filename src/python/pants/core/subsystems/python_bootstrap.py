@@ -10,18 +10,19 @@ import sys
 from collections.abc import Collection
 from dataclasses import dataclass
 
+from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.util_rules import asdf, search_paths
 from pants.core.util_rules.asdf import AsdfPathString, AsdfToolPathsResult
-from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.search_paths import (
-    ValidatedSearchPaths,
     ValidateSearchPathsRequest,
-    VersionManagerSearchPaths,
     VersionManagerSearchPathsRequest,
+    get_un_cachable_version_manager_paths,
+    validate_search_paths,
 )
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest, PathEnvironmentVariable
-from pants.engine.internals.selectors import MultiGet
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.internals.selectors import concurrently
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.option.option_types import DictOption, StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.ordered_set import FrozenOrderedSet
@@ -181,11 +182,12 @@ async def _expand_interpreter_search_paths(
     expanded: list[str] = []
     from_pexrc = None
 
-    pyenv_env = await Get(EnvironmentVars, EnvironmentVarsRequest(("PYENV_ROOT", "HOME")))
+    pyenv_env = await environment_vars_subset(
+        EnvironmentVarsRequest(("PYENV_ROOT", "HOME")), **implicitly()
+    )
     pyenv_root = _get_pyenv_root(pyenv_env)
-    pyenv_path_results = await MultiGet(
-        Get(
-            VersionManagerSearchPaths,
+    pyenv_path_results = await concurrently(
+        get_un_cachable_version_manager_paths(
             VersionManagerSearchPathsRequest(
                 env_tgt,
                 pyenv_root,
@@ -193,7 +195,7 @@ async def _expand_interpreter_search_paths(
                 f"[{PythonBootstrapSubsystem.options_scope}].search_path",
                 (".python-version",),
                 s if s == "<PYENV_LOCAL>" else None,
-            ),
+            )
         )
         for s in interpreter_search_paths
         if s == "<PYENV>" or s == "<PYENV_LOCAL>"
@@ -289,8 +291,7 @@ def _get_pyenv_root(env: EnvironmentVars) -> str | None:
 async def python_bootstrap(
     python_bootstrap_subsystem: PythonBootstrapSubsystem.EnvironmentAware,
 ) -> PythonBootstrap:
-    interpreter_search_paths = await Get(
-        ValidatedSearchPaths,
+    interpreter_search_paths = await validate_search_paths(
         ValidateSearchPathsRequest(
             env_tgt=python_bootstrap_subsystem.env_tgt,
             search_paths=tuple(python_bootstrap_subsystem.search_path),
@@ -306,16 +307,16 @@ async def python_bootstrap(
                     "<PEXRC>",
                 )
             ),
-        ),
+        )
     )
     interpreter_names = python_bootstrap_subsystem.names
 
-    expanded_paths = await Get(
-        _SearchPaths,
+    expanded_paths = await _expand_interpreter_search_paths(
         _ExpandInterpreterSearchPathsRequest(
             interpreter_search_paths,
             python_bootstrap_subsystem.env_tgt,
         ),
+        **implicitly(),
     )
 
     return PythonBootstrap(

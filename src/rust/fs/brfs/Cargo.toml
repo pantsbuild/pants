@@ -1,0 +1,34 @@
+[package]
+name = "brfs"
+version = "0.0.1"
+edition = "2021"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[dependencies]
+clap = { workspace = true, features = ["string"] }
+dirs-next = { workspace = true }
+env_logger = { workspace = true }
+errno = { workspace = true }
+fuser = { workspace = true }
+futures = { workspace = true }
+grpc_util = { path = "../../grpc_util" }
+hashing = { path = "../../hashing" }
+libc = { workspace = true }
+log = { workspace = true }
+parking_lot = { workspace = true }
+protos = { path = "../../protos" }
+store = { path = "../store" }
+task_executor = { path = "../../task_executor" }
+time = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal"] }
+tokio-stream = { workspace = true, features = ["signal"] }
+workunit_store = { path = "../../workunit_store" }
+
+[dev-dependencies]
+bytes = { workspace = true }
+tempfile = { workspace = true }
+testutil = { path = "../../testutil" }
+
+[lints]
+workspace = true

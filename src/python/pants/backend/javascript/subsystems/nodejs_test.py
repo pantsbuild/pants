@@ -453,6 +453,7 @@ def test_node_process_environment_with_tools(rule_runner: RuleRunner) -> None:
                     remote_execution=False,
                     remote_execution_extra_platform_properties=[],
                     execute_in_workspace=False,
+                    keep_sandboxes="never",
                 ),
                 "ran_locally",
                 0,
@@ -471,38 +472,14 @@ def test_node_process_environment_with_tools(rule_runner: RuleRunner) -> None:
         run_rule_with_mocks(
             node_process_environment,
             rule_args=[nodejs_binaries, nodejs_options, nodejs_options_env_aware],
-            mock_gets=[
-                MockGet(
-                    output_type=BinaryPaths,
-                    input_types=(BinaryPathRequest,),
-                    mock=mock_get_binary_path,
-                ),
-                MockGet(
-                    output_type=BinaryShims,
-                    input_types=(BinaryShimsRequest,),
-                    mock=mock_get_binary_shims,
-                ),
-                MockGet(
-                    output_type=EnvironmentVars,
-                    input_types=(EnvironmentVarsRequest,),
-                    mock=mock_environment_vars,
-                ),
-                MockGet(
-                    output_type=Digest,
-                    input_types=(CreateDigest,),
-                    mock=mock_create_digest,
-                ),
-                MockGet(
-                    output_type=Digest,
-                    input_types=(MergeDigests,),
-                    mock=mock_merge_digests,
-                ),
-                MockGet(
-                    output_type=ProcessResult,
-                    input_types=(Process,),
-                    mock=mock_enable_corepack_process_result,
-                ),
-            ],
+            mock_calls={
+                "pants.core.util_rules.system_binaries.create_binary_shims": mock_get_binary_shims,
+                "pants.core.util_rules.system_binaries.find_binary": mock_get_binary_path,
+                "pants.engine.intrinsics.create_digest": mock_create_digest,
+                "pants.engine.intrinsics.merge_digests": mock_merge_digests,
+                "pants.engine.internals.platform_rules.environment_vars_subset": mock_environment_vars,
+                "pants.engine.process.fallible_to_exec_result_or_raise": mock_enable_corepack_process_result,
+            },
         )
 
     run(tools=["real-tool"], optional_tools=[])

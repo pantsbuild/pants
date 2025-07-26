@@ -6,8 +6,9 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 
-from pants.engine.fs import Digest, DigestContents
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.fs import Digest
+from pants.engine.intrinsics import get_digest_contents
+from pants.engine.rules import collect_rules, rule
 from pants.jvm.resolve.coordinate import Coordinate
 
 
@@ -27,7 +28,7 @@ _MAVEN_NAMESPACE_MAP = {"mvn": _MAVEN_NAMESPACE}
 
 @rule(desc="Analysing Maven POM file")
 async def analyse_pom(request: AnalysePomRequest) -> PomReport:
-    contents = await Get(DigestContents, Digest, request.pom_digest)
+    contents = await get_digest_contents(request.pom_digest)
     assert len(contents) == 1
 
     root = ET.fromstring(contents[0].content)

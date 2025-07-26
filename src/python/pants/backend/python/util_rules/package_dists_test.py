@@ -99,7 +99,7 @@ class PluginSetupKwargsRequest(SetupKwargsRequest):
 
 
 @rule
-def setup_kwargs_plugin(request: PluginSetupKwargsRequest) -> SetupKwargs:
+async def setup_kwargs_plugin(request: PluginSetupKwargsRequest) -> SetupKwargs:
     kwargs = {**request.explicit_kwargs, "plugin_demo": "hello world"}
     return SetupKwargs(kwargs, address=request.target.address)
 

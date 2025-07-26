@@ -2,14 +2,18 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import importlib
+import importlib.metadata
 import logging
 import traceback
+from importlib.metadata import Distribution
 
-from pkg_resources import Requirement, WorkingSet
+from packaging.requirements import InvalidRequirement, Requirement
+from packaging.utils import NormalizedName, canonicalize_name
 
 from pants.base.exceptions import BackendConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.goal.builtins import register_builtin_goals
+from pants.init.import_util import find_matching_distributions
 from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
@@ -29,20 +33,18 @@ class PluginLoadOrderError(PluginLoadingError):
 
 def load_backends_and_plugins(
     plugins: list[str],
-    working_set: WorkingSet,
     backends: list[str],
     bc_builder: BuildConfiguration.Builder | None = None,
 ) -> BuildConfiguration:
     """Load named plugins and source backends.
 
     :param plugins: v2 plugins to load.
-    :param working_set: A pkg_resources.WorkingSet to load plugins from.
     :param backends: v2 backends to load.
     :param bc_builder: The BuildConfiguration (for adding aliases).
     """
     bc_builder = bc_builder or BuildConfiguration.Builder()
     load_build_configuration_from_source(bc_builder, backends)
-    load_plugins(bc_builder, plugins, working_set)
+    load_plugins(bc_builder, plugins)
     register_builtin_goals(bc_builder)
     return bc_builder.create()
 
@@ -50,7 +52,6 @@ def load_backends_and_plugins(
 def load_plugins(
     build_configuration: BuildConfiguration.Builder,
     plugins: list[str],
-    working_set: WorkingSet,
 ) -> None:
     """Load named plugins from the current working_set into the supplied build_configuration.
 
@@ -73,44 +74,56 @@ def load_plugins(
     :param build_configuration: The BuildConfiguration (for adding aliases).
     :param plugins: A list of plugin names optionally with versions, in requirement format.
                               eg ['widgetpublish', 'widgetgen==1.2'].
-    :param working_set: A pkg_resources.WorkingSet to load plugins from.
     """
-    loaded: dict = {}
-    for plugin in plugins or []:
-        req = Requirement.parse(plugin)
-        dist = working_set.find(req)
 
-        if not dist:
+    loaded: dict[NormalizedName, Distribution] = {}
+    for plugin in plugins or []:
+        try:
+            req = Requirement(plugin)
+            req_key = canonicalize_name(req.name)
+        except InvalidRequirement:
             raise PluginNotFound(f"Could not find plugin: {req}")
 
-        entries = dist.get_entry_map().get("pantsbuild.plugin", {})
+        dists = list(find_matching_distributions(req))
+        if not dists:
+            raise PluginNotFound(f"Could not find plugin: {req}")
+        dist = dists[0]
 
-        if "load_after" in entries:
-            deps = entries["load_after"].load()()
+        entry_points = dist.entry_points.select(group="pantsbuild.plugin")
+
+        def find_entry_point(entry_point_name: str) -> importlib.metadata.EntryPoint | None:
+            for entry_point in entry_points:
+                if entry_point.name == entry_point_name:
+                    return entry_point
+            return None
+
+        if load_after_entry_point := find_entry_point("load_after"):
+            deps = load_after_entry_point.load()()
             for dep_name in deps:
-                dep = Requirement.parse(dep_name)
-                if dep.key not in loaded:
+                dep = Requirement(dep_name)
+                dep_key = canonicalize_name(dep.name)
+                if dep_key not in loaded:
                     raise PluginLoadOrderError(f"Plugin {plugin} must be loaded after {dep}")
-        if "target_types" in entries:
-            target_types = entries["target_types"].load()()
-            build_configuration.register_target_types(req.key, target_types)
-        if "build_file_aliases" in entries:
-            aliases = entries["build_file_aliases"].load()()
+        if target_types_entry_point := find_entry_point("target_types"):
+            target_types = target_types_entry_point.load()()
+            build_configuration.register_target_types(req_key, target_types)
+        if build_file_aliases_entry_point := find_entry_point("build_file_aliases"):
+            aliases = build_file_aliases_entry_point.load()()
             build_configuration.register_aliases(aliases)
-        if "rules" in entries:
-            rules = entries["rules"].load()()
-            build_configuration.register_rules(req.key, rules)
-        if "remote_auth" in entries:
-            remote_auth_func = entries["remote_auth"].load()
+        if rules_entry_point := find_entry_point("rules"):
+            rules = rules_entry_point.load()()
+            build_configuration.register_rules(req_key, rules)
+        if remote_auth_entry_point := find_entry_point("remote_auth"):
+            remote_auth_func = remote_auth_entry_point.load()
             logger.debug(
                 f"register remote auth function {remote_auth_func.__module__}.{remote_auth_func.__name__} from plugin: {plugin}"
             )
             build_configuration.register_remote_auth_plugin(remote_auth_func)
-        if "auxiliary_goals" in entries:
-            auxiliary_goals = entries["auxiliary_goals"].load()()
-            build_configuration.register_auxiliary_goals(req.key, auxiliary_goals)
+        if auxiliary_goals_entry_point := find_entry_point("auxiliary_goals"):
+            auxiliary_goals = auxiliary_goals_entry_point.load()()
+            build_configuration.register_auxiliary_goals(req_key, auxiliary_goals)
 
-        loaded[dist.as_requirement().key] = dist
+        loaded[req_key] = dist
 
 
 def load_build_configuration_from_source(

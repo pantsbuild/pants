@@ -15,7 +15,7 @@ from pants.build_graph.address import BuildFileAddressRequest, MaybeAddress, Res
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.target_types import GenericTarget, ResourceTarget
 from pants.engine.addresses import Address, AddressInput, BuildFileAddress
-from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.internals.build_files import (
     AddressFamilyDir,
@@ -33,11 +33,7 @@ from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.parser import BuildFilePreludeSymbols, BuildFileSymbolInfo, Parser
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.session import SessionValues
-from pants.engine.internals.synthetic_targets import (
-    SyntheticAddressMap,
-    SyntheticAddressMaps,
-    SyntheticAddressMapsRequest,
-)
+from pants.engine.internals.synthetic_targets import SyntheticAddressMap, SyntheticAddressMaps
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
 from pants.engine.target import (
     Dependencies,
@@ -69,44 +65,33 @@ def test_parse_address_family_empty() -> None:
     optional_af = run_rule_with_mocks(
         parse_address_family,
         rule_args=[
+            AddressFamilyDir("/dev/null"),
             Parser(
                 build_root="",
                 registered_target_types=RegisteredTargetTypes({}),
-                union_membership=UnionMembership({}),
+                union_membership=UnionMembership.empty(),
                 object_aliases=BuildFileAliases(),
                 ignore_unrecognized_symbols=False,
             ),
             BootstrapStatus(in_progress=False),
             BuildFileOptions(("BUILD",)),
             BuildFilePreludeSymbols(FrozenDict(), ()),
-            AddressFamilyDir("/dev/null"),
             RegisteredTargetTypes({}),
-            UnionMembership({}),
+            UnionMembership.empty(),
             MaybeBuildFileDependencyRulesImplementation(None),
             SessionValues({CompleteEnvironmentVars: CompleteEnvironmentVars({})}),
         ],
-        mock_gets=[
-            MockGet(
-                output_type=DigestContents,
-                input_types=(PathGlobs,),
-                mock=lambda _: DigestContents([FileContent(path="/dev/null/BUILD", content=b"")]),
+        mock_calls={
+            "pants.engine.intrinsics.get_digest_contents": lambda __implicitly: DigestContents(
+                [FileContent(path="/dev/null/BUILD", content=b"")]
             ),
-            MockGet(
-                output_type=OptionalAddressFamily,
-                input_types=(AddressFamilyDir,),
-                mock=lambda _: OptionalAddressFamily("/dev"),
+            "pants.engine.internals.synthetic_targets.get_synthetic_address_maps": lambda _: SyntheticAddressMaps(),
+            "pants.engine.internals.build_files.parse_address_family": lambda *_: OptionalAddressFamily(
+                "/dev"
             ),
-            MockGet(
-                output_type=SyntheticAddressMaps,
-                input_types=(SyntheticAddressMapsRequest,),
-                mock=lambda _: SyntheticAddressMaps(),
-            ),
-            MockGet(
-                output_type=EnvironmentVars,
-                input_types=(EnvironmentVarsRequest, CompleteEnvironmentVars),
-                mock=lambda _1, _2: EnvironmentVars({}),
-            ),
-        ],
+            "pants.engine.internals.platform_rules.environment_vars_subset": lambda _1,
+            _2: EnvironmentVars({}),
+        },
     )
     assert optional_af.path == "/dev/null"
     assert optional_af.address_family is not None
@@ -119,79 +104,64 @@ def test_extend_synthetic_target() -> None:
     optional_af = run_rule_with_mocks(
         parse_address_family,
         rule_args=[
+            AddressFamilyDir("/foo"),
             Parser(
                 build_root="",
                 registered_target_types=RegisteredTargetTypes({"resource": ResourceTarget}),
-                union_membership=UnionMembership({}),
+                union_membership=UnionMembership.empty(),
                 object_aliases=BuildFileAliases(),
                 ignore_unrecognized_symbols=False,
             ),
             BootstrapStatus(in_progress=False),
             BuildFileOptions(("BUILD",)),
             BuildFilePreludeSymbols(FrozenDict(), ()),
-            AddressFamilyDir("/foo"),
             RegisteredTargetTypes({"resource": ResourceTarget}),
-            UnionMembership({}),
+            UnionMembership.empty(),
             MaybeBuildFileDependencyRulesImplementation(None),
             SessionValues({CompleteEnvironmentVars: CompleteEnvironmentVars({})}),
         ],
-        mock_gets=[
-            MockGet(
-                output_type=DigestContents,
-                input_types=(PathGlobs,),
-                mock=lambda _: DigestContents(
-                    [
-                        FileContent(
-                            path="/foo/BUILD.1", content=b"resource(name='aaa', description='a')"
-                        ),
-                        FileContent(
-                            path="/foo/BUILD.2",
-                            content=b"resource(name='bar', description='b', _extend_synthetic=True)",
-                        ),
-                    ]
-                ),
+        mock_calls={
+            "pants.engine.intrinsics.get_digest_contents": lambda __implicitly: DigestContents(
+                [
+                    FileContent(
+                        path="/foo/BUILD.1", content=b"resource(name='aaa', description='a')"
+                    ),
+                    FileContent(
+                        path="/foo/BUILD.2",
+                        content=b"resource(name='bar', description='b', _extend_synthetic=True)",
+                    ),
+                ]
             ),
-            MockGet(
-                output_type=OptionalAddressFamily,
-                input_types=(AddressFamilyDir,),
-                mock=lambda _: OptionalAddressFamily(
+            "pants.engine.internals.synthetic_targets.get_synthetic_address_maps": lambda __implicitly: SyntheticAddressMaps(
+                [
+                    SyntheticAddressMap.create(
+                        "/foo/synthetic1",
+                        [
+                            TargetAdaptor("resource", "xxx", "", description="x"),
+                        ],
+                    ),
+                    SyntheticAddressMap.create(
+                        "/foo/synthetic2",
+                        [
+                            TargetAdaptor("resource", "yyy", ""),
+                            TargetAdaptor("resource", "bar", "", extend=42),
+                        ],
+                    ),
+                ]
+            ),
+            "pants.engine.internals.build_files.parse_address_family": lambda __implicitly: OptionalAddressFamily(
+                "/",
+                address_family=AddressFamily.create(
                     "/",
-                    address_family=AddressFamily.create(
-                        "/",
-                        [],
-                        defaults=BuildFileDefaults(
-                            FrozenDict({"resource": FrozenDict({"description": "q"})})
-                        ),
+                    [],
+                    defaults=BuildFileDefaults(
+                        FrozenDict({"resource": FrozenDict({"description": "q"})})
                     ),
                 ),
             ),
-            MockGet(
-                output_type=SyntheticAddressMaps,
-                input_types=(SyntheticAddressMapsRequest,),
-                mock=lambda _: SyntheticAddressMaps(
-                    [
-                        SyntheticAddressMap.create(
-                            "/foo/synthetic1",
-                            [
-                                TargetAdaptor("resource", "xxx", "", description="x"),
-                            ],
-                        ),
-                        SyntheticAddressMap.create(
-                            "/foo/synthetic2",
-                            [
-                                TargetAdaptor("resource", "yyy", ""),
-                                TargetAdaptor("resource", "bar", "", extend=42),
-                            ],
-                        ),
-                    ]
-                ),
-            ),
-            MockGet(
-                output_type=EnvironmentVars,
-                input_types=(EnvironmentVarsRequest, CompleteEnvironmentVars),
-                mock=lambda _1, _2: EnvironmentVars({}),
-            ),
-        ],
+            "pants.engine.internals.platform_rules.environment_vars_subset": lambda _1,
+            _2: EnvironmentVars({}),
+        },
     )
     assert optional_af.path == "/foo"
     assert optional_af.address_family is not None
@@ -223,20 +193,16 @@ def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
             Parser(
                 build_root="",
                 registered_target_types=RegisteredTargetTypes({"target": GenericTarget}),
-                union_membership=UnionMembership({}),
+                union_membership=UnionMembership.empty(),
                 object_aliases=BuildFileAliases(),
                 ignore_unrecognized_symbols=False,
             ),
         ],
-        mock_gets=[
-            MockGet(
-                output_type=DigestContents,
-                input_types=(PathGlobs,),
-                mock=lambda _: DigestContents(
-                    [FileContent(path="/dev/null/prelude", content=prelude_content.encode())]
-                ),
-            ),
-        ],
+        mock_calls={
+            "pants.engine.intrinsics.get_digest_contents": lambda __implicitly: DigestContents(
+                [FileContent(path="/dev/null/prelude", content=prelude_content.encode())]
+            )
+        },
     )
     return symbols
 
@@ -946,7 +912,7 @@ def test_build_files_share_globals() -> None:
             Parser(
                 build_root="",
                 registered_target_types=RegisteredTargetTypes({}),
-                union_membership=UnionMembership({}),
+                union_membership=UnionMembership.empty(),
                 object_aliases=BuildFileAliases(),
                 ignore_unrecognized_symbols=False,
             ),
@@ -1244,3 +1210,31 @@ def test_build_file_syntax_error(filename, contents, expect_failure, expected_me
 
     else:
         BUILDFileEnvVarExtractor.get_env_vars(MockFileContent(filename, contents))
+
+
+def test_build_file_duplicate_declared_names() -> None:
+    rule_runner = RuleRunner(
+        rules=[QueryRule(AddressFamily, [AddressFamilyDir])],
+        target_types=[MockTgt],
+    )
+    rule_runner.write_files(
+        {
+            "src/BUILD.foo": dedent(
+                """\
+                # Define a target.
+                mock_tgt(name="foo")
+                """
+            ),
+            "src/BUILD.bar": dedent(
+                """\
+                # Define a target..
+                mock_tgt(name="foo")
+                """
+            ),
+        },
+    )
+    with pytest.raises(
+        ExecutionError,
+        match="A target already exists at `src/BUILD.bar` with name `foo` and target type `mock_tgt`",
+    ):
+        _ = rule_runner.request(AddressFamily, [AddressFamilyDir("src")])

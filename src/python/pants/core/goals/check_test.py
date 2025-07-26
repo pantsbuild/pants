@@ -10,6 +10,7 @@ from textwrap import dedent
 
 import pytest
 
+from pants.core.environments.rules import EnvironmentNameRequest
 from pants.core.goals.check import (
     Check,
     CheckRequest,
@@ -19,7 +20,6 @@ from pants.core.goals.check import (
     check,
 )
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, Workspace
@@ -30,7 +30,7 @@ from pants.engine.process import (
     ProcessResultMetadata,
 )
 from pants.engine.target import FieldSet, MultipleSourcesField, Target, Targets
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 from pants.util.logging import LogLevel
@@ -155,7 +155,7 @@ def run_typecheck_rule(
     targets: list[Target],
     only: list[str] | None = None,
 ) -> tuple[int, str]:
-    union_membership = UnionMembership({CheckRequest: request_types})
+    union_membership = UnionMembership.from_rules(UnionRule(CheckRequest, t) for t in request_types)
     check_subsystem = create_subsystem(CheckSubsystem, only=only or [])
     rule_runner = RuleRunner(bootstrap_args=["-lwarn"])
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
@@ -185,6 +185,8 @@ def run_typecheck_rule(
                 ),
             ],
             union_membership=union_membership,
+            # We don't want temporary warnings to interfere with our expected output.
+            show_warnings=False,
         )
         assert not stdio_reader.get_stdout()
         return result.exit_code, stdio_reader.get_stderr()
@@ -313,6 +315,7 @@ def test_from_fallible_process_result_output_prepping() -> None:
                         remote_execution=False,
                         remote_execution_extra_platform_properties=[],
                         execute_in_workspace=False,
+                        keep_sandboxes="never",
                     ),
                     "ran_locally",
                     0,

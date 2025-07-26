@@ -25,8 +25,8 @@ from pants.backend.adhoc.target_types import (
     AdhocToolWorkspaceInvalidationSourcesField,
 )
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.test import RuntimePackageDependenciesField, TestTimeoutField
-from pants.core.util_rules.environments import EnvironmentField
 from pants.core.util_rules.system_binaries import BinaryPathTest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
@@ -68,7 +68,7 @@ class ShellGeneratorSettingsRequest(TargetFilesGeneratorSettingsRequest):
 
 
 @rule
-def generator_settings(
+async def generator_settings(
     _: ShellGeneratorSettingsRequest,
     shell_setup: ShellSetup,
 ) -> TargetFilesGeneratorSettings:
@@ -489,7 +489,7 @@ class ShellCommandTestTarget(Target):
     alias = "test_shell_command"
 
     deprecated_alias = "experimental_test_shell_command"
-    deprecated_alias_removal_version = "2.29.0.dev0"
+    deprecated_alias_removal_version = "2.30.0.dev0"
 
     core_fields = (
         *COMMON_TARGET_FIELDS,

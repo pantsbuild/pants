@@ -110,12 +110,14 @@ pub async fn interactive_process_inner(
         &process,
         process.input_digests.inputs.clone(),
         &context.core.store(),
+        context.core.sandboxer().as_ref(),
         &context.core.named_caches,
         &context.core.immutable_inputs,
         None,
         None,
     )
-    .await?;
+    .await
+    .map_err(|cwe| cwe.to_string())?;
     apply_chroot(tempdir.path().to_str().unwrap(), &mut process);
 
     let p = Path::new(&process.argv[0]);
@@ -176,9 +178,9 @@ pub async fn interactive_process_inner(
       // then wait for it to exit (to avoid zombies).
       if let Err(e) = subprocess.attempt_shutdown_sync() {
         // Failed to kill the PGID: try the non-group form.
-        log::warn!("Failed to kill spawned process group ({}). Will try killing only the top process.\n\
+        log::warn!("Failed to kill spawned process group ({e}). Will try killing only the top process.\n\
                   This is unexpected: please file an issue about this problem at \
-                  [https://github.com/pantsbuild/pants/issues/new]", e);
+                  [https://github.com/pantsbuild/pants/issues/new]");
         subprocess.kill().map_err(|e| format!("Failed to interrupt child process: {e}")).await?;
       };
       subprocess.wait().await.map_err(|e| e.to_string())

@@ -48,8 +48,25 @@ impl Task {
         call: externs::Call,
     ) -> NodeResult<Value> {
         let context = context.clone();
+        let implementation_rule = context
+            .core
+            .tasks
+            .vtable()
+            .get(&call.rule_id)
+            .and_then(|ve| {
+                call.inputs
+                    .iter()
+                    .map(|t| ve.get(t.type_id()))
+                    .find(Option::is_some)
+                    .flatten()
+            });
+
+        // If no implementation rule, use the base rule. Typically that will throw a
+        // relevant error, but could hypothetically provide a sensible default implementation.
+        let rule_id = implementation_rule.unwrap_or(&call.rule_id);
+
         let dependency_key =
-            DependencyKey::for_known_rule(call.rule_id.clone(), call.output_type, call.args_arity)
+            DependencyKey::for_known_rule(rule_id.clone(), call.output_type, call.args_arity)
                 .provided_params(call.inputs.iter().map(|t| *t.type_id()));
         params.extend(call.inputs.iter().cloned());
 
@@ -60,13 +77,25 @@ impl Task {
             .ok_or_else(|| throw(format!("No edges for task {entry:?} exist!")))?;
 
         // Find the entry for the Call.
-        let entry = edges.entry_for(&dependency_key).ok_or_else(|| {
-            // NB: The Python constructor for `Call()` will have already errored if
-            // `type(input) != input_type`.
-            throw(format!(
-                "{call} was not detected in your @rule body at rule compile time."
-            ))
-        })?;
+        let entry = edges
+            .entry_for(&dependency_key)
+            .or_else(|| {
+                // The Get might have involved a @union: if so, include its in_scope types in the
+                // lookup.
+                let in_scope_types = call
+                    .input_types
+                    .iter()
+                    .find_map(|t| t.union_in_scope_types())?;
+                edges.entry_for(&dependency_key.in_scope_params(in_scope_types))
+            })
+            .ok_or_else(|| {
+                // NB: The Python constructor for `Call()` will have already errored if
+                // `type(input) != input_type`.
+                throw(format!(
+                    "{call} was not detected in your @rule body at rule compile time. Make sure
+                    the callee is defined before the @rule body."
+                ))
+            })?;
         select(context, call.args, call.args_arity, params, entry).await
     }
 

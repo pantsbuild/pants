@@ -59,6 +59,7 @@ from pants.backend.python.util_rules.pex_test_utils import (
     parse_requirements,
 )
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult
+from pants.core.register import wrap_as_resources
 from pants.core.target_types import FileTarget, ResourceTarget
 from pants.core.util_rules.lockfile_metadata import InvalidLockfileError
 from pants.engine.fs import (
@@ -93,6 +94,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *pex_test_utils.rules(),
             *pex_rules(),
+            *wrap_as_resources.rules,
             QueryRule(GlobalOptions, []),
             QueryRule(ProcessResult, (Process,)),
             QueryRule(PexResolveInfo, (Pex,)),
@@ -102,6 +104,7 @@ def rule_runner() -> RuleRunner:
         target_types=[
             ResourceTarget,
             FileTarget,
+            *wrap_as_resources.target_types,
         ],
     )
 
@@ -613,7 +616,7 @@ def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | Ven
     assert dists[3].project_name == "requests"
     assert dists[3].version == Version("2.23.0")
     # requires_dists is parsed from metadata written by the pex tool, and is always
-    #   a set of valid pkg_resources.Requirements.
+    #   a set of valid requirements.
     assert Requirement('PySocks!=1.5.7,>=1.5.6; extra == "socks"') in dists[3].requires_dists
     assert dists[4].project_name == "urllib3"
 
@@ -653,10 +656,15 @@ def test_determine_pex_python_and_platforms() -> None:
         )
         assert result == expected
 
-    assert_setup(expected=_BuildPexPythonSetup(None, []))
+    assert_setup(
+        expected=_BuildPexPythonSetup(discovered_python, ["--python-path", discovered_python.path])
+    )
     assert_setup(
         interpreter_constraints=ics,
-        expected=_BuildPexPythonSetup(None, ["--interpreter-constraint", "CPython==3.8"]),
+        expected=_BuildPexPythonSetup(
+            discovered_python,
+            ["--interpreter-constraint", "CPython==3.8", "--python-path", discovered_python.path],
+        ),
     )
     assert_setup(
         internal_only=True,
@@ -941,6 +949,34 @@ def test_digest_complete_platforms(rule_runner: RuleRunner, target_type: str) ->
     complete_platforms = rule_runner.request(
         CompletePlatforms,
         [PexCompletePlatformsField([":complete_platforms"], target.address)],
+    )
+
+    # Verify the result
+    assert len(complete_platforms) == 1
+    assert complete_platforms.digest != EMPTY_DIGEST
+
+
+def test_digest_complete_platforms_codegen(rule_runner: RuleRunner) -> None:
+    # Read the complete_platforms content using pkgutil
+    complete_platforms_content = pkgutil.get_data(__name__, "complete_platform_pex_test.json")
+    assert complete_platforms_content is not None
+
+    # Create a target with the complete platforms file
+    rule_runner.write_files(
+        {
+            "BUILD": """\
+file(name='complete_platforms', source='complete_platforms.json')
+experimental_wrap_as_resources(name="codegen", inputs=[':complete_platforms'], )
+            """,
+            "complete_platforms.json": complete_platforms_content,
+        }
+    )
+
+    # Get the CompletePlatforms object
+    target = rule_runner.get_target(Address("", target_name="codegen"))
+    complete_platforms = rule_runner.request(
+        CompletePlatforms,
+        [PexCompletePlatformsField([":codegen"], target.address)],
     )
 
     # Verify the result

@@ -25,6 +25,13 @@ python_tests(
             "tags": ["platform_specific_behavior"],
             "timeout": 220,
         },
+        "pep561_integration_test.py": {
+            "runtime_package_dependencies": [
+                "src/python/pants:pants-packaged",
+                "src/python/pants/testutil:testutil_wheel",
+            ],
+            "timeout": 300,
+        },
         "subsystem_test.py": {"timeout": 180},
         "rules_integration_test.py": {
             "dependencies": [":test_lockfiles"],

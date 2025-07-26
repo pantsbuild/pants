@@ -17,10 +17,15 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PexLayout, PythonResolveField, PythonSourceField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists_pep660 import (
-    EditableLocalDists,
     EditableLocalDistsRequest,
+    build_editable_local_dists,
 )
-from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex
+from pants.backend.python.util_rules.pex import (
+    PexRequest,
+    create_pex,
+    create_venv_pex,
+    find_interpreter,
+)
 from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.backend.python.util_rules.pex_environment import PexEnvironment, PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import EntireLockfile, Lockfile
@@ -35,20 +40,16 @@ from pants.core.goals.export import (
 )
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.source_files import SourceFiles
-from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
+from pants.core.util_rules.stripped_source_files import strip_source_roots
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import CreateDigest, FileContent
-from pants.engine.internals.native_engine import (
-    EMPTY_DIGEST,
-    AddPrefix,
-    Digest,
-    MergeDigests,
-    Snapshot,
-)
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import Process, ProcessCacheScope, ProcessResult
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import AllTargets, HydratedSources, HydrateSourcesRequest, SourcesField
+from pants.engine.internals.graph import hydrate_sources
+from pants.engine.internals.native_engine import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import add_prefix, create_digest, digest_to_snapshot, merge_digests
+from pants.engine.process import Process, ProcessCacheScope, execute_process_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.target import AllTargets, HydrateSourcesRequest, SourcesField
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.option_types import EnumOption, StrListOption
 from pants.util.strutil import path_safe, softwrap
@@ -155,7 +156,9 @@ async def _get_full_python_version(python: PythonExecutable) -> str:
         "-c",
         "import sys; print('.'.join(str(x) for x in sys.version_info[0:3]))",
     ]
-    res = await Get(ProcessResult, Process(argv, description="Get interpreter version"))
+    res = await execute_process_or_raise(
+        **implicitly(Process(argv, description="Get interpreter version"))
+    )
     return res.stdout.strip().decode()
 
 
@@ -199,11 +202,10 @@ async def do_export(
         #  (or a memoized rule) we force the process to rerun per-session.
         #  This does mean re-running the process superfluously when the named cache is intact, but
         #  that is generally fast, since all wheels are already cached, and it's best to be safe.
-        requirements_venv_pex = await Get(
-            VenvPex,
-            PexRequest,
-            dataclasses.replace(req.pex_request, cache_scope=ProcessCacheScope.PER_SESSION),
+        session_request = dataclasses.replace(
+            req.pex_request, cache_scope=ProcessCacheScope.PER_SESSION
         )
+        requirements_venv_pex = await create_venv_pex(**implicitly({session_request: PexRequest}))
         # Note that for symlinking we ignore qualify_path_with_python_version and always qualify,
         # since we need some name for the symlink anyway.
         dest = f"{dest_prefix}/{req.py_version}"
@@ -226,7 +228,7 @@ async def do_export(
     elif export_format == PythonResolveExportFormat.mutable_virtualenv:
         # Note that an internal-only pex will always have the `python` field set.
         # See the build_pex() rule and _determine_pex_python_and_platforms() helper in pex.py.
-        requirements_pex = await Get(Pex, PexRequest, req.pex_request)
+        requirements_pex = await create_pex(req.pex_request)
         assert requirements_pex.python is not None
         if req.qualify_path_with_python_version:
             dest = f"{dest_prefix}/{req.py_version}"
@@ -237,10 +239,10 @@ async def do_export(
             f"(using Python {req.py_version})"
         )
 
-        merged_digest = await Get(Digest, MergeDigests([pex_pex.digest, requirements_pex.digest]))
+        merged_digest = await merge_digests(MergeDigests([pex_pex.digest, requirements_pex.digest]))
         tmpdir_prefix = f".{uuid.uuid4().hex}.tmp"
         tmpdir_under_digest_root = os.path.join("{digest_root}", tmpdir_prefix)
-        merged_digest_under_tmpdir = await Get(Digest, AddPrefix(merged_digest, tmpdir_prefix))
+        merged_digest_under_tmpdir = await add_prefix(AddPrefix(merged_digest, tmpdir_prefix))
 
         venv_prompt = f"{req.resolve_name}/{req.py_version}" if req.resolve_name else req.py_version
 
@@ -274,7 +276,7 @@ async def do_export(
         if req.editable_local_dists_digest is not None:
             # We need the snapshot to get the wheel file names which are something like:
             #   - pkg_name-1.2.3-0.editable-py3-none-any.whl
-            wheels_snapshot = await Get(Snapshot, Digest, req.editable_local_dists_digest)
+            wheels_snapshot = await digest_to_snapshot(req.editable_local_dists_digest)
             # We need the paths to the installed .dist-info directories to finish installation.
             py_major_minor_version = ".".join(req.py_version.split(".", 2)[:2])
             lib_dir = os.path.join(
@@ -366,8 +368,7 @@ class _ExportPythonCodegenSetup:
 
 @rule
 async def python_codegen_export_setup() -> _ExportPythonCodegenSetup:
-    codegen_setup_script_digest = await Get(
-        Digest,
+    codegen_setup_script_digest = await create_digest(
         CreateDigest(
             [
                 FileContent(
@@ -398,7 +399,7 @@ async def python_codegen_export_setup() -> _ExportPythonCodegenSetup:
                     ).encode(),
                 )
             ]
-        ),
+        )
     )
 
     return _ExportPythonCodegenSetup(codegen_setup_script_digest)
@@ -420,26 +421,27 @@ async def export_python_codegen(
     if not non_python_sources_in_python_resolve:
         return _ExportPythonCodegenResult(EMPTY_DIGEST)
 
-    hydrated_non_python_sources = await MultiGet(
-        Get(
-            HydratedSources,
+    hydrated_non_python_sources = await concurrently(
+        hydrate_sources(
             HydrateSourcesRequest(
                 sources,
                 for_sources_types=(PythonSourceField,),
                 enable_codegen=True,
             ),
+            **implicitly(),
         )
         for sources in non_python_sources_in_python_resolve
     )
 
-    merged_snapshot = await Get(
-        Snapshot,
-        MergeDigests(
-            hydrated_sources.snapshot.digest for hydrated_sources in hydrated_non_python_sources
-        ),
+    merged_snapshot = await digest_to_snapshot(
+        **implicitly(
+            MergeDigests(
+                hydrated_sources.snapshot.digest for hydrated_sources in hydrated_non_python_sources
+            )
+        )
     )
 
-    stripped_source_files = await Get(StrippedSourceFiles, SourceFiles(merged_snapshot, ()))
+    stripped_source_files = await strip_source_roots(SourceFiles(merged_snapshot, ()))
 
     return _ExportPythonCodegenResult(stripped_source_files.snapshot.digest)
 
@@ -449,19 +451,17 @@ async def add_codegen_to_export_result(
     resolve: str, export_result: ExportResult, codegen_setup: _ExportPythonCodegenSetup
 ) -> ExportResult:
     # Generate Python sources from codegen targets in this resolve.
-    codegen_result = await Get(
-        _ExportPythonCodegenResult, _ExportPythonCodegenRequest(resolve=resolve)
+    codegen_result = await export_python_codegen(
+        _ExportPythonCodegenRequest(resolve=resolve), **implicitly()
     )
     if codegen_result.digest == EMPTY_DIGEST:
         return export_result
 
-    codegen_digest = await Get(
-        Digest, AddPrefix(codegen_result.digest, _ExportPythonCodegenSetup.PKG_DIR)
+    codegen_digest = await add_prefix(
+        AddPrefix(codegen_result.digest, _ExportPythonCodegenSetup.PKG_DIR)
     )
-
-    export_digest_with_codegen = await Get(
-        Digest,
-        MergeDigests([export_result.digest, codegen_digest, codegen_setup.setup_script_digest]),
+    export_digest_with_codegen = await merge_digests(
+        MergeDigests([export_result.digest, codegen_digest, codegen_setup.setup_script_digest])
     )
 
     pkg_dir_path = os.path.join(
@@ -525,12 +525,12 @@ async def export_virtualenv_for_resolve(
         )
     )
 
-    python = await Get(PythonExecutable, InterpreterConstraints, interpreter_constraints)
+    python = await find_interpreter(interpreter_constraints, **implicitly())
     py_version = await _get_full_python_version(python)
 
     if resolve in export_subsys.options.py_editable_in_resolve:
-        editable_local_dists = await Get(
-            EditableLocalDists, EditableLocalDistsRequest(resolve=resolve)
+        editable_local_dists = await build_editable_local_dists(
+            EditableLocalDistsRequest(resolve=resolve), **implicitly()
         )
         editable_local_dists_digest = editable_local_dists.optional_digest
     else:
@@ -548,8 +548,7 @@ async def export_virtualenv_for_resolve(
     )
 
     dest_prefix = os.path.join("python", "virtualenvs")
-    export_result = await Get(
-        ExportResult,
+    export_result = await do_export(
         VenvExportRequest(
             py_version,
             pex_request,
@@ -558,6 +557,7 @@ async def export_virtualenv_for_resolve(
             qualify_path_with_python_version=True,
             editable_local_dists_digest=editable_local_dists_digest,
         ),
+        **implicitly(),
     )
 
     # Add generated Python sources from codegen targets to the mutable virtualenv.
@@ -577,8 +577,8 @@ async def export_virtualenvs(
     request: ExportVenvsRequest,
     export_subsys: ExportSubsystem,
 ) -> ExportResults:
-    maybe_venvs = await MultiGet(
-        Get(MaybeExportResult, _ExportVenvForResolveRequest(resolve))
+    maybe_venvs = await concurrently(
+        export_virtualenv_for_resolve(_ExportVenvForResolveRequest(resolve), **implicitly())
         for resolve in export_subsys.options.resolve
     )
     return ExportResults(mv.result for mv in maybe_venvs if mv.result is not None)

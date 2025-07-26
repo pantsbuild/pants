@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 from collections import defaultdict
 from collections.abc import Iterable
@@ -17,9 +18,9 @@ from pants.backend.shell.target_types import ShellDependenciesField, ShellSource
 from pants.core.util_rules.external_tool import download_external_tool
 from pants.engine.addresses import Address
 from pants.engine.collection import DeduplicatedCollection
-from pants.engine.fs import Digest, MergeDigests
+from pants.engine.fs import Digest
 from pants.engine.internals.graph import determine_explicitly_provided_dependencies, hydrate_sources
-from pants.engine.intrinsics import execute_process, merge_digests
+from pants.engine.intrinsics import execute_process
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Rule, collect_rules, concurrently, implicitly, rule
@@ -45,7 +46,7 @@ class AllShellTargets(Targets):
 
 
 @rule(desc="Find all Shell targets in project", level=LogLevel.DEBUG)
-def find_all_shell_targets(all_tgts: AllTargets) -> AllShellTargets:
+async def find_all_shell_targets(all_tgts: AllTargets) -> AllShellTargets:
     return AllShellTargets(tgt for tgt in all_tgts if tgt.has_field(ShellSourceField))
 
 
@@ -58,7 +59,7 @@ class ShellMapping:
 
 
 @rule(desc="Creating map of Shell file names to Shell targets", level=LogLevel.DEBUG)
-def map_shell_files(tgts: AllShellTargets) -> ShellMapping:
+async def map_shell_files(tgts: AllShellTargets) -> ShellMapping:
     files_to_addresses: dict[str, Address] = {}
     files_with_multiple_owners: DefaultDict[str, set[Address]] = defaultdict(set)
     for tgt in tgts:
@@ -101,13 +102,17 @@ async def parse_shell_imports(
     # that all `source` statements will error. Then, we can extract the problematic paths from the
     # JSON output.
     downloaded_shellcheck = await download_external_tool(shellcheck.get_request(platform))
-    input_digest = await merge_digests(MergeDigests([request.digest, downloaded_shellcheck.digest]))
+
+    immutable_input_key = "__shellcheck_tool"
+    exe_path = os.path.join(immutable_input_key, downloaded_shellcheck.exe)
+
     process_result = await execute_process(
         Process(
             # NB: We do not load up `[shellcheck].{args,config}` because it would risk breaking
             # determinism of dependency inference in an unexpected way.
-            [downloaded_shellcheck.exe, "--format=json", request.fp],
-            input_digest=input_digest,
+            [exe_path, "--format=json", request.fp],
+            input_digest=request.digest,
+            immutable_input_digests={immutable_input_key: downloaded_shellcheck.digest},
             description=f"Detect Shell imports for {request.fp}",
             level=LogLevel.DEBUG,
             # We expect this to always fail, but it should still be cached because the process is

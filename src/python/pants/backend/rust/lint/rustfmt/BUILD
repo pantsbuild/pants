@@ -3,6 +3,4 @@
 
 python_sources()
 
-python_tests(
-    name="tests",
-)
+python_tests(name="tests", extra_env_vars=["RUSTUP_HOME"])

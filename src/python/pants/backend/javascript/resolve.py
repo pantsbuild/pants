@@ -11,16 +11,16 @@ from pants.backend.javascript.nodejs_project import AllNodeJSProjects, NodeJSPro
 from pants.backend.javascript.package_json import (
     FirstPartyNodePackageTargets,
     NodePackageNameField,
-    OwningNodePackage,
     OwningNodePackageRequest,
     PackageJsonSourceField,
+    find_owning_package,
 )
 from pants.backend.javascript.subsystems.nodejs import UserChosenNodeJSResolveAliases
 from pants.build_graph.address import Address
 from pants.engine.fs import PathGlobs
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import Rule, collect_rules, rule
-from pants.engine.target import Target, WrappedTarget, WrappedTargetRequest
+from pants.engine.internals.graph import resolve_target
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
+from pants.engine.target import Target, WrappedTargetRequest
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 
@@ -47,9 +47,9 @@ class ChosenNodeResolve:
 
 
 async def _get_node_package_json_directory(req: RequestNodeResolve) -> str:
-    wrapped = await Get(
-        WrappedTarget,
+    wrapped = await resolve_target(
         WrappedTargetRequest(req.address, description_of_origin="the `ChosenNodeResolve` rule"),
+        **implicitly(),
     )
     target: Target | None
     if wrapped.target.has_field(PackageJsonSourceField) and wrapped.target.has_field(
@@ -57,7 +57,7 @@ async def _get_node_package_json_directory(req: RequestNodeResolve) -> str:
     ):
         target = wrapped.target
     else:
-        owning_pkg = await Get(OwningNodePackage, OwningNodePackageRequest(wrapped.target.address))
+        owning_pkg = await find_owning_package(OwningNodePackageRequest(wrapped.target.address))
         target = owning_pkg.ensure_owner()
     return os.path.dirname(target[PackageJsonSourceField].file_path)
 

@@ -35,6 +35,7 @@ from pants.core.goals.update_build_files import (
     format_build_file_with_buildifier,
     format_build_file_with_ruff,
     format_build_file_with_yapf,
+    rewrite_build_file,
     update_build_files,
 )
 from pants.core.target_types import GenericTarget
@@ -60,14 +61,14 @@ class MockRewriteReverseLines(RewrittenBuildFileRequest):
 
 
 @rule
-def add_line(request: MockRewriteAddLine) -> RewrittenBuildFile:
+async def add_line(request: MockRewriteAddLine) -> RewrittenBuildFile:
     return RewrittenBuildFile(
         request.path, (*request.lines, "# added line"), change_descriptions=("Add a new line",)
     )
 
 
 @rule
-def reverse_lines(request: MockRewriteReverseLines) -> RewrittenBuildFile:
+async def reverse_lines(request: MockRewriteReverseLines) -> RewrittenBuildFile:
     return RewrittenBuildFile(
         request.path, tuple(reversed(request.lines)), change_descriptions=("Reverse lines",)
     )
@@ -79,6 +80,7 @@ def generic_goal_rule_runner() -> RuleRunner:
         rules=(
             add_line,
             reverse_lines,
+            rewrite_build_file,
             format_build_file_with_ruff,
             format_build_file_with_yapf,
             update_build_files,
@@ -218,6 +220,7 @@ BLACK_ENV_INHERIT = {"PATH", "PYENV_ROOT", "HOME", "LANG", "LC_ALL"}
 def black_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=(
+            rewrite_build_file,
             format_build_file_with_black,
             format_build_file_with_ruff,
             format_build_file_with_yapf,
@@ -299,6 +302,7 @@ def run_ruff(
     """Returns the Goal's result and contents of the BUILD file after execution."""
     rule_runner = RuleRunner(
         rules=(
+            rewrite_build_file,
             format_build_file_with_ruff,
             update_build_files,
             *config_files.rules(),
@@ -350,6 +354,7 @@ def run_buildifier(
     """Returns the Goal's result and contents of the BUILD file after execution."""
     rule_runner = RuleRunner(
         rules=(
+            rewrite_build_file,
             format_build_file_with_buildifier,
             update_build_files,
             *config_files.rules(),
@@ -401,6 +406,7 @@ def run_yapf(
     """Returns the Goal's result and contents of the BUILD file after execution."""
     rule_runner = RuleRunner(
         rules=(
+            rewrite_build_file,
             format_build_file_with_yapf,
             update_build_files,
             *config_files.rules(),

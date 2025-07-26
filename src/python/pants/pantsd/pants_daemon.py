@@ -36,6 +36,8 @@ from pants.version import VERSION
 _SHUTDOWN_TIMEOUT_SECS = 3
 
 _PRESERVED_ENV_VARS = [
+    # Provides location of sandboxer binary.
+    "PANTS_SANDBOXER_BINARY_PATH",
     # Controls backtrace behavior for rust code.
     "RUST_BACKTRACE",
     # The environment variables consumed by the `bollard` crate as of

@@ -23,7 +23,7 @@ from pants.util.strutil import softwrap
 
 if TYPE_CHECKING:
     # Needed to avoid an import cycle.
-    from pants.core.util_rules.environments import EnvironmentTarget
+    from pants.core.environments.target_types import EnvironmentTarget
     from pants.engine.rules import Rule
 
 _SubsystemT = TypeVar("_SubsystemT", bound="Subsystem")
@@ -75,7 +75,7 @@ class Subsystem(metaclass=_SubsystemMeta):
     deprecated_options_scope: str | None = None
     deprecated_options_scope_removal_version: str | None = None
 
-    # // Note: must be aligned with the regex in src/rust/engine/options/src/id.rs.
+    # // Note: must be aligned with the regex in src/rust/options/src/id.rs.
     _scope_name_re = re.compile(r"^(?:[a-z0-9_])+(?:-(?:[a-z0-9_])+)*$")
 
     _rules: ClassVar[Sequence[Rule] | None] = None
@@ -104,7 +104,7 @@ class Subsystem(metaclass=_SubsystemMeta):
         _options_env: EnvironmentVars = EnvironmentVars()
 
         def __getattribute__(self, __name: str) -> Any:
-            from pants.core.util_rules.environments import resolve_environment_sensitive_option
+            from pants.core.environments.rules import resolve_environment_sensitive_option
 
             # Will raise an `AttributeError` if the attribute is not defined.
             # MyPy should stop that from ever happening.
@@ -132,7 +132,7 @@ class Subsystem(metaclass=_SubsystemMeta):
 
         def _is_default(self, __name: str) -> bool:
             """Returns true if the value of the named option is unchanged from the default."""
-            from pants.core.util_rules.environments import resolve_environment_sensitive_option
+            from pants.core.environments.rules import resolve_environment_sensitive_option
 
             v = getattr(type(self), __name)
             assert isinstance(v, OptionInfo)
@@ -147,7 +147,7 @@ class Subsystem(metaclass=_SubsystemMeta):
     def rules(cls: Any) -> Iterable[Rule]:
         # NB: This avoids using `memoized_classmethod` until its interaction with `mypy` can be improved.
         if cls._rules is None:
-            from pants.core.util_rules.environments import add_option_fields_for
+            from pants.core.environments.rules import add_option_fields_for
             from pants.engine.rules import Rule
 
             # nb. `rules` needs to be memoized so that repeated calls to add these rules
@@ -221,7 +221,7 @@ class Subsystem(metaclass=_SubsystemMeta):
     def _construct_env_aware_rule(cls) -> Rule:
         """Returns a `TaskRule` that will construct the target Subsystem.EnvironmentAware."""
         # Global-level imports are conditional, we need to re-import here for runtime use
-        from pants.core.util_rules.environments import EnvironmentTarget
+        from pants.core.environments.target_types import EnvironmentTarget
         from pants.engine.rules import TaskRule
 
         snake_scope = normalize_scope(cls.options_scope)

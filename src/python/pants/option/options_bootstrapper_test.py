@@ -135,7 +135,7 @@ class TestOptionsBootstrapper:
                     ScopeInfo("foo"),
                     ScopeInfo("fruit"),
                 ],
-                union_membership=UnionMembership({}),
+                union_membership=UnionMembership.empty(),
             )
             # So we don't choke on these on the cmd line.
             opts.register("", "--pants-workdir")
@@ -182,7 +182,7 @@ class TestOptionsBootstrapper:
                     ScopeInfo("compile_apt"),
                     ScopeInfo("fruit"),
                 ],
-                union_membership=UnionMembership({}),
+                union_membership=UnionMembership.empty(),
             )
             # So we don't choke on these on the cmd line.
             options.register("", "--pants-config-files", type=list)
@@ -253,7 +253,7 @@ class TestOptionsBootstrapper:
                     ScopeInfo(""),
                     ScopeInfo("resolver"),
                 ],
-                union_membership=UnionMembership({}),
+                union_membership=UnionMembership.empty(),
             )
             opts_single_config.register("", "--pantsrc-files", type=list)
             opts_single_config.register("resolver", "--resolver")
@@ -269,14 +269,14 @@ class TestOptionsBootstrapper:
                     ScopeInfo(""),
                     ScopeInfo("foo"),
                 ],
-                union_membership=UnionMembership({}),
+                union_membership=UnionMembership.empty(),
             )
             opts2 = bootstrapper.full_options_for_scopes(
                 known_scope_infos=[
                     ScopeInfo("foo"),
                     ScopeInfo(""),
                 ],
-                union_membership=UnionMembership({}),
+                union_membership=UnionMembership.empty(),
             )
             assert opts1 is opts2
 
@@ -286,19 +286,19 @@ class TestOptionsBootstrapper:
                     ScopeInfo("foo"),
                     ScopeInfo(""),
                 ],
-                union_membership=UnionMembership({}),
+                union_membership=UnionMembership.empty(),
             )
             assert opts1 is opts3
 
             opts4 = bootstrapper.full_options_for_scopes(
                 known_scope_infos=[ScopeInfo("")],
-                union_membership=UnionMembership({}),
+                union_membership=UnionMembership.empty(),
             )
             assert opts1 is not opts4
 
             opts5 = bootstrapper.full_options_for_scopes(
                 known_scope_infos=[ScopeInfo("")],
-                union_membership=UnionMembership({}),
+                union_membership=UnionMembership.empty(),
             )
             assert opts4 is opts5
             assert opts1 is not opts5
@@ -371,7 +371,7 @@ def test_file_spec_args() -> None:
             known_scope_infos=[
                 ScopeInfo(""),
             ],
-            union_membership=UnionMembership({}),
+            union_membership=UnionMembership.empty(),
         )
         sorted_specs = sorted(options.specs)
         assert ["bar", "fleem:tgt", "foo", "morx:tgt"] == sorted_specs
