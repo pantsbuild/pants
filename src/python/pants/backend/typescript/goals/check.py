@@ -9,34 +9,33 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from pants.backend.javascript.nodejs_project import AllNodeJSProjects, find_node_js_projects
+from pants.backend.javascript.nodejs_project import find_node_js_projects
 from pants.backend.javascript.package_json import (
     AllPackageJson,
     OwningNodePackageRequest,
     all_package_json,
     find_owning_package,
 )
-from pants.backend.javascript.resolve import ChosenNodeResolve, RequestNodeResolve, resolve_for_package
+from pants.backend.javascript.resolve import RequestNodeResolve, resolve_for_package
 from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolRequest, prepare_tool_process
 from pants.backend.typescript.subsystem import TypeScriptSubsystem
+from pants.backend.javascript.target_types import JSRuntimeSourceField
 from pants.backend.typescript.target_types import TypeScriptSourceField, TypeScriptTestSourceField
 from pants.backend.typescript.tsconfig import AllTSConfigs, TSConfig, construct_effective_ts_configs
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.core.target_types import FileSourceField
+from pants.engine.collection import Collection
 from pants.engine.fs import EMPTY_DIGEST, Digest, DigestSubset, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.internals.graph import find_all_targets, hydrate_sources, transitive_targets
 from pants.engine.internals.native_engine import MergeDigests
-from pants.engine.internals.selectors import Get, concurrently
+from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import execute_process, merge_digests, path_globs_to_digest, digest_subset_to_digest
-from pants.engine.process import Process
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
-    AllTargets,
     FieldSet,
     HydrateSourcesRequest,
     Target,
-    TransitiveTargets,
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
@@ -47,6 +46,8 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from pants.backend.javascript.nodejs_project import NodeJSProject
+
+
 
 
 _TYPESCRIPT_OUTPUT_EXTENSIONS = [
@@ -212,16 +213,9 @@ async def _collect_config_files_for_project(
 
 @dataclass(frozen=True)
 class TypeScriptCheckFieldSet(FieldSet):
-    required_fields = (TypeScriptSourceField,)
-
-    sources: TypeScriptSourceField
-
-
-@dataclass(frozen=True)
-class TypeScriptTestCheckFieldSet(FieldSet):
-    required_fields = (TypeScriptTestSourceField,)
-
-    sources: TypeScriptTestSourceField
+    required_fields = (JSRuntimeSourceField,)
+    
+    sources: JSRuntimeSourceField
 
 
 class TypeScriptCheckRequest(CheckRequest):
@@ -229,43 +223,55 @@ class TypeScriptCheckRequest(CheckRequest):
     tool_name = TypeScriptSubsystem.options_scope
 
 
-class TypeScriptTestCheckRequest(CheckRequest):
-    field_set_type = TypeScriptTestCheckFieldSet
-    tool_name = TypeScriptSubsystem.options_scope
+async def _typecheck_typescript_projects(
+    field_sets: Collection[TypeScriptCheckFieldSet],
+    subsystem: TypeScriptSubsystem,
+    global_options: GlobalOptions,
+) -> tuple[CheckResult, ...]:
+    """Type check TypeScript projects, grouping targets by their containing NodeJS project."""
+    if not field_sets:
+        return ()
+
+    all_projects = await find_node_js_projects(**implicitly())
+    
+    owning_packages = await concurrently(
+        find_owning_package(OwningNodePackageRequest(field_set.address), **implicitly())
+        for field_set in field_sets
+    )
+    
+    projects_to_field_sets: dict[NodeJSProject, list[TypeScriptCheckFieldSet]] = {}
+    for field_set, owning_package in zip(field_sets, owning_packages):
+        if owning_package.target:
+            package_directory = owning_package.target.address.spec_path
+            owning_project = all_projects.project_for_directory(package_directory)
+            if owning_project:
+                if owning_project not in projects_to_field_sets:
+                    projects_to_field_sets[owning_project] = []
+                projects_to_field_sets[owning_project].append(field_set)
+
+    project_results = await concurrently(
+        _typecheck_single_project(project, project_field_sets, subsystem, global_options)
+        for project, project_field_sets in projects_to_field_sets.items()
+    )
+    
+    return project_results
 
 
 async def _typecheck_single_project(
     project: NodeJSProject,
+    field_sets: list[TypeScriptCheckFieldSet], 
     subsystem: TypeScriptSubsystem,
     global_options: GlobalOptions,
 ) -> CheckResult:
-    """Type check a single TypeScript project."""
+    """Type check a single TypeScript project with the given field sets."""
+    target_addresses = [field_set.address for field_set in field_sets]
+    
     all_targets = await find_all_targets()
-
-    # Find all TypeScript targets
-    typescript_targets = [
-        target
-        for target in all_targets
-        if (target.has_field(TypeScriptSourceField) or target.has_field(TypeScriptTestSourceField))
+    project_typescript_targets = [
+        target for target in all_targets 
+        if target.address in target_addresses
     ]
 
-    # Get owning packages for all TypeScript targets concurrently
-    typescript_owning_packages = await concurrently(
-        find_owning_package(OwningNodePackageRequest(target.address), **implicitly())
-        for target in typescript_targets
-    )
-
-    # Filter to targets that belong to the current project
-    all_projects = await find_node_js_projects(**implicitly())
-    project_typescript_targets = []
-    for target, owning_package in zip(typescript_targets, typescript_owning_packages):
-        if owning_package.target:
-            package_directory = owning_package.target.address.spec_path
-            target_project = all_projects.project_for_directory(package_directory)
-            if target_project == project:
-                project_typescript_targets.append(target)
-
-    # Get source files from all TypeScript targets in the project
     if project_typescript_targets:
         workspace_target_sources = await concurrently(
             hydrate_sources(
@@ -279,7 +285,6 @@ async def _typecheck_single_project(
             for target in project_typescript_targets
         )
 
-        # Merge all workspace target sources
         all_workspace_digests = [sources.snapshot.digest for sources in workspace_target_sources]
         all_workspace_sources = await merge_digests(MergeDigests(all_workspace_digests))
 
@@ -402,69 +407,21 @@ async def _typecheck_single_project(
     return check_result
 
 
-async def _typecheck_typescript_files(
-    field_sets: tuple[TypeScriptCheckFieldSet | TypeScriptTestCheckFieldSet, ...],
-    subsystem: TypeScriptSubsystem,
-    tool_name: str,
-    global_options: GlobalOptions,
-) -> CheckResults:
-    if subsystem.skip:
-        return CheckResults([], checker_name=tool_name)
-
-    if not field_sets:
-        return CheckResults([], checker_name=tool_name)
-
-    target_sources = await concurrently(
-        hydrate_sources(HydrateSourcesRequest(field_set.sources), **implicitly())
-        for field_set in field_sets
-    )
-
-    all_source_files: list[str] = []
-    target_addresses = set()
-    for i, sources in enumerate(target_sources):
-        all_source_files.extend(sources.snapshot.files)
-        target_addresses.add(field_sets[i].address)
-
-    if not all_source_files:
-        return CheckResults([], checker_name=tool_name)
-
-    all_projects = await find_node_js_projects(**implicitly())
-    owning_packages = await concurrently(
-        find_owning_package(OwningNodePackageRequest(address), **implicitly())
-        for address in target_addresses
-    )
-
-    # Group targets by their containing NodeJS project
-    projects_to_check: dict[NodeJSProject, list[Address]] = {}
-    for address, owning_package in zip(target_addresses, owning_packages):
-        if owning_package.target:
-            package_directory = owning_package.target.address.spec_path
-            owning_project = all_projects.project_for_directory(package_directory)
-            if owning_project:
-                if owning_project not in projects_to_check:
-                    projects_to_check[owning_project] = []
-                projects_to_check[owning_project].append(address)
-
-    if not projects_to_check:
-        logger.warning(f"No NodeJS projects found for TypeScript targets: {target_addresses}")
-        return CheckResults([], checker_name=tool_name)
-
-    # Check all projects
-    project_results = await concurrently(
-        _typecheck_single_project(project, subsystem, global_options)
-        for project in projects_to_check.keys()
-    )
-
-    return CheckResults(project_results, checker_name=tool_name)
-
 
 @rule(desc="Check TypeScript compilation", level=LogLevel.DEBUG)
 async def typecheck_typescript(
     request: TypeScriptCheckRequest, subsystem: TypeScriptSubsystem, global_options: GlobalOptions
 ) -> CheckResults:
-    return await _typecheck_typescript_files(
-        request.field_sets, subsystem, request.tool_name, global_options
+    if subsystem.skip:
+        return CheckResults([], checker_name=request.tool_name)
+
+    check_results = await _typecheck_typescript_projects(
+        request.field_sets, subsystem, global_options
     )
+    
+    return CheckResults(check_results, checker_name=request.tool_name)
+
+
 
 
 def rules():
