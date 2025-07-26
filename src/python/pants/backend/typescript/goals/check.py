@@ -9,15 +9,15 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from pants.backend.javascript.nodejs_project import AllNodeJSProjects
+from pants.backend.javascript.nodejs_project import AllNodeJSProjects, find_node_js_projects
 from pants.backend.javascript.package_json import (
     AllPackageJson,
     OwningNodePackageRequest,
     all_package_json,
     find_owning_package,
 )
-from pants.backend.javascript.resolve import ChosenNodeResolve, RequestNodeResolve
-from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolRequest
+from pants.backend.javascript.resolve import ChosenNodeResolve, RequestNodeResolve, resolve_for_package
+from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolRequest, prepare_tool_process
 from pants.backend.typescript.subsystem import TypeScriptSubsystem
 from pants.backend.typescript.target_types import TypeScriptSourceField, TypeScriptTestSourceField
 from pants.backend.typescript.tsconfig import AllTSConfigs, TSConfig, construct_effective_ts_configs
@@ -25,10 +25,10 @@ from pants.build_graph.address import Address
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.core.target_types import FileSourceField
 from pants.engine.fs import EMPTY_DIGEST, Digest, DigestSubset, GlobMatchErrorBehavior, PathGlobs
-from pants.engine.internals.graph import hydrate_sources
+from pants.engine.internals.graph import find_all_targets, hydrate_sources, transitive_targets
 from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.internals.selectors import Get, concurrently
-from pants.engine.intrinsics import execute_process, merge_digests, path_globs_to_digest
+from pants.engine.intrinsics import execute_process, merge_digests, path_globs_to_digest, digest_subset_to_digest
 from pants.engine.process import Process
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
@@ -151,12 +151,12 @@ async def _extract_typescript_artifacts_for_caching(
     process_output_digest: Digest,
     artifact_globs: list[str],
 ) -> Digest:
-    artifacts_digest = await Get(
-        Digest,
+    artifacts_digest = await digest_subset_to_digest(
         DigestSubset(
             process_output_digest,
             PathGlobs(artifact_globs, glob_match_error_behavior=GlobMatchErrorBehavior.ignore),
         ),
+        **implicitly(),
     )
 
     return artifacts_digest
@@ -197,11 +197,11 @@ async def _collect_config_files_for_project(
     # since they affect package installation, not TypeScript compilation directly.
     if typescript_targets:
         typescript_addresses = [target.address for target in typescript_targets]
-        transitive_targets = await Get(
-            TransitiveTargets, TransitiveTargetsRequest(typescript_addresses)
+        transitive_targets_result = await transitive_targets(
+            TransitiveTargetsRequest(typescript_addresses), **implicitly()
         )
 
-        for target in transitive_targets.closure:
+        for target in transitive_targets_result.closure:
             if target.has_field(FileSourceField):
                 file_path = target[FileSourceField].file_path
                 if file_path.startswith(project.root_dir):
@@ -240,7 +240,7 @@ async def _typecheck_single_project(
     global_options: GlobalOptions,
 ) -> CheckResult:
     """Type check a single TypeScript project."""
-    all_targets = await Get(AllTargets)
+    all_targets = await find_all_targets()
 
     # Find all TypeScript targets
     typescript_targets = [
@@ -256,7 +256,7 @@ async def _typecheck_single_project(
     )
 
     # Filter to targets that belong to the current project
-    all_projects = await Get(AllNodeJSProjects)
+    all_projects = await find_node_js_projects(**implicitly())
     project_typescript_targets = []
     for target, owning_package in zip(typescript_targets, typescript_owning_packages):
         if owning_package.target:
@@ -357,13 +357,15 @@ async def _typecheck_single_project(
     # - For monorepos: all workspaces share the parent project's lockfile/resolve
     # - For standalone projects: the project root contains the lockfile/resolve
     project_address = Address(project.root_dir)
-    project_resolve = await Get(ChosenNodeResolve, RequestNodeResolve(project_address))
+    project_resolve = await resolve_for_package(
+        RequestNodeResolve(project_address), **implicitly()
+    )
 
     # Override the resolve to use the project's resolve instead of default
-    tool_request_with_resolve = replace(tool_request, resolve=project_resolve.resolve_name)
+    tool_request_with_resolve: NodeJSToolRequest = replace(tool_request, resolve=project_resolve.resolve_name)
 
     # Execute TypeScript type checking with the project's resolve
-    process = await Get(Process, NodeJSToolRequest, tool_request_with_resolve)
+    process = await prepare_tool_process(tool_request_with_resolve, **implicitly())
 
     # Set working directory to the project root where tsconfig.json is located
     working_directory = project.root_dir if project.root_dir != "." else None
@@ -426,7 +428,7 @@ async def _typecheck_typescript_files(
     if not all_source_files:
         return CheckResults([], checker_name=tool_name)
 
-    all_projects = await Get(AllNodeJSProjects)
+    all_projects = await find_node_js_projects(**implicitly())
     owning_packages = await concurrently(
         find_owning_package(OwningNodePackageRequest(address), **implicitly())
         for address in target_addresses
