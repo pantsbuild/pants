@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import logging
 import os
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -42,7 +41,6 @@ from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
 
-logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from pants.backend.javascript.nodejs_project import NodeJSProject
@@ -272,30 +270,20 @@ async def _typecheck_single_project(
         if target.address in target_addresses
     ]
 
-    if project_typescript_targets:
-        workspace_target_sources = await concurrently(
-            hydrate_sources(
-                HydrateSourcesRequest(
-                    target[TypeScriptSourceField]
-                    if target.has_field(TypeScriptSourceField)
-                    else target[TypeScriptTestSourceField]
-                ),
-                **implicitly(),
-            )
-            for target in project_typescript_targets
+    workspace_target_sources = await concurrently(
+        hydrate_sources(
+            HydrateSourcesRequest(
+                target[TypeScriptSourceField]
+                if target.has_field(TypeScriptSourceField)
+                else target[TypeScriptTestSourceField]
+            ),
+            **implicitly(),
         )
+        for target in project_typescript_targets
+    )
 
-        all_workspace_digests = [sources.snapshot.digest for sources in workspace_target_sources]
-        all_workspace_sources = await merge_digests(MergeDigests(all_workspace_digests))
-
-    else:
-        logger.warning(f"No TypeScript targets found in project {project.root_dir}")
-        return CheckResult(
-            exit_code=0,
-            stdout="",
-            stderr="",
-            partition_description=f"TypeScript check on {project.root_dir} (no targets)",
-        )
+    all_workspace_digests = [sources.snapshot.digest for sources in workspace_target_sources]
+    all_workspace_sources = await merge_digests(MergeDigests(all_workspace_digests))
 
     # Collect all config files needed for TypeScript compilation
     all_package_jsons, all_ts_configs = await concurrently(
