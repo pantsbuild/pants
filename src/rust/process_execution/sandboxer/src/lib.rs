@@ -398,8 +398,11 @@ impl Sandboxer {
         // UNIX domain socket creation can fail with "transport error" if the path is too long.
         // We have no control over the repo root path length, so we try to create the socket
         // in some standard short path locations, falling back to the repo dir as a last resort.
-        // See https://refspecs.linuxfoundation.org/FHS_3.0/fhs/ch03s15.html for why these paths.
-        let socket_path = try_socket_path(PathBuf::from("/run/pants"))
+        // See https://refspecs.linuxfoundation.org/FHS_3.0/fhs/ch03s15.html and
+        // https://specifications.freedesktop.org/basedir-spec/latest/ for why these paths.
+        let socket_path = env::var_os("XDG_RUNTIME_DIR")
+            .and_then(|path| try_socket_path(PathBuf::from(path).join("pants")))
+            .or_else(|| try_socket_path(PathBuf::from("/run/pants")))
             .or_else(|| try_socket_path(PathBuf::from("/var/run/pants")))
             .or_else(|| try_socket_path(env::temp_dir().join("run/pants")))
             .or_else(|| try_socket_path(pants_workdir.join("sandboxer")))
