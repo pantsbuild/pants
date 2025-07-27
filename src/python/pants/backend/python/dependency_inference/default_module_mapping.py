@@ -126,7 +126,7 @@ DEFAULT_MODULE_MAPPING: dict[str, tuple[str, ...]] = {
         "databricks.sqlalchemy",
     ),
     "delta-spark": ("delta",),
-    "discord.py": ("discord",),
+    "discord-py": ("discord",),
     "django-activity-stream": ("actstream",),
     "django-cors-headers": ("corsheaders",),
     "django-countries": ("django_countries",),
