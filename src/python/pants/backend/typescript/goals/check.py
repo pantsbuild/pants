@@ -8,7 +8,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from pants.backend.javascript.nodejs_project import find_node_js_projects
+from pants.backend.javascript.nodejs_project import AllNodeJSProjects, find_node_js_projects
 from pants.backend.javascript.package_json import (
     AllPackageJson,
     OwningNodePackageRequest,
@@ -30,8 +30,10 @@ from pants.engine.internals.graph import find_all_targets, hydrate_sources, tran
 from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import execute_process, merge_digests, path_globs_to_digest, digest_subset_to_digest
+from pants.engine.process import Process
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
+    AllTargets,
     FieldSet,
     HydrateSourcesRequest,
     Target,
@@ -230,7 +232,12 @@ async def _typecheck_typescript_projects(
     if not field_sets:
         return ()
 
-    all_projects = await find_node_js_projects(**implicitly())
+    all_projects, all_targets, all_package_jsons, all_ts_configs = await concurrently(
+        find_node_js_projects(**implicitly()),
+        find_all_targets(),
+        all_package_json(),
+        construct_effective_ts_configs(),
+    )
     
     owning_packages = await concurrently(
         find_owning_package(OwningNodePackageRequest(field_set.address), **implicitly())
@@ -248,28 +255,60 @@ async def _typecheck_typescript_projects(
                 projects_to_field_sets[owning_project].append(field_set)
 
     project_results = await concurrently(
-        _typecheck_single_project(project, project_field_sets, subsystem, global_options)
-        for project, project_field_sets in projects_to_field_sets.items()
+        _typecheck_single_project(
+            project, 
+            subsystem, 
+            global_options,
+            all_targets,
+            all_projects,
+            all_package_jsons,
+            all_ts_configs,
+        )
+        for project in projects_to_field_sets.keys()
     )
     
     return project_results
 
 
-async def _typecheck_single_project(
+async def _find_project_typescript_targets(
     project: NodeJSProject,
-    field_sets: list[TypeScriptCheckFieldSet], 
-    subsystem: TypeScriptSubsystem,
-    global_options: GlobalOptions,
-) -> CheckResult:
-    """Type check a single TypeScript project with the given field sets."""
-    target_addresses = [field_set.address for field_set in field_sets]
+    all_targets: AllTargets,
+    all_projects: AllNodeJSProjects,
+) -> list[Target] | None:
+    """Find all TypeScript targets belonging to the specified project.
     
-    all_targets = await find_all_targets()
-    project_typescript_targets = [
-        target for target in all_targets 
-        if target.address in target_addresses
+    Returns None if no TypeScript targets found in the project.
+    TypeScript compilation needs all sources in a project to resolve imports correctly.
+    """
+    # Find ALL TypeScript targets in workspace
+    typescript_targets = [
+        target
+        for target in all_targets
+        if (target.has_field(TypeScriptSourceField) or target.has_field(TypeScriptTestSourceField))
     ]
+    
+    # Get owning packages for all TypeScript targets to filter to this project
+    typescript_owning_packages = await concurrently(
+        find_owning_package(OwningNodePackageRequest(target.address), **implicitly())
+        for target in typescript_targets
+    )
+    
+    # Filter to targets that belong to the current project
+    project_typescript_targets = []
+    for target, owning_package in zip(typescript_targets, typescript_owning_packages):
+        if owning_package.target:
+            package_directory = owning_package.target.address.spec_path
+            target_project = all_projects.project_for_directory(package_directory)
+            if target_project == project:
+                project_typescript_targets.append(target)
 
+    return project_typescript_targets if project_typescript_targets else None
+
+
+async def _hydrate_project_sources(
+    project_typescript_targets: list[Target],
+) -> Digest:
+    """Hydrate and merge all source files for TypeScript targets in the project."""
     workspace_target_sources = await concurrently(
         hydrate_sources(
             HydrateSourcesRequest(
@@ -283,14 +322,21 @@ async def _typecheck_single_project(
     )
 
     all_workspace_digests = [sources.snapshot.digest for sources in workspace_target_sources]
-    all_workspace_sources = await merge_digests(MergeDigests(all_workspace_digests))
+    return await merge_digests(MergeDigests(all_workspace_digests))
 
+
+async def _prepare_compilation_input(
+    project: NodeJSProject,
+    project_typescript_targets: list[Target],
+    all_package_jsons: AllPackageJson,
+    all_ts_configs: AllTSConfigs,
+    all_workspace_sources: Digest,
+) -> tuple[Digest, list[str]]:
+    """Prepare input digest and artifact globs for TypeScript compilation.
+    
+    Returns tuple of (input_digest, artifact_globs).
+    """
     # Collect all config files needed for TypeScript compilation
-    all_package_jsons, all_ts_configs = await concurrently(
-        all_package_json(),
-        construct_effective_ts_configs(),
-    )
-
     config_files = await _collect_config_files_for_project(
         project, project_typescript_targets, all_package_jsons, all_ts_configs
     )
@@ -334,7 +380,21 @@ async def _typecheck_single_project(
         + ([cached_typescript_artifacts] if cached_typescript_artifacts != EMPTY_DIGEST else [])
     )
     input_digest = await merge_digests(MergeDigests(all_digests))
+    
+    return input_digest, artifact_globs
 
+
+async def _prepare_typescript_tool_process(
+    project: NodeJSProject,
+    subsystem: TypeScriptSubsystem,
+    input_digest: Digest,
+    resolved_output_dirs: set[str],
+    project_typescript_targets: list[Target],
+) -> Process:
+    """Prepare the TypeScript compiler process for execution.
+    
+    Returns a configured Process ready for execution.
+    """
     # Use --build to compile all projects in workspace with project references
     args = ("--build",)
 
@@ -366,33 +426,66 @@ async def _typecheck_single_project(
     # TypeScript composite projects generate .tsbuildinfo files in the project root by default
     output_directories = (".",) + tuple(sorted(resolved_output_dirs))
 
-    process_with_outputs = replace(
+    return replace(
         process,
         working_directory=working_directory,
         output_directories=output_directories,
     )
 
-    result = await execute_process(process_with_outputs, **implicitly())
+
+async def _typecheck_single_project(
+    project: NodeJSProject,
+    subsystem: TypeScriptSubsystem,
+    global_options: GlobalOptions,
+    all_targets: AllTargets,
+    all_projects: AllNodeJSProjects,
+    all_package_jsons: AllPackageJson,
+    all_ts_configs: AllTSConfigs,
+) -> CheckResult:
+    """Type check a single TypeScript project using all TypeScript targets in the project."""
+    # Find all TypeScript targets for this project
+    project_typescript_targets = await _find_project_typescript_targets(
+        project, all_targets, all_projects
+    )
+    
+    # Early return if no TypeScript targets in project
+    if not project_typescript_targets:
+        return CheckResult(
+            exit_code=0,
+            stdout="",
+            stderr="",
+            partition_description=f"TypeScript check on {project.root_dir} (no targets)",
+        )
+
+    all_workspace_sources = await _hydrate_project_sources(project_typescript_targets)
+    
+    input_digest, artifact_globs = await _prepare_compilation_input(
+        project, project_typescript_targets, all_package_jsons, all_ts_configs, all_workspace_sources
+    )
+    
+    project_root_path = Path(project.root_dir)
+    resolved_output_dirs = _calculate_resolved_output_dirs(
+        project, all_ts_configs, project_root_path
+    )
+    
+    process = await _prepare_typescript_tool_process(
+        project, subsystem, input_digest, resolved_output_dirs, project_typescript_targets
+    )
+
+    result = await execute_process(process, **implicitly())
 
     # Cache TypeScript incremental build artifacts for faster subsequent runs
-    # TypeScript --build generates .tsbuildinfo files and output files that enable incremental compilation
     typescript_artifacts_digest = await _extract_typescript_artifacts_for_caching(
         result.output_digest, artifact_globs
     )
 
-    # Convert to CheckResult with caching support - single result for the project
-    check_result = CheckResult.from_fallible_process_result(
+    # Convert to CheckResult with caching support
+    return CheckResult.from_fallible_process_result(
         result,
         partition_description=f"TypeScript check on {project.root_dir} ({len(project_typescript_targets)} targets)",
-        # Store TypeScript incremental artifacts in the report field for output to dist directory
-        # Note: The report field is used to save tool outputs to the user's dist directory,
-        # not for caching between runs (Pants handles incremental caching internally via digests)
-        # See: write_reports() in multi_tool_goal_helper.py and mypy rules.py for examples
         report=typescript_artifacts_digest,
         output_simplifier=global_options.output_simplifier(),
     )
-
-    return check_result
 
 
 
