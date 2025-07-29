@@ -82,7 +82,7 @@ def _run_pants_help():
 
 
 def _parse_help_for_options(help: dict, scope: str) -> tuple[frozenset[str], frozenset[str]]:
-    """scope represents the goal or subsystem of interest Returns a tuple containing the scoped
+    """Scope represents the goal or subsystem of interest Returns a tuple containing the scoped
     options, followed by unscoped."""
     scoped_help_info = help["scope_to_help_info"][scope]
 

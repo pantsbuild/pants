@@ -45,7 +45,8 @@ class Pytype(PythonToolBase):
         """Pytype will look for a  `pyproject.toml` (with a `[tool.pytype]` section) in the project
         root.
 
-        Pytype's configuration content is specified here: https://github.com/google/pytype#config-
+        Pytype's configuration content is specified here:
+        https://github.com/google/pytype#config-
         file.
         """
 

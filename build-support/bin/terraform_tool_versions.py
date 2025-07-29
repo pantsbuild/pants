@@ -3,11 +3,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 """Fetch versions of Terraform and format them for use in known_versions.
 
-The main version page lists the available versions in descending order.
-It includes stable releases but also various levels of pre-release.
+The main version page lists the available versions in descending order. It includes stable releases
+but also various levels of pre-release.
 
-Each version links to a version-specific page.
-This page includes links to download the binary, sha256sum file, and a signature of the sha256sum file.
+Each version links to a version-specific page. This page includes links to download the binary,
+sha256sum file, and a signature of the sha256sum file.
 """
 
 import csv

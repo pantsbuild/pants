@@ -1,6 +1,5 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
 """Rules for the core Python target types.
 
 This is a separate module to avoid circular dependencies. Note that all types used by call sites are
