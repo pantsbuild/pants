@@ -6,8 +6,7 @@
 // {
 //   "version": 3,
 //   "valid_for_interpreter_constraints": [
-//     "CPython<4,>=3.8",
-//     "CPython==3.11.*"
+//     "CPython<4,>=3.8"
 //   ],
 //   "generated_with_requirements": [
 //     "pytest-html==3.2",
@@ -456,8 +455,7 @@
     "setuptools"
   ],
   "requires_python": [
-    "<4,>=3.8",
-    "==3.11.*"
+    "<4,>=3.8"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",
