@@ -174,7 +174,7 @@ async fn select(
                 select_reentry(context, params, &reentry.query).await
             }
             &rule_graph::EntryWithDeps::Root(_) => {
-                panic!("Not a runtime-executable entry! {:?}", entry)
+                panic!("Not a runtime-executable entry! {entry:?}")
             }
         },
         &rule_graph::Entry::Param(type_id) => {
@@ -182,8 +182,7 @@ async fn select(
                 Ok(key.to_value())
             } else {
                 Err(throw(format!(
-                    "Expected a Param of type {} to be present, but had only: {}",
-                    type_id, params,
+                    "Expected a Param of type {type_id} to be present, but had only: {params}",
                 )))
             }
         }

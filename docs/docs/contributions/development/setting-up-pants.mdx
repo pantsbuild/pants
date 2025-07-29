@@ -56,7 +56,7 @@ If you are okay with Pants running much slower when iterating, set the environme
 :::caution Rust compilation can use lots of storage
 Compiling the engine typically results in several gigabytes of storage over time. We have not yet implemented automated garbage collection for building the engine because contributors are the only ones to need to compile Rust, not every-day users.
 
-To free up space, run `rm -rf src/rust/engine/target`.
+To free up space, run `rm -rf src/rust/target`.
 
 Warning: this will cause Rust to recompile everything.
 :::
@@ -111,7 +111,7 @@ Add this to your `settings.json` file inside the build root's `.vscode` folder:
   "python.linting.enabled": true,
   "python.linting.flake8Enabled": true,
   "python.linting.flake8Args": ["--config=build-support/flake8/.flake8"],
-  "rust-analyzer.linkedProjects": ["src/rust/engine/Cargo.toml"]
+  "rust-analyzer.linkedProjects": ["src/rust/Cargo.toml"]
 }
 ```
 

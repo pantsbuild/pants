@@ -36,7 +36,7 @@ from pants.engine.target import (
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
 )
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.testutil.option_util import create_goal_subsystem, create_subsystem
 from pants.testutil.rule_runner import (
@@ -138,11 +138,8 @@ def single_target_run(
                     mock=rule_runner.run_interactive_process,
                 ),
             ],
-            union_membership=UnionMembership(
-                {
-                    RunFieldSet: [TestRunFieldSet],
-                    RunDebugAdapterRequest: [TestRunFieldSet],
-                },
+            union_membership=UnionMembership.from_rules(
+                {UnionRule(RunFieldSet, TestRunFieldSet)},
             ),
         )
 

@@ -77,6 +77,7 @@ fn native_engine(py: Python, m: &Bound<'_, PyModule>) -> PyO3Result<()> {
     externs::testutil::register(m)?;
     externs::workunits::register(m)?;
     externs::dep_inference::register(m)?;
+    externs::unions::register(py, m)?;
 
     m.add("PollTimeout", py.get_type::<PollTimeout>())?;
 
@@ -779,8 +780,8 @@ fn scheduler_create<'py>(
     ca_certs_path: Option<PathBuf>,
 ) -> PyO3Result<PyScheduler> {
     match fs::increase_limits() {
-        Ok(msg) => debug!("{}", msg),
-        Err(e) => warn!("{}", e),
+        Ok(msg) => debug!("{msg}"),
+        Err(e) => warn!("{e}"),
     }
     let types = types_ptr
         .borrow()
@@ -1122,7 +1123,7 @@ fn session_poll_workunits(
         })
     })
     .unwrap_or_else(|e| {
-        log::warn!("Panic in `session_poll_workunits`: {:?}", e);
+        log::warn!("Panic in `session_poll_workunits`: {e:?}");
         std::panic::resume_unwind(e);
     })
 }
@@ -1314,9 +1315,12 @@ fn tasks_add_call<'py>(
     rule_id: String,
     explicit_args_arity: u16,
     vtable_entries: Option<Vec<(Bound<'py, PyType>, String)>>,
+    in_scope_types: Option<Vec<Bound<'py, PyType>>>,
 ) {
     let output = TypeId::new(output);
     let inputs = inputs.into_iter().map(|t| TypeId::new(&t)).collect();
+    let in_scope_types =
+        in_scope_types.map(|ist| ist.into_iter().map(|t| TypeId::new(&t)).collect());
     py_tasks.borrow_mut().0.get(py).borrow_mut().add_call(
         output,
         inputs,
@@ -1327,6 +1331,7 @@ fn tasks_add_call<'py>(
                 .map(|(k, v)| (TypeId::new(&k), RuleId::from_string(v)))
                 .collect()
         }),
+        in_scope_types,
     );
 }
 
@@ -1706,10 +1711,10 @@ fn maybe_set_panic_handler() {
             panic_str.push_str(&panic_location_str);
         }
 
-        error!("{}", panic_str);
+        error!("{panic_str}");
 
         let panic_file_bug_str = "Please set RUST_BACKTRACE=1, re-run, and then file a bug at https://github.com/pantsbuild/pants/issues.";
-        error!("{}", panic_file_bug_str);
+        error!("{panic_file_bug_str}");
     }));
 }
 

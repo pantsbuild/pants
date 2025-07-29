@@ -1,0 +1,24 @@
+[package]
+version = "0.0.1"
+edition = "2021"
+name = "logging"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[dependencies]
+arc-swap = { workspace = true }
+colored = { workspace = true }
+chrono = { workspace = true }
+log = { workspace = true }
+num_enum = { workspace = true }
+parking_lot = { workspace = true }
+regex = { workspace = true }
+stdio = { path = "../stdio" }
+tokio = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+
+[build-dependencies]
+cargo_metadata = "0.21"
+
+[lints]
+workspace = true

@@ -34,37 +34,23 @@ jobs:
     - name: Configure Git
       run: git config --global safe.directory "$GITHUB_WORKSPACE"
     - name: Install rustup
-      run: 'curl --proto ''=https'' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s --
-        -v -y --default-toolchain none
-
+      run: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y --default-toolchain none
         echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
-
-        '
     - name: Install Rust toolchain
-      run: '# Set the default toolchain. Installs the toolchain if it is not already
-        installed.
-
-        rustup default 1.87.0
-
+      run: |
+        # Set the default toolchain. Installs the toolchain if it is not already installed.
+        rustup default 1.88.0
         cargo version
-
-        '
     - name: Expose Pythons
-      run: 'echo "/opt/python/cp37-cp37m/bin" >> $GITHUB_PATH
-
+      run: |
+        echo "/opt/python/cp37-cp37m/bin" >> $GITHUB_PATH
         echo "/opt/python/cp38-cp38/bin" >> $GITHUB_PATH
-
         echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
-
         echo "/opt/python/cp310-cp310/bin" >> $GITHUB_PATH
-
         echo "/opt/python/cp311-cp311/bin" >> $GITHUB_PATH
-
         echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
-
         echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
-
-        '
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
       with:
@@ -72,10 +58,14 @@ jobs:
         version: 23.x
     - name: Install Python headers
       run: yum install -y python3.11-devel
-    - env: {}
+    - env:
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
+        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
-    - env: {}
+    - env:
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
+        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Build Pants PEX
       run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
@@ -93,22 +83,14 @@ jobs:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants-*.whl
     - if: needs.release_info.outputs.is-release == 'true'
       name: Rename the Pants Pex to its final name for upload
-      run: 'PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import
-        pants.version;print(pants.version.VERSION)")
-
-        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import
-        sys;print(f''cp{sys.version_info[0]}{sys.version_info[1]}'')")
-
-        PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f''{os.uname().sysname.lower()}_{os.uname().machine.lower()}'')")
-
+      run: |
+        PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
+        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')")
+        PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
         PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
 
-
         mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
-
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
-
-        '
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v2
@@ -116,15 +98,21 @@ jobs:
         subject-path: dist/src.python.pants/*.pex
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
-      run: "curl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{\
-        \ github.token }}\" \\\n    -H \"Content-Type: application/octet-stream\"\
-        \ \\\n    ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME\
-        \ \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\n\nWHL=$(find\
-        \ dist/deploy/wheels/pantsbuild.pants -type f -name \"pantsbuild.pants-*.whl\"\
-        )\ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
-        \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
-        \ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)\"\
-        \ \\\n    --data-binary \"@$WHL\";\n"
+      run: |
+        curl -L --fail \
+            -X POST \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Content-Type: application/octet-stream" \
+            ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \
+            --data-binary "@dist/src.python.pants/$PEX_FILENAME"
+
+        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild.pants-*.whl")
+        curl -L --fail \
+            -X POST \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Content-Type: application/octet-stream" \
+            "${{ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)" \
+            --data-binary "@$WHL";
     timeout-minutes: 90
   build_wheels_linux_x86_64:
     container:
@@ -152,37 +140,23 @@ jobs:
     - name: Configure Git
       run: git config --global safe.directory "$GITHUB_WORKSPACE"
     - name: Install rustup
-      run: 'curl --proto ''=https'' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s --
-        -v -y --default-toolchain none
-
+      run: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y --default-toolchain none
         echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
-
-        '
     - name: Install Rust toolchain
-      run: '# Set the default toolchain. Installs the toolchain if it is not already
-        installed.
-
-        rustup default 1.87.0
-
+      run: |
+        # Set the default toolchain. Installs the toolchain if it is not already installed.
+        rustup default 1.88.0
         cargo version
-
-        '
     - name: Expose Pythons
-      run: 'echo "/opt/python/cp37-cp37m/bin" >> $GITHUB_PATH
-
+      run: |
+        echo "/opt/python/cp37-cp37m/bin" >> $GITHUB_PATH
         echo "/opt/python/cp38-cp38/bin" >> $GITHUB_PATH
-
         echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
-
         echo "/opt/python/cp310-cp310/bin" >> $GITHUB_PATH
-
         echo "/opt/python/cp311-cp311/bin" >> $GITHUB_PATH
-
         echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
-
         echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
-
-        '
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
       with:
@@ -193,11 +167,15 @@ jobs:
       with:
         go-version: 1.19.5
     - env:
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
         PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
+        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
     - env:
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
         PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
+        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Build Pants PEX
       run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
@@ -215,22 +193,14 @@ jobs:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants-*.whl
     - if: needs.release_info.outputs.is-release == 'true'
       name: Rename the Pants Pex to its final name for upload
-      run: 'PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import
-        pants.version;print(pants.version.VERSION)")
-
-        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import
-        sys;print(f''cp{sys.version_info[0]}{sys.version_info[1]}'')")
-
-        PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f''{os.uname().sysname.lower()}_{os.uname().machine.lower()}'')")
-
+      run: |
+        PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
+        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')")
+        PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
         PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
 
-
         mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
-
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
-
-        '
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v2
@@ -238,15 +208,21 @@ jobs:
         subject-path: dist/src.python.pants/*.pex
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
-      run: "curl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{\
-        \ github.token }}\" \\\n    -H \"Content-Type: application/octet-stream\"\
-        \ \\\n    ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME\
-        \ \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\n\nWHL=$(find\
-        \ dist/deploy/wheels/pantsbuild.pants -type f -name \"pantsbuild.pants-*.whl\"\
-        )\ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
-        \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
-        \ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)\"\
-        \ \\\n    --data-binary \"@$WHL\";\n"
+      run: |
+        curl -L --fail \
+            -X POST \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Content-Type: application/octet-stream" \
+            ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \
+            --data-binary "@dist/src.python.pants/$PEX_FILENAME"
+
+        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild.pants-*.whl")
+        curl -L --fail \
+            -X POST \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Content-Type: application/octet-stream" \
+            "${{ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)" \
+            --data-binary "@$WHL";
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the pantsbuild.pants.testutil wheel
       uses: actions/attest-build-provenance@v2
@@ -254,11 +230,14 @@ jobs:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants.testutil*.whl
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload testutil Wheel
-      run: "WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name \"pantsbuild.pants.testutil*.whl\"\
-        )\ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
-        \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
-        \ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)\"\
-        \ \\\n    --data-binary \"@$WHL\";\n"
+      run: |
+        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild.pants.testutil*.whl")
+        curl -L --fail \
+            -X POST \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Content-Type: application/octet-stream" \
+            "${{ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)" \
+            --data-binary "@$WHL";
     timeout-minutes: 90
   build_wheels_macos13_x86_64:
     env:
@@ -284,19 +263,14 @@ jobs:
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: '3.7
-
+        python-version: |-
+          3.7
           3.8
-
           3.9
-
           3.10
-
           3.12
-
           3.13
-
-          3.11'
+          3.11
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
       with:
@@ -307,21 +281,17 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
-        key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain')
-          }}-v2
-        path: '~/.rustup/toolchains/1.87.0-*
-
+        key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
+        path: |
+          ~/.rustup/toolchains/1.88.0-*
           ~/.rustup/update-hashes
-
           ~/.rustup/settings.toml
-
-          '
     - name: Cache Cargo
       uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
       with:
         cache-bin: 'false'
         shared-key: engine
-        workspaces: src/rust/engine
+        workspaces: src/rust
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
       with:
@@ -333,11 +303,15 @@ jobs:
         go-version: 1.19.5
     - env:
         ARCHFLAGS: -arch x86_64
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
+        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         _PYTHON_HOST_PLATFORM: macosx-13.0-x86_64
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
     - env:
         ARCHFLAGS: -arch x86_64
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
+        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         _PYTHON_HOST_PLATFORM: macosx-13.0-x86_64
       name: Build Pants PEX
       run: ./pants package src/python/pants:pants-pex
@@ -356,22 +330,14 @@ jobs:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants-*.whl
     - if: needs.release_info.outputs.is-release == 'true'
       name: Rename the Pants Pex to its final name for upload
-      run: 'PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import
-        pants.version;print(pants.version.VERSION)")
-
-        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import
-        sys;print(f''cp{sys.version_info[0]}{sys.version_info[1]}'')")
-
-        PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f''{os.uname().sysname.lower()}_{os.uname().machine.lower()}'')")
-
+      run: |
+        PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
+        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')")
+        PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
         PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
 
-
         mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
-
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
-
-        '
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v2
@@ -379,15 +345,21 @@ jobs:
         subject-path: dist/src.python.pants/*.pex
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
-      run: "curl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{\
-        \ github.token }}\" \\\n    -H \"Content-Type: application/octet-stream\"\
-        \ \\\n    ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME\
-        \ \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\n\nWHL=$(find\
-        \ dist/deploy/wheels/pantsbuild.pants -type f -name \"pantsbuild.pants-*.whl\"\
-        )\ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
-        \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
-        \ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)\"\
-        \ \\\n    --data-binary \"@$WHL\";\n"
+      run: |
+        curl -L --fail \
+            -X POST \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Content-Type: application/octet-stream" \
+            ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \
+            --data-binary "@dist/src.python.pants/$PEX_FILENAME"
+
+        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild.pants-*.whl")
+        curl -L --fail \
+            -X POST \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Content-Type: application/octet-stream" \
+            "${{ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)" \
+            --data-binary "@$WHL";
     timeout-minutes: 90
   build_wheels_macos14_arm64:
     env:
@@ -413,15 +385,12 @@ jobs:
     - name: Set up Python 3.9, 3.10, 3.12, 3.13, 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: '3.9
-
+        python-version: |-
+          3.9
           3.10
-
           3.12
-
           3.13
-
-          3.11'
+          3.11
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
       with:
@@ -432,21 +401,17 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
-        key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain')
-          }}-v2
-        path: '~/.rustup/toolchains/1.87.0-*
-
+        key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
+        path: |
+          ~/.rustup/toolchains/1.88.0-*
           ~/.rustup/update-hashes
-
           ~/.rustup/settings.toml
-
-          '
     - name: Cache Cargo
       uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
       with:
         cache-bin: 'false'
         shared-key: engine
-        workspaces: src/rust/engine
+        workspaces: src/rust
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
       with:
@@ -458,11 +423,15 @@ jobs:
         go-version: 1.19.5
     - env:
         ARCHFLAGS: -arch arm64
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
+        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         _PYTHON_HOST_PLATFORM: macosx-14.0-arm64
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
     - env:
         ARCHFLAGS: -arch arm64
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
+        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         _PYTHON_HOST_PLATFORM: macosx-14.0-arm64
       name: Build Pants PEX
       run: ./pants package src/python/pants:pants-pex
@@ -481,22 +450,14 @@ jobs:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants-*.whl
     - if: needs.release_info.outputs.is-release == 'true'
       name: Rename the Pants Pex to its final name for upload
-      run: 'PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import
-        pants.version;print(pants.version.VERSION)")
-
-        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import
-        sys;print(f''cp{sys.version_info[0]}{sys.version_info[1]}'')")
-
-        PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f''{os.uname().sysname.lower()}_{os.uname().machine.lower()}'')")
-
+      run: |
+        PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
+        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')")
+        PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
         PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
 
-
         mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
-
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
-
-        '
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v2
@@ -504,21 +465,26 @@ jobs:
         subject-path: dist/src.python.pants/*.pex
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
-      run: "curl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{\
-        \ github.token }}\" \\\n    -H \"Content-Type: application/octet-stream\"\
-        \ \\\n    ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME\
-        \ \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\n\nWHL=$(find\
-        \ dist/deploy/wheels/pantsbuild.pants -type f -name \"pantsbuild.pants-*.whl\"\
-        )\ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
-        \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
-        \ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)\"\
-        \ \\\n    --data-binary \"@$WHL\";\n"
+      run: |
+        curl -L --fail \
+            -X POST \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Content-Type: application/octet-stream" \
+            ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \
+            --data-binary "@dist/src.python.pants/$PEX_FILENAME"
+
+        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild.pants-*.whl")
+        curl -L --fail \
+            -X POST \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Content-Type: application/octet-stream" \
+            "${{ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)" \
+            --data-binary "@$WHL";
     timeout-minutes: 90
   publish:
     env:
       MODE: debug
-    if: github.repository_owner == 'pantsbuild' && needs.release_info.outputs.is-release
-      == 'true'
+    if: github.repository_owner == 'pantsbuild' && needs.release_info.outputs.is-release == 'true'
     needs:
     - build_wheels_linux_x86_64
     - build_wheels_linux_arm64
@@ -536,19 +502,14 @@ jobs:
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: '3.7
-
+        python-version: |-
+          3.7
           3.8
-
           3.9
-
           3.10
-
           3.12
-
           3.13
-
-          3.11'
+          3.11
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
       with:
@@ -559,20 +520,17 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
-        key: Linux-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.87.0-*
-
+        key: Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
+        path: |
+          ~/.rustup/toolchains/1.88.0-*
           ~/.rustup/update-hashes
-
           ~/.rustup/settings.toml
-
-          '
     - name: Cache Cargo
       uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
       with:
         cache-bin: 'false'
         shared-key: engine
-        workspaces: src/rust/engine
+        workspaces: src/rust
     - id: get-engine-hash
       name: Get native engine hash
       run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
@@ -581,18 +539,17 @@ jobs:
       uses: actions/cache@v4
       with:
         key: Linux-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
-        path: 'src/python/pants/bin/native_client
-
+        path: |-
+          src/python/pants/bin/native_client
           src/python/pants/bin/sandboxer
-
           src/python/pants/engine/internals/native_engine.so
-
-          src/python/pants/engine/internals/native_engine.so.metadata'
-    - name: Generate announcement
-      run: './pants run src/python/pants_release/generate_release_announcement.py                         --
-        --output-dir=${{ runner.temp }}
-
-        '
+          src/python/pants/engine/internals/native_engine.so.metadata
+    - env:
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
+        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+      name: Generate announcement
+      run: |
+        ./pants run src/python/pants_release/generate_release_announcement.py                         -- --output-dir=${{ runner.temp }}
     - env:
         SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
       name: Announce to Slack
@@ -613,78 +570,85 @@ jobs:
     - env:
         GH_REPO: ${{ github.repository }}
         GH_TOKEN: ${{ github.token }}
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
+        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Get release notes
-      run: './pants run src/python/pants_release/changelog.py -- "${{ needs.release_info.outputs.build-ref
-        }}" > notes.txt
-
-        '
+      run: |
+        ./pants run src/python/pants_release/changelog.py -- "${{ needs.release_info.outputs.build-ref }}" > notes.txt
     - env:
         GH_REPO: ${{ github.repository }}
         GH_TOKEN: ${{ github.token }}
       name: Publish GitHub Release
-      run: 'gh release edit ${{ needs.release_info.outputs.build-ref }} --draft=false
-        --notes-file notes.txt
-
-        '
+      run: |
+        gh release edit ${{ needs.release_info.outputs.build-ref }} --draft=false --notes-file notes.txt
     - env:
         GH_TOKEN: ${{ secrets.WORKER_PANTS_CHEESESHOP_TRIGGER_PAT }}
       name: Trigger cheeseshop build
-      run: 'gh api -X POST "/repos/pantsbuild/wheels.pantsbuild.org/dispatches" -F
-        event_type=github-pages
-
-        '
+      run: |
+        gh api -X POST "/repos/pantsbuild/wheels.pantsbuild.org/dispatches" -F event_type=github-pages
     - env:
         GH_TOKEN: ${{ secrets.WORKER_PANTS_PANTSBUILD_ORG_TRIGGER_PAT }}
       if: needs.release_info.outputs.is-release == 'true'
       name: Trigger docs sync
-      run: 'RELEASE_TAG=${{ needs.release_info.outputs.build-ref }}
-
+      run: |
+        RELEASE_TAG=${{ needs.release_info.outputs.build-ref }}
         RELEASE_VERSION="${RELEASE_TAG#release_}"
-
-        gh workflow run sync_docs.yml -F "version=$RELEASE_VERSION" -F "reviewer=${{
-        github.actor }}" -R pantsbuild/pantsbuild.org
-
-        '
+        gh workflow run sync_docs.yml -F "version=$RELEASE_VERSION" -F "reviewer=${{ github.actor }}" -R pantsbuild/pantsbuild.org
   release_info:
     if: github.repository_owner == 'pantsbuild'
     name: Create draft release and output info
     outputs:
       build-ref: ${{ steps.get_info.outputs.build-ref }}
       is-release: ${{ steps.get_info.outputs.is-release }}
-      release-asset-upload-url: ${{ steps.make_draft_release.outputs.release-asset-upload-url
-        }}
+      release-asset-upload-url: ${{ steps.make_draft_release.outputs.release-asset-upload-url }}
     runs-on: ubuntu-22.04
     steps:
     - env:
         REF: ${{ github.event.inputs.ref }}
       id: get_info
       name: Determine ref to build
-      run: "if [[ -n \"$REF\" ]]; then\n    ref=\"$REF\"\nelse\n    ref=\"${GITHUB_REF#refs/tags/}\"\
-        \nfi\necho \"build-ref=${ref}\" >> $GITHUB_OUTPUT\nif [[ \"${ref}\" =~ ^release_.+$\
-        \ ]]; then\n    echo \"is-release=true\" >> $GITHUB_OUTPUT\nfi\n"
+      run: |
+        if [[ -n "$REF" ]]; then
+            ref="$REF"
+        else
+            ref="${GITHUB_REF#refs/tags/}"
+        fi
+        echo "build-ref=${ref}" >> $GITHUB_OUTPUT
+        if [[ "${ref}" =~ ^release_.+$ ]]; then
+            echo "is-release=true" >> $GITHUB_OUTPUT
+        fi
     - env:
         GH_REPO: ${{ github.repository }}
         GH_TOKEN: ${{ github.token }}
       id: make_draft_release
-      if: github.repository_owner == 'pantsbuild' && steps.get_info.outputs.is-release
-        == 'true'
+      if: github.repository_owner == 'pantsbuild' && steps.get_info.outputs.is-release == 'true'
       name: Make GitHub Release
-      run: "RELEASE_TAG=${{ steps.get_info.outputs.build-ref }}\nRELEASE_VERSION=\"\
-        ${RELEASE_TAG#release_}\"\n\n# NB: This could be a re-run of a release, in\
-        \ the event a job/step failed.\nif ! gh release view $RELEASE_TAG ; then\n\
-        \    GH_RELEASE_ARGS=(\"--notes\" \"\")\n    GH_RELEASE_ARGS+=(\"--title\"\
-        \ \"$RELEASE_TAG\")\n    if [[ $RELEASE_VERSION =~ [[:alpha:]] ]]; then\n\
-        \        GH_RELEASE_ARGS+=(\"--prerelease\")\n        GH_RELEASE_ARGS+=(\"\
-        --latest=false\")\n    else\n        STABLE_RELEASE_TAGS=$(gh api -X GET -F\
-        \ per_page=100 /repos/{owner}/{repo}/releases --jq '.[].tag_name | sub(\"\
-        ^release_\"; \"\") | select(test(\"^[0-9.]+$\"))')\n        LATEST_TAG=$(echo\
-        \ \"$STABLE_RELEASE_TAGS $RELEASE_TAG\" | tr ' ' '\\n' | sort --version-sort\
-        \ | tail -n 1)\n        if [[ $RELEASE_TAG == $LATEST_TAG ]]; then\n     \
-        \       GH_RELEASE_ARGS+=(\"--latest=true\")\n        else\n            GH_RELEASE_ARGS+=(\"\
-        --latest=false\")\n        fi\n    fi\n\n    gh release create \"$RELEASE_TAG\"\
-        \ \"${GH_RELEASE_ARGS[@]}\" --draft\nfi\n\nASSET_UPLOAD_URL=$(gh release view\
-        \ \"$RELEASE_TAG\" --json uploadUrl --jq '.uploadUrl | sub(\"\\\\{\\\\?.*$\"\
-        ; \"\")')\necho \"release-asset-upload-url=$ASSET_UPLOAD_URL\" >> $GITHUB_OUTPUT\n"
+      run: |
+        RELEASE_TAG=${{ steps.get_info.outputs.build-ref }}
+        RELEASE_VERSION="${RELEASE_TAG#release_}"
+
+        # NB: This could be a re-run of a release, in the event a job/step failed.
+        if ! gh release view $RELEASE_TAG ; then
+            GH_RELEASE_ARGS=("--notes" "")
+            GH_RELEASE_ARGS+=("--title" "$RELEASE_TAG")
+            if [[ $RELEASE_VERSION =~ [[:alpha:]] ]]; then
+                GH_RELEASE_ARGS+=("--prerelease")
+                GH_RELEASE_ARGS+=("--latest=false")
+            else
+                STABLE_RELEASE_TAGS=$(gh api -X GET -F per_page=100 /repos/{owner}/{repo}/releases --jq '.[].tag_name | sub("^release_"; "") | select(test("^[0-9.]+$"))')
+                LATEST_TAG=$(echo "$STABLE_RELEASE_TAGS $RELEASE_TAG" | tr ' ' '\n' | sort --version-sort | tail -n 1)
+                if [[ $RELEASE_TAG == $LATEST_TAG ]]; then
+                    GH_RELEASE_ARGS+=("--latest=true")
+                else
+                    GH_RELEASE_ARGS+=("--latest=false")
+                fi
+            fi
+
+            gh release create "$RELEASE_TAG" "${GH_RELEASE_ARGS[@]}" --draft
+        fi
+
+        ASSET_UPLOAD_URL=$(gh release view "$RELEASE_TAG" --json uploadUrl --jq '.uploadUrl | sub("\\{\\?.*$"; "")')
+        echo "release-asset-upload-url=$ASSET_UPLOAD_URL" >> $GITHUB_OUTPUT
 name: Release
 'on':
   push:

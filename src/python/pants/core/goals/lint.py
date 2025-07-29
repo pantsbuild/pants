@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from collections.abc import Callable, Iterable, Iterator, Sequence
+from collections.abc import Callable, Coroutine, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from typing import Any, ClassVar, Protocol, TypeVar, cast, final
 
@@ -32,10 +32,11 @@ from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, Digest, PathGlobs, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.graph import filter_targets
-from pants.engine.internals.native_engine import Snapshot
+from pants.engine.internals.selectors import Get
 from pants.engine.internals.specs_rules import resolve_specs_paths
+from pants.engine.intrinsics import digest_to_snapshot
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, collect_rules, concurrently, goal_rule, implicitly
+from pants.engine.rules import collect_rules, concurrently, goal_rule, implicitly, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.option_types import BoolOption
@@ -347,10 +348,12 @@ async def _get_partitions_by_request_type(
     file_partitioners: Iterable[type[_FilePartitioner]],
     subsystem: _MultiToolGoalSubsystem,
     specs: Specs,
-    # NB: Because the rule parser code will collect `Get`s from caller's scope, these allow the
-    # caller to customize the specific `Get`.
-    make_targets_partition_request_get: Callable[[_TargetPartitioner], Get[Partitions]],
-    make_files_partition_request_get: Callable[[_FilePartitioner], Get[Partitions]],
+    # NB: Because the rule parser code will collect rule calls from caller's scope, these allow the
+    # caller to customize the specific rule.
+    make_targets_partition_request_get: Callable[
+        [_TargetPartitioner], Coroutine[Any, Any, Partitions]
+    ],
+    make_files_partition_request_get: Callable[[_FilePartitioner], Coroutine[Any, Any, Partitions]],
 ) -> dict[type[_CoreRequestType], list[Partitions]]:
     specified_ids = determine_specified_tool_ids(
         subsystem.name,
@@ -387,7 +390,9 @@ async def _get_partitions_by_request_type(
 
     await _warn_on_non_local_environments(targets, f"the {subsystem.name} goal")
 
-    def partition_request_get(request_type: type[AbstractLintRequest]) -> Get[Partitions]:
+    def partition_request_get(
+        request_type: type[AbstractLintRequest],
+    ) -> Coroutine[Any, Any, Partitions]:
         partition_request_type: type = getattr(request_type, "PartitionRequest")
         if partition_request_type in target_partitioners:
             partition_targets_type = cast(LintTargetsRequest, request_type)
@@ -417,6 +422,16 @@ async def _get_partitions_by_request_type(
     return partitions_by_request_type
 
 
+@rule(polymorphic=True)
+async def partition_targets(req: LintTargetsRequest.PartitionRequest) -> Partitions:
+    raise NotImplementedError()
+
+
+@rule(polymorphic=True)
+async def partition_files(req: LintFilesRequest.PartitionRequest) -> Partitions:
+    raise NotImplementedError()
+
+
 @goal_rule
 async def lint(
     console: Console,
@@ -441,8 +456,12 @@ async def lint(
         file_partitioners,
         lint_subsystem,
         specs,
-        lambda request_type: Get(Partitions, LintTargetsRequest.PartitionRequest, request_type),
-        lambda request_type: Get(Partitions, LintFilesRequest.PartitionRequest, request_type),
+        lambda request_type: partition_targets(
+            **implicitly({request_type: LintTargetsRequest.PartitionRequest})
+        ),
+        lambda request_type: partition_files(
+            **implicitly({request_type: LintFilesRequest.PartitionRequest})
+        ),
     )
 
     if not partitions_by_request_type:
@@ -469,7 +488,7 @@ async def lint(
     }
 
     formatter_snapshots = await concurrently(
-        Get(Snapshot, PathGlobs(elements))
+        digest_to_snapshot(**implicitly({PathGlobs(elements): PathGlobs}))
         for request_type, batch in lint_batches_by_request_type.items()
         for elements, _ in batch
         if request_type._requires_snapshot

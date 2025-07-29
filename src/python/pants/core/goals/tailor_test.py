@@ -140,7 +140,7 @@ def rule_runner() -> RuleRunner:
             find_fortran_targets,
             infer_fortran_module_dependency,
             UnionRule(PutativeTargetsRequest, PutativeFortranTargetsRequest),
-            QueryRule(PutativeTargets, (MockPutativeFortranModuleRequest,)),
+            UnionRule(PutativeTargetsRequest, MockPutativeFortranModuleRequest),
             QueryRule(UniquelyNamedPutativeTargets, (PutativeTargets,)),
             QueryRule(DisjointSourcePutativeTarget, (PutativeTarget,)),
             QueryRule(EditedBuildFiles, (EditBuildFilesRequest,)),
@@ -443,6 +443,8 @@ def test_tailor_rule_write_mode(rule_runner: RuleRunner) -> None:
           - Add my_fortran_lib target baz
         Updated conflict/BUILD:
           - Add my_fortran_lib target conflict0
+        Created dir/BUILD:
+          - Add fortran_module target dir
         Updated foo/BUILD:
           - Add fortran_tests target tests
         """
@@ -485,6 +487,8 @@ def test_tailor_rule_check_mode(rule_runner: RuleRunner) -> None:
         """\
         Would create baz/BUILD:
           - Add fortran_library target baz
+        Would create dir/BUILD:
+          - Add fortran_module target dir
         Would update foo/BUILD:
           - Add fortran_tests target tests
 

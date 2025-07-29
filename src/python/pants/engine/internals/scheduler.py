@@ -679,7 +679,7 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
 
     # Compute a reverse index of union membership.
     member_type_to_base_types = defaultdict(list)
-    for base_type, member_types in union_membership.union_rules.items():
+    for base_type, member_types in union_membership.items():
         for member_type in member_types:
             member_type_to_base_types[member_type].append(base_type)
 
@@ -726,6 +726,8 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
                             # polymorphic rule for the union member.
                             if member_rule.output_type == awaitable.output_type:
                                 vtable_entries.append((member_type, member_rule.canonical_name))
+                        in_scope_types = union_in_scope_types(union)
+                        assert in_scope_types is not None
                         native_engine.tasks_add_call(
                             tasks,
                             awaitable.output_type,
@@ -733,6 +735,7 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
                             awaitable.rule_id,
                             awaitable.explicit_args_arity,
                             vtable_entries,
+                            in_scope_types,
                         )
                 else:
                     # This is a union Get.
@@ -758,7 +761,8 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
                     awaitable.input_types,
                     awaitable.rule_id,
                     awaitable.explicit_args_arity,
-                    None,
+                    vtable_entries=None,
+                    in_scope_types=None,
                 )
             else:
                 # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
