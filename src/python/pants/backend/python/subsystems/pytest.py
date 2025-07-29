@@ -26,7 +26,13 @@ from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption, StrOption
+from pants.option.option_types import (
+    ArgsListOption,
+    BoolOption,
+    FileOption,
+    SkipOption,
+    StrOption,
+)
 from pants.util.strutil import softwrap
 
 
@@ -60,8 +66,8 @@ class PyTest(PythonToolBase):
     #  E.g., as default_version = "pytest>=7,<8,!=7.1.0,!=7.1.1"
     default_requirements = [
         "pytest==8.3.5",
-        "pytest-cov>=2.12,!=2.12.1,<3.1",
-        "pytest-xdist>=2.5,<3",
+        "pytest-cov==5.0.0",
+        "pytest-xdist==3.6.0",
     ]
 
     default_main = ConsoleScript("pytest")
@@ -140,7 +146,9 @@ class PyTest(PythonToolBase):
         check_content = {}
         for d in ("", *dirs):
             check_existence.append(os.path.join(d, "pytest.ini"))
-            check_content[os.path.join(d, "pyproject.toml")] = b"[tool.pytest.ini_options]"
+            check_content[os.path.join(d, "pyproject.toml")] = (
+                b"[tool.pytest.ini_options]"
+            )
             check_content[os.path.join(d, "tox.ini")] = b"[pytest]"
             check_content[os.path.join(d, "setup.cfg")] = b"[tool:pytest]"
 

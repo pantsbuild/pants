@@ -9,8 +9,8 @@
 //     "CPython<4,>=3.8"
 //   ],
 //   "generated_with_requirements": [
-//     "pytest-cov!=2.12.1,<3.1,>=2.12",
-//     "pytest-xdist<3,>=2.5",
+//     "pytest-cov==5.0.0",
+//     "pytest-xdist==3.6.0",
 //     "pytest==8.3.5"
 //   ],
 //   "manylinux": "manylinux2014",
@@ -438,24 +438,6 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "607c53218732647dff4acdfcd50cb62615cedf612e72d1724fb1a0cc6405b378",
-              "url": "https://files.pythonhosted.org/packages/f6/f0/10642828a8dfb741e5f3fbaac830550a518a775c7fff6f04a007259b0548/py-1.11.0-py2.py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "51c75c4126074b472f746a24399ad32f6053d1b34b68d2fa41e558e6f4a98719",
-              "url": "https://files.pythonhosted.org/packages/98/ff/fec109ceb715d2a6b4c4a85a61af3b40c723a961e8828319fbcb15b868dc/py-1.11.0.tar.gz"
-            }
-          ],
-          "project_name": "py",
-          "requires_dists": [],
-          "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7",
-          "version": "1.11.0"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
               "hash": "c69214aa47deac29fad6c2a4f590b9c4a9fdb16a403176fe154b79c0b4d4d820",
               "url": "https://files.pythonhosted.org/packages/30/3d/64ad57c803f1fa1e963a7946b6e0fea4a70df53c1a7fed304586539c2bac/pytest-8.3.5-py3-none-any.whl"
             },
@@ -489,13 +471,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "578d5d15ac4a25e5f961c938b85a05b09fdaae9deef3bb6de9a6e766622ca7a6",
-              "url": "https://files.pythonhosted.org/packages/20/49/b3e0edec68d81846f519c602ac38af9db86e1e71275528b3e814ae236063/pytest_cov-3.0.0-py3-none-any.whl"
+              "hash": "4f0764a1219df53214206bf1feea4633c3b558a2925c8b59f144f682861ce652",
+              "url": "https://files.pythonhosted.org/packages/78/3a/af5b4fa5961d9a1e6237b530eb87dd04aea6eb83da09d2a4073d81b54ccf/pytest_cov-5.0.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e7f0f5b1617d2210a2cabc266dfe2f4c75a8d32fb89eafb7ad9d06f6d076d470",
-              "url": "https://files.pythonhosted.org/packages/61/41/e046526849972555928a6d31c2068410e47a31fb5ab0a77f868596811329/pytest-cov-3.0.0.tar.gz"
+              "hash": "5837b58e9f6ebd335b0f8060eecce69b662415b16dc503883a02f45dfeb14857",
+              "url": "https://files.pythonhosted.org/packages/74/67/00efc8d11b630c56f15f4ad9c7f9223f1e5ec275aaae3fa9118c6a223ad2/pytest-cov-5.0.0.tar.gz"
             }
           ],
           "project_name": "pytest-cov",
@@ -506,57 +488,34 @@
             "process-tests; extra == \"testing\"",
             "pytest-xdist; extra == \"testing\"",
             "pytest>=4.6",
-            "six; extra == \"testing\"",
             "virtualenv; extra == \"testing\""
           ],
-          "requires_python": ">=3.6",
-          "version": "3.0.0"
+          "requires_python": ">=3.8",
+          "version": "5.0.0"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "810958f66a91afb1a1e2ae83089d8dc1cd2437ac96b12963042fbb9fb4d16af0",
-              "url": "https://files.pythonhosted.org/packages/f4/af/9c0bda43e486a3c9bf1e0f876d0f241bc3f229d7d65d09331a0868db9629/pytest_forked-1.6.0-py3-none-any.whl"
+              "hash": "958e08f38472e1b3a83450d8d3e682e90fdbffee39a97dd0f27185a3bd9074d1",
+              "url": "https://files.pythonhosted.org/packages/e0/df/585742c204227526baf641e45a95d3c0a94978b85a1414622c1017ebfcf8/pytest_xdist-3.6.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "4dafd46a9a600f65d822b8f605133ecf5b3e1941ebb3588e943b4e3eb71a5a3f",
-              "url": "https://files.pythonhosted.org/packages/8c/c9/93ad2ba2413057ee694884b88cf7467a46c50c438977720aeac26e73fdb7/pytest-forked-1.6.0.tar.gz"
-            }
-          ],
-          "project_name": "pytest-forked",
-          "requires_dists": [
-            "py",
-            "pytest>=3.10"
-          ],
-          "requires_python": ">=3.7",
-          "version": "1.6.0"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "6fe5c74fec98906deb8f2d2b616b5c782022744978e7bd4695d39c8f42d0ce65",
-              "url": "https://files.pythonhosted.org/packages/21/08/b1945d4b4986eb1aa10cf84efc5293bba39da80a2f95db3573dd90678408/pytest_xdist-2.5.0-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "4580deca3ff04ddb2ac53eba39d76cb5dd5edeac050cb6fbc768b0dd712b4edf",
-              "url": "https://files.pythonhosted.org/packages/5d/43/9dbc32d297d6eae85d6c05dc8e8d3371061bd6cbe56a2f645d9ea4b53d9b/pytest-xdist-2.5.0.tar.gz"
+              "hash": "2bf346fb1f1481c8d255750f80bc1dfb9fb18b9ad5286ead0b741b6fd56d15b7",
+              "url": "https://files.pythonhosted.org/packages/c4/d4/c0100baea81c3fa9ded7d16ab09fb9acf90d78fd62a5003fd2e1852a8d76/pytest_xdist-3.6.0.tar.gz"
             }
           ],
           "project_name": "pytest-xdist",
           "requires_dists": [
-            "execnet>=1.1",
+            "execnet>=2.1",
             "filelock; extra == \"testing\"",
             "psutil>=3.0; extra == \"psutil\"",
-            "pytest-forked",
-            "pytest>=6.2.0",
+            "pytest>=7.0.0",
             "setproctitle; extra == \"setproctitle\""
           ],
-          "requires_python": ">=3.6",
-          "version": "2.5.0"
+          "requires_python": ">=3.8",
+          "version": "3.6.0"
         },
         {
           "artifacts": [
@@ -723,11 +682,11 @@
   "overridden": [],
   "path_mappings": {},
   "pex_version": "2.47.0",
-  "pip_version": "25.1.1",
+  "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [
-    "pytest-cov!=2.12.1,<3.1,>=2.12",
-    "pytest-xdist<3,>=2.5",
+    "pytest-cov==5.0.0",
+    "pytest-xdist==3.6.0",
     "pytest==8.3.5"
   ],
   "requires_python": [
