@@ -450,7 +450,7 @@ dependencies = [
  "serde_urlencoded",
  "thiserror 1.0.69",
  "tokio",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.15",
  "tower-service",
  "url",
  "winapi",
@@ -1116,7 +1116,7 @@ dependencies = [
  "testutil",
  "tokio",
  "tokio-rustls",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.15",
  "workunit_store",
 ]
 
@@ -1213,7 +1213,7 @@ dependencies = [
  "time",
  "tokio",
  "tokio-retry2",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.15",
  "tryfuture",
  "ui",
  "url",
@@ -1642,7 +1642,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tokio-stream",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.15",
  "tonic",
  "tonic-build",
  "tower 0.5.2",
@@ -1667,7 +1667,7 @@ dependencies = [
  "indexmap 2.10.0",
  "slab",
  "tokio",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.15",
  "tracing",
 ]
 
@@ -2913,7 +2913,7 @@ dependencies = [
  "testutil",
  "tokio",
  "tokio-rustls",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.15",
  "workunit_store",
 ]
 
@@ -3127,7 +3127,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tokio-stream",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.15",
  "tonic",
  "tower 0.5.2",
  "tryfuture",
@@ -3561,7 +3561,7 @@ dependencies = [
  "testutil",
  "tokio",
  "tokio-rustls",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.15",
  "tonic",
  "workunit_store",
 ]
@@ -3595,7 +3595,7 @@ dependencies = [
  "tempfile",
  "testutil",
  "tokio",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.15",
  "workunit_store",
 ]
 
@@ -3618,7 +3618,7 @@ dependencies = [
  "tempfile",
  "testutil",
  "tokio",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.15",
  "tonic",
  "uuid",
  "workunit_store",
@@ -3698,7 +3698,7 @@ dependencies = [
  "sync_wrapper",
  "tokio",
  "tokio-rustls",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.15",
  "tower 0.5.2",
  "tower-service",
  "url",
@@ -4228,7 +4228,7 @@ dependencies = [
  "testutil",
  "tokio",
  "tokio-rustls",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.15",
  "tonic",
  "tower-service",
  "tryfuture",
@@ -4593,9 +4593,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.7.14"
+version = "0.7.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b9590b93e6fcc1739458317cccd391ad3955e2bde8913edf6f95f9e65a8f034"
+checksum = "66a539a9ad6d5d281510d5bd368c973d636c02dbf8a67300bfb6b950696ad7df"
 dependencies = [
  "bytes",
  "futures-core",
@@ -4719,7 +4719,7 @@ dependencies = [
  "rand 0.8.5",
  "slab",
  "tokio",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.15",
  "tower-layer",
  "tower-service",
  "tracing",
@@ -4736,7 +4736,7 @@ dependencies = [
  "pin-project-lite",
  "sync_wrapper",
  "tokio",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.15",
  "tower-layer",
  "tower-service",
  "tracing",
