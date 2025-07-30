@@ -308,6 +308,11 @@ def global_env() -> Env:
     return {
         "PANTS_CONFIG_FILES": "+['pants.ci.toml']",
         "RUST_BACKTRACE": "all",
+        # Default to disabling OpenTelemetry so GHA steps not using Pants directly do not try
+        # to use Honeycomb if they do invoke Pants indirectly (e.g., Rust integration tests).
+        # Needed because pants.ci.toml refers to `env.HONEYCOMB_API_KEY`.
+        "PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED": "False",
+        "HONEYCOMB_API_KEY": "--DISABLED--",
     }
 
 
@@ -1696,6 +1701,31 @@ def clear_self_hosted_persistent_caches_jobs() -> Jobs:
 
 
 # ----------------------------------------------------------------------
+# Telemetry
+# ----------------------------------------------------------------------
+
+
+def add_telemetry_secret_env(workflow: dict[str, Any]) -> dict[str, Any]:
+    """Inject the Honeycomb telemetry configuration into any job/step which runs Pants."""
+    for job_config in workflow.get("jobs", {}).values():
+        for step_config in job_config.get("steps", []):
+            run_config = step_config.get("run", "")
+            if "./pants" in run_config:
+                if "env" not in step_config:
+                    step_config["env"] = {}
+
+                # Derive the enable flag based on the repository `OPENTELEMETRY_ENABLED` variable.
+                step_config["env"]["PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED"] = gha_expr(
+                    "vars.OPENTELEMETRY_ENABLED || 'False'"
+                )
+                step_config["env"]["HONEYCOMB_API_KEY"] = gha_expr(
+                    "secrets.HONEYCOMB_API_KEY || '--DISABLED--'"
+                )
+
+    return workflow
+
+
+# ----------------------------------------------------------------------
 # Main file
 # ----------------------------------------------------------------------
 
@@ -1710,11 +1740,34 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-# PyYAML will try by default to use anchors to deduplicate certain code. The alias
-# names are cryptic, though, like `&id002`, so we turn this feature off.
-class NoAliasDumper(yaml.SafeDumper):
+class PantsDumper(yaml.SafeDumper):
+    def __init__(self, stream, width=None, **kwargs):
+        # set a very wide width to effectively disable wrapping, which is generally distracting
+        if width is None:
+            width = 999999
+        super().__init__(stream, width=width, **kwargs)
+
+    # PyYAML will try by default to use anchors to deduplicate certain code. The alias
+    # names are cryptic, though, like `&id002`, so we turn this feature off.
     def ignore_aliases(self, data):
         return True
+
+
+# Forcibly use | string literals for multi-line strings, much better than seeing a bunch of \n, or
+# empty lines, if a human need to read the generated file.
+def _yaml_representer_pipes_if_multiline(dumper: PantsDumper, data: str) -> yaml.Node:
+    if "\n" in data:
+        return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
+    return dumper.represent_str(data)
+
+
+PantsDumper.add_representer(str, _yaml_representer_pipes_if_multiline)
+
+
+def dump_yaml(data: object) -> str:
+    result = yaml.dump(data, Dumper=PantsDumper)
+    assert isinstance(result, str)
+    return result
 
 
 def merge_ok(pr_jobs: list[str]) -> Jobs:
@@ -1771,6 +1824,10 @@ def merge_ok(pr_jobs: list[str]) -> Jobs:
 def generate() -> dict[Path, str]:
     """Generate all YAML configs with repo-relative paths."""
 
+    def render_workflow(workflow: dict[str, Any]) -> str:
+        add_telemetry_secret_env(workflow)
+        return f"{HEADER}\n\n{dump_yaml(workflow)}"
+
     pr_jobs = test_workflow_jobs()
     pr_jobs.update(**classify_changes())
     for key, val in pr_jobs.items():
@@ -1787,7 +1844,7 @@ def generate() -> dict[Path, str]:
     pr_jobs.update(merge_ok(sorted(pr_jobs.keys())))
 
     test_workflow_name = "Pull Request CI"
-    test_yaml = yaml.dump(
+    test_yaml = render_workflow(
         {
             "name": test_workflow_name,
             "concurrency": {
@@ -1798,14 +1855,12 @@ def generate() -> dict[Path, str]:
             "jobs": pr_jobs,
             "env": global_env(),
         },
-        width=120,
-        Dumper=NoAliasDumper,
     )
 
     ignore_advisories = " ".join(
         f"--ignore {adv_id}" for adv_id in CARGO_AUDIT_IGNORED_ADVISORY_IDS
     )
-    audit_yaml = yaml.dump(
+    audit_yaml = render_workflow(
         {
             "name": "Cargo Audit",
             "on": {
@@ -1831,18 +1886,17 @@ def generate() -> dict[Path, str]:
     )
 
     cc_jobs, cc_inputs = cache_comparison_jobs_and_inputs()
-    cache_comparison_yaml = yaml.dump(
+    cache_comparison_yaml = render_workflow(
         {
             "name": "Cache Comparison",
             # Kicked off manually.
             "on": {"workflow_dispatch": {"inputs": cc_inputs}},
             "jobs": cc_jobs,
         },
-        Dumper=NoAliasDumper,
     )
 
     release_jobs, release_inputs = release_jobs_and_inputs()
-    release_yaml = yaml.dump(
+    release_yaml = render_workflow(
         {
             "name": "Release",
             "on": {
@@ -1851,22 +1905,20 @@ def generate() -> dict[Path, str]:
             },
             "jobs": release_jobs,
         },
-        Dumper=NoAliasDumper,
     )
 
     public_repos_output = public_repos()
-    public_repos_yaml = yaml.dump(
+    public_repos_yaml = render_workflow(
         {
             "name": "Public repos tests",
             "run-name": public_repos_output.run_name,
             "on": {"workflow_dispatch": {"inputs": public_repos_output.inputs}},
             "jobs": public_repos_output.jobs,
         },
-        Dumper=NoAliasDumper,
     )
 
     clear_self_hosted_persistent_caches = clear_self_hosted_persistent_caches_jobs()
-    clear_self_hosted_persistent_caches_yaml = yaml.dump(
+    clear_self_hosted_persistent_caches_yaml = render_workflow(
         {
             "name": "Clear persistent caches on long-lived self-hosted runners",
             "on": {"workflow_dispatch": {}},
@@ -1875,14 +1927,14 @@ def generate() -> dict[Path, str]:
     )
 
     return {
-        Path(".github/workflows/audit.yaml"): f"{HEADER}\n\n{audit_yaml}",
-        Path(".github/workflows/cache_comparison.yaml"): f"{HEADER}\n\n{cache_comparison_yaml}",
-        Path(".github/workflows/test.yaml"): f"{HEADER}\n\n{test_yaml}",
-        Path(".github/workflows/release.yaml"): f"{HEADER}\n\n{release_yaml}",
-        Path(".github/workflows/public_repos.yaml"): f"{HEADER}\n\n{public_repos_yaml}",
+        Path(".github/workflows/audit.yaml"): audit_yaml,
+        Path(".github/workflows/cache_comparison.yaml"): cache_comparison_yaml,
+        Path(".github/workflows/test.yaml"): test_yaml,
+        Path(".github/workflows/release.yaml"): release_yaml,
+        Path(".github/workflows/public_repos.yaml"): public_repos_yaml,
         Path(
             ".github/workflows/clear_self_hosted_persistent_caches.yaml"
-        ): f"{HEADER}\n\n{clear_self_hosted_persistent_caches_yaml}",
+        ): clear_self_hosted_persistent_caches_yaml,
     }
 
 

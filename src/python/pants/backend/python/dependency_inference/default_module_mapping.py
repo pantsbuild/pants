@@ -118,6 +118,7 @@ DEFAULT_MODULE_MAPPING: dict[str, tuple[str, ...]] = {
     "bitvector": ("BitVector",),
     "cattrs": ("cattr", "cattrs"),
     "cloud-sql-python-connector": ("google.cloud.sql.connector",),
+    "confluent-kafka": ("confluent_kafka",),
     "coolprop": ("CoolProp",),
     "databricks-sdk": ("databricks.sdk",),
     "databricks-sql-connector": (
@@ -125,6 +126,7 @@ DEFAULT_MODULE_MAPPING: dict[str, tuple[str, ...]] = {
         "databricks.sqlalchemy",
     ),
     "delta-spark": ("delta",),
+    "discord-py": ("discord",),
     "django-activity-stream": ("actstream",),
     "django-cors-headers": ("corsheaders",),
     "django-countries": ("django_countries",),

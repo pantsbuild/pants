@@ -1453,7 +1453,13 @@ class BootstrapOptions:
     )
     process_execution_local_enable_nailgun = BoolOption(
         default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_enable_nailgun,
-        help="Whether or not to use nailgun to run JVM requests that are marked as supporting nailgun.",
+        help=softwrap(
+            """
+            Whether or not to use nailgun to run JVM requests that are marked as supporting nailgun.
+            Note that nailgun only works correctly on JDK <= 17 and must be disabled manually for
+            later versions.
+            """
+        ),
         advanced=True,
     )
     process_execution_graceful_shutdown_timeout = IntOption(

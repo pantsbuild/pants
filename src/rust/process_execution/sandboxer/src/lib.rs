@@ -12,8 +12,12 @@ use protos::gen::pants::sandboxer::{
     sandboxer_grpc_client::SandboxerGrpcClient,
     sandboxer_grpc_server::{SandboxerGrpc, SandboxerGrpcServer},
 };
-use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::{
+    env,
+    os::unix::{ffi::OsStrExt, net::SocketAddr},
+    path::{Path, PathBuf},
+};
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -350,11 +354,64 @@ impl Sandboxer {
         pants_workdir: PathBuf,
         store_cli_opt: StoreCliOpt,
     ) -> Result<Self, String> {
-        let sandboxer_workdir = pants_workdir.join("sandboxer");
+        let workdir_hash = format!(
+            "{:x}",
+            Digest::of_bytes(pants_workdir.as_os_str().as_bytes())
+                .hash
+                .prefix_hash()
+        );
+
+        let try_socket_path = |base: PathBuf| -> Option<PathBuf> {
+            let run_dir = if base.starts_with(&pants_workdir) {
+                base
+            } else {
+                base.join(&workdir_hash)
+            };
+            let socket_path = run_dir.join("sandboxer.sock");
+            info!("Trying sandboxer socket path {}", socket_path.display());
+
+            match SocketAddr::from_pathname(&socket_path) {
+                Ok(_) => (),
+                Err(e) => {
+                    warn!(
+                        "Invalid sandboxer socket path {}: {}",
+                        socket_path.display(),
+                        e
+                    );
+                    return None;
+                }
+            }
+
+            let res = fs::create_dir_all(&run_dir);
+            if res.is_err() {
+                warn!(
+                    "Failed to create dir for sandboxer socket at {}",
+                    socket_path.display()
+                );
+                None
+            } else {
+                info!("Using sandboxer socket path {}", socket_path.display());
+                Some(socket_path)
+            }
+        };
+
+        // UNIX domain socket creation can fail with "transport error" if the path is too long.
+        // We have no control over the repo root path length, so we try to create the socket
+        // in some standard short path locations, falling back to the repo dir as a last resort.
+        // See https://refspecs.linuxfoundation.org/FHS_3.0/fhs/ch03s15.html and
+        // https://specifications.freedesktop.org/basedir-spec/latest/ for why these paths.
+        let socket_path = env::var_os("XDG_RUNTIME_DIR")
+            .and_then(|path| try_socket_path(PathBuf::from(path).join("pants")))
+            .or_else(|| try_socket_path(PathBuf::from("/run/pants")))
+            .or_else(|| try_socket_path(PathBuf::from("/var/run/pants")))
+            .or_else(|| try_socket_path(env::temp_dir().join("run/pants")))
+            .or_else(|| try_socket_path(pants_workdir.join("sandboxer")))
+            .ok_or("Failed to find a working socket path".to_owned())?;
+
         Ok(Self {
             sandboxer_bin,
-            socket_path: sandboxer_workdir.join("sandboxer.sock"),
-            log_path: sandboxer_workdir.join("sandboxer.log"),
+            socket_path,
+            log_path: pants_workdir.join("sandboxer").join("sandboxer.log"),
             store_cli_opt,
             process: Arc::new(RwLock::new(None)),
         })

@@ -66,6 +66,27 @@ JDKs used by Pants are automatically fetched using [Coursier](https://get-coursi
 
 To override the default on a particular target, you can use the [`jdk=` field](../../reference/targets/java_source.mdx#jdk). It can be useful to use the [`parametrize` builtin](../using-pants/key-concepts/targets-and-build-files.mdx#parametrizing-targets) with the `jdk=` field, particularly to run test targets under multiple JDKs.
 
+To get a list of available JDK versions:
+
+```sh
+$ coursier java --available
+adoptium:1.11.0.15
+adoptium:1.11.0.16
+...
+```
+
+Please note that JDKs later than 17 are not supported by nailgun
+(see [#20603](https://github.com/pantsbuild/pants/issues/20603)), which
+must be disabled manually:
+
+```toml title="pants.toml"
+[GLOBAL]
+process_execution_local_enable_nailgun = false
+
+[jvm]
+jdk = "temurin:1.22"
+```
+
 #### Scala version
 
 The Scala version to use is configured on a resolve-by-resolve basis (see the "Third-party dependencies" section below) using the [`[scala].version_for_resolve` option](../../reference/subsystems/scala.mdx#version_for_resolve). The default Scala version for your repository will thus be whichever Scala version is configured for the "default" resolve, which is configured by the [`[jvm].default_resolve` option](../../reference/subsystems/jvm#default_resolve).
