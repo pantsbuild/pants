@@ -16,8 +16,8 @@ from pants.core.goals.lint import (
     LintFilesRequest,
     LintResult,
     LintTargetsRequest,
-    _get_partitions_by_request_type,
     _MultiToolGoalSubsystem,
+    get_partitions_by_request_type,
 )
 from pants.core.goals.multi_tool_goal_helper import BatchSizeOption, OnlyOption
 from pants.core.util_rules.partitions import PartitionerType, PartitionMetadataT
@@ -341,7 +341,7 @@ async def _do_fix(
     ],
     make_files_partition_request_get: Callable[[_FilePartitioner], Coroutine[Any, Any, Partitions]],
 ) -> _GoalT:
-    partitions_by_request_type = await _get_partitions_by_request_type(
+    partitions_by_request_type = await get_partitions_by_request_type(
         core_request_types,
         target_partitioners,
         file_partitioners,

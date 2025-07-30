@@ -300,7 +300,7 @@ class _MultiToolGoalSubsystem(Protocol):
     only: OnlyOption
 
 
-async def _get_partitions_by_request_type(
+async def get_partitions_by_request_type(
     core_request_types: Iterable[type[_CoreRequestType]],
     target_partitioners: Iterable[type[_TargetPartitioner]],
     file_partitioners: Iterable[type[_FilePartitioner]],

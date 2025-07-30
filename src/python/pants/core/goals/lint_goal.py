@@ -17,7 +17,7 @@ from pants.core.goals.lint import (
     LintResult,
     LintSubsystem,
     LintTargetsRequest,
-    _get_partitions_by_request_type,
+    get_partitions_by_request_type,
     lint_batch,
     partition_files,
     partition_targets,
@@ -100,7 +100,7 @@ async def lint(
     target_partitioners = union_membership.get(LintTargetsRequest.PartitionRequest)
     file_partitioners = union_membership.get(LintFilesRequest.PartitionRequest)
 
-    partitions_by_request_type = await _get_partitions_by_request_type(
+    partitions_by_request_type = await get_partitions_by_request_type(
         [
             request_type
             for request_type in lint_request_types
