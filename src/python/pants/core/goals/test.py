@@ -9,7 +9,7 @@ import logging
 import os
 import shlex
 from abc import ABC, ABCMeta
-from collections.abc import Iterable, Sequence
+from collections.abc import Coroutine, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -20,9 +20,15 @@ from pants.core.environments.rules import (
     ChosenLocalEnvironmentName,
     EnvironmentName,
     SingleEnvironmentNameRequest,
+    resolve_single_environment_name,
 )
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
-from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
+from pants.core.goals.package import (
+    BuiltPackage,
+    EnvironmentAwarePackageRequest,
+    PackageFieldSet,
+    environment_aware_package,
+)
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.partitions import (
@@ -32,21 +38,23 @@ from pants.core.util_rules.partitions import (
     _BatchBase,
     _PartitionFieldSetsRequestBase,
 )
-from pants.engine.addresses import Address, UnparsedAddressInputs
+from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.console import Console
-from pants.engine.desktop import OpenFiles, OpenFilesRequest
+from pants.engine.desktop import OpenFilesRequest, find_open_program
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP, EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import EMPTY_FILE_DIGEST, Digest, FileDigest, MergeDigests, Snapshot, Workspace
+from pants.engine.fs import EMPTY_FILE_DIGEST, FileDigest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.graph import find_valid_field_sets, resolve_targets
+from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.internals.session import RunId
-from pants.engine.intrinsics import run_interactive_process_in_environment
+from pants.engine.internals.specs_rules import find_valid_field_sets_for_target_roots
+from pants.engine.intrinsics import merge_digests, run_interactive_process_in_environment
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, ProcessResultMetadata
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.rules import collect_rules, concurrently, goal_rule, implicitly, rule
 from pants.engine.target import (
     FieldSet,
-    FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     IntField,
     NoApplicableTargetsBehavior,
@@ -56,7 +64,6 @@ from pants.engine.target import (
     StringSequenceField,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
-    Targets,
     ValidNumbers,
     parse_shard_spec,
 )
@@ -406,6 +413,26 @@ class TestRequest:
             yield from _unsupported_debug_adapter_rules(cls)
 
 
+@rule(polymorphic=True)
+async def partition_tests(req: TestRequest.PartitionRequest) -> Partitions:
+    raise NotImplementedError()
+
+
+@rule(polymorphic=True)
+async def to_debug_request(batch: TestRequest.Batch) -> TestDebugRequest:
+    raise NotImplementedError()
+
+
+@rule(polymorphic=True)
+async def to_debug_adapter_request(batch: TestRequest.Batch) -> TestDebugAdapterRequest:
+    raise NotImplementedError()
+
+
+@rule(polymorphic=True)
+async def run_test_batch(batch: TestRequest.Batch) -> TestResult:
+    raise NotImplementedError()
+
+
 class CoverageData(ABC):
     """Base class for inputs to a coverage report.
 
@@ -502,6 +529,11 @@ class CoverageReports(EngineAwareReturnType):
                 continue
             artifacts[artifact[0]] = artifact[1]
         return artifacts or None
+
+
+@rule(polymorphic=True)
+async def create_coverage_report(req: CoverageDataCollection) -> CoverageReports:
+    raise NotImplementedError()
 
 
 class TestSubsystem(GoalSubsystem):
@@ -712,10 +744,10 @@ class TestSubsystem(GoalSubsystem):
 
 
 class Test(Goal):
+    __test__ = False
+
     subsystem_cls = TestSubsystem
     environment_behavior = Goal.EnvironmentBehavior.USES_ENVIRONMENTS
-
-    __test__ = False
 
 
 class TestTimeoutField(IntField, metaclass=ABCMeta):
@@ -724,6 +756,8 @@ class TestTimeoutField(IntField, metaclass=ABCMeta):
     Each test target that wants to implement a timeout needs to provide with its own concrete field
     class extending this one.
     """
+
+    __test__ = False
 
     alias = "timeout"
     required = False
@@ -812,7 +846,7 @@ async def _get_test_batches(
     local_environment_name: ChosenLocalEnvironmentName,
     test_subsystem: TestSubsystem,
 ) -> list[TestRequest.Batch]:
-    def partitions_get(request_type: type[TestRequest]) -> Get[Partitions]:
+    def partitions_call(request_type: type[TestRequest]) -> Coroutine[Any, Any, Partitions]:
         partition_type = cast(TestRequest, request_type)
         field_set_type = partition_type.field_set_type
         applicable_field_sets: list[TestFieldSet] = []
@@ -821,16 +855,17 @@ async def _get_test_batches(
                 applicable_field_sets.extend(field_sets)
 
         partition_request = partition_type.PartitionRequest(tuple(applicable_field_sets))
-        return Get(
-            Partitions,
-            {
-                partition_request: TestRequest.PartitionRequest,
-                local_environment_name.val: EnvironmentName,
-            },
+        return partition_tests(
+            **implicitly(
+                {
+                    partition_request: TestRequest.PartitionRequest,
+                    local_environment_name.val: EnvironmentName,
+                },
+            )
         )
 
-    all_partitions = await MultiGet(
-        partitions_get(request_type) for request_type in core_request_types
+    all_partitions = await concurrently(
+        partitions_call(request_type) for request_type in core_request_types
     )
 
     return [
@@ -854,16 +889,14 @@ async def _run_debug_tests(
     test_subsystem: TestSubsystem,
     debug_adapter: DebugAdapterSubsystem,
 ) -> Test:
-    debug_requests = await MultiGet(
+    debug_requests = await concurrently(
         (
-            Get(
-                TestDebugRequest,
-                {batch: TestRequest.Batch, environment_name: EnvironmentName},
+            to_debug_request(
+                **implicitly({batch: TestRequest.Batch, environment_name: EnvironmentName})
             )
             if not test_subsystem.debug_adapter
-            else Get(
-                TestDebugAdapterRequest,
-                {batch: TestRequest.Batch, environment_name: EnvironmentName},
+            else to_debug_adapter_request(
+                **implicitly({batch: TestRequest.Batch, environment_name: EnvironmentName})
             )
         )
         for batch, environment_name in zip(batches, environment_names)
@@ -918,8 +951,7 @@ async def run_tests(
         no_applicable_targets_behavior = NoApplicableTargetsBehavior.warn
 
     shard, num_shards = parse_shard_spec(test_subsystem.shard, "the [test].shard option")
-    targets_to_valid_field_sets = await Get(
-        TargetRootsToFieldSets,
+    targets_to_valid_field_sets = await find_valid_field_sets_for_target_roots(
         TargetRootsToFieldSetsRequest(
             TestFieldSet,
             goal_description=goal_description,
@@ -927,6 +959,7 @@ async def run_tests(
             shard=shard,
             num_shards=num_shards,
         ),
+        **implicitly(),
     )
 
     request_types = union_membership.get(TestRequest)
@@ -937,11 +970,9 @@ async def run_tests(
         test_subsystem,
     )
 
-    environment_names = await MultiGet(
-        Get(
-            EnvironmentName,
-            SingleEnvironmentNameRequest,
-            SingleEnvironmentNameRequest.from_field_sets(batch.elements, batch.description),
+    environment_names = await concurrently(
+        resolve_single_environment_name(
+            SingleEnvironmentNameRequest.from_field_sets(batch.elements, batch.description)
         )
         for batch in test_batches
     )
@@ -952,13 +983,14 @@ async def run_tests(
         )
 
     to_test = list(zip(test_batches, environment_names))
-    results = await MultiGet(
-        Get(
-            TestResult,
-            {
-                batch: TestRequest.Batch,
-                environment_name: EnvironmentName,
-            },
+    results = await concurrently(
+        run_test_batch(
+            **implicitly(
+                {
+                    batch: TestRequest.Batch,
+                    environment_name: EnvironmentName,
+                }
+            )
         )
         for batch, environment_name in to_test
     )
@@ -1001,9 +1033,8 @@ async def run_tests(
 
     if test_subsystem.report:
         report_dir = test_subsystem.report_dir(distdir)
-        merged_reports = await Get(
-            Digest,
-            MergeDigests(result.xml_results.digest for result in results if result.xml_results),
+        merged_reports = await merge_digests(
+            MergeDigests(result.xml_results.digest for result in results if result.xml_results)
         )
         workspace.write_digest(merged_reports, path_prefix=str(report_dir))
         console.print_stderr(f"\nWrote test reports to {report_dir}")
@@ -1025,13 +1056,14 @@ async def run_tests(
             collection_cls = coverage_types_to_collection_types[data_cls]  # type: ignore[index]
             coverage_collections.append(collection_cls(data))
         # We can create multiple reports for each coverage data (e.g., console, xml, html)
-        coverage_reports_collections = await MultiGet(
-            Get(
-                CoverageReports,
-                {
-                    coverage_collection: CoverageDataCollection,
-                    local_environment_name.val: EnvironmentName,
-                },
+        coverage_reports_collections = await concurrently(
+            create_coverage_report(
+                **implicitly(
+                    {
+                        coverage_collection: CoverageDataCollection,
+                        local_environment_name.val: EnvironmentName,
+                    }
+                )
             )
             for coverage_collection in coverage_collections
         )
@@ -1042,8 +1074,9 @@ async def run_tests(
             coverage_report_files.extend(report_files)
 
         if coverage_report_files and test_subsystem.open_coverage:
-            open_files = await Get(
-                OpenFiles, OpenFilesRequest(coverage_report_files, error_if_open_not_found=False)
+            open_files = await find_open_program(
+                OpenFilesRequest(coverage_report_files, error_if_open_not_found=False),
+                **implicitly(),
             )
             for process in open_files.processes:
                 _ = await run_interactive_process_in_environment(
@@ -1145,7 +1178,9 @@ class TestExtraEnv:
 @rule
 async def get_filtered_environment(test_env_aware: TestSubsystem.EnvironmentAware) -> TestExtraEnv:
     return TestExtraEnv(
-        await Get(EnvironmentVars, EnvironmentVarsRequest(test_env_aware.extra_env_vars))
+        await environment_vars_subset(
+            EnvironmentVarsRequest(test_env_aware.extra_env_vars), **implicitly()
+        )
     )
 
 
@@ -1211,12 +1246,12 @@ async def build_runtime_package_dependencies(
     unparsed_addresses = request.field.to_unparsed_address_inputs()
     if not unparsed_addresses:
         return BuiltPackageDependencies()
-    tgts = await Get(Targets, UnparsedAddressInputs, unparsed_addresses)
-    field_sets_per_tgt = await Get(
-        FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, tgts)
+    tgts = await resolve_targets(**implicitly(unparsed_addresses))
+    field_sets_per_tgt = await find_valid_field_sets(
+        FieldSetsPerTargetRequest(PackageFieldSet, tgts), **implicitly()
     )
-    packages = await MultiGet(
-        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
+    packages = await concurrently(
+        environment_aware_package(EnvironmentAwarePackageRequest(field_set))
         for field_set in field_sets_per_tgt.field_sets
     )
     return BuiltPackageDependencies(packages)
