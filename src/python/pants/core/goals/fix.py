@@ -16,8 +16,8 @@ from pants.core.goals.lint import (
     LintFilesRequest,
     LintResult,
     LintTargetsRequest,
-    _get_partitions_by_request_type,
     _MultiToolGoalSubsystem,
+    get_partitions_by_request_type,
 )
 from pants.core.goals.multi_tool_goal_helper import BatchSizeOption, OnlyOption
 from pants.core.util_rules.partitions import PartitionerType, PartitionMetadataT
@@ -191,7 +191,7 @@ class _FixBatchElement(NamedTuple):
 
 
 class _FixBatchRequest(Collection[_FixBatchElement]):
-    """Request to serially fix all the elements in the given batch."""
+    """Request to sequentially fix all the elements in the given batch."""
 
 
 @dataclass(frozen=True)
@@ -300,12 +300,12 @@ class _BatchableMultiToolGoalSubsystem(_MultiToolGoalSubsystem, Protocol):
 
 
 @rule(polymorphic=True)
-async def _fix_batch(batch: AbstractFixRequest.Batch) -> FixResult:
+async def fix_batch(batch: AbstractFixRequest.Batch) -> FixResult:
     raise NotImplementedError()
 
 
 @rule
-async def fix_batch(
+async def fix_batch_sequential(
     request: _FixBatchRequest,
 ) -> _FixBatchResult:
     current_snapshot = await digest_to_snapshot(
@@ -315,7 +315,7 @@ async def fix_batch(
     results = []
     for request_type, tool_name, files, key in request:
         batch = request_type(tool_name, files, key, current_snapshot)
-        result = await _fix_batch(  # noqa: PNT30: this is inherently sequential
+        result = await fix_batch(  # noqa: PNT30: this is inherently sequential
             **implicitly({batch: AbstractFixRequest.Batch})
         )
         results.append(result)
@@ -341,7 +341,7 @@ async def _do_fix(
     ],
     make_files_partition_request_get: Callable[[_FilePartitioner], Coroutine[Any, Any, Partitions]],
 ) -> _GoalT:
-    partitions_by_request_type = await _get_partitions_by_request_type(
+    partitions_by_request_type = await get_partitions_by_request_type(
         core_request_types,
         target_partitioners,
         file_partitioners,
@@ -393,7 +393,7 @@ async def _do_fix(
                 )
 
     all_results = await concurrently(
-        fix_batch(request) for request in _make_disjoint_batch_requests()
+        fix_batch_sequential(request) for request in _make_disjoint_batch_requests()
     )
 
     individual_results = list(
@@ -436,7 +436,7 @@ async def fix(
             # NB: We sort the core request types so that fixers are first. This is to ensure that, between
             # fixers and formatters, re-running isn't necessary due to tool conflicts (re-running may
             # still be necessary within formatters). This is because fixers are expected to modify
-            # code irrespective of formattint, and formatters aren't expected to be modifying the code
+            # code irrespective of formatting, and formatters aren't expected to be modifying the code
             # in a way that needs to be fixed.
             key=lambda request_type: request_type.is_fixer,
             reverse=True,
