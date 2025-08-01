@@ -92,7 +92,7 @@ impl Task {
                 // NB: The Python constructor for `Call()` will have already errored if
                 // `type(input) != input_type`.
                 throw(format!(
-                    "{call} was not detected in your @rule body at rule compile time. Make sure
+                    "{call} was not detected in your @rule body at rule compile time. Make sure \
                     the callee is defined before the @rule body."
                 ))
             })?;

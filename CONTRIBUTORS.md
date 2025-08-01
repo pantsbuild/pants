@@ -125,6 +125,7 @@ Created as part of the release process.
 + Gautham Nair
 + Gerald Spencer
 + Gordon Cassie
++ Greg Fast
 + Greg Niemann
 + Greg Shuflin
 + Gregory Borodin

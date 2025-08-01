@@ -18,7 +18,7 @@ Documentation: [www.pantsbuild.org](https://www.pantsbuild.org/).
 
 # Getting started
 
-See the [getting started](https://www.pantsbuild.org/docs/getting-started) documentation.
+See the [getting started](https://www.pantsbuild.org/stable/docs/getting-started) documentation.
 
 # Credits
 

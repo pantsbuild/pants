@@ -308,6 +308,11 @@ def global_env() -> Env:
     return {
         "PANTS_CONFIG_FILES": "+['pants.ci.toml']",
         "RUST_BACKTRACE": "all",
+        # Default to disabling OpenTelemetry so GHA steps not using Pants directly do not try
+        # to use Honeycomb if they do invoke Pants indirectly (e.g., Rust integration tests).
+        # Needed because pants.ci.toml refers to `env.HONEYCOMB_API_KEY`.
+        "PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED": "False",
+        "HONEYCOMB_API_KEY": "--DISABLED--",
     }
 
 
@@ -1704,7 +1709,8 @@ def add_telemetry_secret_env(workflow: dict[str, Any]) -> dict[str, Any]:
     """Inject the Honeycomb telemetry configuration into any job/step which runs Pants."""
     for job_config in workflow.get("jobs", {}).values():
         for step_config in job_config.get("steps", []):
-            if "./pants" in step_config.get("run", ""):
+            run_config = step_config.get("run", "")
+            if "./pants" in run_config:
                 if "env" not in step_config:
                     step_config["env"] = {}
 
@@ -1715,6 +1721,7 @@ def add_telemetry_secret_env(workflow: dict[str, Any]) -> dict[str, Any]:
                 step_config["env"]["HONEYCOMB_API_KEY"] = gha_expr(
                     "secrets.HONEYCOMB_API_KEY || '--DISABLED--'"
                 )
+
     return workflow
 
 
