@@ -419,12 +419,12 @@ async def partition_tests(req: TestRequest.PartitionRequest) -> Partitions:
 
 
 @rule(polymorphic=True)
-async def to_debug_request(batch: TestRequest.Batch) -> TestDebugRequest:
+async def test_batch_to_debug_request(batch: TestRequest.Batch) -> TestDebugRequest:
     raise NotImplementedError()
 
 
 @rule(polymorphic=True)
-async def to_debug_adapter_request(batch: TestRequest.Batch) -> TestDebugAdapterRequest:
+async def test_batch_to_debug_adapter_request(batch: TestRequest.Batch) -> TestDebugAdapterRequest:
     raise NotImplementedError()
 
 
@@ -891,11 +891,11 @@ async def _run_debug_tests(
 ) -> Test:
     debug_requests = await concurrently(
         (
-            to_debug_request(
+            test_batch_to_debug_request(
                 **implicitly({batch: TestRequest.Batch, environment_name: EnvironmentName})
             )
             if not test_subsystem.debug_adapter
-            else to_debug_adapter_request(
+            else test_batch_to_debug_adapter_request(
                 **implicitly({batch: TestRequest.Batch, environment_name: EnvironmentName})
             )
         )
