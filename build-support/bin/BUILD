@@ -6,10 +6,16 @@ shell_sources(name="sh_scripts")
 
 python_sources(
     name="py_scripts",
+    overrides={
+        "external_tool_upgrade.py": {
+            "resolve": "external-tool-upgrade",
+        }
+    },
 )
 
 python_tests(
     name="py_tests",
+    dependencies=["//conftest.py:test_utils"],
     overrides={
         "generate_json_schema_test.py": {
             "dependencies": [
@@ -17,10 +23,20 @@ python_tests(
                 "3rdparty/python#types-setuptools",
             ]
         },
+        "external_tool_upgrade_test.py": {
+            "resolve": "external-tool-upgrade",
+        },
     },
 )
 
 pex_binary(
     name="terraform_tool_versions",
     entry_point="terraform_tool_versions.py",
+)
+
+pex_binary(
+    name="external-tool-upgrade",
+    entry_point="external_tool_upgrade.py",
+    execution_mode="venv",
+    resolve="external-tool-upgrade",
 )
