@@ -15,6 +15,7 @@ python_sources(
 
 python_tests(
     name="py_tests",
+    dependencies=['//conftest.py:test_utils'],
     overrides={
         "generate_json_schema_test.py": {
             "dependencies": [
