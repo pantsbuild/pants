@@ -7,9 +7,7 @@ shell_sources(name="scripts", sources=["cargo", "pants"])
 # https://github.com/pantsbuild/pants/pull/8105.
 files(name="files", sources=["BUILD_ROOT", "pants.toml"])
 
-python_test_utils(name="test_utils",
-                  resolve=parametrize("python-default", "external-tool-upgrade")
-                  )
+python_test_utils(name="test_utils", resolve=parametrize("python-default", "external-tool-upgrade"))
 
 # Used for experimenting with the new Docker support.
 docker_environment(
