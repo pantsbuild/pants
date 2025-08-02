@@ -180,7 +180,6 @@ args = ["--external-sources"]
 args = ["-i 2", "-ci", "-sr"]
 
 [pytest]
-#args = ["--no-header", "-vv"]
 args = ["--no-header", "--noskip", "-vv"]
 execution_slot_var = "TEST_EXECUTION_SLOT"
 install_from_resolve = "pytest"
