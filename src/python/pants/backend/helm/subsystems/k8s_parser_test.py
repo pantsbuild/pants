@@ -120,7 +120,7 @@ def test_crd_parser_can_run(rule_runner: RuleRunner) -> None:
     )
     file_entries = rule_runner.request(DigestEntries, [file_digest])
     with setup_tmpdir(file_digest_python) as tmpdir:
-        rule_runner.set_options([f"--helm-k8s-parser-crd={tmpdir}/crd.py"])
+        rule_runner.set_options([f'--helm-k8s-parser-crd={{"{tmpdir}/crd.py": "CRD"}}'])
         parsed_manifest = rule_runner.request(
             ParsedKubeManifest, [ParseKubeManifestRequest(file=cast(FileEntry, file_entries[0]))]
         )
@@ -169,7 +169,7 @@ def test_crd_parser_class_not_found_error(rule_runner: RuleRunner) -> None:
     )
     file_entries = rule_runner.request(DigestEntries, [file_digest])
     with setup_tmpdir(file_digest_python) as tmpdir:
-        rule_runner.set_options([f"--helm-k8s-parser-crd={tmpdir}/crd.py"])
+        rule_runner.set_options([f'--helm-k8s-parser-crd={{"{tmpdir}/crd.py": "CRD"}}'])
         with pytest.raises(Exception):
             rule_runner.request(
                 ParsedKubeManifest,

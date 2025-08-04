@@ -3,19 +3,22 @@
 
 from __future__ import annotations
 
+import json
 import sys
 
 from hikaru import load_full_yaml  # pants: no-infer-dep
 from hikaru.crd import register_crd_class  # pants: no-infer-dep
 
 
-def _import_crd_source():
+def _import_crd_source(modulename_classname: tuple[str, str]):
     """Dynamically import the CRD source module."""
     try:
         import importlib
 
-        crd_module = importlib.import_module("__crd_source")
-        return getattr(crd_module, "CRD", None)
+        module_name = modulename_classname[0]
+        class_name = modulename_classname[1]
+        crd_module = importlib.import_module(module_name)
+        return getattr(crd_module, class_name, None)
     except ImportError as e:
         print(f"Error: Failed to import CRD module: {e}", file=sys.stderr)
         sys.exit(1)
@@ -26,12 +29,14 @@ def _import_crd_source():
 
 def main(args: list[str]):
     crd = args[1] if len(args) > 1 else None
+    crd = json.loads(crd)
     if crd != "":
-        crd_class = _import_crd_source()
-        if crd_class is None:
-            print("Error: CRD class not found in __crd_source.", file=sys.stderr)
-            sys.exit(1)
-        register_crd_class(crd_class, "crd", is_namespaced=False)
+        for modulename_classname in crd:
+            crd_class = _import_crd_source(modulename_classname)
+            if crd_class is None:
+                print("Error: CRD class not found in __crd_source[...].", file=sys.stderr)
+                sys.exit(1)
+            register_crd_class(crd_class, "crd", is_namespaced=False)
 
     input_filename = args[0]
 

@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import pkgutil
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Any
@@ -24,7 +26,7 @@ from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnTyp
 from pants.engine.fs import CreateDigest, FileContent, FileEntry
 from pants.engine.intrinsics import create_digest, execute_process
 from pants.engine.rules import collect_rules, implicitly, rule
-from pants.option.option_types import StrOption
+from pants.option.option_types import DictOption
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize, softwrap
 
@@ -49,15 +51,18 @@ class HelmKubeParserSubsystem(PythonToolRequirementsBase):
     ]
 
     register_interpreter_constraints = True
-
-    crd = StrOption(
+    crd = DictOption[str](
         help=softwrap(
             """
             Additional custom resource definitions be made available to all Helm processes
             or during value interpolation.
+            Example:
+                [helm-k8s-parser.crd]
+                "filename1"="classname1"
+                "filename2"="classname2"
             """
         ),
-        default="",
+        default={},
     )
 
     default_lockfile_resource = (_HELM_K8S_PARSER_PACKAGE, "k8s_parser.lock")
@@ -66,7 +71,7 @@ class HelmKubeParserSubsystem(PythonToolRequirementsBase):
 @dataclass(frozen=True)
 class _HelmKubeParserTool:
     pex: VenvPex
-    crd: str = ""
+    crd: dict[str] = defaultdict
 
 
 @rule
@@ -86,14 +91,21 @@ async def build_k8s_parser_tool(
     )
 
     digest_sources = [parser_file_content]
-    if k8s_parser.crd != "":
-        crd_sources = open(k8s_parser.crd, "rb").read()
-        if not crd_sources:
-            raise ValueError(f"Unable to find source to crd_cron in {_HELM_K8S_PARSER_PACKAGE}")
-        parser_file_content_source = FileContent(
-            path="__crd_source.py", content=crd_sources, is_executable=False
-        )
-        digest_sources.append(parser_file_content_source)
+
+    modulename_classname = []
+    if k8s_parser.crd != {}:
+        for file, classname in k8s_parser.crd.items():
+            crd_sources = open(file, "rb").read()
+            if not crd_sources:
+                raise ValueError(
+                    f"Unable to find source to customer resource definition in {_HELM_K8S_PARSER_PACKAGE}"
+                )
+            unique_name = f"_crd_source_{hash(file)}"
+            parser_file_content_source = FileContent(
+                path=f"{unique_name}.py", content=crd_sources, is_executable=False
+            )
+            digest_sources.append(parser_file_content_source)
+            modulename_classname.append((unique_name, classname))
     parser_digest = await create_digest(CreateDigest(digest_sources))
 
     # We use copies of site packages because hikaru gets confused with symlinked packages
@@ -113,7 +125,7 @@ async def build_k8s_parser_tool(
         ),
         **implicitly(),
     )
-    return _HelmKubeParserTool(parser_pex, k8s_parser.crd)
+    return _HelmKubeParserTool(parser_pex, json.dumps(modulename_classname))
 
 
 @dataclass(frozen=True)
