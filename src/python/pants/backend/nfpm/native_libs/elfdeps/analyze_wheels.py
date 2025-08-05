@@ -6,9 +6,9 @@ from __future__ import annotations
 import json
 import sys
 import zipfile
+from collections.abc import Generator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
 
 # elfdeps 0.2.0 added analyze_zipfile
 from elfdeps import ELFAnalyzeSettings, ELFInfo, SOInfo, analyze_zipfile
@@ -40,13 +40,9 @@ def analyze_wheels_repo(wheel_repo: Path) -> WheelsELFInfo:
 
     print(f"Analyzing wheels in {wheel_repo}", file=sys.stderr)
     elf_infos: list[ELFInfo] = [
-        elf_info
-        for wheel in wheel_repo.iterdir()
-        for elf_info in analyze_wheel(wheel, settings)
+        elf_info for wheel in wheel_repo.iterdir() for elf_info in analyze_wheel(wheel, settings)
     ]
-    print(
-        f"Done analyzing wheels in {wheel_repo}.", file=sys.stderr
-    )  # end progress indicators
+    print(f"Done analyzing wheels in {wheel_repo}.", file=sys.stderr)  # end progress indicators
 
     provides: set[SOInfo] = set()
     requires: set[SOInfo] = set()
@@ -59,14 +55,10 @@ def analyze_wheels_repo(wheel_repo: Path) -> WheelsELFInfo:
 
 def main() -> int:
     if len(sys.argv) != 2:
-        raise RuntimeError(
-            f"{sys.argv[0]} expects one positional arg, the wheel_repo path"
-        )
+        raise RuntimeError(f"{sys.argv[0]} expects one positional arg, the wheel_repo path")
     wheel_repo = Path(sys.argv[1])
     if not wheel_repo.resolve().is_dir():
-        raise NotADirectoryError(
-            f"{wheel_repo} is not a directory (or a symlink to a directory)!"
-        )
+        raise NotADirectoryError(f"{wheel_repo} is not a directory (or a symlink to a directory)!")
 
     wheels_elf_info = analyze_wheels_repo(wheel_repo=wheel_repo)
 

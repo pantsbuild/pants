@@ -4,14 +4,12 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable
 
 from pants.backend.nfpm.native_libs.elfdeps.subsystem import rules as subsystem_rules
-from pants.backend.nfpm.native_libs.elfdeps.subsystem import (
-    setup_elfdeps_analyze_wheels_tool,
-)
+from pants.backend.nfpm.native_libs.elfdeps.subsystem import setup_elfdeps_analyze_wheels_tool
 from pants.backend.python.util_rules.pex import Pex, PexProcess, VenvPexProcess
 from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.engine.process import ProcessResult, fallible_to_exec_result_or_raise
@@ -34,9 +32,7 @@ class PexELFInfo:
     desc="Analyze ELF (native lib) dependencies of wheels in a PEX",
     level=LogLevel.DEBUG,
 )
-async def elfdeps_analyze_pex_wheels(
-    request: RequestPexELFInfo, pex_pex: PexPEX
-) -> PexELFInfo:
+async def elfdeps_analyze_pex_wheels(request: RequestPexELFInfo, pex_pex: PexPEX) -> PexELFInfo:
     wheel_repo_dir = str(PurePath(request.target_pex.name).with_suffix(".wheel_repo"))
 
     extracted_wheels, elfdeps_analyze_wheels_tool = await concurrently(
