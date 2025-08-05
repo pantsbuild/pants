@@ -6,6 +6,7 @@
 
 ansicolors==1.1.8
 chevron==0.14.0
+elfdeps==0.2.0  # see: pants.backends.nfpm.native_libs.elfdeps
 fasteners==0.20.0
 freezegun==1.5.5
 hdrhistogram==0.10.3

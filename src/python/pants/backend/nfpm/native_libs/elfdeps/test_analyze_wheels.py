@@ -7,7 +7,7 @@ from typing import cast
 import pytest
 import requests
 from _pytest.tmpdir import TempPathFactory
-from elfdeps import ELFAnalyzeSettings, ELFInfo, SOInfo  # pants: no-infer-dep
+from elfdeps import ELFAnalyzeSettings, ELFInfo, SOInfo
 from pytest import fixture
 
 from .analyze_wheels import WheelsELFInfo, analyze_wheel, analyze_wheels_repo

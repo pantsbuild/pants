@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 # elfdeps 0.2.0 added analyze_zipfile
-from elfdeps import ELFAnalyzeSettings, ELFInfo, SOInfo, analyze_zipfile  # pants: no-infer-dep
+from elfdeps import ELFAnalyzeSettings, ELFInfo, SOInfo, analyze_zipfile
 
 
 @dataclass(frozen=True)
