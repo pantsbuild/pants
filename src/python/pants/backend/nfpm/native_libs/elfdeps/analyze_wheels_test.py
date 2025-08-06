@@ -59,7 +59,7 @@ WHEELS_ELF_INFO_DICT = {
     ],
 }
 WHEELS_ELF_INFO_JSON = """{\
-    "provides": ["_setproctitle.cpython-311-x86_64-linux-gnu.so()(64bit)"],
+    "provides": ["_setproctitle.cpython-311-x86_64-linux-gnu.so()(64bit)"],\
     "requires": [\
         "libc.so.6()(64bit)",\
         "libc.so.6(GLIBC_2.2.5)(64bit)",\
