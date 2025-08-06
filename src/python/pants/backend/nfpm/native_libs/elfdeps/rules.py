@@ -27,6 +27,10 @@ class PexELFInfo:
     provides: tuple[str, ...]
     requires: tuple[str, ...]
 
+    def __init__(self, provides: Iterable[str], requires: Iterable[str]):
+        object.__setattr__(self, "provides", tuple(sorted(provides)))
+        object.__setattr__(self, "requires", tuple(sorted(requires)))
+
 
 @rule(
     desc="Analyze ELF (native lib) dependencies of wheels in a PEX",
@@ -76,8 +80,8 @@ async def elfdeps_analyze_pex_wheels(request: RequestPexELFInfo, pex_pex: PexPEX
 
     pex_elf_info = json.loads(result.stdout)
     return PexELFInfo(
-        provides=tuple(pex_elf_info["provides"]),
-        requires=tuple(pex_elf_info["requires"]),
+        provides=pex_elf_info["provides"],
+        requires=pex_elf_info["requires"],
     )
 
 
