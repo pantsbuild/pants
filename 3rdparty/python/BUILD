@@ -51,6 +51,15 @@ __dependents_rules__(
         "pants-plugins/pants_explorer/server/**",
         "!*",
     ),
+    (  # Only scripts, not including rule code, in the elfdeps backend may depend on the elfdeps library
+        (
+            "[elfdeps]",
+        ),
+        "!src/python/pants/backend/nfpm/native_libs/elfdeps/rules*.py",
+        "!src/python/pants/backend/nfpm/native_libs/elfdeps/subsystem.py",
+        "src/python/pants/backend/nfpm/native_libs/elfdeps/**",
+        "!*",
+    ),
     # Free for all on the rest
     ("*", "*"),
 )

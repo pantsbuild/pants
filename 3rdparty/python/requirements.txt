@@ -6,7 +6,6 @@
 
 ansicolors==1.1.8
 chevron==0.14.0
-elfdeps==0.2.0  # see: pants.backends.nfpm.native_libs.elfdeps
 fasteners==0.20.0
 freezegun==1.5.5
 hdrhistogram==0.10.3
@@ -32,6 +31,9 @@ typing-extensions==4.15
 mypy-typing-asserts==0.1.1
 node-semver==0.9.0
 
+
+# These dependencies are for scripts that rules run in an external process.
+elfdeps==0.2.0  # see: pants.backends.nfpm.native_libs.elfdeps
 # These dependencies are only for debugging Pants itself (in VSCode/PyCharm respectively),
 # and should never be imported.
 debugpy==1.8.16
