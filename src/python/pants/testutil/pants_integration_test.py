@@ -417,19 +417,8 @@ class _TomlSerializer:
     The constructor expects a dictionary of option scopes to their corresponding values as
     represented in Python. For example:
 
-      {
-        "GLOBAL": {
-          "o1": True,
-          "o2": "hello",
-          "o3": [0, 1, 2],
-        },
-        "some-subsystem": {
-          "dict_option": {
-            "a": 0,
-            "b": 0,
-          },
-        },
-      }
+    {   "GLOBAL": {     "o1": True,     "o2": "hello",     "o3": [0, 1, 2],   },   "some-subsystem":
+    {     "dict_option": {       "a": 0,       "b": 0,     },   }, }
     """
 
     parsed: Mapping[str, dict[str, int | float | str | bool | list | dict]]

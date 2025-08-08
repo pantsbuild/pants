@@ -51,13 +51,13 @@ class OptionValueContainer:
 
     Implements "value ranking":
 
-       Attribute values can be ranked, so that a given attribute's value can only be changed if
-       the new value has at least as high a rank as the old value. This allows an option value in
-       an outer scope to override that option's value in an inner scope, when the outer scope's
-       value comes from a higher ranked source (e.g., the outer value comes from an env var and
-       the inner one from config).
+    Attribute values can be ranked, so that a given attribute's value can only be changed if the new
+    value has at least as high a rank as the old value. This allows an option value in an outer
+    scope to override that option's value in an inner scope, when the outer scope's value comes from
+    a higher ranked source (e.g., the outer value comes from an env var and the inner one from
+    config).
 
-       See ranked_value.py for more details.
+    See ranked_value.py for more details.
     """
 
     _value_map: dict[Key, RankedValue]
