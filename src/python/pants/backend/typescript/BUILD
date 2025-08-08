@@ -2,6 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 python_sources()
 
-python_tests(
-    name="tests",
+
+resources(
+    name="test_resources",
+    sources=["test_resources/**/*"],
 )

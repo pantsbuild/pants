@@ -183,17 +183,23 @@ async def _run_tool_with_resolve(request: NodeJSToolRequest, resolve: str) -> Pr
     all_first_party = await resolve_to_first_party_node_package(**implicitly())
     package_for_resolve = all_first_party[resolve]
     project = resolves[resolve]
+
     installed = await install_node_packages_for_address(
         InstalledNodePackageRequest(package_for_resolve.address), **implicitly()
     )
+    # Merge the tool's input files (source code, config files) with the installed
+    # packages (node_modules). This is required for resolve-based execution where tools like
+    # TypeScript need both their input files AND the installed dependencies in the sandbox.
+    merged_input_digest = await merge_digests(
+        MergeDigests([request.input_digest, installed.digest])
+    )
+
     return await setup_nodejs_project_environment_process(
         NodeJsProjectEnvironmentProcess(
             env=installed.project_env,
             args=(*project.package_manager.execute_args, request.binary_name, *request.args),
             description=request.description,
-            input_digest=await merge_digests(
-                MergeDigests([request.input_digest, installed.digest])
-            ),
+            input_digest=merged_input_digest,
             output_files=request.output_files,
             output_directories=request.output_directories,
             per_package_caches=request.append_only_caches,
