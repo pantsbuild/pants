@@ -88,7 +88,7 @@ struct ParsedWriteResourceName<'a> {
 /// Parses a resource name of the form `{instance_name}/uploads/{uuid}/blobs/{hash}/{size}` into
 /// a struct with references to the individual components of the resource name. The
 /// `{instance_name}` may be blank (with no leading slash) as per REAPI specification.
-fn parse_write_resource_name(resource: &str) -> Result<ParsedWriteResourceName, String> {
+fn parse_write_resource_name(resource: &str) -> Result<ParsedWriteResourceName<'_>, String> {
     if resource.is_empty() {
         return Err("Missing resource name".to_owned());
     }
@@ -141,7 +141,7 @@ struct ParsedReadResourceName<'a> {
 }
 
 /// `"{instance_name}/blobs/{hash}/{size}"`
-fn parse_read_resource_name(resource: &str) -> Result<ParsedReadResourceName, String> {
+fn parse_read_resource_name(resource: &str) -> Result<ParsedReadResourceName<'_>, String> {
     if resource.is_empty() {
         return Err("Missing resource name".to_owned());
     }
