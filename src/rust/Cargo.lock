@@ -450,7 +450,7 @@ dependencies = [
  "serde_urlencoded",
  "thiserror 1.0.69",
  "tokio",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.16",
  "tower-service",
  "url",
  "winapi",
@@ -1116,7 +1116,7 @@ dependencies = [
  "testutil",
  "tokio",
  "tokio-rustls",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.16",
  "workunit_store",
 ]
 
@@ -1213,7 +1213,7 @@ dependencies = [
  "time",
  "tokio",
  "tokio-retry2",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.16",
  "tryfuture",
  "ui",
  "url",
@@ -1642,7 +1642,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tokio-stream",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.16",
  "tonic",
  "tonic-build",
  "tower 0.5.2",
@@ -1667,7 +1667,7 @@ dependencies = [
  "indexmap 2.10.0",
  "slab",
  "tokio",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.16",
  "tracing",
 ]
 
@@ -1867,11 +1867,10 @@ dependencies = [
 
 [[package]]
 name = "hyper-rustls"
-version = "0.27.5"
+version = "0.27.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d191583f3da1305256f22463b9bb0471acad48a4e534a5218b9963e9c1f59b2"
+checksum = "e3c93eb611681b207e1fe55d5a71ecf91572ec8a6705cdb6857f7d8d5242cf58"
 dependencies = [
- "futures-util",
  "http",
  "hyper",
  "hyper-util",
@@ -1882,7 +1881,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tower-service",
- "webpki-roots",
+ "webpki-roots 1.0.2",
 ]
 
 [[package]]
@@ -2322,7 +2321,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc2f4eb4bc735547cfed7c0a4922cbd04a4655978c09b54f1f7b228750664c34"
 dependencies = [
  "cfg-if",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -2913,7 +2912,7 @@ dependencies = [
  "testutil",
  "tokio",
  "tokio-rustls",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.16",
  "workunit_store",
 ]
 
@@ -3127,7 +3126,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tokio-stream",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.16",
  "tonic",
  "tower 0.5.2",
  "tryfuture",
@@ -3561,7 +3560,7 @@ dependencies = [
  "testutil",
  "tokio",
  "tokio-rustls",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.16",
  "tonic",
  "workunit_store",
 ]
@@ -3595,7 +3594,7 @@ dependencies = [
  "tempfile",
  "testutil",
  "tokio",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.16",
  "workunit_store",
 ]
 
@@ -3618,7 +3617,7 @@ dependencies = [
  "tempfile",
  "testutil",
  "tokio",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.16",
  "tonic",
  "uuid",
  "workunit_store",
@@ -3698,7 +3697,7 @@ dependencies = [
  "sync_wrapper",
  "tokio",
  "tokio-rustls",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.16",
  "tower 0.5.2",
  "tower-service",
  "url",
@@ -3706,7 +3705,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "wasm-streams",
  "web-sys",
- "webpki-roots",
+ "webpki-roots 0.26.8",
  "windows-registry",
 ]
 
@@ -3794,9 +3793,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.29"
+version = "0.23.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2491382039b29b9b11ff08b76ff6c97cf287671dbb74f0be44bda389fffe9bd1"
+checksum = "c0ebcbd2f03de0fc1122ad9bb24b127a5a6cd51d72604a3f3c50ac459762b6cc"
 dependencies = [
  "aws-lc-rs",
  "log",
@@ -3985,9 +3984,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.140"
+version = "1.0.142"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20068b6e96dc6c9bd23e01df8827e6c7e1f2fddd43c21810382803c136b99373"
+checksum = "030fedb782600dcbd6f02d479bf0d817ac3bb40d644745b769d6a96bc3afc5a7"
 dependencies = [
  "itoa",
  "memchr",
@@ -4228,7 +4227,7 @@ dependencies = [
  "testutil",
  "tokio",
  "tokio-rustls",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.16",
  "tonic",
  "tower-service",
  "tryfuture",
@@ -4593,9 +4592,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.7.14"
+version = "0.7.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b9590b93e6fcc1739458317cccd391ad3955e2bde8913edf6f95f9e65a8f034"
+checksum = "14307c986784f72ef81c89db7d9e28d6ac26d16213b109ea501696195e6e3ce5"
 dependencies = [
  "bytes",
  "futures-core",
@@ -4719,7 +4718,7 @@ dependencies = [
  "rand 0.8.5",
  "slab",
  "tokio",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.16",
  "tower-layer",
  "tower-service",
  "tracing",
@@ -4736,7 +4735,7 @@ dependencies = [
  "pin-project-lite",
  "sync_wrapper",
  "tokio",
- "tokio-util 0.7.14",
+ "tokio-util 0.7.16",
  "tower-layer",
  "tower-service",
  "tracing",
@@ -5173,6 +5172,15 @@ name = "webpki-roots"
 version = "0.26.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2210b291f7ea53617fbafcc4939f10914214ec15aace5ba62293a668f322c5c9"
+dependencies = [
+ "rustls-pki-types",
+]
+
+[[package]]
+name = "webpki-roots"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e8983c3ab33d6fb807cfcdad2491c4ea8cbc8ed839181c7dfd9c67c83e261b2"
 dependencies = [
  "rustls-pki-types",
 ]

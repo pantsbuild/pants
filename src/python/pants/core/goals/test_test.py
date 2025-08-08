@@ -18,7 +18,7 @@ from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.target_types import PexBinary, PythonSourcesGeneratorTarget
 from pants.backend.python.target_types_rules import rules as python_target_type_rules
 from pants.backend.python.util_rules import pex_from_targets
-from pants.core.environments.rules import ChosenLocalEnvironmentName, SingleEnvironmentNameRequest
+from pants.core.environments.rules import ChosenLocalEnvironmentName
 from pants.core.goals.test import (
     BuildPackageDependenciesRequest,
     BuiltPackageDependencies,
@@ -29,7 +29,6 @@ from pants.core.goals.test import (
     RuntimePackageDependenciesField,
     ShowOutput,
     Test,
-    TestDebugAdapterRequest,
     TestDebugRequest,
     TestFieldSet,
     TestRequest,
@@ -46,17 +45,8 @@ from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.partitions import Partition, Partitions
 from pants.engine.addresses import Address
 from pants.engine.console import Console
-from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import (
-    EMPTY_DIGEST,
-    EMPTY_FILE_DIGEST,
-    Digest,
-    FileDigest,
-    MergeDigests,
-    Snapshot,
-    Workspace,
-)
+from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, FileDigest, Snapshot, Workspace
 from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
 from pants.engine.process import (
@@ -78,13 +68,7 @@ from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
 from pants.testutil.option_util import create_goal_subsystem, create_subsystem
 from pants.testutil.python_rule_runner import PythonRuleRunner
-from pants.testutil.rule_runner import (
-    MockEffect,
-    MockGet,
-    QueryRule,
-    mock_console,
-    run_rule_with_mocks,
-)
+from pants.testutil.rule_runner import QueryRule, mock_console, run_rule_with_mocks
 from pants.util.logging import LogLevel
 
 
@@ -238,15 +222,18 @@ class ConditionallySucceedsRequest(MockTestRequest):
 
 
 def mock_partitioner(
-    request: MockTestRequest.PartitionRequest,
-    _: EnvironmentName,
+    __implicitly: tuple,
 ) -> Partitions[MockTestFieldSet, Any]:
+    request, typ = next(iter(__implicitly[0].items()))
+    assert typ == TestRequest.PartitionRequest
     return Partitions(Partition((field_set,), None) for field_set in request.field_sets)
 
 
-def mock_test_partition(request: MockTestRequest.Batch, _: EnvironmentName) -> TestResult:
-    request_type = {cls.Batch: cls for cls in MockTestRequest.__subclasses__()}[type(request)]
-    return request_type.test_result(request.elements)
+def mock_test_partition(__implicitly: tuple) -> TestResult:
+    request, typ = next(iter(__implicitly[0].items()))
+    assert typ == TestRequest.Batch
+    request_subtype = {cls.Batch: cls for cls in MockTestRequest.__subclasses__()}[type(request)]
+    return request_subtype.test_result(request.elements)
 
 
 @pytest.fixture
@@ -320,14 +307,15 @@ def run_test_rule(
         )
 
     def mock_debug_request(
-        _field_set: TestFieldSet, _environment_name: EnvironmentName
+        __implicitly: tuple,
     ) -> TestDebugRequest:
         return TestDebugRequest(InteractiveProcess(["/bin/example"], input_digest=EMPTY_DIGEST))
 
     def mock_coverage_report_generation(
-        coverage_data_collection: MockCoverageDataCollection,
-        _: EnvironmentName,
+        __implicitly: tuple,
     ) -> CoverageReports:
+        coverage_data_collection, typ = next(iter(__implicitly[0].items()))
+        assert typ == CoverageDataCollection
         addresses = ", ".join(
             address.spec
             for coverage_data in coverage_data_collection
@@ -351,59 +339,20 @@ def run_test_rule(
                 run_id,
                 ChosenLocalEnvironmentName(EnvironmentName(None)),
             ],
-            mock_gets=[
-                MockGet(
-                    output_type=TargetRootsToFieldSets,
-                    input_types=(TargetRootsToFieldSetsRequest,),
-                    mock=mock_find_valid_field_sets,
+            mock_calls={
+                "pants.core.goals.test.partition_tests": mock_partitioner,
+                "pants.core.environments.rules.resolve_single_environment_name": lambda _a: EnvironmentName(
+                    None
                 ),
-                MockGet(
-                    output_type=Partitions,
-                    input_types=(TestRequest.PartitionRequest, EnvironmentName),
-                    mock=mock_partitioner,
-                ),
-                MockGet(
-                    output_type=EnvironmentName,
-                    input_types=(SingleEnvironmentNameRequest,),
-                    mock=lambda _a: EnvironmentName(None),
-                ),
-                MockGet(
-                    output_type=TestResult,
-                    input_types=(TestRequest.Batch, EnvironmentName),
-                    mock=mock_test_partition,
-                ),
-                MockGet(
-                    output_type=TestDebugRequest,
-                    input_types=(TestRequest.Batch, EnvironmentName),
-                    mock=mock_debug_request,
-                ),
-                MockGet(
-                    output_type=TestDebugAdapterRequest,
-                    input_types=(TestRequest.Batch, EnvironmentName),
-                    mock=mock_debug_request,
-                ),
-                # Merge XML results.
-                MockGet(
-                    output_type=Digest,
-                    input_types=(MergeDigests,),
-                    mock=lambda _: EMPTY_DIGEST,
-                ),
-                MockGet(
-                    output_type=CoverageReports,
-                    input_types=(CoverageDataCollection, EnvironmentName),
-                    mock=mock_coverage_report_generation,
-                ),
-                MockGet(
-                    output_type=OpenFiles,
-                    input_types=(OpenFilesRequest,),
-                    mock=lambda _: OpenFiles(()),
-                ),
-                MockEffect(
-                    output_type=InteractiveProcessResult,
-                    input_types=(InteractiveProcess, EnvironmentName),
-                    mock=lambda _p, _e: InteractiveProcessResult(0),
-                ),
-            ],
+                "pants.core.goals.test.test_batch_to_debug_request": mock_debug_request,
+                "pants.core.goals.test.test_batch_to_debug_adapter_request": mock_debug_request,
+                "pants.core.goals.test.run_test_batch": mock_test_partition,
+                "pants.core.goals.test.create_coverage_report": mock_coverage_report_generation,
+                "pants.engine.internals.specs_rules.find_valid_field_sets_for_target_roots": mock_find_valid_field_sets,
+                "pants.engine.intrinsics.merge_digests": lambda _: EMPTY_DIGEST,
+                "pants.engine.intrinsics._interactive_process": lambda _p,
+                _e: InteractiveProcessResult(0),
+            },
             union_membership=union_membership,
             # We don't want temporary warnings to interfere with our expected output.
             show_warnings=False,
