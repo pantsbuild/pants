@@ -153,7 +153,9 @@ async def prepare_post_renderer_for_helm_deployment(
     replacements = mapping.indexed_docker_addresses.transform_values(find_replacement)
 
     return SetupHelmPostRenderer(
-        replacements, description_of_origin=f"the `helm_deployment` {request.field_set.address}"
+        replacements,
+        description_of_origin=f"the `helm_deployment` {request.field_set.address}",
+        extra_post_renderers=request.field_set.post_renderers.to_unparsed_address_inputs()  # THIS IS MISSING
     )
 
 
