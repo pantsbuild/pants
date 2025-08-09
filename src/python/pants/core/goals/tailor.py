@@ -23,7 +23,7 @@ from pants.engine.fs import CreateDigest, Digest, FileContent, PathGlobs, Worksp
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.build_files import BuildFileOptions
 from pants.engine.internals.graph import resolve_source_paths, resolve_unexpanded_targets
-from pants.engine.internals.selectors import Get, concurrently
+from pants.engine.internals.selectors import concurrently
 from pants.engine.internals.specs_rules import resolve_specs_paths
 from pants.engine.intrinsics import create_digest, get_digest_contents, path_globs_to_paths
 from pants.engine.rules import collect_rules, goal_rule, implicitly, rule
@@ -259,6 +259,13 @@ class PutativeTargets(DeduplicatedCollection[PutativeTarget]):
         for tgts in tgts_iters:
             all_tgts.extend(tgts)
         return cls(all_tgts)
+
+
+@rule(polymorphic=True)
+async def generate_putative_targets(
+    req: PutativeTargetsRequest, env_name: EnvironmentName
+) -> PutativeTargets:
+    raise NotImplementedError()
 
 
 class TailorSubsystem(GoalSubsystem):
@@ -617,6 +624,7 @@ async def tailor(
     console: Console,
     workspace: Workspace,
     union_membership: UnionMembership,
+    env_name: EnvironmentName,
     specs: Specs,
     build_file_options: BuildFileOptions,
 ) -> TailorGoal:
@@ -647,7 +655,11 @@ async def tailor(
     dir_search_paths = tuple(sorted({os.path.dirname(f) for f in specs_paths.files}))
 
     putative_targets_results = await concurrently(
-        Get(PutativeTargets, PutativeTargetsRequest, req_type(dir_search_paths))
+        generate_putative_targets(
+            **implicitly(
+                {req_type(dir_search_paths): PutativeTargetsRequest, env_name: EnvironmentName}
+            )
+        )
         for req_type in union_membership[PutativeTargetsRequest]
     )
     putative_targets = PutativeTargets.merge(putative_targets_results)

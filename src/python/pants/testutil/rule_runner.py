@@ -6,6 +6,7 @@ from __future__ import annotations
 import atexit
 import dataclasses
 import functools
+import inspect
 import os
 import re
 import sys
@@ -753,13 +754,21 @@ def run_rule_with_mocks(
         if isinstance(res, Coroutine):
             # A call-by-name element in a concurrently() is a Coroutine whose frame is
             # the trampoline wrapper that creates and immediately awaits the Call.
-            assert res.cr_frame is not None
-            rule_id = res.cr_frame.f_locals["rule_id"]
-            args = res.cr_frame.f_locals["args"]
+            locals = inspect.getcoroutinelocals(res)
+            assert locals is not None
+            rule_id = locals["rule_id"]
+            args = locals["args"]
+            kwargs = dict(locals["kwargs"])
+            __implicitly = locals.get("__implicitly")
+            if __implicitly:
+                kwargs["__implicitly"] = __implicitly
             mock_call = mock_calls.get(rule_id)
             if mock_call:
                 unconsumed_mock_calls.discard(rule_id)
-                return mock_call(*args)
+                # Close the original, unmocked, coroutine, to prevent the "was never awaited"
+                # warning polluting stderr data that the test may examine.
+                res.close()
+                return mock_call(*args, **kwargs)
             raise AssertionError(f"No mock_call provided for {rule_id}.")
         elif isinstance(res, Call):
             mock_call = mock_calls.get(res.rule_id)
@@ -856,7 +865,9 @@ def mock_console(
         global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
         colors = (
             options_bootstrapper.full_options_for_scopes(
-                [GlobalOptions.get_scope_info()], UnionMembership({}), allow_unknown_options=True
+                [GlobalOptions.get_scope_info()],
+                UnionMembership.empty(),
+                allow_unknown_options=True,
             )
             .for_global_scope()
             .colors

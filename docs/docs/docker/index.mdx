@@ -237,6 +237,56 @@ docker_image(
 
 For working examples, including multi-platform builds with GitHub Actions, refer to the [example-docker](https://github.com/pantsbuild/example-docker) repository.
 
+### Using buildx with Kubernetes drivers
+
+When using a buildx Kubernetes driver instead of a local Docker engine, you'll need to configure Pants to work with your Kubernetes cluster. Here are the key considerations:
+
+#### Environment configuration
+
+Pass along Kubernetes service environment variables to the `[docker]` backend config in `pants.toml` to enable in-cluster configuration discovery:
+
+```toml title="pants.toml"
+[docker]
+env_vars = [
+  "KUBERNETES_SERVICE_HOST",
+  "KUBERNETES_SERVICE_PORT",
+  "KUBERNETES_SERVICE_PORT_HTTPS",
+]
+```
+
+If you're not running in-cluster, ensure a [kubeconfig file](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/) is available and accessible to the Docker CLI.
+
+#### Buildx driver and namespace configuration
+
+Consider explicitly setting the buildx driver and namespace in the same environment variables configuration:
+
+```toml title="pants.toml"
+[docker]
+env_vars = [
+  "KUBERNETES_SERVICE_HOST",
+  "KUBERNETES_SERVICE_PORT", 
+  "KUBERNETES_SERVICE_PORT_HTTPS",
+  "BUILDX_BUILDER=your-k8s-buildx-driver-name",
+  "BUILDKIT_NAMESPACE=your-namespace",
+]
+```
+
+#### Image output configuration
+
+On your `docker_image` target, set `output={"type": "registry"}`. The default output type is "docker," which attempts to load the image into the local Docker engine's image store.
+
+```python title="example/BUILD"
+docker_image(
+    name="docker",
+    output={"type": "registry"},
+)
+```
+
+:::info The `pants publish` goal
+`pants publish` will not succeed on a `docker_image` target when using a Kubernetes buildx driver. `pants package` will upload the image directly to the registry due to the output type. The `pants publish` goal is designed for uploading local images to a registry, which isn't applicable when using remote buildx drivers.
+:::
+
+
 ### Build Docker image example
 
 This example copies both a `file` and `pex_binary`. The file is specified as an explicit dependency in the `BUILD` file, whereas the `pex_binary` dependency is inferred from the path in the `Dockerfile`.

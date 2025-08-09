@@ -32,7 +32,7 @@ class GoalSubsystem(Subsystem):
 
     ```
     @rule
-    def list(console: Console, list_subsystem: ListSubsystem) -> List:
+    async def list(console: Console, list_subsystem: ListSubsystem) -> List:
       transitive = list_subsystem.transitive
       documented = list_subsystem.documented
       ...

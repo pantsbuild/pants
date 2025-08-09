@@ -31,7 +31,7 @@ class PluginInjectNfpmPackageFieldsRequest(InjectNfpmPackageFieldsRequest):
 
 
 @rule
-def inject_nfpm_package_fields_plugin(
+async def inject_nfpm_package_fields_plugin(
     request: PluginInjectNfpmPackageFieldsRequest,
 ) -> InjectedNfpmPackageFields:
     address = request.target.address

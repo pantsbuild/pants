@@ -1,0 +1,22 @@
+[package]
+version = "0.0.1"
+edition = "2021"
+name = "rule_graph"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[dependencies]
+deepsize = { workspace = true, features = ["internment", "smallvec"] }
+fnv = { workspace = true }
+indexmap = { workspace = true }
+internment = { workspace = true }
+itertools = { workspace = true }
+log = { workspace = true }
+petgraph = { workspace = true }
+smallvec = { workspace = true, features = ["union"] }
+
+[dev-dependencies]
+env_logger = { workspace = true }
+
+[lints]
+workspace = true

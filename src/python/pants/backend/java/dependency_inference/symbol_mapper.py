@@ -28,7 +28,7 @@ class AllJavaTargets(Targets):
 
 
 @rule(desc="Find all Java targets in project", level=LogLevel.DEBUG)
-def find_all_java_targets(tgts: AllTargets) -> AllJavaTargets:
+async def find_all_java_targets(tgts: AllTargets) -> AllJavaTargets:
     return AllJavaTargets(tgt for tgt in tgts if tgt.has_field(JavaSourceField))
 
 

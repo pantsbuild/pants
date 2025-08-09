@@ -995,7 +995,7 @@ async def build_go_package(
 
 
 @rule
-def required_built_go_package(fallible_result: FallibleBuiltGoPackage) -> BuiltGoPackage:
+async def required_built_go_package(fallible_result: FallibleBuiltGoPackage) -> BuiltGoPackage:
     if fallible_result.output is not None:
         return fallible_result.output
     raise Exception(

@@ -72,7 +72,7 @@ class ValidateJvmArtifactsForResolveResult:
 
 
 @rule
-def wrap_jvm_lockfile_request(request: GenerateJvmLockfile) -> WrappedGenerateLockfile:
+async def wrap_jvm_lockfile_request(request: GenerateJvmLockfile) -> WrappedGenerateLockfile:
     return WrappedGenerateLockfile(request)
 
 
@@ -109,7 +109,7 @@ class KnownJVMUserResolveNamesRequest(KnownUserResolveNamesRequest):
 
 
 @rule
-def determine_jvm_user_resolves(
+async def determine_jvm_user_resolves(
     _: KnownJVMUserResolveNamesRequest,
     jvm_subsystem: JvmSubsystem,
     union_membership: UnionMembership,

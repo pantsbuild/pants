@@ -73,7 +73,7 @@ class HelmUnitTestPluginBinding(ExternalHelmPluginBinding[HelmUnitTestSubsystem]
 
 
 @rule
-def download_unittest_plugin_request(
+async def download_unittest_plugin_request(
     _: HelmUnitTestPluginBinding, subsystem: HelmUnitTestSubsystem, platform: Platform
 ) -> ExternalHelmPluginRequest:
     return ExternalHelmPluginRequest.from_subsystem(subsystem, platform)

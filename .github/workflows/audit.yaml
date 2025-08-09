@@ -13,11 +13,9 @@ jobs:
       with:
         fetch-depth: 10
     - name: Cargo audit (for security vulnerabilities)
-      run: './cargo install cargo-audit --locked
-
+      run: |
+        ./cargo install cargo-audit --locked
         ./cargo audit --ignore RUSTSEC-2020-0128
-
-        '
 name: Cargo Audit
 'on':
   schedule:

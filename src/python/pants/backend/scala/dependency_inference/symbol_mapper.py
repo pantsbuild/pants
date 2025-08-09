@@ -38,7 +38,7 @@ class FirstPartyScalaTargetsMappingRequest(FirstPartyMappingRequest):
 
 
 @rule(desc="Find all Scala targets in project", level=LogLevel.DEBUG)
-def find_all_scala_targets(targets: AllTargets) -> AllScalaTargets:
+async def find_all_scala_targets(targets: AllTargets) -> AllScalaTargets:
     return AllScalaTargets(tgt for tgt in targets if tgt.has_field(ScalaSourceField))
 
 

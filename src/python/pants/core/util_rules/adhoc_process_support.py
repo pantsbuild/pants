@@ -17,14 +17,14 @@ from typing import TypeVar
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.build_graph.address import Address
+from pants.core.environments.rules import EnvironmentNameRequest, resolve_environment_name
 from pants.core.goals.package import (
     EnvironmentAwarePackageRequest,
     PackageFieldSet,
     environment_aware_package,
 )
-from pants.core.goals.run import RunFieldSet, RunInSandboxRequest
+from pants.core.goals.run import RunFieldSet, generate_run_in_sandbox_request
 from pants.core.target_types import FileSourceField
-from pants.core.util_rules.environments import EnvironmentNameRequest, resolve_environment_name
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine import process
@@ -72,7 +72,7 @@ from pants.engine.process import (
     ProductDescription,
     fallible_to_exec_result_or_raise,
 )
-from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     FieldSetsPerTargetRequest,
     SourcesField,
@@ -256,7 +256,6 @@ async def _resolve_runnable_dependencies(
     )
 
     targets = await resolve_targets(**implicitly({addresses: Addresses}))
-
     fspt = await find_valid_field_sets(
         FieldSetsPerTargetRequest(RunFieldSet, targets), **implicitly()
     )
@@ -273,7 +272,8 @@ async def _resolve_runnable_dependencies(
             )
 
     runnables = await concurrently(
-        Get(RunInSandboxRequest, RunFieldSet, field_set[0]) for field_set in fspt.collection
+        generate_run_in_sandbox_request(**implicitly({field_set[0]: RunFieldSet}))
+        for field_set in fspt.collection
     )
 
     shims: list[FileContent] = []
@@ -436,29 +436,30 @@ async def create_tool_runner(
 
     runnable_targets = await resolve_targets(**implicitly({addresses: Addresses}))
 
-    run_field_sets, environment_name, execution_environment = await concurrently(
+    run_field_sets, environment_name = await concurrently(
         find_valid_field_sets(
             FieldSetsPerTargetRequest(RunFieldSet, runnable_targets), **implicitly()
         ),
         resolve_environment_name(
             EnvironmentNameRequest.from_target(request.target), **implicitly()
         ),
-        resolve_execution_environment(
-            ResolveExecutionDependenciesRequest(
-                address=request.target.address,
-                execution_dependencies=request.execution_dependencies,
-                runnable_dependencies=request.runnable_dependencies,
-            ),
-            **implicitly(),
-        ),
+    )
+
+    req = ResolveExecutionDependenciesRequest(
+        address=request.target.address,
+        execution_dependencies=request.execution_dependencies,
+        runnable_dependencies=request.runnable_dependencies,
+    )
+    execution_environment = await resolve_execution_environment(
+        **implicitly({req: ResolveExecutionDependenciesRequest, environment_name: EnvironmentName}),
     )
 
     run_field_set: RunFieldSet = run_field_sets.field_sets[0]
 
     # Must be run in target environment so that the binaries/envvars match the execution
     # environment when we actually run the process.
-    run_request = await Get(
-        RunInSandboxRequest, {environment_name: EnvironmentName, run_field_set: RunFieldSet}
+    run_request = await generate_run_in_sandbox_request(
+        **implicitly({run_field_set: RunFieldSet, environment_name: EnvironmentName})
     )
 
     dependencies_digest = execution_environment.digest

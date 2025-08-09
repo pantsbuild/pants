@@ -367,12 +367,12 @@ class ProcessExecutionFailure(Exception):
 
 
 @rule
-def get_multi_platform_request_description(req: Process) -> ProductDescription:
+async def get_multi_platform_request_description(req: Process) -> ProductDescription:
     return ProductDescription(req.description)
 
 
 @rule
-def fallible_to_exec_result_or_raise(
+async def fallible_to_exec_result_or_raise(
     fallible_result: FallibleProcessResult,
     description: ProductDescription,
     keep_sandboxes: KeepSandboxes,

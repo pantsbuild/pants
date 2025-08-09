@@ -33,7 +33,7 @@ class AllThriftTargets(Targets):
 
 
 @rule(desc="Find all Thrift targets in project", level=LogLevel.DEBUG)
-def find_all_thrift_targets(targets: AllTargets) -> AllThriftTargets:
+async def find_all_thrift_targets(targets: AllTargets) -> AllThriftTargets:
     return AllThriftTargets(tgt for tgt in targets if tgt.has_field(ThriftSourceField))
 
 
@@ -42,7 +42,7 @@ class GeneratorSettingsRequest(TargetFilesGeneratorSettingsRequest):
 
 
 @rule
-def generator_settings(
+async def generator_settings(
     _: GeneratorSettingsRequest,
     thrift: ThriftSubsystem,
 ) -> TargetFilesGeneratorSettings:

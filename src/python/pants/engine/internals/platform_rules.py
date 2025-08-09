@@ -27,7 +27,7 @@ from pants.util.logging import LogLevel
 
 
 @rule
-def current_platform(
+async def current_platform(
     env_tgt: EnvironmentTarget,
     global_options: GlobalOptions,
     environments_subsystem: EnvironmentsSubsystem,
@@ -93,7 +93,7 @@ async def complete_environment_vars(
 
 
 @rule
-def environment_vars_subset(
+async def environment_vars_subset(
     request: EnvironmentVarsRequest,
     complete_env_vars: CompleteEnvironmentVars,
 ) -> EnvironmentVars:

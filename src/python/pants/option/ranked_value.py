@@ -10,7 +10,7 @@ from functools import total_ordering
 from typing import Any, Optional, Union
 
 
-# NB: Must mirror the Rank enum in src/rust/engine/options/src/lib.rs.
+# NB: Must mirror the Rank enum in src/rust/options/src/lib.rs.
 @total_ordering
 class Rank(Enum):
     # The ranked value sources. Higher ranks override lower ones.

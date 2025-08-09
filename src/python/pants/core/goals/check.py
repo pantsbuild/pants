@@ -9,6 +9,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, ClassVar, Generic, TypeVar, cast
 
+from pants.core.environments.rules import EnvironmentNameRequest
 from pants.core.goals.lint import REPORT_DIR as REPORT_DIR  # noqa: F401
 from pants.core.goals.multi_tool_goal_helper import (
     OnlyOption,
@@ -16,7 +17,6 @@ from pants.core.goals.multi_tool_goal_helper import (
     write_reports,
 )
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType

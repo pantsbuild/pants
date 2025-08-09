@@ -13,8 +13,8 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.core.environments.target_types import EnvironmentTarget
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import _uncacheable_rule, collect_rules
+from pants.engine.internals.platform_rules import environment_vars_subset
+from pants.engine.rules import _uncacheable_rule, collect_rules, implicitly
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -72,8 +72,7 @@ class AsdfToolPathsResult:
 
         if resolve_standard or resolve_local:
             # AsdfToolPathsResult is not cacheable, so only request it if absolutely necessary.
-            return await Get(
-                AsdfToolPathsResult,
+            return await resolve_asdf_tool_paths(
                 AsdfToolPathsRequest(
                     env_tgt=env_tgt,
                     tool_name=tool_name,
@@ -83,6 +82,7 @@ class AsdfToolPathsResult:
                     paths_option_name=paths_option_name,
                     bin_relpath=bin_relpath,
                 ),
+                **implicitly(),
             )
         return AsdfToolPathsResult(tool_name)
 
@@ -247,7 +247,7 @@ async def resolve_asdf_tool_paths(
         tool_env_name,
         "HOME",
     ]
-    env = await Get(EnvironmentVars, EnvironmentVarsRequest(env_vars_to_request))
+    env = await environment_vars_subset(EnvironmentVarsRequest(env_vars_to_request), **implicitly())
 
     standard_tool_paths: tuple[str, ...] = ()
     if request.resolve_standard:

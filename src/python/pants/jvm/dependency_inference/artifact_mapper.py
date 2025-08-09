@@ -255,14 +255,14 @@ class AllJvmTypeProvidingTargets(Targets):
 
 
 @rule(desc="Find all jvm_artifact targets in project", level=LogLevel.DEBUG)
-def find_all_jvm_artifact_targets(targets: AllTargets) -> AllJvmArtifactTargets:
+async def find_all_jvm_artifact_targets(targets: AllTargets) -> AllJvmArtifactTargets:
     return AllJvmArtifactTargets(
         tgt for tgt in targets if tgt.has_fields((JvmArtifactGroupField, JvmArtifactArtifactField))
     )
 
 
 @rule(desc="Find all targets with experimental_provides fields in project", level=LogLevel.DEBUG)
-def find_all_jvm_provides_fields(targets: AllTargets) -> AllJvmTypeProvidingTargets:
+async def find_all_jvm_provides_fields(targets: AllTargets) -> AllJvmTypeProvidingTargets:
     return AllJvmTypeProvidingTargets(
         tgt
         for tgt in targets

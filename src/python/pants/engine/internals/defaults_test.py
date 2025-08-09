@@ -70,7 +70,7 @@ def registered_target_types() -> RegisteredTargetTypes:
 
 @pytest.fixture
 def union_membership() -> UnionMembership:
-    return UnionMembership({})
+    return UnionMembership.empty()
 
 
 def test_assumptions(

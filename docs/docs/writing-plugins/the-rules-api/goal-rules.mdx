@@ -161,7 +161,7 @@ For example, if you are writing a `publish` goal, and you expect to operate on `
 
 ```python
 @goal_rule
-def publish(distribution: PythonDistributionTarget, console: Console) -> Publish:
+async def publish(distribution: PythonDistributionTarget, console: Console) -> Publish:
    ...
 ```
 
@@ -175,7 +175,7 @@ From here, filter out the relevant targets you want using the Target API (see [R
 from pants.engine.target import Targets
 
 @goal_rule
-def publish(targets: Targets, console: Console) -> Publish:
+async def publish(targets: Targets, console: Console) -> Publish:
    relevant_targets = [
        tgt for tgt in targets
        if tgt.has_field(PythonPublishDestination)

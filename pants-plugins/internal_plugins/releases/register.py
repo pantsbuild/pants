@@ -4,16 +4,12 @@
 from __future__ import annotations
 
 from pants.backend.python.util_rules.package_dists import SetupKwargs, SetupKwargsRequest
-from pants.core.util_rules.external_tool import (
-    DownloadedExternalTool,
-    ExternalTool,
-    ExternalToolRequest,
-)
+from pants.core.util_rules.external_tool import ExternalTool, download_external_tool
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.options_parsing import _Options
+from pants.engine.internals.options_parsing import _Options, parse_options
 from pants.engine.internals.session import SessionValues
-from pants.engine.rules import Get, collect_rules, goal_rule, rule
+from pants.engine.rules import collect_rules, goal_rule, implicitly, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -126,24 +122,25 @@ async def check_default_tools(
                 # typically be the same as the default version, but doesn't have to be, if the
                 # tool provides default_known_versions for versions other than default_version).
                 args = ("./pants", f"--{scope}-version={version.version}")
-                blank_opts = await Get(
-                    _Options,
-                    SessionValues(
-                        {
-                            OptionsBootstrapper: OptionsBootstrapper(
-                                args=args,
-                                env=FrozenDict(),
-                                allow_pantsrc=False,
-                            )
-                        }
-                    ),
+                blank_opts = await parse_options(
+                    **implicitly(
+                        SessionValues(
+                            {
+                                OptionsBootstrapper: OptionsBootstrapper(
+                                    args=args,
+                                    env=FrozenDict(),
+                                    allow_pantsrc=False,
+                                )
+                            }
+                        )
+                    )
                 )
                 instance = tool_cls(blank_opts.options.for_scope(scope))
                 req = instance.get_request_for(version.platform, version.sha256, version.filesize)
                 console.write_stdout(f"  version {version.version} for {version.platform}... ")
                 # TODO: We'd like to run all the requests concurrently, but since we can't catch
                 #  engine exceptions, we wouldn't have an easy way to output which one failed.
-                await Get(DownloadedExternalTool, ExternalToolRequest, req)
+                await download_external_tool(req)
                 console.print_stdout(console.sigil_succeeded())
     return CheckDefaultTools(exit_code=0)
 

@@ -115,7 +115,7 @@ class ExternalHelmPlugin(HelmPluginSubsystem, TemplatedExternalTool, metaclass=A
     use it in the Helm setup:
 
     @rule
-    def download_myplugin_plugin_request(
+    async def download_myplugin_plugin_request(
         _: MyPluginBinding, subsystem: MyHelmPluginSubsystem
     ) -> ExternalHelmPluginRequest:
         return ExternalHelmPluginRequest.from_subsystem(subsystem, platform)

@@ -154,7 +154,7 @@ class AllVCSVersionTargets(Targets):
 
 
 @rule(desc="Find all vcs_version targets in project", level=LogLevel.DEBUG)
-def find_all_vcs_version_targets(targets: AllTargets) -> AllVCSVersionTargets:
+async def find_all_vcs_version_targets(targets: AllTargets) -> AllVCSVersionTargets:
     return AllVCSVersionTargets(tgt for tgt in targets if tgt.has_field(VersionGenerateToField))
 
 

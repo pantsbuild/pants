@@ -34,7 +34,7 @@ def given_field_set(
     return field_set
 
 
-def test_batches_are_seperated_on_owning_packages() -> None:
+def test_batches_are_separated_on_owning_packages() -> None:
     field_set_1 = given_field_set(Address("1"), batch_compatibility_tag="default")
     field_set_2 = given_field_set(Address("2"), batch_compatibility_tag="default")
 
@@ -46,7 +46,7 @@ def test_batches_are_seperated_on_owning_packages() -> None:
         else:
             return OwningNodePackage(sentinel.owning_package_2)
 
-    parititions = run_rule_with_mocks(
+    partitions = run_rule_with_mocks(
         partition_nodejs_tests,
         rule_args=(request,),
         mock_calls={
@@ -54,7 +54,7 @@ def test_batches_are_seperated_on_owning_packages() -> None:
         },
     )
 
-    assert len(parititions) == 2
+    assert len(partitions) == 2
 
 
 @pytest.mark.parametrize(
@@ -79,7 +79,7 @@ def test_batches_are_seperated_on_owning_packages() -> None:
         ),
     ],
 )
-def test_batches_are_seperated_on_metadata(field_set_1: Mock, field_set_2: Mock) -> None:
+def test_batches_are_separated_on_metadata(field_set_1: Mock, field_set_2: Mock) -> None:
     request = JSTestRequest.PartitionRequest(field_sets=(field_set_1, field_set_2))
 
     def mocked_owning_node_package(_: OwningNodePackageRequest) -> Any:

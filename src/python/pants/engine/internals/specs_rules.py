@@ -10,6 +10,7 @@ import os
 from collections import defaultdict
 from collections.abc import Iterable
 
+# TODO: This is a very fishy import. `internals` should not be importing from a backend.
 from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.base.specs import (
     AddressLiteralSpec,
@@ -25,15 +26,12 @@ from pants.base.specs import (
 from pants.engine.addresses import Address, Addresses, AddressInput
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import SpecsPaths
-from pants.engine.internals.build_files import (
-    AddressFamilyDir,
-    BuildFileOptions,
-    ensure_address_family,
-    resolve_address,
-)
+from pants.engine.internals.build_files import resolve_address
 from pants.engine.internals.graph import (
     Owners,
     OwnersRequest,
+    address_families_from_raw_specs_without_file_owners,
+    filter_targets,
     find_owners,
     find_valid_field_sets,
     resolve_source_paths,
@@ -41,19 +39,14 @@ from pants.engine.internals.graph import (
     resolve_target_parametrizations,
     resolve_targets,
 )
-from pants.engine.internals.mapper import AddressFamilies, SpecsFilter
+from pants.engine.internals.mapper import SpecsFilter
 from pants.engine.internals.parametrize import _TargetParametrizationsRequest
 from pants.engine.internals.selectors import concurrently
-from pants.engine.internals.synthetic_targets import (
-    SyntheticTargetsSpecPathsRequest,
-    get_synthetic_targets_spec_paths,
-)
 from pants.engine.intrinsics import path_globs_to_paths
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
     FieldSet,
     FieldSetsPerTargetRequest,
-    FilteredTargets,
     NoApplicableTargetsBehavior,
     RegisteredTargetTypes,
     SourcesField,
@@ -62,7 +55,6 @@ from pants.engine.target import (
     TargetGenerator,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
-    Targets,
     WrappedTarget,
     WrappedTargetRequest,
 )
@@ -138,35 +130,6 @@ async def _determine_literal_addresses_from_raw_specs(
             WrappedTargetRequest(addr, description_of_origin=description_of_origin), **implicitly()
         )
         for addr in all_candidate_addresses
-    )
-
-
-@rule(_masked_types=[EnvironmentName])
-async def address_families_from_raw_specs_without_file_owners(
-    specs: RawSpecsWithoutFileOwners,
-    build_file_options: BuildFileOptions,
-) -> AddressFamilies:
-    if not (specs.dir_literals or specs.dir_globs or specs.recursive_globs or specs.ancestor_globs):
-        return AddressFamilies()
-    # Resolve all globs.
-    build_file_globs, validation_globs = specs.to_build_file_path_globs_tuple(
-        build_patterns=build_file_options.patterns,
-        build_ignore_patterns=build_file_options.ignores,
-    )
-    build_file_paths, _ = await concurrently(
-        path_globs_to_paths(build_file_globs),
-        path_globs_to_paths(validation_globs),
-    )
-    dirnames = set(
-        await get_synthetic_targets_spec_paths(
-            SyntheticTargetsSpecPathsRequest(tuple(specs.glob_specs())), **implicitly()
-        )
-    )
-    dirnames.update(os.path.dirname(f) for f in build_file_paths.files)
-    return AddressFamilies(
-        await concurrently(
-            ensure_address_family(**implicitly(AddressFamilyDir(d))) for d in dirnames
-        )
     )
 
 
@@ -293,11 +256,6 @@ async def resolve_addresses_from_specs(specs: Specs) -> Addresses:
     # No matter what, ignores win out over includes. This avoids "specificity wars" and keeps our
     # semantics simple/predictable.
     return Addresses(FrozenOrderedSet(includes) - FrozenOrderedSet(ignores))
-
-
-@rule(_masked_types=[EnvironmentName])
-async def filter_targets(targets: Targets, specs_filter: SpecsFilter) -> FilteredTargets:
-    return FilteredTargets(tgt for tgt in targets if specs_filter.matches(tgt))
 
 
 @rule

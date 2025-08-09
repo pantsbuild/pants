@@ -190,7 +190,7 @@ class ExternalTool(Subsystem, ExportableTool, ExternalToolOptionsMixin, metaclas
             return "./path-to/binary
 
     @rule
-    def my_rule(my_external_tool: MyExternalTool, platform: Platform) -> Foo:
+    async def my_rule(my_external_tool: MyExternalTool, platform: Platform) -> Foo:
         downloaded_tool = await download_external_tool(my_external_tool.get_request(platform))
         ...
     """

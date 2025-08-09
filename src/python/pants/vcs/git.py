@@ -208,7 +208,7 @@ class DiffParser:
             if match := self._filename_regex.match(line):
                 if current_file is not None:
                     # mypy false positive: https://github.com/python/mypy/issues/14987
-                    hunks.setdefault(  # type: ignore[unreachable]
+                    hunks.setdefault(
                         current_file, [Hunk(left=None, right=TextBlock(start=0, count=0))]
                     )
                 current_file = self._parse_filename(match)

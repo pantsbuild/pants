@@ -669,7 +669,7 @@ def build_fs_util() -> None:
     )
     dest_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy(
-        f"src/rust/engine/target/{'release' if release_mode else 'debug'}/fs_util",
+        f"src/rust/target/{'release' if release_mode else 'debug'}/fs_util",
         dest_dir,
     )
     green(f"Built fs_util at {dest_dir / 'fs_util'}.")

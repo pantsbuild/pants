@@ -74,7 +74,7 @@ class GenerateFromPantsRequirementsRequest(GenerateTargetsRequest):
 
 
 @rule
-def generate_from_pants_requirements(
+async def generate_from_pants_requirements(
     request: GenerateFromPantsRequirementsRequest, union_membership: UnionMembership
 ) -> GeneratedTargets:
     generator = request.generator

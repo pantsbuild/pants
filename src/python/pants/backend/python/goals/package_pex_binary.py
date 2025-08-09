@@ -161,12 +161,12 @@ async def package_pex_binary(
 
 
 @rule
-async def built_pacakge_for_pex_from_targets_request(
-    request: PexFromTargetsRequestForBuiltPackage,
+async def built_package_for_pex_from_targets_request(
+    field_set: PexBinaryFieldSet,
 ) -> BuiltPackage:
-    pft_request = request.request
-    pex = await create_pex(**implicitly(pft_request))
-    return BuiltPackage(pex.digest, (BuiltPackageArtifact(pft_request.output_filename),))
+    pft_request = await package_pex_binary(field_set, **implicitly())
+    pex = await create_pex(**implicitly(pft_request.request))
+    return BuiltPackage(pex.digest, (BuiltPackageArtifact(pft_request.request.output_filename),))
 
 
 def rules():

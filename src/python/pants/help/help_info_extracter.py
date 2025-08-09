@@ -23,7 +23,7 @@ from typing import Any, DefaultDict, TypeVar, Union, cast, get_type_hints
 import pants.backend
 from pants.base import deprecated
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.core.util_rules.environments import option_field_name_for
+from pants.core.environments.rules import option_field_name_for
 from pants.engine.goal import GoalSubsystem
 from pants.engine.internals.parser import BuildFileSymbolInfo, BuildFileSymbolsInfo, Registrar
 from pants.engine.rules import Rule, TaskRule

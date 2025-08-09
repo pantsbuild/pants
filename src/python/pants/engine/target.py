@@ -51,6 +51,7 @@ from pants.engine.internals.dep_rules import (
 from pants.engine.internals.native_engine import NO_VALUE as NO_VALUE  # noqa: F401
 from pants.engine.internals.native_engine import Field as Field
 from pants.engine.internals.target_adaptor import SourceBlock, SourceBlocks  # noqa: F401
+from pants.engine.rules import rule
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.source.filespec import Filespec, FilespecMatcher
@@ -108,7 +109,7 @@ class AsyncFieldMixin(Field):
 
 
         @rule
-        def hydrate_sources(request: HydrateSourcesRequest) -> HydratedSources:
+        async def hydrate_sources(request: HydrateSourcesRequest) -> HydratedSources:
             result = await Get(Snapshot, PathGlobs(request.field.value))
             request.field.validate_resolved_files(result.files)
             ...
@@ -1247,6 +1248,11 @@ class GeneratedTargets(FrozenDict[Address, Target]):
         super().__init__(mapping)
 
 
+@rule(polymorphic=True)
+async def generate_targets(req: GenerateTargetsRequest) -> GeneratedTargets:
+    raise NotImplementedError()
+
+
 class TargetTypesToGenerateTargetsRequests(
     FrozenDict[type[TargetGenerator], type[GenerateTargetsRequest]]
 ):
@@ -1839,7 +1845,7 @@ class ValidNumbers(Enum):
         if num is None or self == self.all:  # type: ignore[comparison-overlap]
             return
         if self == self.positive_and_zero:  # type: ignore[comparison-overlap]
-            if num < 0:  # type: ignore[unreachable]
+            if num < 0:
                 raise InvalidFieldException(
                     f"The {repr(alias)} field in target {address} must be greater than or equal to "
                     f"zero, but was set to `{num}`."
@@ -2569,7 +2575,7 @@ class GenerateSourcesRequest:
             output = FortranSources
 
         @rule
-        def generate_fortran_from_avro(request: GenerateFortranFromAvroRequest) -> GeneratedSources:
+        async def generate_fortran_from_avro(request: GenerateFortranFromAvroRequest) -> GeneratedSources:
             ...
 
         def rules():
@@ -2591,6 +2597,13 @@ class GenerateSourcesRequest:
 @dataclass(frozen=True)
 class GeneratedSources:
     snapshot: Snapshot
+
+
+@rule(polymorphic=True)
+async def generate_sources(
+    req: GenerateSourcesRequest, env_name: EnvironmentName
+) -> GeneratedSources:
+    raise NotImplementedError()
 
 
 class SourcesPaths(Paths):
@@ -2845,7 +2858,7 @@ class InferDependenciesRequest(Generic[FS], EngineAwareParameter):
             infer_from = FortranDependenciesInferenceFieldSet
 
         @rule
-        def infer_fortran_dependencies(request: InferFortranDependencies) -> InferredDependencies:
+        async def infer_fortran_dependencies(request: InferFortranDependencies) -> InferredDependencies:
             hydrated_sources = await Get(HydratedSources, HydrateSources(request.field_set.sources))
             ...
             return InferredDependencies(...)

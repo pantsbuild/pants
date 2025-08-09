@@ -8,7 +8,7 @@ import logging
 from pants.base.exiter import ExitCode
 from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.core.util_rules.environments import determine_bootstrap_environment
+from pants.core.environments.rules import determine_bootstrap_environment
 from pants.engine.explorer import ExplorerServer, ExplorerServerRequest, RequestState
 from pants.engine.internals.parser import BuildFileSymbolsInfo
 from pants.engine.internals.selectors import Params

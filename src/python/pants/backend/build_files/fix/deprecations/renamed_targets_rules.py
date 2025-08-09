@@ -35,7 +35,7 @@ class RenamedTargetTypes:
 
 
 @rule
-def determine_renamed_target_types(
+async def determine_renamed_target_types(
     target_types: RegisteredTargetTypes,
 ) -> RenamedTargetTypes:
     return RenamedTargetTypes(
@@ -50,7 +50,7 @@ def determine_renamed_target_types(
 
 
 @rule
-def fix_single(
+async def fix_single(
     request: RenameTargetsInFileRequest,
     renamed_target_types: RenamedTargetTypes,
 ) -> FixedBUILDFile:

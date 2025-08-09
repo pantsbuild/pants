@@ -11,9 +11,9 @@ import pytest
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
+from pants.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 from pants.testutil.pants_integration_test import run_pants_with_workdir
 from pants.util.dirutil import read_file
-from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 
 pytestmark = pytest.mark.platform_specific_behavior
 
@@ -83,7 +83,7 @@ def test_logs_unhandled_exception(tmp_path: Path) -> None:
     pants_run.assert_failure()
 
     regex = "exception during import!"
-    assert re.search(regex, pants_run.stderr)
+    assert re.search(regex, pants_run.stderr), f"Regex not found in log: {pants_run.stderr}"
 
     pid_specific_log_file, shared_log_file = get_log_file_paths(tmp_path.as_posix(), pants_run.pid)
     assert_unhandled_exception_log_matches(pants_run.pid, read_file(pid_specific_log_file))

@@ -983,7 +983,7 @@ class JvmResolveFieldDefaultFactoryRequest(FieldDefaultFactoryRequest):
 
 
 @rule
-def jvm_resolve_field_default_factory(
+async def jvm_resolve_field_default_factory(
     request: JvmResolveFieldDefaultFactoryRequest,
     jvm: JvmSubsystem,
 ) -> FieldDefaultFactoryResult:

@@ -33,7 +33,7 @@ _docs_globs = [
     "docs/*",
 ]
 _rust_globs = [
-    "src/rust/engine/*",
+    "src/rust/*",
     "build-support/bin/rust/*",
 ]
 _release_globs = [

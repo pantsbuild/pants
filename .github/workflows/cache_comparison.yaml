@@ -14,41 +14,41 @@ jobs:
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: '3.7
-
+        python-version: |-
+          3.7
           3.8
-
           3.9
-
           3.10
-
           3.12
-
           3.13
-
-          3.11'
+          3.11
     - env:
         BASE_REF: ${{ github.event.inputs.base_ref }}
         BUILD_COMMIT: ${{ github.event.inputs.build_commit }}
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
         PANTS_ARGS: ${{ github.event.inputs.pants_args }}
+        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         SOURCE_DIFFSPEC: ${{ github.event.inputs.source_diffspec }}
         SOURCE_DIFFSPEC_STEP: ${{ github.event.inputs.source_diffspec_step }}
       name: Prepare cache comparison
-      run: 'MODE=debug ./pants package build-support/bin/cache_comparison.py
-
+      run: |
+        MODE=debug ./pants package build-support/bin/cache_comparison.py
         git fetch --no-tags --depth=1024 origin "$BASE_REF"
-
-        '
     - env:
         BASE_REF: ${{ github.event.inputs.base_ref }}
         BUILD_COMMIT: ${{ github.event.inputs.build_commit }}
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
         PANTS_ARGS: ${{ github.event.inputs.pants_args }}
+        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         SOURCE_DIFFSPEC: ${{ github.event.inputs.source_diffspec }}
         SOURCE_DIFFSPEC_STEP: ${{ github.event.inputs.source_diffspec_step }}
       name: Run cache comparison
-      run: "dist/build-support.bin/cache_comparison_py.pex \\\n  --args=\"$PANTS_ARGS\"\
-        \ \\\n  --build-commit=\"$BUILD_COMMIT\" \\\n  --source-diffspec=\"$SOURCE_DIFFSPEC\"\
-        \ \\\n  --source-diffspec-step=$SOURCE_DIFFSPEC_STEP\n"
+      run: |
+        dist/build-support.bin/cache_comparison_py.pex \
+          --args="$PANTS_ARGS" \
+          --build-commit="$BUILD_COMMIT" \
+          --source-diffspec="$SOURCE_DIFFSPEC" \
+          --source-diffspec-step=$SOURCE_DIFFSPEC_STEP
     timeout-minutes: 90
 name: Cache Comparison
 'on':

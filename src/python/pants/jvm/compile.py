@@ -194,7 +194,9 @@ class ClasspathEntryRequestFactory:
 
 
 @rule
-def calculate_jvm_request_types(union_membership: UnionMembership) -> ClasspathEntryRequestFactory:
+async def calculate_jvm_request_types(
+    union_membership: UnionMembership,
+) -> ClasspathEntryRequestFactory:
     cpe_impls = union_membership.get(ClasspathEntryRequest)
 
     impls_by_source: dict[type[Field], type[ClasspathEntryRequest]] = {}
@@ -398,7 +400,7 @@ class ClasspathDependenciesRequest:
 
 
 @rule
-def required_classfiles(fallible_result: FallibleClasspathEntry) -> ClasspathEntry:
+async def required_classfiles(fallible_result: FallibleClasspathEntry) -> ClasspathEntry:
     if fallible_result.result == CompileResult.SUCCEEDED:
         assert fallible_result.output
         return fallible_result.output
@@ -409,7 +411,7 @@ def required_classfiles(fallible_result: FallibleClasspathEntry) -> ClasspathEnt
 
 
 @rule
-def classpath_dependency_requests(
+async def classpath_dependency_requests(
     classpath_entry_request: ClasspathEntryRequestFactory, request: ClasspathDependenciesRequest
 ) -> ClasspathEntryRequests:
     def ignore_because_generated(coarsened_dep: CoarsenedTarget) -> bool:

@@ -15,8 +15,9 @@ from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.core.util_rules import environments, system_binaries
-from pants.core.util_rules.environments import determine_bootstrap_environment
+from pants.core.environments import rules as environments_rules
+from pants.core.environments.rules import determine_bootstrap_environment
+from pants.core.util_rules import system_binaries
 from pants.engine import desktop, download_file, fs, intrinsics, process
 from pants.engine.console import Console
 from pants.engine.environment import EnvironmentName
@@ -249,7 +250,7 @@ class EngineInitializer:
         execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
 
         @rule
-        def parser_singleton() -> Parser:
+        async def parser_singleton() -> Parser:
             return Parser(
                 build_root=build_root_path,
                 registered_target_types=registered_target_types,
@@ -259,27 +260,27 @@ class EngineInitializer:
             )
 
         @rule
-        def bootstrap_status() -> BootstrapStatus:
+        async def bootstrap_status() -> BootstrapStatus:
             return BootstrapStatus(is_bootstrap)
 
         @rule
-        def build_configuration_singleton() -> BuildConfiguration:
+        async def build_configuration_singleton() -> BuildConfiguration:
             return build_configuration
 
         @rule
-        def registered_target_types_singleton() -> RegisteredTargetTypes:
+        async def registered_target_types_singleton() -> RegisteredTargetTypes:
             return registered_target_types
 
         @rule
-        def union_membership_singleton() -> UnionMembership:
+        async def union_membership_singleton() -> UnionMembership:
             return union_membership
 
         @rule
-        def build_root_singleton() -> BuildRoot:
+        async def build_root_singleton() -> BuildRoot:
             return cast(BuildRoot, BuildRoot.instance)
 
         @rule
-        def current_executing_goals(session_values: SessionValues) -> CurrentExecutingGoals:
+        async def current_executing_goals(session_values: SessionValues) -> CurrentExecutingGoals:
             return session_values.get(CurrentExecutingGoals) or CurrentExecutingGoals()
 
         # Create a Scheduler containing graph and filesystem rules, with no installed goals.
@@ -297,7 +298,7 @@ class EngineInitializer:
                 *specs_rules.rules(),
                 *options_parsing.rules(),
                 *process.rules(),
-                *environments.rules(),
+                *environments_rules.rules(),
                 *system_binaries.rules(),
                 *platform_rules.rules(),
                 *changed_rules(),

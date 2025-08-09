@@ -32,7 +32,7 @@ from pants.util.strutil import softwrap
 
 @dataclass(frozen=True)
 class ExactRequirement:
-    project_name: str
+    name: str
     version: str
 
     @classmethod
@@ -51,7 +51,7 @@ class ExactRequirement:
             using the {specifier.operator!r} operator
             """
         )
-        return cls(project_name=req.name, version=specifier.version)
+        return cls(name=req.name, version=specifier.version)
 
 
 def parse_requirements(requirements: Iterable[str]) -> Iterator[ExactRequirement]:

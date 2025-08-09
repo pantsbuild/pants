@@ -351,7 +351,7 @@ class StatsAggregatorCallbackFactoryRequest:
 
 
 @rule
-def construct_callback(
+async def construct_callback(
     _: StatsAggregatorCallbackFactoryRequest, subsystem: StatsAggregatorSubsystem
 ) -> WorkunitsCallbackFactory:
     return WorkunitsCallbackFactory(

@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
 
-from pants.core.util_rules.environments import ChosenLocalEnvironmentName, EnvironmentName
+from pants.core.environments.rules import ChosenLocalEnvironmentName, EnvironmentName
 from pants.core.util_rules.system_binaries import BinaryPathRequest, find_binary
 from pants.engine.internals.platform_rules import complete_environment_vars, current_platform
 from pants.engine.process import InteractiveProcess

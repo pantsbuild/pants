@@ -676,7 +676,7 @@ def test_constraints_validation(tmp_path: Path, rule_runner: PythonRuleRunner) -
     assert isinstance(pex_req2_reqs.from_superset, Pex)
     repository_pex = pex_req2_reqs.from_superset
     assert not get_all_data(rule_runner, repository_pex).info["strip_pex_env"]
-    assert ["Foo._-BAR==1.0.0", "bar==5.5.5", "baz==2.2.2", "foorl", "qux==3.4.5"] == requirements(
+    assert ["Foo._-BAR==1.0.0", "bar==5.5.5", "baz==2.2.2", url_req, "qux==3.4.5"] == requirements(
         rule_runner, repository_pex
     )
 

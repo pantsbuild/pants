@@ -7,21 +7,27 @@ python_sources(
 
 python_tests(
     name="tests",
-    sources=["*_test.py", "!scheduler_integration_test.py"],
     timeout=90,
     overrides={
         "engine_test.py": {"dependencies": ["//BUILD_ROOT:files"]},
+        "graph_integration_test.py": {
+            "dependencies": [
+                "testprojects/src/python:no_build_file_directory",
+                "testprojects/src/python:sources_directory",
+            ],
+            "timeout": 180,
+        },
         "platform_rules_test.py": {"tags": ["platform_specific_behavior"], "timeout": 120},
+        "remote_cache_integration_test.py": {
+            "dependencies": ["testprojects/src/jvm:lib_directory"],
+        },
+        "scheduler_integration_test.py": {
+            "dependencies": [
+                "testprojects/src/python:hello_directory",
+            ],
+            "timeout": 180,
+        },
     },
-)
-
-python_tests(
-    name="scheduler_integration_test",
-    sources=["scheduler_integration_test.py"],
-    dependencies=[
-        "testprojects/src/python:hello_directory",
-    ],
-    timeout=180,
 )
 
 resources(

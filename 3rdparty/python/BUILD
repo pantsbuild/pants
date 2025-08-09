@@ -34,6 +34,12 @@ python_requirements(
     resolve="pbs-script",
 )
 
+python_requirements(
+    name="external-tool-upgrade",
+    source="external-tool-upgrade-requirements.txt",
+    resolve="external-tool-upgrade",
+)
+
 __dependents_rules__(
     (  # Only the explorer server may depend on these libraries
         (

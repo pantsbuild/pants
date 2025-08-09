@@ -65,3 +65,36 @@ Similarly, build scripts can be introduced to Pants via the
 as a way to introduce artifacts generated via bundlers and/or compilers installed and ran via your package manager.
 The result can the be consumed by other targets as either `resource`-targets that can be depended on,
 or as a package for the [docker backend](../../docker/index.mdx).
+
+### Running
+
+Runnable scripts can be specified and invoked through Pants via the `run` goal. This is meant to support scripts
+that are not directly tied to testing or packaging workflows.
+
+Given a `package.json` that defines a runnable script, e.g.
+
+```json title="package.json"
+{
+    "name": "@my-company/pkg",
+    "scripts": {
+        "start": "node server.js"
+    }
+}
+```
+
+we can define the build symbol [`node_run_script`](../../../reference/build-file-symbols/node_run_script), e.g.
+
+```python title="BUILD"
+package_json(
+    name="pkg",
+    scripts=[
+        node_run_script(entry_point="start"),
+    ],
+)
+```
+
+which allows us to run the script via the `pants` cli, e.g.
+
+```sh title="Shell"
+pants run :pkg#start
+```

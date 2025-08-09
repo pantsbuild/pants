@@ -134,6 +134,10 @@ impl TypeId {
         Self(py_type.as_type_ptr())
     }
 
+    pub fn from_owned(py_type: &Py<PyType>) -> Self {
+        Self(py_type.as_ptr() as *mut pyo3::ffi::PyTypeObject)
+    }
+
     pub fn as_py_type<'py>(&self, py: Python<'py>) -> Bound<'py, PyType> {
         // SAFETY: Dereferencing a pointer to a PyTypeObject is safe as long as the module defining the
         // type is not unloaded. That is true today, but would not be if we implemented support for hot
@@ -655,7 +659,7 @@ mod pycomparedbool_tests {
                 PyComparedBool(None)
                     .into_pyobject(py)
                     .unwrap()
-                    .is(&py.NotImplemented()),
+                    .is(py.NotImplemented()),
             );
         })
     }

@@ -92,7 +92,7 @@ logger = logging.getLogger(__name__)
 
 
 @rule
-def python_files_generator_settings(
+async def python_files_generator_settings(
     _: PythonFilesGeneratorSettingsRequest,
     python_infer: PythonInferSubsystem,
 ) -> TargetFilesGeneratorSettings:
@@ -570,7 +570,7 @@ class PythonResolveFieldDefaultFactoryRequest(FieldDefaultFactoryRequest):
 
 
 @rule
-def python_resolve_field_default_factory(
+async def python_resolve_field_default_factory(
     request: PythonResolveFieldDefaultFactoryRequest,
     python_setup: PythonSetup,
 ) -> FieldDefaultFactoryResult:

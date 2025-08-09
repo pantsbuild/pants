@@ -114,7 +114,7 @@ class ResolveFieldDefaultFactoryRequest(FieldDefaultFactoryRequest):
 
 
 @rule
-def resolve_field_default_factory(
+async def resolve_field_default_factory(
     request: ResolveFieldDefaultFactoryRequest,
 ) -> FieldDefaultFactoryResult:
     return FieldDefaultFactoryResult(lambda f: f.value or _DEFAULT_RESOLVE)
@@ -1726,10 +1726,6 @@ def sources_rule_runner() -> RuleRunner:
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(SourcesPaths, [SourcesPathsRequest]),
         ],
-        # NB: The `graph` module masks the environment is most/all positions. We disable the
-        # inherent environment so that the positions which do require the environment are
-        # highlighted.
-        inherent_environment=None,
     )
 
 
@@ -2117,7 +2113,7 @@ def test_transitive_excludes_error() -> None:
         bad_value="!!//:bad",
         address=Address("demo"),
         registered_target_types=[Valid1, Valid2, Invalid],
-        union_membership=UnionMembership({}),
+        union_membership=UnionMembership.empty(),
     )
     assert "Bad value '!!//:bad' in the `dependencies` field for demo:demo" in exc.args[0]
     assert "work with these target types: ['valid1', 'valid2']" in exc.args[0]

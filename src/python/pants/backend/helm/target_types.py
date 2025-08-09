@@ -240,7 +240,7 @@ class AllHelmChartTargets(Targets):
 
 
 @rule
-def all_helm_chart_targets(all_targets: AllTargets) -> AllHelmChartTargets:
+async def all_helm_chart_targets(all_targets: AllTargets) -> AllHelmChartTargets:
     return AllHelmChartTargets([tgt for tgt in all_targets if HelmChartFieldSet.is_applicable(tgt)])
 
 
@@ -286,7 +286,7 @@ class AllHelmUnitTestTestTargets(Targets):
 
 
 @rule
-def all_helm_unittest_test_targets(all_targets: AllTargets) -> AllHelmUnitTestTestTargets:
+async def all_helm_unittest_test_targets(all_targets: AllTargets) -> AllHelmUnitTestTestTargets:
     return AllHelmUnitTestTestTargets(
         [tgt for tgt in all_targets if tgt.has_field(HelmUnitTestSourceField)]
     )
@@ -401,7 +401,7 @@ class AllHelmArtifactTargets(Targets):
 
 
 @rule
-def all_helm_artifact_targets(all_targets: AllTargets) -> AllHelmArtifactTargets:
+async def all_helm_artifact_targets(all_targets: AllTargets) -> AllHelmArtifactTargets:
     return AllHelmArtifactTargets(
         [tgt for tgt in all_targets if HelmArtifactFieldSet.is_applicable(tgt)]
     )
@@ -566,7 +566,7 @@ class AllHelmDeploymentTargets(Targets):
 
 
 @rule
-def all_helm_deployment_targets(targets: AllTargets) -> AllHelmDeploymentTargets:
+async def all_helm_deployment_targets(targets: AllTargets) -> AllHelmDeploymentTargets:
     return AllHelmDeploymentTargets(
         [tgt for tgt in targets if HelmDeploymentFieldSet.is_applicable(tgt)]
     )

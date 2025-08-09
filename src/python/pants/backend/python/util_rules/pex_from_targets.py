@@ -53,7 +53,6 @@ from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import Digest, GlobMatchErrorBehavior, MergeDigests, PathGlobs
 from pants.engine.internals.graph import OwnersRequest, find_owners, resolve_targets
 from pants.engine.internals.graph import transitive_targets as transitive_targets_get
-from pants.engine.internals.selectors import Get
 from pants.engine.intrinsics import get_digest_contents, merge_digests
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
@@ -416,6 +415,141 @@ class _ConstraintsRepositoryPexRequest:
     repository_pex_request: _RepositoryPexRequest
 
 
+@rule
+async def _setup_constraints_repository_pex(
+    constraints_request: _ConstraintsRepositoryPexRequest,
+    python_setup: PythonSetup,
+    global_requirement_constraints: GlobalRequirementConstraints,
+) -> OptionalPexRequest:
+    request = constraints_request.repository_pex_request
+    if not python_setup.resolve_all_constraints:
+        return OptionalPexRequest(None)
+
+    constraints_path = python_setup.requirement_constraints
+    assert constraints_path is not None
+
+    transitive_targets = await transitive_targets_get(
+        TransitiveTargetsRequest(request.addresses), **implicitly()
+    )
+
+    req_strings = PexRequirements.req_strings_from_requirement_fields(
+        tgt[PythonRequirementsField]
+        for tgt in transitive_targets.closure
+        if tgt.has_field(PythonRequirementsField)
+    )
+
+    # In requirement strings, Foo_-Bar.BAZ and foo-bar-baz refer to the same project. We let
+    # packaging canonicalize for us.
+    # See: https://www.python.org/dev/peps/pep-0503/#normalized-names
+    url_reqs = set()  # E.g., 'foobar@ git+https://github.com/foo/bar.git@branch'
+    name_reqs = set()  # E.g., foobar>=1.2.3
+    name_req_projects = set()
+    constraints_file_reqs = set(global_requirement_constraints)
+
+    for req_str in req_strings:
+        req = PipRequirement.parse(req_str)
+        if req.url:
+            url_reqs.add(req)
+        else:
+            name_reqs.add(req)
+            name_req_projects.add(canonicalize_project_name(req.name))
+
+    constraint_file_projects = {
+        canonicalize_project_name(req.name) for req in constraints_file_reqs
+    }
+    # Constraints files must only contain name reqs, not URL reqs (those are already
+    # constrained by their very nature). See https://github.com/pypa/pip/issues/8210.
+    unconstrained_projects = name_req_projects - constraint_file_projects
+    if unconstrained_projects:
+        logger.warning(
+            softwrap(
+                f"""
+                The constraints file {constraints_path} does not contain
+                entries for the following requirements: {", ".join(unconstrained_projects)}.
+
+                Ignoring `[python].resolve_all_constraints` option.
+                """
+            )
+        )
+        return OptionalPexRequest(None)
+
+    interpreter_constraints = await interpreter_constraints_for_targets(
+        request.to_interpreter_constraints_request(), **implicitly()
+    )
+
+    # To get a full set of requirements we must add the URL requirements to the
+    # constraints file, since the latter cannot contain URL requirements.
+    # NB: We can only add the URL requirements we know about here, i.e., those that
+    #  are transitive deps of the targets in play. There may be others in the repo.
+    #  So we may end up creating a few different repository pexes, each with identical
+    #  name requirements but different subsets of URL requirements. Fortunately since
+    #  all these repository pexes will have identical pinned versions of everything,
+    #  this is not a correctness issue, only a performance one.
+    all_constraints = {str(req) for req in (constraints_file_reqs | url_reqs)}
+    repository_pex = PexRequest(
+        description=f"Resolving {constraints_path}",
+        output_filename="repository.pex",
+        internal_only=request.internal_only,
+        requirements=PexRequirements(
+            all_constraints,
+            constraints_strings=(str(constraint) for constraint in global_requirement_constraints),
+            description_of_origin=constraints_path,
+        ),
+        # Monolithic PEXes like the repository PEX should always use the Packed layout.
+        layout=PexLayout.PACKED,
+        interpreter_constraints=interpreter_constraints,
+        platforms=request.platforms,
+        complete_platforms=request.complete_platforms,
+        additional_args=request.additional_lockfile_args,
+    )
+    return OptionalPexRequest(repository_pex)
+
+
+@rule
+async def get_repository_pex(
+    request: _RepositoryPexRequest, python_setup: PythonSetup
+) -> OptionalPexRequest:
+    # NB: It isn't safe to resolve against an entire lockfile or constraints file if
+    # platforms are in use. See https://github.com/pantsbuild/pants/issues/12222.
+    if request.platforms or request.complete_platforms:
+        return OptionalPexRequest(None)
+
+    if python_setup.requirement_constraints:
+        constraints_repository_pex_request = await _setup_constraints_repository_pex(
+            _ConstraintsRepositoryPexRequest(request), **implicitly()
+        )
+        # TODO: ... Not really sure why we've just re-wrapped an object with the same object ... Leaving alone in case it causes some crazy obscure bug
+        return OptionalPexRequest(constraints_repository_pex_request.maybe_pex_request)
+
+    if not python_setup.enable_resolves:
+        return OptionalPexRequest(None)
+
+    chosen_resolve, interpreter_constraints = await concurrently(
+        choose_python_resolve(ChosenPythonResolveRequest(request.addresses), **implicitly()),
+        interpreter_constraints_for_targets(
+            request.to_interpreter_constraints_request(), **implicitly()
+        ),
+    )
+    return OptionalPexRequest(
+        PexRequest(
+            description=softwrap(
+                f"""
+                Installing {chosen_resolve.lockfile.url} for the resolve
+                `{chosen_resolve.name}`
+                """
+            ),
+            output_filename=f"{path_safe(chosen_resolve.name)}_lockfile.pex",
+            internal_only=request.internal_only,
+            requirements=EntireLockfile(chosen_resolve.lockfile),
+            interpreter_constraints=interpreter_constraints,
+            layout=PexLayout.PACKED,
+            platforms=request.platforms,
+            complete_platforms=request.complete_platforms,
+            additional_args=request.additional_lockfile_args,
+        )
+    )
+
+
 async def _determine_requirements_for_pex_from_targets(
     request: PexFromTargetsRequest, python_setup: PythonSetup
 ) -> tuple[PexRequirements | EntireLockfile, Iterable[Pex]]:
@@ -471,10 +605,7 @@ async def _determine_requirements_for_pex_from_targets(
         )
 
     # Else, request the repository PEX and possibly subset it.
-    # TODO: Call by name fails with "@rule body at rule compile time", but moving it causes
-    # another failure in a different part of this function
-    repository_pex_request = await Get(
-        OptionalPexRequest,
+    repository_pex_request = await get_repository_pex(
         _RepositoryPexRequest(
             request.addresses,
             hardcoded_interpreter_constraints=request.hardcoded_interpreter_constraints,
@@ -483,6 +614,7 @@ async def _determine_requirements_for_pex_from_targets(
             internal_only=request.internal_only,
             additional_lockfile_args=request.additional_lockfile_args,
         ),
+        **implicitly(),
     )
     if should_return_entire_lockfile:
         if repository_pex_request.maybe_pex_request is None:
@@ -631,141 +763,6 @@ async def create_pex_from_targets(
         additional_args=additional_args,
         description=description,
         pex_path=additional_pexes,
-    )
-
-
-@rule
-async def _setup_constraints_repository_pex(
-    constraints_request: _ConstraintsRepositoryPexRequest,
-    python_setup: PythonSetup,
-    global_requirement_constraints: GlobalRequirementConstraints,
-) -> OptionalPexRequest:
-    request = constraints_request.repository_pex_request
-    if not python_setup.resolve_all_constraints:
-        return OptionalPexRequest(None)
-
-    constraints_path = python_setup.requirement_constraints
-    assert constraints_path is not None
-
-    transitive_targets = await transitive_targets_get(
-        TransitiveTargetsRequest(request.addresses), **implicitly()
-    )
-
-    req_strings = PexRequirements.req_strings_from_requirement_fields(
-        tgt[PythonRequirementsField]
-        for tgt in transitive_targets.closure
-        if tgt.has_field(PythonRequirementsField)
-    )
-
-    # In requirement strings, Foo_-Bar.BAZ and foo-bar-baz refer to the same project. We let
-    # packaging canonicalize for us.
-    # See: https://www.python.org/dev/peps/pep-0503/#normalized-names
-    url_reqs = set()  # E.g., 'foobar@ git+https://github.com/foo/bar.git@branch'
-    name_reqs = set()  # E.g., foobar>=1.2.3
-    name_req_projects = set()
-    constraints_file_reqs = set(global_requirement_constraints)
-
-    for req_str in req_strings:
-        req = PipRequirement.parse(req_str)
-        if req.url:
-            url_reqs.add(req)
-        else:
-            name_reqs.add(req)
-            name_req_projects.add(canonicalize_project_name(req.name))
-
-    constraint_file_projects = {
-        canonicalize_project_name(req.name) for req in constraints_file_reqs
-    }
-    # Constraints files must only contain name reqs, not URL reqs (those are already
-    # constrained by their very nature). See https://github.com/pypa/pip/issues/8210.
-    unconstrained_projects = name_req_projects - constraint_file_projects
-    if unconstrained_projects:
-        logger.warning(
-            softwrap(
-                f"""
-                The constraints file {constraints_path} does not contain
-                entries for the following requirements: {", ".join(unconstrained_projects)}.
-
-                Ignoring `[python].resolve_all_constraints` option.
-                """
-            )
-        )
-        return OptionalPexRequest(None)
-
-    interpreter_constraints = await interpreter_constraints_for_targets(
-        request.to_interpreter_constraints_request(), **implicitly()
-    )
-
-    # To get a full set of requirements we must add the URL requirements to the
-    # constraints file, since the latter cannot contain URL requirements.
-    # NB: We can only add the URL requirements we know about here, i.e., those that
-    #  are transitive deps of the targets in play. There may be others in the repo.
-    #  So we may end up creating a few different repository pexes, each with identical
-    #  name requirements but different subsets of URL requirements. Fortunately since
-    #  all these repository pexes will have identical pinned versions of everything,
-    #  this is not a correctness issue, only a performance one.
-    all_constraints = {str(req) for req in (constraints_file_reqs | url_reqs)}
-    repository_pex = PexRequest(
-        description=f"Resolving {constraints_path}",
-        output_filename="repository.pex",
-        internal_only=request.internal_only,
-        requirements=PexRequirements(
-            all_constraints,
-            constraints_strings=(str(constraint) for constraint in global_requirement_constraints),
-            description_of_origin=constraints_path,
-        ),
-        # Monolithic PEXes like the repository PEX should always use the Packed layout.
-        layout=PexLayout.PACKED,
-        interpreter_constraints=interpreter_constraints,
-        platforms=request.platforms,
-        complete_platforms=request.complete_platforms,
-        additional_args=request.additional_lockfile_args,
-    )
-    return OptionalPexRequest(repository_pex)
-
-
-@rule
-async def get_repository_pex(
-    request: _RepositoryPexRequest, python_setup: PythonSetup
-) -> OptionalPexRequest:
-    # NB: It isn't safe to resolve against an entire lockfile or constraints file if
-    # platforms are in use. See https://github.com/pantsbuild/pants/issues/12222.
-    if request.platforms or request.complete_platforms:
-        return OptionalPexRequest(None)
-
-    if python_setup.requirement_constraints:
-        constraints_repository_pex_request = await _setup_constraints_repository_pex(
-            _ConstraintsRepositoryPexRequest(request), **implicitly()
-        )
-        # TODO: ... Not really sure why we've just re-wrapped an object with the same object ... Leaving alone in case it causes some crazy obscure bug
-        return OptionalPexRequest(constraints_repository_pex_request.maybe_pex_request)
-
-    if not python_setup.enable_resolves:
-        return OptionalPexRequest(None)
-
-    chosen_resolve, interpreter_constraints = await concurrently(
-        choose_python_resolve(ChosenPythonResolveRequest(request.addresses), **implicitly()),
-        interpreter_constraints_for_targets(
-            request.to_interpreter_constraints_request(), **implicitly()
-        ),
-    )
-    return OptionalPexRequest(
-        PexRequest(
-            description=softwrap(
-                f"""
-                Installing {chosen_resolve.lockfile.url} for the resolve
-                `{chosen_resolve.name}`
-                """
-            ),
-            output_filename=f"{path_safe(chosen_resolve.name)}_lockfile.pex",
-            internal_only=request.internal_only,
-            requirements=EntireLockfile(chosen_resolve.lockfile),
-            interpreter_constraints=interpreter_constraints,
-            layout=PexLayout.PACKED,
-            platforms=request.platforms,
-            complete_platforms=request.complete_platforms,
-            additional_args=request.additional_lockfile_args,
-        )
     )
 
 
