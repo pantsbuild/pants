@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase
-from pants.option.option_types import SkipOption
+from pants.option.option_types import SkipOption, StrListOption, StrOption
 
 
 class TypeScriptSubsystem(NodeJSToolBase):
@@ -19,6 +19,26 @@ class TypeScriptSubsystem(NodeJSToolBase):
     default_version = "typescript@9.9.9"
 
     skip = SkipOption("check")
+    
+    # TODO: Do we still need this?
+    cache_dir = StrOption(
+        default="~/.cache/pants/typescript",
+        help=(
+            "Directory to use for TypeScript incremental compilation cache. "
+            "TypeScript's --build mode generates .tsbuildinfo files and compiled outputs "
+            "that enable incremental compilation on subsequent runs."
+        ),
+        advanced=True,
+    )
+    
+    extra_build_args = StrListOption(
+        default=["--verbose"],
+        help=(
+            "Extra arguments to pass to tsc when running in --build mode. "
+            "These args are added to the base command 'tsc --build'. "
+            "Commonly used: --verbose (default), --force, --dry."
+        ),
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

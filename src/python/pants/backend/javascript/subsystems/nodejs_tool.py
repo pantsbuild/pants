@@ -93,6 +93,7 @@ class NodeJSToolBase(Subsystem):
         output_files: tuple[str, ...] = (),
         output_directories: tuple[str, ...] = (),
         append_only_caches: FrozenDict[str, str] | None = None,
+        project_caches: FrozenDict[str, str] | None = None,
         timeout_seconds: int | None = None,
         extra_env: Mapping[str, str] | None = None,
     ) -> NodeJSToolRequest:
@@ -107,6 +108,7 @@ class NodeJSToolBase(Subsystem):
             output_files=output_files,
             output_directories=output_directories,
             append_only_caches=append_only_caches or FrozenDict(),
+            project_caches=project_caches or FrozenDict(),
             timeout_seconds=timeout_seconds,
             extra_env=extra_env or FrozenDict(),
             options_scope=self.options_scope,
@@ -126,6 +128,7 @@ class NodeJSToolRequest:
     output_files: tuple[str, ...] = ()
     output_directories: tuple[str, ...] = ()
     append_only_caches: FrozenDict[str, str] = field(default_factory=FrozenDict)
+    project_caches: FrozenDict[str, str] = field(default_factory=FrozenDict)
     timeout_seconds: int | None = None
     extra_env: Mapping[str, str] = field(default_factory=FrozenDict)
 
@@ -203,6 +206,7 @@ async def _run_tool_with_resolve(request: NodeJSToolRequest, resolve: str) -> Pr
             output_files=request.output_files,
             output_directories=request.output_directories,
             per_package_caches=request.append_only_caches,
+            project_caches=request.project_caches,
             timeout_seconds=request.timeout_seconds,
             extra_env=FrozenDict(request.extra_env),
         ),
