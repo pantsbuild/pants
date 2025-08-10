@@ -19,7 +19,7 @@ class TypeScriptSubsystem(NodeJSToolBase):
     default_version = "typescript@9.9.9"
 
     skip = SkipOption("check")
-    
+
     # TODO: Do we still need this?
     cache_dir = StrOption(
         default="~/.cache/pants/typescript",
@@ -30,7 +30,7 @@ class TypeScriptSubsystem(NodeJSToolBase):
         ),
         advanced=True,
     )
-    
+
     extra_build_args = StrListOption(
         default=["--verbose"],
         help=(

@@ -41,17 +41,17 @@ class TSConfig:
     def resolution_root_dir(self) -> str:
         directory = os.path.dirname(self.path)
         return os.path.join(directory, self.base_url) if self.base_url else directory
-    
+
     def validate_outdir(self) -> None:
         # Check that outDir is explicitly set
         if not self.out_dir:
             raise ValueError(
                 f"TypeScript configuration at '{self.path}' is missing required 'outDir' setting. "
                 f"TypeScript type-checking requires an explicit outDir in compilerOptions to work properly. "
-                f"Add '\"outDir\": \"./dist\"' (or your preferred output directory) to the compilerOptions "
+                f'Add \'"outDir": "./dist"\' (or your preferred output directory) to the compilerOptions '
                 f"in {self.path}."
             )
-        
+
         # Reject paths with .. components (prevents cross-package conflicts)
         if ".." in self.out_dir:
             raise ValueError(
@@ -60,7 +60,7 @@ class TSConfig:
                 f"within its package boundary (e.g., './dist', './build'). Cross-package output "
                 f"directories can cause build conflicts where packages overwrite each other's artifacts."
             )
-        
+
         # Reject absolute paths (prevents escaping project entirely)
         if os.path.isabs(self.out_dir):
             raise ValueError(
@@ -206,8 +206,6 @@ async def find_parent_ts_config(req: ParentTSConfigRequest) -> ClosestTSConfig:
         if PurePath(req.file).is_relative_to(os.path.dirname(config.path)):
             return ClosestTSConfig(config)
     return ClosestTSConfig(None)
-
-
 
 
 def rules() -> Iterable[Rule]:
