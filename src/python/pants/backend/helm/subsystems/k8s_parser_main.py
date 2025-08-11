@@ -3,22 +3,22 @@
 
 from __future__ import annotations
 
-import sys
 import re
+import sys
 
 from hikaru import load_full_yaml  # pants: no-infer-dep
 
 
 def remove_comment_only_manifests(manifests: str) -> str:
     """Remove manifests that only contain comment lines and hence cant be parsed by hikaru."""
-    all_manifests = re.split(r'(?m)^---\s*$', manifests)
+    all_manifests = re.split(r"(?m)^---\s*$", manifests)
     non_empty_manifests = []
     for manifest in all_manifests:
         # Keep non-empty lines only
         lines = [l for l in manifest.splitlines() if l.strip()]
         if not all(line.startswith("#") for line in lines):
             non_empty_manifests.append(manifest)
-    return '\n---\n'.join(non_empty_manifests)
+    return "\n---\n".join(non_empty_manifests)
 
 
 def main(args: list[str]):
