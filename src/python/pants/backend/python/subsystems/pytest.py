@@ -54,12 +54,8 @@ class PyTest(PythonToolBase):
     name = "Pytest"
     help_short = "The pytest Python test framework (https://docs.pytest.org/)."
 
-    # Pytest 7.1.0 introduced a significant bug that is apparently not fixed as of 7.1.1 (the most
-    # recent release at the time of writing). see https://github.com/pantsbuild/pants/issues/14990.
-    # TODO: Once this issue is fixed, loosen this to allow the version to float above the bad ones.
-    #  E.g., as default_version = "pytest>=7,<8,!=7.1.0,!=7.1.1"
     default_requirements = [
-        "pytest==8.3.5",
+        "pytest>=7,<8.4,!=7.1.0,!=7.1.1",
         "pytest-cov==5.0.0",
         "pytest-xdist==3.6.0",
     ]
