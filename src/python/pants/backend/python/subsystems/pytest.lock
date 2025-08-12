@@ -682,7 +682,7 @@
   "overridden": [],
   "path_mappings": {},
   "pex_version": "2.47.0",
-  "pip_version": "20.3.4-patched",
+  "pip_version": "25.1.1",
   "prefer_older_binary": false,
   "requirements": [
     "pytest!=7.1.0,!=7.1.1,<8.4,>=7",
