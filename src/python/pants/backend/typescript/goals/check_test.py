@@ -107,6 +107,7 @@ def _create_rule_runner(package_manager: str) -> RuleRunner:
             f"--nodejs-package-manager={package_manager}",
             "-ldebug",
             "--log-levels-by-target={'pants.backend.typescript': 'debug'}",
+            "--keep-sandboxes=always",
         ],
         env_inherit={"PATH"},
     )
@@ -675,7 +676,7 @@ def test_file_targets_available_during_typescript_compilation(
     )
 
 
-@logging(level=LogLevel.INFO)
+@logging(level=LogLevel.DEBUG)
 def test_typescript_incremental_compilation_cache_rule_runner(
     basic_rule_runner: tuple[RuleRunner, str, str],
 ) -> None:
@@ -775,6 +776,7 @@ def test_typescript_incremental_compilation_cache_rule_runner(
             f"--nodejs-package-manager={package_manager}",
             "--typescript-extra-build-args=['-v']",  # Use -v instead of --verbose
             "-ldebug",
+            "--keep-sandboxes=always",
         ],
         env_inherit={"PATH"},
     )
@@ -864,6 +866,7 @@ def test_typescript_incremental_compilation_cache_rule_runner(
             f"--nodejs-package-manager={package_manager}",
             "--typescript-extra-build-args=['-v']",  # Back to -v
             "-ldebug",
+            "--keep-sandboxes=always",
         ],
         env_inherit={"PATH"},
     )
