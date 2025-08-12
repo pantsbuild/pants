@@ -16,7 +16,7 @@ def remove_comment_only_manifests(manifests: str) -> str:
     for manifest in all_manifests:
         # Keep non-empty lines only
         lines = [l for l in manifest.splitlines() if l.strip()]
-        if not all(line.startswith("#") for line in lines):
+        if not all(l.startswith("#") for l in lines):
             non_empty_manifests.append(manifest)
     return "\n---\n".join(non_empty_manifests)
 
@@ -28,6 +28,9 @@ def main(args: list[str]):
 
     with open(input_filename) as file:
         manifests = remove_comment_only_manifests(manifests=file.read())
+        # All manifests are empty or only contain comments
+        if not manifests:
+            return
         try:
             parsed_docs = load_full_yaml(yaml=manifests)
         except RuntimeError as e:
