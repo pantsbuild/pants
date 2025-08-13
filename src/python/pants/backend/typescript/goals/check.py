@@ -57,7 +57,6 @@ from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import (
     create_digest,
     digest_subset_to_digest,
-    digest_to_snapshot,
     execute_process,
     merge_digests,
     path_globs_to_digest,
@@ -79,17 +78,30 @@ from pants.util.logging import LogLevel
 if TYPE_CHECKING:
     from pants.backend.javascript.nodejs_project import NodeJSProject
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
-class TypeScriptSystemBinaries:
-    """System binaries needed for TypeScript cache operations."""
+class CreateTscWrapperScriptRequest:
+    """Request to create TypeScript wrapper script for cache management."""
 
-    cp: CpBinary
-    mkdir: MkdirBinary
-    mktemp: MktempBinary
-    mv: MvBinary
-    find: FindBinary
-    touch: TouchBinary
+    project: NodeJSProject
+    package_output_dirs: tuple[str, ...]
+    build_root: BuildRoot
+    named_cache_sandbox_mount_dir: str
+    tsc_wrapper_filename: str
+
+
+@dataclass(frozen=True)
+class TypeScriptCheckFieldSet(FieldSet):
+    required_fields = (JSRuntimeSourceField,)
+
+    sources: JSRuntimeSourceField
+
+
+class TypeScriptCheckRequest(CheckRequest):
+    field_set_type = TypeScriptCheckFieldSet
+    tool_name = TypeScriptSubsystem.options_scope
 
 
 _TYPESCRIPT_OUTPUT_EXTENSIONS = [
@@ -108,15 +120,13 @@ _TYPESCRIPT_OUTPUT_EXTENSIONS = [
     ".tsbuildinfo",
 ]
 
-logger = logging.getLogger(__name__)
-
 
 def _build_workspace_tsconfig_map(workspaces, all_ts_configs) -> dict[str, TSConfig]:
     workspace_dir_map = {os.path.normpath(pkg.root_dir): pkg for pkg in workspaces}
     workspace_dir_to_tsconfig: dict[str, TSConfig] = {}
 
     # Only consider tsconfig.json files (exclude tsconfig.build.json, tsconfig.test.json, etc.)
-    # since tsc only reads tsconfig.json by default and we don't support -p flag
+    # since tsc only reads tsconfig.json by default and we don't support the `--project` flag currently
     tsconfig_json_files = [
         cfg for cfg in all_ts_configs if os.path.basename(cfg.path) == "tsconfig.json"
     ]
@@ -130,12 +140,12 @@ def _build_workspace_tsconfig_map(workspaces, all_ts_configs) -> dict[str, TSCon
     return workspace_dir_to_tsconfig
 
 
-def _calculate_resolved_output_dirs(
+def _collect_package_output_dirs(
     project: NodeJSProject, all_ts_configs, project_root_path: Path
 ) -> tuple[str, ...]:
     workspace_dir_to_tsconfig = _build_workspace_tsconfig_map(project.workspaces, all_ts_configs)
 
-    resolved_output_dirs = set()
+    package_output_dirs = set()
 
     for workspace_pkg in project.workspaces:
         workspace_pkg_path = Path(workspace_pkg.root_dir)
@@ -151,20 +161,20 @@ def _calculate_resolved_output_dirs(
         if pkg_tsconfig and pkg_tsconfig.out_dir:
             pkg_tsconfig.validate_outdir()
             resolved_out_dir = f"{pkg_prefix}{pkg_tsconfig.out_dir.lstrip('./')}"
-            resolved_output_dirs.add(resolved_out_dir)
+            package_output_dirs.add(resolved_out_dir)
 
-    return tuple(sorted(resolved_output_dirs))
+    return tuple(sorted(package_output_dirs))
 
 
-def _get_typescript_artifact_globs(
-    project: NodeJSProject, resolved_output_dirs: tuple[str, ...]
+def _get_output_artifact_globs(
+    project: NodeJSProject, package_output_dirs: tuple[str, ...]
 ) -> list[str]:
     globs = []
     project_root_path = Path(project.root_dir)
 
-    for resolved_dir in resolved_output_dirs:
+    for output_dir in package_output_dirs:
         for ext in _TYPESCRIPT_OUTPUT_EXTENSIONS:
-            globs.append(f"{resolved_dir}/**/*{ext}")
+            globs.append(f"{output_dir}/**/*{ext}")
 
     # Handle case where tsconfig.tsbuildinfo are output alongside tsconfig.json in each package
     for workspace_pkg in project.workspaces:
@@ -225,19 +235,22 @@ async def _collect_config_files_for_project(
     return config_files
 
 
-async def _create_typescript_cache_wrapper_script(
-    project: NodeJSProject,
-    binaries: TypeScriptSystemBinaries,
-    resolved_output_dirs: tuple[str, ...],
-    build_root: BuildRoot,
-    named_cache_sandbox_mount_dir: str,
-    tsc_wrapper_filename: str,
+@rule
+async def create_tsc_wrapper_script(
+    request: CreateTscWrapperScriptRequest,
+    cp_binary: CpBinary,
+    mkdir_binary: MkdirBinary,
+    mktemp_binary: MktempBinary,
+    mv_binary: MvBinary,
+    find_binary: FindBinary,
+    touch_binary: TouchBinary,
 ) -> Digest:
-    """Create shell script wrapper for TypeScript incremental compilation caching.
+    project = request.project
+    package_output_dirs = request.package_output_dirs
+    build_root = request.build_root
+    named_cache_sandbox_mount_dir = request.named_cache_sandbox_mount_dir
+    tsc_wrapper_filename = request.tsc_wrapper_filename
 
-    Returns:
-        Script digest for merging with input digest
-    """
     project_abs_path = os.path.join(build_root.path, project.root_dir)
     cache_key = sha256(project_abs_path.encode()).hexdigest()
 
@@ -257,14 +270,12 @@ async def _create_typescript_cache_wrapper_script(
         else:
             workspace_dirs.append(".")
     workspace_dirs_str = " ".join(f'"{d}"' for d in workspace_dirs)
-    output_dirs_str = " ".join(f'"{d}"' for d in resolved_output_dirs)
+    output_dirs_str = " ".join(f'"{d}"' for d in package_output_dirs)
 
     script_content = """#!/bin/sh
 # TypeScript incremental compilation cache wrapper
-# Using mounted cache in sandbox like MyPy
 set -e
 
-# Binary paths interpolated directly from Python
 CP_BIN="{cp_binary_path}"
 MKDIR_BIN="{mkdir_binary_path}"
 MKTEMP_BIN="{mktemp_binary_path}"
@@ -276,33 +287,9 @@ TOUCH_BIN="{touch_binary_path}"
 PROJECT_CACHE_SUBDIR="{project_cache_subdir}"
 FILE_EXTENSIONS="{file_extensions}"
 
-# Debug: Show environment and current working directory
-echo "DEBUG: Current working directory: $(pwd)"
-echo "DEBUG: PROJECT_CACHE_SUBDIR=$PROJECT_CACHE_SUBDIR"
-echo "DEBUG: PERSISTENT_CACHE_DIR=$PERSISTENT_CACHE_DIR"
-echo "DEBUG: Contents of current directory: $(echo *)"
-echo "DEBUG: NAMED_CACHES_DIR_VAL=$NAMED_CACHES_DIR_VAL"
-echo "DEBUG: RUN_NUMBER=$RUN_NUMBER"
-
-echo "DEBUG: Host cache directory exists: $([ -d \\"$PERSISTENT_CACHE_DIR\\" ] && echo 'YES' || echo 'NO')"
-
-if [ -d "$PERSISTENT_CACHE_DIR" ]; then
-    echo "DEBUG: Contents of cache directory: $(ls \\"$PERSISTENT_CACHE_DIR\\"/ 2>/dev/null || echo 'EMPTY')"
-else
-    echo "DEBUG: Cache directory does NOT exist at $PERSISTENT_CACHE_DIR"
-    # Check if cache exists at alternative path (macOS symlink issue)
-    ALT_PATH="${{PERSISTENT_CACHE_DIR#/private}}"
-    if [ "$ALT_PATH" != "$PERSISTENT_CACHE_DIR" ] && [ -d "$ALT_PATH" ]; then
-        echo "DEBUG: Cache found at alternative path: $ALT_PATH"
-        echo "DEBUG: Alternative path contents: $(ls \\"$ALT_PATH\\"/ 2>/dev/null || echo 'EMPTY')"
-    fi
-fi
-
 # Step 1: Restore cache from persistent storage to project root
 # This puts output directories and .tsbuildinfo files where tsc expects them
 if [ -d "$PROJECT_CACHE_SUBDIR" ]; then
-    echo "Restoring cache from $PROJECT_CACHE_SUBDIR"
-    
     # Touch cache files before copying to make them newer than source files
     "$FIND_BIN" "$PROJECT_CACHE_SUBDIR" -type f -exec "$TOUCH_BIN" {{}} +
     
@@ -316,8 +303,6 @@ if [ -d "$PROJECT_CACHE_SUBDIR" ]; then
 
     # Touch all TypeScript-compilable source files to trigger metadata validation
     # This ensures TypeScript checks metadata for all files and performs proper incremental compilation
-    echo "DEBUG: Touching all TypeScript source files to trigger validation"
-    echo "DEBUG: File extensions to touch: $FILE_EXTENSIONS"
 
     # Build find arguments for all extensions
     FIND_ARGS=""
@@ -332,24 +317,18 @@ if [ -d "$PROJECT_CACHE_SUBDIR" ]; then
     # Use find and touch binaries passed from Python
     echo "DEBUG: Running: $FIND_BIN . -type f \\\\( $FIND_ARGS \\\\) -exec $TOUCH_BIN {{}} +"
     eval "$FIND_BIN" . -type f '\\(' $FIND_ARGS '\\)' -exec '"$TOUCH_BIN"' {{}} +
-
-    echo "DEBUG: Finished touching source files"
-    echo "DEBUG: Cache restoration complete, timestamp management applied"
-else
-    echo "No cached build found - performing full build"
 fi
 
-# Step 2: Run TypeScript compiler (already in project root due to working_directory)
+# Step 2: Run TypeScript compiler
 "$@"
 
 # If TypeScript failed, exit immediately - no cache operations needed
 if [ $? -ne 0 ]; then
-    echo "TypeScript compilation failed - exiting"
     exit $?
 fi
 
+# TODO: we may not need tsbuildinfo in output?
 # TypeScript succeeded - proceed with file touching and cache operations
-echo "DEBUG: Touching .tsbuildinfo files to ensure they are captured in output digest"
 for workspace_dir in {workspace_dirs_str}; do
     tsbuildinfo_file="$workspace_dir/tsconfig.tsbuildinfo"
     if [ -f "$tsbuildinfo_file" ]; then
@@ -361,7 +340,6 @@ for workspace_dir in {workspace_dirs_str}; do
 done
 
 # Step 3: Save cache contents (compilation succeeded)
-echo "Saving compilation cache"
 
 # Create temp dir for atomic operation  
 CACHE_PARENT="${{PROJECT_CACHE_SUBDIR%/*}}"
@@ -394,21 +372,20 @@ rm -rf "$OLD_BACKUP" 2>/dev/null || true
 
 echo "Cache updated successfully"
 """.format(
-        cp_binary_path=binaries.cp.path,
-        mkdir_binary_path=binaries.mkdir.path,
-        mktemp_binary_path=binaries.mktemp.path,
-        mv_binary_path=binaries.mv.path,
-        find_binary_path=binaries.find.path,
-        touch_binary_path=binaries.touch.path,
+        cp_binary_path=cp_binary.path,
+        mkdir_binary_path=mkdir_binary.path,
+        mktemp_binary_path=mktemp_binary.path,
+        mv_binary_path=mv_binary.path,
+        find_binary_path=find_binary.path,
+        touch_binary_path=touch_binary.path,
         project_cache_subdir=project_cache_subdir,
-        file_extensions=" ".join((
+        file_extensions=" ".join(
             JS_FILE_EXTENSIONS + TS_FILE_EXTENSIONS + JSX_FILE_EXTENSIONS + TSX_FILE_EXTENSIONS
-        )),
+        ),
         workspace_dirs_str=workspace_dirs_str,
         output_dirs_str=output_dirs_str,
     )
 
-    # Create script digest in project directory (since we run from project.root_dir)
     script_digest = await create_digest(
         CreateDigest(
             [
@@ -425,39 +402,31 @@ echo "Cache updated successfully"
     return script_digest
 
 
-@dataclass(frozen=True)
-class TypeScriptCheckFieldSet(FieldSet):
-    required_fields = (JSRuntimeSourceField,)
-
-    sources: JSRuntimeSourceField
-
-
-class TypeScriptCheckRequest(CheckRequest):
-    field_set_type = TypeScriptCheckFieldSet
-    tool_name = TypeScriptSubsystem.options_scope
-
-
 async def _typecheck_typescript_projects(
     field_sets: Collection[TypeScriptCheckFieldSet],
     subsystem: TypeScriptSubsystem,
     global_options: GlobalOptions,
     build_root: BuildRoot,
-    binaries: TypeScriptSystemBinaries,
 ) -> tuple[CheckResult, ...]:
     """Type check TypeScript projects, grouping targets by their containing NodeJS project."""
     if not field_sets:
         return ()
 
-    all_projects, all_targets, all_package_jsons, all_ts_configs = await concurrently(
+    (
+        all_projects,
+        all_targets,
+        all_package_jsons,
+        all_ts_configs,
+        owning_packages,
+    ) = await concurrently(
         find_node_js_projects(**implicitly()),
         find_all_targets(),
         all_package_json(),
         construct_effective_ts_configs(),
-    )
-
-    owning_packages = await concurrently(
-        find_owning_package(OwningNodePackageRequest(field_set.address), **implicitly())
-        for field_set in field_sets
+        concurrently(
+            find_owning_package(OwningNodePackageRequest(field_set.address), **implicitly())
+            for field_set in field_sets
+        ),
     )
 
     projects_to_field_sets: dict[NodeJSProject, list[TypeScriptCheckFieldSet]] = {}
@@ -480,7 +449,6 @@ async def _typecheck_typescript_projects(
             all_package_jsons,
             all_ts_configs,
             build_root,
-            binaries,
         )
         for project in projects_to_field_sets.keys()
     )
@@ -488,30 +456,22 @@ async def _typecheck_typescript_projects(
     return project_results
 
 
-async def _find_project_typescript_targets(
+async def _collect_project_typescript_targets(
     project: NodeJSProject,
     all_targets: AllTargets,
     all_projects: AllNodeJSProjects,
 ) -> list[Target] | None:
-    """Find all TypeScript targets belonging to the specified project.
-
-    Returns None if no TypeScript targets found in the project. TypeScript compilation needs all
-    sources in a project to resolve imports correctly.
-    """
-    # Find ALL TypeScript targets in workspace
     typescript_targets = [
         target
         for target in all_targets
         if (target.has_field(TypeScriptSourceField) or target.has_field(TypeScriptTestSourceField))
     ]
 
-    # Get owning packages for all TypeScript targets to filter to this project
     typescript_owning_packages = await concurrently(
         find_owning_package(OwningNodePackageRequest(target.address), **implicitly())
         for target in typescript_targets
     )
 
-    # Filter to targets that belong to the current project
     project_typescript_targets = []
     for target, owning_package in zip(typescript_targets, typescript_owning_packages):
         if owning_package.target:
@@ -539,9 +499,9 @@ async def _hydrate_project_sources(
         for target in project_typescript_targets
     )
 
-    return await merge_digests(MergeDigests(
-        [sources.snapshot.digest for sources in workspace_target_sources]
-    ))
+    return await merge_digests(
+        MergeDigests([sources.snapshot.digest for sources in workspace_target_sources])
+    )
 
 
 async def _prepare_compilation_input(
@@ -551,25 +511,18 @@ async def _prepare_compilation_input(
     all_ts_configs: AllTSConfigs,
     all_workspace_sources: Digest,
 ) -> Digest:
-    """Prepare input digest for TypeScript compilation.
-
-    Returns the input digest containing sources and configuration files.
-    """
-    # Collect all config files needed for TypeScript compilation
+    """Prepare input digest for TypeScript compilation."""
     config_files = await _collect_config_files_for_project(
         project, project_typescript_targets, all_package_jsons, all_ts_configs
     )
-
-    # Keep the original tsconfig.json files in config_files since we're not modifying them
-
     # Validate that all TypeScript configurations have explicit outDir settings
+    # TODO: If we're enforcing this, then would we get tsbuildinfo at package level?
     project_ts_configs = [
         config for config in all_ts_configs if config.path.startswith(project.root_dir)
     ]
     for ts_config in project_ts_configs:
         ts_config.validate_outdir()
 
-    # Get config file digests (including main tsconfig.json)
     config_digest = (
         await path_globs_to_digest(
             PathGlobs(config_files, glob_match_error_behavior=GlobMatchErrorBehavior.ignore),
@@ -579,48 +532,45 @@ async def _prepare_compilation_input(
         else EMPTY_DIGEST
     )
 
-    # Merge workspace sources and config files
-    return await merge_digests(MergeDigests(
-        [all_workspace_sources] + ([config_digest] if config_digest != EMPTY_DIGEST else [])
-    ))
+    return await merge_digests(
+        MergeDigests(
+            [all_workspace_sources] + ([config_digest] if config_digest != EMPTY_DIGEST else [])
+        )
+    )
 
 
 async def _prepare_typescript_tool_process(
     project: NodeJSProject,
     subsystem: TypeScriptSubsystem,
     input_digest: Digest,
-    resolved_output_dirs: tuple[str, ...],
+    package_output_dirs: tuple[str, ...],
     project_typescript_targets: list[Target],
-    binaries: TypeScriptSystemBinaries,
     build_root: BuildRoot,
 ) -> Process:
     """Prepare the TypeScript compiler process for execution with shell script wrapper for
     caching."""
+    tsc_args = ("--build", *subsystem.extra_build_args)
     tsc_wrapper_filename = "__tsc_wrapper.sh"
 
-    # Determine which resolve to use for this TypeScript project
-    project_address = Address(project.root_dir)
-    project_resolve = await resolve_for_package(RequestNodeResolve(project_address), **implicitly())
-
-    # Set up cache configuration
     named_cache_local_dir = "typescript_cache"
-    named_cache_sandbox_mount_dir = (
-        "._tsc_cache"  # Directory name where cache is mounted in sandbox
+    named_cache_sandbox_mount_dir = "._tsc_cache"
+
+    project_resolve = await resolve_for_package(
+        RequestNodeResolve(Address(project.root_dir)), **implicitly()
     )
 
-    # Create shell script wrapper for cache management
-    script_digest = await _create_typescript_cache_wrapper_script(
-        project,
-        binaries,
-        resolved_output_dirs,
-        build_root,
-        named_cache_sandbox_mount_dir,
-        tsc_wrapper_filename,
+    script_digest = await create_tsc_wrapper_script(
+        CreateTscWrapperScriptRequest(
+            project=project,
+            package_output_dirs=package_output_dirs,
+            build_root=build_root,
+            named_cache_sandbox_mount_dir=named_cache_sandbox_mount_dir,
+            tsc_wrapper_filename=tsc_wrapper_filename,
+        ),
+        **implicitly(),
     )
 
     merged_input = await merge_digests(MergeDigests([input_digest, script_digest]))
-
-    tsc_args = ("--build", *subsystem.extra_build_args)
 
     tool_request = subsystem.request(
         args=tsc_args,
@@ -631,6 +581,7 @@ async def _prepare_typescript_tool_process(
     )
 
     # Override the resolve to use the project's resolve instead of default
+    # TODO: warn that we are doing this
     tool_request_with_resolve: NodeJSToolRequest = replace(
         tool_request, resolve=project_resolve.resolve_name
     )
@@ -641,7 +592,7 @@ async def _prepare_typescript_tool_process(
         process,
         argv=(f"./{tsc_wrapper_filename}",) + process.argv,
         working_directory=project.root_dir,
-        output_directories=resolved_output_dirs,
+        output_directories=package_output_dirs,
     )
 
     return process_with_wrapper
@@ -656,15 +607,11 @@ async def _typecheck_single_project(
     all_package_jsons: AllPackageJson,
     all_ts_configs: AllTSConfigs,
     build_root: BuildRoot,
-    binaries: TypeScriptSystemBinaries,
 ) -> CheckResult:
-    """Type check a single TypeScript project using all TypeScript targets in the project."""
-    # Find all TypeScript targets for this project
-    project_typescript_targets = await _find_project_typescript_targets(
+    project_typescript_targets = await _collect_project_typescript_targets(
         project, all_targets, all_projects
     )
 
-    # Early return if no TypeScript targets in project
     if not project_typescript_targets:
         return CheckResult(
             exit_code=0,
@@ -673,10 +620,7 @@ async def _typecheck_single_project(
             partition_description=f"TypeScript check on {project.root_dir} (no targets)",
         )
 
-    # Hydrate all source files for the project
     all_workspace_sources = await _hydrate_project_sources(project_typescript_targets)
-
-    # Prepare compilation input (sources and config files)
     input_digest = await _prepare_compilation_input(
         project,
         project_typescript_targets,
@@ -684,44 +628,25 @@ async def _typecheck_single_project(
         all_ts_configs,
         all_workspace_sources,
     )
-
-    # Calculate resolved output directories for process setup
-    project_root_path = Path(project.root_dir)
-    resolved_output_dirs = _calculate_resolved_output_dirs(
-        project, all_ts_configs, project_root_path
+    package_output_dirs = _collect_package_output_dirs(
+        project, all_ts_configs, Path(project.root_dir)
     )
 
-    # Prepare the TypeScript compiler process with shell script wrapper for caching
     process = await _prepare_typescript_tool_process(
         project,
         subsystem,
         input_digest,
-        resolved_output_dirs,
+        package_output_dirs,
         project_typescript_targets,
-        binaries,
         build_root,
     )
-
-    # Execute TypeScript compilation
     result = await execute_process(process, **implicitly())
-
-    # Debug logging of output files
-    logger = logging.getLogger(__name__)
-    output_snapshot = await digest_to_snapshot(result.output_digest, **implicitly())
-    logger.debug(f"TypeScript output files: {sorted(output_snapshot.files)}")
-    logger.debug(f"TypeScript stdout: {result.stdout.decode()}")
-    logger.debug(f"TypeScript stderr: {result.stderr.decode()}")
 
     # Extract user-facing outputs for the dist directory
     # This includes compiled .js, .d.ts files and other outputs users want to see
-    artifact_globs = _get_typescript_artifact_globs(project, resolved_output_dirs)
-    logger.debug(f"TypeScript artifact globs: {artifact_globs}")
-
-    # Debug: Show what's actually in output digest
-    output_snapshot = await digest_to_snapshot(result.output_digest, **implicitly())
-    logger.debug(f"All output files: {sorted(output_snapshot.files)}")
-    tsbuildinfo_in_output = [f for f in output_snapshot.files if f.endswith(".tsbuildinfo")]
-    logger.debug(f"tsbuildinfo files in output: {tsbuildinfo_in_output}")
+    # TODO: review how this looks in practice.
+    # TODO: GlobMatchErrorBehavior is correct if no output due to cache - need to check
+    artifact_globs = _get_output_artifact_globs(project, package_output_dirs)
 
     user_outputs_digest = await digest_subset_to_digest(
         DigestSubset(
@@ -731,15 +656,6 @@ async def _typecheck_single_project(
         **implicitly(),
     )
 
-    # Debug: Show what was extracted as user outputs
-    user_outputs_snapshot = await digest_to_snapshot(user_outputs_digest, **implicitly())
-    logger.debug(f"User output files: {sorted(user_outputs_snapshot.files)}")
-    tsbuildinfo_in_user_outputs = [
-        f for f in user_outputs_snapshot.files if f.endswith(".tsbuildinfo")
-    ]
-    logger.debug(f"tsbuildinfo files in user outputs: {tsbuildinfo_in_user_outputs}")
-
-    # Convert to CheckResult with user outputs in report field
     return CheckResult.from_fallible_process_result(
         result,
         partition_description=f"TypeScript check on {project.root_dir} ({len(project_typescript_targets)} targets)",
@@ -754,31 +670,15 @@ async def typecheck_typescript(
     subsystem: TypeScriptSubsystem,
     global_options: GlobalOptions,
     build_root: BuildRoot,
-    cp_binary: CpBinary,
-    mkdir_binary: MkdirBinary,
-    mktemp_binary: MktempBinary,
-    mv_binary: MvBinary,
-    find_binary: FindBinary,
-    touch_binary: TouchBinary,
 ) -> CheckResults:
     if subsystem.skip:
         return CheckResults([], checker_name=request.tool_name)
-
-    binaries = TypeScriptSystemBinaries(
-        cp=cp_binary,
-        mkdir=mkdir_binary,
-        mktemp=mktemp_binary,
-        mv=mv_binary,
-        find=find_binary,
-        touch=touch_binary,
-    )
 
     check_results = await _typecheck_typescript_projects(
         request.field_sets,
         subsystem,
         global_options,
         build_root,
-        binaries,
     )
 
     return CheckResults(check_results, checker_name=request.tool_name)
