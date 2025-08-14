@@ -57,7 +57,7 @@ class PyTest(PythonToolBase):
     default_requirements = [
         "pytest>=7,<8.4,!=7.1.0,!=7.1.1",
         "pytest-cov==5.0.0",
-        "pytest-xdist==3.6.0",
+        "pytest-xdist==3.6.1",
     ]
 
     default_main = ConsoleScript("pytest")

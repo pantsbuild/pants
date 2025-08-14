@@ -11,7 +11,7 @@
 //   "generated_with_requirements": [
 //     "pytest!=7.1.0,!=7.1.1,<8.4,>=7",
 //     "pytest-cov==5.0.0",
-//     "pytest-xdist==3.6.0"
+//     "pytest-xdist==3.6.1"
 //   ],
 //   "manylinux": "manylinux2014",
 //   "requirement_constraints": [],
@@ -497,13 +497,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "958e08f38472e1b3a83450d8d3e682e90fdbffee39a97dd0f27185a3bd9074d1",
-              "url": "https://files.pythonhosted.org/packages/e0/df/585742c204227526baf641e45a95d3c0a94978b85a1414622c1017ebfcf8/pytest_xdist-3.6.0-py3-none-any.whl"
+              "hash": "9ed4adfb68a016610848639bb7e02c9352d5d9f03d04809919e2dafc3be4cca7",
+              "url": "https://files.pythonhosted.org/packages/6d/82/1d96bf03ee4c0fdc3c0cbe61470070e659ca78dc0086fb88b66c185e2449/pytest_xdist-3.6.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "2bf346fb1f1481c8d255750f80bc1dfb9fb18b9ad5286ead0b741b6fd56d15b7",
-              "url": "https://files.pythonhosted.org/packages/c4/d4/c0100baea81c3fa9ded7d16ab09fb9acf90d78fd62a5003fd2e1852a8d76/pytest_xdist-3.6.0.tar.gz"
+              "hash": "ead156a4db231eec769737f57668ef58a2084a34b2e55c4a8fa20d861107300d",
+              "url": "https://files.pythonhosted.org/packages/41/c4/3c310a19bc1f1e9ef50075582652673ef2bfc8cd62afef9585683821902f/pytest_xdist-3.6.1.tar.gz"
             }
           ],
           "project_name": "pytest-xdist",
@@ -515,7 +515,7 @@
             "setproctitle; extra == \"setproctitle\""
           ],
           "requires_python": ">=3.8",
-          "version": "3.6.0"
+          "version": "3.6.1"
         },
         {
           "artifacts": [
@@ -687,7 +687,7 @@
   "requirements": [
     "pytest!=7.1.0,!=7.1.1,<8.4,>=7",
     "pytest-cov==5.0.0",
-    "pytest-xdist==3.6.0"
+    "pytest-xdist==3.6.1"
   ],
   "requires_python": [
     "<4,>=3.8"
