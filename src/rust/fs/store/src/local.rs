@@ -538,7 +538,7 @@ impl FileSource {
     async fn open_readonly(
         &self,
         path: &Path,
-    ) -> Result<(tokio::fs::File, SemaphorePermit), String> {
+    ) -> Result<(tokio::fs::File, SemaphorePermit<'_>), String> {
         let permit = self
             .open_files
             .acquire()
