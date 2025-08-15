@@ -171,7 +171,7 @@ indexmap = { version = "2.10", features = ["std", "serde"] }
 indicatif = "0.17.11"
 internment = "0.6"
 itertools = "0.14"
-libc = "0.2.171"
+libc = "0.2.175"
 lmdb-rkv = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "6ae7a552aa2c932c3ddf652a68cdde2fed547cbc" }
 log = "0.4.26"
 madvise = "0.1"
