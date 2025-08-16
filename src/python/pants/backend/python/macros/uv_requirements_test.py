@@ -50,7 +50,10 @@ def assert_uv_requirements(
     assert set(result.parametrizations.values()) == expected_targets
 
 
-def test_pyproject_toml(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    "section,group", [("tool.uv", "dev-dependencies"), ("dependency-groups", "dev")]
+)
+def test_pyproject_toml(section: str, group: str, rule_runner: RuleRunner) -> None:
     """This tests that we correctly create a new python_requirement for each entry in a
     pyproject.toml file, where each dependency is unique.
 
@@ -79,9 +82,9 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
             """
         ),
         dedent(
-            """\
-            [tool.uv]
-            dev-dependencies = [
+            f"""\
+            [{section}]
+            {group} = [
                 # Comment.
                 "",  # Empty line.
                 "ansicolors>=1.18.0",
@@ -164,6 +167,6 @@ def test_invalid_req_pyproject_toml(rule_runner: RuleRunner) -> None:
         assert_uv_requirements(
             rule_runner,
             "uv_requirements(name='reqs', source='pyproject.toml')",
-            """[tool.uv]\ndev-dependencies = ["Not A Valid Req == 3.7"]""",
+            """[dependency-groups]\ndev = ["Not A Valid Req == 3.7"]""",
             expected_targets=set(),
         )
