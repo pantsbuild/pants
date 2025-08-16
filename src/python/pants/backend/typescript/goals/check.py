@@ -19,26 +19,15 @@ from pants.backend.javascript.package_json import (
 )
 from pants.backend.javascript.resolve import RequestNodeResolve, resolve_for_package
 from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolRequest, prepare_tool_process
-from pants.backend.javascript.target_types import JS_FILE_EXTENSIONS, JSRuntimeSourceField
-from pants.backend.jsx.target_types import JSX_FILE_EXTENSIONS
-from pants.backend.tsx.target_types import TSX_FILE_EXTENSIONS
+from pants.backend.javascript.target_types import JSRuntimeSourceField
 from pants.backend.typescript.subsystem import TypeScriptSubsystem
-from pants.backend.typescript.target_types import (
-    TS_FILE_EXTENSIONS,
-    TypeScriptSourceField,
-    TypeScriptTestSourceField,
-)
+from pants.backend.typescript.target_types import TypeScriptSourceField, TypeScriptTestSourceField
 from pants.backend.typescript.tsconfig import AllTSConfigs, TSConfig, construct_effective_ts_configs
 from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.core.target_types import FileSourceField
-from pants.core.util_rules.system_binaries import (
-    CpBinary,
-    FindBinary,
-    MkdirBinary,
-    TouchBinary,
-)
+from pants.core.util_rules.system_binaries import CpBinary, FindBinary, MkdirBinary, TouchBinary
 from pants.engine.collection import Collection
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -102,23 +91,6 @@ class TypeScriptCheckRequest(CheckRequest):
     tool_name = TypeScriptSubsystem.options_scope
 
 
-_TYPESCRIPT_OUTPUT_EXTENSIONS = [
-    ".js",
-    ".mjs",
-    ".cjs",
-    ".d.ts",
-    ".d.mts",
-    ".d.cts",
-    ".js.map",
-    ".mjs.map",
-    ".cjs.map",
-    ".d.ts.map",
-    ".d.mts.map",
-    ".d.cts.map",
-    ".tsbuildinfo",
-]
-
-
 def _build_workspace_tsconfig_map(workspaces, all_ts_configs) -> dict[str, TSConfig]:
     workspace_dir_map = {os.path.normpath(pkg.root_dir): pkg for pkg in workspaces}
     workspace_dir_to_tsconfig: dict[str, TSConfig] = {}
@@ -170,11 +142,12 @@ def _get_output_artifact_globs(
     globs = []
     project_root_path = Path(project.root_dir)
 
+    # Include all files in output directories
     for output_dir in package_output_dirs:
-        for ext in _TYPESCRIPT_OUTPUT_EXTENSIONS:
-            globs.append(f"{output_dir}/**/*{ext}")
+        globs.append(f"{output_dir}/**/*")
 
-    # Handle case where tsconfig.tsbuildinfo are output alongside tsconfig.json in each package
+    # Handle case where (e.g.) tsconfig.tsbuildinfo is output alongside tsconfig.json in a package
+    # (See https://www.typescriptlang.org/tsconfig/#tsBuildInfoFile for details)
     for workspace_pkg in project.workspaces:
         workspace_pkg_path = Path(workspace_pkg.root_dir)
         if workspace_pkg_path == project_root_path:
@@ -182,7 +155,7 @@ def _get_output_artifact_globs(
         else:
             relative_path = workspace_pkg_path.relative_to(project_root_path)
             pkg_prefix = f"{relative_path.as_posix()}/"
-        globs.append(f"{pkg_prefix}tsconfig.tsbuildinfo")
+        globs.append(f"{pkg_prefix}*.tsbuildinfo")
 
     return globs
 
@@ -270,6 +243,13 @@ async def create_tsc_wrapper_script(
 
     script_content = """#!/bin/sh
 # TypeScript incremental compilation cache wrapper
+
+# All source files in sandbox have mtime as at sandbox creation (e.g. when the process started).
+# Without any special handling, tsc will do a fast immediate rebuild (without checking tsbuildinfo metadata).
+# (tsc outputs: "Project 'tsconfig.json' is out of date because output 'tsconfig.tsbuildinfo' is older than input 'tsconfig.json'")
+# What we want: tsconfig (oldest), tsbuildinfo (newer), source files (newest).
+# See also https://github.com/microsoft/TypeScript/issues/54563
+
 set -e
 
 CP_BIN="{cp_binary_path}"
@@ -278,62 +258,32 @@ FIND_BIN="{find_binary_path}"
 TOUCH_BIN="{touch_binary_path}"
 
 PROJECT_CACHE_SUBDIR="{project_cache_subdir}"
-FILE_EXTENSIONS="{file_extensions}"
-
-# Step 1: Restore cache from persistent storage to project root
-# This puts output directories and .tsbuildinfo files where tsc expects them
 
 # Ensure cache directory exists (it won't on first run)
 "$MKDIR_BIN" -p "$PROJECT_CACHE_SUBDIR" > /dev/null 2>&1
 
-# Touch cache files before copying to make them newer than source files
-"$FIND_BIN" "$PROJECT_CACHE_SUBDIR" -type f -exec "$TOUCH_BIN" {{}} + > /dev/null 2>&1
-
 # Copy cached files to working directory
 "$CP_BIN" -a "$PROJECT_CACHE_SUBDIR/." . > /dev/null 2>&1
 
-# Step 2: Touch all TypeScript-compilable source files to trigger metadata validation
-# This ensures TypeScript checks metadata for all files and performs proper incremental compilation
-FIND_ARGS=""
-for ext in $FILE_EXTENSIONS; do
-    if [ -z "$FIND_ARGS" ]; then
-        FIND_ARGS="-name '*$ext'"
-    else
-        FIND_ARGS="$FIND_ARGS -o -name '*$ext'"
-    fi
-done
-eval "$FIND_BIN" . -type f '\\(' $FIND_ARGS '\\)' -exec '"$TOUCH_BIN"' {{}} +
+# Make tsconfig files oldest
+# This could be improved by passing a list of tsconfig files, but that might be best done if/when we have a Target for tsconfig files.
+"$FIND_BIN" . -type f -name "tsconfig*.json" -exec "$TOUCH_BIN" -t 202001010000 {{}} +
 
-# Step 3: Run TypeScript compiler
+# Run tsc
 "$@"
 
-# TODO: we may not need tsbuildinfo in output?
-# TypeScript succeeded - proceed with file touching and cache operations
+# Update cache
+# Copy .tsbuildinfo files located at package root to cache
 for workspace_dir in {workspace_dirs_str}; do
-    tsbuildinfo_file="$workspace_dir/tsconfig.tsbuildinfo"
-    if [ -f "$tsbuildinfo_file" ]; then
-        touch "$tsbuildinfo_file"
-        echo "DEBUG: Touched $tsbuildinfo_file for output capture"
-    else
-        echo "DEBUG: No $tsbuildinfo_file found to touch"
-    fi
-done
-
-# Step 4: Save cache directly to cache directory
-
-# Copy .tsbuildinfo files from workspace packages to cache
-# Handles case where tsconfig.tsbuildinfo is in the package root
-for workspace_dir in {workspace_dirs_str}; do
-    tsbuildinfo_file="$workspace_dir/tsconfig.tsbuildinfo"
-    if [ -f "$tsbuildinfo_file" ]; then
+    tsbuildinfo_files=("$workspace_dir"/*.tsbuildinfo)
+    if [ -f "${{tsbuildinfo_files[0]}}" ]; then
         "$MKDIR_BIN" -p "$PROJECT_CACHE_SUBDIR/$workspace_dir"
-        "$CP_BIN" "$tsbuildinfo_file" "$PROJECT_CACHE_SUBDIR/$workspace_dir/"
+        "$CP_BIN" "${{tsbuildinfo_files[@]}}" "$PROJECT_CACHE_SUBDIR/$workspace_dir/"
     fi
 done
 
 # Copy output directories to cache
-# Copies all output files and tsbuildinfo files to cache
-# (the output files are needed because tsc checks them against tsbuildinfo when determining if rebuild required)
+# (the output files are needed because tsc checks them against tsbuildinfo hashes when determining if a rebuild is required)
 for output_dir in {output_dirs_str}; do
     if [ -d "$output_dir" ]; then
         output_parent="$(dirname "$output_dir")"
@@ -341,17 +291,12 @@ for output_dir in {output_dirs_str}; do
         "$CP_BIN" -r "$output_dir" "$PROJECT_CACHE_SUBDIR/$output_parent/"
     fi
 done
-
-echo "Cache updated successfully"
 """.format(
         cp_binary_path=cp_binary.path,
         mkdir_binary_path=mkdir_binary.path,
         find_binary_path=find_binary.path,
         touch_binary_path=touch_binary.path,
         project_cache_subdir=project_cache_subdir,
-        file_extensions=" ".join(
-            JS_FILE_EXTENSIONS + TS_FILE_EXTENSIONS + JSX_FILE_EXTENSIONS + TSX_FILE_EXTENSIONS
-        ),
         workspace_dirs_str=workspace_dirs_str,
         output_dirs_str=output_dirs_str,
     )
@@ -486,7 +431,7 @@ async def _prepare_compilation_input(
         project, project_typescript_targets, all_package_jsons, all_ts_configs
     )
     # Validate that all TypeScript configurations have explicit outDir settings
-    # TODO: If we're enforcing this, then would we get tsbuildinfo at package level?
+    # TODO: Add docs for this
     project_ts_configs = [
         config for config in all_ts_configs if config.path.startswith(project.root_dir)
     ]
@@ -612,12 +557,7 @@ async def _typecheck_single_project(
     )
     result = await execute_process(process, **implicitly())
 
-    # Extract user-facing outputs for the dist directory
-    # This includes compiled .js, .d.ts files and other outputs users want to see
-    # TODO: review how this looks in practice.
-    # TODO: GlobMatchErrorBehavior is correct if no output due to cache - need to check
     artifact_globs = _get_output_artifact_globs(project, package_output_dirs)
-
     user_outputs_digest = await digest_subset_to_digest(
         DigestSubset(
             result.output_digest,
