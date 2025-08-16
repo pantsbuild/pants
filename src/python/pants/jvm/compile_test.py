@@ -1,6 +1,5 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
 """Tests of multi-language JVM compilation.
 
 Tests of individual compilers should generally be written directly against the relevant `@rules`,

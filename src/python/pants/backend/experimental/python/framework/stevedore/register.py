@@ -1,6 +1,5 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
 """A python "framework" for apps to dynamically load plugins.
 
 See https://github.com/openstack/stevedore for details.

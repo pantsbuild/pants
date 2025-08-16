@@ -44,34 +44,26 @@ Pid = int
 
 
 def get_arch_name(uname_result: posix.uname_result | None = None) -> str:
-    """
-    :API: public
-    """
+    """:API: public."""
     if uname_result is None:
         uname_result = os.uname()
     return uname_result.machine.lower()
 
 
 def get_os_name(uname_result: posix.uname_result | None = None) -> str:
-    """
-    :API: public
-    """
+    """:API: public."""
     if uname_result is None:
         uname_result = os.uname()
     return uname_result.sysname.lower()
 
 
 def normalize_arch_name(arch_name: str) -> str:
-    """
-    :API: public
-    """
+    """:API: public."""
     return _normalize(arch_name, ARCH_ALIASES, "architecture")
 
 
 def normalize_os_name(os_name: str) -> str:
-    """
-    :API: public
-    """
+    """:API: public."""
     return _normalize(os_name, OS_ALIASES, "operating system")
 
 
