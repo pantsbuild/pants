@@ -37,8 +37,6 @@ from pants.core.util_rules.system_binaries import (
     CpBinary,
     FindBinary,
     MkdirBinary,
-    MktempBinary,
-    MvBinary,
     TouchBinary,
 )
 from pants.engine.collection import Collection
@@ -240,8 +238,6 @@ async def create_tsc_wrapper_script(
     request: CreateTscWrapperScriptRequest,
     cp_binary: CpBinary,
     mkdir_binary: MkdirBinary,
-    mktemp_binary: MktempBinary,
-    mv_binary: MvBinary,
     find_binary: FindBinary,
     touch_binary: TouchBinary,
 ) -> Digest:
@@ -278,54 +274,38 @@ set -e
 
 CP_BIN="{cp_binary_path}"
 MKDIR_BIN="{mkdir_binary_path}"
-MKTEMP_BIN="{mktemp_binary_path}"
-MV_BIN="{mv_binary_path}"
 FIND_BIN="{find_binary_path}"
 TOUCH_BIN="{touch_binary_path}"
 
-# Cache paths - using mounted cache with dynamic relative path
 PROJECT_CACHE_SUBDIR="{project_cache_subdir}"
 FILE_EXTENSIONS="{file_extensions}"
 
 # Step 1: Restore cache from persistent storage to project root
 # This puts output directories and .tsbuildinfo files where tsc expects them
-if [ -d "$PROJECT_CACHE_SUBDIR" ]; then
-    # Touch cache files before copying to make them newer than source files
-    "$FIND_BIN" "$PROJECT_CACHE_SUBDIR" -type f -exec "$TOUCH_BIN" {{}} +
-    
-    # Copy cached files to working directory
-    if "$CP_BIN" -a "$PROJECT_CACHE_SUBDIR/." .; then
-        echo "Cache restored successfully"
+
+# Ensure cache directory exists (it won't on first run)
+"$MKDIR_BIN" -p "$PROJECT_CACHE_SUBDIR" > /dev/null 2>&1
+
+# Touch cache files before copying to make them newer than source files
+"$FIND_BIN" "$PROJECT_CACHE_SUBDIR" -type f -exec "$TOUCH_BIN" {{}} + > /dev/null 2>&1
+
+# Copy cached files to working directory
+"$CP_BIN" -a "$PROJECT_CACHE_SUBDIR/." . > /dev/null 2>&1
+
+# Step 2: Touch all TypeScript-compilable source files to trigger metadata validation
+# This ensures TypeScript checks metadata for all files and performs proper incremental compilation
+FIND_ARGS=""
+for ext in $FILE_EXTENSIONS; do
+    if [ -z "$FIND_ARGS" ]; then
+        FIND_ARGS="-name '*$ext'"
     else
-        echo "ERROR: Failed to restore cache"
-        exit 1
+        FIND_ARGS="$FIND_ARGS -o -name '*$ext'"
     fi
+done
+eval "$FIND_BIN" . -type f '\\(' $FIND_ARGS '\\)' -exec '"$TOUCH_BIN"' {{}} +
 
-    # Touch all TypeScript-compilable source files to trigger metadata validation
-    # This ensures TypeScript checks metadata for all files and performs proper incremental compilation
-
-    # Build find arguments for all extensions
-    FIND_ARGS=""
-    for ext in $FILE_EXTENSIONS; do
-        if [ -z "$FIND_ARGS" ]; then
-            FIND_ARGS="-name '*$ext'"
-        else
-            FIND_ARGS="$FIND_ARGS -o -name '*$ext'"
-        fi
-    done
-
-    # Use find and touch binaries passed from Python
-    echo "DEBUG: Running: $FIND_BIN . -type f \\\\( $FIND_ARGS \\\\) -exec $TOUCH_BIN {{}} +"
-    eval "$FIND_BIN" . -type f '\\(' $FIND_ARGS '\\)' -exec '"$TOUCH_BIN"' {{}} +
-fi
-
-# Step 2: Run TypeScript compiler
+# Step 3: Run TypeScript compiler
 "$@"
-
-# If TypeScript failed, exit immediately - no cache operations needed
-if [ $? -ne 0 ]; then
-    exit $?
-fi
 
 # TODO: we may not need tsbuildinfo in output?
 # TypeScript succeeded - proceed with file touching and cache operations
@@ -339,43 +319,33 @@ for workspace_dir in {workspace_dirs_str}; do
     fi
 done
 
-# Step 3: Save cache contents (compilation succeeded)
-
-# Create temp dir for atomic operation  
-CACHE_PARENT="${{PROJECT_CACHE_SUBDIR%/*}}"
-"$MKDIR_BIN" -p "$CACHE_PARENT"
-TMP_CACHE_DIR="$("$MKTEMP_BIN" -d "$CACHE_PARENT/tmp.XXXXXX")"
+# Step 4: Save cache directly to cache directory
 
 # Copy .tsbuildinfo files from workspace packages to cache
+# Handles case where tsconfig.tsbuildinfo is in the package root
 for workspace_dir in {workspace_dirs_str}; do
     tsbuildinfo_file="$workspace_dir/tsconfig.tsbuildinfo"
     if [ -f "$tsbuildinfo_file" ]; then
-        "$MKDIR_BIN" -p "$TMP_CACHE_DIR/$workspace_dir"
-        "$CP_BIN" "$tsbuildinfo_file" "$TMP_CACHE_DIR/$workspace_dir/"
+        "$MKDIR_BIN" -p "$PROJECT_CACHE_SUBDIR/$workspace_dir"
+        "$CP_BIN" "$tsbuildinfo_file" "$PROJECT_CACHE_SUBDIR/$workspace_dir/"
     fi
 done
 
 # Copy output directories to cache
+# Copies all output files and tsbuildinfo files to cache
+# (the output files are needed because tsc checks them against tsbuildinfo when determining if rebuild required)
 for output_dir in {output_dirs_str}; do
     if [ -d "$output_dir" ]; then
         output_parent="$(dirname "$output_dir")"
-        "$MKDIR_BIN" -p "$TMP_CACHE_DIR/$output_parent"
-        "$CP_BIN" -r "$output_dir" "$TMP_CACHE_DIR/$output_parent/"
+        "$MKDIR_BIN" -p "$PROJECT_CACHE_SUBDIR/$output_parent"
+        "$CP_BIN" -r "$output_dir" "$PROJECT_CACHE_SUBDIR/$output_parent/"
     fi
 done
-
-# Atomic replace
-OLD_BACKUP="$PROJECT_CACHE_SUBDIR.bak.$$"
-"$MV_BIN" "$PROJECT_CACHE_SUBDIR" "$OLD_BACKUP" 2>/dev/null || true
-"$MV_BIN" "$TMP_CACHE_DIR" "$PROJECT_CACHE_SUBDIR"
-rm -rf "$OLD_BACKUP" 2>/dev/null || true
 
 echo "Cache updated successfully"
 """.format(
         cp_binary_path=cp_binary.path,
         mkdir_binary_path=mkdir_binary.path,
-        mktemp_binary_path=mktemp_binary.path,
-        mv_binary_path=mv_binary.path,
         find_binary_path=find_binary.path,
         touch_binary_path=touch_binary.path,
         project_cache_subdir=project_cache_subdir,
