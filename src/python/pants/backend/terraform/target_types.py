@@ -30,7 +30,6 @@ class TerraformDependenciesField(Dependencies):
 
 class TerraformModuleSourcesField(MultipleSourcesField):
     default = ("*.tf",)
-    expected_file_extensions = (".tf",)
     ban_subdirectories = True
     help = generate_multiple_sources_field_help_message(
         "Example: `sources=['example.tf', 'new_*.tf', '!old_ignore.tf']`"
