@@ -1,0 +1,8 @@
+{
+  "name": "@test/common-types",
+  "version": "1.0.0",
+  "description": "Shared TypeScript type definitions",
+  "main": "./src/index.ts",
+  "private": true,
+  "type": "module"
+}
