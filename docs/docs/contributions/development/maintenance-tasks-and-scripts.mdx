@@ -5,6 +5,40 @@
 
 There's a variety of maintenance tasks that happen on different frequencies.
 
+## Improve documentation
+
+The per-version documentation at https://pantsbuild.org is stored in the separate [pantsbuild.org](https://github.com/pantsbuild/pantsbuild.org) repo. The [Development](https://github.com/pantsbuild/pantsbuild.org/blob/main/README.md#development) instructions in that repo describe how to set up `nvm` and `pnpm`.
+
+You'll want to run `pnpm install` in the pantsbuild.org repo to bootstrap its dependencies, then `pnpm start` to serve the docsite with your changes. This should look something like:
+```shell
+PANTS_REPO_ROOT="$(git rev-parse --show-toplevel)"
+PANTS_DOCSITE_REPO_PATH='<wherever you cloned pantsbuild/pantsbuild.org>'
+
+pushd "$PANTS_DOCSITE_REPO_PATH"
+# May need to run `nvm install` if this fails:
+nvm use
+# Avoid re-installing if nothing changed:
+pnpm install --optimistic-repeat-install
+
+# Copy over docs from the pants repo:
+cp -r "${PANTS_REPO_ROOT}/docs/docs" ./docs
+
+# Continuously rebuild docsite:
+pnpm start
+```
+
+If you want to copy over any changes as you make them in the pants source, you can make use of [`watchexec`](https://github.com/watchexec/watchexec) and [`rsync`](https://rsync.samba.org/):
+```shell
+watchexec --verbose --ignore-nothing --shell=none --watch "${PANTS_REPO_ROOT}/docs/docs" \
+    rsync --info=name --itemize-changes --human-readable --out-format='%f %n %o %i (%l bytes)' \
+          --verbose --progress \
+          --preallocate --checksum --inplace --mkpath \
+          --recursive "${PANTS_REPO_ROOT}/docs/docs" \
+          "${PANTS_DOCSITE_REPO_PATH}/docs"
+```
+
+This will rebuild your changes much more quickly than repeatedly calling `cp -r`.
+
 ## Update the default/known versions of a built-in tool/subsystem
 
 ### External tools (downloaded executables)
