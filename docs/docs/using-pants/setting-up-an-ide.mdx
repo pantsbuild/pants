@@ -7,9 +7,24 @@
 
 If you use a code-aware editor or IDE, such as PyCharm or VSCode, you may want to set it up to understand your code layout and dependencies. This will allow it to perform code navigation, auto-completion and other features that rely on code comprehension.
 
-## First-party sources
+## IDE Module Discovery
 
-To get your editor to understand the repo's first-party sources, you will probably need to tell it about the repo's [source roots](./key-concepts/source-roots.mdx). You can list those with:
+Assuming you are using the ["resolves" feature for Python lockfiles](../python/overview/third-party-dependencies.mdx)—which we strongly recommend—Pants can export a virtualenv for each of your resolves. You can then point your IDE to whichever resolve you want to load at the time.
+
+For first-party sources, you will need PEP-660 editable installs of all python_distribution targets that own the first-party code within that resolve.
+
+To use the `export` goal to create a virtualenv:
+
+```
+❯ pants export --export-py-editable-in-resolve=python-default --resolve=python-default
+Wrote symlink to mutable virtualenv for python-default (using Python 3.9.13) to dist/export/python/virtualenvs/python-default
+```
+
+You can specify the `--resolve` and --export-py-editable-in-resolve flags [multiple times](./key-concepts/options.mdx#list-values) to export multiple virtualenvs at once.
+
+Adding the `--py-resolve-format=symlinked_immutable_virtualenv` option symlinks to an immutable, internal virtualenv that does not have `pip` installed in it. It also hence cannot contain editable installs of your first-party code. This method is faster, but you must be careful not to attempt to modify the virtualenv. If you omit this flag, Pants will create a standalone, mutable virtualenv that includes `pip`, and that you can modify, but this method is slower. 
+
+An alternate way to get your editor to understand the repo's first-party sources is by telling it about the repo's [source roots](./key-concepts/source-roots.mdx). You can list those with:
 
 ```shell
 $ pants roots
@@ -30,22 +45,7 @@ $ python3 -c "print('PYTHONPATH=./' + ':./'.join('''${ROOTS}'''.replace(' ', '\\
 
 See [Use of the PYTHONPATH variable](https://code.visualstudio.com/docs/python/environments#_use-of-the-pythonpath-variable) to learn more about using the `PYTHONPATH` variable in VSCode.
 
-## Python third-party dependencies and tools
-
-To get your editor to understand the repo's third-party Python dependencies, you will probably want to point it at a virtualenv containing those dependencies.
-
-Assuming you are using the ["resolves" feature for Python lockfiles](../python/overview/third-party-dependencies.mdx)—which we strongly recommend—Pants can export a virtualenv for each of your resolves. You can then point your IDE to whichever resolve you want to load at the time.
-
-To use the `export` goal to create a virtualenv:
-
-```
-❯ pants export --py-resolve-format=symlinked_immutable_virtualenv --resolve=python-default
-Wrote symlink to immutable virtualenv for python-default (using Python 3.9.13) to dist/export/python/virtualenvs/python-default
-```
-
-You can specify the `--resolve` flag [multiple times](./key-concepts/options.mdx#list-values) to export multiple virtualenvs at once.
-
-The `--py-resolve-format=symlinked_immutable_virtualenv` option symlinks to an immutable, internal virtualenv that does not have `pip` installed in it. This method is faster, but you must be careful not to attempt to modify the virtualenv. If you omit this flag, Pants will create a standalone, mutable virtualenv that includes `pip`, and that you can modify, but this method is slower.
+Note: Some third-party extensions of your IDE (like Pylint with VSCode) may not use the updated PYTHONPATH from the .env file. Mutable virtualenvs with editable installs work better in such cases.
 
 ### Tool virtualenvs
 
