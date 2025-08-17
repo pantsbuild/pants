@@ -898,3 +898,25 @@ def test_typescript_incremental_compilation_cache_rule_runner(
     print(f"   Package manager: {package_manager}")
     print("   All 4 scenarios passed: cache creation → incremental → file change → incremental")
     print("=" * 60)
+
+
+def test_typescript_version_warning(basic_rule_runner: tuple[RuleRunner, str, str], caplog) -> None:
+    """Test that setting --typescript-version emits a warning."""
+    rule_runner, test_project, package_manager = basic_rule_runner
+    test_files = _load_project_test_files(test_project)
+    rule_runner.write_files(test_files)
+
+    rule_runner.set_options(
+        [f"--nodejs-package-manager={package_manager}", "--typescript-version=typescript@5.0.0"],
+        env_inherit={"PATH"},
+    )
+
+    target = rule_runner.get_target(
+        Address("basic_project/src", target_name="ts_sources", relative_file_path="index.ts")
+    )
+    request = TypeScriptCheckRequest(field_sets=(TypeScriptCheckFieldSet.create(target),))
+    rule_runner.request(CheckResults, [request])
+
+    assert caplog.records
+    assert "You set --typescript-version=typescript@5.0.0" in caplog.text
+    assert "This setting is ignored because TypeScript always uses" in caplog.text

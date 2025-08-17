@@ -28,7 +28,6 @@ from pants.build_graph.address import Address
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.system_binaries import CpBinary, FindBinary, MkdirBinary, TouchBinary
-from pants.engine.collection import Collection
 from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
@@ -317,60 +316,6 @@ done
     return script_digest
 
 
-async def _typecheck_typescript_projects(
-    field_sets: Collection[TypeScriptCheckFieldSet],
-    subsystem: TypeScriptSubsystem,
-    global_options: GlobalOptions,
-    build_root: BuildRoot,
-) -> tuple[CheckResult, ...]:
-    """Type check TypeScript projects, grouping targets by their containing NodeJS project."""
-    if not field_sets:
-        return ()
-
-    (
-        all_projects,
-        all_targets,
-        all_package_jsons,
-        all_ts_configs,
-        owning_packages,
-    ) = await concurrently(
-        find_node_js_projects(**implicitly()),
-        find_all_targets(),
-        all_package_json(),
-        construct_effective_ts_configs(),
-        concurrently(
-            find_owning_package(OwningNodePackageRequest(field_set.address), **implicitly())
-            for field_set in field_sets
-        ),
-    )
-
-    projects_to_field_sets: dict[NodeJSProject, list[TypeScriptCheckFieldSet]] = {}
-    for field_set, owning_package in zip(field_sets, owning_packages):
-        if owning_package.target:
-            package_directory = owning_package.target.address.spec_path
-            owning_project = all_projects.project_for_directory(package_directory)
-            if owning_project:
-                if owning_project not in projects_to_field_sets:
-                    projects_to_field_sets[owning_project] = []
-                projects_to_field_sets[owning_project].append(field_set)
-
-    project_results = await concurrently(
-        _typecheck_single_project(
-            project,
-            subsystem,
-            global_options,
-            all_targets,
-            all_projects,
-            all_package_jsons,
-            all_ts_configs,
-            build_root,
-        )
-        for project in projects_to_field_sets.keys()
-    )
-
-    return project_results
-
-
 async def _collect_project_typescript_targets(
     project: NodeJSProject,
     all_targets: AllTargets,
@@ -454,7 +399,7 @@ async def _prepare_compilation_input(
     )
 
 
-async def _prepare_typescript_tool_process(
+async def _prepare_tsc_build_process(
     project: NodeJSProject,
     subsystem: TypeScriptSubsystem,
     input_digest: Digest,
@@ -466,7 +411,6 @@ async def _prepare_typescript_tool_process(
     caching."""
     tsc_args = ("--build", *subsystem.extra_build_args)
     tsc_wrapper_filename = "__tsc_wrapper.sh"
-
     named_cache_local_dir = "typescript_cache"
     named_cache_sandbox_mount_dir = "._tsc_cache"
 
@@ -485,18 +429,17 @@ async def _prepare_typescript_tool_process(
         **implicitly(),
     )
 
-    merged_input = await merge_digests(MergeDigests([input_digest, script_digest]))
+    tool_input = await merge_digests(MergeDigests([input_digest, script_digest]))
 
     tool_request = subsystem.request(
         args=tsc_args,
-        input_digest=merged_input,
+        input_digest=tool_input,
         description=f"Type-check TypeScript project {project.root_dir} ({len(project_typescript_targets)} targets)",
         level=LogLevel.DEBUG,
         project_caches=FrozenDict({named_cache_local_dir: named_cache_sandbox_mount_dir}),
     )
 
-    # Override the resolve to use the project's resolve instead of default
-    # TODO: warn that we are doing this
+    # Use the project's resolve for TypeScript execution (always resolve-based)
     tool_request_with_resolve: NodeJSToolRequest = replace(
         tool_request, resolve=project_resolve.resolve_name
     )
@@ -547,7 +490,7 @@ async def _typecheck_single_project(
         project, all_ts_configs, Path(project.root_dir)
     )
 
-    process = await _prepare_typescript_tool_process(
+    process = await _prepare_tsc_build_process(
         project,
         subsystem,
         input_digest,
@@ -574,7 +517,7 @@ async def _typecheck_single_project(
     )
 
 
-@rule(desc="Check TypeScript compilation", level=LogLevel.DEBUG)
+@rule(desc="Check TypeScript compilation")
 async def typecheck_typescript(
     request: TypeScriptCheckRequest,
     subsystem: TypeScriptSubsystem,
@@ -584,14 +527,52 @@ async def typecheck_typescript(
     if subsystem.skip:
         return CheckResults([], checker_name=request.tool_name)
 
-    check_results = await _typecheck_typescript_projects(
-        request.field_sets,
-        subsystem,
-        global_options,
-        build_root,
+    field_sets = request.field_sets
+    if not field_sets:
+        return CheckResults([], checker_name=request.tool_name)
+
+    (
+        all_projects,
+        all_targets,
+        all_package_jsons,
+        all_ts_configs,
+        owning_packages,
+    ) = await concurrently(
+        find_node_js_projects(**implicitly()),
+        find_all_targets(),
+        all_package_json(),
+        construct_effective_ts_configs(),
+        concurrently(
+            find_owning_package(OwningNodePackageRequest(field_set.address), **implicitly())
+            for field_set in field_sets
+        ),
     )
 
-    return CheckResults(check_results, checker_name=request.tool_name)
+    projects_to_field_sets: dict[NodeJSProject, list[TypeScriptCheckFieldSet]] = {}
+    for field_set, owning_package in zip(field_sets, owning_packages):
+        if owning_package.target:
+            package_directory = owning_package.target.address.spec_path
+            owning_project = all_projects.project_for_directory(package_directory)
+            if owning_project:
+                if owning_project not in projects_to_field_sets:
+                    projects_to_field_sets[owning_project] = []
+                projects_to_field_sets[owning_project].append(field_set)
+
+    project_results = await concurrently(
+        _typecheck_single_project(
+            project,
+            subsystem,
+            global_options,
+            all_targets,
+            all_projects,
+            all_package_jsons,
+            all_ts_configs,
+            build_root,
+        )
+        for project in projects_to_field_sets.keys()
+    )
+
+    return CheckResults(project_results, checker_name=request.tool_name)
 
 
 def rules():

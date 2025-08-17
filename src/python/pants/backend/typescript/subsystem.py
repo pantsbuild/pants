@@ -3,8 +3,13 @@
 
 from __future__ import annotations
 
+import logging
+
 from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase
 from pants.option.option_types import SkipOption, StrListOption, StrOption
+from pants.util.strutil import softwrap
+
+logger = logging.getLogger(__name__)
 
 
 class TypeScriptSubsystem(NodeJSToolBase):
@@ -12,11 +17,10 @@ class TypeScriptSubsystem(NodeJSToolBase):
     name = "TypeScript"
     help = """TypeScript type checker (tsc)."""
 
-    # NOTE: TypeScript always uses resolve-based execution (not download-and-execute)
-    # because it needs access to project dependencies for type checking.
-    # The resolve is determined dynamically in check.py using ChosenNodeResolve.
-    # The actual TypeScript version comes from the project's package.json dependencies.
-    default_version = "typescript@9.9.9"
+    # TypeScript always uses resolve-based execution because it needs access to project
+    # dependencies for type checking. The resolve is determined dynamically in check.py.
+    # This default version is never used - TypeScript must come from project package.json.
+    default_version = "typescript@FROM_PACKAGE_JSON"
 
     skip = SkipOption("check")
 
@@ -42,7 +46,17 @@ class TypeScriptSubsystem(NodeJSToolBase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Override binary name since the package is 'typescript' but the binary is 'tsc'
+
+        # Warn if user manually set version
+        if self.version != "typescript@FROM_PACKAGE_JSON":
+            logger.warning(
+                softwrap(f"""
+                    You set --typescript-version={self.version}. This setting is ignored because
+                    TypeScript always uses the version from your project's package.json dependencies
+                    or devDependencies. Please ensure TypeScript is listed in your package.json.
+                """)
+            )
+
         self._binary_name_override = "tsc"
 
     @property
