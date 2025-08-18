@@ -60,6 +60,7 @@ from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import OrderedSet
 
 if TYPE_CHECKING:
     from pants.backend.javascript.nodejs_project import NodeJSProject
@@ -113,9 +114,8 @@ def _collect_package_output_dirs(
     project: NodeJSProject, all_ts_configs, project_root_path: Path
 ) -> tuple[str, ...]:
     workspace_dir_to_tsconfig = _build_workspace_tsconfig_map(project.workspaces, all_ts_configs)
-
-    package_output_dirs = set()
-
+    
+    package_output_dirs = OrderedSet()
     for workspace_pkg in project.workspaces:
         workspace_pkg_path = Path(workspace_pkg.root_dir)
 
@@ -128,11 +128,10 @@ def _collect_package_output_dirs(
         pkg_tsconfig = workspace_dir_to_tsconfig.get(os.path.normpath(workspace_pkg.root_dir))
 
         if pkg_tsconfig and pkg_tsconfig.out_dir:
-            pkg_tsconfig.validate_outdir()
             resolved_out_dir = f"{pkg_prefix}{pkg_tsconfig.out_dir.lstrip('./')}"
             package_output_dirs.add(resolved_out_dir)
 
-    return tuple(sorted(package_output_dirs))
+    return tuple(package_output_dirs)
 
 
 def _get_output_artifact_globs(

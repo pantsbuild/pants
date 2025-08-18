@@ -23,6 +23,7 @@ from pants.backend.typescript.target_types import (
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResults
 from pants.core.target_types import FileTarget
+from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner, logging
@@ -140,10 +141,7 @@ def _assert_identical_output_results(results_1: CheckResults, results_2: CheckRe
         )
 
         # Check for empty digest (indicates caching issues)
-        empty_digest_fingerprint = (
-            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-        )
-        if first_result.report.fingerprint == empty_digest_fingerprint:
+        if first_result.report.fingerprint == EMPTY_DIGEST.fingerprint:
             assert False, (
                 f"Caching not working for result {i + 1} - empty artifacts digest detected"
             )
