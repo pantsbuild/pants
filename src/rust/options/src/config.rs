@@ -100,7 +100,7 @@ struct ValueConversionError<'a> {
 }
 
 trait FromValue: Parseable {
-    fn from_value(value: &Value) -> Result<Self, ValueConversionError>;
+    fn from_value(value: &Value) -> Result<Self, ValueConversionError<'_>>;
 
     fn from_config(config: &ConfigReader, id: &OptionId) -> Result<Option<Self>, String> {
         if let Some(value) = config.get_value(id) {
@@ -149,7 +149,7 @@ trait FromValue: Parseable {
 }
 
 impl FromValue for String {
-    fn from_value(value: &Value) -> Result<String, ValueConversionError> {
+    fn from_value(value: &Value) -> Result<String, ValueConversionError<'_>> {
         if let Some(string) = value.as_str() {
             Ok(string.to_owned())
         } else {
@@ -162,7 +162,7 @@ impl FromValue for String {
 }
 
 impl FromValue for bool {
-    fn from_value(value: &Value) -> Result<bool, ValueConversionError> {
+    fn from_value(value: &Value) -> Result<bool, ValueConversionError<'_>> {
         if let Some(boolean) = value.as_bool() {
             Ok(boolean)
         } else {
@@ -175,7 +175,7 @@ impl FromValue for bool {
 }
 
 impl FromValue for i64 {
-    fn from_value(value: &Value) -> Result<i64, ValueConversionError> {
+    fn from_value(value: &Value) -> Result<i64, ValueConversionError<'_>> {
         if let Some(int) = value.as_integer() {
             Ok(int)
         } else {
@@ -188,7 +188,7 @@ impl FromValue for i64 {
 }
 
 impl FromValue for f64 {
-    fn from_value(value: &Value) -> Result<f64, ValueConversionError> {
+    fn from_value(value: &Value) -> Result<f64, ValueConversionError<'_>> {
         if let Some(float) = value.as_float() {
             Ok(float)
         } else if let Some(int) = value.as_integer() {

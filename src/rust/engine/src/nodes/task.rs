@@ -160,7 +160,7 @@ impl Task {
         params: Params,
         entry: Intern<rule_graph::Entry<Rule>>,
         gog: externs::GetOrGenerator,
-    ) -> BoxFuture<NodeResult<Value>> {
+    ) -> BoxFuture<'_, NodeResult<Value>> {
         async move {
             match gog {
                 externs::GetOrGenerator::Get(get) => {
