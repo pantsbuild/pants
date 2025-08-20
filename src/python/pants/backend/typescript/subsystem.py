@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 
 from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase
-from pants.option.option_types import SkipOption, StrListOption, StrOption
+from pants.option.option_types import SkipOption, StrListOption
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -24,30 +24,18 @@ class TypeScriptSubsystem(NodeJSToolBase):
 
     skip = SkipOption("check")
 
-    # TODO: Do we still need this?
-    cache_dir = StrOption(
-        default="~/.cache/pants/typescript",
-        help=(
-            "Directory to use for TypeScript incremental compilation cache. "
-            "TypeScript's --build mode generates .tsbuildinfo files and compiled outputs "
-            "that enable incremental compilation on subsequent runs."
-        ),
-        advanced=True,
-    )
-
     extra_build_args = StrListOption(
-        default=["--verbose"],
+        default=[],
         help=(
             "Extra arguments to pass to tsc when running in --build mode. "
             "These args are added to the base command 'tsc --build'. "
-            "Commonly used: --verbose (default), --force, --dry."
+            "Commonly used: --verbose, --force, --dry."
         ),
     )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Warn if user manually set version
         if self.version != "typescript@FROM_PACKAGE_JSON":
             logger.warning(
                 softwrap(f"""

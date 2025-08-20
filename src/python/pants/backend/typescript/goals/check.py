@@ -114,8 +114,8 @@ def _collect_package_output_dirs(
     project: NodeJSProject, all_ts_configs, project_root_path: Path
 ) -> tuple[str, ...]:
     workspace_dir_to_tsconfig = _build_workspace_tsconfig_map(project.workspaces, all_ts_configs)
-    
-    package_output_dirs = OrderedSet()
+
+    package_output_dirs: OrderedSet[str] = OrderedSet()
     for workspace_pkg in project.workspaces:
         workspace_pkg_path = Path(workspace_pkg.root_dir)
 
@@ -527,9 +527,6 @@ async def typecheck_typescript(
         return CheckResults([], checker_name=request.tool_name)
 
     field_sets = request.field_sets
-    if not field_sets:
-        return CheckResults([], checker_name=request.tool_name)
-
     (
         all_projects,
         all_targets,
