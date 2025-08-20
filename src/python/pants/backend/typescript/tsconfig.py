@@ -43,7 +43,6 @@ class TSConfig:
         return os.path.join(directory, self.base_url) if self.base_url else directory
 
     def validate_outdir(self) -> None:
-        # Check that outDir is explicitly set
         if not self.out_dir:
             raise ValueError(
                 f"TypeScript configuration at '{self.path}' is missing required 'outDir' setting. "
@@ -52,7 +51,6 @@ class TSConfig:
                 f"in {self.path}."
             )
 
-        # Reject paths with .. components (prevents cross-package conflicts)
         if ".." in self.out_dir:
             raise ValueError(
                 f"TypeScript configuration at '{self.path}' has outDir '{self.out_dir}' "
@@ -61,12 +59,10 @@ class TSConfig:
                 f"directories can cause build conflicts where packages overwrite each other's artifacts."
             )
 
-        # Reject absolute paths (prevents escaping project entirely)
         if os.path.isabs(self.out_dir):
             raise ValueError(
                 f"TypeScript configuration at '{self.path}' has absolute outDir '{self.out_dir}'. "
-                f"Use a relative path within the package directory instead (e.g., './dist', './build'). "
-                f"Absolute paths break build hermeticity and can cause security issues."
+                f"Use a relative path within the package directory instead (e.g., './dist', './build')."
             )
 
 

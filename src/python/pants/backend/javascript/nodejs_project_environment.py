@@ -156,7 +156,7 @@ async def setup_nodejs_project_environment_process(
             for key, value in req.per_package_caches.items()
         }
     )
-    final_append_only_caches = FrozenDict(
+    append_only_caches: FrozenDict[str, str] = FrozenDict(
         **per_package_caches, **req.project_caches, **req.env.project.extra_caches()
     )
 
@@ -172,7 +172,7 @@ async def setup_nodejs_project_environment_process(
                 working_directory=req.env.root_dir,
                 output_files=output_files,
                 output_directories=output_directories,
-                append_only_caches=final_append_only_caches,
+                append_only_caches=append_only_caches,
                 timeout_seconds=req.timeout_seconds,
                 project_digest=project_digest,
                 extra_env=FrozenDict(
