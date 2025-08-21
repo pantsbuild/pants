@@ -70,8 +70,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class CreateTscWrapperScriptRequest:
-    """Request to create TypeScript wrapper script for cache management."""
-
     project: NodeJSProject
     package_output_dirs: tuple[str, ...]
     build_root: BuildRoot
@@ -97,6 +95,7 @@ def _build_workspace_tsconfig_map(workspaces, all_ts_configs) -> dict[str, TSCon
 
     # Only consider tsconfig.json files (exclude tsconfig.build.json, tsconfig.test.json, etc.)
     # since tsc only reads tsconfig.json by default and we don't support the `--project` flag currently
+    # Additionally, TSConfig class only supports tsconfig.json.
     tsconfig_json_files = [
         cfg for cfg in all_ts_configs if os.path.basename(cfg.path) == "tsconfig.json"
     ]
@@ -111,9 +110,9 @@ def _build_workspace_tsconfig_map(workspaces, all_ts_configs) -> dict[str, TSCon
 
 
 def _collect_package_output_dirs(
-    project: NodeJSProject, all_ts_configs, project_root_path: Path
+    project: NodeJSProject, project_ts_configs: list[TSConfig], project_root_path: Path
 ) -> tuple[str, ...]:
-    workspace_dir_to_tsconfig = _build_workspace_tsconfig_map(project.workspaces, all_ts_configs)
+    workspace_dir_to_tsconfig = _build_workspace_tsconfig_map(project.workspaces, project_ts_configs)
 
     package_output_dirs: OrderedSet[str] = OrderedSet()
     for workspace_pkg in project.workspaces:
@@ -140,7 +139,6 @@ def _get_output_artifact_globs(
     globs = []
     project_root_path = Path(project.root_dir)
 
-    # Include all files in output directories
     for output_dir in package_output_dirs:
         globs.append(f"{output_dir}/**/*")
 
@@ -158,30 +156,29 @@ def _get_output_artifact_globs(
     return globs
 
 
-async def _collect_config_files_for_project(
-    project: NodeJSProject,
-    targets: list[Target],
-    all_package_json: AllPackageJson,
-    all_ts_configs: AllTSConfigs,
-) -> list[str]:
-    """Collect all configuration files needed for TypeScript compilation in a project.
-
-    This includes:
-    - package.json files (for dependencies and module resolution)
-    - tsconfig.json files (for TypeScript compiler configuration)
-    - file() targets that are dependencies of JS/TS targets
-    """
-    config_files = []
-
+def _collect_project_configs(
+    project: NodeJSProject, all_package_jsons: AllPackageJson, all_ts_configs: AllTSConfigs
+) -> tuple[list, list[TSConfig]]:
     project_package_jsons = [
-        pkg for pkg in all_package_json if pkg.root_dir.startswith(project.root_dir)
+        pkg for pkg in all_package_jsons if pkg.root_dir.startswith(project.root_dir)
     ]
-    for pkg_json in project_package_jsons:
-        config_files.append(pkg_json.file)
-
     project_ts_configs = [
         config for config in all_ts_configs if config.path.startswith(project.root_dir)
     ]
+    return project_package_jsons, project_ts_configs
+
+
+async def _collect_config_files_for_project(
+    project: NodeJSProject,
+    targets: list[Target],
+    project_package_jsons: list,
+    project_ts_configs: list[TSConfig],
+) -> list[str]:
+    config_files = []
+
+    for pkg_json in project_package_jsons:
+        config_files.append(pkg_json.file)
+
     for ts_config in project_ts_configs:
         config_files.append(ts_config.path)
 
@@ -318,9 +315,8 @@ async def _collect_project_targets(
     project: NodeJSProject,
     all_targets: AllTargets,
     all_projects: AllNodeJSProjects,
-    all_ts_configs: AllTSConfigs,
-) -> list[Target] | None:
-    project_ts_configs = [cfg for cfg in all_ts_configs if cfg.path.startswith(project.root_dir)]
+    project_ts_configs: list[TSConfig],
+) -> list[Target]:
     has_allow_js = any(ts_config.allow_js for ts_config in project_ts_configs if ts_config.allow_js)
 
     if has_allow_js:
@@ -348,13 +344,12 @@ async def _collect_project_targets(
             if target_project == project:
                 project_targets.append(target)
 
-    return project_targets if project_targets else None
+    return project_targets
 
 
 async def _hydrate_project_sources(
     project_targets: list[Target],
 ) -> Digest:
-    """Hydrate and merge all source files for JS/TS targets in the project."""
     workspace_target_sources = await concurrently(
         hydrate_sources(
             HydrateSourcesRequest(target[JSRuntimeSourceField]),
@@ -371,19 +366,13 @@ async def _hydrate_project_sources(
 async def _prepare_compilation_input(
     project: NodeJSProject,
     project_targets: list[Target],
-    all_package_jsons: AllPackageJson,
-    all_ts_configs: AllTSConfigs,
+    project_package_jsons: list,
+    project_ts_configs: list[TSConfig],
     all_workspace_sources: Digest,
 ) -> Digest:
-    """Prepare input digest for TypeScript compilation."""
     config_files = await _collect_config_files_for_project(
-        project, project_targets, all_package_jsons, all_ts_configs
+        project, project_targets, project_package_jsons, project_ts_configs
     )
-    # Validate that all TypeScript configurations have explicit outDir settings
-    # TODO: Add docs for this
-    project_ts_configs = [
-        config for config in all_ts_configs if config.path.startswith(project.root_dir)
-    ]
     for ts_config in project_ts_configs:
         ts_config.validate_outdir()
 
@@ -396,11 +385,7 @@ async def _prepare_compilation_input(
         else EMPTY_DIGEST
     )
 
-    return await merge_digests(
-        MergeDigests(
-            [all_workspace_sources] + ([config_digest] if config_digest != EMPTY_DIGEST else [])
-        )
-    )
+    return await merge_digests(MergeDigests([all_workspace_sources, config_digest]))
 
 
 async def _prepare_tsc_build_process(
@@ -411,8 +396,6 @@ async def _prepare_tsc_build_process(
     project_targets: list[Target],
     build_root: BuildRoot,
 ) -> Process:
-    """Prepare the TypeScript compiler process for execution with shell script wrapper for
-    caching."""
     tsc_args = ("--build", *subsystem.extra_build_args)
     tsc_wrapper_filename = "__tsc_wrapper.sh"
     named_cache_local_dir = "typescript_cache"
@@ -443,7 +426,7 @@ async def _prepare_tsc_build_process(
         project_caches=FrozenDict({named_cache_local_dir: named_cache_sandbox_mount_dir}),
     )
 
-    # Use the project's resolve for TypeScript execution (always resolve-based)
+    # Uses the project's resolve as TypeScript execution requires project deps.
     tool_request_with_resolve: NodeJSToolRequest = replace(
         tool_request, resolve=project_resolve.resolve_name
     )
@@ -470,8 +453,12 @@ async def _typecheck_single_project(
     all_ts_configs: AllTSConfigs,
     build_root: BuildRoot,
 ) -> CheckResult:
+    project_package_jsons, project_ts_configs = _collect_project_configs(
+        project, all_package_jsons, all_ts_configs
+    )
+    
     project_targets = await _collect_project_targets(
-        project, all_targets, all_projects, all_ts_configs
+        project, all_targets, all_projects, project_ts_configs
     )
 
     if not project_targets:
@@ -486,12 +473,12 @@ async def _typecheck_single_project(
     input_digest = await _prepare_compilation_input(
         project,
         project_targets,
-        all_package_jsons,
-        all_ts_configs,
+        project_package_jsons,
+        project_ts_configs,
         all_workspace_sources,
     )
     package_output_dirs = _collect_package_output_dirs(
-        project, all_ts_configs, Path(project.root_dir)
+        project, project_ts_configs, Path(project.root_dir)
     )
 
     process = await _prepare_tsc_build_process(
@@ -516,6 +503,7 @@ async def _typecheck_single_project(
     return CheckResult.from_fallible_process_result(
         result,
         partition_description=f"TypeScript check on {project.root_dir} ({len(project_targets)} targets)",
+        # TODO: remove
         report=user_outputs_digest,
         output_simplifier=global_options.output_simplifier(),
     )
