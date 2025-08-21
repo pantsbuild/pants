@@ -23,7 +23,7 @@ from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
     has_python_version,
-    skip_unless_python38_and_python39_present,
+    skip_unless_python310_and_python311_present,
 )
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import QueryRule
@@ -87,7 +87,7 @@ def assert_success(
 @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
-    all_major_minor_python_versions(["CPython>=3.8,<4"]),
+    all_major_minor_python_versions(["CPython>=3.9,<4"]),
 )
 def test_passing(rule_runner: PythonRuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"})
@@ -105,7 +105,7 @@ def test_failing(rule_runner: PythonRuleRunner) -> None:
     result = run_bandit(rule_runner, [tgt])
     assert len(result) == 1
     assert result[0].exit_code == 1
-    assert "Issue: [B303:blacklist] Use of insecure MD2, MD4, MD5" in result[0].stdout
+    assert "Issue: [B324:hashlib] Use of weak MD5 hash for security." in result[0].stdout
     assert result[0].report == EMPTY_DIGEST
 
 
@@ -121,51 +121,51 @@ def test_multiple_targets(rule_runner: PythonRuleRunner) -> None:
     assert len(result) == 1
     assert result[0].exit_code == 1
     assert "good.py" not in result[0].stdout
-    assert "Issue: [B303:blacklist] Use of insecure MD2, MD4, MD5" in result[0].stdout
+    assert "Issue: [B324:hashlib] Use of weak MD5 hash for security." in result[0].stdout
     assert result[0].report == EMPTY_DIGEST
 
 
-@skip_unless_python38_and_python39_present
+@skip_unless_python310_and_python311_present
 def test_uses_correct_python_version(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
-            "f.py": "y = (x := 5)'\n",
+            "f.py": "eg = ExceptionGroup('', [Exception()])'\n",
             "BUILD": dedent(
                 """\
-                python_sources(name="py38", interpreter_constraints=["==3.8.*"])
-                python_sources(name="py39", interpreter_constraints=["==3.9.*"])
+                python_sources(name="py310", interpreter_constraints=["==3.10.*"])
+                python_sources(name="py311", interpreter_constraints=["==3.11.*"])
                 """
             ),
         }
     )
 
-    py38_tgt = rule_runner.get_target(Address("", target_name="py38", relative_file_path="f.py"))
-    py38_result = run_bandit(rule_runner, [py38_tgt])
-    assert len(py38_result) == 1
-    assert py38_result[0].exit_code == 0
-    assert "f.py (syntax error while parsing AST from file)" in py38_result[0].stdout
+    py310_tgt = rule_runner.get_target(Address("", target_name="py310", relative_file_path="f.py"))
+    py310_result = run_bandit(rule_runner, [py310_tgt])
+    assert len(py310_result) == 1
+    assert py310_result[0].exit_code == 0
+    assert "f.py (syntax error while parsing AST from file)" in py310_result[0].stdout
 
-    py39_tgt = rule_runner.get_target(Address("", target_name="py39", relative_file_path="f.py"))
-    py39_result = run_bandit(rule_runner, [py39_tgt])
-    assert len(py39_result) == 1
-    assert py39_result[0].exit_code == 0
-    assert "No issues identified." in py39_result[0].stdout
+    py311_tgt = rule_runner.get_target(Address("", target_name="py311", relative_file_path="f.py"))
+    py311_result = run_bandit(rule_runner, [py311_tgt])
+    assert len(py311_result) == 1
+    assert py311_result[0].exit_code == 0
+    assert "No issues identified." in py311_result[0].stdout
 
     # Test that we partition incompatible targets when passed in a single batch. We expect Py38
     # to still fail, but Py39 should pass.
-    combined_result = run_bandit(rule_runner, [py38_tgt, py39_tgt])
+    combined_result = run_bandit(rule_runner, [py310_tgt, py311_tgt])
     assert len(combined_result) == 2
 
-    batched_py38_result, batched_py39_result = sorted(
+    batched_py310_result, batched_py311_result = sorted(
         combined_result, key=lambda result: result.stderr
     )
-    assert batched_py38_result.exit_code == 0
-    assert batched_py38_result.partition_description == "['CPython==3.8.*']"
-    assert "f.py (syntax error while parsing AST from file)" in batched_py38_result.stdout
+    assert batched_py310_result.exit_code == 0
+    assert batched_py310_result.partition_description == "['CPython==3.10.*']"
+    assert "f.py (syntax error while parsing AST from file)" in batched_py310_result.stdout
 
-    assert batched_py39_result.exit_code == 0
-    assert batched_py39_result.partition_description == "['CPython==3.9.*']"
-    assert "No issues identified." in batched_py39_result.stdout
+    assert batched_py311_result.exit_code == 0
+    assert batched_py311_result.partition_description == "['CPython==3.11.*']"
+    assert "No issues identified." in batched_py311_result.stdout
 
 
 def test_respects_config_file(rule_runner: PythonRuleRunner) -> None:
@@ -173,7 +173,7 @@ def test_respects_config_file(rule_runner: PythonRuleRunner) -> None:
         {
             "f.py": BAD_FILE,
             "BUILD": "python_sources(name='t')",
-            ".bandit": "skips: ['B303']",
+            ".bandit": "skips: ['B324']",
         }
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
@@ -183,7 +183,7 @@ def test_respects_config_file(rule_runner: PythonRuleRunner) -> None:
 def test_respects_passthrough_args(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    assert_success(rule_runner, tgt, extra_args=["--bandit-args='--skip=B303'"])
+    assert_success(rule_runner, tgt, extra_args=["--bandit-args='--skip=B324'"])
 
 
 def test_skip(rule_runner: PythonRuleRunner) -> None:
@@ -193,14 +193,12 @@ def test_skip(rule_runner: PythonRuleRunner) -> None:
     assert not result
 
 
-@pytest.mark.skipif(not (has_python_version("3.7")), reason="Missing requisite Python")
+@pytest.mark.skipif(not (has_python_version("3.11")), reason="Missing Python 3.11")
 def test_3rdparty_plugin(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "f.py": "aws_key = 'JalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEY'\n",
-            # NB: `bandit-aws` does not currently work with Python 3.8. See
-            #  https://github.com/pantsbuild/pants/issues/10545.
-            "BUILD": "python_sources(name='t', interpreter_constraints=['>=3.7,<3.8'])",
+            "BUILD": "python_sources(name='t', interpreter_constraints=['>=3.11,<3.12'])",
             "bandit.lock": read_resource(
                 "pants.backend.python.lint.bandit", "bandit_plugin_test.lock"
             ),
@@ -233,7 +231,8 @@ def test_report_file(rule_runner: PythonRuleRunner) -> None:
     report_files = rule_runner.request(DigestContents, [result[0].report])
     assert len(report_files) == 1
     assert (
-        "Issue: [B303:blacklist] Use of insecure MD2, MD4, MD5" in report_files[0].content.decode()
+        "Issue: [B324:hashlib] Use of weak MD5 hash for security."
+        in report_files[0].content.decode()
     )
 
 
@@ -254,5 +253,5 @@ def test_type_stubs(rule_runner: PythonRuleRunner) -> None:
     assert result[0].exit_code == 1
     assert "f.py " not in result[0].stdout
     assert "f.pyi" in result[0].stdout
-    assert "Issue: [B303:blacklist] Use of insecure MD2, MD4, MD5" in result[0].stdout
+    assert "Issue: [B324:hashlib] Use of weak MD5 hash for security." in result[0].stdout
     assert result[0].report == EMPTY_DIGEST
