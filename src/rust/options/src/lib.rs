@@ -622,7 +622,7 @@ impl OptionParser {
         id: &OptionId,
         default: Option<&T>,
         getter: fn(&Arc<dyn OptionsSource>, &OptionId) -> Result<Option<T::Owned>, String>,
-    ) -> Result<OptionalOptionValue<T::Owned>, String> {
+    ) -> Result<OptionalOptionValue<'_, T::Owned>, String> {
         let mut derivation = None;
         if self.include_derivation {
             let mut derivations = vec![];
@@ -656,7 +656,7 @@ impl OptionParser {
         &self,
         id: &OptionId,
         default: Option<bool>,
-    ) -> Result<OptionalOptionValue<bool>, String> {
+    ) -> Result<OptionalOptionValue<'_, bool>, String> {
         self.parse_scalar(id, default.as_ref(), |source, id| source.get_bool(id))
     }
 
@@ -664,7 +664,7 @@ impl OptionParser {
         &self,
         id: &OptionId,
         default: Option<i64>,
-    ) -> Result<OptionalOptionValue<i64>, String> {
+    ) -> Result<OptionalOptionValue<'_, i64>, String> {
         self.parse_scalar(id, default.as_ref(), |source, id| source.get_int(id))
     }
 
@@ -672,7 +672,7 @@ impl OptionParser {
         &self,
         id: &OptionId,
         default: Option<f64>,
-    ) -> Result<OptionalOptionValue<f64>, String> {
+    ) -> Result<OptionalOptionValue<'_, f64>, String> {
         self.parse_scalar(id, default.as_ref(), |source, id| source.get_float(id))
     }
 
@@ -680,21 +680,25 @@ impl OptionParser {
         &self,
         id: &OptionId,
         default: Option<&str>,
-    ) -> Result<OptionalOptionValue<String>, String> {
+    ) -> Result<OptionalOptionValue<'_, String>, String> {
         self.parse_scalar(id, default, |source, id| source.get_string(id))
     }
 
-    pub fn parse_bool(&self, id: &OptionId, default: bool) -> Result<OptionValue<bool>, String> {
+    pub fn parse_bool(
+        &self,
+        id: &OptionId,
+        default: bool,
+    ) -> Result<OptionValue<'_, bool>, String> {
         self.parse_bool_optional(id, Some(default))
             .map(OptionalOptionValue::unwrap)
     }
 
-    pub fn parse_int(&self, id: &OptionId, default: i64) -> Result<OptionValue<i64>, String> {
+    pub fn parse_int(&self, id: &OptionId, default: i64) -> Result<OptionValue<'_, i64>, String> {
         self.parse_int_optional(id, Some(default))
             .map(OptionalOptionValue::unwrap)
     }
 
-    pub fn parse_float(&self, id: &OptionId, default: f64) -> Result<OptionValue<f64>, String> {
+    pub fn parse_float(&self, id: &OptionId, default: f64) -> Result<OptionValue<'_, f64>, String> {
         self.parse_float_optional(id, Some(default))
             .map(OptionalOptionValue::unwrap)
     }
@@ -703,7 +707,7 @@ impl OptionParser {
         &self,
         id: &OptionId,
         default: &str,
-    ) -> Result<OptionValue<String>, String> {
+    ) -> Result<OptionValue<'_, String>, String> {
         self.parse_string_optional(id, Some(default))
             .map(OptionalOptionValue::unwrap)
     }
@@ -715,7 +719,7 @@ impl OptionParser {
         default: Vec<T>,
         getter: fn(&Arc<dyn OptionsSource>, &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String>,
         remover: fn(&mut Vec<T>, &[T]),
-    ) -> Result<ListOptionValue<T>, String> {
+    ) -> Result<ListOptionValue<'_, T>, String> {
         let mut derivation = None;
         if self.include_derivation {
             let mut derivations = vec![(
@@ -766,7 +770,7 @@ impl OptionParser {
         id: &OptionId,
         default: Vec<T>,
         getter: fn(&Arc<dyn OptionsSource>, &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String>,
-    ) -> Result<ListOptionValue<T>, String> {
+    ) -> Result<ListOptionValue<'_, T>, String> {
         self.parse_list(id, default, getter, |list, remove| {
             let to_remove = remove.iter().collect::<HashSet<_>>();
             list.retain(|item| !to_remove.contains(item));
@@ -777,7 +781,7 @@ impl OptionParser {
         &self,
         id: &OptionId,
         default: Vec<bool>,
-    ) -> Result<ListOptionValue<bool>, String> {
+    ) -> Result<ListOptionValue<'_, bool>, String> {
         self.parse_list_hashable(id, default, |source, id| source.get_bool_list(id))
     }
 
@@ -785,7 +789,7 @@ impl OptionParser {
         &self,
         id: &OptionId,
         default: Vec<i64>,
-    ) -> Result<ListOptionValue<i64>, String> {
+    ) -> Result<ListOptionValue<'_, i64>, String> {
         self.parse_list_hashable(id, default, |source, id| source.get_int_list(id))
     }
 
@@ -794,7 +798,7 @@ impl OptionParser {
         &self,
         id: &OptionId,
         default: Vec<f64>,
-    ) -> Result<ListOptionValue<f64>, String> {
+    ) -> Result<ListOptionValue<'_, f64>, String> {
         self.parse_list(
             id,
             default,
@@ -809,7 +813,7 @@ impl OptionParser {
         &self,
         id: &OptionId,
         default: Vec<String>,
-    ) -> Result<ListOptionValue<String>, String> {
+    ) -> Result<ListOptionValue<'_, String>, String> {
         self.parse_list_hashable::<String>(id, default, |source, id| source.get_string_list(id))
     }
 
@@ -817,7 +821,7 @@ impl OptionParser {
         &self,
         id: &OptionId,
         default: HashMap<String, Val>,
-    ) -> Result<DictOptionValue, String> {
+    ) -> Result<DictOptionValue<'_>, String> {
         let mut derivation = None;
         if self.include_derivation {
             let mut derivations = vec![(
