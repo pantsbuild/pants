@@ -291,7 +291,7 @@ def generate(buildroot: str, tools: Sequence[Tool], args: Sequence[str], dry_run
     ]
 
     if dry_run:
-        logger.info("Would run: " + " ".join(args))
+        logger.info("Would run: " + " ".join(repr(arg) for arg in args))
         return
 
     # If there is a pre-existing lockfile, seed it so we get the pretty lockfile diff
@@ -302,7 +302,7 @@ def generate(buildroot: str, tools: Sequence[Tool], args: Sequence[str], dry_run
             logger.debug(f"copying existing lockfile from {lockfile_dest}")
             shutil.copy(lockfile_dest, lockfile_buildroot_filename(tool.lockfile_name))
 
-    logger.debug("Running: " + " ".join(args))
+    logger.debug("Running: " + " ".join(repr(arg) for arg in args))
     subprocess.run(args, cwd=buildroot, check=True)
 
     # Copy the generated lockfiles from the tmp repo to the Pants repo.
