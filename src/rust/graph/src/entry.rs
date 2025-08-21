@@ -465,7 +465,7 @@ impl<N: Node> Entry<N> {
         &self,
         context: &Context<N>,
         entry_id: EntryId,
-    ) -> BoxFuture<NodeResult<N>> {
+    ) -> BoxFuture<'_, NodeResult<N>> {
         let mut state = self.state.lock();
 
         // First check whether the Node is already complete, or is currently running: in both of these
