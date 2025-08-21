@@ -345,10 +345,15 @@ def test_works_with_python38(rule_runner: PythonRuleRunner) -> None:
                 """
             ),
             f"{PACKAGE}/BUILD": "python_sources(interpreter_constraints=['>=3.8'])",
+            "mypy.lock": read_sibling_resource(__name__, "mypy_py38.lock"),
         }
     )
+    extra_args = [
+        "--python-resolves={'mypy':'mypy.lock'}",
+        "--mypy-install-from-resolve=mypy",
+    ]
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
-    assert_success(rule_runner, tgt)
+    assert_success(rule_runner, tgt, extra_args=extra_args)
 
 
 @skip_unless_python39_present

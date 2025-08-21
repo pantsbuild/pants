@@ -340,7 +340,6 @@ async def mypy_typecheck_partition(
         set(itertools.chain(first_party_plugins.source_roots, closure_sources.source_roots))
     )
     env = {
-        "PEX_EXTRA_SYS_PATH": ":".join(all_used_source_roots),
         "MYPYPATH": ":".join(all_used_source_roots),
         # Always emit colors to improve cache hit rates, the results are post-processed to match the
         # global setting

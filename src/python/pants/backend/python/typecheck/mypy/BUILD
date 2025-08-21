@@ -10,6 +10,7 @@ resources(
         "mypy_with_django_stubs.lock",
         "mypy_with_more_itertools.lock",
         "mypy_shadowing_typed_ast.lock",
+        "mypy_py38.lock",
     ],
 )
 

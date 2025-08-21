@@ -9,6 +9,10 @@
 //     "CPython<3.14,>=3.9"
 //   ],
 //   "generated_with_requirements": [
+//     "opentelemetry-api~=1.34.1",
+//     "opentelemetry-exporter-otlp-proto-http~=1.34.1",
+//     "opentelemetry-instrumentation-requests~=0.55b1",
+//     "opentelemetry-sdk~=1.34.1",
 //     "semgrep<2,>=1.20.0"
 //   ],
 //   "manylinux": "manylinux2014",
@@ -474,31 +478,6 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "bd5011788200372a32418f888e326a09ff80d0214bd961147cfed01b5c018eec",
-              "url": "https://files.pythonhosted.org/packages/6e/c6/ac0b6c1e2d138f1002bcf799d330bd6d85084fece321e662a14223794041/Deprecated-1.2.18-py2.py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "422b6f6d859da6f2ef57857761bfb392480502a64c3028ca9bbe86085d72115d",
-              "url": "https://files.pythonhosted.org/packages/98/97/06afe62762c9a8a86af0cfb7bfdab22a43ad17138b07af5b1a58442690a2/deprecated-1.2.18.tar.gz"
-            }
-          ],
-          "project_name": "deprecated",
-          "requires_dists": [
-            "PyTest-Cov; extra == \"dev\"",
-            "PyTest; extra == \"dev\"",
-            "bump2version<1; extra == \"dev\"",
-            "setuptools; python_version >= \"3.12\" and extra == \"dev\"",
-            "tox; extra == \"dev\"",
-            "wrapt<2,>=1.10"
-          ],
-          "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7",
-          "version": "1.2.18"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
               "hash": "3111b9d131c238bec2f8f516e123e14ba243563fb135d3fe885990585aa7795b",
               "url": "https://files.pythonhosted.org/packages/02/cc/b7e31358aac6ed1ef2bb790a9746ac2c69bcb3c8588b41616914eb106eaf/exceptiongroup-1.2.2-py3-none-any.whl"
             },
@@ -606,41 +585,41 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "30962b96c0c223483ed6cc7280e7f0199feb01a0e40cfae4d4450fc6fab1f570",
-              "url": "https://files.pythonhosted.org/packages/2d/0a/679461c511447ffaf176567d5c496d1de27cbe34a87df6677d7171b2fbd4/importlib_metadata-7.1.0-py3-none-any.whl"
+              "hash": "e5dd1551894c77868a30651cef00984d50e1002d06942a7101d34870c5f02afd",
+              "url": "https://files.pythonhosted.org/packages/20/b0/36bd937216ec521246249be3bf9855081de4c5e06a0c9b4219dbeda50373/importlib_metadata-8.7.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "b78938b926ee8d5f020fc4772d487045805a55ddbad2ecf21c6d60938dc7fcd2",
-              "url": "https://files.pythonhosted.org/packages/a0/fc/c4e6078d21fc4fa56300a241b87eae76766aa380a23fc450fc85bb7bf547/importlib_metadata-7.1.0.tar.gz"
+              "hash": "d13b81ad223b890aa16c5471f2ac3056cf76c5f10f82d6f9292f0b415f389000",
+              "url": "https://files.pythonhosted.org/packages/76/66/650a33bd90f786193e4de4b3ad86ea60b53c89b669a5c7be931fac31cdb0/importlib_metadata-8.7.0.tar.gz"
             }
           ],
           "project_name": "importlib-metadata",
           "requires_dists": [
-            "flufl.flake8; extra == \"testing\"",
-            "furo; extra == \"docs\"",
-            "importlib-resources>=1.3; python_version < \"3.9\" and extra == \"testing\"",
+            "flufl.flake8; extra == \"test\"",
+            "furo; extra == \"doc\"",
+            "importlib_resources>=1.3; python_version < \"3.9\" and extra == \"test\"",
             "ipython; extra == \"perf\"",
-            "jaraco.packaging>=9.3; extra == \"docs\"",
-            "jaraco.test>=5.4; extra == \"testing\"",
-            "jaraco.tidelift>=1.4; extra == \"docs\"",
-            "packaging; extra == \"testing\"",
-            "pyfakefs; extra == \"testing\"",
-            "pytest-checkdocs>=2.4; extra == \"testing\"",
-            "pytest-cov; extra == \"testing\"",
-            "pytest-enabler>=2.2; extra == \"testing\"",
-            "pytest-mypy; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
-            "pytest-perf>=0.9.2; extra == \"testing\"",
-            "pytest-ruff>=0.2.1; extra == \"testing\"",
-            "pytest>=6; extra == \"testing\"",
-            "rst.linker>=1.9; extra == \"docs\"",
-            "sphinx-lint; extra == \"docs\"",
-            "sphinx>=3.5; extra == \"docs\"",
+            "jaraco.packaging>=9.3; extra == \"doc\"",
+            "jaraco.test>=5.4; extra == \"test\"",
+            "jaraco.tidelift>=1.4; extra == \"doc\"",
+            "packaging; extra == \"test\"",
+            "pyfakefs; extra == \"test\"",
+            "pytest!=8.1.*,>=6; extra == \"test\"",
+            "pytest-checkdocs>=2.4; extra == \"check\"",
+            "pytest-cov; extra == \"cover\"",
+            "pytest-enabler>=2.2; extra == \"enabler\"",
+            "pytest-mypy; extra == \"type\"",
+            "pytest-perf>=0.9.2; extra == \"test\"",
+            "pytest-ruff>=0.2.1; sys_platform != \"cygwin\" and extra == \"check\"",
+            "rst.linker>=1.9; extra == \"doc\"",
+            "sphinx-lint; extra == \"doc\"",
+            "sphinx>=3.5; extra == \"doc\"",
             "typing-extensions>=3.6.4; python_version < \"3.8\"",
-            "zipp>=0.5"
+            "zipp>=3.20"
           ],
-          "requires_python": ">=3.8",
-          "version": "7.1.0"
+          "requires_python": ">=3.9",
+          "version": "8.7.0"
         },
         {
           "artifacts": [
@@ -768,194 +747,196 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "757fa1aa020a0f8fa139f8959e53dec2051cc26b832e76fa839a6d76ecefd737",
-              "url": "https://files.pythonhosted.org/packages/7e/b2/4bc5e52c9a23df0ac17dbb23923e609a8269cd67000a712b4f5bcfae1490/opentelemetry_api-1.25.0-py3-none-any.whl"
+              "hash": "b7df4cb0830d5a6c29ad0c0691dbae874d8daefa934b8b1d642de48323d32a8c",
+              "url": "https://files.pythonhosted.org/packages/a5/3a/2ba85557e8dc024c0842ad22c570418dc02c36cbd1ab4b832a93edf071b8/opentelemetry_api-1.34.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "77c4985f62f2614e42ce77ee4c9da5fa5f0bc1e1821085e9a47533a9323ae869",
-              "url": "https://files.pythonhosted.org/packages/df/0d/10357006dc10fc65f7c7b46c18232e466e355f9e606ac461cfc7193b4cbe/opentelemetry_api-1.25.0.tar.gz"
+              "hash": "64f0bd06d42824843731d05beea88d4d4b6ae59f9fe347ff7dfa2cc14233bbb3",
+              "url": "https://files.pythonhosted.org/packages/4d/5e/94a8cb759e4e409022229418294e098ca7feca00eb3c467bb20cbd329bda/opentelemetry_api-1.34.1.tar.gz"
             }
           ],
           "project_name": "opentelemetry-api",
           "requires_dists": [
-            "deprecated>=1.2.6",
-            "importlib-metadata<=7.1,>=6.0"
+            "importlib-metadata<8.8.0,>=6.0",
+            "typing-extensions>=4.5.0"
           ],
-          "requires_python": ">=3.8",
-          "version": "1.25.0"
+          "requires_python": ">=3.9",
+          "version": "1.34.1"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "15637b7d580c2675f70246563363775b4e6de947871e01d0f4e3881d1848d693",
-              "url": "https://files.pythonhosted.org/packages/05/02/74ac6619eec78c82a923324f916d3eccd2f2254cf4270b669e96b76bf717/opentelemetry_exporter_otlp_proto_common-1.25.0-py3-none-any.whl"
+              "hash": "8e2019284bf24d3deebbb6c59c71e6eef3307cd88eff8c633e061abba33f7e87",
+              "url": "https://files.pythonhosted.org/packages/72/e8/8b292a11cc8d8d87ec0c4089ae21b6a58af49ca2e51fa916435bc922fdc7/opentelemetry_exporter_otlp_proto_common-1.34.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "c93f4e30da4eee02bacd1e004eb82ce4da143a2f8e15b987a9f603e0a85407d3",
-              "url": "https://files.pythonhosted.org/packages/37/a7/85ffaaacd712e4634fa1c56cbf79a02cf90b8a178fe1eee2cabfb0b7f44d/opentelemetry_exporter_otlp_proto_common-1.25.0.tar.gz"
+              "hash": "b59a20a927facd5eac06edaf87a07e49f9e4a13db487b7d8a52b37cb87710f8b",
+              "url": "https://files.pythonhosted.org/packages/86/f0/ff235936ee40db93360233b62da932d4fd9e8d103cd090c6bcb9afaf5f01/opentelemetry_exporter_otlp_proto_common-1.34.1.tar.gz"
             }
           ],
           "project_name": "opentelemetry-exporter-otlp-proto-common",
           "requires_dists": [
-            "opentelemetry-proto==1.25.0"
+            "opentelemetry-proto==1.34.1"
           ],
-          "requires_python": ">=3.8",
-          "version": "1.25.0"
+          "requires_python": ">=3.9",
+          "version": "1.34.1"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "2eca686ee11b27acd28198b3ea5e5863a53d1266b91cda47c839d95d5e0541a6",
-              "url": "https://files.pythonhosted.org/packages/1d/b9/a47734f7c5a45619d8c64c227f119092b4679b2c49d37116fda7c0fc4573/opentelemetry_exporter_otlp_proto_http-1.25.0-py3-none-any.whl"
+              "hash": "5251f00ca85872ce50d871f6d3cc89fe203b94c3c14c964bbdc3883366c705d8",
+              "url": "https://files.pythonhosted.org/packages/79/54/b05251c04e30c1ac70cf4a7c5653c085dfcf2c8b98af71661d6a252adc39/opentelemetry_exporter_otlp_proto_http-1.34.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "9f8723859e37c75183ea7afa73a3542f01d0fd274a5b97487ea24cb683d7d684",
-              "url": "https://files.pythonhosted.org/packages/72/d9/1c3c518853c27d323a46813d3e99d601959ca2c6963d5217fe2110f0d579/opentelemetry_exporter_otlp_proto_http-1.25.0.tar.gz"
+              "hash": "aaac36fdce46a8191e604dcf632e1f9380c7d5b356b27b3e0edb5610d9be28ad",
+              "url": "https://files.pythonhosted.org/packages/19/8f/954bc725961cbe425a749d55c0ba1df46832a5999eae764d1a7349ac1c29/opentelemetry_exporter_otlp_proto_http-1.34.1.tar.gz"
             }
           ],
           "project_name": "opentelemetry-exporter-otlp-proto-http",
           "requires_dists": [
-            "deprecated>=1.2.6",
             "googleapis-common-protos~=1.52",
             "opentelemetry-api~=1.15",
-            "opentelemetry-exporter-otlp-proto-common==1.25.0",
-            "opentelemetry-proto==1.25.0",
-            "opentelemetry-sdk~=1.25.0",
-            "requests~=2.7"
+            "opentelemetry-exporter-otlp-proto-common==1.34.1",
+            "opentelemetry-proto==1.34.1",
+            "opentelemetry-sdk~=1.34.1",
+            "requests~=2.7",
+            "typing-extensions>=4.5.0"
           ],
-          "requires_python": ">=3.8",
-          "version": "1.25.0"
+          "requires_python": ">=3.9",
+          "version": "1.34.1"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "89cd721b9c18c014ca848ccd11181e6b3fd3f6c7669e35d59c48dc527408c18b",
-              "url": "https://files.pythonhosted.org/packages/10/e5/d6fff0a6f6fbddf03c7fb48ab47925581c4f1a8268f9ad98e5ea4a8b90a5/opentelemetry_instrumentation-0.46b0-py3-none-any.whl"
+              "hash": "cbb1496b42bc394e01bc63701b10e69094e8564e281de063e4328d122cc7a97e",
+              "url": "https://files.pythonhosted.org/packages/60/7d/8ddfda1506c2fcca137924d5688ccabffa1aed9ec0955b7d0772de02cec3/opentelemetry_instrumentation-0.55b1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "974e0888fb2a1e01c38fbacc9483d024bb1132aad92d6d24e2e5543887a7adda",
-              "url": "https://files.pythonhosted.org/packages/0f/20/0a5d980843e048e9516443a91c63a559b40e5d50a730e73e72a5bde727fd/opentelemetry_instrumentation-0.46b0.tar.gz"
+              "hash": "2dc50aa207b9bfa16f70a1a0571e011e737a9917408934675b89ef4d5718c87b",
+              "url": "https://files.pythonhosted.org/packages/cb/69/d8995f229ddf4d98b9c85dd126aeca03dd1742f6dc5d3bc0d2f6dae1535c/opentelemetry_instrumentation-0.55b1.tar.gz"
             }
           ],
           "project_name": "opentelemetry-instrumentation",
           "requires_dists": [
             "opentelemetry-api~=1.4",
-            "setuptools>=16.0",
+            "opentelemetry-semantic-conventions==0.55b1",
+            "packaging>=18.0",
             "wrapt<2.0.0,>=1.0.0"
           ],
-          "requires_python": ">=3.8",
-          "version": "0.46b0"
+          "requires_python": ">=3.9",
+          "version": "0.55b1"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "a8c2472800d8686f3f286cd524b8746b386154092e85a791ba14110d1acc9b81",
-              "url": "https://files.pythonhosted.org/packages/20/42/5eee8720eccd4b94dd3d4908364785db8b22c9ae512ee47caff29064ca4c/opentelemetry_instrumentation_requests-0.46b0-py3-none-any.whl"
+              "hash": "c9ba0a67850b49aa965e760e87e4b68e52530e5373a0b3c15d290a8997136619",
+              "url": "https://files.pythonhosted.org/packages/fc/31/9643d13bb78e07038c96e264a9e75cde93ecde50ff2b0cac7597613074d7/opentelemetry_instrumentation_requests-0.55b1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "ef0ad63bfd0d52631daaf7d687e763dbd89b465f5cb052f12a4e67e5e3d181e4",
-              "url": "https://files.pythonhosted.org/packages/f6/28/5b5e9fb74639e47f026a3fd6550bba965ca18b316a8178907540e711855c/opentelemetry_instrumentation_requests-0.46b0.tar.gz"
+              "hash": "3a04ae7bc90af08acef074b369275cf77c60533b319fa91cad76a380fd035c83",
+              "url": "https://files.pythonhosted.org/packages/29/0c/8300ceffd0a41e69590f20ff4854f5c0b2ed5e9453c21c1d710746377cd2/opentelemetry_instrumentation_requests-0.55b1.tar.gz"
             }
           ],
           "project_name": "opentelemetry-instrumentation-requests",
           "requires_dists": [
             "opentelemetry-api~=1.12",
-            "opentelemetry-instrumentation==0.46b0",
-            "opentelemetry-semantic-conventions==0.46b0",
-            "opentelemetry-util-http==0.46b0",
+            "opentelemetry-instrumentation==0.55b1",
+            "opentelemetry-semantic-conventions==0.55b1",
+            "opentelemetry-util-http==0.55b1",
             "requests~=2.0; extra == \"instruments\""
           ],
-          "requires_python": ">=3.8",
-          "version": "0.46b0"
+          "requires_python": ">=3.9",
+          "version": "0.55b1"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "f07e3341c78d835d9b86665903b199893befa5e98866f63d22b00d0b7ca4972f",
-              "url": "https://files.pythonhosted.org/packages/64/ae/d6b5f11ecbffafe8b6d54130fed0cc78aad3711e00074d63a7359d6dcf3b/opentelemetry_proto-1.25.0-py3-none-any.whl"
+              "hash": "eb4bb5ac27f2562df2d6857fc557b3a481b5e298bc04f94cc68041f00cebcbd2",
+              "url": "https://files.pythonhosted.org/packages/28/ab/4591bfa54e946350ce8b3f28e5c658fe9785e7cd11e9c11b1671a867822b/opentelemetry_proto-1.34.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "35b6ef9dc4a9f7853ecc5006738ad40443701e52c26099e197895cbda8b815a3",
-              "url": "https://files.pythonhosted.org/packages/c9/3c/28c9ce40eb8ab287471af81659089ca98ef4f7ce289669e23b19c29f24a8/opentelemetry_proto-1.25.0.tar.gz"
+              "hash": "16286214e405c211fc774187f3e4bbb1351290b8dfb88e8948af209ce85b719e",
+              "url": "https://files.pythonhosted.org/packages/66/b3/c3158dd012463bb7c0eb7304a85a6f63baeeb5b4c93a53845cf89f848c7e/opentelemetry_proto-1.34.1.tar.gz"
             }
           ],
           "project_name": "opentelemetry-proto",
           "requires_dists": [
-            "protobuf<5.0,>=3.19"
+            "protobuf<6.0,>=5.0"
           ],
-          "requires_python": ">=3.8",
-          "version": "1.25.0"
+          "requires_python": ">=3.9",
+          "version": "1.34.1"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d97ff7ec4b351692e9d5a15af570c693b8715ad78b8aafbec5c7100fe966b4c9",
-              "url": "https://files.pythonhosted.org/packages/ae/b2/729a959a8aa032bce246c791f977161099ab60fb0188408ccec1bf283b00/opentelemetry_sdk-1.25.0-py3-none-any.whl"
+              "hash": "308effad4059562f1d92163c61c8141df649da24ce361827812c40abb2a1e96e",
+              "url": "https://files.pythonhosted.org/packages/07/1b/def4fe6aa73f483cabf4c748f4c25070d5f7604dcc8b52e962983491b29e/opentelemetry_sdk-1.34.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "ce7fc319c57707ef5bf8b74fb9f8ebdb8bfafbe11898410e0d2a761d08a98ec7",
-              "url": "https://files.pythonhosted.org/packages/05/3c/77076b77f1d73141adc119f62370ec9456ef314ba0b4e7072e3775c36ef7/opentelemetry_sdk-1.25.0.tar.gz"
+              "hash": "8091db0d763fcd6098d4781bbc80ff0971f94e260739aa6afe6fd379cdf3aa4d",
+              "url": "https://files.pythonhosted.org/packages/6f/41/fe20f9036433da8e0fcef568984da4c1d1c771fa072ecd1a4d98779dccdd/opentelemetry_sdk-1.34.1.tar.gz"
             }
           ],
           "project_name": "opentelemetry-sdk",
           "requires_dists": [
-            "opentelemetry-api==1.25.0",
-            "opentelemetry-semantic-conventions==0.46b0",
-            "typing-extensions>=3.7.4"
+            "opentelemetry-api==1.34.1",
+            "opentelemetry-semantic-conventions==0.55b1",
+            "typing-extensions>=4.5.0"
           ],
-          "requires_python": ">=3.8",
-          "version": "1.25.0"
+          "requires_python": ">=3.9",
+          "version": "1.34.1"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "6daef4ef9fa51d51855d9f8e0ccd3a1bd59e0e545abe99ac6203804e36ab3e07",
-              "url": "https://files.pythonhosted.org/packages/fd/41/28dae1ec1fe0151373f06bd06d9170ca14b52d5b3a6c2dc55f85bc219619/opentelemetry_semantic_conventions-0.46b0-py3-none-any.whl"
+              "hash": "5da81dfdf7d52e3d37f8fe88d5e771e191de924cfff5f550ab0b8f7b2409baed",
+              "url": "https://files.pythonhosted.org/packages/1a/89/267b0af1b1d0ba828f0e60642b6a5116ac1fd917cde7fc02821627029bd1/opentelemetry_semantic_conventions-0.55b1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "fbc982ecbb6a6e90869b15c1673be90bd18c8a56ff1cffc0864e38e2edffaefa",
-              "url": "https://files.pythonhosted.org/packages/4e/ea/a4a5277247b3d2ed2e23a58b0d509c2eafa4ebb56038ba5b23c0f9ea6242/opentelemetry_semantic_conventions-0.46b0.tar.gz"
+              "hash": "ef95b1f009159c28d7a7849f5cbc71c4c34c845bb514d66adfdf1b3fff3598b3",
+              "url": "https://files.pythonhosted.org/packages/5d/f0/f33458486da911f47c4aa6db9bda308bb80f3236c111bf848bd870c16b16/opentelemetry_semantic_conventions-0.55b1.tar.gz"
             }
           ],
           "project_name": "opentelemetry-semantic-conventions",
           "requires_dists": [
-            "opentelemetry-api==1.25.0"
+            "opentelemetry-api==1.34.1",
+            "typing-extensions>=4.5.0"
           ],
-          "requires_python": ">=3.8",
-          "version": "0.46b0"
+          "requires_python": ">=3.9",
+          "version": "0.55b1"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "8dc1949ce63caef08db84ae977fdc1848fe6dc38e6bbaad0ae3e6ecd0d451629",
-              "url": "https://files.pythonhosted.org/packages/a2/7f/26d3d8880ea79adde8bb7bc306b25ca5134d6f6c3006ba464716405b4729/opentelemetry_util_http-0.46b0-py3-none-any.whl"
+              "hash": "e134218df8ff010e111466650e5f019496b29c3b4f1b7de0e8ff8ebeafeebdf4",
+              "url": "https://files.pythonhosted.org/packages/a3/0a/49c5464efc0e6f6aa94a9ec054879efe2a59d7c1f6aacc500665b3d8afdc/opentelemetry_util_http-0.55b1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "03b6e222642f9c7eae58d9132343e045b50aca9761fcb53709bd2b663571fdf6",
-              "url": "https://files.pythonhosted.org/packages/f0/91/45bf243850463b2c83000ca129442255eaef7c446bd0f59a2ab54b15abff/opentelemetry_util_http-0.46b0.tar.gz"
+              "hash": "29e119c1f6796cccf5fc2aedb55274435cde5976d0ac3fec3ca20a80118f821e",
+              "url": "https://files.pythonhosted.org/packages/12/f7/3cc23b95921177cdda6d61d3475659b86bac335ed02dd19f994a850ceee3/opentelemetry_util_http-0.55b1.tar.gz"
             }
           ],
           "project_name": "opentelemetry-util-http",
           "requires_dists": [],
-          "requires_python": ">=3.8",
-          "version": "0.46b0"
+          "requires_python": ">=3.9",
+          "version": "0.55b1"
         },
         {
           "artifacts": [
@@ -992,34 +973,34 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "15a0af558aa3b13efef102ae6e4f3efac06f1eea11afb3a57db2901447d9fb59",
-              "url": "https://files.pythonhosted.org/packages/0c/c1/6aece0ab5209981a70cd186f164c133fdba2f51e124ff92b73de7fd24d78/protobuf-4.25.8-py3-none-any.whl"
+              "hash": "6cf42630262c59b2d8de33954443d94b746c952b01434fc58a417fdbd2e84bd5",
+              "url": "https://files.pythonhosted.org/packages/7e/cc/7e77861000a0691aeea8f4566e5d3aa716f2b1dece4a24439437e41d3d25/protobuf-5.29.5-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "ca809b42f4444f144f2115c4c1a747b9a404d590f18f37e9402422033e464e0f",
-              "url": "https://files.pythonhosted.org/packages/28/d7/ab27049a035b258dab43445eb6ec84a26277b16105b277cbe0a7698bdc6c/protobuf-4.25.8-cp37-abi3-macosx_10_9_universal2.whl"
+              "hash": "bc1463bafd4b0929216c35f437a8e28731a2b7fe3d98bb77a600efced5a15c84",
+              "url": "https://files.pythonhosted.org/packages/43/29/d09e70352e4e88c9c7a198d5645d7277811448d76c23b00345670f7c8a38/protobuf-5.29.5.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "9ad7ef62d92baf5a8654fbb88dac7fa5594cfa70fd3440488a5ca3bfc6d795a7",
-              "url": "https://files.pythonhosted.org/packages/bd/6d/a4a198b61808dd3d1ee187082ccc21499bc949d639feb948961b48be9a7e/protobuf-4.25.8-cp37-abi3-manylinux2014_aarch64.whl"
+              "hash": "fa18533a299d7ab6c55a238bf8629311439995f2e7eca5caaff08663606e9015",
+              "url": "https://files.pythonhosted.org/packages/6c/04/98f6f8cf5b07ab1294c13f34b4e69b3722bb609c5b701d6c169828f9f8aa/protobuf-5.29.5-cp38-abi3-manylinux2014_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "83e6e54e93d2b696a92cad6e6efc924f3850f82b52e1563778dfab8b355101b0",
-              "url": "https://files.pythonhosted.org/packages/d6/c6/c9deaa6e789b6fc41b88ccbdfe7a42d2b82663248b715f55aa77fbc00724/protobuf-4.25.8-cp37-abi3-manylinux2014_x86_64.whl"
+              "hash": "63848923da3325e1bf7e9003d680ce6e14b07e55d0473253a690c3a8b8fd6e61",
+              "url": "https://files.pythonhosted.org/packages/85/e4/07c80521879c2d15f321465ac24c70efe2381378c00bf5e56a0f4fbac8cd/protobuf-5.29.5-cp38-abi3-manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "6135cf8affe1fc6f76cced2641e4ea8d3e59518d1f24ae41ba97bcad82d397cd",
-              "url": "https://files.pythonhosted.org/packages/df/01/34c8d2b6354906d728703cb9d546a0e534de479e25f1b581e4094c4a85cc/protobuf-4.25.8.tar.gz"
+              "hash": "e38c5add5a311f2a6eb0340716ef9b039c1dfa428b28f25a7838ac329204a671",
+              "url": "https://files.pythonhosted.org/packages/dd/73/10e1661c21f139f2c6ad9b23040ff36fee624310dc28fba20d33fdae124c/protobuf-5.29.5-cp38-abi3-macosx_10_9_universal2.whl"
             }
           ],
           "project_name": "protobuf",
           "requires_dists": [],
           "requires_python": ">=3.8",
-          "version": "4.25.8"
+          "version": "5.29.5"
         },
         {
           "artifacts": [
@@ -1092,24 +1073,23 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "9257b468badc3d347e146a4faa268ff229039d4c2d176ab0cffb4c4fbc73d5d9",
-              "url": "https://files.pythonhosted.org/packages/c1/d1/23ba6235ed82883bb416f57179d1db2c05f3fb8e5d83c18660f9ab6f09c9/rich-13.5.3-py3-none-any.whl"
+              "hash": "536f5f1785986d6dbdea3c75205c473f970777b4a0d6c6dd1b696aa05a3fa04f",
+              "url": "https://files.pythonhosted.org/packages/e3/30/3c4d035596d3cf444529e0b2953ad0466f6049528a879d27534700580395/rich-14.1.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "87b43e0543149efa1253f485cd845bb7ee54df16c9617b8a893650ab84b4acb6",
-              "url": "https://files.pythonhosted.org/packages/1d/d6/9773d48804d085962c4f522db96f6a9ea9bd2e0480b3959a929176d92f01/rich-13.5.3.tar.gz"
+              "hash": "e497a48b844b0320d45007cdebfeaeed8db2a4f4bcf49f15e455cfc4af11eaa8",
+              "url": "https://files.pythonhosted.org/packages/fe/75/af448d8e52bf1d8fa6a9d089ca6c07ff4453d86c65c145d0a300bb073b9b/rich-14.1.0.tar.gz"
             }
           ],
           "project_name": "rich",
           "requires_dists": [
             "ipywidgets<9,>=7.5.1; extra == \"jupyter\"",
             "markdown-it-py>=2.2.0",
-            "pygments<3.0.0,>=2.13.0",
-            "typing-extensions<5.0,>=4.0.0; python_version < \"3.9\""
+            "pygments<3.0.0,>=2.13.0"
           ],
-          "requires_python": ">=3.7.0",
-          "version": "13.5.3"
+          "requires_python": ">=3.8.0",
+          "version": "14.1.0"
         },
         {
           "artifacts": [
@@ -1668,24 +1648,24 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "148f6488d698b7a5eded5ea793a025308b25eca97208181b6a026037f391f701",
-              "url": "https://files.pythonhosted.org/packages/d1/e5/f2a0621f1781b76a38194acae72f01e37b1941470407345b6e8653ad7640/ruamel.yaml-0.18.15-py3-none-any.whl"
+              "hash": "b16b6c3816dff0a93dca12acf5e70afd089fa5acb80604afd1ffa8b465b7722c",
+              "url": "https://files.pythonhosted.org/packages/35/79/5e2cffa1c77432f11cd93a5351f30732c997a239d3a3090856a72d6d8ba7/ruamel.yaml-0.17.40-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "dbfca74b018c4c3fba0b9cc9ee33e53c371194a9000e694995e620490fd40700",
-              "url": "https://files.pythonhosted.org/packages/3e/db/f3950f5e5031b618aae9f423a39bf81a55c148aecd15a34527898e752cf4/ruamel.yaml-0.18.15.tar.gz"
+              "hash": "6024b986f06765d482b5b07e086cc4b4cd05dd22ddcbc758fa23d54873cf313d",
+              "url": "https://files.pythonhosted.org/packages/d1/d6/eb2833ccba5ea36f8f4de4bcfa0d1a91eb618f832d430b70e3086821f251/ruamel.yaml-0.17.40.tar.gz"
             }
           ],
           "project_name": "ruamel-yaml",
           "requires_dists": [
             "mercurial>5.7; extra == \"docs\"",
-            "ruamel.yaml.clib>=0.2.7; platform_python_implementation == \"CPython\" and python_version < \"3.14\"",
+            "ruamel.yaml.clib>=0.2.7; platform_python_implementation == \"CPython\" and python_version < \"3.13\"",
             "ruamel.yaml.jinja2>=0.2; extra == \"jinja2\"",
             "ryd; extra == \"docs\""
           ],
-          "requires_python": ">=3.8",
-          "version": "0.18.15"
+          "requires_python": ">=3",
+          "version": "0.17.40"
         },
         {
           "artifacts": [
@@ -1879,28 +1859,28 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "e06349068c2ceacbad2961dbaf3cbe1c242bc4d4b58c5891c82b4babda48ed2e",
-              "url": "https://files.pythonhosted.org/packages/7c/60/bab04dd9b41e06e38a03e2b1c92f57eb63b2a89a13c32d5afeac57068d8f/semgrep-1.132.1-cp39.cp310.cp311.py39.py310.py311-none-musllinux_1_0_x86_64.manylinux2014_x86_64.whl"
+              "hash": "41797931371d05c41a6e09861b3d631136b4fe644d80802b2fd48af650e5fa5a",
+              "url": "https://files.pythonhosted.org/packages/fd/84/3b6afc829f54b331f47d55c565096ef74a98d96d794612d2e5330062d373/semgrep-1.79.0-cp38.cp39.cp310.cp311.py37.py38.py39.py310.py311-none-musllinux_1_0_aarch64.manylinux2014_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "5043e7fca95db5a8fef39ef3fdebf8638189164983a123752c2ee93495ec3aef",
-              "url": "https://files.pythonhosted.org/packages/06/c7/9b093abb3d4ca6de0dc0c7cf3dd9ac892926f1e465ff21f0aef0b5533f1d/semgrep-1.132.1-cp39.cp310.cp311.py39.py310.py311-none-musllinux_1_0_aarch64.manylinux2014_aarch64.whl"
+              "hash": "fde15d090b4beb865e12c2c727404c8dee2f41b9d793a7f972b278cdefb22bea",
+              "url": "https://files.pythonhosted.org/packages/45/61/9ee9e601ddc9f9073708d4e6886d0c7021b59b3180b6cb53c0bd01b393d9/semgrep-1.79.0.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "0f4da44e0b112100642467521f7ec495145ec4d47a1a67addc7a8332999aeaac",
-              "url": "https://files.pythonhosted.org/packages/75/ac/1a4864005c5f0e87eaf90fd234acd6fa10941630182666e48c34d49e887f/semgrep-1.132.1-cp39.cp310.cp311.py39.py310.py311-none-macosx_11_0_arm64.whl"
+              "hash": "5a28858c1f5249bf4fed3f180f2db2589ce1832c1058eb6d18a0f086c91dadc1",
+              "url": "https://files.pythonhosted.org/packages/56/4a/469abc30b134354632d8b8e83249121447fca74a615509a09bed90340813/semgrep-1.79.0-cp38.cp39.cp310.cp311.py37.py38.py39.py310.py311-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "6c21c3afa2b7e7cf183badd42e1ed3ad81ee2ea096bbc9fd09448486ec6b3778",
-              "url": "https://files.pythonhosted.org/packages/7e/97/4fce00cc2cea09b763328a5c31f3f3d5a6af535bc5d12edc69b2ad6f7a13/semgrep-1.132.1-cp39.cp310.cp311.py39.py310.py311-none-macosx_10_14_x86_64.whl"
+              "hash": "fe5cf0ac8afdb786cbd4e6c97c418ca7adc8f4c42584a69dc7c10e15db5f7d9b",
+              "url": "https://files.pythonhosted.org/packages/d6/88/35615a4e1142755cb3d2c86d63160f63ab770c111c82de9318bba27fb888/semgrep-1.79.0-cp38.cp39.cp310.cp311.py37.py38.py39.py310.py311-none-macosx_11_0_arm64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "bc1e64134062924879090af08285bb79c265217c6b59b6a8d3e7c6f5f9cb5f07",
-              "url": "https://files.pythonhosted.org/packages/e6/35/2ba92de542799ff386e01bb09ccbe8fe1829111144c4dc1432d0ca5afbb2/semgrep-1.132.1.tar.gz"
+              "hash": "4b22b5f4db17204648baf8bc58fcd74c09eb5f41bd407422193253b4de9af18e",
+              "url": "https://files.pythonhosted.org/packages/e9/23/eff37582f900cf742b5fc7709dfd0e63cc2bc0faefe6ec200f150666fa7a/semgrep-1.79.0-cp38.cp39.cp310.cp311.py37.py38.py39.py310.py311-none-macosx_10_14_x86_64.whl"
             }
           ],
           "project_name": "semgrep",
@@ -1908,98 +1888,24 @@
             "attrs>=21.3",
             "boltons~=21.0",
             "click-option-group~=0.5",
-            "click~=8.1.8",
+            "click~=8.1",
             "colorama~=0.4.0",
             "defusedxml~=0.7.1",
             "exceptiongroup~=1.2.0",
             "glom~=22.1",
             "jsonschema~=4.6",
-            "opentelemetry-api~=1.25.0",
-            "opentelemetry-exporter-otlp-proto-http~=1.25.0",
-            "opentelemetry-instrumentation-requests~=0.46b0",
-            "opentelemetry-sdk~=1.25.0",
             "packaging>=21.0",
             "peewee~=3.14",
             "requests~=2.22",
-            "rich~=13.5.2",
-            "ruamel.yaml>=0.18.5",
+            "rich>=12.6.0",
+            "ruamel.yaml<0.18,>=0.16.0",
             "tomli~=2.0.1",
             "typing-extensions~=4.2",
             "urllib3~=2.0",
             "wcmatch~=8.3"
           ],
-          "requires_python": ">=3.9",
-          "version": "1.132.1"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922",
-              "url": "https://files.pythonhosted.org/packages/a3/dc/17031897dae0efacfea57dfd3a82fdd2a2aeb58e0ff71b77b87e44edc772/setuptools-80.9.0-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "f36b47402ecde768dbfafc46e8e4207b4360c654f1f3bb84475f0a28628fb19c",
-              "url": "https://files.pythonhosted.org/packages/18/5d/3bf57dcd21979b887f014ea83c24ae194cfcd12b9e0fda66b957c69d1fca/setuptools-80.9.0.tar.gz"
-            }
-          ],
-          "project_name": "setuptools",
-          "requires_dists": [
-            "build[virtualenv]>=1.0.3; extra == \"test\"",
-            "filelock>=3.4.0; extra == \"test\"",
-            "furo; extra == \"doc\"",
-            "importlib_metadata>=6; python_version < \"3.10\" and extra == \"core\"",
-            "importlib_metadata>=7.0.2; python_version < \"3.10\" and extra == \"type\"",
-            "ini2toml[lite]>=0.14; extra == \"test\"",
-            "jaraco.develop>=7.21; (python_version >= \"3.9\" and sys_platform != \"cygwin\") and extra == \"test\"",
-            "jaraco.develop>=7.21; sys_platform != \"cygwin\" and extra == \"type\"",
-            "jaraco.envs>=2.2; extra == \"test\"",
-            "jaraco.functools>=4; extra == \"core\"",
-            "jaraco.packaging>=9.3; extra == \"doc\"",
-            "jaraco.path>=3.7.2; extra == \"test\"",
-            "jaraco.test>=5.5; extra == \"test\"",
-            "jaraco.text>=3.7; extra == \"core\"",
-            "jaraco.tidelift>=1.4; extra == \"doc\"",
-            "more_itertools; extra == \"core\"",
-            "more_itertools>=8.8; extra == \"core\"",
-            "mypy==1.14.*; extra == \"type\"",
-            "packaging>=24.2; extra == \"core\"",
-            "packaging>=24.2; extra == \"test\"",
-            "pip>=19.1; extra == \"test\"",
-            "platformdirs>=4.2.2; extra == \"core\"",
-            "pygments-github-lexers==0.0.5; extra == \"doc\"",
-            "pyproject-hooks!=1.1; extra == \"doc\"",
-            "pyproject-hooks!=1.1; extra == \"test\"",
-            "pytest!=8.1.*,>=6; extra == \"test\"",
-            "pytest-checkdocs>=2.4; extra == \"check\"",
-            "pytest-cov; extra == \"cover\"",
-            "pytest-enabler>=2.2; extra == \"enabler\"",
-            "pytest-home>=0.5; extra == \"test\"",
-            "pytest-mypy; extra == \"type\"",
-            "pytest-perf; sys_platform != \"cygwin\" and extra == \"test\"",
-            "pytest-ruff>=0.2.1; sys_platform != \"cygwin\" and extra == \"check\"",
-            "pytest-subprocess; extra == \"test\"",
-            "pytest-timeout; extra == \"test\"",
-            "pytest-xdist>=3; extra == \"test\"",
-            "rst.linker>=1.9; extra == \"doc\"",
-            "ruff>=0.8.0; sys_platform != \"cygwin\" and extra == \"check\"",
-            "sphinx-favicon; extra == \"doc\"",
-            "sphinx-inline-tabs; extra == \"doc\"",
-            "sphinx-lint; extra == \"doc\"",
-            "sphinx-notfound-page<2,>=1; extra == \"doc\"",
-            "sphinx-reredirects; extra == \"doc\"",
-            "sphinx>=3.5; extra == \"doc\"",
-            "sphinxcontrib-towncrier; extra == \"doc\"",
-            "tomli-w>=1.0.0; extra == \"test\"",
-            "tomli>=2.0.1; python_version < \"3.11\" and extra == \"core\"",
-            "towncrier<24.7; extra == \"doc\"",
-            "virtualenv>=13.0.0; extra == \"test\"",
-            "wheel>=0.43.0; extra == \"core\"",
-            "wheel>=0.44.0; extra == \"test\""
-          ],
-          "requires_python": ">=3.9",
-          "version": "80.9.0"
+          "requires_python": ">=3.8",
+          "version": "1.79.0"
         },
         {
           "artifacts": [
@@ -2323,6 +2229,10 @@
   "pip_version": "25.2",
   "prefer_older_binary": false,
   "requirements": [
+    "opentelemetry-api~=1.34.1",
+    "opentelemetry-exporter-otlp-proto-http~=1.34.1",
+    "opentelemetry-instrumentation-requests~=0.55b1",
+    "opentelemetry-sdk~=1.34.1",
     "semgrep<2,>=1.20.0"
   ],
   "requires_python": [
