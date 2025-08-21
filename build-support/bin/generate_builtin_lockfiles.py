@@ -241,6 +241,7 @@ def generate_python_tool_lockfiles(tools: Sequence[PythonTool], dry_run: bool) -
             "--python-resolves-to-constraints-file={}",
             "--python-resolves-to-no-binary={}",
             "--python-resolves-to-only-binary={}",
+            "--pex-emit-warnings=true",
         ]
         generate(tmp_buildroot, tools, python_args, dry_run)
 
