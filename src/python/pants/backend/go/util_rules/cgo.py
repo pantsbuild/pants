@@ -796,7 +796,7 @@ async def cgo_compile_request(
         for arg in flags.ldflags:
             if "__PANTS_SANDBOX_ROOT__" in arg:
                 include_module_sources_with_output = True
-        cgo_env["CGO_LDFLAGS"] = " ".join([shlex.quote(arg) for arg in flags.ldflags])
+        cgo_env["CGO_LDFLAGS"] = shlex.join(flags.ldflags)
 
     # Note: If Pants supported building C static or shared archives, then we would need to direct cgo here to
     # produce a header file via the `-exportheader` option. Not necessary since Pants does not support that.
