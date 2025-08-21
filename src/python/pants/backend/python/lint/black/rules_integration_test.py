@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import importlib
 from textwrap import dedent
 
 import pytest
@@ -110,16 +111,30 @@ def run_black(
     all_major_minor_python_versions(Black.default_interpreter_constraints),
 )
 def test_passing(rule_runner: PythonRuleRunner, major_minor_interpreter: str) -> None:
-    rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"})
-    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     interpreter_constraint = (
         ">=3.6.2,<3.7" if major_minor_interpreter == "3.6" else f"=={major_minor_interpreter}.*"
     )
+    extra_args = [f"--black-interpreter-constraints=['{interpreter_constraint}']"]
+
+    rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"})
+    if major_minor_interpreter == "3.8":
+        lockfile_content = importlib.resources.read_text(
+            "pants.backend.python.lint.black", "black-py38-testing.lock"
+        )
+        rule_runner.write_files({"black-py38-testing.lock": lockfile_content})
+        extra_args.extend(
+            [
+                "--python-resolves={'black-py38-testing': 'black-py38-testing.lock'}",
+                "--black-install-from-resolve=black-py38-testing",
+            ]
+        )
+
+    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     fmt_result = run_black(
         rule_runner,
         [tgt],
         expected_ics=interpreter_constraint,
-        extra_args=[f"--black-interpreter-constraints=['{interpreter_constraint}']"],
+        extra_args=extra_args,
     )
     assert "1 file left unchanged" in fmt_result.stderr
     assert fmt_result.output == rule_runner.make_snapshot({"f.py": GOOD_FILE})
@@ -200,11 +215,26 @@ def test_works_with_python38(rule_runner: PythonRuleRunner) -> None:
             pass
         """
     )
+    lockfile_content = importlib.resources.read_text(
+        "pants.backend.python.lint.black", "black-py38-testing.lock"
+    )
     rule_runner.write_files(
-        {"f.py": content, "BUILD": "python_sources(name='t', interpreter_constraints=['>=3.8'])"}
+        {
+            "f.py": content,
+            "BUILD": "python_sources(name='t', interpreter_constraints=['>=3.8'])",
+            "black-py38-testing.lock": lockfile_content,
+        }
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    fmt_result = run_black(rule_runner, [tgt], expected_ics=">=3.8")
+    fmt_result = run_black(
+        rule_runner,
+        [tgt],
+        expected_ics=">=3.8",
+        extra_args=[
+            "--python-resolves={'black-py38-testing': 'black-py38-testing.lock'}",
+            "--black-install-from-resolve=black-py38-testing",
+        ],
+    )
     assert "1 file left unchanged" in fmt_result.stderr
     assert fmt_result.output == rule_runner.make_snapshot({"f.py": content})
     assert fmt_result.did_change is False
