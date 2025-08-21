@@ -30,6 +30,11 @@ from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner, logging
 from pants.util.logging import LogLevel
 
+# Test constants for JavaScript type checking
+JS_TYPE_ERROR_FILE_NUMBER_TO_STRING = (
+    'let x = "hello";\nx = 42; // Type error: cannot assign number to string\n'
+)
+
 
 def parse_typescript_build_status(stdout: str) -> str:
     """Parse TypeScript verbose output to detect build type."""
@@ -664,3 +669,60 @@ def test_set_typescript_version_warns(
     assert caplog.records
     assert "You set --typescript-version=typescript@5.0.0" in caplog.text
     assert "This setting is ignored because TypeScript always uses" in caplog.text
+
+
+def test_check_javascript_enabled(
+    basic_rule_runner: tuple[RuleRunner, str, str],
+) -> None:
+    """Test that JavaScript files are type-checked when allowJs and checkJs are enabled."""
+    rule_runner, test_project, _ = basic_rule_runner
+    test_files = _load_project_test_files(test_project)
+
+    tsconfig_content = json.loads(test_files["basic_project/tsconfig.json"])
+    tsconfig_content["compilerOptions"]["allowJs"] = True
+    tsconfig_content["compilerOptions"]["checkJs"] = True
+    test_files["basic_project/tsconfig.json"] = json.dumps(tsconfig_content, indent=2)
+
+    test_files["basic_project/src/error.js"] = JS_TYPE_ERROR_FILE_NUMBER_TO_STRING
+    test_files["basic_project/src/BUILD"] = (
+        'javascript_sources(name="js_sources")\ntypescript_sources()\n'
+    )
+
+    rule_runner.write_files(test_files)
+
+    js_target = rule_runner.get_target(
+        Address("basic_project/src", target_name="js_sources", relative_file_path="error.js")
+    )
+    request = TypeScriptCheckRequest(field_sets=(TypeScriptCheckFieldSet.create(js_target),))
+    results = rule_runner.request(CheckResults, [request])
+
+    assert len(results.results) == 1
+    assert results.results[0].exit_code != 0
+    assert "error.js" in results.results[0].stdout
+    assert "Type 'number' is not assignable to type 'string'" in results.results[0].stdout
+
+
+def test_check_javascript_disabled(
+    basic_rule_runner: tuple[RuleRunner, str, str],
+) -> None:
+    """Test that JavaScript files are ignored when allowJs is disabled."""
+    rule_runner, test_project, _ = basic_rule_runner
+    test_files = _load_project_test_files(test_project)
+
+    # Use the same JS file with type error that would be caught if processed
+    test_files["basic_project/src/error.js"] = JS_TYPE_ERROR_FILE_NUMBER_TO_STRING
+    test_files["basic_project/src/BUILD"] = (
+        'javascript_sources(name="js_sources")\ntypescript_sources()\n'
+    )
+
+    rule_runner.write_files(test_files)
+
+    js_target = rule_runner.get_target(
+        Address("basic_project/src", target_name="js_sources", relative_file_path="error.js")
+    )
+    request = TypeScriptCheckRequest(field_sets=(TypeScriptCheckFieldSet.create(js_target),))
+    results = rule_runner.request(CheckResults, [request])
+
+    assert len(results.results) == 1
+    assert results.results[0].exit_code == 0
+    assert "error.js" not in results.results[0].stdout

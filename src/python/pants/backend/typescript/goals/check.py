@@ -160,7 +160,7 @@ def _get_output_artifact_globs(
 
 async def _collect_config_files_for_project(
     project: NodeJSProject,
-    typescript_targets: list[Target],
+    targets: list[Target],
     all_package_json: AllPackageJson,
     all_ts_configs: AllTSConfigs,
 ) -> list[str]:
@@ -169,7 +169,7 @@ async def _collect_config_files_for_project(
     This includes:
     - package.json files (for dependencies and module resolution)
     - tsconfig.json files (for TypeScript compiler configuration)
-    - file() targets that are dependencies of TypeScript targets
+    - file() targets that are dependencies of JS/TS targets
     """
     config_files = []
 
@@ -185,21 +185,20 @@ async def _collect_config_files_for_project(
     for ts_config in project_ts_configs:
         config_files.append(ts_config.path)
 
-    # Add file() targets that are dependencies of TypeScript targets
+    # Add file() targets that are dependencies of JS/TS targets
     # Note: Package manager config files
     # (.npmrc, .pnpmrc, pnpm-workspace.yaml) should be dependencies of package_json targets
     # since they affect package installation, not TypeScript compilation directly.
-    if typescript_targets:
-        typescript_addresses = [target.address for target in typescript_targets]
-        transitive_targets_result = await transitive_targets(
-            TransitiveTargetsRequest(typescript_addresses), **implicitly()
-        )
+    target_addresses = [target.address for target in targets]
+    transitive_targets_result = await transitive_targets(
+        TransitiveTargetsRequest(target_addresses), **implicitly()
+    )
 
-        for target in transitive_targets_result.closure:
-            if target.has_field(FileSourceField):
-                file_path = target[FileSourceField].file_path
-                if file_path.startswith(project.root_dir):
-                    config_files.append(file_path)
+    for target in transitive_targets_result.closure:
+        if target.has_field(FileSourceField):
+            file_path = target[FileSourceField].file_path
+            if file_path.startswith(project.root_dir):
+                config_files.append(file_path)
 
     return config_files
 
@@ -315,47 +314,53 @@ done
     return script_digest
 
 
-async def _collect_project_typescript_targets(
+async def _collect_project_targets(
     project: NodeJSProject,
     all_targets: AllTargets,
     all_projects: AllNodeJSProjects,
+    all_ts_configs: AllTSConfigs,
 ) -> list[Target] | None:
-    typescript_targets = [
-        target
-        for target in all_targets
-        if (target.has_field(TypeScriptSourceField) or target.has_field(TypeScriptTestSourceField))
-    ]
+    project_ts_configs = [cfg for cfg in all_ts_configs if cfg.path.startswith(project.root_dir)]
+    has_allow_js = any(ts_config.allow_js for ts_config in project_ts_configs if ts_config.allow_js)
 
-    typescript_owning_packages = await concurrently(
+    if has_allow_js:
+        targets = [target for target in all_targets if target.has_field(JSRuntimeSourceField)]
+    else:
+        targets = [
+            target
+            for target in all_targets
+            if (
+                target.has_field(TypeScriptSourceField)
+                or target.has_field(TypeScriptTestSourceField)
+            )
+        ]
+
+    target_owning_packages = await concurrently(
         find_owning_package(OwningNodePackageRequest(target.address), **implicitly())
-        for target in typescript_targets
+        for target in targets
     )
 
-    project_typescript_targets = []
-    for target, owning_package in zip(typescript_targets, typescript_owning_packages):
+    project_targets = []
+    for target, owning_package in zip(targets, target_owning_packages):
         if owning_package.target:
             package_directory = owning_package.target.address.spec_path
             target_project = all_projects.project_for_directory(package_directory)
             if target_project == project:
-                project_typescript_targets.append(target)
+                project_targets.append(target)
 
-    return project_typescript_targets if project_typescript_targets else None
+    return project_targets if project_targets else None
 
 
 async def _hydrate_project_sources(
-    project_typescript_targets: list[Target],
+    project_targets: list[Target],
 ) -> Digest:
-    """Hydrate and merge all source files for TypeScript targets in the project."""
+    """Hydrate and merge all source files for JS/TS targets in the project."""
     workspace_target_sources = await concurrently(
         hydrate_sources(
-            HydrateSourcesRequest(
-                target[TypeScriptSourceField]
-                if target.has_field(TypeScriptSourceField)
-                else target[TypeScriptTestSourceField]
-            ),
+            HydrateSourcesRequest(target[JSRuntimeSourceField]),
             **implicitly(),
         )
-        for target in project_typescript_targets
+        for target in project_targets
     )
 
     return await merge_digests(
@@ -365,14 +370,14 @@ async def _hydrate_project_sources(
 
 async def _prepare_compilation_input(
     project: NodeJSProject,
-    project_typescript_targets: list[Target],
+    project_targets: list[Target],
     all_package_jsons: AllPackageJson,
     all_ts_configs: AllTSConfigs,
     all_workspace_sources: Digest,
 ) -> Digest:
     """Prepare input digest for TypeScript compilation."""
     config_files = await _collect_config_files_for_project(
-        project, project_typescript_targets, all_package_jsons, all_ts_configs
+        project, project_targets, all_package_jsons, all_ts_configs
     )
     # Validate that all TypeScript configurations have explicit outDir settings
     # TODO: Add docs for this
@@ -403,7 +408,7 @@ async def _prepare_tsc_build_process(
     subsystem: TypeScriptSubsystem,
     input_digest: Digest,
     package_output_dirs: tuple[str, ...],
-    project_typescript_targets: list[Target],
+    project_targets: list[Target],
     build_root: BuildRoot,
 ) -> Process:
     """Prepare the TypeScript compiler process for execution with shell script wrapper for
@@ -433,7 +438,7 @@ async def _prepare_tsc_build_process(
     tool_request = subsystem.request(
         args=tsc_args,
         input_digest=tool_input,
-        description=f"Type-check TypeScript project {project.root_dir} ({len(project_typescript_targets)} targets)",
+        description=f"Type-check TypeScript project {project.root_dir} ({len(project_targets)} targets)",
         level=LogLevel.DEBUG,
         project_caches=FrozenDict({named_cache_local_dir: named_cache_sandbox_mount_dir}),
     )
@@ -465,11 +470,11 @@ async def _typecheck_single_project(
     all_ts_configs: AllTSConfigs,
     build_root: BuildRoot,
 ) -> CheckResult:
-    project_typescript_targets = await _collect_project_typescript_targets(
-        project, all_targets, all_projects
+    project_targets = await _collect_project_targets(
+        project, all_targets, all_projects, all_ts_configs
     )
 
-    if not project_typescript_targets:
+    if not project_targets:
         return CheckResult(
             exit_code=0,
             stdout="",
@@ -477,10 +482,10 @@ async def _typecheck_single_project(
             partition_description=f"TypeScript check on {project.root_dir} (no targets)",
         )
 
-    all_workspace_sources = await _hydrate_project_sources(project_typescript_targets)
+    all_workspace_sources = await _hydrate_project_sources(project_targets)
     input_digest = await _prepare_compilation_input(
         project,
-        project_typescript_targets,
+        project_targets,
         all_package_jsons,
         all_ts_configs,
         all_workspace_sources,
@@ -494,7 +499,7 @@ async def _typecheck_single_project(
         subsystem,
         input_digest,
         package_output_dirs,
-        project_typescript_targets,
+        project_targets,
         build_root,
     )
     result = await execute_process(process, **implicitly())
@@ -510,7 +515,7 @@ async def _typecheck_single_project(
 
     return CheckResult.from_fallible_process_result(
         result,
-        partition_description=f"TypeScript check on {project.root_dir} ({len(project_typescript_targets)} targets)",
+        partition_description=f"TypeScript check on {project.root_dir} ({len(project_targets)} targets)",
         report=user_outputs_digest,
         output_simplifier=global_options.output_simplifier(),
     )

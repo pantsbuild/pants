@@ -36,6 +36,8 @@ class TSConfig:
     paths: FrozenDict[str, tuple[str, ...]] | None = None
     base_url: str | None = None
     out_dir: str | None = None
+    allow_js: bool | None = None
+    check_js: bool | None = None
 
     @property
     def resolution_root_dir(self) -> str:
@@ -143,6 +145,8 @@ def _parse_config_from_content(content: FileContent) -> tuple[TSConfig, str | No
         paths=compiler_options.get("paths"),
         base_url=compiler_options.get("baseUrl"),
         out_dir=compiler_options.get("outDir"),
+        allow_js=compiler_options.get("allowJs"),
+        check_js=compiler_options.get("checkJs"),
     ), parsed_ts_config_json.get("extends")
 
 
@@ -163,6 +167,8 @@ async def parse_extended_ts_config(request: ParseTSConfigRequest) -> TSConfig:
         # Do NOT inherit outDir - paths in extended configs are resolved relative to where they're defined,
         # not where they're used, making inherited outDir values incorrect for child projects
         out_dir=ts_config.out_dir,
+        allow_js=ts_config.allow_js if ts_config.allow_js is not None else extended_parent.allow_js,
+        check_js=ts_config.check_js if ts_config.check_js is not None else extended_parent.check_js,
     )
 
 
