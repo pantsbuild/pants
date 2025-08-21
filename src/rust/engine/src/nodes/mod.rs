@@ -193,7 +193,7 @@ fn select_reentry(
     context: Context,
     params: Params,
     query: &Query<TypeId>,
-) -> BoxFuture<NodeResult<Value>> {
+) -> BoxFuture<'_, NodeResult<Value>> {
     // TODO: Actually using the `RuleEdges` of this entry to compute inputs is not
     // implemented: doing so would involve doing something similar to what we do for
     // intrinsics above, and waiting to compute inputs before executing the query here.
