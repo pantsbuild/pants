@@ -225,19 +225,22 @@ class CoursierResolvedLockfile:
         self, key: CoursierResolveKey, coord: Coordinate
     ) -> tuple[CoursierLockfileEntry, tuple[CoursierLockfileEntry, ...]]:
         """Return the entry for the given Coordinate, and for its direct dependencies."""
-        entries = {(i.coord.group, i.coord.artifact): i for i in self.entries}
-        entry = entries.get((coord.group, coord.artifact))
+        entries = {(i.coord.group, i.coord.artifact, i.coord.classifier): i for i in self.entries}
+        entry = entries.get((coord.group, coord.artifact, coord.classifier))
         if entry is None:
             raise self._coordinate_not_found(key, coord)
 
-        return (entry, tuple(entries[(i.group, i.artifact)] for i in entry.direct_dependencies))
+        return (
+            entry,
+            tuple(entries[(i.group, i.artifact, i.classifier)] for i in entry.direct_dependencies),
+        )
 
     def dependencies(
         self, key: CoursierResolveKey, coord: Coordinate
     ) -> tuple[CoursierLockfileEntry, tuple[CoursierLockfileEntry, ...]]:
         """Return the entry for the given Coordinate, and for its transitive dependencies."""
-        entries = {(i.coord.group, i.coord.artifact): i for i in self.entries}
-        entry = entries.get((coord.group, coord.artifact))
+        entries = {(i.coord.group, i.coord.artifact, i.coord.classifier): i for i in self.entries}
+        entry = entries.get((coord.group, coord.artifact, coord.classifier))
         if entry is None:
             raise self._coordinate_not_found(key, coord)
 
@@ -250,7 +253,8 @@ class CoursierResolvedLockfile:
                 # https://github.com/coursier/coursier/issues/2884
                 # As a workaround, if this happens, we want to skip the dependency.
                 # TODO Drop the check once the bug is fixed.
-                if (dependency_entry := entries.get((d.group, d.artifact))) is not None
+                if (dependency_entry := entries.get((d.group, d.artifact, d.classifier)))
+                is not None
             ),
         )
 
