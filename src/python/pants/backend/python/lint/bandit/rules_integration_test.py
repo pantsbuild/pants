@@ -27,7 +27,7 @@ from pants.testutil.python_interpreter_selection import (
 )
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import QueryRule
-from pants.util.resources import read_resource
+from pants.util.resources import read_sibling_resource
 
 
 @pytest.fixture
@@ -199,9 +199,7 @@ def test_3rdparty_plugin(rule_runner: PythonRuleRunner) -> None:
         {
             "f.py": "aws_key = 'JalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEY'\n",
             "BUILD": "python_sources(name='t', interpreter_constraints=['>=3.11,<3.12'])",
-            "bandit.lock": read_resource(
-                "pants.backend.python.lint.bandit", "bandit_plugin_test.lock"
-            ),
+            "bandit.lock": read_sibling_resource(__name__, "bandit_plugin_test.lock"),
         }
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))

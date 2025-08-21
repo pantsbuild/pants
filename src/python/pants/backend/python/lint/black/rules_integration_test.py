@@ -25,7 +25,7 @@ from pants.testutil.python_interpreter_selection import (
 )
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import QueryRule
-from pants.util.resources import read_resource
+from pants.util.resources import read_sibling_resource
 
 
 @pytest.fixture
@@ -118,9 +118,7 @@ def test_passing(rule_runner: PythonRuleRunner, major_minor_interpreter: str) ->
 
     rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"})
     if major_minor_interpreter == "3.8":
-        lockfile_content = read_resource(
-            "pants.backend.python.lint.black", "black-py38-testing.lock"
-        )
+        lockfile_content = read_sibling_resource(__name__, "black-py38-testing.lock")
         rule_runner.write_files({"black-py38-testing.lock": lockfile_content})
         extra_args.extend(
             [
@@ -215,7 +213,7 @@ def test_works_with_python38(rule_runner: PythonRuleRunner) -> None:
             pass
         """
     )
-    lockfile_content = read_resource("pants.backend.python.lint.black", "black-py38-testing.lock")
+    lockfile_content = read_sibling_resource(__name__, "black-py38-testing.lock")
     rule_runner.write_files(
         {
             "f.py": content,
