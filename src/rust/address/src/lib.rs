@@ -65,6 +65,6 @@ peg::parser! {
     }
 }
 
-pub fn parse_address_spec(value: &str) -> Result<SpecInput, String> {
+pub fn parse_address_spec(value: &str) -> Result<SpecInput<'_>, String> {
     parsers::spec(value).map_err(|e| format!("Failed to parse address spec `{value}`: {e}"))
 }
