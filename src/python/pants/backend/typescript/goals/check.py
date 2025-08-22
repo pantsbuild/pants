@@ -32,7 +32,6 @@ from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
     Digest,
-    DigestSubset,
     FileContent,
     GlobMatchErrorBehavior,
     PathGlobs,
@@ -42,7 +41,6 @@ from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import (
     create_digest,
-    digest_subset_to_digest,
     execute_process,
     merge_digests,
     path_globs_to_digest,
@@ -132,28 +130,6 @@ def _collect_package_output_dirs(
 
     return tuple(package_output_dirs)
 
-
-def _get_output_artifact_globs(
-    project: NodeJSProject, package_output_dirs: tuple[str, ...]
-) -> list[str]:
-    globs = []
-    project_root_path = Path(project.root_dir)
-
-    for output_dir in package_output_dirs:
-        globs.append(f"{output_dir}/**/*")
-
-    # Handle case where (e.g.) tsconfig.tsbuildinfo is output alongside tsconfig.json in a package
-    # (See https://www.typescriptlang.org/tsconfig/#tsBuildInfoFile for details)
-    for workspace_pkg in project.workspaces:
-        workspace_pkg_path = Path(workspace_pkg.root_dir)
-        if workspace_pkg_path == project_root_path:
-            pkg_prefix = ""
-        else:
-            relative_path = workspace_pkg_path.relative_to(project_root_path)
-            pkg_prefix = f"{relative_path.as_posix()}/"
-        globs.append(f"{pkg_prefix}*.tsbuildinfo")
-
-    return globs
 
 
 def _collect_project_configs(
@@ -319,6 +295,7 @@ async def _collect_project_targets(
 ) -> list[Target]:
     has_allow_js = any(ts_config.allow_js for ts_config in project_ts_configs if ts_config.allow_js)
 
+    # TODO: I'm on the fence on whether this filtering is worthwhile - should we just always use JSRuntimeSourceField?
     if has_allow_js:
         targets = [target for target in all_targets if target.has_field(JSRuntimeSourceField)]
     else:
@@ -491,20 +468,9 @@ async def _typecheck_single_project(
     )
     result = await execute_process(process, **implicitly())
 
-    artifact_globs = _get_output_artifact_globs(project, package_output_dirs)
-    user_outputs_digest = await digest_subset_to_digest(
-        DigestSubset(
-            result.output_digest,
-            PathGlobs(artifact_globs, glob_match_error_behavior=GlobMatchErrorBehavior.ignore),
-        ),
-        **implicitly(),
-    )
-
     return CheckResult.from_fallible_process_result(
         result,
         partition_description=f"TypeScript check on {project.root_dir} ({len(project_targets)} targets)",
-        # TODO: remove
-        report=user_outputs_digest,
         output_simplifier=global_options.output_simplifier(),
     )
 

@@ -24,7 +24,6 @@ from pants.backend.typescript.target_types import (
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResults
 from pants.core.target_types import FileTarget
-from pants.engine.fs import Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner, logging
@@ -327,34 +326,6 @@ def test_typescript_check_pnpm_link_protocol_success(
 
 
 @logging(level=LogLevel.INFO)
-def test_typescript_output_generation(
-    basic_rule_runner: tuple[RuleRunner, str, str],
-) -> None:
-    """Test that TypeScript --build produces .js and .d.ts output files in the dist directory."""
-
-    rule_runner, test_project, _ = basic_rule_runner
-    test_files = _load_project_test_files(test_project)
-    rule_runner.write_files(test_files)
-    target = rule_runner.get_target(
-        Address("basic_project/src", target_name="ts_sources", relative_file_path="index.ts")
-    )
-    field_set = TypeScriptCheckFieldSet.create(target)
-
-    request = TypeScriptCheckRequest([field_set])
-    results = rule_runner.request(CheckResults, [request])
-
-    assert len(results.results) == 1
-    result = results.results[0]
-    assert result.exit_code == 0
-
-    snapshot = rule_runner.request(Snapshot, [result.report])
-
-    expected_files = ["dist/index.js", "dist/index.d.ts", "dist/math.js", "dist/math.d.ts"]
-    assert all(f in snapshot.files for f in expected_files), (
-        f"Missing expected files. Expected: {expected_files}, Found: {sorted(snapshot.files)}"
-    )
-
-
 def test_package_manager_config_dependency_tracking(
     basic_rule_runner: tuple[RuleRunner, str, str],
 ) -> None:
