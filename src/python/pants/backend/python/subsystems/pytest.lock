@@ -9,9 +9,9 @@
 //     "CPython<4,>=3.8"
 //   ],
 //   "generated_with_requirements": [
-//     "pytest!=7.1.0,!=7.1.1,<8.4,>=7",
-//     "pytest-cov==5.0.0",
-//     "pytest-xdist==3.6.1"
+//     "pytest!=7.1.0,!=7.1.1,<9,>=7",
+//     "pytest-cov<7,>=5",
+//     "pytest-xdist<4,>=3.6.1"
 //   ],
 //   "manylinux": "manylinux2014",
 //   "requirement_constraints": [],
@@ -681,13 +681,13 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.47.0",
-  "pip_version": "25.1.1",
+  "pex_version": "2.50.2",
+  "pip_version": "25.2",
   "prefer_older_binary": false,
   "requirements": [
-    "pytest!=7.1.0,!=7.1.1,<8.4,>=7",
-    "pytest-cov==5.0.0",
-    "pytest-xdist==3.6.1"
+    "pytest!=7.1.0,!=7.1.1,<9,>=7",
+    "pytest-cov<7,>=5",
+    "pytest-xdist<4,>=3.6.1"
   ],
   "requires_python": [
     "<4,>=3.8"

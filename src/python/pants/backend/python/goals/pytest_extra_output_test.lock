@@ -9,8 +9,8 @@
 //     "CPython<4,>=3.8"
 //   ],
 //   "generated_with_requirements": [
-//     "pytest-html==3.2",
-//     "pytest==8.3.5",
+//     "pytest!=7.1.0,!=7.1.1,<9,>=7",
+//     "pytest-html<4,>=3.1",
 //     "setuptools"
 //   ],
 //   "manylinux": "manylinux2014",
@@ -446,12 +446,12 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.47.0",
-  "pip_version": "25.1.1",
+  "pex_version": "2.50.2",
+  "pip_version": "25.2",
   "prefer_older_binary": false,
   "requirements": [
-    "pytest-html==3.2",
-    "pytest==8.3.5",
+    "pytest!=7.1.0,!=7.1.1,<9,>=7",
+    "pytest-html<4,>=3.1",
     "setuptools"
   ],
   "requires_python": [
