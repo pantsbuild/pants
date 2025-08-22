@@ -110,7 +110,9 @@ def _build_workspace_tsconfig_map(workspaces, all_ts_configs) -> dict[str, TSCon
 def _collect_package_output_dirs(
     project: NodeJSProject, project_ts_configs: list[TSConfig], project_root_path: Path
 ) -> tuple[str, ...]:
-    workspace_dir_to_tsconfig = _build_workspace_tsconfig_map(project.workspaces, project_ts_configs)
+    workspace_dir_to_tsconfig = _build_workspace_tsconfig_map(
+        project.workspaces, project_ts_configs
+    )
 
     package_output_dirs: OrderedSet[str] = OrderedSet()
     for workspace_pkg in project.workspaces:
@@ -129,7 +131,6 @@ def _collect_package_output_dirs(
             package_output_dirs.add(resolved_out_dir)
 
     return tuple(package_output_dirs)
-
 
 
 def _collect_project_configs(
@@ -433,7 +434,7 @@ async def _typecheck_single_project(
     project_package_jsons, project_ts_configs = _collect_project_configs(
         project, all_package_jsons, all_ts_configs
     )
-    
+
     project_targets = await _collect_project_targets(
         project, all_targets, all_projects, project_ts_configs
     )

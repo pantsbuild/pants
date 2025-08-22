@@ -59,28 +59,29 @@ my-project/
 
 Add `BUILD` files to define TypeScript targets:
 
-```python title="packages/shared/BUILD"
+```python tab={"label": "my-project/packages/shared/BUILD"}
 typescript_sources()
 ```
 
-```python title="packages/web-app/BUILD" 
+```python tab={"label": "my-project/packages/web-app/BUILD"}
 typescript_sources()
 ```
 
-```python title="BUILD"
+```python tab={"label": "my-project/BUILD"}
 package_json()
 ```
 
-`package.json`, `tsconfig.json`, and `pnpm-workspace.yaml` files are automatically discovered.
+`package.json`, `tsconfig.json`, and `pnpm-workspace.yaml` files are automatically discovered. Typescript *must* be installed in your project's dependencies.
 
-Typescript *must* be installed in your project's dependencies.
+:::info How Pants runs TypeScript
+Pants invokes TypeScript using `tsc --build` at the project level. This means TypeScript compilation operates on entire projects (defined by `tsconfig.json` files) rather than individual files. This approach allows use of TypeScript's [build mode and project references](https://www.typescriptlang.org/docs/handbook/project-references.html) and incremental compilation with `.tsbuildinfo` files.
+:::
 
+## Configuring project references
 
-### Project references
+To use project references with Pants, configure your `tsconfig.json` files appropriately. Pants will automatically use these configurations when running `tsc --build`:
 
-For complex projects with multiple packages, TypeScript supports [project references](https://www.typescriptlang.org/docs/handbook/project-references.html):
-
-```json title="tsconfig.json"
+```json title="my-project/tsconfig.json"
 {
   "references": [
     { "path": "./packages/shared" },
@@ -89,7 +90,7 @@ For complex projects with multiple packages, TypeScript supports [project refere
 }
 ```
 
-```json title="packages/shared/tsconfig.json"  
+```json title="my-project/packages/shared/tsconfig.json"  
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
@@ -111,7 +112,30 @@ For TypeScript incremental compilation caching to work with `tsc --build`, your 
 Project references with these options enable incremental compilation and better dependency tracking across packages.
 :::
 
-## Running TypeScript type checking
+### Workspaces configuration for pnpm
+
+pnpm workspaces require special `link:` protocol dependencies for cross-package TypeScript imports to work with Pants:
+
+```yaml tab={"label": "my-project/pnpm-workspace.yaml"}
+packages:
+  - 'packages/*'
+```
+
+```json tab={"label": "my-project/package.json"}
+{
+  "dependencies": {
+    "@myorg/shared": "link:./packages/shared"
+  }
+}
+```
+
+Each workspace package that will be imported by other packages must have a `link:` dependency in the root `package.json`. The `link:` protocol creates symlinks that TypeScript can resolve for cross-package imports, enabling proper type checking across workspace packages.
+
+:::note pnpm hoist patterns not supported
+Due to [pnpm issue #3642](https://github.com/pnpm/pnpm/issues/3642), it's not possible to use hoist patterns instead of explicit `link:` dependencies for TypeScript cross-package imports with Pants.
+:::
+
+## Running type checking
 
 Use the `check` goal to type-check your TypeScript code:
 
@@ -125,26 +149,6 @@ Use the `check` goal to type-check your TypeScript code:
 
 TypeScript typechecking is supported with Yarn (v1), npm, and pnpm. You can specify the package manager to use with the `--nodejs-package-manager` option or by specifying it in package.json.
 
-:::note Workspace configuration for pnpm
-pnpm workspaces require special `link:` protocol dependencies for cross-package TypeScript imports:
-
-```yaml title="pnpm-workspace.yaml"
-packages:
-  - 'packages/*'
-```
-
-```json title="packages/app/package.json"
-{
-  "dependencies": {
-    "@myorg/shared": "link:../shared"
-  }
-}
-```
-
-The `link:` protocol creates symlinks that TypeScript can resolve for cross-package imports, enabling proper type checking across workspace packages.
-:::
-
-## Advanced configuration
 
 ### Package manager configuration
 
@@ -157,7 +161,45 @@ file(name="npmrc", source=".npmrc")  # Required for private registries or custom
 
 Package manager configs must be dependencies of `package_json` (not `typescript_sources`) since they affect package installation, not TypeScript compilation directly.
 
+## Advanced configuration
+
+### JavaScript type checking
+
+TypeScript can also type-check JavaScript files when configured with `allowJs` and `checkJs` options:
+
+```json title="tsconfig.json"
+{
+  "compilerOptions": {
+    "allowJs": true,    // Allow .js files to be imported
+    "checkJs": true,    // Enable type checking for .js files  
+    "outDir": "./dist"
+  },
+  "include": ["src/**/*"]
+}
+```
+
+Add `javascript_sources()` targets to your BUILD files:
+
+```python title="BUILD"
+typescript_sources()
+javascript_sources()  # Required for TypeScript to check .js files
+```
+
+With these settings enabled, Pants will include JavaScript files in TypeScript type checking alongside your TypeScript files.
+
 ### Output directory configuration
 
 The TypeScript backend automatically detects output directories by reading the `outDir` setting from each `tsconfig.json` file in your project.
 `outDir` must be a relative path within the package directory (e.g., `"./dist"`, `"./build"`).
+
+### Troubleshooting cache issues
+
+TypeScript incremental compilation output is automatically cached to speed up subsequent runs. If you encounter cache-related build issues:
+
+```bash
+# Clear TypeScript cache (located in your configured named-caches-dir)
+rm -rf ~/.cache/pants/named_caches/typescript_incremental/
+
+# Run with fresh cache
+pants check ::
+```

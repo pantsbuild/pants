@@ -26,8 +26,7 @@ from pants.core.goals.check import CheckResults
 from pants.core.target_types import FileTarget
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
-from pants.testutil.rule_runner import RuleRunner, logging
-from pants.util.logging import LogLevel
+from pants.testutil.rule_runner import RuleRunner
 
 # Test constants for JavaScript type checking
 JS_TYPE_ERROR_FILE_NUMBER_TO_STRING = (
@@ -318,14 +317,12 @@ def test_typescript_check_pnpm_link_protocol_success(
     request = TypeScriptCheckRequest([parent_field_set])
     results = rule_runner.request(CheckResults, [request])
 
-    # Should succeed - pnpm link: protocol should resolve correctly
     assert len(results.results) == 1
     assert results.results[0].exit_code == 0, (
         f"TypeScript check failed: {results.results[0].stdout}\n{results.results[0].stderr}"
     )
 
 
-@logging(level=LogLevel.INFO)
 def test_package_manager_config_dependency_tracking(
     basic_rule_runner: tuple[RuleRunner, str, str],
 ) -> None:
