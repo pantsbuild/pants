@@ -16,7 +16,7 @@ pex==2.50.2
 psutil==5.9.8
 # This should be compatible with pytest.py, although it can be looser so that we don't
 # over-constrain pantsbuild.pants.testutil
-pytest>=6.2.4,<8.4,!=7.1.0,!=7.1.1
+pytest>=7,<9,!=7.1.0,!=7.1.1
 python-lsp-jsonrpc==1.0.0
 PyYAML>=6.0,<7.0
 requests[security]>=2.28.1
