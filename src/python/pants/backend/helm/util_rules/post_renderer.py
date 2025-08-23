@@ -155,7 +155,7 @@ async def prepare_post_renderer_for_helm_deployment(
     return SetupHelmPostRenderer(
         replacements,
         description_of_origin=f"the `helm_deployment` {request.field_set.address}",
-        extra_post_renderers=request.field_set.post_renderers.to_unparsed_address_inputs()  # THIS IS MISSING
+        extra_post_renderers=request.field_set.post_renderers.to_unparsed_address_inputs(),
     )
 
 
