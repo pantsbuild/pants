@@ -327,7 +327,7 @@ def test_use_simple_extra_post_renderer(rule_runner: RuleRunner) -> None:
                         content=dedent(
                             """\
                             #!/bin/bash
-                            cat <&0
+                            sed 's/foo_value/modified_by_post_renderer/g'
                             """
                         ).encode(),
                         is_executable=True,
@@ -366,4 +366,6 @@ def test_use_simple_extra_post_renderer(rule_runner: RuleRunner) -> None:
         digest=rendered_output.snapshot.digest,
         filename="mychart/templates/configmap.yaml",
     )
-    assert rendered_configmap_file == _TEST_EXPECTED_CONFIGMAP_FILE
+    # The post-renderer should have modified foo_value to modified_by_post_renderer
+    expected_modified_configmap = _TEST_EXPECTED_CONFIGMAP_FILE.replace("foo_value", "modified_by_post_renderer")
+    assert rendered_configmap_file == expected_modified_configmap
