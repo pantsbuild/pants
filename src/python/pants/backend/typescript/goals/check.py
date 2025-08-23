@@ -202,14 +202,14 @@ async def create_tsc_wrapper_script(
     )
     project_cache_subdir = f"{cache_relative_path}/{cache_key}"
 
-    workspace_dirs = []
+    package_dirs = []
     for workspace_pkg in project.workspaces:
         if workspace_pkg.root_dir != project.root_dir:
-            workspace_relative = workspace_pkg.root_dir.removeprefix(f"{project.root_dir}/")
-            workspace_dirs.append(workspace_relative)
+            package_relative = workspace_pkg.root_dir.removeprefix(f"{project.root_dir}/")
+            package_dirs.append(package_relative)
         else:
-            workspace_dirs.append(".")
-    workspace_dirs_str = " ".join(f'"{d}"' for d in workspace_dirs)
+            package_dirs.append(".")
+    package_dirs_str = " ".join(f'"{d}"' for d in package_dirs)
     output_dirs_str = " ".join(f'"{d}"' for d in package_output_dirs)
 
     script_content = """#!/bin/sh
@@ -245,12 +245,13 @@ PROJECT_CACHE_SUBDIR="{project_cache_subdir}"
 
 # Update cache
 # Copy .tsbuildinfo files located at package root to cache
-for workspace_dir in {workspace_dirs_str}; do
-    tsbuildinfo_files=("$workspace_dir"/*.tsbuildinfo)
-    if [ -f "${{tsbuildinfo_files[0]}}" ]; then
-        "$MKDIR_BIN" -p "$PROJECT_CACHE_SUBDIR/$workspace_dir"
-        "$CP_BIN" "${{tsbuildinfo_files[@]}}" "$PROJECT_CACHE_SUBDIR/$workspace_dir/"
-    fi
+for package_dir in {package_dirs_str}; do
+    for tsbuildinfo_file in "$package_dir"/*.tsbuildinfo; do
+        if [ -f "$tsbuildinfo_file" ]; then
+            "$MKDIR_BIN" -p "$PROJECT_CACHE_SUBDIR/$package_dir"
+            "$CP_BIN" "$tsbuildinfo_file" "$PROJECT_CACHE_SUBDIR/$package_dir/"
+        fi
+    done
 done
 
 # Copy output directories to cache
@@ -268,7 +269,7 @@ done
         find_binary_path=find_binary.path,
         touch_binary_path=touch_binary.path,
         project_cache_subdir=project_cache_subdir,
-        workspace_dirs_str=workspace_dirs_str,
+        package_dirs_str=package_dirs_str,
         output_dirs_str=output_dirs_str,
     )
 
