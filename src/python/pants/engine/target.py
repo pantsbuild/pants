@@ -1214,7 +1214,7 @@ class GenerateTargetsRequest(Generic[_TargetGenerator]):
 class GeneratedTargets(FrozenDict[Address, Target]):
     """A mapping of the address of generated targets to the targets themselves."""
 
-    def __init__(self, generator: Target, generated_targets: Iterable[Target]) -> None:
+    def __new__(cls, generator: Target, generated_targets: Iterable[Target]) -> GeneratedTargets:
         expected_spec_path = generator.address.spec_path
         expected_tgt_name = generator.address.target_name
         mapping = {}
@@ -1242,7 +1242,7 @@ class GeneratedTargets(FrozenDict[Address, Target]):
                     "Consider using `request.generator.address.create_generated()`."
                 )
             mapping[tgt.address] = tgt
-        super().__init__(mapping)
+        return super().__new__(cls, mapping)
 
 
 @rule(polymorphic=True)
