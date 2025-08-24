@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from collections.abc import Iterable
 
+from pants.backend.javascript.subsystems import nodejs_tool
 from pants.backend.tsx.goals import tailor as tsx_tailor
 from pants.backend.tsx.target_types import (
     TSXSourcesGeneratorTarget,
@@ -9,7 +10,7 @@ from pants.backend.tsx.target_types import (
     TSXTestsGeneratorTarget,
     TSXTestTarget,
 )
-from pants.backend.typescript.goals import tailor
+from pants.backend.typescript.goals import check, tailor
 from pants.backend.typescript.target_types import (
     TypeScriptSourcesGeneratorTarget,
     TypeScriptSourceTarget,
@@ -38,4 +39,6 @@ def rules() -> Iterable[Rule | UnionRule]:
     return (
         *tailor.rules(),
         *tsx_tailor.rules(),
+        *nodejs_tool.rules(),
+        *check.rules(),
     )
