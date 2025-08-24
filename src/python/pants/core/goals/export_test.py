@@ -18,7 +18,7 @@ from pants.core.goals.export import (
     ExportResults,
     ExportSubsystem,
     PostProcessingCommand,
-    export,
+    export_goal,
     warn_exported_bin_conflicts,
 )
 from pants.core.goals.generate_lockfiles import KnownUserResolveNames, KnownUserResolveNamesRequest
@@ -103,7 +103,10 @@ def run_export_rule(
     monkeypatch.setattr("pants.engine.intrinsics.task_side_effected", noop)
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
 
-        def do_mock_export(req: ExportRequest):
+        def do_mock_export(__implicitly: tuple) -> ExportResults:
+            req, typ = next(iter(__implicitly[0].items()))
+            assert typ == ExportRequest
+
             if resolves:
                 digest = rule_runner.request(
                     Digest, [CreateDigest([FileContent("foo/bar", b"BAR")])]
@@ -134,9 +137,10 @@ def run_export_rule(
                     ],
                 )
                 return ExportResults(mock_export(digest, (), binary) for binary in binaries)
+            raise Exception("No resolves or binaries specified")
 
         result: Export = run_rule_with_mocks(
-            export,
+            export_goal,
             rule_args=[
                 console,
                 Targets([]),
@@ -148,13 +152,9 @@ def run_export_rule(
             ],
             mock_calls={
                 "pants.engine.intrinsics.add_prefix": lambda *xs: rule_runner.request(Digest, xs),
+                "pants.core.goals.export.export": do_mock_export,
             },
             mock_gets=[
-                MockGet(
-                    output_type=ExportResults,
-                    input_types=(ExportRequest,),
-                    mock=do_mock_export,
-                ),
                 rule_runner.do_not_use_mock(Digest, (MergeDigests,)),
                 rule_runner.do_not_use_mock(EnvironmentVars, (EnvironmentVarsRequest,)),
                 rule_runner.do_not_use_mock(KnownUserResolveNames, (KnownUserResolveNamesRequest,)),
