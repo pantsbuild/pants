@@ -110,16 +110,17 @@ class AsyncFieldMixin(Field):
 
         @rule
         async def hydrate_sources(request: HydrateSourcesRequest) -> HydratedSources:
-            result = await Get(Snapshot, PathGlobs(request.field.value))
+            digest = await path_globs_to_digest(PathGlobs(request.field.value))
+            result = await digest_to_snapshot(digest)
             request.field.validate_resolved_files(result.files)
             ...
             return HydratedSources(result)
 
-    Then, call sites can `await Get` if they need to hydrate the field, even if they subclassed
+    Then, call sites can `await` if they need to hydrate the field, even if they subclassed
     the original async field to have custom behavior:
 
-        sources1 = await Get(HydratedSources, HydrateSourcesRequest(my_tgt.get(Sources)))
-        sources2 = await Get(HydratedSources, HydrateSourcesRequest(custom_tgt.get(CustomSources)))
+        sources1 = hydrate_sources(HydrateSourcesRequest(my_tgt.get(Sources)))
+        sources2 = hydrate_sources(HydrateSourcesRequest(custom_tgt.get(CustomSources)))
     """
 
     address: Address
@@ -969,11 +970,7 @@ class TransitiveTargets:
 
 @dataclass(frozen=True)
 class TransitiveTargetsRequest:
-    """A request to get the transitive dependencies of the input roots.
-
-    Resolve the transitive targets with `await Get(TransitiveTargets,
-    TransitiveTargetsRequest([addr1, addr2]))`.
-    """
+    """A request to get the transitive dependencies of the input roots."""
 
     roots: tuple[Address, ...]
     should_traverse_deps_predicate: ShouldTraverseDepsPredicate
@@ -1046,7 +1043,7 @@ class TargetGenerator(Target):
     # types being generated manually. The applicable defaults are available on the `AddressFamily`
     # which you can get using:
     #
-    #    family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
+    #    family = await ensure_address_family(**implicitly(AddressFamilyDir(address.spec_path)))
     #    target_defaults = family.defaults.get(MyTarget.alias, {})
     generated_target_cls: ClassVar[type[Target]]
 
@@ -2263,13 +2260,13 @@ class SourcesField(AsyncFieldMixin, Field):
         and the engine will generate the sources if possible or will return an instance of
         HydratedSources with an empty snapshot if not possible:
 
-            await Get(
-                HydratedSources,
+            await hydrate_sources(
                 HydrateSourcesRequest(
                     sources_field,
                     for_sources_types=[FortranSources],
                     enable_codegen=True,
-                )
+                ),
+                **implicitly(),
             )
 
         This method is useful when you need to filter targets before hydrating them, such as how
@@ -2617,9 +2614,9 @@ class SourcesPaths(Paths):
 class SourcesPathsRequest(EngineAwareParameter):
     """A request to resolve the file names of the `source`/`sources` field.
 
-    Use via `Get(SourcesPaths, SourcesPathRequest(tgt.get(SourcesField))`.
+    Use via `await resolve_source_paths(SourcesPathRequest(tgt.get(SourcesField))`.
 
-    This is faster than `Get(HydratedSources, HydrateSourcesRequest)` because it does not snapshot
+    This is faster than `await hydrate_sources(HydrateSourcesRequest)` because it does not snapshot
     the files and it only resolves the file names.
 
     This does not consider codegen, and only captures the files from the field. Use
@@ -2658,9 +2655,9 @@ def targets_with_sources_types(
 class Dependencies(StringSequenceField, AsyncFieldMixin):
     """The dependencies field.
 
-    To resolve all dependencies—including the results of dependency inference—use either `await
-    Get(Addresses, DependenciesRequest(tgt[Dependencies])` or `await Get(Targets,
-    DependenciesRequest(tgt[Dependencies])`.
+    To resolve all dependencies—including the results of dependency inference—use either
+    `await resolve_dependencies(DependenciesRequest(tgt[Dependencies])` or
+    `await resolve_targets(**implicitly(DependenciesRequest(tgt[Dependencies]))`.
     """
 
     alias = "dependencies"
@@ -2725,12 +2722,13 @@ class ExplicitlyProvidedDependenciesRequest(EngineAwareParameter):
 class ExplicitlyProvidedDependencies:
     """The literal addresses from a BUILD file `dependencies` field.
 
-    Almost always, you should use `await Get(Addresses, DependenciesRequest)` instead, which will
-    consider dependency inference and apply ignores. However, this type can be
+    Almost always, you should use `await resolve_dependencies(DependenciesRequest, **implicitly())`
+    instead, which will consider dependency inference and apply ignores. However, this type can be
     useful particularly within inference rules to see if a user already explicitly
     provided a dependency.
 
-    Resolve using `await Get(ExplicitlyProvidedDependencies, DependenciesRequest)`.
+    Resolve using
+    `await determine_explicitly_provided_dependencies(**implicitly(DependenciesRequest))`.
 
     Note that the `includes` are not filtered based on the `ignores`: this type preserves exactly
     what was in the BUILD file.
@@ -2859,7 +2857,7 @@ class InferDependenciesRequest(Generic[FS], EngineAwareParameter):
 
         @rule
         async def infer_fortran_dependencies(request: InferFortranDependencies) -> InferredDependencies:
-            hydrated_sources = await Get(HydratedSources, HydrateSources(request.field_set.sources))
+            hydrated_sources = await hydrate_sources(HydrateSources(request.field_set.sources))
             ...
             return InferredDependencies(...)
 
@@ -2991,11 +2989,12 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
     dedicated field.
 
     This type will ensure that the dependencies show up in project introspection,
-    like `dependencies` and `dependents`, but not show up when you call `Get(TransitiveTargets,
-    TransitiveTargetsRequest)` and `Get(Addresses, DependenciesRequest)`.
+    like `dependencies` and `dependents`, but not show up when you
+    `await transitive_targets(TransitiveTargetsRequest(...), **implicitly())` and
+    `await resolve_dependencies(DependenciesRequest(...), **implicitly())`.
 
-    To hydrate this field's dependencies, use `await Get(Addresses, UnparsedAddressInputs,
-    tgt.get(MyField).to_unparsed_address_inputs())`.
+    To hydrate this field's dependencies, use
+    `await resolve_unparsed_address_inputs(tgt.get(MyField).to_unparsed_address_inputs(), **implicitly())`.
     """
 
     def to_unparsed_address_inputs(self) -> UnparsedAddressInputs:
