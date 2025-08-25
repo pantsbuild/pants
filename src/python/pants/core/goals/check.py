@@ -9,7 +9,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, ClassVar, Generic, TypeVar, cast
 
-from pants.core.environments.rules import EnvironmentNameRequest
+from pants.core.environments.rules import EnvironmentNameRequest, resolve_environment_name
 from pants.core.goals.lint import REPORT_DIR as REPORT_DIR  # noqa: F401
 from pants.core.goals.multi_tool_goal_helper import (
     OnlyOption,
@@ -23,8 +23,9 @@ from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnTyp
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.selectors import concurrently
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, goal_rule
+from pants.engine.rules import QueryRule, collect_rules, goal_rule, implicitly, rule
 from pants.engine.target import FieldSet, FilteredTargets
 from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
@@ -159,6 +160,14 @@ class CheckRequest(Generic[_FS], EngineAwareParameter):
         return {"addresses": [fs.address.spec for fs in self.field_sets]}
 
 
+@rule(polymorphic=True)
+async def check(
+    req: CheckRequest,
+    environment_name: EnvironmentName,
+) -> CheckResults:
+    raise NotImplementedError()
+
+
 class CheckSubsystem(GoalSubsystem):
     name = "check"
     help = "Run type checking or the lightest variant of compilation available for a language."
@@ -176,7 +185,7 @@ class Check(Goal):
 
 
 @goal_rule
-async def check(
+async def check_goal(
     console: Console,
     workspace: Workspace,
     targets: FilteredTargets,
@@ -203,12 +212,8 @@ async def check(
         (request, field_set) for request in requests for field_set in request.field_sets
     ]
 
-    environment_names = await MultiGet(
-        Get(
-            EnvironmentName,
-            EnvironmentNameRequest,
-            EnvironmentNameRequest.from_field_set(field_set),
-        )
+    environment_names = await concurrently(
+        resolve_environment_name(EnvironmentNameRequest.from_field_set(field_set), **implicitly())
         for (_, field_set) in request_to_field_set
     )
 
@@ -218,8 +223,8 @@ async def check(
     }
 
     # Run each check request in each valid environment (potentially multiple runs per tool)
-    all_results = await MultiGet(
-        Get(CheckResults, {request: CheckRequest, env_name: EnvironmentName})
+    all_results = await concurrently(
+        check(**implicitly({request: CheckRequest, env_name: EnvironmentName}))
         for (request, env_name) in request_to_env_name
     )
 

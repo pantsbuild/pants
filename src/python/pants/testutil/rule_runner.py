@@ -24,6 +24,7 @@ from pants.base.build_root import BuildRoot
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.goals.run import generate_run_request
 from pants.core.util_rules import adhoc_binaries
 from pants.engine.addresses import Address
 from pants.engine.console import Console
@@ -283,6 +284,8 @@ class RuleRunner:
             *self.rules,
             *source_root.rules(),
             *adhoc_binaries.rules(),
+            # Many tests indirectly rely on this rule.
+            generate_run_request,
             QueryRule(WrappedTarget, [WrappedTargetRequest]),
             QueryRule(AllTargets, []),
             QueryRule(UnionMembership, []),

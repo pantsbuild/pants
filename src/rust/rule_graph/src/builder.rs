@@ -1475,7 +1475,7 @@ impl<R: Rule> Builder<R> {
         include_deleted_dependencies: bool,
     ) -> BTreeMap<
         DependencyKey<R::TypeId>,
-        Vec<EdgeReference<MaybeDeleted<DependencyKey<R::TypeId>, EdgePrunedReason>, u32>>,
+        Vec<EdgeReference<'_, MaybeDeleted<DependencyKey<R::TypeId>, EdgePrunedReason>, u32>>,
     > {
         let node = &graph[node_id].0.node;
         let mut edges_by_dependency_key = node

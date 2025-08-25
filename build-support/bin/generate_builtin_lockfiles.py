@@ -59,6 +59,7 @@ from pants.backend.tools.yamllint.subsystem import Yamllint
 from pants.base.build_environment import get_buildroot
 from pants.jvm.resolve.jvm_tool import JvmToolBase
 from pants.jvm.shading.jarjar import JarJar
+from pants.option.global_options import KeepSandboxes
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
 
@@ -193,17 +194,29 @@ def create_parser() -> argparse.ArgumentParser:
         const=logging.DEBUG,
         default=logging.INFO,
     )
+    parser.add_argument(
+        "--keep-sandboxes",
+        type=KeepSandboxes,
+        choices=list(KeepSandboxes),
+        default=KeepSandboxes.never,
+        help="Set this to 'always' or 'on_failure' to preserve temp directories and chroots.",
+    )
     return parser
 
 
-def generate_python_tool_lockfiles(tools: Sequence[PythonTool], dry_run: bool) -> None:
+def generate_python_tool_lockfiles(
+    tools: Sequence[PythonTool], dry_run: bool, keep_sandboxes: KeepSandboxes
+) -> None:
     def req_file(_tool: PythonTool) -> str:
         return f"{_tool.name}-requirements.txt"
 
+    cleanup_tmp = keep_sandboxes == KeepSandboxes.never
     # Generate the builtin lockfiles via temporary named resolves in a tmp repo.
     # This is to completely disassociate the generation of builtin lockfiles from
     # the consumption of lockfiles in the Pants repo.
-    with temporary_dir() as tmp_buildroot:
+    with temporary_dir(cleanup=cleanup_tmp) as tmp_buildroot:
+        if not cleanup_tmp:
+            logger.info(f"Preserving temp buildroot: {tmp_buildroot}")
         for tool in tools:
             with open(os.path.join(tmp_buildroot, req_file(tool)), "w") as reqs_file:
                 for req_str in tool.cls.default_requirements:
@@ -241,15 +254,21 @@ def generate_python_tool_lockfiles(tools: Sequence[PythonTool], dry_run: bool) -
             "--python-resolves-to-constraints-file={}",
             "--python-resolves-to-no-binary={}",
             "--python-resolves-to-only-binary={}",
+            "--pex-emit-warnings=true",
         ]
-        generate(tmp_buildroot, tools, python_args, dry_run)
+        generate(tmp_buildroot, tools, python_args, dry_run, keep_sandboxes)
 
 
-def generate_jvm_tool_lockfiles(tools: Sequence[JvmTool], dry_run: bool) -> None:
+def generate_jvm_tool_lockfiles(
+    tools: Sequence[JvmTool], dry_run: bool, keep_sandboxes: KeepSandboxes
+) -> None:
+    cleanup_tmp = keep_sandboxes == KeepSandboxes.never
     # Generate the builtin lockfiles via temporary named resolves in a tmp repo.
     # This is to completely disassociate the generation of builtin lockfiles from
     # the consumption of lockfiles in the Pants repo.
-    with temporary_dir() as tmp_buildroot:
+    with temporary_dir(cleanup=cleanup_tmp) as tmp_buildroot:
+        if not cleanup_tmp:
+            logger.info(f"Preserving temp buildroot: {tmp_buildroot}")
         jvm_args = []
         for tool in tools:
             jvm_args.extend(
@@ -259,10 +278,16 @@ def generate_jvm_tool_lockfiles(tools: Sequence[JvmTool], dry_run: bool) -> None
                     f"--{tool.name}-lockfile={tool.lockfile_name}",
                 ]
             )
-        generate(tmp_buildroot, tools, jvm_args, dry_run)
+        generate(tmp_buildroot, tools, jvm_args, dry_run, keep_sandboxes)
 
 
-def generate(buildroot: str, tools: Sequence[Tool], args: Sequence[str], dry_run: bool) -> None:
+def generate(
+    buildroot: str,
+    tools: Sequence[Tool],
+    args: Sequence[str],
+    dry_run: bool,
+    keep_sandboxes: KeepSandboxes,
+) -> None:
     def lockfile_inrepo_dest(lockfile_pkg, lockfile_filename):
         return os.path.join(
             "src",
@@ -281,6 +306,7 @@ def generate(buildroot: str, tools: Sequence[Tool], args: Sequence[str], dry_run
     args = [
         os.path.join(pants_repo_root, "pants"),
         "--concurrent",
+        f"--keep-sandboxes={keep_sandboxes.value}",
         "--anonymous-telemetry-enabled=false",
         f"--backend-packages={backends}",
         *args,
@@ -290,7 +316,7 @@ def generate(buildroot: str, tools: Sequence[Tool], args: Sequence[str], dry_run
     ]
 
     if dry_run:
-        logger.info("Would run: " + " ".join(args))
+        logger.info("Would run: " + " ".join(repr(arg) for arg in args))
         return
 
     # If there is a pre-existing lockfile, seed it so we get the pretty lockfile diff
@@ -301,7 +327,7 @@ def generate(buildroot: str, tools: Sequence[Tool], args: Sequence[str], dry_run
             logger.debug(f"copying existing lockfile from {lockfile_dest}")
             shutil.copy(lockfile_dest, lockfile_buildroot_filename(tool.lockfile_name))
 
-    logger.debug("Running: " + " ".join(args))
+    logger.debug("Running: " + " ".join(repr(arg) for arg in args))
     subprocess.run(args, cwd=buildroot, check=True)
 
     # Copy the generated lockfiles from the tmp repo to the Pants repo.
@@ -342,9 +368,9 @@ def main() -> None:
             "or via the --all-python/--all-jvm flags."
         )
     if python_tools:
-        generate_python_tool_lockfiles(python_tools, args.dry_run)
+        generate_python_tool_lockfiles(python_tools, args.dry_run, args.keep_sandboxes)
     if jvm_tools:
-        generate_jvm_tool_lockfiles(jvm_tools, args.dry_run)
+        generate_jvm_tool_lockfiles(jvm_tools, args.dry_run, args.keep_sandboxes)
 
 
 if __name__ == "__main__":

@@ -29,7 +29,7 @@ from pants.engine.process import (
     InteractiveProcessResult,
     Process,
 )
-from pants.engine.rules import Get, collect_rules, concurrently, goal_rule, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, goal_rule, implicitly, rule
 from pants.engine.target import (
     FieldSet,
     FieldSetsPerTargetRequest,
@@ -90,6 +90,14 @@ class DeployProcess:
     process: InteractiveProcess | None
     publish_dependencies: tuple[Target, ...] = ()
     description: str | None = None
+
+
+@rule(polymorphic=True)
+async def create_deploy_process(
+    req: DeployFieldSet,
+    environment_name: EnvironmentName,
+) -> DeployProcess:
+    raise NotImplementedError()
 
 
 class DeploySubsystem(GoalSubsystem):
@@ -227,7 +235,7 @@ async def run_deploy(
     )
 
     deploy_processes = await concurrently(
-        Get(DeployProcess, DeployFieldSet, field_set)
+        create_deploy_process(**implicitly({field_set: DeployFieldSet}))
         for field_set in target_roots_to_deploy_field_sets.field_sets
     )
 

@@ -19,16 +19,16 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.specs_rules import (
     AmbiguousImplementationsException,
     TooManyTargetsException,
+    find_valid_field_sets_for_target_roots,
 )
 from pants.engine.intrinsics import run_interactive_process
 from pants.engine.process import InteractiveProcess
-from pants.engine.rules import Get, Rule, _uncacheable_rule, collect_rules, goal_rule, rule
+from pants.engine.rules import Rule, _uncacheable_rule, collect_rules, goal_rule, implicitly, rule
 from pants.engine.target import (
     BoolField,
     FieldSet,
     NoApplicableTargetsBehavior,
     Target,
-    TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
@@ -156,6 +156,18 @@ class RunInSandboxRequest(RunRequest):
 
 
 @rule(polymorphic=True)
+async def generate_run_request(run_field_set: RunFieldSet, env_name: EnvironmentName) -> RunRequest:
+    raise NotImplementedError()
+
+
+@rule(polymorphic=True)
+async def generate_run_debug_adapter_request(
+    run_field_set: RunFieldSet, env_name: EnvironmentName
+) -> RunDebugAdapterRequest:
+    raise NotImplementedError()
+
+
+@rule(polymorphic=True)
 async def generate_run_in_sandbox_request(
     run_field_set: RunFieldSet, env_name: EnvironmentName
 ) -> RunInSandboxRequest:
@@ -209,13 +221,13 @@ class Run(Goal):
 async def _find_what_to_run(
     goal_description: str,
 ) -> tuple[RunFieldSet, Target]:
-    targets_to_valid_field_sets = await Get(
-        TargetRootsToFieldSets,
+    targets_to_valid_field_sets = await find_valid_field_sets_for_target_roots(
         TargetRootsToFieldSetsRequest(
             RunFieldSet,
             goal_description=goal_description,
             no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
         ),
+        **implicitly(),
     )
     mapping = targets_to_valid_field_sets.mapping
 
@@ -246,9 +258,9 @@ async def run(
     await _warn_on_non_local_environments((target,), "the `run` goal")
 
     request = await (
-        Get(RunRequest, RunFieldSet, field_set)
+        generate_run_request(**implicitly({field_set: RunFieldSet}))
         if not run_subsystem.debug_adapter
-        else Get(RunDebugAdapterRequest, RunFieldSet, field_set)
+        else generate_run_debug_adapter_request(**implicitly({field_set: RunFieldSet}))
     )
     restartable = target.get(RestartableField).value
     if run_subsystem.debug_adapter:
@@ -291,8 +303,8 @@ def _unsupported_debug_adapter_rules(cls: type[RunFieldSet]) -> Iterable:
 
 
 async def _run_request(request: RunFieldSet) -> RunInSandboxRequest:
-    run_request = await Get(RunRequest, RunFieldSet, request)
-    return run_request.to_run_in_sandbox_request()
+    run_req = await generate_run_request(**implicitly({request: RunFieldSet}))
+    return run_req.to_run_in_sandbox_request()
 
 
 @memoized

@@ -48,7 +48,7 @@ from pants.engine.process import (
     Process,
     ProcessCacheScope,
 )
-from pants.engine.rules import Get, collect_rules, concurrently, goal_rule, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, goal_rule, implicitly, rule
 from pants.engine.target import (
     FieldSet,
     ImmutableValue,
@@ -180,6 +180,14 @@ class PublishProcesses(Collection[PublishPackages]):
     """
 
 
+@rule(polymorphic=True)
+async def create_publish_processes(
+    req: PublishRequest,
+    environment_name: EnvironmentName,
+) -> PublishProcesses:
+    raise NotImplementedError()
+
+
 @dataclass(frozen=True)
 class PublishProcessesRequest:
     """Internal request taking all field sets for a target and turning it into a `PublishProcesses`
@@ -266,12 +274,13 @@ async def package_for_publish(
                 logger.info(str(artifact.extra_log_lines[0]))
 
     publish = await concurrently(
-        Get(
-            PublishProcesses,
-            {
-                field_set._request(packages): PublishRequest,
-                local_environment.val: EnvironmentName,
-            },
+        create_publish_processes(
+            **implicitly(
+                {
+                    field_set._request(packages): PublishRequest,
+                    local_environment.val: EnvironmentName,
+                }
+            )
         )
         for field_set in request.publish_field_sets
     )

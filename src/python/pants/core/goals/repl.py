@@ -17,7 +17,7 @@ from pants.engine.fs import Digest
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.intrinsics import run_interactive_process
 from pants.engine.process import InteractiveProcess
-from pants.engine.rules import Get, collect_rules, goal_rule
+from pants.engine.rules import collect_rules, goal_rule, implicitly, rule
 from pants.engine.target import FilteredTargets, Target
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import ArgsListOption, BoolOption, StrOption
@@ -105,6 +105,14 @@ class ReplRequest:
         object.__setattr__(self, "run_in_workspace", run_in_workspace)
 
 
+@rule(polymorphic=True)
+async def get_repl_request(
+    impl: ReplImplementation,
+    environment_name: EnvironmentName,
+) -> ReplRequest:
+    raise NotImplementedError()
+
+
 @goal_rule
 async def run_repl(
     console: Console,
@@ -145,7 +153,7 @@ async def run_repl(
         return Repl(-1)
 
     repl_impl = repl_implementation_cls(targets=specified_targets)
-    request = await Get(ReplRequest, ReplImplementation, repl_impl)
+    request = await get_repl_request(**implicitly({repl_impl: ReplImplementation}))
 
     env = {**complete_env, **request.extra_env}
 
