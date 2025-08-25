@@ -6,7 +6,7 @@
 // {
 //   "version": 3,
 //   "valid_for_interpreter_constraints": [
-//     "CPython<4,>=3.8"
+//     "CPython<3.14,>=3.9"
 //   ],
 //   "generated_with_requirements": [
 //     "flake8<7,>=5.0.4"
@@ -24,6 +24,7 @@
   "allow_wheels": true,
   "build_isolation": true,
   "constraints": [],
+  "elide_unused_requires_dist": false,
   "excluded": [],
   "locked_resolves": [
     {
@@ -32,24 +33,23 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "7a1cf6b73744f5806ab95e526f6f0d8c01c66d7bbe349562d22dfca20610b248",
-              "url": "https://files.pythonhosted.org/packages/cf/a0/b881b63a17a59d9d07f5c0cc91a29182c8e8a9aa2bde5b3b2b16519c02f4/flake8-5.0.4-py2.py3-none-any.whl"
+              "hash": "ffdfce58ea94c6580c77888a86506937f9a1a227dfcd15f245d694ae20a6b6e5",
+              "url": "https://files.pythonhosted.org/packages/b0/24/bbf7175ffc47cb3d3e1eb523ddb23272968359dfcf2e1294707a2bf12fc4/flake8-6.1.0-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "6fbe320aad8d6b95cec8b8e47bc933004678dc63095be98528b7bdd2a9f510db",
-              "url": "https://files.pythonhosted.org/packages/ad/00/9808c62b2d529cefc69ce4e4a1ea42c0f855effa55817b7327ec5b75e60a/flake8-5.0.4.tar.gz"
+              "hash": "d5b3857f07c030bdb5bf41c7f53799571d75c4491748a3adcd47de929e34cd23",
+              "url": "https://files.pythonhosted.org/packages/cf/f8/bbe24f43695c0c480181e39ce910c2650c794831886ec46ddd7c40520e6a/flake8-6.1.0.tar.gz"
             }
           ],
           "project_name": "flake8",
           "requires_dists": [
-            "importlib-metadata<4.3,>=1.1.0; python_version < \"3.8\"",
             "mccabe<0.8.0,>=0.7.0",
-            "pycodestyle<2.10.0,>=2.9.0",
-            "pyflakes<2.6.0,>=2.5.0"
+            "pycodestyle<2.12.0,>=2.11.0",
+            "pyflakes<3.2.0,>=3.1.0"
           ],
-          "requires_python": ">=3.6.1",
-          "version": "5.0.4"
+          "requires_python": ">=3.8.1",
+          "version": "6.1.0"
         },
         {
           "artifacts": [
@@ -73,37 +73,37 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d1735fc58b418fd7c5f658d28d943854f8a849b01a5d0a1e6f3f3fdd0166804b",
-              "url": "https://files.pythonhosted.org/packages/67/e4/fc77f1039c34b3612c4867b69cbb2b8a4e569720b1f19b0637002ee03aff/pycodestyle-2.9.1-py2.py3-none-any.whl"
+              "hash": "44fe31000b2d866f2e41841b18528a505fbd7fef9017b04eff4e2648a0fadc67",
+              "url": "https://files.pythonhosted.org/packages/b1/90/a998c550d0ddd07e38605bb5c455d00fcc177a800ff9cc3dafdcb3dd7b56/pycodestyle-2.11.1-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "2c9607871d58c76354b697b42f5d57e1ada7d261c261efac224b664affdc5785",
-              "url": "https://files.pythonhosted.org/packages/b6/83/5bcaedba1f47200f0665ceb07bcb00e2be123192742ee0edfb66b600e5fd/pycodestyle-2.9.1.tar.gz"
+              "hash": "41ba0e7afc9752dfb53ced5489e89f8186be00e599e712660695b7a75ff2663f",
+              "url": "https://files.pythonhosted.org/packages/34/8f/fa09ae2acc737b9507b5734a9aec9a2b35fa73409982f57db1b42f8c3c65/pycodestyle-2.11.1.tar.gz"
             }
           ],
           "project_name": "pycodestyle",
           "requires_dists": [],
-          "requires_python": ">=3.6",
-          "version": "2.9.1"
+          "requires_python": ">=3.8",
+          "version": "2.11.1"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "4579f67d887f804e67edb544428f264b7b24f435b263c4614f384135cea553d2",
-              "url": "https://files.pythonhosted.org/packages/dc/13/63178f59f74e53acc2165aee4b002619a3cfa7eeaeac989a9eb41edf364e/pyflakes-2.5.0-py2.py3-none-any.whl"
+              "hash": "4132f6d49cb4dae6819e5379898f2b8cce3c5f23994194c24b77d5da2e36f774",
+              "url": "https://files.pythonhosted.org/packages/00/e9/1e1fd7fae559bfd07704991e9a59dd1349b72423c904256c073ce88a9940/pyflakes-3.1.0-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "491feb020dca48ccc562a8c0cbe8df07ee13078df59813b83959cbdada312ea3",
-              "url": "https://files.pythonhosted.org/packages/07/92/f0cb5381f752e89a598dd2850941e7f570ac3cb8ea4a344854de486db152/pyflakes-2.5.0.tar.gz"
+              "hash": "a0aae034c444db0071aa077972ba4768d40c830d9539fd45bf4cd3f8f6992efc",
+              "url": "https://files.pythonhosted.org/packages/8b/fb/7251eaec19a055ec6aafb3d1395db7622348130d1b9b763f78567b2aab32/pyflakes-3.1.0.tar.gz"
             }
           ],
           "project_name": "pyflakes",
           "requires_dists": [],
-          "requires_python": ">=3.6",
-          "version": "2.5.0"
+          "requires_python": ">=3.8",
+          "version": "3.1.0"
         }
       ],
       "platform_tag": null
@@ -113,14 +113,14 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.16.2",
-  "pip_version": "24.2",
+  "pex_version": "2.50.2",
+  "pip_version": "25.2",
   "prefer_older_binary": false,
   "requirements": [
     "flake8<7,>=5.0.4"
   ],
   "requires_python": [
-    "<4,>=3.8"
+    "<3.14,>=3.9"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",
@@ -129,5 +129,6 @@
     "mac"
   ],
   "transitive": true,
-  "use_pep517": null
+  "use_pep517": null,
+  "use_system_time": false
 }

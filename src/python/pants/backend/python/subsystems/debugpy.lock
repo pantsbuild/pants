@@ -6,7 +6,7 @@
 // {
 //   "version": 3,
 //   "valid_for_interpreter_constraints": [
-//     "CPython<4,>=3.8"
+//     "CPython<3.14,>=3.9"
 //   ],
 //   "generated_with_requirements": [
 //     "debugpy<1.7,>=1.6.5"
@@ -24,6 +24,7 @@
   "allow_wheels": true,
   "build_isolation": true,
   "constraints": [],
+  "elide_unused_requires_dist": false,
   "excluded": [],
   "locked_resolves": [
     {
@@ -42,18 +43,8 @@
             },
             {
               "algorithm": "sha256",
-              "hash": "92b6dae8bfbd497c90596bbb69089acf7954164aea3228a99d7e43e5267f5b36",
-              "url": "https://files.pythonhosted.org/packages/0d/ed/5eafd6fa735ac71623121bbf001813386b520064b60c505f3a07d1a8e6a5/debugpy-1.6.7.post1-cp38-cp38-macosx_11_0_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
               "hash": "d16882030860081e7dd5aa619f30dec3c2f9a421e69861125f83cc372c94e57d",
               "url": "https://files.pythonhosted.org/packages/33/a4/0dffe40fc4de1850e8e430f24fcd00570c3072086aea3c2e79bb18ba3e1a/debugpy-1.6.7.post1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "72f5d2ecead8125cf669e62784ef1e6300f4067b0f14d9f95ee00ae06fc7c4f7",
-              "url": "https://files.pythonhosted.org/packages/3f/7c/1baf8e2899ea754ae6c2f17c3cf4d6cea9fbc2516ee1e785c105617da380/debugpy-1.6.7.post1-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
@@ -84,14 +75,14 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.16.2",
-  "pip_version": "24.2",
+  "pex_version": "2.50.2",
+  "pip_version": "25.2",
   "prefer_older_binary": false,
   "requirements": [
     "debugpy<1.7,>=1.6.5"
   ],
   "requires_python": [
-    "<4,>=3.8"
+    "<3.14,>=3.9"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",
@@ -100,5 +91,6 @@
     "mac"
   ],
   "transitive": true,
-  "use_pep517": null
+  "use_pep517": null,
+  "use_system_time": false
 }

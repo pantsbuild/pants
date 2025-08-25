@@ -73,7 +73,7 @@ def run_docformatter(
     # Excluded due to https://github.com/pantsbuild/pants/issues/21718
     # lib2to3 is Officially Removed in 3.13, but some distributions of Python
     # remove it earlier See for example https://github.com/PyCQA/docformatter/issues/129
-    all_major_minor_python_versions(["CPython>=3.8,<3.12"]),
+    all_major_minor_python_versions(["CPython>=3.9,<3.12"]),
 )
 def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"})
