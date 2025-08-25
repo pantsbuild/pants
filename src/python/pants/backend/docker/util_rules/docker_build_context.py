@@ -41,7 +41,7 @@ from pants.core.goals.package import (
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.addresses import Address, UnparsedAddressInputs
-from pants.engine.fs import Digest, MergeDigests, Snapshot
+from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, MergeDigests, Snapshot
 from pants.engine.internals.graph import (
     find_valid_field_sets,
     resolve_targets,
@@ -49,7 +49,7 @@ from pants.engine.internals.graph import (
 )
 from pants.engine.internals.graph import transitive_targets as transitive_targets_get
 from pants.engine.intrinsics import digest_to_snapshot
-from pants.engine.rules import collect_rules, concurrently, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule, Get, MultiGet
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
@@ -332,7 +332,53 @@ async def create_docker_build_context(
     else:
         logger.debug("Did not build any packages for Docker image")
 
-    embedded_pkgs_digest = [built_package.digest for built_package in embedded_pkgs]
+    # Create digests for embedded packages. For upstream Docker images, we use only the image ID
+    # to ensure hash stability. This prevents changes in image tags (which may include timestamps
+    # or other dynamic values) from affecting the build context hash of dependent images.
+    embedded_pkgs_digest = []
+    
+    # For Docker images, we need to extract the metadata filename and create stable digests
+    docker_metadata_gets = []
+    docker_package_indices = []
+    for i, built_package in enumerate(embedded_pkgs):
+        field_set = pkgs_wanting_embedding[i]
+        if (
+            request.build_upstream_images
+            and isinstance(getattr(field_set, "source", None), DockerImageSourceField)
+        ):
+            docker_metadata_gets.append(Get(DigestContents, Digest, built_package.digest))
+            docker_package_indices.append(i)
+        else:
+            # For non-Docker packages, use the regular digest
+            embedded_pkgs_digest.append(built_package.digest)
+    
+    # Get metadata contents for Docker images
+    if docker_metadata_gets:
+        docker_metadata_contents = await MultiGet(*docker_metadata_gets)
+        
+        for metadata_contents, pkg_index in zip(docker_metadata_contents, docker_package_indices):
+            built_package = embedded_pkgs[pkg_index]
+            
+            # Extract the original filename from the metadata
+            if metadata_contents:
+                original_filename = next(iter(metadata_contents)).path
+                
+                # Find the Docker image artifact to get the image ID
+                for artifact in built_package.artifacts:
+                    if isinstance(artifact, BuiltDockerImage):
+                        stable_content = artifact.image_id.encode()
+                        stable_digest = await Get(
+                            Digest, CreateDigest([FileContent(original_filename, stable_content)])
+                        )
+                        embedded_pkgs_digest.append(stable_digest)
+                        break
+                else:
+                    # Fallback if no BuiltDockerImage found (shouldn't happen)
+                    embedded_pkgs_digest.append(built_package.digest)
+            else:
+                # Fallback if no contents in digest
+                embedded_pkgs_digest.append(built_package.digest)
+
     all_digests = (dockerfile_info.digest, sources.snapshot.digest, *embedded_pkgs_digest)
 
     # Merge all digests to get the final docker build context digest.
