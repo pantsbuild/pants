@@ -7,12 +7,13 @@ from pants.bsp.util_rules.targets import BSPResourcesRequest, BSPResourcesResult
 from pants.core.target_types import ResourceSourceField
 from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFilesRequest
-from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
+from pants.core.util_rules.stripped_source_files import strip_source_roots
 from pants.engine.addresses import Addresses
-from pants.engine.fs import AddPrefix, Digest
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import collect_rules
-from pants.engine.target import CoarsenedTargets, SourcesField
+from pants.engine.fs import AddPrefix
+from pants.engine.internals.graph import coarsened_targets
+from pants.engine.intrinsics import add_prefix
+from pants.engine.rules import collect_rules, implicitly
+from pants.engine.target import SourcesField
 from pants.util.strutil import path_safe
 
 
@@ -32,22 +33,22 @@ async def _jvm_bsp_resources(
 
     This is a rule helper rather than a `@rule` for the same reason as `_jvm_bsp_compile`.
     """
-    coarsened_targets = await Get(
-        CoarsenedTargets, Addresses([fs.address for fs in request.field_sets])
+    coarsened_tgts = await coarsened_targets(
+        **implicitly(Addresses([fs.address for fs in request.field_sets]))
     )
 
-    source_files = await Get(
-        StrippedSourceFiles,
-        SourceFilesRequest(
-            [tgt.get(SourcesField) for tgt in coarsened_targets.closure()],
-            for_sources_types=(ResourceSourceField,),
-            enable_codegen=True,
-        ),
+    source_files = await strip_source_roots(
+        **implicitly(
+            SourceFilesRequest(
+                [tgt.get(SourcesField) for tgt in coarsened_tgts.closure()],
+                for_sources_types=(ResourceSourceField,),
+                enable_codegen=True,
+            )
+        )
     )
 
     rel_resources_dir = _jvm_resources_directory(request.bsp_target.bsp_target_id)
-    output_digest = await Get(
-        Digest,
+    output_digest = await add_prefix(
         AddPrefix(source_files.snapshot.digest, rel_resources_dir),
     )
 

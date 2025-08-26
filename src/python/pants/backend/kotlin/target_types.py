@@ -19,6 +19,7 @@ from pants.engine.target import (
     TargetFilesGenerator,
     generate_multiple_sources_field_help_message,
 )
+from pants.jvm.run import jvm_rules
 from pants.jvm.target_types import (
     JunitTestExtraEnvVarsField,
     JunitTestSourceField,
@@ -247,5 +248,5 @@ class KotlincPluginTarget(Target):
 
 def rules():
     return [
-        *KotlinFieldSet.jvm_rules(),
+        *jvm_rules(KotlinFieldSet),
     ]

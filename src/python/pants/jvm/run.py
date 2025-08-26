@@ -12,10 +12,10 @@ from pants.core.util_rules.system_binaries import UnzipBinary
 from pants.core.util_rules.system_binaries import rules as system_binaries_rules
 from pants.engine.addresses import Addresses
 from pants.engine.internals.graph import coarsened_targets
-from pants.engine.internals.native_engine import Digest, MergeDigests
+from pants.engine.internals.native_engine import Digest, MergeDigests, UnionRule
 from pants.engine.intrinsics import digest_to_snapshot, execute_process, merge_digests
 from pants.engine.process import Process, execute_process_or_raise
-from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.jvm.classpath import classpath as classpath_get
 from pants.jvm.classpath import rules as classpath_rules
 from pants.jvm.jdk_rules import (
@@ -26,8 +26,9 @@ from pants.jvm.jdk_rules import (
     prepare_jdk_environment,
 )
 from pants.jvm.jdk_rules import rules as jdk_rules
-from pants.jvm.target_types import NO_MAIN_CLASS, GenericJvmRunRequest
+from pants.jvm.target_types import NO_MAIN_CLASS, GenericJvmRunRequest, JvmRunnableSourceFieldSet
 from pants.util.logging import LogLevel
+from pants.util.memo import memoized
 
 logger = logging.getLogger(__name__)
 
@@ -172,6 +173,26 @@ async def create_run_request(
     )
 
     return _post_process_jvm_process(proc, jdk)
+
+
+@memoized
+def _jvm_source_run_request_rule(cls: type[JvmRunnableSourceFieldSet]) -> Iterable[Rule]:
+    from pants.jvm.run import rules as run_rules
+
+    @rule(
+        canonical_name_suffix=cls.__name__,
+        _param_type_overrides={"request": cls},
+        level=LogLevel.DEBUG,
+    )
+    async def jvm_source_run_request(request: JvmRunnableSourceFieldSet) -> RunRequest:
+        return await create_run_request(GenericJvmRunRequest(request), **implicitly())
+
+    return [*run_rules(), *collect_rules(locals())]
+
+
+def jvm_rules(cls: type[JvmRunnableSourceFieldSet]) -> Iterable[Rule | UnionRule]:
+    yield from _jvm_source_run_request_rule(cls)
+    yield from cls.rules()
 
 
 def _post_process_jvm_process(proc: Process, jdk: JdkEnvironment) -> RunRequest:
