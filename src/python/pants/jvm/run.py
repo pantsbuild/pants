@@ -26,7 +26,12 @@ from pants.jvm.jdk_rules import (
     prepare_jdk_environment,
 )
 from pants.jvm.jdk_rules import rules as jdk_rules
-from pants.jvm.target_types import NO_MAIN_CLASS, GenericJvmRunRequest, JvmRunnableSourceFieldSet
+from pants.jvm.target_types import (
+    NO_MAIN_CLASS,
+    GenericJvmRunRequest,
+    JvmArtifactFieldSet,
+    JvmRunnableSourceFieldSet,
+)
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 
@@ -177,8 +182,6 @@ async def create_run_request(
 
 @memoized
 def _jvm_source_run_request_rule(cls: type[JvmRunnableSourceFieldSet]) -> Iterable[Rule]:
-    from pants.jvm.run import rules as run_rules
-
     @rule(
         canonical_name_suffix=cls.__name__,
         _param_type_overrides={"request": cls},
@@ -226,10 +229,17 @@ def _post_process_jvm_process(proc: Process, jdk: JdkEnvironment) -> RunRequest:
     )
 
 
-def rules():
+def run_rules():
     return [
         *collect_rules(),
         *system_binaries_rules(),
         *jdk_rules(),
         *classpath_rules(),
+    ]
+
+
+def rules():
+    return [
+        *run_rules(),
+        *jvm_rules(JvmArtifactFieldSet),
     ]
