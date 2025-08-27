@@ -35,7 +35,7 @@ from pants.backend.python.target_types import (
 from pants.core.util_rules.stripped_source_files import StrippedFileNameRequest, strip_file_name
 from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
-from pants.engine.rules import Get, collect_rules, concurrently, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import AllTargets, Target
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.frozendict import FrozenDict
@@ -141,6 +141,13 @@ class FirstPartyPythonMappingImplMarker:
     """
 
 
+@rule(polymorphic=True)
+async def get_first_party_python_mapping_impl(
+    marker: FirstPartyPythonMappingImplMarker, env_name: EnvironmentName
+) -> FirstPartyPythonMappingImpl:
+    raise NotImplementedError()
+
+
 @dataclass(frozen=True)
 class FirstPartyPythonModuleMapping:
     resolves_to_modules_to_providers: FrozenDict[
@@ -203,10 +210,8 @@ async def merge_first_party_module_mappings(
     union_membership: UnionMembership,
 ) -> FirstPartyPythonModuleMapping:
     all_mappings = await concurrently(
-        Get(
-            FirstPartyPythonMappingImpl,
-            FirstPartyPythonMappingImplMarker,
-            marker_cls(),
+        get_first_party_python_mapping_impl(
+            **implicitly({marker_cls(): FirstPartyPythonMappingImplMarker})
         )
         for marker_cls in union_membership.get(FirstPartyPythonMappingImplMarker)
     )
