@@ -49,7 +49,7 @@ from pants.core.util_rules.system_binaries import (
 )
 from pants.engine.collection import Collection
 from pants.engine.fs import CreateDigest, FileContent, MergeDigests, RemovePrefix
-from pants.engine.internals.graph import coarsened_targets as coarsened_targets_get
+from pants.engine.internals.graph import resolve_coarsened_targets as coarsened_targets_get
 from pants.engine.intrinsics import create_digest, execute_process, merge_digests, remove_prefix
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest

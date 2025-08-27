@@ -14,13 +14,12 @@ from typing import ClassVar
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
-from pants.core.goals.run import RestartableField, RunFieldSet, RunInSandboxBehavior, RunRequest
+from pants.core.goals.run import RestartableField, RunFieldSet, RunInSandboxBehavior
 from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.addresses import Address
-from pants.engine.fs import Digest, DigestContents
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import Rule, collect_rules, rule
+from pants.engine.intrinsics import get_digest_contents
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
@@ -48,7 +47,6 @@ from pants.jvm.subsystems import JvmSubsystem
 from pants.util.docutil import git_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized
 from pants.util.strutil import bullet_list, help_text, pluralize, softwrap
 
 # -----------------------------------------------------------------------------------------------
@@ -129,11 +127,6 @@ class JvmRunnableSourceFieldSet(RunFieldSet):
     run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
     jdk_version: JvmJdkField
     main_class: JvmMainClassNameField
-
-    @classmethod
-    def jvm_rules(cls) -> Iterable[Rule | UnionRule]:
-        yield from _jvm_source_run_request_rule(cls)
-        yield from cls.rules()
 
 
 @dataclass(frozen=True)
@@ -514,11 +507,8 @@ async def generate_from_pom_xml(
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
     generator = request.generator
-    pom_xml = await Get(
-        SourceFiles,
-        SourceFilesRequest([generator[PomXmlSourceField]]),
-    )
-    files = await Get(DigestContents, Digest, pom_xml.snapshot.digest)
+    pom_xml = await determine_source_files(SourceFilesRequest([generator[PomXmlSourceField]]))
+    files = await get_digest_contents(pom_xml.snapshot.digest)
     if not files:
         raise FileNotFoundError(f"pom.xml not found: {generator[PomXmlSourceField].value}")
 
@@ -990,27 +980,11 @@ async def jvm_resolve_field_default_factory(
     return FieldDefaultFactoryResult(lambda f: f.normalized_value(jvm))
 
 
-@memoized
-def _jvm_source_run_request_rule(cls: type[JvmRunnableSourceFieldSet]) -> Iterable[Rule]:
-    from pants.jvm.run import rules as run_rules
-
-    @rule(
-        canonical_name_suffix=cls.__name__,
-        _param_type_overrides={"request": cls},
-        level=LogLevel.DEBUG,
-    )
-    async def jvm_source_run_request(request: JvmRunnableSourceFieldSet) -> RunRequest:
-        return await Get(RunRequest, GenericJvmRunRequest(request))
-
-    return [*run_rules(), *collect_rules(locals())]
-
-
 def rules():
     return [
         *collect_rules(),
         UnionRule(GenerateTargetsRequest, GenerateFromPomXmlRequest),
         UnionRule(FieldDefaultFactoryRequest, JvmResolveFieldDefaultFactoryRequest),
-        *JvmArtifactFieldSet.jvm_rules(),
     ]
 
 

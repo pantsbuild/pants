@@ -4,14 +4,13 @@ from __future__ import annotations
 
 import logging
 
-from pants.core.goals.package import BuiltPackage
 from pants.core.goals.run import RunRequest
 from pants.core.util_rules.system_binaries import rules as system_binaries_rules
-from pants.engine.rules import Get, collect_rules, implicitly, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.jvm.classpath import rules as classpath_rules
 from pants.jvm.jdk_rules import JdkRequest, JvmProcess, jvm_process, prepare_jdk_environment
 from pants.jvm.jdk_rules import rules as jdk_rules
-from pants.jvm.package.deploy_jar import DeployJarFieldSet
+from pants.jvm.package.deploy_jar import DeployJarFieldSet, package_deploy_jar
 from pants.jvm.package.deploy_jar import rules as deploy_jar_rules
 from pants.jvm.run import _post_process_jvm_process
 from pants.util.logging import LogLevel
@@ -30,7 +29,7 @@ async def create_deploy_jar_run_request(
     main_class = field_set.main_class.value
     assert main_class is not None
 
-    package = await Get(BuiltPackage, DeployJarFieldSet, field_set)
+    package = await package_deploy_jar(**implicitly(field_set))
     assert len(package.artifacts) == 1
     jar_path = package.artifacts[0].relpath
     assert jar_path is not None
