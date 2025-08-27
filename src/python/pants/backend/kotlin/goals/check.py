@@ -8,7 +8,7 @@ import logging
 from pants.backend.kotlin.target_types import KotlinFieldSet
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.engine.addresses import Addresses
-from pants.engine.internals.graph import coarsened_targets as coarsened_targets_get
+from pants.engine.internals.graph import resolve_coarsened_targets as coarsened_targets_get
 from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import CoarsenedTargets
 from pants.engine.unions import UnionRule
