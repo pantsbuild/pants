@@ -64,7 +64,7 @@ async def docformatter_fmt(
     # not an issue here).
     if result.exit_code not in [0, 3]:
         # TODO(#12725):It would be more straightforward to force the exception with:
-        # result = await Get(ProcessResult, FallibleProcessResult, result)
+        # result = await fallible_to_exec_result_or_raise(result, **implicitly())
         raise ProcessExecutionFailure(
             result.exit_code,
             result.stdout,

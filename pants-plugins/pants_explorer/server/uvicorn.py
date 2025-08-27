@@ -15,7 +15,7 @@ from uvicorn import Config, Server  # type: ignore
 from pants.base.exiter import ExitCode
 from pants.engine.environment import EnvironmentName
 from pants.engine.explorer import ExplorerServer, ExplorerServerRequest, RequestState
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.unions import UnionMembership, union
 
 logger = logging.getLogger(__name__)
@@ -88,13 +88,20 @@ class UvicornServerSetup:
         self.callback(uvicorn)
 
 
+@rule(polymorphic=True)
+async def get_uvicorn_server_setup(
+    req: UvicornServerSetupRequest, env_name: EnvironmentName
+) -> UvicornServerSetup:
+    raise NotImplementedError()
+
+
 @rule
 async def create_server(
     request: UvicornServerRequest, union_membership: UnionMembership
 ) -> ExplorerServer:
     uvicorn = UvicornServer.from_request(request)
-    setups = await MultiGet(
-        Get(UvicornServerSetup, UvicornServerSetupRequest, request_type(request))
+    setups = await concurrently(
+        get_uvicorn_server_setup(**implicitly({request_type(request): UvicornServerSetupRequest}))
         for request_type in union_membership.get(UvicornServerSetupRequest)
     )
     for setup in setups:
