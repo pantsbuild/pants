@@ -204,7 +204,7 @@ prost-build = "0.13"
 prost-types = "0.13"
 pyo3 = "0.25.1"
 pyo3-build-config = "0.25.1"
-rand = "0.8"
+rand = "0.9"
 regex = "1"
 reqwest = { version = "0.12", default-features = false }
 rlimit = "0.8"
