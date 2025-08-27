@@ -16,7 +16,7 @@ from pants.engine.target import (
     generate_multiple_sources_field_help_message,
 )
 from pants.jvm import target_types as jvm_target_types
-from pants.jvm.run import jvm_rules
+from pants.jvm.run import jvm_run_rules
 from pants.jvm.target_types import (
     JunitTestExtraEnvVarsField,
     JunitTestSourceField,
@@ -150,5 +150,5 @@ def rules():
     return [
         *collect_rules(),
         *jvm_target_types.rules(),
-        *jvm_rules(JavaFieldSet),
+        *jvm_run_rules(JavaFieldSet),
     ]

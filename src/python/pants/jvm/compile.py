@@ -384,7 +384,7 @@ class FallibleClasspathEntry(EngineAwareReturnType):
 
 
 @rule(polymorphic=True)
-async def fallible_classpath_entry(
+async def get_fallible_classpath_entry(
     req: ClasspathEntryRequest,
     environment_name: EnvironmentName,
 ) -> FallibleClasspathEntry:
@@ -453,7 +453,7 @@ async def classpath_dependency_requests(
 async def compile_classpath_entries(requests: ClasspathEntryRequests) -> FallibleClasspathEntries:
     return FallibleClasspathEntries(
         await concurrently(
-            fallible_classpath_entry(**implicitly({request: ClasspathEntryRequest}))
+            get_fallible_classpath_entry(**implicitly({request: ClasspathEntryRequest}))
             for request in requests
         )
     )

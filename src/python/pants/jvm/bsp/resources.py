@@ -10,7 +10,7 @@ from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import strip_source_roots
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix
-from pants.engine.internals.graph import coarsened_targets
+from pants.engine.internals.graph import resolve_coarsened_targets
 from pants.engine.intrinsics import add_prefix
 from pants.engine.rules import collect_rules, implicitly
 from pants.engine.target import SourcesField
@@ -33,7 +33,7 @@ async def _jvm_bsp_resources(
 
     This is a rule helper rather than a `@rule` for the same reason as `_jvm_bsp_compile`.
     """
-    coarsened_tgts = await coarsened_targets(
+    coarsened_tgts = await resolve_coarsened_targets(
         **implicitly(Addresses([fs.address for fs in request.field_sets]))
     )
 

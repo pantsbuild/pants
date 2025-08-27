@@ -11,7 +11,7 @@ from pants.bsp.spec.task import TaskProgressParams
 from pants.bsp.util_rules.targets import BSPCompileRequest, BSPCompileResult
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, MergeDigests
-from pants.engine.internals.graph import coarsened_targets
+from pants.engine.internals.graph import resolve_coarsened_targets
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import add_prefix, merge_digests
@@ -22,7 +22,7 @@ from pants.jvm.compile import (
     ClasspathEntryRequestFactory,
     CompileResult,
     FallibleClasspathEntry,
-    fallible_classpath_entry,
+    get_fallible_classpath_entry,
 )
 from pants.jvm.resolve.coursier_fetch import select_coursier_resolve_for_targets
 from pants.jvm.target_types import JvmArtifactFieldSet
@@ -50,7 +50,9 @@ async def notify_for_classpath_entry(
     request: BSPClasspathEntryRequest,
     context: BSPContext,
 ) -> FallibleClasspathEntry:
-    entry = await fallible_classpath_entry(**implicitly({request.request: ClasspathEntryRequest}))
+    entry = await get_fallible_classpath_entry(
+        **implicitly({request.request: ClasspathEntryRequest})
+    )
     context.notify_client(
         TaskProgressParams(
             task_id=request.task_id,
@@ -80,10 +82,10 @@ async def _jvm_bsp_compile(
     @unions, and we can't forward the implementation of a @union to another the way we might with
     an abstract class.
     """
-    coarsened_tgts = await coarsened_targets(
+    coarsened_targets = await resolve_coarsened_targets(
         **implicitly(Addresses([fs.address for fs in request.field_sets]))
     )
-    resolve = await select_coursier_resolve_for_targets(coarsened_tgts, **implicitly())
+    resolve = await select_coursier_resolve_for_targets(coarsened_targets, **implicitly())
 
     # TODO: We include the (non-3rdparty) transitive dependencies here, because each project
     # currently only has a single BuildTarget. This has the effect of including `resources` targets,
@@ -100,7 +102,7 @@ async def _jvm_bsp_compile(
             ),
             **implicitly(),
         )
-        for coarsened_target in coarsened_tgts.coarsened_closure()
+        for coarsened_target in coarsened_targets.coarsened_closure()
         if not any(JvmArtifactFieldSet.is_applicable(t) for t in coarsened_target.members)
     )
 

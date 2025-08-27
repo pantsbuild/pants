@@ -11,7 +11,7 @@ from pants.core.goals.run import RunRequest
 from pants.core.util_rules.system_binaries import UnzipBinary
 from pants.core.util_rules.system_binaries import rules as system_binaries_rules
 from pants.engine.addresses import Addresses
-from pants.engine.internals.graph import coarsened_targets
+from pants.engine.internals.graph import resolve_coarsened_targets
 from pants.engine.internals.native_engine import Digest, MergeDigests, UnionRule
 from pants.engine.intrinsics import digest_to_snapshot, execute_process, merge_digests
 from pants.engine.process import Process, execute_process_or_raise
@@ -152,7 +152,7 @@ async def create_run_request(
 
     jdk = await prepare_jdk_environment(**implicitly(JdkRequest.from_field(field_set.jdk_version)))
 
-    artifacts = await coarsened_targets(**implicitly(Addresses([field_set.address])))
+    artifacts = await resolve_coarsened_targets(**implicitly(Addresses([field_set.address])))
     classpath = await classpath_get(artifacts, **implicitly())
 
     classpath_entries = list(classpath.args(prefix="{chroot}"))
@@ -193,7 +193,7 @@ def _jvm_source_run_request_rule(cls: type[JvmRunnableSourceFieldSet]) -> Iterab
     return [*run_rules(), *collect_rules(locals())]
 
 
-def jvm_rules(cls: type[JvmRunnableSourceFieldSet]) -> Iterable[Rule | UnionRule]:
+def jvm_run_rules(cls: type[JvmRunnableSourceFieldSet]) -> Iterable[Rule | UnionRule]:
     yield from _jvm_source_run_request_rule(cls)
     yield from cls.rules()
 
@@ -241,5 +241,5 @@ def run_rules():
 def rules():
     return [
         *run_rules(),
-        *jvm_rules(JvmArtifactFieldSet),
+        *jvm_run_rules(JvmArtifactFieldSet),
     ]

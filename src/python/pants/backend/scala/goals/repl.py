@@ -12,7 +12,7 @@ from pants.core.goals.repl import ReplImplementation, ReplRequest
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, MergeDigests
-from pants.engine.internals.graph import coarsened_targets
+from pants.engine.internals.graph import resolve_coarsened_targets
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import add_prefix, merge_digests
 from pants.engine.rules import collect_rules, implicitly, rule
@@ -35,7 +35,7 @@ async def create_scala_repl_request(
 ) -> ReplRequest:
     user_classpath = await classpath(**implicitly({request.addresses: Addresses}))
 
-    roots = await coarsened_targets(**implicitly({request.addresses: Addresses}))
+    roots = await resolve_coarsened_targets(**implicitly({request.addresses: Addresses}))
     environs = await concurrently(
         prepare_jdk_environment(**implicitly({JdkRequest.from_target(target): JdkRequest}))
         for target in roots
