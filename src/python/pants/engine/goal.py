@@ -100,6 +100,10 @@ class Goal:
     exit_code: int
     subsystem_cls: ClassVar[type[GoalSubsystem]]
 
+    # A marker that allows initialization code to check for Goal subclasses without
+    # having to import Goal and use issubclass(), which can cause a dependency cycle.
+    __goal__ = True
+
     f"""Indicates that a Goal has been migrated to compute EnvironmentNames to build targets in.
 
     All goals in `pantsbuild/pants` should be migrated before the 2.15.x branch is cut, but end

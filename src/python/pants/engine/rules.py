@@ -25,7 +25,6 @@ from typing import (
 from typing_extensions import ParamSpec
 
 from pants.engine.engine_aware import SideEffecting
-from pants.engine.goal import Goal
 from pants.engine.internals.rule_visitor import collect_awaitables
 from pants.engine.internals.selectors import AwaitableConstraints, Call
 from pants.engine.internals.selectors import Effect as Effect  # noqa: F401
@@ -33,7 +32,6 @@ from pants.engine.internals.selectors import Get as Get  # noqa: F401
 from pants.engine.internals.selectors import MultiGet as MultiGet  # noqa: F401
 from pants.engine.internals.selectors import concurrently as concurrently  # noqa: F401
 from pants.engine.unions import UnionRule
-from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -98,7 +96,7 @@ def _make_rule(
                         a union type.
     """
 
-    is_goal_cls = issubclass(return_type, Goal)
+    is_goal_cls = getattr(return_type, "__goal__", False)
     if rule_type == RuleType.rule and is_goal_cls:
         raise TypeError(
             "An `@rule` that returns a `Goal` must instead be declared with `@goal_rule`."
@@ -316,7 +314,7 @@ def rule_decorator(
         )
         for parameter in func_params
     }
-    is_goal_cls = issubclass(return_type, Goal)
+    is_goal_cls = is_goal_cls = getattr(return_type, "__goal__", False)
 
     # Set a default canonical name if one is not explicitly provided to the module and name of the
     # function that implements it, plus an optional suffix. This is used as the workunit name.
@@ -549,11 +547,11 @@ def collect_rules(*namespaces: ModuleType | Mapping[str, Any]) -> Iterable[Rule]
                 rule = getattr(item, "rule", None)
                 if isinstance(rule, TaskRule):
                     for input in rule.parameters.values():
-                        if issubclass(input, Subsystem):
+                        if getattr(input, "__subsystem__", False):
                             yield from input.rules()
-                        if issubclass(input, Subsystem.EnvironmentAware):
+                        if getattr(input, "__subsystem_environment_aware__", False):
                             yield from input.subsystem.rules()
-                    if issubclass(rule.output_type, Goal):
+                    if getattr(rule.output_type, "__goal__", False):
                         yield from rule.output_type.subsystem_cls.rules()
                     yield rule
 

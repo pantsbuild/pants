@@ -70,7 +70,7 @@ from pants.engine.process import (
 )
 from pants.engine.rules import Rule, RuleIndex, TaskRule
 from pants.engine.unions import UnionMembership, is_union, union_in_scope_types
-from pants.option.global_options import (
+from pants.option.bootstrap_options import (
     LOCAL_STORE_LEASE_TIME_SECS,
     ExecutionOptions,
     LocalStoreOptions,

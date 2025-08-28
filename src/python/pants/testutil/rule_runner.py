@@ -45,12 +45,8 @@ from pants.engine.unions import UnionMembership, UnionRule
 from pants.goal.auxiliary_goal import AuxiliaryGoal
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import initialize_stdio, initialize_stdio_raw, stdio_destination
-from pants.option.global_options import (
-    DynamicRemoteOptions,
-    ExecutionOptions,
-    GlobalOptions,
-    LocalStoreOptions,
-)
+from pants.option.bootstrap_options import DynamicRemoteOptions, ExecutionOptions, LocalStoreOptions
+from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source import source_root
 from pants.testutil.option_util import create_options_bootstrapper
@@ -317,10 +313,11 @@ class RuleRunner:
                 args=bootstrap_args, env=None
             )
             options = self.options_bootstrapper.full_options(
-                self.build_config,
-                union_membership=UnionMembership.from_rules(
+                self.build_config.known_scope_infos,
+                UnionMembership.from_rules(
                     rule for rule in self.rules if isinstance(rule, UnionRule)
                 ),
+                self.build_config.allow_unknown_options,
             )
             global_options = self.options_bootstrapper.bootstrap_options.for_global_scope()
 
