@@ -1017,7 +1017,7 @@ async def coarsened_targets_request(addresses: Addresses) -> CoarsenedTargetsReq
 
 
 @rule(desc="Resolve coarsened targets", level=LogLevel.DEBUG, _masked_types=[EnvironmentName])
-async def coarsened_targets(
+async def resolve_coarsened_targets(
     request: CoarsenedTargetsRequest, local_environment_name: ChosenLocalEnvironmentName
 ) -> CoarsenedTargets:
     dependency_mapping = await transitive_dependency_mapping(

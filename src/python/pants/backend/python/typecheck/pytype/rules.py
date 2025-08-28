@@ -35,7 +35,7 @@ from pants.core.util_rules import config_files
 from pants.core.util_rules.config_files import find_config_file
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.collection import Collection
-from pants.engine.internals.graph import coarsened_targets as coarsened_targets_get
+from pants.engine.internals.graph import resolve_coarsened_targets as coarsened_targets_get
 from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import execute_process, merge_digests

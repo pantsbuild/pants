@@ -264,4 +264,5 @@ def test_jvm_artifact(antlr_jvm_lockfile: JVMLockfileFixture) -> None:
             f"{tmpdir}:org.antlr_antlr4",
         ]
         result = run_pants(args)
+        result.assert_success()
         assert result.stdout.splitlines()[0].strip() == "ANTLR Parser Generator  Version 4.11.1"

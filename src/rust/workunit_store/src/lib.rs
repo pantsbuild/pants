@@ -22,7 +22,6 @@ use parking_lot::Mutex;
 use petgraph::stable_graph::{NodeIndex, StableDiGraph};
 use petgraph::visit::{VisitMap, Visitable};
 use rand::Rng;
-use rand::thread_rng;
 use smallvec::SmallVec;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::task_local;
@@ -46,8 +45,8 @@ pub struct SpanId(u64);
 
 impl SpanId {
     pub fn new() -> SpanId {
-        let mut rng = thread_rng();
-        SpanId(rng.gen())
+        let mut rng = rand::rng();
+        SpanId(rng.random())
     }
 }
 

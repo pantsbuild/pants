@@ -4,7 +4,7 @@
 use std::time::Duration;
 
 use futures::Future;
-use rand::{Rng, thread_rng};
+use rand::Rng;
 use tonic::{Code, Status};
 
 pub fn status_is_retryable(status: &Status) -> bool {
@@ -36,7 +36,7 @@ where
     let last_error = loop {
         // Delay before the next send attempt if this is a retry.
         if num_retries > 0 {
-            let multiplier = thread_rng().gen_range(0..2_u32.pow(num_retries) + 1);
+            let multiplier = rand::rng().random_range(0..2_u32.pow(num_retries) + 1);
             let sleep_time = INTERVAL_DURATION * multiplier;
             let sleep_time = sleep_time.min(MAX_BACKOFF_DURATION);
             tokio::time::sleep(sleep_time).await;

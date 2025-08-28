@@ -16,7 +16,7 @@ from pants.backend.kotlin.target_types import (
 from pants.build_graph.address import AddressInput
 from pants.engine.addresses import Addresses
 from pants.engine.internals.build_files import resolve_address
-from pants.engine.internals.graph import coarsened_targets as coarsened_targets_get
+from pants.engine.internals.graph import resolve_coarsened_targets as coarsened_targets_get
 from pants.engine.internals.graph import resolve_targets
 from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.intrinsics import merge_digests

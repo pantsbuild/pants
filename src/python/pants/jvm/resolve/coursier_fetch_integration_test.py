@@ -9,7 +9,7 @@ import pytest
 
 from pants.base.specs import RawSpecs, RecursiveGlobSpec
 from pants.core.util_rules import config_files, source_files
-from pants.engine.fs import FileDigest
+from pants.engine.fs import EMPTY_DIGEST, FileDigest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessExecutionFailure
 from pants.engine.target import Targets
@@ -18,6 +18,7 @@ from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
 from pants.jvm.resolve.coordinate import Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
+from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.target_types import (
     JvmArtifactExclusion,
     JvmArtifactJarSourceField,
@@ -789,3 +790,38 @@ def test_force_version(rule_runner):
         version="1.7.19",
         strict=True,
     ) in [e.coord for e in entries]
+
+
+@maybe_skip_jdk_test
+def test_multiple_classified_jars(rule_runner: RuleRunner) -> None:
+    resolved_lockfile = rule_runner.request(
+        CoursierResolvedLockfile,
+        [
+            ArtifactRequirements(
+                [
+                    ArtifactRequirement(
+                        # This depends on both gax-grpc and gax-grpc:testlib
+                        coordinate=Coordinate(
+                            group="org.apache.beam",
+                            artifact="beam-sdks-java-io-google-cloud-platform",
+                            version="2.67.0",
+                        )
+                    ),
+                ]
+            )
+        ],
+    )
+
+    resolve_key = CoursierResolveKey(name="test", path="test", digest=EMPTY_DIGEST)
+
+    gax_grpc_coord = Coordinate(
+        group="com.google.api",
+        artifact="gax-grpc",
+        version="2.67.0",
+    )
+
+    (direct_dependency, _) = resolved_lockfile.direct_dependencies(resolve_key, gax_grpc_coord)
+    (dependency, _) = resolved_lockfile.dependencies(resolve_key, gax_grpc_coord)
+
+    assert direct_dependency.file_name == "com.google.api_gax-grpc_2.67.0.jar"
+    assert dependency.file_name == "com.google.api_gax-grpc_2.67.0.jar"
