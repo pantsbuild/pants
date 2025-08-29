@@ -262,7 +262,7 @@ class BUILDFileEnvVarExtractor(ast.NodeVisitor):
                 value = arg.s if isinstance(arg, ast.Str) else None
             else:
                 value = arg.value if isinstance(arg, ast.Constant) else None
-            if value:
+            if isinstance(value, str):
                 # Found env name in this call, we're done here.
                 self.env_vars.add(value)
                 return

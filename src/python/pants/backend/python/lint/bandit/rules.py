@@ -3,7 +3,10 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from pants.backend.python.lint.bandit.subsystem import Bandit, BanditFieldSet
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -25,7 +28,7 @@ from pants.util.strutil import pluralize
 
 class BanditRequest(LintTargetsRequest):
     field_set_type = BanditFieldSet
-    tool_subsystem = Bandit
+    tool_subsystem = cast(type[SkippableSubsystem], Bandit)
 
 
 def generate_argv(source_files: SourceFiles, bandit: Bandit) -> tuple[str, ...]:
