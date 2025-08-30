@@ -540,7 +540,9 @@ def test_get_all_help_info(tmp_path) -> None:
             "construct_scope_foo": {
                 "description": None,
                 "documentation": "A foo.",
-                "awaitables": ("Get(ScopedOptions, Scope, ..)",),
+                "awaitables": (
+                    "pants.engine.internals.options_parsing.scope_options() -> ScopedOptions",
+                ),
                 "input_types": (),
                 "name": "construct_scope_foo",
                 "output_type": "Foo",
@@ -557,20 +559,6 @@ def test_get_all_help_info(tmp_path) -> None:
             },
         },
         "name_to_api_type_info": {
-            "pants.option.scope.Scope": {
-                "consumed_by_rules": (),
-                "dependents": (),
-                "dependencies": (),
-                "documentation": "An options scope.",
-                "is_union": False,
-                "module": "pants.option.scope",
-                "name": "Scope",
-                "provider": ("pants.option.scope",),
-                "returned_by_rules": (),
-                "union_members": (),
-                "union_type": None,
-                "used_in_rules": ("construct_scope_foo",),
-            },
             "pants.engine.target.Target": {
                 "consumed_by_rules": (),
                 "dependents": (),

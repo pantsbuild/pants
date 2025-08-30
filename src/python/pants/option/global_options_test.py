@@ -45,7 +45,7 @@ def test_dynamic_remote_options_auth_plugin(tmp_path: Path) -> None:
         plugin_path.write_text(
             dedent(
                 f"""\
-                from pants.option.global_options import AuthPluginState, AuthPluginResult
+                from pants.option.bootstrap_options import AuthPluginState, AuthPluginResult
 
                 def remote_auth(initial_execution_headers, initial_store_headers, options, **kwargs):
                     return AuthPluginResult(
