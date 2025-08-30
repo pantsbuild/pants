@@ -7,19 +7,16 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from pants.base.build_environment import pants_version
-from pants.base.exceptions import BuildConfigurationError
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import BootstrapOptions, GlobalOptions
+from pants.option.bootstrap_options import BootstrapOptions
 from pants.option.option_types import collect_options_info
 from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.strutil import softwrap
 
 if TYPE_CHECKING:
-    from pants.build_graph.build_configuration import BuildConfiguration
+    pass
 
 
 # TODO: Rebrand this. It isn't actually about "bootstrapping" any more (and the term
@@ -85,7 +82,7 @@ class OptionsBootstrapper:
             args=args,
             env=env,
             config_sources=None,
-            known_scope_infos=[GlobalOptions.get_scope_info()],
+            known_scope_infos=[ScopeInfo(scope=GLOBAL_SCOPE)],
             allow_unknown_options=True,
             allow_pantsrc=allow_pantsrc,
         )
@@ -141,27 +138,17 @@ class OptionsBootstrapper:
         )
 
     def full_options(
-        self, build_configuration: BuildConfiguration, union_membership: UnionMembership
+        self,
+        known_scope_infos: Sequence[ScopeInfo],
+        union_membership: UnionMembership,
+        allow_unknown_options: bool = False,
     ) -> Options:
         # Parse and register options.
-        known_scope_infos = [
-            subsystem.get_scope_info() for subsystem in build_configuration.all_subsystems
-        ]
         options = self.full_options_for_scopes(
             known_scope_infos,
             union_membership,
-            allow_unknown_options=build_configuration.allow_unknown_options,
+            allow_unknown_options=allow_unknown_options,
         )
 
-        global_options = options.for_global_scope()
-        if global_options.pants_version != pants_version():
-            raise BuildConfigurationError(
-                softwrap(
-                    f"""
-                        Version mismatch: Requested version was {global_options.pants_version},
-                        our version is {pants_version()}.
-                        """
-                )
-            )
-        GlobalOptions.validate_instance(options.for_global_scope())
+        BootstrapOptions.validate_instance(options.for_global_scope())
         return options

@@ -19,7 +19,7 @@ from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, goal_rule, rule
 from pants.engine.streaming_workunit_handler import StreamingWorkunitHandler
 from pants.goal.run_tracker import RunTracker
-from pants.option.global_options import CacheContentBehavior, RemoteCacheWarningsBehavior
+from pants.option.bootstrap_options import CacheContentBehavior, RemoteCacheWarningsBehavior
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.pants_integration_test import run_pants
 from pants.testutil.rule_runner import QueryRule, RuleRunner

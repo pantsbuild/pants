@@ -43,13 +43,13 @@ from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.init import specs_calculator
 from pants.init.bootstrap_scheduler import BootstrapStatus
-from pants.option.global_options import (
+from pants.option.bootstrap_options import (
     DEFAULT_EXECUTION_OPTIONS,
     DynamicRemoteOptions,
     ExecutionOptions,
-    GlobalOptions,
     LocalStoreOptions,
 )
+from pants.option.global_options import GlobalOptions
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name

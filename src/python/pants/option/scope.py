@@ -67,6 +67,14 @@ class ScopeInfo:
 
 
 @dataclass(frozen=True)
+class OptionsParsingSettings:
+    """Information derived from options bootstrapping used to parse full options."""
+
+    known_scope_infos: tuple[ScopeInfo, ...]
+    allow_unknown_options: bool
+
+
+@dataclass(frozen=True)
 class ScopedOptions:
     """A wrapper around options selected for a particular Scope."""
 

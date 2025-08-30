@@ -20,7 +20,8 @@ from pants.engine.internals.native_engine import PyExecutor, PyNailgunServer
 from pants.init.engine_initializer import GraphScheduler
 from pants.init.logging import initialize_stdio, pants_log_path
 from pants.init.util import init_workdir
-from pants.option.global_options import GlobalOptions, LocalStoreOptions
+from pants.option.bootstrap_options import LocalStoreOptions
+from pants.option.global_options import GlobalOptions
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper

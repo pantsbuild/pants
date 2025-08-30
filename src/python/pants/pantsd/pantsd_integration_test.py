@@ -114,7 +114,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         plugin = dedent(
             """\
             from datetime import datetime
-            from pants.option.global_options import AuthPluginState, AuthPluginResult
+            from pants.option.bootstrap_options import AuthPluginState, AuthPluginResult
 
             def remote_auth(
                 initial_execution_headers, initial_store_headers, options, env, prior_result

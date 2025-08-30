@@ -14,12 +14,12 @@ from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.environments.subsystems import EnvironmentsSubsystem
 from pants.engine.goal import GoalSubsystem
-from pants.engine.rules import Rule, RuleIndex
+from pants.engine.rules import Rule, RuleIndex, collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
 from pants.option.alias import CliOptions
 from pants.option.global_options import GlobalOptions
-from pants.option.scope import normalize_scope
+from pants.option.scope import OptionsParsingSettings, ScopeInfo, normalize_scope
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
@@ -74,6 +74,10 @@ class BuildConfiguration:
                 key=lambda x: x.options_scope,
             )
         )
+
+    @property
+    def known_scope_infos(self) -> tuple[ScopeInfo, ...]:
+        return tuple(subsystem.get_scope_info() for subsystem in self.all_subsystems)
 
     @property
     def target_types(self) -> tuple[type[Target], ...]:
@@ -223,16 +227,16 @@ class BuildConfiguration:
             # "Index" the rules to normalize them and expand their dependencies.
             rule_index = RuleIndex.create(rules)
             rules_and_queries: tuple[Rule, ...] = (*rule_index.rules, *rule_index.queries)
-            for rule in rules_and_queries:
-                self._rule_to_providers[rule].append(plugin_or_backend)
+            for _rule in rules_and_queries:
+                self._rule_to_providers[_rule].append(plugin_or_backend)
             for union_rule in rule_index.union_rules:
                 self._union_rule_to_providers[union_rule].append(plugin_or_backend)
             self.register_subsystems(
                 plugin_or_backend,
                 (
-                    rule.output_type
-                    for rule in rules_and_queries
-                    if issubclass(rule.output_type, Subsystem)
+                    _rule.output_type
+                    for _rule in rules_and_queries
+                    if issubclass(_rule.output_type, Subsystem)
                 ),
             )
 
@@ -317,3 +321,17 @@ class BuildConfiguration:
                 allow_unknown_options=self._allow_unknown_options,
                 remote_auth_plugin_func=self._remote_auth_plugin,
             )
+
+
+@rule
+async def get_full_options_parsing_settings(
+    build_config: BuildConfiguration,
+) -> OptionsParsingSettings:
+    return OptionsParsingSettings(
+        build_config.known_scope_infos,
+        build_config.allow_unknown_options,
+    )
+
+
+def rules():
+    return collect_rules()

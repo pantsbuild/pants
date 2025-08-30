@@ -53,7 +53,7 @@ from pants.engine.internals.native_engine import Field as Field
 from pants.engine.internals.target_adaptor import SourceBlock, SourceBlocks  # noqa: F401
 from pants.engine.rules import rule
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
-from pants.option.global_options import UnmatchedBuildFileGlobs
+from pants.option.bootstrap_options import UnmatchedBuildFileGlobs
 from pants.source.filespec import Filespec, FilespecMatcher
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.dirutil import fast_relpath

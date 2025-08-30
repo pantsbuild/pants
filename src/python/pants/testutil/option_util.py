@@ -10,7 +10,7 @@ from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.goal import GoalSubsystem
 from pants.engine.unions import UnionMembership
 from pants.init.options_initializer import OptionsInitializer
-from pants.option.global_options import DynamicRemoteOptions
+from pants.option.bootstrap_options import DynamicRemoteOptions
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.ranked_value import Rank, RankedValue, Value

@@ -59,7 +59,7 @@ from pants.engine.target import (
     Targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.option.global_options import UnmatchedBuildFileGlobs
+from pants.option.bootstrap_options import UnmatchedBuildFileGlobs
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import help_text, softwrap
 
