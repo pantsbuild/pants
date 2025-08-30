@@ -313,11 +313,11 @@ class RuleRunner:
                 args=bootstrap_args, env=None
             )
             options = self.options_bootstrapper.full_options(
-                self.build_config.known_scope_infos,
-                UnionMembership.from_rules(
+                known_scope_infos=self.build_config.known_scope_infos,
+                union_membership=UnionMembership.from_rules(
                     rule for rule in self.rules if isinstance(rule, UnionRule)
                 ),
-                self.build_config.allow_unknown_options,
+                allow_unknown_options=self.build_config.allow_unknown_options,
             )
             global_options = self.options_bootstrapper.bootstrap_options.for_global_scope()
 

@@ -314,7 +314,7 @@ def rule_decorator(
         )
         for parameter in func_params
     }
-    is_goal_cls = is_goal_cls = getattr(return_type, "__goal__", False)
+    is_goal_cls = getattr(return_type, "__goal__", False)
 
     # Set a default canonical name if one is not explicitly provided to the module and name of the
     # function that implements it, plus an optional suffix. This is used as the workunit name.
