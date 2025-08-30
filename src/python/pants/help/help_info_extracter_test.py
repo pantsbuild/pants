@@ -14,7 +14,8 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import IntField, RegisteredTargetTypes, StringField, Target
 from pants.engine.unions import UnionMembership
 from pants.help.help_info_extracter import HelpInfoExtracter, pretty_print_type_hint, to_help_str
-from pants.option.global_options import GlobalOptions, LogLevelOption
+from pants.option.bootstrap_options import LogLevelOption
+from pants.option.global_options import GlobalOptions
 from pants.option.native_options import NativeOptionParser
 from pants.option.option_types import BoolOption, IntListOption, OptionInfo, StrListOption
 from pants.option.options import Options
