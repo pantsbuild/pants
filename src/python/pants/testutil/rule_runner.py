@@ -22,17 +22,18 @@ from typing import Any, Generic, TypeVar, cast, overload
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.specs_parser import SpecsParser
+from pants.build_graph import build_configuration
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.run import generate_run_request
-from pants.core.util_rules import adhoc_binaries
+from pants.core.util_rules import adhoc_binaries, misc
 from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import CreateDigest, Digest, FileContent, Snapshot, Workspace
 from pants.engine.goal import CurrentExecutingGoals, Goal
-from pants.engine.internals import native_engine
+from pants.engine.internals import native_engine, options_parsing
 from pants.engine.internals.native_engine import ProcessExecutionEnvironment, PyExecutor
 from pants.engine.internals.scheduler import ExecutionError, Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Call, Effect, Get, Params
@@ -278,7 +279,10 @@ class RuleRunner:
         self.rules = tuple(rewrite_rule_for_inherent_environment(rule) for rule in (rules or ()))
         all_rules = (
             *self.rules,
+            *build_configuration.rules(),
             *source_root.rules(),
+            *options_parsing.rules(),
+            *misc.rules(),
             *adhoc_binaries.rules(),
             # Many tests indirectly rely on this rule.
             generate_run_request,
