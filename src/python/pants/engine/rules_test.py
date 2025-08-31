@@ -28,7 +28,7 @@ from pants.engine.rules import (
     rule,
 )
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, DEFAULT_LOCAL_STORE_OPTIONS
+from pants.option.bootstrap_options import DEFAULT_EXECUTION_OPTIONS, DEFAULT_LOCAL_STORE_OPTIONS
 from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
 from pants.util.enums import match
 from pants.util.logging import LogLevel

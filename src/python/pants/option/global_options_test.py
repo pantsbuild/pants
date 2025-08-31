@@ -13,13 +13,9 @@ import pytest
 from pants.base.build_environment import get_buildroot
 from pants.engine.internals.native_engine import PyRemotingOptions
 from pants.engine.internals.scheduler import ExecutionError
+from pants.option.bootstrap_options import DynamicRemoteOptions, ExecutionOptions, RemoteProvider
 from pants.option.errors import OptionsError
-from pants.option.global_options import (
-    DynamicRemoteOptions,
-    ExecutionOptions,
-    GlobalOptions,
-    RemoteProvider,
-)
+from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_dynamic_remote_options
 from pants.testutil.pytest_util import no_exception
@@ -49,7 +45,7 @@ def test_dynamic_remote_options_auth_plugin(tmp_path: Path) -> None:
         plugin_path.write_text(
             dedent(
                 f"""\
-                from pants.option.global_options import AuthPluginState, AuthPluginResult
+                from pants.option.bootstrap_options import AuthPluginState, AuthPluginResult
 
                 def remote_auth(initial_execution_headers, initial_store_headers, options, **kwargs):
                     return AuthPluginResult(

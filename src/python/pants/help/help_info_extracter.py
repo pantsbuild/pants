@@ -771,6 +771,13 @@ class HelpInfoExtracter:
                 yield rule.output_type, provider, tuple(_rule_dependencies(rule))
 
                 for constraint in rule.awaitables:
+                    # TODO: For call-by-name, constraint.input_types only lists the types
+                    # provided explicitly in a type map passed to **implicitly. Positional
+                    # arguments don't appear in input_types. So this is no longer a robust
+                    # way to get all the types. However, if a type is also available as
+                    # some other rule's output type, we will still see it. This covers
+                    # the important case for help output, namely "which rule should I
+                    # call by name to get an instance of this type?"
                     for input_type in constraint.input_types:
                         yield input_type, _find_provider(input_type), ()
 
