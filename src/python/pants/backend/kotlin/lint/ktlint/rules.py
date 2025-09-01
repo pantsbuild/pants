@@ -2,11 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import logging
 from dataclasses import dataclass
+from typing import cast
 
 from pants.backend.kotlin.lint.ktlint.skip_field import SkipKtlintField
 from pants.backend.kotlin.lint.ktlint.subsystem import KtlintSubsystem
 from pants.backend.kotlin.target_types import KotlinSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.process import execute_process_or_raise
@@ -36,7 +38,7 @@ class KtlintFieldSet(FieldSet):
 
 class KtlintRequest(FmtTargetsRequest):
     field_set_type = KtlintFieldSet
-    tool_subsystem = KtlintSubsystem
+    tool_subsystem = cast(type[SkippableSubsystem], KtlintSubsystem)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

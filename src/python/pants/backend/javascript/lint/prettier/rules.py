@@ -7,12 +7,14 @@ import logging
 import os
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import cast
 
 from pants.backend.javascript.lint.prettier.subsystem import Prettier
 from pants.backend.javascript.subsystems import nodejs_tool
 from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolRequest
 from pants.backend.javascript.target_types import JSRuntimeSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.config_files import find_config_file
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import MergeDigests
@@ -36,7 +38,7 @@ class PrettierFmtFieldSet(FieldSet):
 
 class PrettierFmtRequest(FmtTargetsRequest):
     field_set_type = PrettierFmtFieldSet
-    tool_subsystem = Prettier
+    tool_subsystem = cast(type[SkippableSubsystem], Prettier)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

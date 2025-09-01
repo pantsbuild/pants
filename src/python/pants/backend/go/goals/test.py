@@ -10,7 +10,7 @@ import os
 from collections import deque
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from pants.backend.go.subsystems.gotest import GoTestSubsystem
 from pants.backend.go.target_type_rules import (
@@ -68,6 +68,7 @@ from pants.backend.go.util_rules.tests_analysis import (
     generate_testmain,
 )
 from pants.build_graph.address import Address
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.test import TestExtraEnv, TestFieldSet, TestRequest, TestResult, TestSubsystem
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
@@ -141,7 +142,7 @@ class GoTestFieldSet(TestFieldSet):
 
 
 class GoTestRequest(TestRequest):
-    tool_subsystem = GoTestSubsystem
+    tool_subsystem = cast(type[SkippableSubsystem], GoTestSubsystem)
     field_set_type = GoTestFieldSet
 
 

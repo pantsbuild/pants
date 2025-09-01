@@ -296,7 +296,9 @@ _GoalT = TypeVar("_GoalT", bound=Goal)
 
 
 class _BatchableMultiToolGoalSubsystem(_MultiToolGoalSubsystem, Protocol):
-    batch_size: BatchSizeOption
+    # Expose parsed option value via a read-only property for compatibility.
+    @property
+    def batch_size(self) -> int: ...
 
 
 @rule(polymorphic=True)
@@ -358,8 +360,8 @@ async def _do_fix(
         batches = partition_sequentially(
             files,
             key=lambda x: str(x),
-            size_target=subsystem.batch_size,  # type: ignore[arg-type]
-            size_max=4 * subsystem.batch_size,  # type: ignore[operator]
+            size_target=subsystem.batch_size,
+            size_max=4 * subsystem.batch_size,
         )
         for batch in batches:
             yield tuple(batch)

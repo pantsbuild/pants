@@ -6,12 +6,12 @@ from __future__ import annotations
 from typing import cast
 
 from pants.backend.python.lint.bandit.subsystem import Bandit, BanditFieldSet
-from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import VenvPexProcess, create_venv_pex
 from pants.core.goals.lint import REPORT_DIR, LintResult, LintTargetsRequest, Partitions
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.config_files import find_config_file
 from pants.core.util_rules.partitions import Partition
 from pants.core.util_rules.source_files import (

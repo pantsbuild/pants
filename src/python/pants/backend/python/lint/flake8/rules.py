@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from typing import cast
 
 from pants.backend.python.lint.flake8.subsystem import (
     Flake8,
@@ -16,6 +17,7 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.pex import VenvPexProcess, create_venv_pex
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.lint import REPORT_DIR, LintResult, LintTargetsRequest, Partitions
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.config_files import find_config_file
 from pants.core.util_rules.partitions import Partition
 from pants.core.util_rules.source_files import (
@@ -38,7 +40,7 @@ from pants.util.strutil import pluralize
 
 class Flake8Request(LintTargetsRequest):
     field_set_type = Flake8FieldSet
-    tool_subsystem = Flake8
+    tool_subsystem = cast(type[SkippableSubsystem], Flake8)
 
 
 def generate_argv(source_files: SourceFiles, flake8: Flake8) -> tuple[str, ...]:

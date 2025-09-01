@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import cast
 
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import (
@@ -17,6 +18,7 @@ from pants.backend.helm.util_rules import tool
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest, get_helm_chart
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.goals.lint import LintResult, LintTargetsRequest, Partitions
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.partitions import Partition
 from pants.engine.intrinsics import execute_process
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
@@ -34,7 +36,7 @@ class HelmLintFieldSet(HelmChartFieldSet):
 
 class HelmLintRequest(LintTargetsRequest):
     field_set_type = HelmLintFieldSet
-    tool_subsystem = HelmSubsystem  # type: ignore[assignment]
+    tool_subsystem = cast(type[SkippableSubsystem], HelmSubsystem)
 
 
 @rule

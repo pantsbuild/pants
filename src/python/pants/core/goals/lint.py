@@ -150,6 +150,9 @@ class AbstractLintRequest:
             ]
     """
 
+    # Accept any Subsystem class. Specific rules will request the concrete subsystem instance
+    # (which may be skippable) as needed. Using `type[SkippableSubsystem]` causes mypy issues
+    # with class-object Protocol typing across varied subsystems.
     tool_subsystem: ClassVar[type[SkippableSubsystem]]
     partitioner_type: ClassVar[PartitionerType] = PartitionerType.CUSTOM
 
@@ -297,7 +300,10 @@ _FilePartitioner = TypeVar("_FilePartitioner", bound=LintFilesRequest.PartitionR
 
 class _MultiToolGoalSubsystem(Protocol):
     name: str
-    only: OnlyOption
+
+    # Expose parsed option value via a read-only property for compatibility.
+    @property
+    def only(self) -> Iterable[str]: ...
 
 
 async def get_partitions_by_request_type(
@@ -313,7 +319,7 @@ async def get_partitions_by_request_type(
 ) -> dict[type[_CoreRequestType], list[Partitions]]:
     specified_ids = determine_specified_tool_ids(
         subsystem.name,
-        subsystem.only,  # type: ignore[arg-type]
+        subsystem.only,
         core_request_types,
     )
 
