@@ -4,13 +4,14 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, cast
 
 from pants.backend.cue import subsystem
 from pants.backend.cue.rules import _run_cue
 from pants.backend.cue.subsystem import Cue
 from pants.backend.cue.target_types import CueFieldSet
 from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.platform import Platform
@@ -20,7 +21,7 @@ from pants.util.logging import LogLevel
 
 class CueLintRequest(LintTargetsRequest):
     field_set_type = CueFieldSet
-    tool_subsystem = Cue
+    tool_subsystem = cast(type[SkippableSubsystem], Cue)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

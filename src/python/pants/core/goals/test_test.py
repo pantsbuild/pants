@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from textwrap import dedent
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
@@ -19,6 +19,7 @@ from pants.backend.python.target_types import PexBinary, PythonSourcesGeneratorT
 from pants.backend.python.target_types_rules import rules as python_target_type_rules
 from pants.backend.python.util_rules import pex_from_targets
 from pants.core.environments.rules import ChosenLocalEnvironmentName
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.test import (
     BuildPackageDependenciesRequest,
     BuiltPackageDependencies,
@@ -175,7 +176,7 @@ class MockTestSubsystem(Subsystem):
 
 class MockTestRequest(TestRequest):
     field_set_type = MockTestFieldSet
-    tool_subsystem = MockTestSubsystem
+    tool_subsystem = cast(type[SkippableSubsystem], MockTestSubsystem)
 
     @staticmethod
     @abstractmethod

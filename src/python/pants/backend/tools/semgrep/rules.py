@@ -8,10 +8,12 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
+from typing import cast
 
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import VenvPexProcess, create_venv_pex
 from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.partitions import Partition, Partitions
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.addresses import Address
@@ -41,7 +43,7 @@ _DEFAULT_SEMGREP_CONFIG_DIR = ".semgrep"
 
 class SemgrepLintRequest(LintTargetsRequest):
     field_set_type = SemgrepFieldSet
-    tool_subsystem = SemgrepSubsystem
+    tool_subsystem = cast(type[SkippableSubsystem], SemgrepSubsystem)
 
 
 @dataclass(frozen=True)

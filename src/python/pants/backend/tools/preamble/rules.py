@@ -7,10 +7,11 @@ import dataclasses
 import datetime
 import re
 import string
-from typing import Any
+from typing import Any, cast
 
 from pants.backend.tools.preamble.subsystem import PreambleSubsystem
 from pants.core.goals.fmt import FmtFilesRequest, FmtResult, Partitions
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.engine.fs import CreateDigest
 from pants.engine.intrinsics import digest_to_snapshot, get_digest_contents
 from pants.engine.rules import collect_rules, implicitly, rule
@@ -19,7 +20,7 @@ from pants.util.memo import memoized
 
 
 class PreambleRequest(FmtFilesRequest):
-    tool_subsystem = PreambleSubsystem
+    tool_subsystem = cast(type[SkippableSubsystem], PreambleSubsystem)
 
 
 @memoized

@@ -5,9 +5,10 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from pants.backend.java.subsystems.junit import JUnit
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.resolves import ExportableTool
 from pants.core.goals.test import (
     TestDebugRequest,
@@ -67,7 +68,7 @@ class JunitTestFieldSet(TestFieldSet):
 
 
 class JunitTestRequest(TestRequest):
-    tool_subsystem = JUnit
+    tool_subsystem = cast(type[SkippableSubsystem], JUnit)
     field_set_type = JunitTestFieldSet
     supports_debug = True
 

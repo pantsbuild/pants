@@ -2,9 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import logging
 from dataclasses import dataclass
+from typing import cast
 
 from pants.backend.terraform.target_types import TerraformFieldSet
 from pants.core.goals.lint import LintTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import ExternalTool
 from pants.core.util_rules.partitions import PartitionerType
@@ -127,5 +129,5 @@ class TfSecFieldSet(TerraformFieldSet):
 
 class TfSecRequest(LintTargetsRequest):
     field_set_type = TfSecFieldSet
-    tool_subsystem = TFSec
+    tool_subsystem = cast(type[SkippableSubsystem], TFSec)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION

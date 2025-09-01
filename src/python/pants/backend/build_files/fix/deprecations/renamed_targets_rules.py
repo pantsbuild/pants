@@ -5,11 +5,13 @@ from __future__ import annotations
 
 import tokenize
 from dataclasses import dataclass
+from typing import cast
 
 from pants.backend.build_files.fix.base import FixBuildFilesRequest
 from pants.backend.build_files.fix.deprecations.base import FixBUILDFileRequest, FixedBUILDFile
 from pants.backend.build_files.fix.deprecations.subsystem import BUILDDeprecationsFixer
 from pants.core.goals.fix import FixResult
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import digest_to_snapshot, get_digest_contents
@@ -20,7 +22,7 @@ from pants.util.logging import LogLevel
 
 
 class RenameTargetsInFilesRequest(FixBuildFilesRequest):
-    tool_subsystem = BUILDDeprecationsFixer
+    tool_subsystem = cast(type[SkippableSubsystem], BUILDDeprecationsFixer)
 
 
 class RenameTargetsInFileRequest(FixBUILDFileRequest):

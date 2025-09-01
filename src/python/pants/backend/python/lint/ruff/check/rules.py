@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from pants.backend.python.lint.ruff.check.skip_field import SkipRuffCheckField
 from pants.backend.python.lint.ruff.common import RunRuffRequest, run_ruff
@@ -18,6 +18,7 @@ from pants.backend.python.target_types import (
 from pants.backend.python.util_rules import pex
 from pants.core.goals.fix import FixResult, FixTargetsRequest
 from pants.core.goals.lint import REPORT_DIR, LintResult, LintTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.fs import DigestSubset, PathGlobs, RemovePrefix
@@ -44,7 +45,7 @@ class RuffCheckFieldSet(FieldSet):
 
 class RuffLintRequest(LintTargetsRequest):
     field_set_type = RuffCheckFieldSet
-    tool_subsystem = Ruff
+    tool_subsystem = cast(type[SkippableSubsystem], Ruff)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
     @classproperty
@@ -58,7 +59,7 @@ class RuffLintRequest(LintTargetsRequest):
 
 class RuffFixRequest(FixTargetsRequest):
     field_set_type = RuffCheckFieldSet
-    tool_subsystem = Ruff
+    tool_subsystem = cast(type[SkippableSubsystem], Ruff)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
     # We don't need to include automatically added lint rules for this RuffFixRequest,

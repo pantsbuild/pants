@@ -6,11 +6,12 @@ from __future__ import annotations
 import os
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from pants.backend.python.util_rules.pex import PexProcess, create_pex
 from pants.backend.tools.yamllint.subsystem import Yamllint
 from pants.core.goals.lint import LintFilesRequest, LintResult
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.config_files import (
     GatherConfigFilesByDirectoriesRequest,
     gather_config_files_by_workspace_dir,
@@ -26,7 +27,7 @@ from pants.util.strutil import pluralize
 
 
 class YamllintRequest(LintFilesRequest):
-    tool_subsystem = Yamllint
+    tool_subsystem = cast(type[SkippableSubsystem], Yamllint)
 
 
 @dataclass(frozen=True)

@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
+from typing import cast
 
 from pants.backend.python.lint.ruff.common import RunRuffRequest, run_ruff
 from pants.backend.python.lint.ruff.format.skip_field import SkipRuffFormatField
@@ -14,6 +15,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules import pex
 from pants.core.goals.fmt import AbstractFmtRequest, FmtResult, FmtTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.platform import Platform
 from pants.engine.rules import collect_rules, rule
@@ -37,7 +39,7 @@ class RuffFormatFieldSet(FieldSet):
 
 class RuffFormatRequest(FmtTargetsRequest):
     field_set_type = RuffFormatFieldSet
-    tool_subsystem = Ruff
+    tool_subsystem = cast(type[SkippableSubsystem], Ruff)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
     @classproperty

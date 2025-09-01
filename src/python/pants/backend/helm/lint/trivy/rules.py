@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from pants.backend.helm.subsystems.post_renderer import setup_post_renderer_launcher
 from pants.backend.helm.target_types import (
@@ -23,6 +23,7 @@ from pants.backend.helm.util_rules.renderer import (
 from pants.backend.tools.trivy.rules import RunTrivyRequest, run_trivy
 from pants.backend.tools.trivy.subsystem import SkipTrivyField, Trivy
 from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, implicitly, rule
@@ -31,7 +32,7 @@ from pants.util.logging import LogLevel
 
 
 class TrivyLintHelmRequest(LintTargetsRequest, metaclass=ABCMeta):
-    tool_subsystem = Trivy
+    tool_subsystem = cast(type[SkippableSubsystem], Trivy)
 
 
 @dataclass(frozen=True)
@@ -76,7 +77,7 @@ class TrivyLintHelmDeploymentFieldSet(HelmDeploymentFieldSet, TrivyHelmFieldSet)
 
 class TrivyLintHelmDeploymentRequest(TrivyLintHelmRequest):
     field_set_type = TrivyLintHelmDeploymentFieldSet
-    tool_subsystem = Trivy
+    tool_subsystem = cast(type[SkippableSubsystem], Trivy)
     partitioner_type = PartitionerType.DEFAULT_ONE_PARTITION_PER_INPUT
 
 
@@ -113,7 +114,7 @@ class TrivyLintHelmChartFieldSet(HelmChartFieldSet, TrivyHelmFieldSet):
 
 class TrivyLintHelmChartRequest(TrivyLintHelmRequest):
     field_set_type = TrivyLintHelmChartFieldSet
-    tool_subsystem = Trivy
+    tool_subsystem = cast(type[SkippableSubsystem], Trivy)
     partitioner_type = PartitionerType.DEFAULT_ONE_PARTITION_PER_INPUT
 
 

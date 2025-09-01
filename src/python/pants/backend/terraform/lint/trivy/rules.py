@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from pants.backend.terraform.dependencies import (
     prepare_terraform_invocation,
@@ -21,6 +21,7 @@ from pants.backend.terraform.target_types import (
 from pants.backend.tools.trivy.rules import RunTrivyRequest, run_trivy
 from pants.backend.tools.trivy.subsystem import SkipTrivyField, Trivy
 from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.internals.native_engine import MergeDigests
@@ -32,7 +33,7 @@ from pants.util.logging import LogLevel
 
 
 class TrivyLintTerraformRequest(LintTargetsRequest, metaclass=ABCMeta):
-    tool_subsystem = Trivy
+    tool_subsystem = cast(type[SkippableSubsystem], Trivy)
 
 
 @dataclass(frozen=True)
@@ -102,7 +103,7 @@ class TrivyLintTerraformDeploymentFieldSet(TerraformDeploymentFieldSet, TrivyTer
 
 class TrivyLintTerraformDeploymentRequest(TrivyLintTerraformRequest):
     field_set_type = TrivyLintTerraformDeploymentFieldSet
-    tool_subsystem = Trivy
+    tool_subsystem = cast(type[SkippableSubsystem], Trivy)
     partitioner_type = PartitionerType.DEFAULT_ONE_PARTITION_PER_INPUT
 
 
@@ -123,7 +124,7 @@ class TrivyLintTerraformModuleFieldSet(TerraformFieldSet, TrivyTerraformFieldSet
 
 class TrivyLintTerraformModuleRequest(TrivyLintTerraformRequest):
     field_set_type = TrivyLintTerraformModuleFieldSet
-    tool_subsystem = Trivy
+    tool_subsystem = cast(type[SkippableSubsystem], Trivy)
     partitioner_type = PartitionerType.DEFAULT_ONE_PARTITION_PER_INPUT
 
 

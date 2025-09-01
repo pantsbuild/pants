@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, assert_never
+from typing import Any, assert_never, cast
 
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPexProcess, create_venv_pex
@@ -12,6 +12,7 @@ from pants.backend.sql.lint.sqlfluff.subsystem import Sqlfluff, SqlfluffFieldSet
 from pants.core.goals.fix import FixResult, FixTargetsRequest
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.config_files import find_config_file
 from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
@@ -27,7 +28,7 @@ from pants.util.strutil import pluralize
 
 class SqlfluffFixRequest(FixTargetsRequest):
     field_set_type = SqlfluffFieldSet
-    tool_subsystem = Sqlfluff
+    tool_subsystem = cast(type[SkippableSubsystem], Sqlfluff)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
     # We don't need to include automatically added lint rules for this SqlfluffFixRequest,
@@ -37,13 +38,13 @@ class SqlfluffFixRequest(FixTargetsRequest):
 
 class SqlfluffLintRequest(LintTargetsRequest):
     field_set_type = SqlfluffFieldSet
-    tool_subsystem = Sqlfluff
+    tool_subsystem = cast(type[SkippableSubsystem], Sqlfluff)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 class SqlfluffFormatRequest(FmtTargetsRequest):
     field_set_type = SqlfluffFieldSet
-    tool_subsystem = Sqlfluff
+    tool_subsystem = cast(type[SkippableSubsystem], Sqlfluff)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
     @classproperty

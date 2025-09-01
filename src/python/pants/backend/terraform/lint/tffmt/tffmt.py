@@ -11,6 +11,7 @@ from pants.backend.terraform.target_types import TerraformFieldSet
 from pants.backend.terraform.tool import TerraformCommand, TerraformProcess
 from pants.backend.terraform.tool import rules as tool_rules
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.partitions import Partition
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
@@ -33,7 +34,7 @@ class TfFmtSubsystem(Subsystem):
 
 class TffmtRequest(FmtTargetsRequest):
     field_set_type = TerraformFieldSet
-    tool_subsystem = TfFmtSubsystem
+    tool_subsystem = cast(type[SkippableSubsystem], TfFmtSubsystem)
 
 
 @dataclass(frozen=True)

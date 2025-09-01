@@ -8,10 +8,11 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.core.goals.lint import LintFilesRequest, LintResult, Partitions
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.engine.fs import PathGlobs
 from pants.engine.intrinsics import get_digest_contents
 from pants.engine.rules import collect_rules, implicitly, rule
@@ -260,7 +261,7 @@ class MultiMatcher:
 
 
 class RegexLintRequest(LintFilesRequest):
-    tool_subsystem = RegexLintSubsystem
+    tool_subsystem = cast(type[SkippableSubsystem], RegexLintSubsystem)
 
 
 @rule

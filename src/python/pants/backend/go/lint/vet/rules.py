@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os.path
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from pants.backend.go.lint.vet.skip_field import SkipGoVetField
 from pants.backend.go.lint.vet.subsystem import GoVetSubsystem
@@ -18,6 +18,7 @@ from pants.backend.go.util_rules.go_mod import (
 )
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.fs import MergeDigests
@@ -42,7 +43,7 @@ class GoVetFieldSet(FieldSet):
 
 class GoVetRequest(LintTargetsRequest):
     field_set_type = GoVetFieldSet
-    tool_subsystem = GoVetSubsystem
+    tool_subsystem = cast(type[SkippableSubsystem], GoVetSubsystem)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

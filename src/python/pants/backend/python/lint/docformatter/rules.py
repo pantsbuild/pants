@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
+from typing import cast
 
 from pants.backend.python.lint.docformatter.skip_field import SkipDocformatterField
 from pants.backend.python.lint.docformatter.subsystem import Docformatter
@@ -9,6 +10,7 @@ from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import VenvPexProcess, create_venv_pex
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.intrinsics import execute_process
 from pants.engine.process import ProcessExecutionFailure
@@ -32,7 +34,7 @@ class DocformatterFieldSet(FieldSet):
 
 class DocformatterRequest(FmtTargetsRequest):
     field_set_type = DocformatterFieldSet
-    tool_subsystem = Docformatter
+    tool_subsystem = cast(type[SkippableSubsystem], Docformatter)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

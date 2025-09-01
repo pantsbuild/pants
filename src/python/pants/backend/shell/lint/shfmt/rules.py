@@ -2,11 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
+from typing import cast
 
 from pants.backend.shell.lint.shfmt.skip_field import SkipShfmtField
 from pants.backend.shell.lint.shfmt.subsystem import Shfmt
 from pants.backend.shell.target_types import ShellSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import find_config_file
 from pants.core.util_rules.external_tool import download_external_tool
@@ -35,7 +37,7 @@ class ShfmtFieldSet(FieldSet):
 
 class ShfmtRequest(FmtTargetsRequest):
     field_set_type = ShfmtFieldSet
-    tool_subsystem = Shfmt
+    tool_subsystem = cast(type[SkippableSubsystem], Shfmt)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

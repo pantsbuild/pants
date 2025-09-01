@@ -8,7 +8,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 import pytest
 
@@ -25,6 +25,7 @@ from pants.core.goals.lint import (
     Partitions,
 )
 from pants.core.goals.lint_goal import lint
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.partitions import PartitionerType, _EmptyMetadata
 from pants.engine.addresses import Address
@@ -556,7 +557,7 @@ def test_default_single_partition_partitioner() -> None:
 
     class LintKitchenRequest(LintTargetsRequest):
         field_set_type = MockLinterFieldSet
-        tool_subsystem = KitchenSubsystem
+        tool_subsystem = cast(type[SkippableSubsystem], KitchenSubsystem)
         partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
     rules = [

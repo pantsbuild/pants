@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import cast
 
 from pants.backend.python.lint.pyupgrade.skip_field import SkipPyUpgradeField
 from pants.backend.python.lint.pyupgrade.subsystem import PyUpgrade
@@ -11,6 +12,7 @@ from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import VenvPexProcess, create_venv_pex
 from pants.core.goals.fix import FixResult, FixTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.intrinsics import execute_process
 from pants.engine.rules import collect_rules, implicitly, rule
@@ -34,7 +36,7 @@ class PyUpgradeFieldSet(FieldSet):
 
 class PyUpgradeRequest(FixTargetsRequest):
     field_set_type = PyUpgradeFieldSet
-    tool_subsystem = PyUpgrade
+    tool_subsystem = cast(type[SkippableSubsystem], PyUpgrade)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

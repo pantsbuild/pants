@@ -2,11 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import ClassVar, cast
 
 from pants.core.goals.fix import Fix, FixFilesRequest, FixResult
 from pants.core.goals.fmt import Fmt, FmtFilesRequest, FmtResult
 from pants.core.goals.lint import Lint, LintFilesRequest, LintResult
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.adhoc_process_support import (
     ToolRunner,
     ToolRunnerRequest,
@@ -290,7 +291,7 @@ class CodeQualityToolRuleBuilder:
             skip = SkipOption("lint")
 
         class CodeQualityProcessingRequest(LintFilesRequest):
-            tool_subsystem = CodeQualityToolInstance
+            tool_subsystem = cast(type[SkippableSubsystem], CodeQualityToolInstance)
 
         @rule(canonical_name_suffix=self.scope)
         async def partition_inputs(
@@ -342,7 +343,7 @@ class CodeQualityToolRuleBuilder:
             skip = SkipOption("lint", "fmt")
 
         class CodeQualityProcessingRequest(FmtFilesRequest):
-            tool_subsystem = CodeQualityToolInstance
+            tool_subsystem = cast(type[SkippableSubsystem], CodeQualityToolInstance)
 
         @rule(canonical_name_suffix=self.scope)
         async def partition_inputs(
@@ -403,7 +404,7 @@ class CodeQualityToolRuleBuilder:
             skip = SkipOption("lint", "fmt", "fix")
 
         class CodeQualityProcessingRequest(FixFilesRequest):
-            tool_subsystem = CodeQualityToolInstance
+            tool_subsystem = cast(type[SkippableSubsystem], CodeQualityToolInstance)
 
         @rule(canonical_name_suffix=self.scope)
         async def partition_inputs(

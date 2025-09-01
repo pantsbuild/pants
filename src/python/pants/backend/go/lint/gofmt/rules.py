@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os.path
 from dataclasses import dataclass
+from typing import cast
 
 from pants.backend.go.lint.gofmt.skip_field import SkipGofmtField
 from pants.backend.go.lint.gofmt.subsystem import (
@@ -16,6 +17,7 @@ from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules import goroot
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.process import Process, execute_process_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
@@ -37,7 +39,7 @@ class GofmtFieldSet(FieldSet):
 
 class GofmtRequest(FmtTargetsRequest):
     field_set_type = GofmtFieldSet
-    tool_subsystem = GofmtSubsystem
+    tool_subsystem = cast(type[SkippableSubsystem], GofmtSubsystem)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

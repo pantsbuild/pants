@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
+from typing import cast
 
 from pants.backend.python.lint.add_trailing_comma.skip_field import SkipAddTrailingCommaField
 from pants.backend.python.lint.add_trailing_comma.subsystem import AddTrailingComma
@@ -9,6 +10,7 @@ from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import VenvPexProcess, create_venv_pex
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.process import execute_process_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
@@ -30,7 +32,7 @@ class AddTrailingCommaFieldSet(FieldSet):
 
 class AddTrailingCommaRequest(FmtTargetsRequest):
     field_set_type = AddTrailingCommaFieldSet
-    tool_subsystem = AddTrailingComma
+    tool_subsystem = cast(type[SkippableSubsystem], AddTrailingComma)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

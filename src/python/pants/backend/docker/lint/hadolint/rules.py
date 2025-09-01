@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from pants.backend.docker.lint.hadolint.skip_field import SkipHadolintField
 from pants.backend.docker.lint.hadolint.subsystem import Hadolint
@@ -14,6 +14,7 @@ from pants.backend.docker.subsystems.dockerfile_parser import (
 )
 from pants.backend.docker.target_types import DockerImageSourceField
 from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import find_config_file
 from pants.core.util_rules.external_tool import download_external_tool
@@ -42,7 +43,7 @@ class HadolintFieldSet(FieldSet):
 
 class HadolintRequest(LintTargetsRequest):
     field_set_type = HadolintFieldSet
-    tool_subsystem = Hadolint
+    tool_subsystem = cast(type[SkippableSubsystem], Hadolint)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

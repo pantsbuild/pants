@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
 from pants.backend.visibility.subsystem import VisibilitySubsystem
 from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.internals.build_files import get_dependencies_rule_application
 from pants.engine.internals.dep_rules import DependencyRuleActionDeniedError
@@ -30,7 +32,7 @@ class VisibilityFieldSet(FieldSet):
 
 
 class EnforceVisibilityRules(LintTargetsRequest):
-    tool_subsystem = VisibilitySubsystem
+    tool_subsystem = cast(type[SkippableSubsystem], VisibilitySubsystem)
     field_set_type = VisibilityFieldSet
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 

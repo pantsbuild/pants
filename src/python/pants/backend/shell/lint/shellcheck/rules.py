@@ -2,12 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from pants.backend.shell.lint.shellcheck.skip_field import SkipShellcheckField
 from pants.backend.shell.lint.shellcheck.subsystem import Shellcheck
 from pants.backend.shell.target_types import ShellDependenciesField, ShellSourceField
 from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import find_config_file
 from pants.core.util_rules.external_tool import download_external_tool
@@ -39,7 +40,7 @@ class ShellcheckFieldSet(FieldSet):
 
 class ShellcheckRequest(LintTargetsRequest):
     field_set_type = ShellcheckFieldSet
-    tool_subsystem = Shellcheck
+    tool_subsystem = cast(type[SkippableSubsystem], Shellcheck)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

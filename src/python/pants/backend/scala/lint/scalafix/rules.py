@@ -17,6 +17,7 @@ from pants.backend.scala.target_types import ScalaSourceField
 from pants.backend.scala.util_rules.versions import ScalaVersion
 from pants.core.goals.fix import FixResult, FixTargetsRequest, Partitions
 from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import (
     GatherConfigFilesByDirectoriesRequest,
@@ -77,12 +78,12 @@ class ScalafixFieldSet(FieldSet):
 
 class ScalafixFixRequest(FixTargetsRequest):
     field_set_type = ScalafixFieldSet
-    tool_subsystem = ScalafixSubsystem
+    tool_subsystem = cast(type[SkippableSubsystem], ScalafixSubsystem)
 
 
 class ScalafixLintRequest(LintTargetsRequest):
     field_set_type = ScalafixFieldSet
-    tool_subsystem = ScalafixSubsystem
+    tool_subsystem = cast(type[SkippableSubsystem], ScalafixSubsystem)
 
 
 @dataclass(frozen=True)

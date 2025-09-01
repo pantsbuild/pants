@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
+from typing import cast
 
 from pants.backend.python.lint.autoflake.skip_field import SkipAutoflakeField
 from pants.backend.python.lint.autoflake.subsystem import Autoflake
@@ -9,6 +10,7 @@ from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import VenvPexProcess, create_venv_pex
 from pants.core.goals.fix import FixResult, FixTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.process import execute_process_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
@@ -30,7 +32,7 @@ class AutoflakeFieldSet(FieldSet):
 
 class AutoflakeRequest(FixTargetsRequest):
     field_set_type = AutoflakeFieldSet
-    tool_subsystem = Autoflake
+    tool_subsystem = cast(type[SkippableSubsystem], Autoflake)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
