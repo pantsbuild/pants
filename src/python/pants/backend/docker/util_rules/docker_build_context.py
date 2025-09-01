@@ -130,18 +130,19 @@ class DockerBuildContext:
         build_env: DockerBuildEnvironment,
         upstream_image_ids: Iterable[str],
         dockerfile_info: DockerfileInfo,
-        should_suggest_renames: bool = True,
     ) -> DockerBuildContext:
         interpolation_context: dict[str, dict[str, str] | InterpolationValue] = {}
 
+        # Merge build args once and reuse for both interpolation context and stage parsing
+        merged_build_args_with_extensions = {}
         if build_args:
-            interpolation_context["build_args"] = cls._merge_build_args(
+            merged_build_args_with_extensions = cls._merge_build_args(
                 dockerfile_info, build_args, build_env
             )
 
         # Override default value type for the `build_args` context to get helpful error messages.
         interpolation_context["build_args"] = DockerBuildArgsInterpolationValue(
-            interpolation_context.get("build_args", {})
+            merged_build_args_with_extensions
         )
 
         # Data from Pants.
@@ -151,13 +152,20 @@ class DockerBuildContext:
         }
 
         # Base image tags values for all stages (as parsed from the Dockerfile instructions).
+        # Use the full build_args that includes extra_build_args from the BUILD file.
         stage_names, tags_values = cls._get_stages_and_tags(
-            dockerfile_info, interpolation_context["build_args"]
+            dockerfile_info, merged_build_args_with_extensions
         )
         interpolation_context["tags"] = tags_values
 
-        copy_source_vs_context_source = (
-            tuple(
+        return cls(
+            build_args=build_args,
+            digest=snapshot.digest,
+            dockerfile=dockerfile_info.source,
+            build_env=build_env,
+            upstream_image_ids=tuple(sorted(upstream_image_ids)),
+            interpolation_context=InterpolationContext.from_dict(interpolation_context),
+            copy_source_vs_context_source=tuple(
                 suggest_renames(
                     tentative_paths=(
                         # We don't want to include the Dockerfile as a suggested rename
@@ -167,19 +175,7 @@ class DockerBuildContext:
                     actual_files=snapshot.files,
                     actual_dirs=snapshot.dirs,
                 )
-            )
-            if should_suggest_renames
-            else ()
-        )
-
-        return cls(
-            build_args=build_args,
-            digest=snapshot.digest,
-            dockerfile=dockerfile_info.source,
-            build_env=build_env,
-            upstream_image_ids=tuple(sorted(upstream_image_ids)),
-            interpolation_context=InterpolationContext.from_dict(interpolation_context),
-            copy_source_vs_context_source=copy_source_vs_context_source,
+            ),
             stages=tuple(sorted(stage_names)),
         )
 
