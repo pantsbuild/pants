@@ -44,7 +44,6 @@ from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.fs import (
     CreateDigest,
     Digest,
-    DigestContents,
     FileContent,
     MergeDigests,
     Snapshot,
@@ -55,8 +54,8 @@ from pants.engine.internals.graph import (
     resolve_unparsed_address_inputs,
 )
 from pants.engine.internals.graph import transitive_targets as transitive_targets_get
-from pants.engine.intrinsics import digest_to_snapshot
-from pants.engine.rules import Get, MultiGet, collect_rules, concurrently, implicitly, rule
+from pants.engine.intrinsics import create_digest, digest_to_snapshot, get_digest_contents
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
@@ -345,36 +344,30 @@ async def create_docker_build_context(
     embedded_pkgs_digest = []
 
     # For Docker images, we need to extract the metadata filename and create stable digests
-    docker_metadata_gets = []
-    docker_package_indices = []
-    for i, built_package in enumerate(embedded_pkgs):
-        field_set = pkgs_wanting_embedding[i]
+    docker_packages = []
+    for field_set, built_package in zip(pkgs_wanting_embedding, embedded_pkgs):
         if request.build_upstream_images and isinstance(
             getattr(field_set, "source", None), DockerImageSourceField
         ):
-            docker_metadata_gets.append(Get(DigestContents, Digest, built_package.digest))
-            docker_package_indices.append(i)
+            docker_packages.append(built_package)
         else:
-            # For non-Docker packages, use the regular digest
             embedded_pkgs_digest.append(built_package.digest)
 
-    # Get metadata contents for Docker images
-    if docker_metadata_gets:
-        docker_metadata_contents = await MultiGet(*docker_metadata_gets)
+    if docker_packages:
+        docker_metadata_contents = await concurrently(
+            get_digest_contents(built_package.digest) for built_package in docker_packages
+        )
 
-        for metadata_contents, pkg_index in zip(docker_metadata_contents, docker_package_indices):
-            built_package = embedded_pkgs[pkg_index]
+        for metadata_contents, built_package in zip(docker_metadata_contents, docker_packages):
 
-            # Extract the original filename from the metadata
             if metadata_contents:
-                original_filename = next(iter(metadata_contents)).path
-
-                # Find the Docker image artifact to get the image ID
                 for artifact in built_package.artifacts:
                     if isinstance(artifact, BuiltDockerImage):
                         stable_content = artifact.image_id.encode()
-                        stable_digest = await Get(
-                            Digest, CreateDigest([FileContent(original_filename, stable_content)])
+                        # Use a stable filename for better debugging
+                        stable_filename = "docker-info.stable.json"
+                        stable_digest = await create_digest(
+                            CreateDigest([FileContent(stable_filename, stable_content)])
                         )
                         embedded_pkgs_digest.append(stable_digest)
                         break
