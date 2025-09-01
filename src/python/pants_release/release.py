@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import requests
+from packaging.utils import canonicalize_name
 from packaging.version import Version
 from pants_release.common import VERSION_PATH, banner, die, green
 from pants_release.git import git, git_rev_parse
@@ -127,7 +128,7 @@ class Package:
         max_size_mb: int,
         validate: Callable[[str, Path, list[str]], None],
     ) -> None:
-        self.name = name
+        self.name = canonicalize_name(name)
         self.target = target
         self.max_size_mb = max_size_mb
         self.validate = validate
@@ -148,7 +149,10 @@ class Package:
         return f"Package<name={self.name}>"
 
     def find_locally(self, *, version: str, search_dir: str | Path) -> list[Path]:
-        return list(Path(search_dir).rglob(f"{self.name}-{version}-*.whl"))
+        # See https://peps.python.org/pep-0427/#escaping-and-unicode: the wheel filename
+        # undergoes extra canonicalization beyond the standard package name canonicalization.
+        fs_name = re.sub(r"[^\w\d.]+", "_", self.name, re.UNICODE)
+        return list(Path(search_dir).glob(f"{fs_name}-{version}-*.whl"))
 
     def exists_on_pypi(self) -> bool:  # type: ignore[return]
         response = requests.head(f"https://pypi.org/project/{self.name}/")
@@ -532,18 +536,18 @@ def build_pants_wheels() -> None:
         )
 
     for package in PACKAGES:
-        found_wheels = sorted(Path("dist").glob(f"{package}-{version}-*.whl"))
+        found_wheels = package.find_locally(version=version, search_dir="dist")
         if not is_cross_platform(found_wheels):
             # NB: For any platform-specific wheels, like pantsbuild.pants, we assume that the
             # top-level `dist` will only have wheels built for the current platform. This
             # should be safe because it is not possible to build native wheels for another
             # platform.
-            if len(found_wheels) > 1:
+            if len(found_wheels) != 1:
                 die(
                     softwrap(
                         f"""
-                        Found multiple wheels for {package} in the `dist/` folder, but was
-                        expecting only one wheel: {sorted(wheel.name for wheel in found_wheels)}.
+                        Found {len(found_wheels)} wheels for {package} in `dist/`, but was
+                        expecting one wheel: {sorted(wheel.name for wheel in found_wheels)}.
                         """
                     )
                 )

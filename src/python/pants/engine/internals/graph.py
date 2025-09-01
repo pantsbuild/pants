@@ -104,7 +104,8 @@ from pants.engine.target import (
     generate_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.option.global_options import GlobalOptions, UnmatchedBuildFileGlobs
+from pants.option.bootstrap_options import UnmatchedBuildFileGlobs
+from pants.option.global_options import GlobalOptions
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
