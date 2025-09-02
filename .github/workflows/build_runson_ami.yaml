@@ -1,0 +1,52 @@
+name: Build RunsOn AMI
+
+on:
+    workflow_dispatch:
+    schedule:
+      # Runs at 12:00 PM (noon) on the 1st day of every month
+      - cron: '0 12 1 * *'
+
+jobs:
+  build_ami:
+    name: Build-AMI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          # TODO: Rename this PAT to something that encompasses more than just cherry-picking
+          # but all PR creation (such as this one).
+          token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
+      - name: Run packer
+        env:
+            GH_TOKEN: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
+        run: |
+          wget -O - https://apt.releases.hashicorp.com/gpg | \
+            sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) \
+            signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] \
+            https://apt.releases.hashicorp.com \
+            $(grep -oP '(?<=UBUNTU_CODENAME=).*' /etc/os-release || lsb_release -cs) main" | \
+            sudo tee /etc/apt/sources.list.d/hashicorp.list
+          sudo apt update && sudo apt install -y packer gh
+
+          git config --local user.email "pantsbuild+github-automation@gmail.com"
+          git config --local user.name "Worker Pants (Pantsbuild GitHub Automation Bot)"
+
+          packer init build-support/packer/runson/runson.pkr.hcl
+          packer build build-support/packer/runson/runson.pkr.hcl
+          export set AMI_ID=`jq -r '.builds[-1].artifact_id | split(":")[1]' manifest.json`
+          yq -i ".images.\"ubuntu22-full-arm64-python3.7-3.13\".ami=\"$AMI_ID\"" .github/runs-on.yml
+
+          export set BRANCH_NAME="upgrade_runson_to_${AMI_ID}"
+
+          git co -b "${BRANCH_NAME}"
+          git add .github/runs-on.yml
+          git commit -m "Upgrade RunsOn AMI to ${AMI_ID}"
+          gh pr create \
+            --base main \
+            --head ${BRANCH_NAME} \
+            --fill \
+            --label "release-notes:not-required" \
+            --reviewer "pantsbuild/maintainers"
+
