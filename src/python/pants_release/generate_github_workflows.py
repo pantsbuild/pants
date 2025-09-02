@@ -941,7 +941,7 @@ def build_wheels_job(
                             "if": "needs.release_info.outputs.is-release == 'true'",
                             "uses": action("attest-build-provenance"),
                             "with": {
-                                "subject-path": "dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants-*.whl",
+                                "subject-path": "dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants-*.whl",
                             },
                         },
                         {
@@ -983,7 +983,7 @@ def build_wheels_job(
                                     ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \\
                                     --data-binary "@dist/src.python.pants/$PEX_FILENAME"
 
-                                WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild.pants-*.whl")
+                                WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild_pants-*.whl")
                                 curl -L --fail \\
                                     -X POST \\
                                     -H "Authorization: Bearer ${{ github.token }}" \\
@@ -1000,7 +1000,7 @@ def build_wheels_job(
                                     "if": "needs.release_info.outputs.is-release == 'true'",
                                     "uses": action("attest-build-provenance"),
                                     "with": {
-                                        "subject-path": "dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants.testutil*.whl",
+                                        "subject-path": "dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants_testutil*.whl",
                                     },
                                 },
                                 {
@@ -1009,7 +1009,7 @@ def build_wheels_job(
                                     # NB: See above about curl
                                     "run": dedent(
                                         """\
-                                        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild.pants.testutil*.whl")
+                                        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild_pants_testutil*.whl")
                                         curl -L --fail \\
                                             -X POST \\
                                             -H "Authorization: Bearer ${{ github.token }}" \\
