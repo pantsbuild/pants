@@ -56,5 +56,4 @@ jobs:
             --head ${BRANCH_NAME} \
             --fill \
             --label "release-notes:not-required" \
-            --reviewer "pantsbuild/maintainers"
-
+            --reviewer "benjyw,tdyas"
