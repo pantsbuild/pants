@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 10
       - name: Run packer
         env:
             GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -53,7 +55,7 @@ jobs:
           git push origin ${BRANCH_NAME}
           gh pr create \
             --base main \
-            --head origin/${BRANCH_NAME} \
+            --head ${BRANCH_NAME} \
             --fill \
             --label "release-notes:not-required" \
             --reviewer "benjyw,tdyas"
