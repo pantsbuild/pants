@@ -45,7 +45,8 @@ def _generate(
     rule_runner: PythonRuleRunner,
     requirements_string: str = "ansicolors==1.1.8",
     requirement_constraints_str: str = '//   "requirement_constraints": [],\n',
-    only_binary_and_no_binary_str: str = '//   "only_binary": [],\n//   "no_binary": []',
+    only_binary_and_no_binary_str: str = '//   "only_binary": [],\n//   "no_binary": [],\n',
+    excludes_and_overrides_str: str = '//   "excludes": [],\n//   "overrides": []',
 ) -> str:
     result = rule_runner.request(
         GenerateLockfileResult,
@@ -73,7 +74,7 @@ def _generate(
             //
             // --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
             // {{
-            //   "version": 3,
+            //   "version": 4,
             //   "valid_for_interpreter_constraints": [],
             //   "generated_with_requirements": [
             //     "{requirements_string}"
@@ -83,6 +84,7 @@ def _generate(
         )
         + requirement_constraints_str
         + only_binary_and_no_binary_str
+        + excludes_and_overrides_str
         + dedent(
             """
             // }
@@ -90,6 +92,7 @@ def _generate(
             """
         )
     )
+
     assert content.startswith(pex_header)
     return strip_prefix(content, pex_header)
 
@@ -102,14 +105,14 @@ def test_pex_lockfile_generation(
 ) -> None:
     args = ["--python-resolves={'test': 'foo.lock'}"]
     only_binary_lock_str = '//   "only_binary": [],\n'
-    no_binary_lock_str = '//   "no_binary": []'
+    no_binary_lock_str = '//   "no_binary": [],\n'
     no_binary_arg = f"{{'{RESOLVE_OPTION_KEY__DEFAULT}': ['ansicolors']}}"
     if no_binary:
         no_binary_lock_str = dedent(
             """\
             //   "no_binary": [
             //     "ansicolors"
-            //   ]"""
+            //   ],\n"""
         )
         args.append(f"--python-resolves-to-no-binary={no_binary_arg}")
     if only_binary:

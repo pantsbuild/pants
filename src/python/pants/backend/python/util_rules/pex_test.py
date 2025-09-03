@@ -762,6 +762,8 @@ def test_setup_pex_requirements() -> None:
                         only_binary=FrozenOrderedSet(),
                         no_binary=FrozenOrderedSet(),
                         path_mappings=(),
+                        excludes=FrozenOrderedSet(),
+                        overrides=FrozenOrderedSet(),
                     ),
                 ),
                 MockGet(
@@ -916,6 +918,8 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
         only_binary=set(),
         no_binary=set(),
         manylinux=None,
+        excludes=set(),
+        overrides=set(),
     ).add_header_to_lockfile(b"", regenerate_command="regen", delimeter="#")
     rule_runner.write_files({"lock.txt": lock_content.decode()})
 

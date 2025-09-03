@@ -181,6 +181,8 @@ def test_validate_lockfiles(
             ),
             no_binary=FrozenOrderedSet(["not-sdist" if invalid_no_binary else "sdist"]),
             only_binary=FrozenOrderedSet(["not-bdist" if invalid_only_binary else "bdist"]),
+            overrides=FrozenOrderedSet(),
+            excludes=FrozenOrderedSet(),
             path_mappings=(),
         ),
     )
@@ -366,6 +368,8 @@ class TestResolvePexConfigPexArgs:
                 constraints_file=None,
                 no_binary=FrozenOrderedSet(no_binary) if no_binary else FrozenOrderedSet(),
                 only_binary=FrozenOrderedSet(only_binary) if only_binary else FrozenOrderedSet(),
+                excludes=FrozenOrderedSet(),
+                overrides=FrozenOrderedSet(),
                 path_mappings=[],
             ).pex_args()
         )
