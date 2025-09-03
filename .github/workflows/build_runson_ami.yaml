@@ -20,7 +20,7 @@ jobs:
         env:
             GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -x +e
+          set -ex
 
           wget -O - https://apt.releases.hashicorp.com/gpg | \
             sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
@@ -33,7 +33,11 @@ jobs:
 
           git config --local user.email "pantsbuild+github-automation@gmail.com"
           git config --local user.name "Worker Pants (Pantsbuild GitHub Automation Bot)"
+
+          # Don't xtrace GITHUB_TOKEN.
+          set +x
           git remote set-url origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}"
+          set -x
 
           packer init build-support/packer/runson/runson.pkr.hcl
           packer build build-support/packer/runson/runson.pkr.hcl
