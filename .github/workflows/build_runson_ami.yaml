@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 10
       - name: Run packer
         env:
             GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -24,22 +26,11 @@ jobs:
         run: |
           set -ex
 
-          wget -O - https://apt.releases.hashicorp.com/gpg | \
-            sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) \
-            signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] \
-            https://apt.releases.hashicorp.com \
-            $(grep -oP '(?<=UBUNTU_CODENAME=).*' /etc/os-release || lsb_release -cs) main" | \
-            sudo tee /etc/apt/sources.list.d/hashicorp.list
-          sudo apt update && sudo apt install -y packer gh
-
           git config --local user.email "pantsbuild+github-automation@gmail.com"
           git config --local user.name "Worker Pants (Pantsbuild GitHub Automation Bot)"
 
-          # Don't xtrace GITHUB_TOKEN.
-          set +x
-          git remote set-url origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}"
-          set -x
+          # In case we're running from a branch that isn't main (e.g., for debugging this workflow).
+          git fetch origin main
 
           packer init build-support/packer/runson/runson.pkr.hcl
           packer build build-support/packer/runson/runson.pkr.hcl
