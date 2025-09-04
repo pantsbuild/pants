@@ -31,8 +31,10 @@ from pants.engine.internals.engine_testutil import (
 )
 from pants.engine.internals.scheduler import ExecutionError, SchedulerSession
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import create_digest, merge_digests
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
-from pants.engine.rules import Get, MultiGet, rule
+from pants.engine.rules import implicitly, rule
 from pants.engine.streaming_workunit_handler import (
     StreamingWorkunitContext,
     StreamingWorkunitHandler,
@@ -81,7 +83,7 @@ class Fib:
 async def fib(n: int) -> Fib:
     if n < 2:
         return Fib(n)
-    x, y = tuple(await MultiGet([Get(Fib, int(n - 2)), Get(Fib, int(n - 1))]))
+    x, y = tuple(await concurrently([fib(int(n - 2)), fib(int(n - 1))]))
     return Fib(x.val + y.val)
 
 
@@ -128,22 +130,11 @@ class Epsilon:
     pass
 
 
-@rule(canonical_name="canonical_rule_one", desc="Rule number 1", level=LogLevel.INFO)
-async def rule_one_function(i: Input) -> Beta:
-    """This rule should be the first one executed by the engine, and thus have no parent."""
-    a = Alpha()
-    o = await Get(Omega, Alpha, a)
-    b = await Get(Beta, Omega, o)
-    time.sleep(1)
-    return b
-
-
-@rule(desc="Rule number 2", level=LogLevel.INFO)
-async def rule_two(a: Alpha) -> Omega:
-    """This rule should be invoked in the body of `rule_one` and therefore its workunit should be a
-    child of `rule_one`'s workunit."""
-    await Get(Gamma, Alpha, a)
-    return Omega()
+@rule(desc="Rule number 4", level=LogLevel.INFO)
+async def rule_four(a: Alpha) -> Gamma:
+    """This rule should be invoked in the body of `rule_two` and therefore its workunit should be a
+    child of `rule_two`'s workunit."""
+    return Gamma()
 
 
 @rule(desc="Rule number 3", level=LogLevel.INFO)
@@ -153,30 +144,41 @@ async def rule_three(o: Omega) -> Beta:
     return Beta()
 
 
-@rule(desc="Rule number 4", level=LogLevel.INFO)
-async def rule_four(a: Alpha) -> Gamma:
-    """This rule should be invoked in the body of `rule_two` and therefore its workunit should be a
-    child of `rule_two`'s workunit."""
-    return Gamma()
+@rule(desc="Rule number 2", level=LogLevel.INFO)
+async def rule_two(a: Alpha) -> Omega:
+    """This rule should be invoked in the body of `rule_one` and therefore its workunit should be a
+    child of `rule_one`'s workunit."""
+    await rule_four(a)
+    return Omega()
 
 
-@rule(desc="Rule A", level=LogLevel.INFO)
-async def rule_A(i: Input) -> Alpha:
-    o = Omega()
-    a = await Get(Alpha, Omega, o)
-    return a
-
-
-@rule
-async def rule_B(o: Omega) -> Alpha:
-    e = Epsilon()
-    a = await Get(Alpha, Epsilon, e)
-    return a
+@rule(canonical_name="canonical_rule_one", desc="Rule number 1", level=LogLevel.INFO)
+async def rule_one_function(i: Input) -> Beta:
+    """This rule should be the first one executed by the engine, and thus have no parent."""
+    a = Alpha()
+    o = await rule_two(a)
+    b = await rule_three(o)
+    time.sleep(1)
+    return b
 
 
 @rule(desc="Rule C", level=LogLevel.INFO)
 async def rule_C(e: Epsilon) -> Alpha:
     return Alpha()
+
+
+@rule
+async def rule_B(o: Omega) -> Alpha:
+    e = Epsilon()
+    a = await rule_C(e)
+    return a
+
+
+@rule(desc="Rule A", level=LogLevel.INFO)
+async def rule_A(i: Input) -> Alpha:
+    o = Omega()
+    a = await rule_B(o)
+    return a
 
 
 class TestEngine(SchedulerTestBase):
@@ -957,26 +959,38 @@ class Union:
     pass
 
 
+@dataclass(frozen=True)
+class Str:
+    val: str
+
+
+@rule(polymorphic=True)
+async def to_str(_: Union) -> Str:
+    raise NotImplementedError()
+
+
 class Member(Union):
     pass
 
 
 def test_union_member_construction(run_tracker: RunTracker) -> None:
-    """Use a union member which is a subclass of its @union as a Get input."""
+    """Use a union member which is a subclass of its @union as polymorphic input."""
 
     @rule
-    async def output(_: Member) -> str:
-        return "yep"
+    async def output(_: Member) -> Str:
+        return Str("yep")
 
     @rule
     async def for_member() -> str:
-        return await Get(str, Member())
+        ret = await to_str(**implicitly({Member(): Union}))
+        return ret.val
 
     rule_runner = RuleRunner(
         target_types=[],
         rules=[
             UnionRule(Union, Member),
             QueryRule(str, ()),
+            to_str,
             output,
             for_member,
         ],
@@ -1004,9 +1018,9 @@ async def catch_merge_digests_error(file_input: FileInput) -> MergedOutput:
     # Create two separate digests writing different contents to the same file path.
     input_1 = CreateDigest((FileContent(path=file_input.filename, content=b"yes"),))
     input_2 = CreateDigest((FileContent(path=file_input.filename, content=b"no"),))
-    digests = await MultiGet(Get(Digest, CreateDigest, input_1), Get(Digest, CreateDigest, input_2))
+    digests = await concurrently(create_digest(input_1), create_digest(input_2))
     try:
-        merged = await Get(Digest, MergeDigests(digests))
+        merged = await merge_digests(MergeDigests(digests))
     except IntrinsicError as e:
         raise MergeErr(f"error merging digests for input {file_input}: {e}")
     return MergedOutput(merged)

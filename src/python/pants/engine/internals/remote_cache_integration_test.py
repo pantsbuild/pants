@@ -15,8 +15,9 @@ from pants.engine.fs import Digest, DigestContents, DigestEntries, FileDigest, F
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.engine_testutil import WorkunitTracker
 from pants.engine.internals.native_engine import EMPTY_FILE_DIGEST, PyExecutor, PyStubCAS
+from pants.engine.intrinsics import execute_process, get_digest_contents, get_digest_entries
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, goal_rule, rule
+from pants.engine.rules import goal_rule, implicitly, rule
 from pants.engine.streaming_workunit_handler import StreamingWorkunitHandler
 from pants.goal.run_tracker import RunTracker
 from pants.option.bootstrap_options import CacheContentBehavior, RemoteCacheWarningsBehavior
@@ -128,8 +129,8 @@ class ProcessOutputEntries(DigestEntries):
 @rule
 async def entries_from_process(process_result: ProcessResult) -> ProcessOutputEntries:
     # DigestEntries won't actually load file content, so we need to force it with DigestContents.
-    _ = await Get(DigestContents, Digest, process_result.output_digest)
-    return ProcessOutputEntries(await Get(DigestEntries, Digest, process_result.output_digest))
+    _ = await get_digest_contents(process_result.output_digest)
+    return ProcessOutputEntries(await get_digest_entries(process_result.output_digest))
 
 
 def test_async_backtracking() -> None:
@@ -203,14 +204,14 @@ class MockRun(Goal):
 
 @goal_rule
 async def mock_run(workspace: Workspace, dist_dir: DistDir, mock_run: MockRunSubsystem) -> MockRun:
-    result = await Get(
-        ProcessResult,
+    result = await execute_process(
         Process(
             ["/bin/bash", "-c", "/bin/sleep 1 && echo content > file.txt"],
             description="Create file.txt",
             output_files=["file.txt"],
             level=LogLevel.INFO,
         ),
+        **implicitly(),
     )
     workspace.write_digest(
         result.output_digest,
