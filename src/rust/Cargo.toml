@@ -244,7 +244,7 @@ url = "2.5"
 uuid = "1.18.0"
 walkdir = "2"
 webpki = "0.22"
-whoami = "1.5.2"
+whoami = "1.6.1"
 
 # NB: If a change to these versions requires cache busting, bump the version of
 # `src/rust/dep_inference/Cargo.toml`.
