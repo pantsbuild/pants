@@ -11,6 +11,7 @@ from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.util_rules import goroot
 from pants.backend.go.util_rules.go_bootstrap import GoBootstrap
 from pants.backend.go.util_rules.goroot import GoRoot
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.system_binaries import (
     BashBinary,
     BinaryShimsRequest,
@@ -18,7 +19,6 @@ from pants.core.util_rules.system_binaries import (
 )
 from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import create_digest, merge_digests
 from pants.engine.process import Process, fallible_to_exec_result_or_raise

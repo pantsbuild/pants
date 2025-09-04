@@ -31,6 +31,7 @@ from pants.core.goals.package import (
 )
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.partitions import (
     PartitionerType,
     PartitionMetadataT,
@@ -47,7 +48,6 @@ from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP, EnvironmentVars, En
 from pants.engine.fs import EMPTY_FILE_DIGEST, FileDigest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.graph import find_valid_field_sets, resolve_targets
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.internals.session import RunId
 from pants.engine.internals.specs_rules import find_valid_field_sets_for_target_roots
 from pants.engine.intrinsics import merge_digests, run_interactive_process_in_environment

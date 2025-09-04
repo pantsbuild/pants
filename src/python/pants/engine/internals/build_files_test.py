@@ -89,7 +89,7 @@ def test_parse_address_family_empty() -> None:
             "pants.engine.internals.build_files.parse_address_family": lambda *_: OptionalAddressFamily(
                 "/dev"
             ),
-            "pants.engine.internals.platform_rules.environment_vars_subset": lambda _1,
+            "pants.core.util_rules.env_vars.environment_vars_subset": lambda _1,
             _2: EnvironmentVars({}),
         },
     )
@@ -159,7 +159,7 @@ def test_extend_synthetic_target() -> None:
                     ),
                 ),
             ),
-            "pants.engine.internals.platform_rules.environment_vars_subset": lambda _1,
+            "pants.core.util_rules.env_vars.environment_vars_subset": lambda _1,
             _2: EnvironmentVars({}),
         },
     )

@@ -19,6 +19,7 @@ from pants.core.goals.generate_lockfiles import (
 )
 from pants.core.goals.resolves import ExportableTool, ExportMode
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.env_vars import EnvironmentVarsRequest
@@ -33,7 +34,6 @@ from pants.engine.fs import (
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import (
     add_prefix,

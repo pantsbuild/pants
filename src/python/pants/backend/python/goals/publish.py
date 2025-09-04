@@ -21,9 +21,9 @@ from pants.core.goals.publish import (
     PublishRequest,
 )
 from pants.core.util_rules.config_files import ConfigFiles, find_config_file
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import CreateDigest, MergeDigests, Snapshot
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.intrinsics import digest_to_snapshot, merge_digests
 from pants.engine.process import InteractiveProcess
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule

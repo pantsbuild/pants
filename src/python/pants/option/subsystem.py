@@ -10,9 +10,10 @@ from abc import ABCMeta
 from collections.abc import Callable, Iterable, Sequence
 from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, cast
 
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.options_parsing import scope_options
-from pants.engine.internals.selectors import AwaitableConstraints, Get
+from pants.engine.internals.selectors import AwaitableConstraints
 from pants.engine.rules import implicitly
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass
 from pants.option.errors import OptionsError
@@ -253,10 +254,13 @@ class Subsystem(metaclass=_SubsystemMeta):
             parameters=FrozenDict({"subsystem_instance": cls, "env_tgt": EnvironmentTarget}),
             awaitables=(
                 AwaitableConstraints(
-                    rule_id=None,
+                    rule_id="pants.core.util_rules.env_vars.environment_vars_subset",
                     output_type=EnvironmentVars,
-                    explicit_args_arity=0,
-                    input_types=(EnvironmentVarsRequest,),
+                    explicit_args_arity=1,
+                    # NB: For a call-by-name, the input_types are the explicit ones provided
+                    # in a map passed to **implicitly(), and our call to this rule uses a
+                    # positional arg and an empty **implicitly(), so input_types are empty here.
+                    input_types=tuple(),
                     is_effect=False,
                 ),
             ),
@@ -348,11 +352,8 @@ async def _construct_env_aware(
     t.env_tgt = env_tgt
 
     if t.env_vars_used_by_options:
-        # TODO: Switching this to call-by-name will require some refactoring, since
-        # the environment_vars_subset() rule depends on EnvironmentSubsystem, which
-        # of course depends on Subsystem...
-        t._options_env = await Get(
-            EnvironmentVars, EnvironmentVarsRequest(t.env_vars_used_by_options)
+        t._options_env = await environment_vars_subset(
+            EnvironmentVarsRequest(t.env_vars_used_by_options), **implicitly()
         )
 
     return t
