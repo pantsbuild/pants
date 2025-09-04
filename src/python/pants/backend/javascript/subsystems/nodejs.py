@@ -16,6 +16,8 @@ from nodesemver import min_satisfying
 from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.util_rules import asdf, search_paths, system_binaries
 from pants.core.util_rules.asdf import AsdfPathString, AsdfToolPathsResult
+from pants.core.util_rules.env_vars import environment_vars_subset
+from pants.core.util_rules.env_vars import environment_vars_subset as environment_vars_subset_get
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalToolRequest,
@@ -45,10 +47,6 @@ from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP, EnvironmentVars, En
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, DownloadFile
 from pants.engine.internals.native_engine import FileDigest, MergeDigests
 from pants.engine.internals.platform_rules import environment_path_variable
-from pants.engine.internals.platform_rules import environment_vars_subset
-from pants.engine.internals.platform_rules import (
-    environment_vars_subset as environment_vars_subset_get,
-)
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import create_digest, merge_digests
 from pants.engine.platform import Platform

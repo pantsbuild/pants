@@ -54,6 +54,7 @@ from pants.backend.python.util_rules.python_sources import strip_python_sources
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.core.target_types import FileSourceField, ResourceSourceField
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
@@ -70,7 +71,6 @@ from pants.engine.fs import (
 )
 from pants.engine.internals.graph import resolve_targets
 from pants.engine.internals.graph import transitive_targets as transitive_targets_get
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.intrinsics import add_prefix, create_digest, get_digest_contents, merge_digests
 from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (

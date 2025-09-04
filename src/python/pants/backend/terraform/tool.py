@@ -24,11 +24,11 @@ from pathlib import Path
 
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import external_tool
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.external_tool import TemplatedExternalTool, download_external_tool
 from pants.core.util_rules.system_binaries import BashBinary, MkdirBinary
 from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_DIGEST, Digest
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import collect_rules, implicitly, rule
