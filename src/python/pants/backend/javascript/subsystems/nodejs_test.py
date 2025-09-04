@@ -473,11 +473,11 @@ def test_node_process_environment_with_tools(rule_runner: RuleRunner) -> None:
             node_process_environment,
             rule_args=[nodejs_binaries, nodejs_options, nodejs_options_env_aware],
             mock_calls={
+                "pants.core.util_rules.env_vars.environment_vars_subset": mock_environment_vars,
                 "pants.core.util_rules.system_binaries.create_binary_shims": mock_get_binary_shims,
                 "pants.core.util_rules.system_binaries.find_binary": mock_get_binary_path,
                 "pants.engine.intrinsics.create_digest": mock_create_digest,
                 "pants.engine.intrinsics.merge_digests": mock_merge_digests,
-                "pants.engine.internals.platform_rules.environment_vars_subset": mock_environment_vars,
                 "pants.engine.process.fallible_to_exec_result_or_raise": mock_enable_corepack_process_result,
             },
         )
