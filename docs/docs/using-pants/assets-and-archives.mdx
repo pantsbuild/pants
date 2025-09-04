@@ -11,7 +11,7 @@ There are two ways to include asset files in your project: `resource` and `file`
 
 ## `resources`
 
-A [`resource`](../../reference/targets/resource.mdx) target is for files that are members of code packages, and are loaded via language-specific mechanisms, such as Python's `importlib.resources.read_text()` or Java's `getResource()`.
+A [`resource`](../../reference/targets/resource.mdx) target is for files that are members of code packages, and are loaded via language-specific mechanisms, such as Python's `importlib.resources.files()` or Java's `getResource()`.
 
 Pants will make resources available on the appropriate runtime path, such as Python's `PYTHONPATH` or the JVM classpath. Resources can be loaded directly from a binary in which they are embedded, such as a Pex file, without first unpacking it.
 
@@ -23,7 +23,7 @@ For example, to load resources in Python:
 import importlib.resources
 
 if __name__ == "__main__":
-    config = importlib.resources.read_text("project", "config.json")
+    config = importlib.resources.files("project").joinpath("config.json").read_text()
     print(f"Config: {config}")
 ```
 
