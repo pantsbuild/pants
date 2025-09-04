@@ -45,6 +45,7 @@ jobs:
           gh pr create \
             --base main \
             --head ${BRANCH_NAME} \
-            --fill \
+            --title "Upgrade RunsOn AMI to ${AMI_ID}" \
+            --body "" \
             --label "release-notes:not-required" \
             --reviewer "benjyw,tdyas"
