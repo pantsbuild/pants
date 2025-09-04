@@ -2,7 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
+from pants.core.util_rules.subprocess_environment import SubprocessEnvironment, SubprocessEnvironmentVars
+from pants.core.util_rules import subprocess_environment
 
+import dataclasses
+import itertools
 import logging
 
 from pants.engine.environment import EnvironmentName
@@ -39,7 +43,11 @@ from pants.engine.process import (
     ProcessExecutionEnvironment,
 )
 from pants.engine.rules import _uncacheable_rule, collect_rules, implicitly, rule
+from pants.option.global_options import GlobalOptions
 from pants.util.docutil import git_url
+from pants.util.frozendict import FrozenDict
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.internals.selectors import Get
 
 
 @rule
@@ -102,8 +110,15 @@ async def add_prefix(add_prefix: AddPrefix) -> Digest:
 
 @rule
 async def execute_process(
-    process: Process, process_execution_environment: ProcessExecutionEnvironment
+    process: Process,
+    process_execution_environment: ProcessExecutionEnvironment,
+    subproc_env: SubprocessEnvironment.EnvironmentAware,
 ) -> FallibleProcessResult:
+    names = subproc_env.env_vars_to_pass_to_subprocesses
+    if names:
+        env_vars = await Get(EnvironmentVars, EnvironmentVarsRequest(names))
+        items = itertools.chain(process.env.items(), env_vars.items())
+        process = dataclasses.replace(process, env=FrozenDict(items))
     return await native_engine.execute_process(process, process_execution_environment)
 
 
@@ -207,4 +222,5 @@ async def path_metadata_request(request: PathMetadataRequest) -> PathMetadataRes
 def rules():
     return [
         *collect_rules(),
+        *subprocess_environment.rules(),
     ]
