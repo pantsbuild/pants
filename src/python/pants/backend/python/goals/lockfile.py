@@ -187,6 +187,8 @@ async def generate_lockfile(
         ),
         only_binary=set(pip_args_setup.resolve_config.only_binary),
         no_binary=set(pip_args_setup.resolve_config.no_binary),
+        excludes=set(pip_args_setup.resolve_config.excludes),
+        overrides=set(pip_args_setup.resolve_config.overrides),
     )
     lockfile_with_header = metadata.add_header_to_lockfile(
         initial_lockfile_digest_contents[0].content,

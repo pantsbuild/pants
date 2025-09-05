@@ -337,6 +337,8 @@ class ResolvePexConfig:
     constraints_file: ResolvePexConstraintsFile | None
     only_binary: FrozenOrderedSet[str]
     no_binary: FrozenOrderedSet[str]
+    excludes: FrozenOrderedSet[str]
+    overrides: FrozenOrderedSet[str]
     path_mappings: tuple[str, ...]
 
     def pex_args(self) -> Iterator[str]:
@@ -385,6 +387,9 @@ class ResolvePexConfig:
 
         yield from (f"--path-mapping={v}" for v in self.path_mappings)
 
+        yield from (f"--exclude={exclude}" for exclude in self.excludes)
+        yield from (f"--override={override}" for override in self.overrides)
+
 
 @dataclass(frozen=True)
 class ResolvePexConfigRequest(EngineAwareParameter):
@@ -416,11 +421,15 @@ async def determine_resolve_pex_config(
             constraints_file=None,
             no_binary=FrozenOrderedSet(),
             only_binary=FrozenOrderedSet(),
+            excludes=FrozenOrderedSet(),
+            overrides=FrozenOrderedSet(),
             path_mappings=python_repos.path_mappings,
         )
 
     no_binary = python_setup.resolves_to_no_binary().get(request.resolve_name) or []
     only_binary = python_setup.resolves_to_only_binary().get(request.resolve_name) or []
+    excludes = python_setup.resolves_to_excludes().get(request.resolve_name) or []
+    overrides = python_setup.resolves_to_overrides().get(request.resolve_name) or []
 
     constraints_file: ResolvePexConstraintsFile | None = None
     _constraints_file_path = python_setup.resolves_to_constraints_file().get(request.resolve_name)
@@ -468,6 +477,8 @@ async def determine_resolve_pex_config(
         constraints_file=constraints_file,
         no_binary=FrozenOrderedSet(no_binary),
         only_binary=FrozenOrderedSet(only_binary),
+        excludes=FrozenOrderedSet(excludes),
+        overrides=FrozenOrderedSet(overrides),
         path_mappings=python_repos.path_mappings,
     )
 
@@ -498,6 +509,8 @@ def validate_metadata(
         ),
         only_binary=resolve_config.only_binary,
         no_binary=resolve_config.no_binary,
+        excludes=resolve_config.excludes,
+        overrides=resolve_config.overrides,
     )
     if validation:
         return

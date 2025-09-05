@@ -364,6 +364,28 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
+    _resolves_to_excludes = DictOption[list[str]](
+        help=softwrap(
+            """ Specifies requirements to exclude from a resolve and its
+            lockfile.  Any distribution included in the PEX's resolve that
+            matches the requirement is excluded from the built PEX along with
+            all of its transitive dependencies that are not also required by
+            other non-excluded distributions.  At runtime, the PEX will boot
+            without checking the excluded dependencies are available.
+            """
+        ),
+        advanced=True,
+    )
+    _resolves_to_overrides = DictOption[list[str]](
+        help=softwrap(
+            """ Specifies a transitive requirement to override in a resovle
+            and its lockfile. Any distribution requirement in the PEX's
+            resolve that matches the override project name is replaced with
+            the given override requirement."""
+        ),
+        advanced=True,
+    )
+
     invalid_lockfile_behavior = EnumOption(
         default=InvalidLockfileBehavior.error,
         help=softwrap(
@@ -673,6 +695,26 @@ class PythonSetup(Subsystem):
             for resolve, vals in self._resolves_to_option_helper(
                 self._resolves_to_only_binary,
                 "resolves_to_only_binary",
+            ).items()
+        }
+
+    @memoized_method
+    def resolves_to_excludes(self) -> dict[str, list[str]]:
+        return {
+            resolve: sorted([canonicalize_name(v) for v in vals])
+            for resolve, vals in self._resolves_to_option_helper(
+                self._resolves_to_excludes,
+                "resolves_to_excludes",
+            ).items()
+        }
+
+    @memoized_method
+    def resolves_to_overrides(self) -> dict[str, list[str]]:
+        return {
+            resolve: sorted(vals)
+            for resolve, vals in self._resolves_to_option_helper(
+                self._resolves_to_overrides,
+                "resolves_to_overrides",
             ).items()
         }
 
