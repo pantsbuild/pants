@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
 import packaging
 
@@ -34,6 +35,7 @@ from pants.backend.python.util_rules.python_sources import (
     prepare_python_sources,
 )
 from pants.core.goals.lint import REPORT_DIR, LintResult, LintTargetsRequest, Partitions
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.config_files import find_config_file
 from pants.core.util_rules.partitions import Partition
 from pants.engine.fs import CreateDigest, Directory, MergeDigests, RemovePrefix
@@ -60,7 +62,7 @@ class PartitionMetadata:
 
 class PylintRequest(LintTargetsRequest):
     field_set_type = PylintFieldSet
-    tool_subsystem = Pylint
+    tool_subsystem = cast(type[SkippableSubsystem], Pylint)
 
 
 def generate_argv(field_sets: tuple[PylintFieldSet, ...], pylint: Pylint) -> tuple[str, ...]:

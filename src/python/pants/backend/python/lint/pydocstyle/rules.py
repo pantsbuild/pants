@@ -3,10 +3,13 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from pants.backend.python.lint.pydocstyle.subsystem import Pydocstyle, PydocstyleFieldSet
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import VenvPexProcess, create_venv_pex
 from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.config_files import find_config_file
 from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import (
@@ -23,7 +26,7 @@ from pants.util.strutil import pluralize
 
 class PydocstyleRequest(LintTargetsRequest):
     field_set_type = PydocstyleFieldSet
-    tool_subsystem = Pydocstyle
+    tool_subsystem = cast(type[SkippableSubsystem], Pydocstyle)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

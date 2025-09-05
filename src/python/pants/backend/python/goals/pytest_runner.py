@@ -8,6 +8,7 @@ import re
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
+from typing import cast
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
@@ -42,6 +43,7 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
     prepare_python_sources,
 )
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.test import (
     BuildPackageDependenciesRequest,
     RuntimePackageDependenciesField,
@@ -477,7 +479,7 @@ async def setup_pytest_for_target(
 
 
 class PyTestRequest(TestRequest):
-    tool_subsystem = PyTest
+    tool_subsystem = cast(type[SkippableSubsystem], PyTest)
     field_set_type = PythonTestFieldSet
     partitioner_type = PartitionerType.CUSTOM
     supports_debug = True

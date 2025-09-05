@@ -4,7 +4,7 @@
 import os
 import re
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.subsystems.shunit2 import Shunit2
@@ -17,6 +17,7 @@ from pants.backend.shell.target_types import (
     Shunit2TestTimeoutField,
     SkipShunit2TestsField,
 )
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.test import (
     BuildPackageDependenciesRequest,
     RuntimePackageDependenciesField,
@@ -71,7 +72,7 @@ class Shunit2FieldSet(TestFieldSet):
 
 
 class Shunit2TestRequest(TestRequest):
-    tool_subsystem = Shunit2
+    tool_subsystem = cast(type[SkippableSubsystem], Shunit2)
     field_set_type = Shunit2FieldSet
     supports_debug = True
 

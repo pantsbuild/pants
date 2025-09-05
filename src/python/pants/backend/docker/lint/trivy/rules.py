@@ -8,6 +8,7 @@ from pants.backend.docker.target_types import DockerImageSourceField, DockerImag
 from pants.backend.tools.trivy.rules import RunTrivyRequest, run_trivy
 from pants.backend.tools.trivy.subsystem import SkipTrivyField, Trivy
 from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.package import (
     EnvironmentAwarePackageRequest,
     PackageFieldSet,
@@ -35,7 +36,7 @@ class TrivyDockerFieldSet(FieldSet):
 
 class TrivyDockerRequest(LintTargetsRequest):
     field_set_type = TrivyDockerFieldSet
-    tool_subsystem = Trivy
+    tool_subsystem = cast(type[SkippableSubsystem], Trivy)
     partitioner_type = PartitionerType.DEFAULT_ONE_PARTITION_PER_INPUT
 
 

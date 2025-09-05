@@ -296,7 +296,9 @@ _GoalT = TypeVar("_GoalT", bound=Goal)
 
 
 class _BatchableMultiToolGoalSubsystem(_MultiToolGoalSubsystem, Protocol):
-    batch_size: BatchSizeOption
+    # Expose parsed option value via a read-only property for compatibility.
+    @property
+    def batch_size(self) -> int: ...
 
 
 @rule(polymorphic=True)

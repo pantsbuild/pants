@@ -7,6 +7,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
+from typing import cast
 
 from pants.backend.javascript import install_node_package, nodejs_project_environment
 from pants.backend.javascript.install_node_package import (
@@ -29,6 +30,7 @@ from pants.backend.javascript.target_types import JSRuntimeSourceField, JSTestRu
 from pants.backend.typescript.target_types import TypeScriptSourceField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.build_graph.address import Address
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.test import (
     CoverageData,
     CoverageDataCollection,
@@ -91,7 +93,7 @@ class JSTestFieldSet(TestFieldSet):
 
 
 class JSTestRequest(TestRequest):
-    tool_subsystem = NodeJSTest
+    tool_subsystem = cast(type[SkippableSubsystem], NodeJSTest)
     field_set_type = JSTestFieldSet
 
     partitioner_type = PartitionerType.CUSTOM

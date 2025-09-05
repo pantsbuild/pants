@@ -4,12 +4,14 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import cast
 
 from pants.backend.cue import subsystem
 from pants.backend.cue.rules import _run_cue
 from pants.backend.cue.subsystem import Cue
 from pants.backend.cue.target_types import CueFieldSet
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.platform import Platform
 from pants.engine.rules import Rule, collect_rules, rule
@@ -18,7 +20,7 @@ from pants.util.logging import LogLevel
 
 class CueFmtRequest(FmtTargetsRequest):
     field_set_type = CueFieldSet
-    tool_subsystem = Cue
+    tool_subsystem = cast(type[SkippableSubsystem], Cue)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

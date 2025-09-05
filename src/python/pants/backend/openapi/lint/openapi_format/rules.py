@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+from typing import cast
 
 from pants.backend.javascript.subsystems import nodejs_tool
 from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolRequest
@@ -12,6 +13,7 @@ from pants.backend.openapi.lint.openapi_format.subsystem import (
     OpenApiFormatSubsystem,
 )
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.process import fallible_to_exec_result_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
@@ -21,7 +23,7 @@ from pants.util.strutil import pluralize
 
 class OpenApiFormatRequest(FmtTargetsRequest):
     field_set_type = OpenApiFormatFieldSet
-    tool_subsystem = OpenApiFormatSubsystem
+    tool_subsystem = cast(type[SkippableSubsystem], OpenApiFormatSubsystem)
     partitioner_type = PartitionerType.DEFAULT_ONE_PARTITION_PER_INPUT
 
 

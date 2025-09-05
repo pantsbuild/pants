@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
 from pants.backend.python.lint.isort.skip_field import SkipIsortField
 from pants.backend.python.lint.isort.subsystem import Isort
@@ -14,6 +15,7 @@ from pants.backend.python.util_rules.pex import (
     determine_venv_pex_resolve_info,
 )
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.config_files import find_config_file
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import MergeDigests
@@ -39,7 +41,7 @@ class IsortFieldSet(FieldSet):
 
 class IsortRequest(FmtTargetsRequest):
     field_set_type = IsortFieldSet
-    tool_subsystem = Isort
+    tool_subsystem = cast(type[SkippableSubsystem], Isort)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
