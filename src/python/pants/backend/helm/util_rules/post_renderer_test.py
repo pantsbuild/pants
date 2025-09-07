@@ -38,7 +38,6 @@ from pants.core.goals import package
 from pants.core.goals.run import rules as run_rules
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import ProcessResult
 from pants.engine.rules import QueryRule, rule
 from pants.engine.target import Target
@@ -341,5 +340,7 @@ def test_use_simple_extra_post_renderer(rule_runner: RuleRunner) -> None:
         filename="mychart/templates/configmap.yaml",
     )
     # The post-renderer should have modified foo_value to modified_by_post_renderer
-    expected_modified_configmap = _TEST_EXPECTED_CONFIGMAP_FILE.replace("foo_value", "modified_by_post_renderer")
+    expected_modified_configmap = _TEST_EXPECTED_CONFIGMAP_FILE.replace(
+        "foo_value", "modified_by_post_renderer"
+    )
     assert rendered_configmap_file == expected_modified_configmap
