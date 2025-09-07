@@ -80,7 +80,7 @@ jobs:
       name: Attest the pantsbuild.pants wheel
       uses: actions/attest-build-provenance@v2
       with:
-        subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants-*.whl
+        subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants-*.whl
     - if: needs.release_info.outputs.is-release == 'true'
       name: Rename the Pants Pex to its final name for upload
       run: |
@@ -106,7 +106,7 @@ jobs:
             ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \
             --data-binary "@dist/src.python.pants/$PEX_FILENAME"
 
-        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild.pants-*.whl")
+        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild_pants-*.whl")
         curl -L --fail \
             -X POST \
             -H "Authorization: Bearer ${{ github.token }}" \
@@ -190,7 +190,7 @@ jobs:
       name: Attest the pantsbuild.pants wheel
       uses: actions/attest-build-provenance@v2
       with:
-        subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants-*.whl
+        subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants-*.whl
     - if: needs.release_info.outputs.is-release == 'true'
       name: Rename the Pants Pex to its final name for upload
       run: |
@@ -216,7 +216,7 @@ jobs:
             ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \
             --data-binary "@dist/src.python.pants/$PEX_FILENAME"
 
-        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild.pants-*.whl")
+        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild_pants-*.whl")
         curl -L --fail \
             -X POST \
             -H "Authorization: Bearer ${{ github.token }}" \
@@ -227,11 +227,11 @@ jobs:
       name: Attest the pantsbuild.pants.testutil wheel
       uses: actions/attest-build-provenance@v2
       with:
-        subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants.testutil*.whl
+        subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants_testutil*.whl
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload testutil Wheel
       run: |
-        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild.pants.testutil*.whl")
+        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild_pants_testutil*.whl")
         curl -L --fail \
             -X POST \
             -H "Authorization: Bearer ${{ github.token }}" \
@@ -327,7 +327,7 @@ jobs:
       name: Attest the pantsbuild.pants wheel
       uses: actions/attest-build-provenance@v2
       with:
-        subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants-*.whl
+        subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants-*.whl
     - if: needs.release_info.outputs.is-release == 'true'
       name: Rename the Pants Pex to its final name for upload
       run: |
@@ -353,7 +353,7 @@ jobs:
             ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \
             --data-binary "@dist/src.python.pants/$PEX_FILENAME"
 
-        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild.pants-*.whl")
+        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild_pants-*.whl")
         curl -L --fail \
             -X POST \
             -H "Authorization: Bearer ${{ github.token }}" \
@@ -447,7 +447,7 @@ jobs:
       name: Attest the pantsbuild.pants wheel
       uses: actions/attest-build-provenance@v2
       with:
-        subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild.pants-*.whl
+        subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants-*.whl
     - if: needs.release_info.outputs.is-release == 'true'
       name: Rename the Pants Pex to its final name for upload
       run: |
@@ -473,7 +473,7 @@ jobs:
             ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \
             --data-binary "@dist/src.python.pants/$PEX_FILENAME"
 
-        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild.pants-*.whl")
+        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild_pants-*.whl")
         curl -L --fail \
             -X POST \
             -H "Authorization: Bearer ${{ github.token }}" \

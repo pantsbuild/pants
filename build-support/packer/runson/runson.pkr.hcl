@@ -118,4 +118,8 @@ build {
       "python3.13 python3.13-dev python3.13-venv",
     ]
   }
+  post-processor "manifest" {
+      output = "manifest.json"
+      strip_path = true
+  }
 }

@@ -22,16 +22,18 @@ from typing import Any, Generic, TypeVar, cast, overload
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.specs_parser import SpecsParser
+from pants.build_graph import build_configuration
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.core.util_rules import adhoc_binaries
+from pants.core.goals.run import generate_run_request
+from pants.core.util_rules import adhoc_binaries, misc
 from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import CreateDigest, Digest, FileContent, Snapshot, Workspace
 from pants.engine.goal import CurrentExecutingGoals, Goal
-from pants.engine.internals import native_engine
+from pants.engine.internals import native_engine, options_parsing
 from pants.engine.internals.native_engine import ProcessExecutionEnvironment, PyExecutor
 from pants.engine.internals.scheduler import ExecutionError, Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Call, Effect, Get, Params
@@ -44,12 +46,8 @@ from pants.engine.unions import UnionMembership, UnionRule
 from pants.goal.auxiliary_goal import AuxiliaryGoal
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import initialize_stdio, initialize_stdio_raw, stdio_destination
-from pants.option.global_options import (
-    DynamicRemoteOptions,
-    ExecutionOptions,
-    GlobalOptions,
-    LocalStoreOptions,
-)
+from pants.option.bootstrap_options import DynamicRemoteOptions, ExecutionOptions, LocalStoreOptions
+from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source import source_root
 from pants.testutil.option_util import create_options_bootstrapper
@@ -281,8 +279,13 @@ class RuleRunner:
         self.rules = tuple(rewrite_rule_for_inherent_environment(rule) for rule in (rules or ()))
         all_rules = (
             *self.rules,
+            *build_configuration.rules(),
             *source_root.rules(),
+            *options_parsing.rules(),
+            *misc.rules(),
             *adhoc_binaries.rules(),
+            # Many tests indirectly rely on this rule.
+            generate_run_request,
             QueryRule(WrappedTarget, [WrappedTargetRequest]),
             QueryRule(AllTargets, []),
             QueryRule(UnionMembership, []),
@@ -314,10 +317,11 @@ class RuleRunner:
                 args=bootstrap_args, env=None
             )
             options = self.options_bootstrapper.full_options(
-                self.build_config,
+                known_scope_infos=self.build_config.known_scope_infos,
                 union_membership=UnionMembership.from_rules(
                     rule for rule in self.rules if isinstance(rule, UnionRule)
                 ),
+                allow_unknown_options=self.build_config.allow_unknown_options,
             )
             global_options = self.options_bootstrapper.bootstrap_options.for_global_scope()
 

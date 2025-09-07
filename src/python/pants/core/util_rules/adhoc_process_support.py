@@ -25,6 +25,7 @@ from pants.core.goals.package import (
 )
 from pants.core.goals.run import RunFieldSet, generate_run_in_sandbox_request
 from pants.core.target_types import FileSourceField
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine import process
@@ -53,7 +54,6 @@ from pants.engine.internals.graph import (
     transitive_targets,
 )
 from pants.engine.internals.native_engine import AddressInput, PathMetadata, RemovePrefix
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.intrinsics import (
     create_digest,
     digest_subset_to_digest,
@@ -885,7 +885,7 @@ def _output_at_build_root(process: Process, bash: BashBinary) -> Process:
         output_files = tuple(os.path.join(working_directory, d) for d in output_files)
 
     cd = f"cd {shlex.quote(working_directory)} && " if working_directory else ""
-    shlexed_argv = " ".join(shlex.quote(arg) for arg in process.argv)
+    shlexed_argv = shlex.join(process.argv)
     new_argv = (bash.path, "-c", f"{cd}{shlexed_argv}")
 
     return dataclasses.replace(

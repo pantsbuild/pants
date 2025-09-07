@@ -55,7 +55,7 @@ from pants.engine.target import (
     targets_with_sources_types,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.option.global_options import UnmatchedBuildFileGlobs
+from pants.option.bootstrap_options import UnmatchedBuildFileGlobs
 from pants.testutil.pytest_util import no_exception
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet

@@ -104,7 +104,8 @@ from pants.engine.target import (
     generate_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.option.global_options import GlobalOptions, UnmatchedBuildFileGlobs
+from pants.option.bootstrap_options import UnmatchedBuildFileGlobs
+from pants.option.global_options import GlobalOptions
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -1017,7 +1018,7 @@ async def coarsened_targets_request(addresses: Addresses) -> CoarsenedTargetsReq
 
 
 @rule(desc="Resolve coarsened targets", level=LogLevel.DEBUG, _masked_types=[EnvironmentName])
-async def coarsened_targets(
+async def resolve_coarsened_targets(
     request: CoarsenedTargetsRequest, local_environment_name: ChosenLocalEnvironmentName
 ) -> CoarsenedTargets:
     dependency_mapping = await transitive_dependency_mapping(

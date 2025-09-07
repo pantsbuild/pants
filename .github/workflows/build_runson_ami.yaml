@@ -1,0 +1,51 @@
+name: Build RunsOn AMI
+
+on:
+    workflow_dispatch: {}
+    schedule:
+      # Runs at 12:00 PM (noon) on the 1st day of every month
+      - cron: '0 12 1 * *'
+
+jobs:
+  build_ami:
+    name: Build-AMI
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 10
+      - name: Run packer
+        env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          set -ex
+
+          git config --local user.email "pantsbuild+github-automation@gmail.com"
+          git config --local user.name "Worker Pants (Pantsbuild GitHub Automation Bot)"
+
+          # In case we're running from a branch that isn't main (e.g., for debugging this workflow).
+          git fetch origin main
+
+          packer init build-support/packer/runson/runson.pkr.hcl
+          packer build build-support/packer/runson/runson.pkr.hcl
+          AMI_ID=`jq -r '.builds[-1].artifact_id | split(":")[1]' manifest.json`
+          yq -i ".images.\"ubuntu22-full-arm64-python3.7-3.13\".ami=\"$AMI_ID\"" .github/runs-on.yml
+
+          BRANCH_NAME="upgrade_runson_to_${AMI_ID}"
+          git checkout -b "${BRANCH_NAME}"
+          git add .github/runs-on.yml
+          git commit -m "Upgrade RunsOn AMI to ${AMI_ID}"
+          git push origin ${BRANCH_NAME}
+          gh pr create \
+            --base main \
+            --head ${BRANCH_NAME} \
+            --title "Upgrade RunsOn AMI to ${AMI_ID}" \
+            --body "" \
+            --label "release-notes:not-required" \
+            --reviewer "benjyw,tdyas"

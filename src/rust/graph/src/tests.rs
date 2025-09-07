@@ -208,13 +208,13 @@ async fn invalidate_randomly() {
     let graph2 = graph.clone();
     let (send, recv) = mpsc::channel();
     let _join = thread::spawn(move || {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut invalidations = invalidations;
         while invalidations > 0 {
             invalidations -= 1;
 
             // Invalidate a random node in the graph.
-            let candidate = rng.gen_range(0..range);
+            let candidate = rng.random_range(0..range);
             graph2.invalidate_from_roots(true, |n: &TNode| n.id == candidate);
 
             thread::sleep(sleep_per_invalidation);

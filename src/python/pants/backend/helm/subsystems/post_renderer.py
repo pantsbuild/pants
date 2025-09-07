@@ -55,7 +55,7 @@ class HelmPostRendererSubsystem(PythonToolRequirementsBase):
     ]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.8,<3.10"]
+    default_interpreter_constraints = ["CPython>=3.9,<3.14"]
 
     default_lockfile_resource = (_HELM_POSTRENDERER_PACKAGE, "post_renderer.lock")
 
@@ -209,7 +209,7 @@ async def setup_post_renderer_launcher(
     )
 
     def shell_cmd(args: Iterable[str]) -> str:
-        return " ".join([shlex.quote(arg) for arg in args])
+        return shlex.join(args)
 
     # Build a shell wrapper script which will be the actual entry-point sent to Helm as the post-renderer.
     # Extra post-renderers are plugged by piping the output of one into the next one in the order they

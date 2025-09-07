@@ -43,10 +43,20 @@ class SemgrepSubsystem(PythonToolBase):
     )
 
     default_main = ConsoleScript("semgrep")
-    default_requirements = ["semgrep>=1.20.0,<2"]
+    default_requirements = [
+        "semgrep>=1.20.0,<2",
+        # As of version 1.79.0, semgrep depends on outdated opentelemetry packages, that
+        # themselves depend on the deprecated pkg_resources API, leading to warnings.
+        # When semgrep updates its own requirements appropriately, we can remove these pins.
+        # See https://github.com/semgrep/semgrep/issues/11069.
+        "opentelemetry-api~=1.34.1",
+        "opentelemetry-sdk~=1.34.1",
+        "opentelemetry-exporter-otlp-proto-http~=1.34.1",
+        "opentelemetry-instrumentation-requests~=0.55b1",
+    ]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.8,<4"]
+    default_interpreter_constraints = ["CPython>=3.9,<3.14"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.tools.semgrep", "semgrep.lock")

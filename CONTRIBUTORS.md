@@ -30,6 +30,7 @@ Created as part of the release process.
 + Bardur Arantsson
 + Bastian Wegge
 + Ben Limmer
++ Ben Wilen
 + Benjamin Dabelow
 + Benjy Weinberger
 + Berkay Öztürk

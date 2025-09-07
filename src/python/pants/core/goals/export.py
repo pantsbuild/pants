@@ -13,12 +13,13 @@ from typing import cast
 
 from pants.base.build_root import BuildRoot
 from pants.core.goals.generate_lockfiles import (
-    KnownUserResolveNames,
     KnownUserResolveNamesRequest,
     UnrecognizedResolveNamesError,
+    get_known_user_resolve_names,
 )
 from pants.core.goals.resolves import ExportableTool, ExportMode
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.env_vars import EnvironmentVarsRequest
@@ -33,8 +34,7 @@ from pants.engine.fs import (
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.platform_rules import environment_vars_subset
-from pants.engine.internals.selectors import Get, concurrently
+from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import (
     add_prefix,
     create_digest,
@@ -42,7 +42,7 @@ from pants.engine.intrinsics import (
     run_interactive_process,
 )
 from pants.engine.process import InteractiveProcess
-from pants.engine.rules import collect_rules, goal_rule, implicitly
+from pants.engine.rules import collect_rules, goal_rule, implicitly, rule
 from pants.engine.target import FilteredTargets, Target
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import StrListOption
@@ -141,6 +141,14 @@ class ExportResults(Collection[ExportResult]):
     pass
 
 
+@rule(polymorphic=True)
+async def export(
+    req: ExportRequest,
+    environment_name: EnvironmentName,
+) -> ExportResults:
+    raise NotImplementedError()
+
+
 class ExportSubsystem(GoalSubsystem):
     name = "export"
     help = softwrap(
@@ -180,7 +188,7 @@ class Export(Goal):
 
 
 @goal_rule
-async def export(
+async def export_goal(
     console: Console,
     targets: FilteredTargets,
     workspace: Workspace,
@@ -198,7 +206,7 @@ async def export(
 
     requests = tuple(request_type(targets) for request_type in request_types)
     all_results = await concurrently(
-        Get(ExportResults, ExportRequest, request) for request in requests
+        export(**implicitly({request: ExportRequest})) for request in requests
     )
     flattened_results = sorted(
         (res for results in all_results for res in results), key=lambda res: res.resolve or ""
@@ -248,7 +256,7 @@ async def export(
     )
     if unexported_resolves:
         all_known_user_resolve_names = await concurrently(
-            Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())
+            get_known_user_resolve_names(**implicitly({request(): KnownUserResolveNamesRequest}))
             for request in union_membership.get(KnownUserResolveNamesRequest)
         )
         all_known_bin_names = [

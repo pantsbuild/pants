@@ -53,7 +53,7 @@ from pants.bsp.util_rules.targets import (
 from pants.core.util_rules.system_binaries import BashBinary, ReadlinkBinary
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests, Workspace
-from pants.engine.internals.graph import coarsened_targets as coarsened_targets_get
+from pants.engine.internals.graph import resolve_coarsened_targets as coarsened_targets_get
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get, concurrently
 from pants.engine.intrinsics import add_prefix, create_digest, digest_to_snapshot, merge_digests

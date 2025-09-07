@@ -19,7 +19,7 @@ use protos::gen::google::longrunning::{
     CancelOperationRequest, Operation, operations_client::OperationsClient,
 };
 use protos::gen::google::rpc::{PreconditionFailure, Status as StatusProto};
-use rand::{Rng, thread_rng};
+use rand::Rng;
 use remexec::{
     Action, Command, ExecuteRequest, ExecuteResponse, ExecutedActionMetadata, ServerCapabilities,
     WaitExecutionRequest, capabilities_client::CapabilitiesClient,
@@ -728,7 +728,7 @@ impl CommandRunner {
             if num_retries > 0 {
                 workunit.increment_counter(Metric::RemoteExecutionRPCRetries, 1);
 
-                let multiplier = thread_rng().gen_range(0..2_u32.pow(num_retries) + 1);
+                let multiplier = rand::rng().random_range(0..2_u32.pow(num_retries) + 1);
                 let sleep_time = self.retry_interval_duration * multiplier;
                 let sleep_time = sleep_time.min(MAX_BACKOFF_DURATION);
                 debug!("delaying {sleep_time:?} before retry");
