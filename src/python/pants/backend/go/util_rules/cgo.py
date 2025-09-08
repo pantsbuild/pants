@@ -23,12 +23,12 @@ from pants.backend.go.util_rules.cgo_security import check_linker_flags
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.system_binaries import BinaryPathTest, get_bash
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.fs import CreateDigest, DigestSubset, Directory, FileContent, PathGlobs
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import (
     create_digest,

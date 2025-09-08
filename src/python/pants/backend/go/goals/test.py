@@ -70,12 +70,12 @@ from pants.backend.go.util_rules.tests_analysis import (
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestExtraEnv, TestFieldSet, TestRequest, TestResult, TestSubsystem
 from pants.core.target_types import FileSourceField
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_FILE_DIGEST, AddPrefix, Digest, MergeDigests
 from pants.engine.internals.graph import resolve_targets
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Snapshot
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.intrinsics import (
     add_prefix,
     digest_to_snapshot,

@@ -25,6 +25,7 @@ from pants.core.goals.package import (
 )
 from pants.core.goals.run import RunFieldSet, generate_run_in_sandbox_request
 from pants.core.target_types import FileSourceField
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine import process
@@ -53,7 +54,6 @@ from pants.engine.internals.graph import (
     transitive_targets,
 )
 from pants.engine.internals.native_engine import AddressInput, PathMetadata, RemovePrefix
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.intrinsics import (
     create_digest,
     digest_subset_to_digest,

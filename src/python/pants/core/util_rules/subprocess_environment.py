@@ -3,8 +3,8 @@
 
 from dataclasses import dataclass
 
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.engine.env_vars import EnvironmentVarsRequest
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem

@@ -13,8 +13,8 @@ from pants.backend.docker.util_rules.docker_build_args import (
     docker_build_args,
 )
 from pants.backend.docker.utils import KeyValueSequenceUtil
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import Target
 

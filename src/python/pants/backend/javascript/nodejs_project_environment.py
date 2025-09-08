@@ -23,9 +23,9 @@ from pants.backend.javascript.resolve import (
 from pants.backend.javascript.subsystems import nodejs
 from pants.backend.javascript.subsystems.nodejs import NodeJSToolProcess, setup_node_tool_process
 from pants.build_graph.address import Address
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import merge_digests, path_globs_to_digest
 from pants.engine.process import Process

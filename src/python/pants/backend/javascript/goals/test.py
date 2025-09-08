@@ -46,6 +46,7 @@ from pants.core.goals.test import (
 from pants.core.target_types import AssetSourceField
 from pants.core.util_rules import source_files
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.partitions import Partition, PartitionerType, Partitions
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.env_vars import EnvironmentVarsRequest
@@ -53,7 +54,6 @@ from pants.engine.fs import DigestSubset, GlobExpansionConjunction
 from pants.engine.internals import graph, platform_rules
 from pants.engine.internals.graph import transitive_targets
 from pants.engine.internals.native_engine import MergeDigests, Snapshot
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import digest_to_snapshot, execute_process_with_retry, merge_digests
 from pants.engine.process import ProcessCacheScope, ProcessWithRetries
