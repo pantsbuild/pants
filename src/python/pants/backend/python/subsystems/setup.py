@@ -701,7 +701,7 @@ class PythonSetup(Subsystem):
     @memoized_method
     def resolves_to_excludes(self) -> dict[str, list[str]]:
         return {
-            resolve: sorted([vals])
+            resolve: sorted(vals)
             for resolve, vals in self._resolves_to_option_helper(
                 self._resolves_to_excludes,
                 "resolves_to_excludes",
