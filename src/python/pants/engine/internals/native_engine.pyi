@@ -415,11 +415,7 @@ class Field:
 # ------------------------------------------------------------------------------
 
 class Digest:
-    """A Digest is a lightweight reference to a set of files known about by the engine.
-
-    You can use `await Get(Snapshot, Digest)` to see the file names referred to, or use `await
-    Get(DigestContents, Digest)` to see the actual file content.
-    """
+    """A Digest is a lightweight reference to a set of files known about by the engine."""
 
     def __init__(self, fingerprint: str, serialized_bytes_length: int) -> None: ...
     @property
@@ -446,11 +442,8 @@ class Snapshot:
     """A Snapshot is a collection of sorted file paths and dir paths fingerprinted by their
     names/content.
 
-    You can lift a `Digest` to a `Snapshot` with `await Get(Snapshot, Digest, my_digest)`.
-
     The `files` and `dirs` properties are symlink oblivious. If you require knowing about symlinks,
-    you can use the `digest` property to request the `DigestEntries`:
-    `await Get(DigestEntries, Digest, snapshot.digest)`.
+    you can use the `digest` property to request the `DigestEntries`.
     """
 
     @classmethod
@@ -478,12 +471,8 @@ class Snapshot:
 class MergeDigests:
     """A request to merge several digests into one single digest.
 
-    This will fail if there are any conflicting changes, such as two digests having the same
-    file but with different content.
-
-    Example:
-
-        result = await Get(Digest, MergeDigests([digest1, digest2])
+    This will fail if there are any conflicting changes, such as two digests having the same file
+    but with different content.
     """
 
     def __init__(self, digests: Iterable[Digest]) -> None: ...
@@ -492,12 +481,7 @@ class MergeDigests:
     def __repr__(self) -> str: ...
 
 class AddPrefix:
-    """A request to add the specified prefix path to every file and directory in the digest.
-
-    Example:
-
-        result = await Get(Digest, AddPrefix(input_digest, "my_dir")
-    """
+    """A request to add the specified prefix path to every file and directory in the digest."""
 
     def __init__(self, digest: Digest, prefix: str) -> None: ...
     def __eq__(self, other: AddPrefix | Any) -> bool: ...
@@ -509,10 +493,6 @@ class RemovePrefix:
 
     This will fail if there are any files or directories in the original input digest without the
     specified prefix.
-
-    Example:
-
-        result = await Get(Digest, RemovePrefix(input_digest, "my_dir")
     """
 
     def __init__(self, digest: Digest, prefix: str) -> None: ...
@@ -793,10 +773,6 @@ class NativeDependenciesRequest:
     * Depending on the implementation, a `metadata` structure
       can be passed. It will be supplied to the native parser, and
       it will be incorporated into the cache key.
-
-
-    Example:
-        result = await Get(NativeParsedPythonDependencies, NativeDependenciesRequest(input_digest, None)
     """
 
     def __init__(self, digest: Digest, metadata: InferenceMetadata | None = None) -> None: ...

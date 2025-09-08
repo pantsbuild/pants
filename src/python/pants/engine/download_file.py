@@ -8,9 +8,8 @@ from urllib.parse import urlparse
 
 from pants.engine.fs import Digest, DownloadFile, NativeDownloadFile
 from pants.engine.internals.native_engine import FileDigest
-from pants.engine.internals.selectors import Get
 from pants.engine.intrinsics import download_file as native_download_file
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import GlobalOptions
 from pants.util.strutil import bullet_list, softwrap
@@ -65,6 +64,11 @@ class URLDownloadHandler:
     expected_digest: FileDigest
 
 
+@rule(polymorphic=True)
+async def download_file_using_handler(handler: URLDownloadHandler) -> Digest:
+    raise NotImplementedError()
+
+
 @rule
 async def download_file(
     request: DownloadFile,
@@ -98,7 +102,9 @@ async def download_file(
         )
     if len(matched_handlers) == 1:
         handler = matched_handlers[0]
-        return await Get(Digest, URLDownloadHandler, handler(request.url, request.expected_digest))
+        return await download_file_using_handler(
+            **implicitly({handler(request.url, request.expected_digest): URLDownloadHandler})
+        )
 
     return await native_download_file(
         NativeDownloadFile(

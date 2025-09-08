@@ -15,7 +15,6 @@ from pants.engine.fs import EMPTY_DIGEST, Digest, FileDigest
 from pants.engine.internals.native_engine import (  # noqa: F401
     ProcessExecutionEnvironment as ProcessExecutionEnvironment,
 )
-from pants.engine.internals.selectors import Get
 from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
 from pants.engine.rules import collect_rules, rule
@@ -155,23 +154,23 @@ class Process:
 
         Usually, you will want to provide input files/directories via the parameter `input_digest`.
         The process will then be able to access these paths through relative paths. If you want to
-        give multiple input digests, first merge them with `await Get(Digest, MergeDigests)`. Files
-        larger than 512KB will be read-only unless they are globbed as part of either `output_files`
-        or `output_directories`.
+        give multiple input digests, first merge them with `merge_digests()`. Files larger than
+        512KB will be read-only unless they are globbed as part of either `output_files` or
+        `output_directories`.
 
         Often, you will want to capture the files/directories created in the process. To do this,
         you can either set `output_files` or `output_directories`. The specified paths should be
         specified relative to the `working_directory`, if any, and will then be used to populate
         `output_digest` on the `ProcessResult`. If you want to split up this output digest into
-        multiple digests, use `await Get(Digest, DigestSubset)` on the `output_digest`.
+        multiple digests, use `digest_subset_to_digest()` on the `output_digest`.
 
-        To actually run the process, use `await Get(ProcessResult, Process)` or
-        `await Get(FallibleProcessResult, Process)`.
+        To actually run the process, use or `await execute_process(Process(...), **implicitly())`
+        or `await execute_process_or_raise(**implicitly(Process(...)))`.
 
         Example:
 
-            result = await Get(
-                ProcessResult, Process(["/bin/echo", "hello world"], description="demo")
+            result = await execute_process_or_raise(
+                **implicitly(Process(["/bin/echo", "hello world"], description="demo")
             )
             assert result.stdout == b"hello world"
         """
@@ -412,20 +411,6 @@ async def fallible_to_exec_result_or_raise(
 # Where the execute_process() intrinsic is invoked implicitly to create a FallibleProcessResult.
 # This is simply a better name for the same rule, when invoked in this use case.
 execute_process_or_raise = fallible_to_exec_result_or_raise
-
-
-@rule
-async def execute_process_with_retry(req: ProcessWithRetries) -> ProcessResultWithRetries:
-    results: list[FallibleProcessResult] = []
-    for attempt in range(0, req.attempts):
-        proc = dataclasses.replace(req.proc, attempt=attempt)
-        result = await Get(  # noqa: PNT30: We only know that we need to rerun the test after we run it
-            FallibleProcessResult, Process, proc
-        )
-        results.append(result)
-        if result.exit_code == 0:
-            break
-    return ProcessResultWithRetries(tuple(results))
 
 
 @dataclass(frozen=True)

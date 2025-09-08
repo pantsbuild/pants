@@ -25,13 +25,13 @@ from pants.engine.addresses import Addresses
 from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.fs import DigestSubset, MergeDigests, PathGlobs, RemovePrefix
 from pants.engine.internals.graph import transitive_targets
-from pants.engine.intrinsics import digest_subset_to_digest, digest_to_snapshot, merge_digests
-from pants.engine.process import (
-    InteractiveProcess,
-    ProcessCacheScope,
-    ProcessWithRetries,
+from pants.engine.intrinsics import (
+    digest_subset_to_digest,
+    digest_to_snapshot,
     execute_process_with_retry,
+    merge_digests,
 )
+from pants.engine.process import InteractiveProcess, ProcessCacheScope, ProcessWithRetries
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import SourcesField, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule

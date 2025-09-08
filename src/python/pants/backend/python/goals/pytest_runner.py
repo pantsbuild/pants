@@ -79,16 +79,11 @@ from pants.engine.intrinsics import (
     create_digest,
     digest_subset_to_digest,
     digest_to_snapshot,
+    execute_process_with_retry,
     get_digest_contents,
     merge_digests,
 )
-from pants.engine.process import (
-    InteractiveProcess,
-    Process,
-    ProcessCacheScope,
-    ProcessWithRetries,
-    execute_process_with_retry,
-)
+from pants.engine.process import InteractiveProcess, Process, ProcessCacheScope, ProcessWithRetries
 from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import Target, TransitiveTargetsRequest, WrappedTargetRequest
 from pants.engine.unions import UnionMembership, UnionRule, union

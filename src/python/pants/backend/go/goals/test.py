@@ -76,13 +76,17 @@ from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_FILE_DIGEST, AddPrefix, Digest, MergeDigests
 from pants.engine.internals.graph import resolve_targets
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Snapshot
-from pants.engine.intrinsics import add_prefix, digest_to_snapshot, merge_digests
+from pants.engine.intrinsics import (
+    add_prefix,
+    digest_to_snapshot,
+    execute_process_with_retry,
+    merge_digests,
+)
 from pants.engine.process import (
     Process,
     ProcessCacheScope,
     ProcessWithRetries,
     execute_process_or_raise,
-    execute_process_with_retry,
 )
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import Dependencies, DependenciesRequest, SourcesField, Target

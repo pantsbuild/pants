@@ -40,15 +40,14 @@ from pants.core.util_rules.system_binaries import (
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, FileContent, MergeDigests
 from pants.engine.internals.graph import transitive_targets as transitive_targets_get
-from pants.engine.intrinsics import create_digest, get_digest_contents, merge_digests
-from pants.engine.platform import Platform
-from pants.engine.process import (
-    InteractiveProcess,
-    Process,
-    ProcessCacheScope,
-    ProcessWithRetries,
+from pants.engine.intrinsics import (
+    create_digest,
     execute_process_with_retry,
+    get_digest_contents,
+    merge_digests,
 )
+from pants.engine.platform import Platform
+from pants.engine.process import InteractiveProcess, Process, ProcessCacheScope, ProcessWithRetries
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import SourcesField, Target, TransitiveTargetsRequest
 from pants.option.global_options import GlobalOptions
