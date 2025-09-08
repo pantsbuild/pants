@@ -396,7 +396,7 @@ $ pants project-version --as-json myapp:
   ProjectVersionGitTagMismatch: Project version string '0.0.3' from 'myapp/VERSION' doesn't match latest Git tag '0.0.1'
 ```
 
-This happens because of how the Pants cache works. Modifying our repository tags doesn't qualify for the changes that should invalidate the cache. It is not safe to [cache the `Process` runs](../writing-plugins/the-rules-api/processes.mdx) and since we know that Git will access the repository (that is outside the sandbox), we should change its cacheability using the `ProcessCacheScope` parameter so that our Git call would run once per run of Pants.
+This happens because of how the Pants cache works. Modifying our repository tags doesn't qualify for the changes that should invalidate the cache. It is not safe to [cache the `Process` runs](../writing-plugins/the-rules-api/processes.mdx#caching-and-restarting) and since we know that Git will access the repository (that is outside the sandbox), we should change its cacheability using the `ProcessCacheScope` parameter so that our Git call would run once per run of Pants.
 
 ```python
 git_describe = await Get(
