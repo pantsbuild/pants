@@ -8,14 +8,13 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadataV3
 from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfile,
-    LoadedLockfileRequest,
     Lockfile,
     PexRequirements,
     Resolve,
 )
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.testutil.option_util import create_subsystem
-from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
+from pants.testutil.rule_runner import run_rule_with_mocks
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -58,14 +57,12 @@ def test_get_lockfile_metadata() -> None:
         run_rule_with_mocks(
             get_lockfile_metadata,
             rule_args=[tool],
-            mock_gets=[
-                MockGet(Lockfile, (Resolve,), lambda x: lockfile),
-                MockGet(
-                    LoadedLockfile,
-                    (LoadedLockfileRequest,),
-                    lambda x: loaded_lockfile if x.lockfile == lockfile else None,
-                ),
-            ],
+            mock_calls={
+                "pants.backend.python.util_rules.pex_requirements.get_lockfile_for_resolve": lambda _: lockfile,
+                "pants.backend.python.util_rules.pex_requirements.load_lockfile": lambda x: loaded_lockfile
+                if x.lockfile == lockfile
+                else None,
+            },
         )
         == metadata
     )
