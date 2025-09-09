@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import importlib.resources
+import json
 import logging
 import os.path
 from abc import ABC, abstractmethod
@@ -52,7 +53,13 @@ from pants.engine.fs import (
     PathGlobs,
 )
 from pants.engine.internals.graph import determine_explicitly_provided_dependencies
-from pants.engine.intrinsics import create_digest, digest_to_snapshot, path_globs_to_paths
+from pants.engine.internals.native_engine import MergeDigests
+from pants.engine.intrinsics import (
+    create_digest,
+    digest_to_snapshot,
+    merge_digests,
+    path_globs_to_paths,
+)
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     AsyncFieldMixin,
@@ -571,6 +578,7 @@ async def build_python_faas(
     output_filename = request.output_path.value_or_default(
         file_ending="zip" if layout is PexVenvLayout.FLAT_ZIPPED else None
     )
+    metadata_filename = f"{output_filename}.metadata.json"
 
     result = await pex_venv_get(
         PexVenvRequest(
@@ -584,28 +592,41 @@ async def build_python_faas(
         ),
     )
 
-    extra_log_lines = []
+    metadata = {}
 
     if platforms.interpreter_version is not None:
-        extra_log_lines.append(
-            f"    Runtime: {request.runtime.from_interpreter_version(*platforms.interpreter_version)}"
-        )
+        runtime = request.runtime.from_interpreter_version(*platforms.interpreter_version)
+        metadata["runtime"] = runtime
 
     if request.architecture is not None:
-        extra_log_lines.append(f"    Architecture: {request.architecture.value}")
+        metadata["architecture"] = request.architecture.value
 
     if reexported_handler_func is not None:
         if request.log_only_reexported_handler_func:
             handler_text = reexported_handler_func
         else:
             handler_text = f"{request.reexported_handler_module}.{reexported_handler_func}"
-        extra_log_lines.append(f"    Handler: {handler_text}")
+        metadata["handler"] = handler_text
 
+    metadata_digest = await create_digest(
+        CreateDigest(
+            [
+                FileContent(
+                    metadata_filename, json.dumps(metadata, indent=2, sort_keys=True).encode()
+                )
+            ]
+        )
+    )
+    digest = await merge_digests(MergeDigests([result.digest, metadata_digest]))
+
+    extra_log_lines = [f"    {key.capitalize()}: {val}" for key, val in metadata.items()]
     artifact = BuiltPackageArtifact(
         output_filename,
         extra_log_lines=tuple(extra_log_lines),
     )
-    return BuiltPackage(digest=result.digest, artifacts=(artifact,))
+    metadata_artifact = BuiltPackageArtifact(metadata_filename)
+
+    return BuiltPackage(digest=digest, artifacts=(artifact, metadata_artifact))
 
 
 def rules():

@@ -535,31 +535,23 @@ def test_layout_should_be_passed_through_and_adjust_filename(input_layout, expec
         reexported_handler_module=None,
     )
 
-    mock_build = Mock()
+    mock_build = Mock(return_value=Mock(digest=EMPTY_DIGEST))
 
     # Exercise
     run_rule_with_mocks(
         build_python_faas,
         rule_args=[request],
-        mock_gets=[
-            MockGet(
-                output_type=RuntimePlatforms,
-                input_types=(RuntimePlatformsRequest,),
-                mock=lambda _: RuntimePlatforms(interpreter_version=None),
+        mock_calls={
+            "pants.backend.python.util_rules.faas.infer_runtime_platforms": lambda _: RuntimePlatforms(
+                interpreter_version=None
             ),
-            MockGet(
-                output_type=ResolvedPythonFaaSHandler,
-                input_types=(ResolvePythonFaaSHandlerRequest,),
-                mock=lambda _: Mock(),
+            "pants.backend.python.util_rules.pex.create_pex": lambda _: Pex(
+                digest=EMPTY_DIGEST, name="pex", python=None
             ),
-            MockGet(output_type=Digest, input_types=(CreateDigest,), mock=lambda _: EMPTY_DIGEST),
-            MockGet(
-                output_type=Pex,
-                input_types=(PexFromTargetsRequest,),
-                mock=lambda _: Pex(digest=EMPTY_DIGEST, name="pex", python=None),
-            ),
-            MockGet(output_type=PexVenv, input_types=(PexVenvRequest,), mock=mock_build),
-        ],
+            "pants.backend.python.util_rules.pex_venv.pex_venv": mock_build,
+            "pants.engine.intrinsics.create_digest": lambda _: EMPTY_DIGEST,
+            "pants.engine.intrinsics.merge_digests": lambda _: EMPTY_DIGEST,
+        },
     )
 
     args = mock_build.mock_calls[0].args[0]
