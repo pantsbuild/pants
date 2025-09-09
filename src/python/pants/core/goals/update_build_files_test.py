@@ -160,6 +160,8 @@ def test_get_lockfile_interpreter_constraints() -> None:
         only_binary=set(),
         no_binary=set(),
         manylinux=None,
+        excludes=set(),
+        overrides=set(),
     )
 
     def assert_ics(
