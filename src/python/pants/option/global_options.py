@@ -431,7 +431,7 @@ def ca_certs_path_to_file_content(path: str) -> FileContent:
     """Set up FileContent for using the ca_certs_path locally in a process sandbox.
 
     This helper can be used when setting up a Process so that the certs are included in the process.
-    Use `Get(Digest, CreateDigest)`, and then include this in the `input_digest` for the Process.
+    Use `create_digest()`, and then include this in the `input_digest` for the Process.
     Typically, you will also need to configure the invoking tool to load those certs, via its argv
     or environment variables.
 

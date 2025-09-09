@@ -31,17 +31,32 @@ def union(
     polymorphism.
 
     Annotating a class with @union allows other classes to register a `UnionRule(BaseClass,
-    MemberClass)`. Then, you can use `Get(Output, BaseClass, member_class_instance)`. This
-    would be similar to writing `Get(Output, MemberClass, member_class_instance)`, but allows you
-    to write generic code without knowing what concrete classes might later implement that union.
+    MemberClass)`. Then, given
 
-    Often, union bases are abstract classes, but they need not be.
+    @rule(polymorphic=True)
+    async def base_rule(arg: BaseClass) -> Output:
+       raise NotImplementedError()
 
-    By default, in order to provide a stable extension API, when a `@union` is used in a `Get`,
+    and
+
+    @rule
+    async def member_rule(arg: MemberClass) -> Output:
+        ....
+
+    Then `await base_rule(**implicitly({member_class_instance: MemberClass}))` will dispatch
+    to member_rule() at runtime based on the type of the argument.
+
+    This allows you to write generic code without knowing what concrete classes might later
+    implement that union.
+
+    Often, union bases are abstract classes, and the members subclass the base, but this need not
+    be the case.
+
+    By default, in order to provide a stable extension API, when a `@union` is used in a @rule
     _only_ the provided parameter is available to callees, But in order to expand its API, a
     `@union` declaration may optionally include additional "in_scope_types", which are types
-    which must already be in scope at callsites where the `@union` is used in a `Get`, and
-    which are propagated to the callee.
+    which must already be in scope at callsites where the `@union` is used, and
+    which are propagated to the callee, which must have an argument of that type.
 
     See https://www.pantsbuild.org/stable/docs/writing-plugins/the-rules-api/union-rules-advanced.
     """
