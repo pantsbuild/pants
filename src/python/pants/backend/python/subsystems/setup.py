@@ -378,7 +378,7 @@ class PythonSetup(Subsystem):
     )
     _resolves_to_overrides = DictOption[list[str]](
         help=softwrap(
-            """ Specifies a transitive requirement to override in a resovle
+            """ Specifies a transitive requirement to override in a resolve
             and its lockfile. Any distribution requirement in the PEX's
             resolve that matches the override project name is replaced with
             the given override requirement."""
