@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from pants.backend.codegen.thrift import jvm_symbol_mapper
-from pants.backend.codegen.thrift.jvm_symbol_mapper import FirstPartyThriftJvmMappingRequest
-from pants.engine.rules import collect_rules, rule
+from pants.backend.codegen.thrift.jvm_symbol_mapper import (
+    FirstPartyThriftJvmMappingRequest,
+    map_first_party_thrift_targets_to_jvm_symbols,
+)
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
-from pants.jvm.dependency_inference.symbol_mapper import FirstPartyMappingRequest
+from pants.jvm.dependency_inference.symbol_mapper import FirstPartyMappingRequest, SymbolMap
 
 
 class FirstPartyThriftScroogeJavaTargetsMappingRequest(FirstPartyMappingRequest):
@@ -16,8 +19,10 @@ class FirstPartyThriftScroogeJavaTargetsMappingRequest(FirstPartyMappingRequest)
 @rule
 async def map_first_party_thrift_scrooge_java_targets_to_symbols(
     _: FirstPartyThriftScroogeJavaTargetsMappingRequest,
-) -> FirstPartyThriftJvmMappingRequest:
-    return FirstPartyThriftJvmMappingRequest()
+) -> SymbolMap:
+    return await map_first_party_thrift_targets_to_jvm_symbols(
+        FirstPartyThriftJvmMappingRequest(), **implicitly()
+    )
 
 
 def rules():
