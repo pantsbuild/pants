@@ -41,6 +41,7 @@ _PEX_VERSION = "v2.55.2"
 _PEX_BINARY_HASH = "20ae5530c58fa1144db1c9bc74e3732127c3203f6f6f0731089eca25282ab022"
 _PEX_BINARY_SIZE = 4785641
 
+
 class PexCli(TemplatedExternalTool):
     options_scope = "pex-cli"
     name = "pex"
@@ -62,7 +63,10 @@ class PexCli(TemplatedExternalTool):
         ),
     )
 
-    default_known_versions = [f"{_PEX_VERSION}|{platform}|{_PEX_BINARY_HASH}|{_PEX_BINARY_SIZE}" for platform in ["macos_x86_64", "macos_arm64", "linux_x86_64", "linux_arm64"]]
+    default_known_versions = [
+        f"{_PEX_VERSION}|{platform}|{_PEX_BINARY_HASH}|{_PEX_BINARY_SIZE}"
+        for platform in ["macos_x86_64", "macos_arm64", "linux_x86_64", "linux_arm64"]
+    ]
 
 
 @dataclass(frozen=True)
