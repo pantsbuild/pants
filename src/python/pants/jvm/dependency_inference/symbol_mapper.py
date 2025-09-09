@@ -55,7 +55,9 @@ class SymbolMap(FrozenDict[_ResolveName, FrozenTrieNode]):
 
 
 @rule(polymorphic=True)
-async def create_first_party_map(req: FirstPartyMappingRequest) -> SymbolMap:
+async def create_first_party_map(
+    req: FirstPartyMappingRequest, env_name: EnvironmentName
+) -> SymbolMap:
     raise NotImplementedError()
 
 
