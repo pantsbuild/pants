@@ -246,6 +246,8 @@ def test_infer_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
 
 
 class TestRuntimeField(PythonFaaSRuntimeField):
+    __test__ = False
+
     known_runtimes = (
         PythonFaaSKnownRuntime(
             "3.45", 3, 45, "", tag="faas-test-3-45", architecture=FaaSArchitecture.X86_64
@@ -587,24 +589,35 @@ def test_pex_build_extra_args_passed_through() -> None:
     run_rule_with_mocks(
         build_python_faas,
         rule_args=[request],
+        mock_calls={
+            "pants.backend.python.util_rules.faas.infer_runtime_platforms": lambda _: RuntimePlatforms(
+                interpreter_version=None
+            ),
+            "pants.backend.python.util_rules.pex.create_pex": mock_build,
+            "pants.backend.python.util_rules.pex_venv.pex_venv": Mock(
+                return_value=Mock(digest=EMPTY_DIGEST)
+            ),
+            "pants.engine.intrinsics.create_digest": lambda _: EMPTY_DIGEST,
+            "pants.engine.intrinsics.merge_digests": lambda _: EMPTY_DIGEST,
+        },
         mock_gets=[
-            MockGet(
-                output_type=RuntimePlatforms,
-                input_types=(RuntimePlatformsRequest,),
-                mock=lambda _: RuntimePlatforms(interpreter_version=None),
-            ),
-            MockGet(
-                output_type=ResolvedPythonFaaSHandler,
-                input_types=(ResolvePythonFaaSHandlerRequest,),
-                mock=lambda _: Mock(),
-            ),
-            MockGet(output_type=Digest, input_types=(CreateDigest,), mock=lambda _: EMPTY_DIGEST),
-            MockGet(
-                output_type=Pex,
-                input_types=(PexFromTargetsRequest,),
-                mock=mock_build,
-            ),
-            MockGet(output_type=PexVenv, input_types=(PexVenvRequest,), mock=Mock()),
+            # MockGet(
+            #     output_type=RuntimePlatforms,
+            #     input_types=(RuntimePlatformsRequest,),
+            #     mock=lambda _: RuntimePlatforms(interpreter_version=None),
+            # ),
+            # MockGet(
+            #     output_type=ResolvedPythonFaaSHandler,
+            #     input_types=(ResolvePythonFaaSHandlerRequest,),
+            #     mock=lambda _: Mock(),
+            # ),
+            # MockGet(output_type=Digest, input_types=(CreateDigest,), mock=lambda _: EMPTY_DIGEST),
+            # MockGet(
+            #     output_type=Pex,
+            #     input_types=(PexFromTargetsRequest,),
+            #     mock=mock_build,
+            # ),
+            # MockGet(output_type=PexVenv, input_types=(PexVenvRequest,), mock=Mock()),
         ],
     )
 
