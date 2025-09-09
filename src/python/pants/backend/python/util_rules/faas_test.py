@@ -600,25 +600,6 @@ def test_pex_build_extra_args_passed_through() -> None:
             "pants.engine.intrinsics.create_digest": lambda _: EMPTY_DIGEST,
             "pants.engine.intrinsics.merge_digests": lambda _: EMPTY_DIGEST,
         },
-        mock_gets=[
-            # MockGet(
-            #     output_type=RuntimePlatforms,
-            #     input_types=(RuntimePlatformsRequest,),
-            #     mock=lambda _: RuntimePlatforms(interpreter_version=None),
-            # ),
-            # MockGet(
-            #     output_type=ResolvedPythonFaaSHandler,
-            #     input_types=(ResolvePythonFaaSHandlerRequest,),
-            #     mock=lambda _: Mock(),
-            # ),
-            # MockGet(output_type=Digest, input_types=(CreateDigest,), mock=lambda _: EMPTY_DIGEST),
-            # MockGet(
-            #     output_type=Pex,
-            #     input_types=(PexFromTargetsRequest,),
-            #     mock=mock_build,
-            # ),
-            # MockGet(output_type=PexVenv, input_types=(PexVenvRequest,), mock=Mock()),
-        ],
     )
 
     assert extra_args[0] in mock_build.mock_calls[0].args[0].additional_args
