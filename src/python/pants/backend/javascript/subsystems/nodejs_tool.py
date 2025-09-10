@@ -28,7 +28,6 @@ from pants.backend.javascript.subsystems.nodejs import (
     setup_node_tool_process,
 )
 from pants.engine.internals.native_engine import Digest, MergeDigests
-from pants.engine.internals.selectors import Get
 from pants.engine.intrinsics import merge_digests
 from pants.engine.process import Process
 from pants.engine.rules import Rule, collect_rules, implicitly, rule
@@ -130,8 +129,7 @@ class NodeJSToolRequest:
     extra_env: Mapping[str, str] = field(default_factory=FrozenDict)
 
 
-async def _run_tool_without_resolve(request: NodeJSToolRequest) -> Process:
-    nodejs = await Get(NodeJS)
+async def _run_tool_without_resolve(request: NodeJSToolRequest, nodejs: NodeJS) -> Process:
     pkg_manager_version = nodejs.package_managers.get(nodejs.package_manager)
     pkg_manager_and_version = nodejs.default_package_manager
     if pkg_manager_version is None or pkg_manager_and_version is None:
@@ -205,9 +203,9 @@ async def _run_tool_with_resolve(request: NodeJSToolRequest, resolve: str) -> Pr
 
 
 @rule
-async def prepare_tool_process(request: NodeJSToolRequest) -> Process:
+async def prepare_tool_process(request: NodeJSToolRequest, nodejs: NodeJS) -> Process:
     if request.resolve is None:
-        return await _run_tool_without_resolve(request)
+        return await _run_tool_without_resolve(request, nodejs)
     return await _run_tool_with_resolve(request, request.resolve)
 
 

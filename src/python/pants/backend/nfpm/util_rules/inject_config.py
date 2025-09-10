@@ -10,8 +10,7 @@ from dataclasses import dataclass
 from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
 from pants.engine.environment import EnvironmentName
 from pants.engine.internals.native_engine import Address, Field
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionMembership, union
 from pants.util.frozendict import FrozenDict
@@ -94,6 +93,13 @@ class InjectNfpmPackageFieldsRequest(ABC):
         """Whether to use this InjectNfpmPackageFieldsRequest implementation for this target."""
 
 
+@rule(polymorphic=True)
+async def get_inject_nfpm_package_fields(
+    req: InjectNfpmPackageFieldsRequest, env_name: EnvironmentName
+) -> InjectedNfpmPackageFields:
+    raise NotImplementedError()
+
+
 @dataclass(frozen=True)
 class NfpmPackageTargetWrapper:
     """Nfpm Package target Wrapper.
@@ -138,8 +144,8 @@ async def determine_injected_nfpm_package_fields(
     inject_nfpm_config_request: InjectNfpmPackageFieldsRequest = inject_nfpm_config_request_type(
         target
     )  # type: ignore[abstract]
-    return await Get(
-        InjectedNfpmPackageFields, InjectNfpmPackageFieldsRequest, inject_nfpm_config_request
+    return await get_inject_nfpm_package_fields(
+        **implicitly({inject_nfpm_config_request: InjectNfpmPackageFieldsRequest})
     )
 
 
