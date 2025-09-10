@@ -46,14 +46,9 @@ from pants.backend.python.util_rules.pex_from_targets import (
     GlobalRequirementConstraints,
     PexFromTargetsRequest,
     _determine_requirements_for_pex_from_targets,
-    _PexRequirementsRequest,
-    _RepositoryPexRequest,
 )
 from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
-    LoadedLockfile,
-    LoadedLockfileRequest,
-    Lockfile,
     PexRequirements,
     Resolve,
 )
@@ -65,7 +60,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.fs import Snapshot
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.python_rule_runner import PythonRuleRunner
-from pants.testutil.rule_runner import MockGet, QueryRule, engine_error, run_rule_with_mocks
+from pants.testutil.rule_runner import QueryRule, engine_error, run_rule_with_mocks
 from pants.util.contextutil import pushd
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
@@ -178,7 +173,6 @@ def test_determine_requirements_for_pex_from_targets() -> None:
     loaded_lockfile__pex = Mock(is_pex_native=True, as_constraints_strings=None)
     chosen_resolve__pex = Mock(lockfile=Mock())
     chosen_resolve__pex.name = "pex"  # name has special meaning in Mock(), so must set it here.
-    resolve__not_pex = Resolve("not_pex", False)
     loaded_lockfile__not_pex = Mock(is_pex_native=False, as_constraints_strings=req_strings)
     chosen_resolve__not_pex = Mock(lockfile=Mock())
     chosen_resolve__not_pex.name = "not_pex"  # ditto.
@@ -244,48 +238,21 @@ def test_determine_requirements_for_pex_from_targets() -> None:
         reqs, pexes = run_rule_with_mocks(
             _determine_requirements_for_pex_from_targets,
             rule_args=[pex_from_targets_request, python_setup],
-            mock_gets=[
-                MockGet(
-                    output_type=PexRequirements,
-                    input_types=(_PexRequirementsRequest,),
-                    mock=lambda _: resolved_pex_requirements,
+            mock_calls={
+                "pants.backend.python.util_rules.pex_from_targets.determine_requirement_strings_in_closure": lambda _: resolved_pex_requirements,
+                "pants.backend.python.util_rules.pex_from_targets.choose_python_resolve": lambda _: (
+                    chosen_resolve__pex
+                    if _mode == RequirementMode.PEX_LOCKFILE
+                    else chosen_resolve__not_pex
                 ),
-                MockGet(
-                    output_type=ChosenPythonResolve,
-                    input_types=(ChosenPythonResolveRequest,),
-                    mock=lambda _: (
-                        chosen_resolve__pex
-                        if _mode == RequirementMode.PEX_LOCKFILE
-                        else chosen_resolve__not_pex
-                    ),
+                "pants.backend.python.util_rules.pex_requirements.load_lockfile": lambda _: (
+                    loaded_lockfile__pex
+                    if _mode == RequirementMode.PEX_LOCKFILE
+                    else loaded_lockfile__not_pex
                 ),
-                MockGet(
-                    output_type=Lockfile,
-                    input_types=(Resolve,),
-                    mock=lambda _: (
-                        resolve__pex if _mode == RequirementMode.PEX_LOCKFILE else resolve__not_pex
-                    ),
-                ),
-                MockGet(
-                    output_type=LoadedLockfile,
-                    input_types=(LoadedLockfileRequest,),
-                    mock=lambda _: (
-                        loaded_lockfile__pex
-                        if _mode == RequirementMode.PEX_LOCKFILE
-                        else loaded_lockfile__not_pex
-                    ),
-                ),
-                MockGet(
-                    output_type=OptionalPexRequest,
-                    input_types=(_RepositoryPexRequest,),
-                    mock=lambda _: mock_repository_pex_request,
-                ),
-                MockGet(
-                    output_type=OptionalPex,
-                    input_types=(OptionalPexRequest,),
-                    mock=lambda _: mock_repository_pex,
-                ),
-            ],
+                "pants.backend.python.util_rules.pex_from_targets.get_repository_pex": lambda _: mock_repository_pex_request,
+                "pants.backend.python.util_rules.pex.create_optional_pex": lambda _: mock_repository_pex,
+            },
         )
         assert expected_reqs == reqs
         assert expected_pexes == pexes

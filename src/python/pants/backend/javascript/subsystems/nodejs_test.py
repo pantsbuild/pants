@@ -27,11 +27,7 @@ from pants.backend.javascript.subsystems.nodejs import (
 from pants.backend.javascript.target_types import JSSourcesGeneratorTarget
 from pants.backend.python import target_types_rules
 from pants.core.util_rules import config_files, source_files
-from pants.core.util_rules.external_tool import (
-    DownloadedExternalTool,
-    ExternalToolRequest,
-    ExternalToolVersion,
-)
+from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolVersion
 from pants.core.util_rules.search_paths import (
     VersionManagerSearchPaths,
     VersionManagerSearchPathsRequest,
@@ -55,7 +51,7 @@ from pants.engine.process import (
     ProcessResultMetadata,
 )
 from pants.testutil.option_util import create_subsystem
-from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
+from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.contextutil import temporary_dir
 
 
@@ -209,13 +205,6 @@ def test_node_version_from_semver_download(
     run_rule_with_mocks(
         determine_nodejs_binaries,
         rule_args=(nodejs_subsystem, Platform.linux_x86_64, _BinaryPathsPerVersion()),
-        mock_gets=[
-            MockGet(
-                DownloadedExternalTool,
-                (ExternalToolRequest,),
-                mock=lambda *_: DownloadedExternalTool(EMPTY_DIGEST, "myexe"),
-            ),
-        ],
     )
 
     nodejs_subsystem.download_known_version.assert_called_once_with(
@@ -260,9 +249,6 @@ def test_node_version_from_semver_bootstrap(
     result = run_rule_with_mocks(
         determine_nodejs_binaries,
         rule_args=(nodejs_subsystem, Platform.linux_x86_64, discoverable_versions),
-        mock_gets=[
-            MockGet(DownloadedExternalTool, (ExternalToolRequest,), mock=mock_download),
-        ],
     )
 
     assert result.binary_dir == expected_path
@@ -281,9 +267,6 @@ def test_finding_no_node_version_is_an_error(mock_nodejs_subsystem: Mock) -> Non
         run_rule_with_mocks(
             determine_nodejs_binaries,
             rule_args=(nodejs_subsystem, Platform.linux_x86_64, discoverable_versions),
-            mock_gets=[
-                MockGet(DownloadedExternalTool, (ExternalToolRequest,), mock=mock_download),
-            ],
         )
 
 
@@ -340,7 +323,9 @@ def test_get_nvm_root(env: dict[str, str], expected_directory: str | None) -> No
 
     result = run_rule_with_mocks(
         _get_nvm_root,
-        mock_gets=[MockGet(EnvironmentVars, (EnvironmentVarsRequest,), mock_environment_vars)],
+        mock_calls={
+            "pants.core.util_rules.env_vars.environment_vars_subset": mock_environment_vars,
+        },
     )
     assert result == expected_directory
 
