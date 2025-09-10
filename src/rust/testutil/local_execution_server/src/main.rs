@@ -3,8 +3,8 @@
 
 use mock::execution_server::{ExpectedAPICall, MockExecution, MockOperation, TestServer};
 use protos::{
-    gen::build::bazel::remote::execution::v2::{Digest, ExecuteRequest},
-    gen::google::longrunning::Operation,
+    pb::build::bazel::remote::execution::v2::{Digest, ExecuteRequest},
+    pb::google::longrunning::Operation,
 };
 use std::io::Read;
 

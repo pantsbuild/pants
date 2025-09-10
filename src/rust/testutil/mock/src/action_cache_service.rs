@@ -13,7 +13,7 @@ use tokio::time::sleep;
 use tonic::{Request, Response, Status};
 
 use hashing::{Digest, Fingerprint};
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::pb::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 
 pub struct ActionCacheHandle {

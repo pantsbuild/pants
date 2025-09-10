@@ -17,7 +17,7 @@ use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
 use log::{debug, error, warn};
 use parking_lot::Mutex;
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::pb::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 use store::{RemoteProvider, RemoteStoreOptions, Store, StoreError};
 use tokio::signal::unix::{SignalKind, signal};

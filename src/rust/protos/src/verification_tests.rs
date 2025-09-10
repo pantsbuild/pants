@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use hashing::EMPTY_DIGEST;
 
-use crate::gen::build::bazel::remote::execution::v2::{Digest, Directory, DirectoryNode, FileNode};
+use crate::pb::build::bazel::remote::execution::v2::{Digest, Directory, DirectoryNode, FileNode};
 use crate::verify_directory_canonical;
 
 const HASH: &str = "693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d";

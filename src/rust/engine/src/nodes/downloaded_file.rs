@@ -12,7 +12,7 @@ use fs::RelativePath;
 use graph::CompoundNode;
 use grpc_util::prost::MessageExt;
 use hashing::Digest;
-use protos::gen::pants::cache::{CacheKey, CacheKeyType, ObservedUrl};
+use protos::pb::pants::cache::{CacheKey, CacheKeyType, ObservedUrl};
 use pyo3::prelude::Python;
 use url::Url;
 

@@ -7,7 +7,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use bytes::Bytes;
 use hashing::Digest;
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::pb::build::bazel::remote::execution::v2 as remexec;
 use remexec::ActionResult;
 use tokio::fs::File;
 use tokio::io::{AsyncSeekExt, AsyncWrite};

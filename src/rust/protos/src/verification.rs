@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use hashing::Digest;
 
-use crate::gen::build::bazel::remote::execution::v2 as remote_execution;
+use crate::pb::build::bazel::remote::execution::v2 as remote_execution;
 
 pub fn verify_directory_canonical(
     digest: Digest,

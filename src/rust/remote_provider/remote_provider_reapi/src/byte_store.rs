@@ -16,8 +16,8 @@ use grpc_util::{
     LayeredService, headers_to_http_header_map, layered_service, status_ref_to_str, status_to_str,
 };
 use hashing::{Digest, Hasher};
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use protos::gen::google::bytestream::byte_stream_client::ByteStreamClient;
+use protos::pb::build::bazel::remote::execution::v2 as remexec;
+use protos::pb::google::bytestream::byte_stream_client::ByteStreamClient;
 use remexec::{
     BatchUpdateBlobsRequest, ServerCapabilities, capabilities_client::CapabilitiesClient,
     content_addressable_storage_client::ContentAddressableStorageClient,
@@ -162,7 +162,7 @@ impl Provider {
           if len == 0 {
             // if the reader is empty, the ReaderStream gives no elements, but we have to write at least
             // one.
-            yield protos::gen::google::bytestream::WriteRequest {
+            yield protos::pb::google::bytestream::WriteRequest {
               resource_name: resource_name.clone(),
               write_offset: 0,
               finish_write: true,
@@ -183,7 +183,7 @@ impl Provider {
               Ok(data) => {
                 let write_offset = num_seen_bytes as i64;
                 num_seen_bytes += data.len();
-                yield protos::gen::google::bytestream::WriteRequest {
+                yield protos::pb::google::bytestream::WriteRequest {
                   resource_name: resource_name.clone(),
                   write_offset,
                   finish_write: num_seen_bytes == len,
@@ -374,7 +374,7 @@ impl ByteStoreProvider for Provider {
             digest.size_bytes
         );
 
-        let request = protos::gen::google::bytestream::ReadRequest {
+        let request = protos::pb::google::bytestream::ReadRequest {
             resource_name,
             read_offset: 0,
             // 0 means no limit.
@@ -655,8 +655,8 @@ mod tests {
     use super::RPC_RESPONSE_PER_ITEM_SIZE;
     use crate::remexec::FindMissingBlobsRequest;
     use prost::Message;
-    use protos::gen::build::bazel::remote::execution::v2;
     use protos::r#gen::google::rpc;
+    use protos::pb::build::bazel::remote::execution::v2;
     use testutil::data::TestData;
 
     #[test]

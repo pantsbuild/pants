@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use fs::RelativePath;
 use prost_types::Timestamp;
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::pb::build::bazel::remote::execution::v2 as remexec;
 use remexec::ExecutedActionMetadata;
 use tempfile::TempDir;
 use workunit_store::RunId;
