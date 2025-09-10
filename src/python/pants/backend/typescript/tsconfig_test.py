@@ -192,3 +192,121 @@ def test_parses_tsconfig_non_json_standard() -> None:
         "data3": "foo,]"
         } """
     assert json.loads(_clean_tsconfig_contents(content)) == json.loads(content)
+
+
+def test_validate_tsconfig_outdir_missing() -> None:
+    ts_config = TSConfig(path="project/tsconfig.json", out_dir=None)
+
+    with pytest.raises(ValueError) as exc_info:
+        ts_config.validate_outdir()
+
+    error_message = str(exc_info.value)
+    assert "missing required 'outDir' setting" in error_message
+
+
+def test_validate_tsconfig_outdir_with_parent_references() -> None:
+    ts_config = TSConfig(path="project/tsconfig.json", out_dir="../dist")
+
+    with pytest.raises(ValueError) as exc_info:
+        ts_config.validate_outdir()
+
+    error_message = str(exc_info.value)
+    assert "uses '..' path components" in error_message
+
+    # Test with multiple .. components
+    ts_config = TSConfig(path="project/tsconfig.json", out_dir="../../build")
+
+    with pytest.raises(ValueError) as exc_info:
+        ts_config.validate_outdir()
+
+    error_message = str(exc_info.value)
+    assert "uses '..' path components" in error_message
+
+    # Test with .. in the middle of the path
+    ts_config = TSConfig(path="project/tsconfig.json", out_dir="./lib/../dist")
+
+    with pytest.raises(ValueError) as exc_info:
+        ts_config.validate_outdir()
+
+    error_message = str(exc_info.value)
+    assert "uses '..' path components" in error_message
+
+
+def test_validate_tsconfig_outdir_with_absolute_paths() -> None:
+    ts_config = TSConfig(path="project/tsconfig.json", out_dir="/tmp/build")
+
+    with pytest.raises(ValueError) as exc_info:
+        ts_config.validate_outdir()
+
+    error_message = str(exc_info.value)
+    assert "absolute outDir" in error_message
+
+
+def test_validate_tsconfig_outdir_valid() -> None:
+    valid_configs = [
+        TSConfig(path="project/tsconfig.json", out_dir="./dist"),
+        TSConfig(path="project/tsconfig.json", out_dir="dist"),
+        TSConfig(path="project/tsconfig.json", out_dir="./build"),
+        TSConfig(path="project/tsconfig.json", out_dir="./lib/output"),
+        TSConfig(path="project/tsconfig.json", out_dir="build/js"),
+    ]
+
+    for ts_config in valid_configs:
+        ts_config.validate_outdir()
+
+
+def test_tsconfig_parsing_with_allow_js_and_check_js(rule_runner: RuleRunner) -> None:
+    """Test parsing of allowJs and checkJs compiler options."""
+    rule_runner.write_files(
+        {
+            "project/BUILD": "typescript_source()",
+            "project/index.ts": "",
+            # Test various combinations
+            "project/tsconfig1.json": json.dumps(
+                {"compilerOptions": {"allowJs": True, "outDir": "./dist"}}
+            ),
+            "project/tsconfig2.json": json.dumps(
+                {"compilerOptions": {"allowJs": False, "outDir": "./dist"}}
+            ),
+            "project/tsconfig3.json": json.dumps(
+                {"compilerOptions": {"outDir": "./dist"}}  # Missing allowJs defaults to None
+            ),
+            "project/tsconfig4.json": json.dumps(
+                {"compilerOptions": {"allowJs": True, "checkJs": True, "outDir": "./dist"}}
+            ),
+        }
+    )
+    configs = rule_runner.request(AllTSConfigs, [TSConfigsRequest("tsconfig.json")])
+    configs_by_path = {config.path: config for config in configs}
+
+    assert configs_by_path["project/tsconfig1.json"] == TSConfig(
+        "project/tsconfig1.json", out_dir="./dist", allow_js=True
+    )
+    assert configs_by_path["project/tsconfig2.json"] == TSConfig(
+        "project/tsconfig2.json", out_dir="./dist", allow_js=False
+    )
+    assert configs_by_path["project/tsconfig3.json"] == TSConfig(
+        "project/tsconfig3.json", out_dir="./dist", allow_js=None
+    )
+    assert configs_by_path["project/tsconfig4.json"] == TSConfig(
+        "project/tsconfig4.json", out_dir="./dist", allow_js=True, check_js=True
+    )
+
+
+def test_tsconfig_allow_js_inheritance_from_extended_config(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "project/BUILD": "typescript_source()",
+            "project/index.ts": "",
+            "project/tsconfig.json": json.dumps(
+                {"compilerOptions": {"allowJs": True, "outDir": "./dist"}}
+            ),
+            "project/lib/tsconfig.json": json.dumps({"extends": ".."}),
+        }
+    )
+    configs = rule_runner.request(AllTSConfigs, [TSConfigsRequest("tsconfig.json")])
+    expected_configs = {
+        TSConfig("project/tsconfig.json", out_dir="./dist", allow_js=True),
+        TSConfig("project/lib/tsconfig.json", allow_js=True),
+    }
+    assert set(configs) == expected_configs
