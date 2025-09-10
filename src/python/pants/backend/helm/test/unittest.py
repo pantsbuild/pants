@@ -7,7 +7,7 @@ import dataclasses
 import logging
 import os
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from pants.backend.helm.dependency_inference.unittest import rules as dependency_rules
 from pants.backend.helm.subsystems.unittest import HelmUnitTestSubsystem
@@ -32,6 +32,7 @@ from pants.backend.helm.util_rules.sources import (
 )
 from pants.backend.helm.util_rules.tool import HelmProcess, helm_process
 from pants.core.goals.generate_snapshots import GenerateSnapshotsFieldSet, GenerateSnapshotsResult
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.test import TestFieldSet, TestRequest, TestResult, TestSubsystem
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
@@ -83,7 +84,7 @@ class HelmUnitTestFieldSet(TestFieldSet, GenerateSnapshotsFieldSet):
 
 
 class HelmUnitTestRequest(TestRequest):
-    tool_subsystem = HelmUnitTestSubsystem
+    tool_subsystem = cast(type[SkippableSubsystem], HelmUnitTestSubsystem)
     field_set_type = HelmUnitTestFieldSet
 
 

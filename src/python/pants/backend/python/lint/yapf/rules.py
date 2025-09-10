@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
 from pants.backend.python.lint.yapf.skip_field import SkipYapfField
 from pants.backend.python.lint.yapf.subsystem import Yapf
@@ -12,6 +13,7 @@ from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import VenvPexProcess, create_venv_pex
 from pants.core.goals.fmt import AbstractFmtRequest, FmtResult, FmtTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.config_files import find_config_file
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import MergeDigests
@@ -36,7 +38,7 @@ class YapfFieldSet(FieldSet):
 
 class YapfRequest(FmtTargetsRequest):
     field_set_type = YapfFieldSet
-    tool_subsystem = Yapf
+    tool_subsystem = cast(type[SkippableSubsystem], Yapf)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

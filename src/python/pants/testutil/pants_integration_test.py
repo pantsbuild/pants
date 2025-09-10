@@ -229,7 +229,7 @@ def run_pants_with_workdir_without_waiting(
     else:
         env = cast(dict[Union[str, bytes], Union[str, bytes]], os.environ.copy())
 
-    env.update(PYTHONPATH=os.pathsep.join(sys.path), NO_SCIE_WARNING="1")
+    env.update({"PYTHONPATH": os.pathsep.join(sys.path), "NO_SCIE_WARNING": "1"})
     if extra_env:
         env.update(cast(dict[Union[str, bytes], Union[str, bytes]], extra_env))
 

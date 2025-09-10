@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.scala.target_types import (
@@ -12,6 +12,7 @@ from pants.backend.scala.target_types import (
     ScalatestTestSourceField,
     ScalatestTestTimeoutField,
 )
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.resolves import ExportableTool
 from pants.core.goals.test import (
     TestDebugRequest,
@@ -65,7 +66,7 @@ class ScalatestTestFieldSet(TestFieldSet):
 
 
 class ScalatestTestRequest(TestRequest):
-    tool_subsystem = Scalatest
+    tool_subsystem = cast(type[SkippableSubsystem], Scalatest)
     field_set_type = ScalatestTestFieldSet
     supports_debug = True
 

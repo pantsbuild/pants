@@ -1,6 +1,7 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from dataclasses import dataclass
+from typing import cast
 
 from pants.backend.codegen.protobuf.lint.buf.skip_field import SkipBufFormatField
 from pants.backend.codegen.protobuf.lint.buf.subsystem import BufSubsystem
@@ -9,6 +10,7 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceField,
 )
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.external_tool import download_external_tool
 from pants.core.util_rules.system_binaries import (
     BinaryShimsRequest,
@@ -40,7 +42,7 @@ class BufFieldSet(FieldSet):
 
 class BufFormatRequest(FmtTargetsRequest):
     field_set_type = BufFieldSet
-    tool_subsystem = BufSubsystem  # type: ignore[assignment]
+    tool_subsystem = cast(type[SkippableSubsystem], BufSubsystem)
 
     @classproperty
     def tool_name(cls) -> str:

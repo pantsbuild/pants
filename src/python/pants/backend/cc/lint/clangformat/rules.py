@@ -6,11 +6,13 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import cast
 
 from pants.backend.cc.lint.clangformat.subsystem import ClangFormat
 from pants.backend.cc.target_types import CCSourceField
 from pants.backend.python.util_rules.pex import PexProcess, create_pex
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.config_files import find_config_file
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import MergeDigests
@@ -34,7 +36,7 @@ class ClangFormatFmtFieldSet(FieldSet):
 
 class ClangFormatRequest(FmtTargetsRequest):
     field_set_type = ClangFormatFmtFieldSet
-    tool_subsystem = ClangFormat
+    tool_subsystem = cast(type[SkippableSubsystem], ClangFormat)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

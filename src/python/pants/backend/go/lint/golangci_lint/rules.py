@@ -3,7 +3,7 @@
 
 import textwrap
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from pants.backend.go.lint.golangci_lint.skip_field import SkipGolangciLintField
 from pants.backend.go.lint.golangci_lint.subsystem import GolangciLint
@@ -21,6 +21,7 @@ from pants.backend.go.util_rules.go_mod import (
 )
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import find_config_file
 from pants.core.util_rules.external_tool import download_external_tool
@@ -52,7 +53,7 @@ class GolangciLintFieldSet(FieldSet):
 
 class GolangciLintRequest(LintTargetsRequest):
     field_set_type = GolangciLintFieldSet
-    tool_subsystem = GolangciLint
+    tool_subsystem = cast(type[SkippableSubsystem], GolangciLint)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

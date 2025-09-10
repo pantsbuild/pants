@@ -1,10 +1,11 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Any
+from typing import Any, cast
 
 from pants.backend.tools.taplo.subsystem import Taplo
 from pants.core.goals.fmt import FmtFilesRequest, FmtResult, Partitions
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import find_config_file
 from pants.core.util_rules.external_tool import download_external_tool
@@ -20,7 +21,7 @@ from pants.util.strutil import pluralize
 
 
 class TaploFmtRequest(FmtFilesRequest):
-    tool_subsystem = Taplo
+    tool_subsystem = cast(type[SkippableSubsystem], Taplo)
 
 
 @rule
