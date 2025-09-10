@@ -655,7 +655,7 @@ mod tests {
     use super::RPC_RESPONSE_PER_ITEM_SIZE;
     use crate::remexec::FindMissingBlobsRequest;
     use prost::Message;
-    use protos::r#gen::google::rpc;
+    use protos::pb::google::rpc;
     use protos::pb::build::bazel::remote::execution::v2;
     use testutil::data::TestData;
 
