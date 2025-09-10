@@ -317,7 +317,7 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
     explicit dependency on b/B.java.
     b:b depends directly on a:a, and its source b/B.java inherits that dependency.
 
-    Therefore, after target expansion via Get(Targets, Addresses(...)), we get the cycle of:
+    Therefore, after target expansion via resolve_targets(**implicitly(Addresses(...))), we get the cycle of:
 
         a/A.java -> b/B.java -> a/A.java
     """
