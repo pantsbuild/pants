@@ -254,7 +254,7 @@ async def pyright_typecheck_partition(
             description=f"Run Pyright on {pluralize(len(root_sources.snapshot.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
-        nodejs,
+        **implicitly(),
     )
     result = await execute_process(process, **implicitly())
     return CheckResult.from_fallible_process_result(
