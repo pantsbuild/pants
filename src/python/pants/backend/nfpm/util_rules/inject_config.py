@@ -94,7 +94,7 @@ class InjectNfpmPackageFieldsRequest(ABC):
 
 
 @rule(polymorphic=True)
-async def get_inject_nfpm_package_fields(
+async def inject_nfpm_package_fields(
     req: InjectNfpmPackageFieldsRequest, env_name: EnvironmentName
 ) -> InjectedNfpmPackageFields:
     raise NotImplementedError()
@@ -144,7 +144,7 @@ async def determine_injected_nfpm_package_fields(
     inject_nfpm_config_request: InjectNfpmPackageFieldsRequest = inject_nfpm_config_request_type(
         target
     )  # type: ignore[abstract]
-    return await get_inject_nfpm_package_fields(
+    return await inject_nfpm_package_fields(
         **implicitly({inject_nfpm_config_request: InjectNfpmPackageFieldsRequest})
     )
 
