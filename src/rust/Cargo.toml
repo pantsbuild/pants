@@ -202,8 +202,8 @@ prodash = { git = "https://github.com/stuhood/prodash", rev = "stuhood/raw-messa
 prost = "0.13"
 prost-build = "0.13"
 prost-types = "0.13"
-pyo3 = "0.25.1"
-pyo3-build-config = "0.25.1"
+pyo3 = "0.26.0"
+pyo3-build-config = "0.26.0"
 rand = "0.9"
 regex = "1"
 reqwest = { version = "0.12", default-features = false }
