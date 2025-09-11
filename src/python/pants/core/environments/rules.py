@@ -103,16 +103,17 @@ async def _warn_on_non_local_environments(specified_targets: Iterable[Target], s
     ]
 
     env_tgts = await concurrently(
-        Get(
-            EnvironmentTarget,
-            EnvironmentNameRequest(
-                name,
-                description_of_origin=(
-                    "the `environment` field of targets including , ".join(
-                        tgt.address.spec for tgt in tgts[:3]
-                    )
-                ),
-            ),
+        get_target_for_environment_name(
+            **implicitly(
+                EnvironmentNameRequest(
+                    name,
+                    description_of_origin=(
+                        "the `environment` field of targets including , ".join(
+                            tgt.address.spec for tgt in tgts[:3]
+                        )
+                    ),
+                )
+            )
         )
         for name, tgts in env_names_and_targets
     )
@@ -383,10 +384,9 @@ async def get_target_for_environment_name(
             softwrap(
                 f"""
                 The name `{env_name.val}` is not defined. The name should have been normalized and
-                validated in the rule `EnvironmentNameRequest -> EnvironmentName`
-                already. If you directly wrote
-                `Get(EnvironmentTarget, EnvironmentName(my_name))`, refactor to
-                `Get(EnvironmentTarget, EnvironmentNameRequest(my_name, ...))`.
+                validated in the resolve_environment_name() rule already. If you called
+                `get_target_for_environment_name(EnvironmentName(name))`, refactor to
+                `get_target_for_environment_name(**implicitly(EnvironmentNameRequest(name, ...))`.
                 """
             )
         )
@@ -427,6 +427,7 @@ async def _apply_fallback_environment(env_tgt: Target, error_msg: str) -> Enviro
     fallback_field = env_tgt[FallbackEnvironmentField]
     if fallback_field.value is None:
         raise NoFallbackEnvironmentError(error_msg)
+    # TODO: Requires call-by-name support for mutual @rule recursion.
     return await Get(
         EnvironmentName,
         EnvironmentNameRequest(
