@@ -50,7 +50,7 @@ impl Interns {
         }
     }
 
-    pub fn key_insert(&self, py: Python, v: PyObject) -> PyResult<Key> {
+    pub fn key_insert(&self, py: Python, v: Py<PyAny>) -> PyResult<Key> {
         let (id, type_id): (u64, TypeId) = {
             let v = v.bind(py);
             let keys = self.keys.bind(py);

@@ -187,7 +187,7 @@ where
 }
 
 ///
-/// Collect the Values contained within an outer Python Iterable PyObject.
+/// Collect the Values contained within an outer Python Iterable Py<PyAny>.
 ///
 pub fn collect_iterable<'py>(value: &Bound<'py, PyAny>) -> Result<Vec<Bound<'py, PyAny>>, String> {
     match value.try_iter() {
@@ -517,7 +517,7 @@ impl PyGeneratorResponseNativeCall {
         Some(self_)
     }
 
-    fn send(&self, py: Python<'_>, value: PyObject) -> PyResult<()> {
+    fn send(&self, py: Python<'_>, value: Py<PyAny>) -> PyResult<()> {
         let args = PyTuple::new(py, [value])?.into_pyobject(py)?.unbind();
         Err(PyStopIteration::new_err(args))
     }
@@ -597,9 +597,9 @@ impl PyGeneratorResponseCall {
     }
 
     #[getter]
-    fn inputs(&self, py: Python<'_>) -> PyResult<Vec<PyObject>> {
+    fn inputs(&self, py: Python<'_>) -> PyResult<Vec<Py<PyAny>>> {
         let inner = self.borrow_inner(py)?;
-        let args: Vec<PyObject> = inner.args.as_ref().map_or_else(
+        let args: Vec<Py<PyAny>> = inner.args.as_ref().map_or_else(
             || Ok(Vec::default()),
             |args| args.to_py_object().extract(py),
         )?;
@@ -697,7 +697,7 @@ impl PyGeneratorResponseGet {
     }
 
     #[getter]
-    fn inputs(&self, py: Python<'_>) -> PyResult<Vec<PyObject>> {
+    fn inputs(&self, py: Python<'_>) -> PyResult<Vec<Py<PyAny>>> {
         Ok(self
             .0
             .get(py)

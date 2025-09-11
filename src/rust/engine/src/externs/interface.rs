@@ -33,7 +33,7 @@ use petgraph::graph::{DiGraph, Graph};
 use process_execution::CacheContentBehavior;
 use pyo3::exceptions::{PyException, PyIOError, PyKeyboardInterrupt, PyValueError};
 use pyo3::prelude::{
-    PyModule, PyObject, PyResult as PyO3Result, Python, pyclass, pyfunction, pymethods, pymodule,
+    PyModule, PyResult as PyO3Result, Python, pyclass, pyfunction, pymethods, pymodule,
     wrap_pyfunction,
 };
 use pyo3::sync::GILProtected;
@@ -454,7 +454,7 @@ impl PySession {
         ui_use_prodash: bool,
         max_workunit_level: u64,
         build_id: String,
-        session_values: PyObject,
+        session_values: Py<PyAny>,
         cancellation_latch: &Bound<'_, PySessionCancellationLatch>,
         py: Python,
     ) -> PyO3Result<Self> {
@@ -551,7 +551,7 @@ struct PyResult {
     #[pyo3(get)]
     is_throw: bool,
     #[pyo3(get)]
-    result: PyObject,
+    result: Py<PyAny>,
     #[pyo3(get)]
     python_traceback: Option<String>,
     #[pyo3(get)]
@@ -624,7 +624,7 @@ impl PyThreadLocals {
 fn nailgun_server_create(
     py_executor: &externs::scheduler::PyExecutor,
     port: u16,
-    runner: PyObject,
+    runner: Py<PyAny>,
 ) -> PyO3Result<PyNailgunServer> {
     let server_future = {
         let executor = py_executor.0.clone();
@@ -698,8 +698,8 @@ fn nailgun_server_await_shutdown(
 #[pyfunction]
 fn strongly_connected_components(
     py: Python,
-    adjacency_lists: Vec<(PyObject, Vec<PyObject>)>,
-) -> PyO3Result<Vec<Vec<PyObject>>> {
+    adjacency_lists: Vec<(Py<PyAny>, Vec<Py<PyAny>>)>,
+) -> PyO3Result<Vec<Vec<Py<PyAny>>>> {
     let mut graph: DiGraph<Key, (), u32> = Graph::new();
     let mut node_ids: HashMap<Key, _> = HashMap::new();
 
@@ -1074,12 +1074,12 @@ async fn workunits_to_py_tuple_value(
 
 #[pyfunction]
 fn session_poll_workunits(
-    py_scheduler: PyObject,
-    py_session: PyObject,
+    py_scheduler: Py<PyAny>,
+    py_session: Py<PyAny>,
     max_log_verbosity_level: u64,
-) -> PyO3Result<PyObject> {
-    // TODO: Black magic. PyObject is not marked UnwindSafe, and contains an UnsafeCell. Since PyO3
-    // only allows us to receive `pyfunction` arguments as `PyObject` (or references under a held
+) -> PyO3Result<Py<PyAny>> {
+    // TODO: Black magic. Py<PyAny> is not marked UnwindSafe, and contains an UnsafeCell. Since PyO3
+    // only allows us to receive `pyfunction` arguments as `Py<PyAny>` (or references under a held
     // GIL), we cannot do what it does to use `catch_unwind` which would be interacting with
     // `catch_unwind` while the object is still a raw pointer, and unchecked.
     //
@@ -1132,9 +1132,9 @@ fn session_poll_workunits(
 fn session_run_interactive_process(
     py: Python,
     py_session: &Bound<'_, PySession>,
-    interactive_process: PyObject,
+    interactive_process: Py<PyAny>,
     process_config_from_environment: &Bound<'_, PyProcessExecutionEnvironment>,
-) -> PyO3Result<PyObject> {
+) -> PyO3Result<Py<PyAny>> {
     let core = py_session.borrow().0.core().clone();
     let session = &py_session.borrow().0;
     let context = core.graph.context(SessionCore::new(session.clone()));
@@ -1177,7 +1177,7 @@ fn scheduler_live_items<'py>(
     py: Python<'py>,
     py_scheduler: &Bound<'py, PyScheduler>,
     py_session: &Bound<'_, PySession>,
-) -> (Vec<PyObject>, HashMap<&'static str, (usize, usize)>) {
+) -> (Vec<Py<PyAny>>, HashMap<&'static str, (usize, usize)>) {
     let core = py_scheduler.borrow().0.core.clone();
     let scheduler = &py_scheduler.borrow().0;
     let session = &py_session.borrow().0;
@@ -1241,7 +1241,7 @@ fn execution_add_root_select<'py>(
     py: Python<'py>,
     py_scheduler: &Bound<'py, PyScheduler>,
     py_execution_request: &Bound<'py, PyExecutionRequest>,
-    param_vals: Vec<PyObject>,
+    param_vals: Vec<Py<PyAny>>,
     product: &Bound<'py, PyType>,
 ) -> PyO3Result<()> {
     let scheduler = &py_scheduler.borrow().0;
@@ -1265,7 +1265,7 @@ fn execution_add_root_select<'py>(
 fn tasks_task_begin<'py>(
     py: Python<'py>,
     py_tasks: &Bound<'py, PyTasks>,
-    func: PyObject,
+    func: Py<PyAny>,
     output_type: &Bound<'py, PyType>,
     arg_types: Vec<(String, Bound<'py, PyType>)>,
     masked_types: Vec<Bound<'py, PyType>>,
@@ -1884,7 +1884,7 @@ fn single_file_digests_to_bytes<'py>(
             }
         });
 
-        let bytes_values: Vec<PyObject> = py
+        let bytes_values: Vec<Py<PyAny>> = py
             .detach(|| core.executor.block_on(future::try_join_all(digest_futures)))
             .map(|values| values.into_iter().map(|val| val.into()).collect())
             .map_err(possible_store_missing_digest)?;

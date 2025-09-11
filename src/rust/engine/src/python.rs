@@ -287,28 +287,28 @@ impl Key {
         self.value.clone()
     }
 
-    pub fn to_py_object(&self) -> PyObject {
+    pub fn to_py_object(&self) -> Py<PyAny> {
         self.to_value().into()
     }
 }
 
-// NB: Although `PyObject` (aka `Py<PyAny>`) directly implements `Clone`, it's ~4% faster to wrap
+// NB: Although `Py<PyAny>` (aka `Py<PyAny>`) directly implements `Clone`, it's ~4% faster to wrap
 // in `Arc` like this, because `Py<T>` internally acquires a (non-GIL) global lock during `Clone`
 // and `Drop`.
 #[derive(Clone)]
-pub struct Value(Arc<PyObject>);
+pub struct Value(Arc<Py<PyAny>>);
 
 // NB: The size of objects held by a Graph is tracked independently, so we assert that each Value
 // is only as large as its pointer.
 known_deep_size!(8; Value);
 
 impl Value {
-    pub fn new(obj: PyObject) -> Value {
+    pub fn new(obj: Py<PyAny>) -> Value {
         Value(Arc::new(obj))
     }
 
     // NB: Longer name because overloaded in a few places.
-    pub fn consume_into_py_object(self, py: Python) -> PyObject {
+    pub fn consume_into_py_object(self, py: Python) -> Py<PyAny> {
         match Arc::try_unwrap(self.0) {
             Ok(obj) => obj,
             Err(arc_handle) => arc_handle.clone_ref(py),
@@ -368,7 +368,7 @@ impl<'py> IntoPyObject<'py> for &Value {
     }
 }
 
-impl From<Value> for PyObject {
+impl From<Value> for Py<PyAny> {
     fn from(value: Value) -> Self {
         match Arc::try_unwrap(value.0) {
             Ok(obj) => obj,
@@ -377,8 +377,8 @@ impl From<Value> for PyObject {
     }
 }
 
-impl From<PyObject> for Value {
-    fn from(obj: PyObject) -> Self {
+impl From<Py<PyAny>> for Value {
+    fn from(obj: Py<PyAny>) -> Self {
         Value::new(obj)
     }
 }
