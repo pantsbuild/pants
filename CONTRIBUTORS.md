@@ -392,6 +392,7 @@ Created as part of the release process.
 + csteiner
 + eugene yokota
 + fabric-peter
++ github-actions[bot]
 + gyudoza
 + hephex
 + jgartdele/del
