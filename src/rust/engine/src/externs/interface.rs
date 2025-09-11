@@ -1175,6 +1175,7 @@ fn scheduler_metrics<'py>(
     })
 }
 
+#[allow(clippy::type_complexity)]
 #[pyfunction]
 fn scheduler_live_items<'py>(
     py: Python<'py>,

@@ -6,7 +6,7 @@
 
 use futures::FutureExt;
 use futures::future::{BoxFuture, Future};
-use parking_lot::Mutex;
+use parking_lot::{MappedRwLockReadGuard, Mutex, RwLock, RwLockReadGuard};
 use pyo3::FromPyObject;
 use pyo3::exceptions::{PyAssertionError, PyException, PyStopIteration, PyTypeError, PyValueError};
 use pyo3::prelude::*;
@@ -17,7 +17,7 @@ use smallvec::{SmallVec, smallvec};
 use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::fmt;
-use std::sync::{Arc, LazyLock};
+use std::sync::LazyLock;
 
 use logging::PythonLogLevel;
 use rule_graph::RuleId;
@@ -521,17 +521,23 @@ impl PyGeneratorResponseNativeCall {
 }
 
 #[pyclass(subclass)]
-pub struct PyGeneratorResponseCall(Mutex<Option<Arc<Call>>>);
+pub struct PyGeneratorResponseCall(RwLock<Option<Call>>);
 
 impl PyGeneratorResponseCall {
-    fn borrow_inner<'py>(&'py self, py: Python<'py>) -> PyResult<Arc<Call>> {
-        let inner = self.0.lock_py_attached(py);
+    fn borrow_inner<'py>(
+        &'py self,
+        _py: Python<'py>,
+    ) -> PyResult<MappedRwLockReadGuard<'py, Call>> {
+        // TODO: This may deadlock with the GIL. The `read_py_attached` extenstion method available in
+        // https://github.com/PyO3/pyo3/pull/5435 should be used once available in PyO3.
+        let read_guard = self.0.read();
 
-        match &*inner {
-            Some(call) => Ok(Arc::clone(call)),
-            None => Err(PyException::new_err(
+        if read_guard.is_some() {
+            Ok(RwLockReadGuard::map(read_guard, |g| g.as_ref().unwrap()))
+        } else {
+            Err(PyException::new_err(
                 "A `Call` may not be consumed after being provided to the @rule engine.",
-            )),
+            ))
         }
     }
 }
@@ -561,14 +567,14 @@ impl PyGeneratorResponseCall {
         };
         let (input_types, inputs) = interpret_get_inputs(py, input_arg0, input_arg1)?;
 
-        Ok(Self(Mutex::new(Some(Arc::new(Call {
+        Ok(Self(RwLock::new(Some(Call {
             rule_id: RuleId::from_string(rule_id),
             output_type,
             args,
             args_arity,
             input_types,
             inputs,
-        })))))
+        }))))
     }
 
     #[getter]
@@ -609,16 +615,13 @@ impl PyGeneratorResponseCall {
 }
 
 impl PyGeneratorResponseCall {
-    fn take(&self, py: Python<'_>) -> Result<Call, String> {
+    fn take(&self, _py: Python<'_>) -> Result<Call, String> {
+        // TODO: The write lock may deadlock with the GIL. The `write_py_attached` extenstion method available in
+        // https://github.com/PyO3/pyo3/pull/5435 should be used once available in PyO3.
         self.0
-            .lock_py_attached(py)
+            .write()
             .take()
             .ok_or_else(|| "A `Call` may only be consumed once.".to_owned())
-            .and_then(|h| {
-                Arc::try_unwrap(h).map_err(|_| {
-                    "A `Call` had more than one strong reference once taken!".to_owned()
-                })
-            })
     }
 }
 
