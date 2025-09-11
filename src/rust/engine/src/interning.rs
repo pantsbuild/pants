@@ -45,7 +45,7 @@ pub struct Interns {
 impl Interns {
     pub fn new() -> Self {
         Self {
-            keys: Python::with_gil(|py| PyDict::new(py).unbind()),
+            keys: Python::attach(|py| PyDict::new(py).unbind()),
             id_generator: atomic::AtomicU64::default(),
         }
     }

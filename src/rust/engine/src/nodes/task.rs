@@ -196,7 +196,7 @@ impl Task {
     ) -> NodeResult<(Value, TypeId)> {
         let mut input = GeneratorInput::Initial;
         loop {
-            let response = Python::with_gil(|py| {
+            let response = Python::attach(|py| {
                 externs::generator_send(py, &context.core.types.coroutine, &generator, input)
             })?;
             match response {
@@ -248,7 +248,7 @@ impl Task {
                     match future::try_join_all(get_futures).await {
                         Ok(values) => {
                             let values_tuple_result =
-                                Python::with_gil(|py| externs::store_tuple(py, values));
+                                Python::attach(|py| externs::store_tuple(py, values));
                             input = match values_tuple_result {
                                 Ok(t) => GeneratorInput::Arg(t),
                                 Err(err) => GeneratorInput::Err(err),
@@ -307,7 +307,7 @@ impl Task {
             self.task.side_effecting,
             &self.side_effected,
             async move {
-                Python::with_gil(|py| {
+                Python::attach(|py| {
                     let func = self.task.func.0.value.bind(py);
 
                     // If there are explicit positional arguments, apply any computed arguments as
@@ -367,7 +367,7 @@ impl Task {
         }
 
         if self.task.engine_aware_return_type {
-            Python::with_gil(|py| {
+            Python::attach(|py| {
                 EngineAwareReturnType::update_workunit(workunit, result_val.bind(py))
             })
         };

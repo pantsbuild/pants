@@ -36,8 +36,8 @@ impl PyExecutor {
             // thread, and the Python runtime won't wipe the trace function between calls.
             // See https://github.com/PyO3/pyo3/issues/2495
             let _ =
-                unsafe { ffi::PyThreadState_New(Python::with_gil(|_| PyInterpreterState_Main())) };
-            Python::with_gil(|py| {
+                unsafe { ffi::PyThreadState_New(Python::attach(|_| PyInterpreterState_Main())) };
+            Python::attach(|py| {
                 let _ = py.eval(c"__import__('debugpy').debug_this_thread()", None, None);
             });
         })

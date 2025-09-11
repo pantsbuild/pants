@@ -150,11 +150,11 @@ impl TypeId {
     }
 
     pub fn is_union(&self) -> bool {
-        Python::with_gil(|py| externs::is_union(py, &self.as_py_type(py)).unwrap())
+        Python::attach(|py| externs::is_union(py, &self.as_py_type(py)).unwrap())
     }
 
     pub fn union_in_scope_types(&self) -> Option<Vec<TypeId>> {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             externs::union_in_scope_types(py, &self.as_py_type(py))
                 .unwrap()
                 .map(|types| {
@@ -169,7 +169,7 @@ impl TypeId {
 
 impl fmt::Debug for TypeId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let type_bound = self.as_py_type(py);
             let name = type_bound.name().unwrap();
             write!(f, "{name}")
@@ -200,7 +200,7 @@ pub struct Function(pub Key);
 impl Function {
     /// The function represented as `path.to.module:lineno:func_name`.
     pub fn full_name(&self) -> String {
-        let (module, name, line_no) = Python::with_gil(|py| {
+        let (module, name, line_no) = Python::attach(|py| {
             let obj = self.0.value.bind(py);
             let module: String = externs::getattr(obj, "__module__").unwrap();
             let name: String = externs::getattr(obj, "__name__").unwrap();
@@ -280,7 +280,7 @@ impl Key {
     }
 
     pub fn from_value(val: Value) -> PyResult<Key> {
-        Python::with_gil(|py| externs::INTERNS.key_insert(py, val.consume_into_py_object(py)))
+        Python::attach(|py| externs::INTERNS.key_insert(py, val.consume_into_py_object(py)))
     }
 
     pub fn to_value(&self) -> Value {
@@ -329,7 +329,7 @@ impl workunit_store::Value for Value {
 
 impl PartialEq for Value {
     fn eq(&self, other: &Value) -> bool {
-        Python::with_gil(|py| externs::equals(self.bind(py), other.0.bind(py)))
+        Python::attach(|py| externs::equals(self.bind(py), other.0.bind(py)))
     }
 }
 
@@ -337,7 +337,7 @@ impl Eq for Value {}
 
 impl fmt::Debug for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let repr = Python::with_gil(|py| {
+        let repr = Python::attach(|py| {
             let obj = self.0.bind(py);
             externs::val_to_str(obj)
         });
@@ -372,7 +372,7 @@ impl From<Value> for PyObject {
     fn from(value: Value) -> Self {
         match Arc::try_unwrap(value.0) {
             Ok(obj) => obj,
-            Err(arc_handle) => Python::with_gil(|py| arc_handle.clone_ref(py)),
+            Err(arc_handle) => Python::attach(|py| arc_handle.clone_ref(py)),
         }
     }
 }
@@ -549,7 +549,7 @@ impl fmt::Display for Failure {
                 write!(f, "Missing digest: {s}: {d:?}")
             }
             Failure::Throw { val, .. } => {
-                let repr = Python::with_gil(|py| {
+                let repr = Python::attach(|py| {
                     let obj = val.0.bind(py);
                     externs::val_to_str(obj)
                 });
@@ -591,13 +591,13 @@ impl From<String> for Failure {
 
 impl From<PyErr> for Failure {
     fn from(py_err: PyErr) -> Self {
-        Python::with_gil(|py| Failure::from_py_err_with_gil(py, py_err))
+        Python::attach(|py| Failure::from_py_err_with_gil(py, py_err))
     }
 }
 
 pub fn throw(msg: String) -> Failure {
     let python_traceback = Failure::native_traceback(&msg);
-    Python::with_gil(|py| Failure::Throw {
+    Python::attach(|py| Failure::Throw {
         val: externs::create_exception(py, msg),
         python_traceback,
         engine_traceback: Vec::new(),
@@ -640,7 +640,7 @@ mod pycomparedbool_tests {
     fn pycomparedbool_conversion_tests() {
         pyo3::prepare_freethreaded_python();
 
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             assert!(
                 PyComparedBool(Some(true))
                     .into_pyobject(py)

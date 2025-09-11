@@ -629,7 +629,7 @@ fn nailgun_server_create(
     let server_future = {
         let executor = py_executor.0.clone();
         nailgun::Server::new(executor, port, move |exe: nailgun::RawFdExecution| {
-            Python::with_gil(|py| {
+            Python::attach(|py| {
                 let args_tuple = match PyTuple::new(py, exe.cmd.args) {
                     Ok(t) => t,
                     Err(e) => {
@@ -838,7 +838,7 @@ async fn workunit_to_py_value(
         ))
     })?;
     let has_parent_ids = !workunit.parent_ids.is_empty();
-    let mut dict_entries = Python::with_gil(|py| -> PyO3Result<Vec<(Value, Value)>> {
+    let mut dict_entries = Python::attach(|py| -> PyO3Result<Vec<(Value, Value)>> {
         let mut dict_entries = vec![
             (
                 externs::store_utf8(py, "name"),
@@ -921,7 +921,7 @@ async fn workunit_to_py_value(
     for (artifact_name, digest) in metadata.artifacts.iter() {
         let store = core.store();
         let py_val = match digest {
-            ArtifactOutput::FileDigest(digest) => Python::with_gil(|py| {
+            ArtifactOutput::FileDigest(digest) => Python::attach(|py| {
                 crate::nodes::Snapshot::store_file_digest(py, *digest).map_err(PyException::new_err)
             })?,
             ArtifactOutput::Snapshot(digest_handle) => {
@@ -937,19 +937,19 @@ async fn workunit_to_py_value(
                     .await
                     .map_err(possible_store_missing_digest)?;
 
-                Python::with_gil(|py| {
+                Python::attach(|py| {
                     crate::nodes::Snapshot::store_snapshot(py, snapshot)
                         .map_err(PyException::new_err)
                 })?
             }
         };
 
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             artifact_entries.push((externs::store_utf8(py, artifact_name.as_str()), py_val))
         })
     }
 
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let mut user_metadata_entries = Vec::with_capacity(metadata.user_metadata.len());
         for (user_metadata_key, user_metadata_item) in metadata.user_metadata.iter() {
             let value = match user_metadata_item {
@@ -1092,7 +1092,7 @@ fn session_poll_workunits(
     let py_session = std::panic::AssertUnwindSafe(py_session);
     std::panic::catch_unwind(|| {
         let (core, session, py_level) = {
-            Python::with_gil(|py| -> PyO3Result<_> {
+            Python::attach(|py| -> PyO3Result<_> {
                 let py_scheduler = py_scheduler.extract::<PyRef<PyScheduler>>(py)?;
                 let py_session = py_session.extract::<PyRef<PySession>>(py)?;
                 let py_level: PythonLogLevel = max_log_verbosity_level
@@ -1105,7 +1105,7 @@ fn session_poll_workunits(
             let workunit_store = session.workunit_store();
             let (started, completed) = workunit_store.latest_workunits(py_level.into());
 
-            Python::with_gil(|py| -> PyO3Result<_> {
+            Python::attach(|py| -> PyO3Result<_> {
                 let started_val = core.executor.block_on(workunits_to_py_tuple_value(
                     py,
                     &workunit_store,
@@ -1878,7 +1878,7 @@ fn single_file_digests_to_bytes<'py>(
             async move {
                 store
                     .load_file_bytes_with(py_file_digest.0, |bytes| {
-                        Python::with_gil(|py| externs::store_bytes(py, bytes))
+                        Python::attach(|py| externs::store_bytes(py, bytes))
                     })
                     .await
             }
