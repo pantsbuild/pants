@@ -6,18 +6,18 @@
 
 use futures::FutureExt;
 use futures::future::{BoxFuture, Future};
+use parking_lot::Mutex;
 use pyo3::FromPyObject;
 use pyo3::exceptions::{PyAssertionError, PyException, PyStopIteration, PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::sync::GILProtected;
+use pyo3::sync::MutexExt;
 use pyo3::types::{PyBool, PyBytes, PyDict, PySequence, PyString, PyTuple, PyType};
 use pyo3::{create_exception, import_exception, intern};
 use smallvec::{SmallVec, smallvec};
-use std::cell::{Ref, RefCell};
 use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::fmt;
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 
 use logging::PythonLogLevel;
 use rule_graph::RuleId;
@@ -485,19 +485,16 @@ fn interpret_get_inputs(
 }
 
 #[pyclass]
-pub struct PyGeneratorResponseNativeCall(GILProtected<RefCell<Option<NativeCall>>>);
+pub struct PyGeneratorResponseNativeCall(Mutex<Option<NativeCall>>);
 
 impl PyGeneratorResponseNativeCall {
     pub fn new(call: impl Future<Output = Result<Value, Failure>> + 'static + Send) -> Self {
-        Self(GILProtected::new(RefCell::new(Some(NativeCall {
-            call: call.boxed(),
-        }))))
+        Self(Mutex::new(Some(NativeCall { call: call.boxed() })))
     }
 
     fn take(&self, py: Python<'_>) -> Result<NativeCall, String> {
         self.0
-            .get(py)
-            .borrow_mut()
+            .lock_py_attached(py)
             .take()
             .ok_or_else(|| "A `NativeCall` may only be consumed once.".to_owned())
     }
@@ -524,17 +521,18 @@ impl PyGeneratorResponseNativeCall {
 }
 
 #[pyclass(subclass)]
-pub struct PyGeneratorResponseCall(GILProtected<RefCell<Option<Call>>>);
+pub struct PyGeneratorResponseCall(Mutex<Option<Arc<Call>>>);
 
 impl PyGeneratorResponseCall {
-    fn borrow_inner<'py>(&'py self, py: Python<'py>) -> PyResult<Ref<'py, Call>> {
-        let inner: Ref<'py, _> = self.0.get(py).borrow();
+    fn borrow_inner<'py>(&'py self, py: Python<'py>) -> PyResult<Arc<Call>> {
+        let inner = self.0.lock_py_attached(py);
 
-        Ref::filter_map(inner, |o: &Option<Call>| o.as_ref()).map_err(|_| {
-            PyException::new_err(
+        match &*inner {
+            Some(call) => Ok(Arc::clone(call)),
+            None => Err(PyException::new_err(
                 "A `Call` may not be consumed after being provided to the @rule engine.",
-            )
-        })
+            )),
+        }
     }
 }
 
@@ -563,7 +561,7 @@ impl PyGeneratorResponseCall {
         };
         let (input_types, inputs) = interpret_get_inputs(py, input_arg0, input_arg1)?;
 
-        Ok(Self(GILProtected::new(RefCell::new(Some(Call {
+        Ok(Self(Mutex::new(Some(Arc::new(Call {
             rule_id: RuleId::from_string(rule_id),
             output_type,
             args,
@@ -613,22 +611,25 @@ impl PyGeneratorResponseCall {
 impl PyGeneratorResponseCall {
     fn take(&self, py: Python<'_>) -> Result<Call, String> {
         self.0
-            .get(py)
-            .borrow_mut()
+            .lock_py_attached(py)
             .take()
             .ok_or_else(|| "A `Call` may only be consumed once.".to_owned())
+            .and_then(|h| {
+                Arc::try_unwrap(h).map_err(|_| {
+                    "A `Call` had more than one strong reference once taken!".to_owned()
+                })
+            })
     }
 }
 
 // Contains a `RefCell<Option<Get>>` in order to allow us to `take` the content without cloning.
 #[pyclass(subclass)]
-pub struct PyGeneratorResponseGet(GILProtected<RefCell<Option<Get>>>);
+pub struct PyGeneratorResponseGet(Mutex<Option<Get>>);
 
 impl PyGeneratorResponseGet {
     fn take(&self, py: Python<'_>) -> Result<Get, String> {
         self.0
-            .get(py)
-            .borrow_mut()
+            .lock_py_attached(py)
             .take()
             .ok_or_else(|| "A `Get` may only be consumed once.".to_owned())
     }
@@ -655,19 +656,18 @@ impl PyGeneratorResponseGet {
 
         let (input_types, inputs) = interpret_get_inputs(py, input_arg0, input_arg1)?;
 
-        Ok(Self(GILProtected::new(RefCell::new(Some(Get {
+        Ok(Self(Mutex::new(Some(Get {
             output,
             input_types,
             inputs,
-        })))))
+        }))))
     }
 
     #[getter]
     fn output_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyType>> {
         Ok(self
             .0
-            .get(py)
-            .borrow()
+            .lock_py_attached(py)
             .as_ref()
             .ok_or_else(|| {
                 PyException::new_err(
@@ -682,8 +682,7 @@ impl PyGeneratorResponseGet {
     fn input_types<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyType>>> {
         Ok(self
             .0
-            .get(py)
-            .borrow()
+            .lock_py_attached(py)
             .as_ref()
             .ok_or_else(|| {
                 PyException::new_err(
@@ -700,8 +699,7 @@ impl PyGeneratorResponseGet {
     fn inputs(&self, py: Python<'_>) -> PyResult<Vec<Py<PyAny>>> {
         Ok(self
             .0
-            .get(py)
-            .borrow()
+            .lock_py_attached(py)
             .as_ref()
             .ok_or_else(|| {
                 PyException::new_err(
@@ -717,7 +715,7 @@ impl PyGeneratorResponseGet {
     fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
         Ok(format!(
             "{}",
-            self.0.get(py).borrow().as_ref().ok_or_else(|| {
+            self.0.lock_py_attached(py).as_ref().ok_or_else(|| {
                 PyException::new_err(
                     "A `Get` may not be consumed after being provided to the @rule engine.",
                 )

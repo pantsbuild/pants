@@ -3260,8 +3260,10 @@ checksum = "7ba0117f4212101ee6544044dae45abe1083d30ce7b29c4b5cbdfa2354e07383"
 dependencies = [
  "indoc",
  "libc",
+ "lock_api",
  "memoffset 0.9.1",
  "once_cell",
+ "parking_lot 0.12.4",
  "portable-atomic",
  "pyo3-build-config",
  "pyo3-ffi",

@@ -6,7 +6,6 @@
 
 /// This crate is a wrapper around the engine crate which exposes a Python module via PyO3.
 use std::any::Any;
-use std::cell::RefCell;
 use std::collections::hash_map::HashMap;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::convert::TryInto;
@@ -29,6 +28,7 @@ use hashing::Digest;
 use log::{self, Log, debug, error, warn};
 use logging::logger::PANTS_LOGGER;
 use logging::{Logger, PythonLogLevel};
+use parking_lot::Mutex as SyncMutex;
 use petgraph::graph::{DiGraph, Graph};
 use process_execution::CacheContentBehavior;
 use pyo3::exceptions::{PyException, PyIOError, PyKeyboardInterrupt, PyValueError};
@@ -36,12 +36,12 @@ use pyo3::prelude::{
     PyModule, PyResult as PyO3Result, Python, pyclass, pyfunction, pymethods, pymodule,
     wrap_pyfunction,
 };
-use pyo3::sync::GILProtected;
+use pyo3::sync::MutexExt;
 use pyo3::types::{
     PyAnyMethods, PyBytes, PyDict, PyDictMethods, PyList, PyListMethods, PyModuleMethods, PyTuple,
     PyType,
 };
-use pyo3::{Bound, IntoPyObject, PyAny, PyRef, create_exception};
+use pyo3::{Bound, IntoPyObject, Py, PyAny, PyRef, create_exception};
 use regex::Regex;
 use remote::remote_cache::RemoteCacheWarningsBehavior;
 use rule_graph::{self, RuleGraph, RuleId};
@@ -177,18 +177,18 @@ pub fn initialize() -> PyO3Result<()> {
 }
 
 #[pyclass]
-struct PyTasks(GILProtected<RefCell<Tasks>>);
+struct PyTasks(SyncMutex<Option<Tasks>>);
 
 #[pymethods]
 impl PyTasks {
     #[new]
     fn __new__() -> Self {
-        Self(GILProtected::new(RefCell::new(Tasks::new())))
+        Self(SyncMutex::new(Some(Tasks::new())))
     }
 }
 
 #[pyclass]
-struct PyTypes(GILProtected<RefCell<Option<Types>>>);
+struct PyTypes(SyncMutex<Option<Types>>);
 
 #[pymethods]
 impl PyTypes {
@@ -225,7 +225,7 @@ impl PyTypes {
         parsed_javascript_deps_candidate_result: &Bound<'_, PyType>,
         py: Python,
     ) -> Self {
-        Self(GILProtected::new(RefCell::new(Some(Types {
+        Self(SyncMutex::new(Some(Types {
             directory_digest: TypeId::new(&py.get_type::<externs::fs::PyDigest>()),
             file_digest: TypeId::new(&py.get_type::<externs::fs::PyFileDigest>()),
             snapshot: TypeId::new(&py.get_type::<externs::fs::PySnapshot>()),
@@ -269,7 +269,7 @@ impl PyTypes {
             deps_request: TypeId::new(
                 &py.get_type::<externs::dep_inference::PyNativeDependenciesRequest>(),
             ),
-        }))))
+        })))
     }
 }
 
@@ -513,14 +513,14 @@ impl PySessionCancellationLatch {
 
 #[pyclass]
 struct PyNailgunServer {
-    server: GILProtected<RefCell<Option<nailgun::Server>>>,
+    server: SyncMutex<Option<nailgun::Server>>,
     executor: Executor,
 }
 
 #[pymethods]
 impl PyNailgunServer {
     fn port(&self, py: Python<'_>) -> PyO3Result<u16> {
-        let borrowed_server = self.server.get(py).borrow();
+        let borrowed_server = self.server.lock_py_attached(py);
         let server = borrowed_server.as_ref().ok_or_else(|| {
             PyException::new_err("Cannot get the port of a server that has already shut down.")
         })?;
@@ -529,7 +529,7 @@ impl PyNailgunServer {
 }
 
 #[pyclass]
-struct PyExecutionRequest(GILProtected<RefCell<ExecutionRequest>>);
+struct PyExecutionRequest(SyncMutex<ExecutionRequest>);
 
 #[pymethods]
 impl PyExecutionRequest {
@@ -542,7 +542,7 @@ impl PyExecutionRequest {
             timeout: timeout_in_ms.map(Duration::from_millis),
             ..ExecutionRequest::default()
         };
-        Self(GILProtected::new(RefCell::new(request)))
+        Self(SyncMutex::new(request))
     }
 }
 
@@ -670,7 +670,7 @@ fn nailgun_server_create(
         .block_on(server_future)
         .map_err(PyException::new_err)?;
     Ok(PyNailgunServer {
-        server: GILProtected::new(RefCell::new(Some(server))),
+        server: SyncMutex::new(Some(server)),
         executor: py_executor.0.clone(),
     })
 }
@@ -683,8 +683,7 @@ fn nailgun_server_await_shutdown(
     if let Some(server) = nailgun_server_ptr
         .borrow()
         .server
-        .get(py)
-        .borrow_mut()
+        .lock_py_attached(py)
         .take()
     {
         let executor = nailgun_server_ptr.borrow().executor.clone();
@@ -786,11 +785,15 @@ fn scheduler_create<'py>(
     let types = types_ptr
         .borrow()
         .0
-        .get(py)
-        .borrow_mut()
+        .lock_py_attached(py)
         .take()
         .ok_or_else(|| PyException::new_err("An instance of PyTypes may only be used once."))?;
-    let tasks = py_tasks.borrow().0.get(py).replace(Tasks::new());
+    let tasks = py_tasks
+        .borrow()
+        .0
+        .lock_py_attached(py)
+        .replace(Tasks::new())
+        .unwrap();
 
     // NOTE: Enter the Tokio runtime so that libraries like Tonic (for gRPC) are able to
     // use `tokio::spawn` since Python does not setup Tokio for the main thread. This also
@@ -1213,8 +1216,7 @@ fn scheduler_execute<'py>(
     let scheduler = &py_scheduler.borrow().0;
     let session = &py_session.borrow().0;
     let execution_request_cell_ref = py_execution_request.borrow();
-    let execution_request_cell = execution_request_cell_ref.0.get(py);
-    let execution_request: &mut ExecutionRequest = &mut execution_request_cell.borrow_mut();
+    let execution_request = execution_request_cell_ref.0.lock_py_attached(py);
 
     scheduler.core.executor.enter(|| {
         // TODO: A parent_id should be an explicit argument.
@@ -1223,7 +1225,7 @@ fn scheduler_execute<'py>(
         Ok(py
             .detach(|| {
                 scheduler
-                    .execute(execution_request, session)
+                    .execute(&execution_request, session)
                     .map_err(|e| match e {
                         ExecutionTermination::KeyboardInterrupt => PyKeyboardInterrupt::new_err(()),
                         ExecutionTermination::PollTimeout => PollTimeout::new_err(()),
@@ -1246,8 +1248,7 @@ fn execution_add_root_select<'py>(
 ) -> PyO3Result<()> {
     let scheduler = &py_scheduler.borrow().0;
     let execution_request_cell_ref = py_execution_request.borrow();
-    let execution_request_cell = execution_request_cell_ref.0.get(py);
-    let execution_request: &mut ExecutionRequest = &mut execution_request_cell.borrow_mut();
+    let mut execution_request = execution_request_cell_ref.0.lock_py_attached(py);
 
     scheduler.core.executor.enter(|| {
         let product = TypeId::new(product);
@@ -1256,7 +1257,7 @@ fn execution_add_root_select<'py>(
             .map(|p| Key::from_value(p.into()))
             .collect::<Result<Vec<_>, _>>()?;
         Params::new(keys)
-            .and_then(|params| scheduler.add_root_select(execution_request, params, product))
+            .and_then(|params| scheduler.add_root_select(&mut execution_request, params, product))
             .map_err(PyException::new_err)
     })
 }
@@ -1286,24 +1287,36 @@ fn tasks_task_begin<'py>(
         .map(|(name, typ)| (name, TypeId::new(&typ.as_borrowed())))
         .collect();
     let masked_types = masked_types.into_iter().map(|t| TypeId::new(&t)).collect();
-    py_tasks.borrow_mut().0.get(py).borrow_mut().task_begin(
-        func,
-        output_type,
-        side_effecting,
-        engine_aware_return_type,
-        arg_types,
-        masked_types,
-        cacheable,
-        name,
-        if desc.is_empty() { None } else { Some(desc) },
-        py_level.into(),
-    );
+    py_tasks
+        .borrow_mut()
+        .0
+        .lock_py_attached(py)
+        .as_mut()
+        .unwrap()
+        .task_begin(
+            func,
+            output_type,
+            side_effecting,
+            engine_aware_return_type,
+            arg_types,
+            masked_types,
+            cacheable,
+            name,
+            if desc.is_empty() { None } else { Some(desc) },
+            py_level.into(),
+        );
     Ok(())
 }
 
 #[pyfunction]
 fn tasks_task_end(py: Python<'_>, py_tasks: &Bound<'_, PyTasks>) {
-    py_tasks.borrow_mut().0.get(py).borrow_mut().task_end();
+    py_tasks
+        .borrow_mut()
+        .0
+        .lock_py_attached(py)
+        .as_mut()
+        .unwrap()
+        .task_end();
 }
 
 #[pyfunction]
@@ -1321,18 +1334,24 @@ fn tasks_add_call<'py>(
     let inputs = inputs.into_iter().map(|t| TypeId::new(&t)).collect();
     let in_scope_types =
         in_scope_types.map(|ist| ist.into_iter().map(|t| TypeId::new(&t)).collect());
-    py_tasks.borrow_mut().0.get(py).borrow_mut().add_call(
-        output,
-        inputs,
-        RuleId::from_string(rule_id),
-        explicit_args_arity,
-        vtable_entries.map(|vte| {
-            vte.into_iter()
-                .map(|(k, v)| (TypeId::new(&k), RuleId::from_string(v)))
-                .collect()
-        }),
-        in_scope_types,
-    );
+    py_tasks
+        .borrow_mut()
+        .0
+        .lock_py_attached(py)
+        .as_mut()
+        .unwrap()
+        .add_call(
+            output,
+            inputs,
+            RuleId::from_string(rule_id),
+            explicit_args_arity,
+            vtable_entries.map(|vte| {
+                vte.into_iter()
+                    .map(|(k, v)| (TypeId::new(&k), RuleId::from_string(v)))
+                    .collect()
+            }),
+            in_scope_types,
+        );
 }
 
 #[pyfunction]
@@ -1347,8 +1366,9 @@ fn tasks_add_get<'py>(
     py_tasks
         .borrow_mut()
         .0
-        .get(py)
-        .borrow_mut()
+        .lock_py_attached(py)
+        .as_mut()
+        .unwrap()
         .add_get(output, inputs);
 }
 
@@ -1366,11 +1386,13 @@ fn tasks_add_get_union<'py>(
         .into_iter()
         .map(|t| TypeId::new(&t))
         .collect();
-    py_tasks.borrow_mut().0.get(py).borrow_mut().add_get_union(
-        product,
-        input_types,
-        in_scope_types,
-    );
+    py_tasks
+        .borrow_mut()
+        .0
+        .lock_py_attached(py)
+        .as_mut()
+        .unwrap()
+        .add_get_union(product, input_types, in_scope_types);
 }
 
 #[pyfunction]
@@ -1385,8 +1407,9 @@ fn tasks_add_query<'py>(
     py_tasks
         .borrow_mut()
         .0
-        .get(py)
-        .borrow_mut()
+        .lock_py_attached(py)
+        .as_mut()
+        .unwrap()
         .query_add(product, params);
 }
 
