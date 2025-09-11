@@ -466,7 +466,7 @@ impl PySession {
         // NB: Session creation interacts with the Graph, which must not be accessed while the GIL is
         // held.
         let session = py
-            .allow_threads(|| {
+            .detach(|| {
                 Session::new(
                     core,
                     dynamic_ui,
@@ -688,7 +688,7 @@ fn nailgun_server_await_shutdown(
         .take()
     {
         let executor = nailgun_server_ptr.borrow().executor.clone();
-        py.allow_threads(|| executor.block_on(server.shutdown()))
+        py.detach(|| executor.block_on(server.shutdown()))
             .map_err(PyException::new_err)
     } else {
         Ok(())
@@ -1142,7 +1142,7 @@ fn session_run_interactive_process(
     let interactive_process: Value = interactive_process.into();
     let process_config = Value::from(process_config_from_environment.as_any());
 
-    py.allow_threads(|| {
+    py.detach(|| {
         core.executor.clone().block_on(nodes::task_context(
             context.clone(),
             true,
@@ -1165,7 +1165,7 @@ fn scheduler_metrics<'py>(
     let session = &py_session.borrow().0;
 
     core.executor.enter(|| {
-        py.allow_threads(|| {
+        py.detach(|| {
             let result = scheduler.metrics(session);
             result.into_iter().map(|(k, v)| (k.to_owned(), v)).collect()
         })
@@ -1184,7 +1184,7 @@ fn scheduler_live_items<'py>(
 
     let (items, sizes) = core
         .executor
-        .enter(|| py.allow_threads(|| scheduler.live_items(session)));
+        .enter(|| py.detach(|| scheduler.live_items(session)));
     let py_items = items
         .into_iter()
         .map(|value| value.bind(py).clone().unbind())
@@ -1196,7 +1196,7 @@ fn scheduler_live_items<'py>(
 fn scheduler_shutdown(py: Python, py_scheduler: &Bound<'_, PyScheduler>, timeout_secs: u64) {
     let core = py_scheduler.borrow().0.core.clone();
     core.executor.enter(|| {
-        py.allow_threads(|| {
+        py.detach(|| {
             core.executor
                 .block_on(core.shutdown(Duration::from_secs(timeout_secs)));
         })
@@ -1221,7 +1221,7 @@ fn scheduler_execute<'py>(
         session.workunit_store().init_thread_state(None);
 
         Ok(py
-            .allow_threads(|| {
+            .detach(|| {
                 scheduler
                     .execute(execution_request, session)
                     .map_err(|e| match e {
@@ -1400,7 +1400,7 @@ fn graph_invalidate_paths(
     scheduler
         .core
         .executor
-        .enter(|| py.allow_threads(|| scheduler.invalidate_paths(&paths) as u64))
+        .enter(|| py.detach(|| scheduler.invalidate_paths(&paths) as u64))
 }
 
 #[pyfunction]
@@ -1409,7 +1409,7 @@ fn graph_invalidate_all_paths(py: Python, py_scheduler: &Bound<'_, PyScheduler>)
     scheduler
         .core
         .executor
-        .enter(|| py.allow_threads(|| scheduler.invalidate_all_paths() as u64))
+        .enter(|| py.detach(|| scheduler.invalidate_all_paths() as u64))
 }
 
 #[pyfunction]
@@ -1418,7 +1418,7 @@ fn graph_invalidate_all(py: Python, py_scheduler: &Bound<'_, PyScheduler>) {
     scheduler
         .core
         .executor
-        .enter(|| py.allow_threads(|| scheduler.invalidate_all()))
+        .enter(|| py.detach(|| scheduler.invalidate_all()))
 }
 
 #[pyfunction]
@@ -1434,7 +1434,7 @@ fn check_invalidation_watcher_liveness(py_scheduler: &Bound<'_, PyScheduler>) ->
 fn graph_len(py: Python, py_scheduler: &Bound<'_, PyScheduler>) -> u64 {
     let core = &py_scheduler.borrow().0.core;
     core.executor
-        .enter(|| py.allow_threads(|| core.graph.len() as u64))
+        .enter(|| py.detach(|| core.graph.len() as u64))
 }
 
 #[pyfunction]
@@ -1447,7 +1447,7 @@ fn graph_visualize(
     let scheduler = &py_scheduler.borrow().0;
     let session = &py_session.borrow().0;
     scheduler.core.executor.enter(|| {
-        py.allow_threads(|| scheduler.visualize(session, path.as_path()))
+        py.detach(|| scheduler.visualize(session, path.as_path()))
             .map_err(|e| {
                 PyException::new_err(format!(
                     "Failed to visualize to {}: {:?}",
@@ -1469,7 +1469,7 @@ fn session_get_metrics(
     py_session: &Bound<'_, PySession>,
 ) -> HashMap<&'static str, u64> {
     let session = &py_session.borrow().0;
-    py.allow_threads(|| session.workunit_store().get_metrics())
+    py.detach(|| session.workunit_store().get_metrics())
 }
 
 #[pyfunction]
@@ -1484,7 +1484,7 @@ fn session_get_observation_histograms<'py>(
 
     let session = &py_session.borrow().0;
     py_scheduler.borrow().0.core.executor.enter(|| {
-        let observations = py.allow_threads(|| {
+        let observations = py.detach(|| {
             session
                 .workunit_store()
                 .encode_observations()
@@ -1542,7 +1542,7 @@ fn session_wait_for_tail_tasks(
     let session = &py_session.borrow().0;
 
     core.executor.enter(|| {
-        py.allow_threads(|| {
+        py.detach(|| {
             core.executor.block_on(session.tail_tasks().wait(timeout));
         })
     });
@@ -1726,7 +1726,7 @@ fn garbage_collect_store(
 ) -> PyO3Result<()> {
     let core = py_scheduler.borrow().0.core.clone();
     core.clone().executor.enter(|| {
-        py.allow_threads(|| {
+        py.detach(|| {
             core.executor.block_on(
                 core.store()
                     .garbage_collect(target_size_bytes, store::ShrinkBehavior::Fast),
@@ -1747,7 +1747,7 @@ fn lease_files_in_graph(
     let session = &py_session.borrow().0;
 
     core.executor.enter(|| {
-        py.allow_threads(|| {
+        py.detach(|| {
             let digests = scheduler.all_digests(session);
             core.executor
                 .block_on(core.store().lease_all_recursively(digests.iter()))
@@ -1792,7 +1792,7 @@ fn capture_snapshots(
             .collect::<Result<Vec<_>, _>>()
             .map_err(PyValueError::new_err)?;
 
-        py.allow_threads(|| {
+        py.detach(|| {
             let snapshot_futures = path_globs_and_roots
                 .into_iter()
                 .map(|(path_globs, root, digest_hint)| {
@@ -1836,7 +1836,7 @@ fn ensure_remote_has_recursive(
             .collect::<Result<Vec<Digest>, _>>()
             .map_err(PyException::new_err)?;
 
-        py.allow_threads(|| {
+        py.detach(|| {
             core.executor
                 .block_on(core.store().ensure_remote_has_recursive(digests))
         })
@@ -1856,7 +1856,7 @@ fn ensure_directory_digest_persisted(
         let digest =
             crate::nodes::lift_directory_digest(py_digest).map_err(PyException::new_err)?;
 
-        py.allow_threads(|| {
+        py.detach(|| {
             core.executor
                 .block_on(core.store().ensure_directory_digest_persisted(digest))
         })
@@ -1885,7 +1885,7 @@ fn single_file_digests_to_bytes<'py>(
         });
 
         let bytes_values: Vec<PyObject> = py
-            .allow_threads(|| core.executor.block_on(future::try_join_all(digest_futures)))
+            .detach(|| core.executor.block_on(future::try_join_all(digest_futures)))
             .map(|values| values.into_iter().map(|val| val.into()).collect())
             .map_err(possible_store_missing_digest)?;
 
@@ -2073,14 +2073,14 @@ fn stdio_thread_set_destination(stdio_destination: &Bound<'_, PyStdioDestination
 #[pyfunction]
 #[pyo3(signature = (log_path))]
 fn set_per_run_log_path(py: Python, log_path: Option<PathBuf>) {
-    py.allow_threads(|| {
+    py.detach(|| {
         PANTS_LOGGER.set_per_run_logs(log_path);
     })
 }
 
 #[pyfunction]
 fn write_log(py: Python, msg: String, level: u64, target: String) {
-    py.allow_threads(|| {
+    py.detach(|| {
         Logger::log_from_python(&msg, level, &target).expect("Error logging message");
     })
 }
@@ -2107,7 +2107,7 @@ fn teardown_dynamic_ui<'py>(
 
 #[pyfunction]
 fn flush_log(py: Python) {
-    py.allow_threads(|| {
+    py.detach(|| {
         PANTS_LOGGER.flush();
     })
 }
@@ -2132,7 +2132,7 @@ where
     T: Send,
     E: Send,
 {
-    py.allow_threads(|| {
+    py.detach(|| {
         let future = f();
         tokio::task::block_in_place(|| futures::executor::block_on(future))
     })

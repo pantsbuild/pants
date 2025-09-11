@@ -257,7 +257,7 @@ enum CreateDigestItem {
 
 #[pyfunction]
 fn create_digest(py: Python, create_digest: Value) -> PyResult<PyGeneratorResponseNativeCall> {
-    let (items_to_store, trie) = py.allow_threads(|| -> Result<_, Failure> {
+    let (items_to_store, trie) = py.detach(|| -> Result<_, Failure> {
         let mut new_file_count = 0;
 
         let items: Vec<CreateDigestItem> = {

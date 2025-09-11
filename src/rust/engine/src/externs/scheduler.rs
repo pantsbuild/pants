@@ -54,7 +54,7 @@ impl PyExecutor {
     /// Shut down this executor, waiting for all tasks to exit. Any tasks which have not exited at
     /// the end of the timeout will be leaked.
     fn shutdown(&self, py: Python, duration_secs: f64) {
-        py.allow_threads(|| self.0.shutdown(Duration::from_secs_f64(duration_secs)))
+        py.detach(|| self.0.shutdown(Duration::from_secs_f64(duration_secs)))
     }
 }
 
