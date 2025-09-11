@@ -379,9 +379,19 @@ class PythonSetup(Subsystem):
     _resolves_to_overrides = DictOption[list[str]](
         help=softwrap(
             """ Specifies a transitive requirement to override in a resolve
-            and its lockfile. Any distribution requirement in the PEX's
-            resolve that matches the override project name is replaced with
-            the given override requirement."""
+            and its lockfile.  Overrides can either modify an existing
+            dependency on a project name by changing extras, version
+            constraints or markers or else they can completely swap out the
+            dependency for a dependency on another project altogether. For the
+            former, simply supply the requirement you wish. For example,
+            specifying `--override cowsay==5.0` will override any transitive
+            dependency on cowsay that has any combination of extras, version
+            constraints or markers with the requirement `cowsay==5.0`. To
+            completely replace cowsay with another library altogether, you can
+            specify an override like `--override cowsay=my-cowsay>2`. This
+            will replace any transitive dependency on cowsay that has any
+            combination of extras, version constraints or markers with the
+            requirement `my-cowsay>2`."""
         ),
         advanced=True,
     )

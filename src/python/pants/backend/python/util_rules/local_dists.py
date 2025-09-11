@@ -15,7 +15,7 @@ from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.python_sources import PythonSourceFiles
 from pants.build_graph.address import Address
-from pants.core.goals.package import BuiltPackage, PackageFieldSet
+from pants.core.goals.package import PackageFieldSet, build_package
 from pants.core.util_rules import system_binaries
 from pants.core.util_rules.source_files import SourceFiles
 from pants.core.util_rules.system_binaries import BashBinary, UnzipBinary
@@ -25,7 +25,7 @@ from pants.engine.internals.graph import resolve_target
 from pants.engine.internals.graph import transitive_targets as transitive_targets_get
 from pants.engine.intrinsics import digest_to_snapshot, merge_digests
 from pants.engine.process import Process, fallible_to_exec_result_or_raise
-from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import TransitiveTargetsRequest, WrappedTargetRequest
 from pants.util.dirutil import fast_relpath_optional
 from pants.util.docutil import doc_url
@@ -49,7 +49,7 @@ async def isolate_local_dist_wheels(
     bash: BashBinary,
     unzip_binary: UnzipBinary,
 ) -> LocalDistWheels:
-    dist = await Get(BuiltPackage, PackageFieldSet, dist_field_set)
+    dist = await build_package(**implicitly({dist_field_set: PackageFieldSet}))
     wheels_snapshot = await digest_to_snapshot(
         **implicitly(DigestSubset(dist.digest, PathGlobs(["**/*.whl"])))
     )
