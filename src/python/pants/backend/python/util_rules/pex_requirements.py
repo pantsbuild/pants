@@ -7,8 +7,11 @@ import importlib.resources
 import logging
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
+from pathlib import PurePath
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
+
+import toml
 
 from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.subsystems.setup import InvalidLockfileBehavior, PythonSetup
@@ -130,6 +133,12 @@ def is_probably_pex_json_lockfile(lockfile_bytes: bytes) -> bool:
     return False
 
 
+def is_pylock_path(lockfile_path: str) -> bool:
+    """Check if the lockfile path is a pylock.toml file."""
+    p = PurePath(lockfile_path)
+    return p.stem.startswith("pylock") and p.suffix == ".toml"
+
+
 def _pex_lockfile_requirement_count(lockfile_bytes: bytes) -> int:
     # TODO: this is a very naive heuristic that will overcount, and also relies on Pants
     #  setting `--indent` when generating lockfiles. More robust would be parsing the JSON
@@ -214,14 +223,20 @@ async def load_lockfile(
             f"(origin: {lockfile.url_description_of_origin})"
         )
 
-    is_pex_native = is_probably_pex_json_lockfile(lock_bytes)
+    is_pylock = is_pylock_path(lockfile_path)
+    is_pex_native = is_pylock or is_probably_pex_json_lockfile(lock_bytes)
     if is_pex_native:
-        header_delimiter = "//"
-        stripped_lock_bytes = strip_comments_from_pex_json_lockfile(lock_bytes)
-        lockfile_digest = await create_digest(
-            CreateDigest([FileContent(lockfile_path, stripped_lock_bytes)])
-        )
-        requirement_estimate = _pex_lockfile_requirement_count(lock_bytes)
+        if is_pylock:
+            header_delimiter = "#"
+            data = toml.loads(lock_bytes.decode())
+            requirement_estimate = len(data["packages"])
+        else:
+            header_delimiter = "//"
+            stripped_lock_bytes = strip_comments_from_pex_json_lockfile(lock_bytes)
+            lockfile_digest = await create_digest(
+                CreateDigest([FileContent(lockfile_path, stripped_lock_bytes)])
+            )
+            requirement_estimate = _pex_lockfile_requirement_count(lock_bytes)
         constraints_strings = None
     else:
         header_delimiter = "#"
