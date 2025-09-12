@@ -3,8 +3,13 @@
 
 from __future__ import annotations
 
+import importlib
+import sys
+import textwrap
 from collections.abc import Iterable
+from contextlib import contextmanager
 from dataclasses import dataclass
+from pathlib import Path
 
 import pytest
 
@@ -142,38 +147,68 @@ def test_byname() -> None:
     assert_awaitables(rule3, [(int, []), (int, int), (int, [])])
 
 
-def test_byname_recursion() -> None:
+@contextmanager
+def temporary_module(tmp_path: Path, rule_code: str):
+    module_name = "_temp_module"
+    src_file = tmp_path / f"{module_name}.py"
+    with open(src_file, "w") as fp:
+        fp.write(rule_code)
+    spec = importlib.util.spec_from_file_location(module_name, src_file)
+    assert spec
+    assert spec.loader
+    module = importlib.util.module_from_spec(spec)
+    assert module
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    yield module
+    del sys.modules[module_name]
+
+
+def test_byname_recursion(tmp_path: Path) -> None:
     # Note that it's important that the rule is defined inside this function, so that
     # the @rule decorator is evaluated at test runtime, and not test file parse time.
-    @rule
-    async def recursive_rule(arg: int) -> int:
-        if arg == 0:
-            return 0
-        recursive = await recursive_rule(arg - 1)
-        return recursive
+    # However recursion is only supported for rules at module scope, so we have to
+    # jump through some hoops to create a module at runtime.
 
-    assert_awaitables(recursive_rule, [(int, [])])
+    rule_code = textwrap.dedent("""
+        from pants.engine.rules import rule
+
+        @rule
+        async def recursive_rule(arg: int) -> int:
+            if arg == 0:
+                return 0
+            recursive = await recursive_rule(arg - 1)
+            return recursive
+    """)
+    with temporary_module(tmp_path, rule_code) as module:
+        assert_awaitables(module.recursive_rule, [(int, [])])
 
 
-@pytest.mark.xfail(
-    reason="We don't yet support mutual recursion via call-by-name.",
-    run=False,
-)
-def test_byname_mutual_recursion() -> None:
-    @rule
-    async def mutually_recursive_rule_1(arg: str) -> int:
-        if arg == "0":
-            return 0
-        recursive = await mutually_recursive_rule_2(int(arg) - 1)
-        return int(recursive)
+def test_byname_mutual_recursion(tmp_path: Path) -> None:
+    # Note that it's important that the rules are defined inside this function, so that
+    # the @rule decorators are evaluated at test runtime, and not test file parse time.
+    # However recursion is only supported for rules at module scope, so we have to
+    # jump through some hoops to create a module at runtime.
 
-    @rule
-    async def mutually_recursive_rule_2(arg: int) -> str:
-        recursive = await mutually_recursive_rule_1(str(arg - 1))
-        return str(recursive)
+    rule_code = textwrap.dedent("""
+        from pants.engine.rules import rule
 
-    assert_awaitables(mutually_recursive_rule_1, [(str, [])])
-    assert_awaitables(mutually_recursive_rule_2, [(int, [])])
+        @rule
+        async def mutually_recursive_rule_1(arg: str) -> int:
+            if arg == "0":
+                return 0
+            recursive = await mutually_recursive_rule_2(int(arg) - 1)
+            return int(recursive)
+
+        @rule
+        async def mutually_recursive_rule_2(arg: int) -> str:
+            recursive = await mutually_recursive_rule_1(str(arg - 1))
+            return str(recursive)
+    """)
+
+    with temporary_module(tmp_path, rule_code) as module:
+        assert_awaitables(module.mutually_recursive_rule_1, [(str, [])])
+        assert_awaitables(module.mutually_recursive_rule_2, [(int, [])])
 
 
 def test_rule_helpers_free_functions() -> None:

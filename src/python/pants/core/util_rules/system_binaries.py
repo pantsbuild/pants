@@ -26,7 +26,7 @@ from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import create_digest, execute_process, path_metadata_request
 from pants.engine.platform import Platform
 from pants.engine.process import Process, execute_process_or_raise
-from pants.engine.rules import Get, collect_rules, implicitly, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
@@ -596,9 +596,7 @@ async def get_bash(system_binaries: SystemBinariesSubsystem.EnvironmentAware) ->
         search_path=search_path,
         test=BinaryPathTest(args=["--version"]),
     )
-    # Note: This Get is still necxessary to avoid a circular reference to `find_binary`` rule.
-    # TODO: Requires call-by-name support for mutual @rule recursion.
-    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    paths = await find_binary(request, **implicitly())
     first_path = paths.first_path
     if not first_path:
         raise BinaryNotFoundError.from_request(request)
