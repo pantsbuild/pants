@@ -25,7 +25,7 @@ use grpc_util::prost::MessageExt;
 use hashing::Digest;
 use itertools::Itertools;
 use local::CapturedWorkdirError;
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::pb::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 use remexec::ExecutedActionMetadata;
 use remexec::{Action, Command, ExecuteRequest};

@@ -15,7 +15,7 @@ use fs::{DirectoryDigest, EMPTY_DIRECTORY_DIGEST, RelativePath};
 use grpc_util::tls;
 use hashing::{Digest, EMPTY_DIGEST};
 use mock::StubCAS;
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::pb::build::bazel::remote::execution::v2 as remexec;
 use store::{RemoteProvider, RemoteStoreOptions, Store};
 use testutil::data::{TestData, TestDirectory, TestTree};
 use workunit_store::{RunId, RunningWorkunit, WorkunitStore};

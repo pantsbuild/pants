@@ -9,8 +9,8 @@ use bytes::Bytes;
 use cache::PersistentCache;
 use log::{debug, warn};
 use prost::Message;
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use protos::gen::pants::cache::{CacheKey, CacheKeyType};
+use protos::pb::build::bazel::remote::execution::v2 as remexec;
+use protos::pb::pants::cache::{CacheKey, CacheKeyType};
 use serde::{Deserialize, Serialize};
 use store::{Store, StoreError};
 use workunit_store::{

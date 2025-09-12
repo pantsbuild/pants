@@ -19,8 +19,8 @@ use process_execution::{
     local::KeepSandboxes,
 };
 use prost::Message;
-use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
-use protos::gen::buildbarn::cas::UncachedActionResult;
+use protos::pb::build::bazel::remote::execution::v2::{Action, Command};
+use protos::pb::buildbarn::cas::UncachedActionResult;
 use protos::require_digest;
 use remote::remote_cache::RemoteCacheRunnerOptions;
 use store::{ImmutableInputs, RemoteProvider, RemoteStoreOptions, Store, StoreCliOpt};

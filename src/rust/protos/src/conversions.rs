@@ -1,6 +1,6 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-impl<'a> From<&'a hashing::Digest> for crate::gen::build::bazel::remote::execution::v2::Digest {
+impl<'a> From<&'a hashing::Digest> for crate::pb::build::bazel::remote::execution::v2::Digest {
     fn from(d: &'a hashing::Digest) -> Self {
         Self {
             hash: d.hash.to_hex(),
@@ -9,7 +9,7 @@ impl<'a> From<&'a hashing::Digest> for crate::gen::build::bazel::remote::executi
     }
 }
 
-impl From<hashing::Digest> for crate::gen::build::bazel::remote::execution::v2::Digest {
+impl From<hashing::Digest> for crate::pb::build::bazel::remote::execution::v2::Digest {
     fn from(d: hashing::Digest) -> Self {
         Self {
             hash: d.hash.to_hex(),
@@ -18,11 +18,11 @@ impl From<hashing::Digest> for crate::gen::build::bazel::remote::execution::v2::
     }
 }
 
-impl TryFrom<&crate::gen::build::bazel::remote::execution::v2::Digest> for hashing::Digest {
+impl TryFrom<&crate::pb::build::bazel::remote::execution::v2::Digest> for hashing::Digest {
     type Error = String;
 
     fn try_from(
-        d: &crate::gen::build::bazel::remote::execution::v2::Digest,
+        d: &crate::pb::build::bazel::remote::execution::v2::Digest,
     ) -> Result<Self, Self::Error> {
         hashing::Fingerprint::from_hex_string(&d.hash)
             .map_err(|err| format!("Bad fingerprint in Digest {:?}: {:?}", &d.hash, err))
@@ -30,11 +30,11 @@ impl TryFrom<&crate::gen::build::bazel::remote::execution::v2::Digest> for hashi
     }
 }
 
-impl TryFrom<crate::gen::build::bazel::remote::execution::v2::Digest> for hashing::Digest {
+impl TryFrom<crate::pb::build::bazel::remote::execution::v2::Digest> for hashing::Digest {
     type Error = String;
 
     fn try_from(
-        d: crate::gen::build::bazel::remote::execution::v2::Digest,
+        d: crate::pb::build::bazel::remote::execution::v2::Digest,
     ) -> Result<Self, Self::Error> {
         hashing::Fingerprint::from_hex_string(&d.hash)
             .map_err(|err| format!("Bad fingerprint in Digest {:?}: {:?}", &d.hash, err))
@@ -44,7 +44,7 @@ impl TryFrom<crate::gen::build::bazel::remote::execution::v2::Digest> for hashin
 
 pub fn require_digest<
     'a,
-    D: Into<Option<&'a crate::gen::build::bazel::remote::execution::v2::Digest>>,
+    D: Into<Option<&'a crate::pb::build::bazel::remote::execution::v2::Digest>>,
 >(
     digest_opt: D,
 ) -> Result<hashing::Digest, String> {

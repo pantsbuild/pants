@@ -9,7 +9,7 @@ use serde_derive::{Deserialize, Serialize};
 use tree_sitter::{Node, Parser};
 
 use crate::code;
-use protos::gen::pants::cache::{
+use protos::pb::pants::cache::{
     JavascriptInferenceMetadata, javascript_inference_metadata::ImportPattern,
 };
 

@@ -13,7 +13,7 @@ use http::header::AUTHORIZATION;
 use opendal::layers::{ConcurrentLimitLayer, RetryLayer, TimeoutLayer};
 use opendal::{Builder, Operator};
 use prost::Message;
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::pb::build::bazel::remote::execution::v2 as remexec;
 use remexec::ActionResult;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;

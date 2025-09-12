@@ -11,7 +11,7 @@ use futures::FutureExt;
 use futures::future::{BoxFuture, TryFutureExt};
 use hashing::Digest;
 use parking_lot::Mutex;
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::pb::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 use remexec::{ActionResult, Command, Tree};
 use remote_provider::{ActionCacheProvider, choose_action_cache_provider};

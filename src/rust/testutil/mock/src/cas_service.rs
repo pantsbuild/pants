@@ -10,9 +10,9 @@ use futures::Stream;
 use futures::stream::StreamExt;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use protos::gen::build::bazel::semver::SemVer;
-use protos::gen::google::bytestream::{
+use protos::pb::build::bazel::remote::execution::v2 as remexec;
+use protos::pb::build::bazel::semver::SemVer;
+use protos::pb::google::bytestream::{
     QueryWriteStatusRequest, QueryWriteStatusResponse, ReadRequest, ReadResponse, WriteRequest,
     WriteResponse, byte_stream_server::ByteStream,
 };
@@ -433,10 +433,10 @@ impl ContentAddressableStorage for StubCASResponder {
             let status = write_blob(blob_request, &mut blobs);
             responses.push(remexec::batch_update_blobs_response::Response {
                 digest,
-                status: Some(protos::gen::google::rpc::Status {
+                status: Some(protos::pb::google::rpc::Status {
                     code: status.code() as i32,
                     message: status.message().to_string(),
-                    ..protos::gen::google::rpc::Status::default()
+                    ..protos::pb::google::rpc::Status::default()
                 }),
             })
         }
@@ -501,10 +501,10 @@ impl ContentAddressableStorage for StubCASResponder {
             responses.push(remexec::batch_read_blobs_response::Response {
                 digest: Some(digest),
                 data: data_opt.unwrap_or_else(Bytes::new),
-                status: Some(protos::gen::google::rpc::Status {
+                status: Some(protos::pb::google::rpc::Status {
                     code: status.code() as i32,
                     message: status.message().to_string(),
-                    ..protos::gen::google::rpc::Status::default()
+                    ..protos::pb::google::rpc::Status::default()
                 }),
                 compressor: remexec::compressor::Value::Identity as i32,
             });

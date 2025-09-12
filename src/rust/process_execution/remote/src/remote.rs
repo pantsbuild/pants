@@ -14,11 +14,11 @@ use futures::future;
 use futures::{Stream, StreamExt};
 use log::{Level, debug, trace, warn};
 use prost::Message;
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use protos::gen::google::longrunning::{
+use protos::pb::build::bazel::remote::execution::v2 as remexec;
+use protos::pb::google::longrunning::{
     CancelOperationRequest, Operation, operations_client::OperationsClient,
 };
-use protos::gen::google::rpc::{PreconditionFailure, Status as StatusProto};
+use protos::pb::google::rpc::{PreconditionFailure, Status as StatusProto};
 use rand::Rng;
 use remexec::{
     Action, Command, ExecuteRequest, ExecuteResponse, ExecutedActionMetadata, ServerCapabilities,
@@ -573,7 +573,7 @@ impl CommandRunner {
             OperationOrStatus::Operation(operation) => {
                 assert!(operation.done, "operation was not marked done");
 
-                use protos::gen::google::longrunning::operation::Result as OperationResult;
+                use protos::pb::google::longrunning::operation::Result as OperationResult;
                 let execute_response = match operation.result {
                     Some(OperationResult::Response(response_any)) => {
                         remexec::ExecuteResponse::decode(&response_any.value[..]).map_err(|e| {

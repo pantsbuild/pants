@@ -14,9 +14,9 @@ use std::time::Instant;
 use futures::{FutureExt, Stream};
 use hashing::Digest;
 use parking_lot::Mutex;
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use protos::gen::build::bazel::semver::SemVer;
-use protos::gen::google::longrunning::{
+use protos::pb::build::bazel::remote::execution::v2 as remexec;
+use protos::pb::build::bazel::semver::SemVer;
+use protos::pb::google::longrunning::{
     CancelOperationRequest, DeleteOperationRequest, GetOperationRequest, ListOperationsRequest,
     ListOperationsResponse, Operation, operations_server::Operations,
     operations_server::OperationsServer,
