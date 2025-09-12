@@ -11,8 +11,8 @@ use hashing::{Digest, Fingerprint};
 use maplit::{btreemap, hashset};
 use mock::execution_server::{ExpectedAPICall, MockOperation};
 use prost::Message;
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use protos::gen::google::longrunning::Operation;
+use protos::pb::build::bazel::remote::execution::v2 as remexec;
+use protos::pb::google::longrunning::Operation;
 use remexec::{ExecutedActionMetadata, execution_stage::Value as ExecutionStageValue};
 use store::{RemoteProvider, RemoteStoreOptions, SnapshotOps, Store, StoreError};
 use tempfile::TempDir;
@@ -1578,7 +1578,7 @@ async fn bad_result_bytes() {
             name: op_name.clone(),
             done: true,
             result: Some(
-              protos::gen::google::longrunning::operation::Result::Response(prost_types::Any {
+              protos::pb::google::longrunning::operation::Result::Response(prost_types::Any {
                 type_url: "type.googleapis.com/build.bazel.remote.execution.v2.ExecuteResponse"
                   .into(),
                 value: vec![0x00, 0x00, 0x00],
@@ -1623,8 +1623,8 @@ async fn initial_response_error() {
                     Operation {
                         name: op_name.to_string(),
                         done: true,
-                        result: Some(protos::gen::google::longrunning::operation::Result::Error(
-                            protos::gen::google::rpc::Status {
+                        result: Some(protos::pb::google::longrunning::operation::Result::Error(
+                            protos::pb::google::rpc::Status {
                                 code: Code::Internal as i32,
                                 message: "Something went wrong".to_string(),
                                 ..Default::default()
@@ -1977,7 +1977,7 @@ async fn extract_execute_response_success() {
         name: "cat".to_owned(),
         done: true,
         result: Some(
-            protos::gen::google::longrunning::operation::Result::Response(make_any_proto(
+            protos::pb::google::longrunning::operation::Result::Response(make_any_proto(
                 &remexec::ExecuteResponse {
                     result: Some(remexec::ActionResult {
                         exit_code: wanted_exit_code,
@@ -1993,7 +1993,7 @@ async fn extract_execute_response_success() {
                     }),
                     ..Default::default()
                 },
-                "protos::gen::",
+                "protos::pb::",
             )),
         ),
         ..Default::default()
@@ -2018,15 +2018,15 @@ async fn extract_execute_response_timeout() {
         name: "cat".to_owned(),
         done: true,
         result: Some(
-            protos::gen::google::longrunning::operation::Result::Response(make_any_proto(
+            protos::pb::google::longrunning::operation::Result::Response(make_any_proto(
                 &remexec::ExecuteResponse {
-                    status: Some(protos::gen::google::rpc::Status {
+                    status: Some(protos::pb::google::rpc::Status {
                         code: Code::DeadlineExceeded as i32,
                         ..Default::default()
                     }),
                     ..Default::default()
                 },
-                "protos::gen::",
+                "protos::pb::",
             )),
         ),
         ..Default::default()
@@ -2065,7 +2065,7 @@ async fn extract_execute_response_missing_digests() {
 async fn extract_execute_response_missing_other_things() {
     let missing = vec![
         missing_preconditionfailure_violation(&TestData::roland().digest()),
-        protos::gen::google::rpc::precondition_failure::Violation {
+        protos::pb::google::rpc::precondition_failure::Violation {
             r#type: "MISSING".to_owned(),
             subject: "monkeys".to_owned(),
             ..Default::default()
@@ -2085,7 +2085,7 @@ async fn extract_execute_response_missing_other_things() {
 
 #[tokio::test]
 async fn extract_execute_response_other_failed_precondition() {
-    let missing = vec![protos::gen::google::rpc::precondition_failure::Violation {
+    let missing = vec![protos::pb::google::rpc::precondition_failure::Violation {
         r#type: "OUT_OF_CAPACITY".to_owned(),
         ..Default::default()
     }];
@@ -2124,15 +2124,15 @@ async fn extract_execute_response_other_status() {
         name: "cat".to_owned(),
         done: true,
         result: Some(
-            protos::gen::google::longrunning::operation::Result::Response(make_any_proto(
+            protos::pb::google::longrunning::operation::Result::Response(make_any_proto(
                 &remexec::ExecuteResponse {
-                    status: Some(protos::gen::google::rpc::Status {
+                    status: Some(protos::pb::google::rpc::Status {
                         code: Code::PermissionDenied as i32,
                         ..Default::default()
                     }),
                     ..Default::default()
                 },
-                "protos::gen::",
+                "protos::pb::",
             )),
         ),
         ..Default::default()
@@ -2193,7 +2193,7 @@ async fn remote_workunits_are_stored() {
 
 #[tokio::test]
 async fn format_error_complete() {
-    let error = protos::gen::google::rpc::Status {
+    let error = protos::pb::google::rpc::Status {
         code: Code::Cancelled as i32,
         message: "Oops, oh well!".to_string(),
         ..Default::default()
@@ -2207,7 +2207,7 @@ async fn format_error_complete() {
 
 #[tokio::test]
 async fn extract_execute_response_unknown_code() {
-    let error = protos::gen::google::rpc::Status {
+    let error = protos::pb::google::rpc::Status {
         code: 555,
         message: "Oops, oh well!".to_string(),
         ..Default::default()
@@ -2451,7 +2451,7 @@ fn make_delayed_incomplete_operation_with_stage(
                     stage: stage as i32,
                     ..Default::default()
                 },
-                "protos::gen::",
+                "protos::pb::",
             ));
         }
         x => panic!("Unexpected MockOperation content: {x:?}"),
@@ -2460,7 +2460,7 @@ fn make_delayed_incomplete_operation_with_stage(
 }
 
 fn make_retryable_operation_failure() -> MockOperation {
-    let status = protos::gen::google::rpc::Status {
+    let status = protos::pb::google::rpc::Status {
         code: Code::Aborted as i32,
         message: String::from("the bot running the task appears to be lost"),
         ..Default::default()
@@ -2469,12 +2469,12 @@ fn make_retryable_operation_failure() -> MockOperation {
     let operation = Operation {
         done: true,
         result: Some(
-            protos::gen::google::longrunning::operation::Result::Response(make_any_proto(
+            protos::pb::google::longrunning::operation::Result::Response(make_any_proto(
                 &remexec::ExecuteResponse {
                     status: Some(status),
                     ..Default::default()
                 },
-                "protos::gen::",
+                "protos::pb::",
             )),
         ),
         ..Default::default()
@@ -2527,16 +2527,16 @@ fn make_successful_operation_with_maybe_metadata(
         name: operation_name.to_string(),
         done: true,
         result: Some(
-            protos::gen::google::longrunning::operation::Result::Response(make_any_proto(
+            protos::pb::google::longrunning::operation::Result::Response(make_any_proto(
                 &remexec::ExecuteResponse {
-                    status: Some(protos::gen::google::rpc::Status {
+                    status: Some(protos::pb::google::rpc::Status {
                         code: Code::Ok as i32,
                         ..Default::default()
                     }),
                     result: Some(make_action_result(stdout, stderr, exit_code, metadata)),
                     ..Default::default()
                 },
-                "protos::gen::",
+                "protos::pb::",
             )),
         ),
         ..Default::default()
@@ -2595,18 +2595,18 @@ fn timestamp_only_secs(v: i64) -> prost_types::Timestamp {
 }
 
 fn make_precondition_failure_operation(
-    violations: Vec<protos::gen::google::rpc::precondition_failure::Violation>,
+    violations: Vec<protos::pb::google::rpc::precondition_failure::Violation>,
 ) -> MockOperation {
     let operation = Operation {
         name: "cat".to_owned(),
         done: true,
         result: Some(
-            protos::gen::google::longrunning::operation::Result::Response(make_any_proto(
+            protos::pb::google::longrunning::operation::Result::Response(make_any_proto(
                 &remexec::ExecuteResponse {
                     status: Some(make_precondition_failure_status(violations)),
                     ..Default::default()
                 },
-                "protos::gen::",
+                "protos::pb::",
             )),
         ),
         ..Default::default()
@@ -2615,13 +2615,13 @@ fn make_precondition_failure_operation(
 }
 
 fn make_precondition_failure_status(
-    violations: Vec<protos::gen::google::rpc::precondition_failure::Violation>,
-) -> protos::gen::google::rpc::Status {
-    protos::gen::google::rpc::Status {
+    violations: Vec<protos::pb::google::rpc::precondition_failure::Violation>,
+) -> protos::pb::google::rpc::Status {
+    protos::pb::google::rpc::Status {
         code: Code::FailedPrecondition as i32,
         details: vec![make_any_proto(
-            &protos::gen::google::rpc::PreconditionFailure { violations },
-            "protos::gen::",
+            &protos::pb::google::rpc::PreconditionFailure { violations },
+            "protos::pb::",
         )],
         ..Default::default()
     }
@@ -2799,9 +2799,9 @@ fn make_any_proto<T: Message>(message: &T, prefix: &str) -> prost_types::Any {
 
 fn missing_preconditionfailure_violation(
     digest: &Digest,
-) -> protos::gen::google::rpc::precondition_failure::Violation {
+) -> protos::pb::google::rpc::precondition_failure::Violation {
     {
-        protos::gen::google::rpc::precondition_failure::Violation {
+        protos::pb::google::rpc::precondition_failure::Violation {
             r#type: "MISSING".to_owned(),
             subject: format!("blobs/{}/{}", digest.hash, digest.size_bytes),
             ..Default::default()

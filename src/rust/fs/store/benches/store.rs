@@ -15,7 +15,7 @@ use fs::{
     PosixFS, PreparedPathGlobs, StrictGlobMatching,
 };
 use hashing::EMPTY_DIGEST;
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::pb::build::bazel::remote::execution::v2 as remexec;
 use task_executor::Executor;
 use tempfile::TempDir;
 

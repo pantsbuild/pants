@@ -4,7 +4,7 @@ use std::{collections::BTreeMap, time::Duration};
 
 use hashing::Digest;
 use mock::StubCAS;
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::pb::build::bazel::remote::execution::v2 as remexec;
 use remote_provider_traits::{ActionCacheProvider, RemoteProvider, RemoteStoreOptions};
 
 use super::action_cache::Provider;

@@ -12,7 +12,7 @@ use dep_inference::{dockerfile, javascript, python};
 use fs::{DirectoryDigest, Entry, SymlinkBehavior};
 use grpc_util::prost::MessageExt;
 use hashing::Digest;
-use protos::gen::pants::cache::{
+use protos::pb::pants::cache::{
     CacheKey, CacheKeyType, DependencyInferenceRequest, dependency_inference_request,
 };
 use pyo3::exceptions::PyException;

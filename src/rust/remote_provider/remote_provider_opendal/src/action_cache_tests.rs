@@ -9,7 +9,7 @@ use grpc_util::tls;
 use hashing::Digest;
 use opendal::services::Memory;
 use prost::Message;
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::pb::build::bazel::remote::execution::v2 as remexec;
 use remote_provider_traits::{ActionCacheProvider, RemoteProvider, RemoteStoreOptions};
 
 use super::Provider;

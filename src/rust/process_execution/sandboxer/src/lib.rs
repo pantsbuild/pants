@@ -7,7 +7,7 @@ use hashing::Digest;
 use hyper_util::rt::TokioIo;
 use log::{debug, info, warn};
 use logging::logger::PANTS_LOGGER;
-use protos::gen::pants::sandboxer::{
+use protos::pb::pants::sandboxer::{
     MaterializeDirectoryRequest, MaterializeDirectoryResponse,
     sandboxer_grpc_client::SandboxerGrpcClient,
     sandboxer_grpc_server::{SandboxerGrpc, SandboxerGrpcServer},

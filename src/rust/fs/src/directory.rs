@@ -19,7 +19,7 @@ use serde::Serialize;
 // TODO: Extract protobuf-specific pieces to a new crate.
 use grpc_util::prost::MessageExt;
 use hashing::{Digest, EMPTY_DIGEST};
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::pb::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 
 use crate::{LinkDepth, MAX_LINK_DEPTH, PathStat, RelativePath};

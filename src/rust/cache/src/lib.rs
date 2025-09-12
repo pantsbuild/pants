@@ -7,7 +7,7 @@ use std::time::Duration;
 use bytes::Bytes;
 use grpc_util::prost::MessageExt;
 use hashing::Digest;
-use protos::gen::pants::cache::CacheKey;
+use protos::pb::pants::cache::CacheKey;
 use sharded_lmdb::ShardedLmdb;
 use task_executor::Executor;
 
