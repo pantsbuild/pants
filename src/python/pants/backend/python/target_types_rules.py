@@ -50,7 +50,6 @@ from pants.backend.python.util_rules.entry_points import (
     get_python_distribution_entry_point_unambiguous_module_owners,
 )
 from pants.backend.python.util_rules.interpreter_constraints import interpreter_constraints_contains
-from pants.backend.python.util_rules.package_dists import InvalidEntryPoint
 from pants.core.util_rules.unowned_dependency_behavior import (
     UnownedDependencyError,
     UnownedDependencyUsage,
@@ -89,6 +88,15 @@ from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import bullet_list, softwrap
 
 logger = logging.getLogger(__name__)
+
+
+class SetupPyError(Exception):
+    def __init__(self, msg: str):
+        super().__init__(f"{msg} See {doc_url('docs/python/overview/building-distributions')}.")
+
+
+class InvalidEntryPoint(SetupPyError, InvalidFieldException):
+    """Indicates that a specified binary entry point was invalid."""
 
 
 @rule

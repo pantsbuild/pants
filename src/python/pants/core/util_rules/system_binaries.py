@@ -597,6 +597,7 @@ async def get_bash(system_binaries: SystemBinariesSubsystem.EnvironmentAware) ->
         test=BinaryPathTest(args=["--version"]),
     )
     # Note: This Get is still necxessary to avoid a circular reference to `find_binary`` rule.
+    # TODO: Requires call-by-name support for mutual @rule recursion.
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path
     if not first_path:

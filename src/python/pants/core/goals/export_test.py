@@ -21,17 +21,16 @@ from pants.core.goals.export import (
     export_goal,
     warn_exported_bin_conflicts,
 )
-from pants.core.goals.generate_lockfiles import KnownUserResolveNames, KnownUserResolveNamesRequest
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Workspace
+from pants.engine.fs import CreateDigest, Digest, FileContent, Workspace
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target, Targets
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.testutil.option_util import create_subsystem
-from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
+from pants.testutil.rule_runner import RuleRunner, mock_console, run_rule_with_mocks
 
 
 class MockTarget(Target):
@@ -93,6 +92,7 @@ def run_export_rule(
 ) -> tuple[int, str]:
     resolves = resolves or []
     binaries = binaries or []
+    has_post_processing_commands = bool(resolves)
     union_membership = UnionMembership.from_rules([UnionRule(ExportRequest, MockExportRequest)])
     with open(os.path.join(rule_runner.build_root, "somefile"), "wb") as fp:
         fp.write(b"SOMEFILE")
@@ -150,21 +150,30 @@ def run_export_rule(
                 DistDir(relpath=Path("dist")),
                 create_subsystem(ExportSubsystem, resolve=resolves, bin=binaries),
             ],
+            # TODO: Create a rule_runner.call() method that invokes by-name, and use that to
+            #  replace these rule_runner.request() by-type calls.
             mock_calls={
                 "pants.engine.intrinsics.add_prefix": lambda *xs: rule_runner.request(Digest, xs),
                 "pants.core.goals.export.export": do_mock_export,
+                **(
+                    {
+                        "pants.engine.intrinsics._interactive_process": lambda ip: _mock_run(
+                            rule_runner, ip
+                        )
+                    }
+                    if has_post_processing_commands
+                    else {}
+                ),
+                "pants.engine.intrinsics.merge_digests": lambda *iv: rule_runner.request(
+                    Digest, iv
+                ),
+                "pants.core.util_rules.env_vars.environment_vars_subset": lambda *iv: rule_runner.request(
+                    EnvironmentVars, iv
+                ),
+                "pants.engine.intrinsics.create_digest": lambda *iv: rule_runner.request(
+                    Digest, iv
+                ),
             },
-            mock_gets=[
-                rule_runner.do_not_use_mock(Digest, (MergeDigests,)),
-                rule_runner.do_not_use_mock(EnvironmentVars, (EnvironmentVarsRequest,)),
-                rule_runner.do_not_use_mock(KnownUserResolveNames, (KnownUserResolveNamesRequest,)),
-                rule_runner.do_not_use_mock(Digest, (CreateDigest,)),
-                MockGet(
-                    output_type=InteractiveProcessResult,
-                    input_types=(InteractiveProcess,),
-                    mock=lambda ip: _mock_run(rule_runner, ip),
-                ),  # for workspace.write_digest
-            ],
             union_membership=union_membership,
         )
         return result.exit_code, stdio_reader.get_stdout()

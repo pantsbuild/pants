@@ -41,7 +41,7 @@ from pants.core.environments.target_types import (
     RemoteExtraPlatformPropertiesField,
 )
 from pants.engine.environment import LOCAL_ENVIRONMENT_MATCHER, ChosenLocalWorkspaceEnvironmentName
-from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
+from pants.engine.internals.docker import DockerResolveImageResult
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessCacheScope
 from pants.engine.target import FieldSet, OptionalSingleSourceField, Target
@@ -116,13 +116,11 @@ def test_extract_process_config_from_environment() -> None:
                 keep_sandboxes,
                 env_subsystem,
             ],
-            mock_gets=[
-                MockGet(
-                    output_type=DockerResolveImageResult,
-                    input_types=(DockerResolveImageRequest,),
-                    mock=lambda req: DockerResolveImageResult("sha256:abc123"),
-                )
-            ],
+            mock_calls={
+                "pants.engine.intrinsics.docker_resolve_image": lambda req: DockerResolveImageResult(
+                    "sha256:abc123"
+                ),
+            },
         )
         assert result.platform == Platform.linux_arm64.value
         assert result.remote_execution is expected_remote_execution

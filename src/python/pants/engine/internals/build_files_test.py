@@ -16,7 +16,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.target_types import GenericTarget, ResourceTarget
 from pants.engine.addresses import Address, AddressInput, BuildFileAddress
 from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars
-from pants.engine.fs import DigestContents, FileContent, PathGlobs
+from pants.engine.fs import DigestContents, FileContent
 from pants.engine.internals.build_files import (
     AddressFamilyDir,
     BUILDFileEnvVarExtractor,
@@ -49,13 +49,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership
 from pants.init.bootstrap_scheduler import BootstrapStatus
 from pants.testutil.pytest_util import assert_logged
-from pants.testutil.rule_runner import (
-    MockGet,
-    QueryRule,
-    RuleRunner,
-    engine_error,
-    run_rule_with_mocks,
-)
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
 
@@ -917,34 +911,30 @@ def test_build_files_share_globals() -> None:
                 ignore_unrecognized_symbols=False,
             ),
         ],
-        mock_gets=[
-            MockGet(
-                output_type=DigestContents,
-                input_types=(PathGlobs,),
-                mock=lambda _: DigestContents(
-                    [
-                        FileContent(
-                            path="/dev/null/prelude1",
-                            content=dedent(
-                                """\
+        mock_calls={
+            "pants.engine.intrinsics.get_digest_contents": lambda _: DigestContents(
+                [
+                    FileContent(
+                        path="/dev/null/prelude1",
+                        content=dedent(
+                            """\
                                 def hello():
                                     pass
                                 """
-                            ).encode(),
-                        ),
-                        FileContent(
-                            path="/dev/null/prelude2",
-                            content=dedent(
-                                """\
+                        ).encode(),
+                    ),
+                    FileContent(
+                        path="/dev/null/prelude2",
+                        content=dedent(
+                            """\
                                 def world():
                                     pass
                                 """
-                            ).encode(),
-                        ),
-                    ]
-                ),
+                        ).encode(),
+                    ),
+                ]
             ),
-        ],
+        },
     )
     assert symbols.symbols["hello"].__globals__ is symbols.symbols["world"].__globals__
     assert "world" in symbols.symbols["hello"].__globals__
