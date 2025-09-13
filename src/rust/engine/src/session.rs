@@ -146,7 +146,7 @@ impl Session {
         ui_use_prodash: bool,
         mut max_workunit_level: log::Level,
         build_id: String,
-        session_values: PyObject,
+        session_values: Py<PyAny>,
         cancelled: AsyncLatch,
     ) -> Result<Session, String> {
         // We record workunits with the maximum level of:

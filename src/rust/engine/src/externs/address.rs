@@ -768,7 +768,7 @@ impl Address {
         }
     }
 
-    fn maybe_convert_to_target_generator(self_: PyRef<Self>, py: Python) -> PyResult<PyObject> {
+    fn maybe_convert_to_target_generator(self_: PyRef<Self>, py: Python) -> PyResult<Py<PyAny>> {
         if !self_.is_generated_target() && !self_.is_parametrized() {
             return Ok(self_.into_pyobject(py)?.into_any().unbind());
         }

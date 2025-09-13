@@ -96,7 +96,7 @@ impl DownloadedFile {
 
     pub(super) async fn run_node(self, context: Context) -> NodeResult<store::Snapshot> {
         let (url_str, expected_digest, auth_headers, retry_delay_duration, max_attempts) =
-            Python::with_gil(|py| {
+            Python::attach(|py| {
                 let py_download_file_val = self.0.to_value();
                 let py_download_file = py_download_file_val.bind(py);
                 let url_str: String = externs::getattr(py_download_file, "url")

@@ -33,7 +33,7 @@ pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
 // The (nested) values of a dict-valued option are represented by Val.
 // This function converts them to equivalent Python types.
-fn val_to_py_object(py: Python, val: &Val) -> PyResult<PyObject> {
+fn val_to_py_object(py: Python, val: &Val) -> PyResult<Py<PyAny>> {
     let res = match val {
         Val::Bool(b) => b.into_pyobject(py)?.into_any().unbind(),
         Val::Int(i) => i.into_pyobject(py)?.into_any().unbind(),
@@ -64,7 +64,7 @@ fn dict_into_py(py: Python, vals: HashMap<String, Val>) -> PyResult<PyDictVal> {
             Ok(pyobj) => Ok((k, pyobj)),
             Err(err) => Err(err),
         })
-        .collect::<PyResult<HashMap<String, PyObject>>>()
+        .collect::<PyResult<HashMap<String, Py<PyAny>>>>()
 }
 
 // Converts a Python object into a Val, which is necessary for receiving
@@ -218,7 +218,7 @@ impl PyConfigSource {
 struct PyOptionParser(OptionParser);
 
 // The pythonic value of a dict-typed option.
-type PyDictVal = HashMap<String, PyObject>;
+type PyDictVal = HashMap<String, Py<PyAny>>;
 
 // The derivation of the option value, as a vec of (value, rank, details string) tuples.
 type OptionValueDerivation<'py, T> = Vec<(T, isize, Option<Bound<'py, PyString>>)>;
@@ -580,7 +580,7 @@ impl PyOptionParser {
     fn validate_config(
         &self,
         py: Python<'_>,
-        py_valid_keys: HashMap<String, PyObject>,
+        py_valid_keys: HashMap<String, Py<PyAny>>,
     ) -> PyResult<Vec<String>> {
         let mut valid_keys = HashMap::new();
 
