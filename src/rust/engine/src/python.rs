@@ -638,7 +638,7 @@ mod pycomparedbool_tests {
 
     #[test]
     fn pycomparedbool_conversion_tests() {
-        pyo3::prepare_freethreaded_python();
+        Python::initialize();
 
         Python::attach(|py| {
             assert!(
