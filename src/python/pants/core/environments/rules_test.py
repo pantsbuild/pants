@@ -49,13 +49,7 @@ from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.option.option_types import ShellStrListOption
 from pants.option.subsystem import Subsystem
 from pants.testutil.option_util import create_subsystem
-from pants.testutil.rule_runner import (
-    MockGet,
-    QueryRule,
-    RuleRunner,
-    engine_error,
-    run_rule_with_mocks,
-)
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error, run_rule_with_mocks
 
 
 @pytest.fixture
@@ -368,14 +362,10 @@ def test_resolve_environment_name_local_and_docker_fallbacks(monkeypatch) -> Non
                 "pants.core.environments.rules.determine_local_environment": mock_determine_local_environment,
                 "pants.core.environments.rules.determine_local_workspace_environment": mock_determine_local_workspace_environment,
                 "pants.core.environments.rules.get_target_for_environment_name": mock_get_target_for_environment_name,
-            },
-            mock_gets=[
-                MockGet(
-                    output_type=EnvironmentName,
-                    input_types=(EnvironmentNameRequest,),
-                    mock=lambda req: EnvironmentName(req.raw_value),
+                "pants.core.environments.rules.resolve_environment_name": lambda req: EnvironmentName(
+                    req.raw_value
                 ),
-            ],
+            },
         ).val
         return result
 

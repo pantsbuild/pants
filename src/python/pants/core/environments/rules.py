@@ -47,7 +47,7 @@ from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.intrinsics import docker_resolve_image
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, QueryRule, collect_rules, concurrently, implicitly, rule
+from pants.engine.rules import QueryRule, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     NO_VALUE,
     Field,
@@ -428,14 +428,14 @@ async def _apply_fallback_environment(env_tgt: Target, error_msg: str) -> Enviro
     if fallback_field.value is None:
         raise NoFallbackEnvironmentError(error_msg)
     # TODO: Requires call-by-name support for mutual @rule recursion.
-    return await Get(
-        EnvironmentName,
+    return await resolve_environment_name(
         EnvironmentNameRequest(
             fallback_field.value,
             description_of_origin=(
                 f"the `{fallback_field.alias}` field of the target {env_tgt.address}"
             ),
         ),
+        **implicitly(),
     )
 
 
