@@ -427,7 +427,6 @@ async def _apply_fallback_environment(env_tgt: Target, error_msg: str) -> Enviro
     fallback_field = env_tgt[FallbackEnvironmentField]
     if fallback_field.value is None:
         raise NoFallbackEnvironmentError(error_msg)
-    # TODO: Requires call-by-name support for mutual @rule recursion.
     return await resolve_environment_name(
         EnvironmentNameRequest(
             fallback_field.value,
