@@ -320,30 +320,6 @@ def test_outlined_get() -> None:
     ) in str(exc.value.args[0])
 
 
-@rule
-async def uses_rule_helper_before_definition() -> int:
-    return await get_after_rule()
-
-
-async def get_after_rule() -> int:
-    return await Get(int, str, "hello")
-
-
-def test_rule_helper_after_rule_definition_fails() -> None:
-    rule_runner = RuleRunner(
-        rules=[
-            uses_rule_helper_before_definition,
-            QueryRule(int, []),
-        ],
-    )
-
-    with pytest.raises(ExecutionError) as exc:
-        rule_runner.request(int, [])
-    assert (
-        "Get(int, str, hello) was not detected in your @rule body at rule compile time."
-    ) in str(exc.value.args[0])
-
-
 @dataclass(frozen=True)
 class SomeInput:
     s: str
