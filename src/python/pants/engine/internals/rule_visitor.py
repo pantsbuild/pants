@@ -86,7 +86,7 @@ def get_module_scope_rules(module: ModuleType) -> tuple[RuleDescriptor, ...]:
     defined later in the module is already known.  This allows rule1() and rule2() to be
     mutually recursive.
 
-    TODO: Support mutual recursion for rules defined in inner scopes?
+    Note that we don't support recursive rules defined dynamically in inner scopes.
     """
     descriptors = getattr(module, PANTS_RULE_DESCRIPTORS_MODULE_KEY, None)
     if descriptors is None:
