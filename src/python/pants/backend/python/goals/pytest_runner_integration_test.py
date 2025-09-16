@@ -43,9 +43,10 @@ from pants.core.goals.test import (
 from pants.core.util_rules import config_files, distdir
 from pants.core.util_rules.partitions import Partitions
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent
+from pants.engine.fs import CreateDigest, DigestContents, FileContent
+from pants.engine.intrinsics import create_digest
 from pants.engine.process import InteractiveProcessResult
-from pants.engine.rules import Get, rule
+from pants.engine.rules import rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
 from pants.testutil.debug_adapter_util import debugadapter_port_for_testing
@@ -671,13 +672,13 @@ class UnusedPlugin(PytestPluginSetupRequest):
 
 @rule
 async def used_plugin(_: UsedPlugin) -> PytestPluginSetup:
-    digest = await Get(Digest, CreateDigest([FileContent("used.txt", b"")]))
+    digest = await create_digest(CreateDigest([FileContent("used.txt", b"")]))
     return PytestPluginSetup(digest=digest, extra_sys_path=("sys/path/used",))
 
 
 @rule
 async def unused_plugin(_: UnusedPlugin) -> PytestPluginSetup:
-    digest = await Get(Digest, CreateDigest([FileContent("unused.txt", b"")]))
+    digest = await create_digest(CreateDigest([FileContent("unused.txt", b"")]))
     return PytestPluginSetup(digest=digest, extra_sys_path=("sys/path/unused",))
 
 

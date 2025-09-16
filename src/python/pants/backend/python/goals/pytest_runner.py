@@ -84,7 +84,7 @@ from pants.engine.intrinsics import (
     merge_digests,
 )
 from pants.engine.process import InteractiveProcess, Process, ProcessCacheScope, ProcessWithRetries
-from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import Target, TransitiveTargetsRequest, WrappedTargetRequest
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import GlobalOptions
@@ -133,6 +133,11 @@ class PytestPluginSetupRequest(ABC):
         """Whether the setup implementation should be used for this target or not."""
 
 
+@rule(polymorphic=True)
+async def get_pytest_plugin_setup(req: PytestPluginSetupRequest) -> PytestPluginSetup:
+    raise NotImplementedError()
+
+
 class AllPytestPluginSetups(Collection[PytestPluginSetup]):
     pass
 
@@ -160,7 +165,8 @@ async def run_all_setup_plugins(
         if request_type.is_applicable(wrapped_tgt.target)
     ]
     setups = await concurrently(
-        Get(PytestPluginSetup, PytestPluginSetupRequest, request) for request in setup_requests
+        get_pytest_plugin_setup(**implicitly({request: PytestPluginSetupRequest}))
+        for request in setup_requests
     )
     return AllPytestPluginSetups(setups)
 

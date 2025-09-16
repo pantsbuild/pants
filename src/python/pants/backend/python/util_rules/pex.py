@@ -79,7 +79,7 @@ from pants.engine.process import (
     ProcessResult,
     fallible_to_exec_result_or_raise,
 )
-from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import HydrateSourcesRequest, SourcesField, TransitiveTargetsRequest
 from pants.engine.unions import UnionMembership, union
 from pants.util.frozendict import FrozenDict
@@ -98,6 +98,13 @@ class PythonProvider:
     """
 
     interpreter_constraints: InterpreterConstraints
+
+
+@rule(polymorphic=True)
+async def get_python_executable(
+    provider: PythonProvider, env_name: EnvironmentName
+) -> PythonExecutable:
+    raise NotImplementedError()
 
 
 class PexPlatforms(DeduplicatedCollection[str]):
@@ -358,8 +365,8 @@ async def find_interpreter(
         )
     if python_providers:
         python_provider = next(iter(python_providers))
-        python = await Get(
-            PythonExecutable, PythonProvider, python_provider(interpreter_constraints)
+        python = await get_python_executable(
+            **implicitly({python_provider(interpreter_constraints): PythonProvider})
         )
         return python
 
