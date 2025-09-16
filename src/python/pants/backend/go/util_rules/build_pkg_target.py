@@ -64,7 +64,7 @@ from pants.engine.internals.graph import (
     resolve_targets,
 )
 from pants.engine.internals.native_engine import EMPTY_DIGEST, MergeDigests
-from pants.engine.internals.selectors import Get, concurrently
+from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import create_digest, execute_process, merge_digests
 from pants.engine.process import Process
 from pants.engine.rules import collect_rules, implicitly, rule
@@ -280,6 +280,13 @@ class GoCodegenBuildRequest:
     generate_from: ClassVar[type[SourcesField]]
 
 
+@rule(polymorphic=True)
+async def get_build_request_for_generated_code(
+    req: GoCodegenBuildRequest, env_name: EnvironmentName
+) -> FallibleBuildGoPackageRequest:
+    raise NotImplementedError()
+
+
 def maybe_get_codegen_request_type(
     tgt: Target, build_opts: GoBuildOptions, union_membership: UnionMembership
 ) -> GoCodegenBuildRequest | None:
@@ -319,8 +326,8 @@ async def setup_build_go_package_target_request(
     codegen_request = maybe_get_codegen_request_type(target, request.build_opts, union_membership)
     if codegen_request:
         # TODO need to move setup_build_go_package_target_request_for_stdlib around to resolve circular dependency
-        codegen_result = await Get(
-            FallibleBuildGoPackageRequest, GoCodegenBuildRequest, codegen_request
+        codegen_result = await get_build_request_for_generated_code(
+            **implicitly({codegen_request: GoCodegenBuildRequest})
         )
         return codegen_result
 

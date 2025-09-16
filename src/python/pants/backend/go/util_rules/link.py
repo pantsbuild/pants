@@ -11,17 +11,17 @@ from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.cgo_binaries import CGoBinaryPathRequest, find_cgo_binary_path
 from pants.backend.go.util_rules.import_config import ImportConfigRequest, generate_import_config
 from pants.backend.go.util_rules.link_defs import (
-    ImplicitLinkerDependencies,
     ImplicitLinkerDependenciesHook,
+    get_implicit_linker_dependencies,
 )
 from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, compute_go_tool_id
 from pants.core.util_rules.system_binaries import BashBinary, BinaryPathTest
 from pants.engine.fs import CreateDigest, Digest, Directory, FileContent
 from pants.engine.internals.native_engine import AddPrefix, MergeDigests
-from pants.engine.internals.selectors import MultiGet, concurrently
+from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import add_prefix, create_digest, merge_digests
 from pants.engine.process import fallible_to_exec_result_or_raise
-from pants.engine.rules import Get, collect_rules, implicitly, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionMembership
 from pants.util.frozendict import FrozenDict
 
@@ -91,11 +91,9 @@ async def link_go_binary(
     union_membership: UnionMembership,
 ) -> LinkedGoBinary:
     implict_linker_deps_hooks = union_membership.get(ImplicitLinkerDependenciesHook)
-    implicit_linker_deps = await MultiGet(
-        Get(
-            ImplicitLinkerDependencies,
-            ImplicitLinkerDependenciesHook,
-            hook(build_opts=request.build_opts),
+    implicit_linker_deps = await concurrently(
+        get_implicit_linker_dependencies(
+            **implicitly({hook(build_opts=request.build_opts): ImplicitLinkerDependenciesHook})
         )
         for hook in implict_linker_deps_hooks
     )
