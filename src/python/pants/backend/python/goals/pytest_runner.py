@@ -55,6 +55,7 @@ from pants.core.goals.test import (
 )
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.config_files import find_config_file
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.partitions import Partition, PartitionerType, Partitions
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.addresses import Address
@@ -74,21 +75,15 @@ from pants.engine.fs import (
 )
 from pants.engine.internals.graph import resolve_target
 from pants.engine.internals.graph import transitive_targets as transitive_targets_get
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.intrinsics import (
     create_digest,
     digest_subset_to_digest,
     digest_to_snapshot,
+    execute_process_with_retry,
     get_digest_contents,
     merge_digests,
 )
-from pants.engine.process import (
-    InteractiveProcess,
-    Process,
-    ProcessCacheScope,
-    ProcessWithRetries,
-    execute_process_with_retry,
-)
+from pants.engine.process import InteractiveProcess, Process, ProcessCacheScope, ProcessWithRetries
 from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import Target, TransitiveTargetsRequest, WrappedTargetRequest
 from pants.engine.unions import UnionMembership, UnionRule, union

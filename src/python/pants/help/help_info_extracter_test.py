@@ -14,7 +14,8 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import IntField, RegisteredTargetTypes, StringField, Target
 from pants.engine.unions import UnionMembership
 from pants.help.help_info_extracter import HelpInfoExtracter, pretty_print_type_hint, to_help_str
-from pants.option.global_options import GlobalOptions, LogLevelOption
+from pants.option.bootstrap_options import LogLevelOption
+from pants.option.global_options import GlobalOptions
 from pants.option.native_options import NativeOptionParser
 from pants.option.option_types import BoolOption, IntListOption, OptionInfo, StrListOption
 from pants.option.options import Options
@@ -539,7 +540,9 @@ def test_get_all_help_info(tmp_path) -> None:
             "construct_scope_foo": {
                 "description": None,
                 "documentation": "A foo.",
-                "awaitables": ("Get(ScopedOptions, Scope, ..)",),
+                "awaitables": (
+                    "pants.engine.internals.options_parsing.scope_options() -> ScopedOptions",
+                ),
                 "input_types": (),
                 "name": "construct_scope_foo",
                 "output_type": "Foo",
@@ -556,20 +559,6 @@ def test_get_all_help_info(tmp_path) -> None:
             },
         },
         "name_to_api_type_info": {
-            "pants.option.scope.Scope": {
-                "consumed_by_rules": (),
-                "dependents": (),
-                "dependencies": (),
-                "documentation": "An options scope.",
-                "is_union": False,
-                "module": "pants.option.scope",
-                "name": "Scope",
-                "provider": ("pants.option.scope",),
-                "returned_by_rules": (),
-                "union_members": (),
-                "union_type": None,
-                "used_in_rules": ("construct_scope_foo",),
-            },
             "pants.engine.target.Target": {
                 "consumed_by_rules": (),
                 "dependents": (),

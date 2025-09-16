@@ -14,12 +14,13 @@ from pants.bsp.util_rules.targets import (
     BSPBuildTargetInternal,
     BSPResourcesRequest,
     BSPResourcesResult,
+    get_bsp_resources,
     resolve_bsp_build_target_addresses,
     resolve_bsp_build_target_identifier,
 )
 from pants.engine.fs import Workspace
 from pants.engine.internals.native_engine import EMPTY_DIGEST, MergeDigests
-from pants.engine.internals.selectors import Get, concurrently
+from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import merge_digests
 from pants.engine.rules import _uncacheable_rule, collect_rules, implicitly, rule
 from pants.engine.target import FieldSet
@@ -59,10 +60,14 @@ async def resources_bsp_target(
                 field_sets_by_request_type[resources_request_type].add(field_set)
 
     resources_results = await concurrently(
-        Get(
-            BSPResourcesResult,
-            BSPResourcesRequest,
-            resources_request_type(bsp_target=request.bsp_target, field_sets=tuple(field_sets)),
+        get_bsp_resources(
+            **implicitly(
+                {
+                    resources_request_type(
+                        bsp_target=request.bsp_target, field_sets=tuple(field_sets)
+                    ): BSPResourcesRequest
+                }
+            )
         )
         for resources_request_type, field_sets in field_sets_by_request_type.items()
     )

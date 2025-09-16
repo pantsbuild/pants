@@ -103,7 +103,7 @@ class PythonSetup(Subsystem):
             #  We'll probably want to find and modify all those tests to set an explicit IC, but
             #  that will take time.
             if "PYTEST_CURRENT_TEST" in os.environ:
-                return (">=3.8,<4",)
+                return (">=3.9,<3.14",)
             raise OptionsError(
                 softwrap(
                     f"""\
@@ -364,6 +364,38 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
+    _resolves_to_excludes = DictOption[list[str]](
+        help=softwrap(
+            """ Specifies requirements to exclude from a resolve and its
+            lockfile.  Any distribution included in the PEX's resolve that
+            matches the requirement is excluded from the built PEX along with
+            all of its transitive dependencies that are not also required by
+            other non-excluded distributions.  At runtime, the PEX will boot
+            without checking the excluded dependencies are available.
+            """
+        ),
+        advanced=True,
+    )
+    _resolves_to_overrides = DictOption[list[str]](
+        help=softwrap(
+            """ Specifies a transitive requirement to override in a resolve
+            and its lockfile.  Overrides can either modify an existing
+            dependency on a project name by changing extras, version
+            constraints or markers or else they can completely swap out the
+            dependency for a dependency on another project altogether. For the
+            former, simply supply the requirement you wish. For example,
+            specifying `--override cowsay==5.0` will override any transitive
+            dependency on cowsay that has any combination of extras, version
+            constraints or markers with the requirement `cowsay==5.0`. To
+            completely replace cowsay with another library altogether, you can
+            specify an override like `--override cowsay=my-cowsay>2`. This
+            will replace any transitive dependency on cowsay that has any
+            combination of extras, version constraints or markers with the
+            requirement `my-cowsay>2`."""
+        ),
+        advanced=True,
+    )
+
     invalid_lockfile_behavior = EnumOption(
         default=InvalidLockfileBehavior.error,
         help=softwrap(
@@ -673,6 +705,26 @@ class PythonSetup(Subsystem):
             for resolve, vals in self._resolves_to_option_helper(
                 self._resolves_to_only_binary,
                 "resolves_to_only_binary",
+            ).items()
+        }
+
+    @memoized_method
+    def resolves_to_excludes(self) -> dict[str, list[str]]:
+        return {
+            resolve: sorted(vals)
+            for resolve, vals in self._resolves_to_option_helper(
+                self._resolves_to_excludes,
+                "resolves_to_excludes",
+            ).items()
+        }
+
+    @memoized_method
+    def resolves_to_overrides(self) -> dict[str, list[str]]:
+        return {
+            resolve: sorted(vals)
+            for resolve, vals in self._resolves_to_option_helper(
+                self._resolves_to_overrides,
+                "resolves_to_overrides",
             ).items()
         }
 

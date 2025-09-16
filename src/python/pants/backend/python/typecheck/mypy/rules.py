@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import dataclasses
-import itertools
 from collections.abc import Iterable
 from dataclasses import dataclass
 from hashlib import sha256
@@ -50,7 +49,7 @@ from pants.core.util_rules.system_binaries import (
 )
 from pants.engine.collection import Collection
 from pants.engine.fs import CreateDigest, FileContent, MergeDigests, RemovePrefix
-from pants.engine.internals.graph import coarsened_targets as coarsened_targets_get
+from pants.engine.internals.graph import resolve_coarsened_targets as coarsened_targets_get
 from pants.engine.intrinsics import create_digest, execute_process, merge_digests, remove_prefix
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest
@@ -336,12 +335,9 @@ async def mypy_typecheck_partition(
         )
     )
 
-    all_used_source_roots = sorted(
-        set(itertools.chain(first_party_plugins.source_roots, closure_sources.source_roots))
-    )
     env = {
-        "PEX_EXTRA_SYS_PATH": ":".join(all_used_source_roots),
-        "MYPYPATH": ":".join(all_used_source_roots),
+        "PEX_EXTRA_SYS_PATH": ":".join(first_party_plugins.source_roots),
+        "MYPYPATH": ":".join(closure_sources.source_roots),
         # Always emit colors to improve cache hit rates, the results are post-processed to match the
         # global setting
         "MYPY_FORCE_COLOR": "1",

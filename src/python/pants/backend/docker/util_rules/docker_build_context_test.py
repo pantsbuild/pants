@@ -450,14 +450,14 @@ def test_packaged_pex_path(rule_runner: RuleRunner) -> None:
 
 def test_packaged_pex_environment(rule_runner: RuleRunner) -> None:
     image = (
-        "python:3.8-buster@sha256:04c3f641c2254c229fd2f704c5199ff4bea57d26c1c29008ae3a4afddde98709"
+        "python:3.11-buster@sha256:3a19b4d6ce4402d11bb19aa11416e4a262a60a57707a5cda5787a81285df2666"
     )
     if machine() == "x86_64":
         platform = "linux_x86_64"
-        expected_dist = "psutil-5.9.2-cp38-cp38-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+        expected_dist = "psutil-7.0.0-cp36-abi3-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
     elif machine() == "aarch64":
         platform = "linux_arm64"
-        expected_dist = "psutil-5.9.2-cp38-cp38-linux_aarch64.whl"
+        expected_dist = "psutil-7.0.0-cp36-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
     else:
         pytest.skip("This test only runs on amd64 and arm64.")
 
@@ -466,28 +466,28 @@ def test_packaged_pex_environment(rule_runner: RuleRunner) -> None:
             "BUILD": dedent(
                 f"""
               docker_environment(
-                name="python_38",
+                name="python_311",
                 image="{image}",
                 platform="{platform}",
                 python_bootstrap_search_path=["<PATH>"],
               )
 
-              python_requirement(name="psutil", requirements=["psutil==5.9.2"])
+              python_requirement(name="psutil", requirements=["psutil==7.0.0"])
               """
             ),
             "src/docker/BUILD": """docker_image(dependencies=["src/python/proj/cli:bin"])""",
-            "src/docker/Dockerfile": """FROM python:3.8""",
+            "src/docker/Dockerfile": """FROM python:3.11""",
             "src/python/proj/cli/BUILD": dedent(
                 """
               pex_binary(
                 name="bin",
                 entry_point="main.py",
-                environment="python_38",
+                environment="python_311",
                 dependencies=["//:psutil"],
               )
               """
             ),
-            "src/python/proj/cli/main.py": """import psutil; assert psutil.Process.is_running()""",
+            "src/python/proj/cli/main.py": """import psutil; assert psutil.Process().is_running()""",
         }
     )
 
@@ -495,7 +495,7 @@ def test_packaged_pex_environment(rule_runner: RuleRunner) -> None:
     context = assert_build_context(
         rule_runner,
         Address("src/docker", target_name="docker"),
-        pants_args=["--environments-preview-names={'python_38': '//:python_38'}"],
+        pants_args=["--environments-preview-names={'python_311': '//:python_311'}"],
         expected_files=["src/docker/Dockerfile", pex_file],
     )
 

@@ -24,7 +24,7 @@ from pants.engine.environment import EnvironmentName
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import create_digest
-from pants.engine.rules import Get, collect_rules, implicitly, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import AllTargets
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.jvm.resolve import coursier_fetch
@@ -69,6 +69,13 @@ class ValidateJvmArtifactsForResolveRequest:
 class ValidateJvmArtifactsForResolveResult:
     """Sentinel type that represents that a backend is satisfied with the artifacts for a JVM
     resolve."""
+
+
+@rule(polymorphic=True)
+async def _validate_jvm_artifacts_for_resolve(
+    req: ValidateJvmArtifactsForResolveRequest, env_name: EnvironmentName
+) -> ValidateJvmArtifactsForResolveResult:
+    raise NotImplementedError()
 
 
 @rule
@@ -138,10 +145,8 @@ async def validate_jvm_artifacts_for_resolve(
     impls = union_membership.get(ValidateJvmArtifactsForResolveRequest)
     for impl in impls:
         validate_request = impl(artifacts=request.artifacts, resolve_name=request.resolve_name)
-        _ = await Get(  # noqa: PNT30: requires triage
-            ValidateJvmArtifactsForResolveResult,
-            ValidateJvmArtifactsForResolveRequest,
-            validate_request,
+        _ = await _validate_jvm_artifacts_for_resolve(  # noqa: PNT30: requires triage
+            **implicitly({validate_request: ValidateJvmArtifactsForResolveRequest})
         )
 
     return GenerateJvmLockfile(

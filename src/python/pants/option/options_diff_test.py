@@ -1,11 +1,12 @@
 # Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from dataclasses import replace
 from typing import Any
 
 import pytest
 
-from pants.option.global_options import DynamicRemoteOptions, RemoteProvider
+from pants.option.bootstrap_options import DynamicRemoteOptions, RemoteProvider
 from pants.option.options_diff import summarize_dynamic_options_diff, summarize_options_map_diff
 from pants.testutil.option_util import create_dynamic_remote_options
 

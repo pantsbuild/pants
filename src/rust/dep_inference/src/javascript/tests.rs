@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use crate::javascript::import_pattern::{Import, Pattern, StarMatch, imports_from_patterns};
 use crate::javascript::{ImportCollector, JavascriptImportInfo, get_dependencies};
 use javascript_inference_metadata::ImportPattern;
-use protos::gen::pants::cache::{JavascriptInferenceMetadata, javascript_inference_metadata};
+use protos::pb::pants::cache::{JavascriptInferenceMetadata, javascript_inference_metadata};
 
 fn assert_imports(code: &str, imports: &[&str]) {
     let mut collector = ImportCollector::new(code);

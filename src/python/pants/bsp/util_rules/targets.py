@@ -47,7 +47,7 @@ from pants.engine.environment import EnvironmentName
 from pants.engine.fs import PathGlobs, Workspace
 from pants.engine.internals.graph import resolve_source_paths, resolve_targets
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
-from pants.engine.internals.selectors import Get, concurrently
+from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import get_digest_contents, merge_digests
 from pants.engine.rules import _uncacheable_rule, collect_rules, implicitly, rule
 from pants.engine.target import (
@@ -93,6 +93,13 @@ class BSPBuildTargetsMetadataResult:
 
     # Output to write into `.pants.d/bsp` for access by IDE.
     digest: Digest = EMPTY_DIGEST
+
+
+@rule(polymorphic=True)
+async def get_bsp_build_targets_metadata(
+    req: BSPBuildTargetsMetadataRequest, env_name: EnvironmentName
+) -> BSPBuildTargetsMetadataResult:
+    raise NotImplementedError()
 
 
 @dataclass(frozen=True)
@@ -381,10 +388,10 @@ async def generate_one_bsp_build_target_request(
 
     # Request each language backend to provide metadata for the BuildTarget, and then merge it.
     metadata_results = await concurrently(
-        Get(
-            BSPBuildTargetsMetadataResult,
-            BSPBuildTargetsMetadataRequest,
-            request_type(field_sets=tuple(field_sets)),
+        get_bsp_build_targets_metadata(
+            **implicitly(
+                {request_type(field_sets=tuple(field_sets)): BSPBuildTargetsMetadataRequest}
+            )
         )
         for request_type, field_sets in field_sets_by_request_type.items()
     )
@@ -556,6 +563,13 @@ class BSPDependencyModulesResult:
     digest: Digest = EMPTY_DIGEST
 
 
+@rule(polymorphic=True)
+async def get_bsp_dependency_modules(
+    req: BSPDependencyModulesRequest, env_name: EnvironmentName
+) -> BSPDependencyModulesResult:
+    raise NotImplementedError()
+
+
 class DependencyModulesHandlerMapping(BSPHandlerMapping):
     method_name = "buildTarget/dependencyModules"
     request_type = DependencyModulesParams
@@ -598,10 +612,10 @@ async def resolve_one_dependency_module(
         return ResolveOneDependencyModuleResult(bsp_target_id=request.bsp_target_id)
 
     responses = await concurrently(
-        Get(
-            BSPDependencyModulesResult,
-            BSPDependencyModulesRequest,
-            dep_module_request_type(field_sets=tuple(field_sets)),
+        get_bsp_dependency_modules(
+            **implicitly(
+                {dep_module_request_type(field_sets=tuple(field_sets)): BSPDependencyModulesRequest}
+            )
         )
         for dep_module_request_type, field_sets in field_sets_by_request_type.items()
     )
@@ -658,6 +672,11 @@ class BSPCompileResult:
     output_digest: Digest
 
 
+@rule(polymorphic=True)
+async def bsp_compile(req: BSPCompileRequest, env_name: EnvironmentName) -> BSPCompileResult:
+    raise NotImplementedError()
+
+
 # -----------------------------------------------------------------------------------------------
 # Resources request.
 # See https://build-server-protocol.github.io/docs/specification.html#resources-request
@@ -685,6 +704,13 @@ class BSPResourcesResult:
 
     resources: tuple[Uri, ...]
     output_digest: Digest
+
+
+@rule(polymorphic=True)
+async def get_bsp_resources(
+    req: BSPResourcesRequest, env_name: EnvironmentName
+) -> BSPResourcesResult:
+    raise NotImplementedError()
 
 
 def rules():

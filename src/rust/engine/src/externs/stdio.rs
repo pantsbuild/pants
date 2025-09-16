@@ -29,7 +29,7 @@ impl PyStdioRead {
         let py_buffer = PyBuffer::get(obj)?;
         let mut buffer = vec![0; py_buffer.len_bytes()];
         let read = py
-            .allow_threads(|| stdio::get_destination().read_stdin(&mut buffer))
+            .detach(|| stdio::get_destination().read_stdin(&mut buffer))
             .map_err(|e| PyException::new_err(e.to_string()))?;
         // NB: `as_mut_slice` exposes a `&[Cell<u8>]`, which we can't use directly in `read`. We use
         // `copy_from_slice` instead, which unfortunately involves some extra copying.
@@ -60,7 +60,7 @@ pub struct PyStdioWrite {
 #[pymethods]
 impl PyStdioWrite {
     fn write(&self, payload: &str, py: Python) {
-        py.allow_threads(|| {
+        py.detach(|| {
             let destination = stdio::get_destination();
             if self.is_stdout {
                 destination.write_stdout(payload.as_bytes());

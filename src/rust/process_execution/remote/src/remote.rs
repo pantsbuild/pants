@@ -14,12 +14,12 @@ use futures::future;
 use futures::{Stream, StreamExt};
 use log::{Level, debug, trace, warn};
 use prost::Message;
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use protos::gen::google::longrunning::{
+use protos::pb::build::bazel::remote::execution::v2 as remexec;
+use protos::pb::google::longrunning::{
     CancelOperationRequest, Operation, operations_client::OperationsClient,
 };
-use protos::gen::google::rpc::{PreconditionFailure, Status as StatusProto};
-use rand::{Rng, thread_rng};
+use protos::pb::google::rpc::{PreconditionFailure, Status as StatusProto};
+use rand::Rng;
 use remexec::{
     Action, Command, ExecuteRequest, ExecuteResponse, ExecutedActionMetadata, ServerCapabilities,
     WaitExecutionRequest, capabilities_client::CapabilitiesClient,
@@ -573,7 +573,7 @@ impl CommandRunner {
             OperationOrStatus::Operation(operation) => {
                 assert!(operation.done, "operation was not marked done");
 
-                use protos::gen::google::longrunning::operation::Result as OperationResult;
+                use protos::pb::google::longrunning::operation::Result as OperationResult;
                 let execute_response = match operation.result {
                     Some(OperationResult::Response(response_any)) => {
                         remexec::ExecuteResponse::decode(&response_any.value[..]).map_err(|e| {
@@ -728,7 +728,7 @@ impl CommandRunner {
             if num_retries > 0 {
                 workunit.increment_counter(Metric::RemoteExecutionRPCRetries, 1);
 
-                let multiplier = thread_rng().gen_range(0..2_u32.pow(num_retries) + 1);
+                let multiplier = rand::rng().random_range(0..2_u32.pow(num_retries) + 1);
                 let sleep_time = self.retry_interval_duration * multiplier;
                 let sleep_time = sleep_time.min(MAX_BACKOFF_DURATION);
                 debug!("delaying {sleep_time:?} before retry");

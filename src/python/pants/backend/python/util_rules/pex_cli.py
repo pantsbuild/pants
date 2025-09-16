@@ -37,12 +37,17 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
+_PEX_VERSION = "v2.55.2"
+_PEX_BINARY_HASH = "20ae5530c58fa1144db1c9bc74e3732127c3203f6f6f0731089eca25282ab022"
+_PEX_BINARY_SIZE = 4785641
+
+
 class PexCli(TemplatedExternalTool):
     options_scope = "pex-cli"
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pex-tool/pex)."
 
-    default_version = "v2.47.0"
+    default_version = _PEX_VERSION
     default_url_template = "https://github.com/pex-tool/pex/releases/download/{version}/pex"
     version_constraints = ">=2.13.0,<3.0"
 
@@ -59,10 +64,8 @@ class PexCli(TemplatedExternalTool):
     )
 
     default_known_versions = [
-        "v2.47.0|macos_x86_64|e5166a60fe2617c0ff5fcd4f560cb4d85aa50e0013f4e1135e468139ec91e09a|4840635",
-        "v2.47.0|macos_arm64|e5166a60fe2617c0ff5fcd4f560cb4d85aa50e0013f4e1135e468139ec91e09a|4840635",
-        "v2.47.0|linux_x86_64|e5166a60fe2617c0ff5fcd4f560cb4d85aa50e0013f4e1135e468139ec91e09a|4840635",
-        "v2.47.0|linux_arm64|e5166a60fe2617c0ff5fcd4f560cb4d85aa50e0013f4e1135e468139ec91e09a|4840635",
+        f"{_PEX_VERSION}|{platform}|{_PEX_BINARY_HASH}|{_PEX_BINARY_SIZE}"
+        for platform in ["macos_x86_64", "macos_arm64", "linux_x86_64", "linux_arm64"]
     ]
 
 

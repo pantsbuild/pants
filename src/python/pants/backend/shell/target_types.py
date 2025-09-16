@@ -488,9 +488,6 @@ class ShellCommandRunTarget(Target):
 class ShellCommandTestTarget(Target):
     alias = "test_shell_command"
 
-    deprecated_alias = "experimental_test_shell_command"
-    deprecated_alias_removal_version = "2.30.0.dev0"
-
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ShellCommandTestDependenciesField,

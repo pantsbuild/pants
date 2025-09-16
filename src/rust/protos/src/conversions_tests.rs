@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::convert::TryInto;
 
-use crate::gen::build::bazel::remote::execution::v2 as remexec;
+use crate::pb::build::bazel::remote::execution::v2 as remexec;
 
 #[test]
 fn from_our_digest() {

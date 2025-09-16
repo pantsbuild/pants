@@ -12,7 +12,7 @@ use dep_inference::{dockerfile, javascript, python};
 use fs::{DirectoryDigest, Entry, SymlinkBehavior};
 use grpc_util::prost::MessageExt;
 use hashing::Digest;
-use protos::gen::pants::cache::{
+use protos::pb::pants::cache::{
     CacheKey, CacheKeyType, DependencyInferenceRequest, dependency_inference_request,
 };
 use pyo3::exceptions::PyException;
@@ -55,7 +55,7 @@ impl PreparedInferenceRequest {
         let PyNativeDependenciesRequest {
             directory_digest,
             metadata,
-        } = Python::with_gil(|py| deps_request.bind(py).extract())?;
+        } = Python::attach(|py| deps_request.bind(py).extract())?;
 
         let (path, digest) = Self::find_one_file(directory_digest, store, backend).await?;
         let str_path = path.display().to_string();
@@ -146,7 +146,7 @@ fn parse_dockerfile_info(deps_request: Value) -> PyGeneratorResponseNativeCall {
                 )
                 .await?;
 
-                let result = Python::with_gil(|py| -> Result<_, PyErr> {
+                let result = Python::attach(|py| -> Result<_, PyErr> {
                     Ok(externs::unsafe_call(
                         py,
                         core.types.parsed_dockerfile_info_result,
@@ -227,7 +227,7 @@ fn parse_python_deps(deps_request: Value) -> PyGeneratorResponseNativeCall {
                 )
                 .await?;
 
-                let result = Python::with_gil(|py| -> Result<_, PyErr> {
+                let result = Python::attach(|py| -> Result<_, PyErr> {
                     Ok(externs::unsafe_call(
                         py,
                         core.types.parsed_python_deps_result,
@@ -295,7 +295,7 @@ fn parse_javascript_deps(deps_request: Value) -> PyGeneratorResponseNativeCall {
                 )
                 .await?;
 
-                Python::with_gil(|py| -> Result<_, Failure> {
+                Python::attach(|py| -> Result<_, Failure> {
                     let import_items = result
                         .imports
                         .into_iter()

@@ -30,6 +30,7 @@ Created as part of the release process.
 + Bardur Arantsson
 + Bastian Wegge
 + Ben Limmer
++ Ben Wilen
 + Benjamin Dabelow
 + Benjy Weinberger
 + Berkay Öztürk
@@ -73,6 +74,7 @@ Created as part of the release process.
 + Dan Fabulich
 + Dan Harrison
 + Daniel Anderson
++ Daniel Beck
 + Daniel Bentley
 + Daniel Cavazos
 + Daniel Goldman
@@ -398,11 +400,13 @@ Created as part of the release process.
 + offsetcyan
 + okcleary
 + olivercoleman-switchdin
++ peter-woyzbun
 + philipp-sontag-by
 + purajit
 + ravi2024sk
 + sww
 + twunderlich-grapl
++ vladislav doster
 + wimax-grapl
 + yjabri
 + Éric Jacob

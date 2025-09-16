@@ -193,7 +193,7 @@ fn select_reentry(
     context: Context,
     params: Params,
     query: &Query<TypeId>,
-) -> BoxFuture<NodeResult<Value>> {
+) -> BoxFuture<'_, NodeResult<Value>> {
     // TODO: Actually using the `RuleEdges` of this entry to compute inputs is not
     // implemented: doing so would involve doing something similar to what we do for
     // intrinsics above, and waiting to compute inputs before executing the query here.
@@ -230,7 +230,7 @@ pub fn lift_file_digest(digest: &Bound<'_, PyAny>) -> Result<hashing::Digest, St
 }
 
 pub fn unmatched_globs_additional_context() -> Option<String> {
-    let url = Python::with_gil(|py| {
+    let url = Python::attach(|py| {
         externs::doc_url(
             py,
             "troubleshooting#pants-cannot-find-a-file-in-your-project",
@@ -395,7 +395,7 @@ impl NodeKey {
             NodeKey::Task(ref task) => {
                 let task_desc = task.task.display_info.desc.as_ref().map(|s| s.to_owned())?;
 
-                let displayable_param_names: Vec<_> = Python::with_gil(|py| {
+                let displayable_param_names: Vec<_> = Python::attach(|py| {
                     Self::engine_aware_params(context, py, &task.params)
                         .filter_map(|k| EngineAwareParameter::debug_hint(k.value.bind(py)))
                         .collect()
@@ -501,7 +501,7 @@ impl Node for NodeKey {
             desc = workunit_desc.clone(),
             user_metadata = {
                 if let Some(params) = maybe_params {
-                    Python::with_gil(|py| {
+                    Python::attach(|py| {
                         Self::engine_aware_params(&context, py, params)
                             .flat_map(|k| EngineAwareParameter::metadata(k.value.bind(py)))
                             .collect()
@@ -601,9 +601,7 @@ impl Node for NodeKey {
                 }
             }
             (NodeKey::Task(ref t), NodeOutput::Value(ref v)) if t.task.engine_aware_return_type => {
-                Python::with_gil(|py| {
-                    EngineAwareReturnType::is_cacheable(v.bind(py)).unwrap_or(true)
-                })
+                Python::attach(|py| EngineAwareReturnType::is_cacheable(v.bind(py)).unwrap_or(true))
             }
             _ => true,
         }
@@ -615,7 +613,7 @@ impl Node for NodeKey {
             path[0] += " <-";
             path.push(path[0].clone());
         }
-        let url = Python::with_gil(|py| {
+        let url = Python::attach(|py| {
             externs::doc_url(
                 py,
                 "docs/using-pants/key-concepts/targets-and-build-files#dependencies-and-dependency-inference",
@@ -651,7 +649,7 @@ impl Display for NodeKey {
             NodeKey::Root(s) => write!(f, "{}", s.product),
             NodeKey::Task(task) => {
                 let params = {
-                    Python::with_gil(|py| {
+                    Python::attach(|py| {
                         task.params
                             .keys()
                             .filter_map(|k| EngineAwareParameter::debug_hint(k.to_value().bind(py)))

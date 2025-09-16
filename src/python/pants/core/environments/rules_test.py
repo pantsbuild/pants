@@ -41,7 +41,7 @@ from pants.core.environments.target_types import (
     RemoteExtraPlatformPropertiesField,
 )
 from pants.engine.environment import LOCAL_ENVIRONMENT_MATCHER, ChosenLocalWorkspaceEnvironmentName
-from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
+from pants.engine.internals.docker import DockerResolveImageResult
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessCacheScope
 from pants.engine.target import FieldSet, OptionalSingleSourceField, Target
@@ -49,13 +49,7 @@ from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.option.option_types import ShellStrListOption
 from pants.option.subsystem import Subsystem
 from pants.testutil.option_util import create_subsystem
-from pants.testutil.rule_runner import (
-    MockGet,
-    QueryRule,
-    RuleRunner,
-    engine_error,
-    run_rule_with_mocks,
-)
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error, run_rule_with_mocks
 
 
 @pytest.fixture
@@ -116,13 +110,11 @@ def test_extract_process_config_from_environment() -> None:
                 keep_sandboxes,
                 env_subsystem,
             ],
-            mock_gets=[
-                MockGet(
-                    output_type=DockerResolveImageResult,
-                    input_types=(DockerResolveImageRequest,),
-                    mock=lambda req: DockerResolveImageResult("sha256:abc123"),
-                )
-            ],
+            mock_calls={
+                "pants.engine.intrinsics.docker_resolve_image": lambda req: DockerResolveImageResult(
+                    "sha256:abc123"
+                ),
+            },
         )
         assert result.platform == Platform.linux_arm64.value
         assert result.remote_execution is expected_remote_execution
@@ -370,14 +362,10 @@ def test_resolve_environment_name_local_and_docker_fallbacks(monkeypatch) -> Non
                 "pants.core.environments.rules.determine_local_environment": mock_determine_local_environment,
                 "pants.core.environments.rules.determine_local_workspace_environment": mock_determine_local_workspace_environment,
                 "pants.core.environments.rules.get_target_for_environment_name": mock_get_target_for_environment_name,
-            },
-            mock_gets=[
-                MockGet(
-                    output_type=EnvironmentName,
-                    input_types=(EnvironmentNameRequest,),
-                    mock=lambda req: EnvironmentName(req.raw_value),
+                "pants.core.environments.rules.resolve_environment_name": lambda req: EnvironmentName(
+                    req.raw_value
                 ),
-            ],
+            },
         ).val
         return result
 

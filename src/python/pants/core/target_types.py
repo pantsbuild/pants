@@ -62,7 +62,7 @@ from pants.engine.target import (
     generate_multiple_sources_field_help_message,
 )
 from pants.engine.unions import UnionRule
-from pants.option.global_options import UnmatchedBuildFileGlobs
+from pants.option.bootstrap_options import UnmatchedBuildFileGlobs
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel

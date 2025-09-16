@@ -150,11 +150,11 @@ impl TypeId {
     }
 
     pub fn is_union(&self) -> bool {
-        Python::with_gil(|py| externs::is_union(py, &self.as_py_type(py)).unwrap())
+        Python::attach(|py| externs::is_union(py, &self.as_py_type(py)).unwrap())
     }
 
     pub fn union_in_scope_types(&self) -> Option<Vec<TypeId>> {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             externs::union_in_scope_types(py, &self.as_py_type(py))
                 .unwrap()
                 .map(|types| {
@@ -169,7 +169,7 @@ impl TypeId {
 
 impl fmt::Debug for TypeId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let type_bound = self.as_py_type(py);
             let name = type_bound.name().unwrap();
             write!(f, "{name}")
@@ -200,7 +200,7 @@ pub struct Function(pub Key);
 impl Function {
     /// The function represented as `path.to.module:lineno:func_name`.
     pub fn full_name(&self) -> String {
-        let (module, name, line_no) = Python::with_gil(|py| {
+        let (module, name, line_no) = Python::attach(|py| {
             let obj = self.0.value.bind(py);
             let module: String = externs::getattr(obj, "__module__").unwrap();
             let name: String = externs::getattr(obj, "__name__").unwrap();
@@ -280,35 +280,35 @@ impl Key {
     }
 
     pub fn from_value(val: Value) -> PyResult<Key> {
-        Python::with_gil(|py| externs::INTERNS.key_insert(py, val.consume_into_py_object(py)))
+        Python::attach(|py| externs::INTERNS.key_insert(py, val.consume_into_py_object(py)))
     }
 
     pub fn to_value(&self) -> Value {
         self.value.clone()
     }
 
-    pub fn to_py_object(&self) -> PyObject {
+    pub fn to_py_object(&self) -> Py<PyAny> {
         self.to_value().into()
     }
 }
 
-// NB: Although `PyObject` (aka `Py<PyAny>`) directly implements `Clone`, it's ~4% faster to wrap
+// NB: Although `Py<PyAny>` (aka `Py<PyAny>`) directly implements `Clone`, it's ~4% faster to wrap
 // in `Arc` like this, because `Py<T>` internally acquires a (non-GIL) global lock during `Clone`
 // and `Drop`.
 #[derive(Clone)]
-pub struct Value(Arc<PyObject>);
+pub struct Value(Arc<Py<PyAny>>);
 
 // NB: The size of objects held by a Graph is tracked independently, so we assert that each Value
 // is only as large as its pointer.
 known_deep_size!(8; Value);
 
 impl Value {
-    pub fn new(obj: PyObject) -> Value {
+    pub fn new(obj: Py<PyAny>) -> Value {
         Value(Arc::new(obj))
     }
 
     // NB: Longer name because overloaded in a few places.
-    pub fn consume_into_py_object(self, py: Python) -> PyObject {
+    pub fn consume_into_py_object(self, py: Python) -> Py<PyAny> {
         match Arc::try_unwrap(self.0) {
             Ok(obj) => obj,
             Err(arc_handle) => arc_handle.clone_ref(py),
@@ -329,7 +329,7 @@ impl workunit_store::Value for Value {
 
 impl PartialEq for Value {
     fn eq(&self, other: &Value) -> bool {
-        Python::with_gil(|py| externs::equals(self.bind(py), other.0.bind(py)))
+        Python::attach(|py| externs::equals(self.bind(py), other.0.bind(py)))
     }
 }
 
@@ -337,7 +337,7 @@ impl Eq for Value {}
 
 impl fmt::Debug for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let repr = Python::with_gil(|py| {
+        let repr = Python::attach(|py| {
             let obj = self.0.bind(py);
             externs::val_to_str(obj)
         });
@@ -368,17 +368,17 @@ impl<'py> IntoPyObject<'py> for &Value {
     }
 }
 
-impl From<Value> for PyObject {
+impl From<Value> for Py<PyAny> {
     fn from(value: Value) -> Self {
         match Arc::try_unwrap(value.0) {
             Ok(obj) => obj,
-            Err(arc_handle) => Python::with_gil(|py| arc_handle.clone_ref(py)),
+            Err(arc_handle) => Python::attach(|py| arc_handle.clone_ref(py)),
         }
     }
 }
 
-impl From<PyObject> for Value {
-    fn from(obj: PyObject) -> Self {
+impl From<Py<PyAny>> for Value {
+    fn from(obj: Py<PyAny>) -> Self {
         Value::new(obj)
     }
 }
@@ -549,7 +549,7 @@ impl fmt::Display for Failure {
                 write!(f, "Missing digest: {s}: {d:?}")
             }
             Failure::Throw { val, .. } => {
-                let repr = Python::with_gil(|py| {
+                let repr = Python::attach(|py| {
                     let obj = val.0.bind(py);
                     externs::val_to_str(obj)
                 });
@@ -591,13 +591,13 @@ impl From<String> for Failure {
 
 impl From<PyErr> for Failure {
     fn from(py_err: PyErr) -> Self {
-        Python::with_gil(|py| Failure::from_py_err_with_gil(py, py_err))
+        Python::attach(|py| Failure::from_py_err_with_gil(py, py_err))
     }
 }
 
 pub fn throw(msg: String) -> Failure {
     let python_traceback = Failure::native_traceback(&msg);
-    Python::with_gil(|py| Failure::Throw {
+    Python::attach(|py| Failure::Throw {
         val: externs::create_exception(py, msg),
         python_traceback,
         engine_traceback: Vec::new(),
@@ -638,9 +638,9 @@ mod pycomparedbool_tests {
 
     #[test]
     fn pycomparedbool_conversion_tests() {
-        pyo3::prepare_freethreaded_python();
+        Python::initialize();
 
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             assert!(
                 PyComparedBool(Some(true))
                     .into_pyobject(py)

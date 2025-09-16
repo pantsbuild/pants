@@ -12,15 +12,11 @@ hdrhistogram==0.10.3
 ijson==3.2.3
 libcst==1.4.0
 packaging==24.2
-pex==2.47.0
+pex==2.55.2
 psutil==5.9.8
 # This should be compatible with pytest.py, although it can be looser so that we don't
 # over-constrain pantsbuild.pants.testutil
-# Pytest 7.1.0 introduced a significant bug that is apparently not fixed as of 7.1.1 (the most
-# recent release at the time of writing). see https://github.com/pantsbuild/pants/issues/14990.
-# TODO: Once this issue is fixed, loosen this to allow the version to float above the bad ones.
-#  E.g., as default_version = "pytest>=6.2.4,<8,!=7.1.0,!=7.1.1"
-pytest>=6.2.4,<7.1.0
+pytest>=7,<9,!=7.1.0,!=7.1.1
 python-lsp-jsonrpc==1.0.0
 PyYAML>=6.0,<7.0
 requests[security]>=2.28.1
@@ -47,7 +43,7 @@ urllib3<2
 # These dependencies are only for debugging Pants itself (in VSCode/PyCharm respectively),
 # and should never be imported.
 debugpy==1.8.13
-pydevd-pycharm==251.23536.40 
+pydevd-pycharm==251.23536.40
 
 # These dependencies must only be used from the explorer backend, and no code outside that backend
 # may import anything from it, so these libraries are not ending up as requirements of Pants itself.

@@ -17,7 +17,7 @@ use grpc_util::prost::MessageExt;
 use grpc_util::tls;
 use hashing::Digest;
 use mock::{RequestType, StubCAS};
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::pb::build::bazel::remote::execution::v2 as remexec;
 use workunit_store::WorkunitStore;
 
 use crate::local::ByteStore;

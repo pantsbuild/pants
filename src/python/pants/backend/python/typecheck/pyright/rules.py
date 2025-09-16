@@ -12,6 +12,7 @@ from dataclasses import dataclass, replace
 import toml
 
 from pants.backend.javascript.subsystems import nodejs_tool
+from pants.backend.javascript.subsystems.nodejs import NodeJS
 from pants.backend.javascript.subsystems.nodejs_tool import prepare_tool_process
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -45,7 +46,7 @@ from pants.core.util_rules.config_files import ConfigFiles, find_config_file
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.collection import Collection
 from pants.engine.fs import CreateDigest, FileContent
-from pants.engine.internals.graph import coarsened_targets as coarsened_targets_get
+from pants.engine.internals.graph import resolve_coarsened_targets as coarsened_targets_get
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import (
@@ -164,6 +165,7 @@ async def pyright_typecheck_partition(
     partition: PyrightPartition,
     pyright: Pyright,
     pex_environment: PexEnvironment,
+    nodejs: NodeJS,
 ) -> CheckResult:
     root_sources_get = determine_source_files(
         SourceFilesRequest(fs.sources for fs in partition.field_sets)
@@ -251,7 +253,8 @@ async def pyright_typecheck_partition(
             input_digest=input_digest,
             description=f"Run Pyright on {pluralize(len(root_sources.snapshot.files), 'file')}.",
             level=LogLevel.DEBUG,
-        )
+        ),
+        **implicitly(),
     )
     result = await execute_process(process, **implicitly())
     return CheckResult.from_fallible_process_result(

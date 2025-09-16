@@ -46,12 +46,10 @@ from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
     LoadedLockfile,
-    LoadedLockfileRequest,
     Lockfile,
     PexRequirements,
     Resolve,
     ResolvePexConfig,
-    ResolvePexConfigRequest,
 )
 from pants.backend.python.util_rules.pex_test_utils import (
     create_pex_and_get_all_data,
@@ -76,7 +74,6 @@ from pants.option.global_options import GlobalOptions
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import (
     PYTHON_BOOTSTRAP_ENV,
-    MockGet,
     QueryRule,
     RuleRunner,
     engine_error,
@@ -646,13 +643,9 @@ def test_determine_pex_python_and_platforms() -> None:
         result = run_rule_with_mocks(
             _determine_pex_python_and_platforms,
             rule_args=[request],
-            mock_gets=[
-                MockGet(
-                    output_type=PythonExecutable,
-                    input_types=(InterpreterConstraints,),
-                    mock=lambda _: discovered_python,
-                )
-            ],
+            mock_calls={
+                "pants.backend.python.util_rules.pex.find_interpreter": lambda _: discovered_python
+            },
         )
         assert result == expected
 
@@ -728,48 +721,32 @@ def test_setup_pex_requirements() -> None:
         result = run_rule_with_mocks(
             _setup_pex_requirements,
             rule_args=[request, create_subsystem(PythonSetup)],
-            mock_gets=[
-                MockGet(
-                    output_type=Lockfile,
-                    input_types=(Resolve,),
-                    mock=lambda _: lockfile_obj,
+            mock_calls={
+                "pants.backend.python.util_rules.pex_requirements.determine_resolve_pex_config": lambda _: ResolvePexConfig(
+                    indexes=("custom-index",),
+                    find_links=("custom-find-links",),
+                    manylinux=None,
+                    constraints_file=None,
+                    only_binary=FrozenOrderedSet(),
+                    no_binary=FrozenOrderedSet(),
+                    path_mappings=(),
+                    excludes=FrozenOrderedSet(),
+                    overrides=FrozenOrderedSet(),
                 ),
-                MockGet(
-                    output_type=LoadedLockfile,
-                    input_types=(LoadedLockfileRequest,),
-                    mock=lambda _: create_loaded_lockfile(is_pex_lock),
-                ),
-                MockGet(
-                    output_type=PexRequirementsInfo,
-                    input_types=(PexRequirements,),
-                    mock=lambda _: PexRequirementsInfo(
-                        (
-                            tuple(str(x) for x in requirements.req_strings_or_addrs)
-                            if isinstance(requirements, PexRequirements)
-                            else tuple()
-                        ),
-                        ("imma/link",) if include_find_links else tuple(),
+                "pants.backend.python.util_rules.pex.get_req_strings": lambda _: PexRequirementsInfo(
+                    (
+                        tuple(str(x) for x in requirements.req_strings_or_addrs)
+                        if isinstance(requirements, PexRequirements)
+                        else tuple()
                     ),
+                    ("imma/link",) if include_find_links else tuple(),
                 ),
-                MockGet(
-                    output_type=ResolvePexConfig,
-                    input_types=(ResolvePexConfigRequest,),
-                    mock=lambda _: ResolvePexConfig(
-                        indexes=("custom-index",),
-                        find_links=("custom-find-links",),
-                        manylinux=None,
-                        constraints_file=None,
-                        only_binary=FrozenOrderedSet(),
-                        no_binary=FrozenOrderedSet(),
-                        path_mappings=(),
-                    ),
+                "pants.engine.intrinsics.create_digest": lambda _: constraints_digest,
+                "pants.backend.python.util_rules.pex_requirements.load_lockfile": lambda _: create_loaded_lockfile(
+                    is_pex_lock
                 ),
-                MockGet(
-                    output_type=Digest,
-                    input_types=(CreateDigest,),
-                    mock=lambda _: constraints_digest,
-                ),
-            ],
+                "pants.backend.python.util_rules.pex_requirements.get_lockfile_for_resolve": lambda _: lockfile_obj,
+            },
         )
         assert result == expected
 
@@ -916,6 +893,8 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
         only_binary=set(),
         no_binary=set(),
         manylinux=None,
+        excludes=set(),
+        overrides=set(),
     ).add_header_to_lockfile(b"", regenerate_command="regen", delimeter="#")
     rule_runner.write_files({"lock.txt": lock_content.decode()})
 

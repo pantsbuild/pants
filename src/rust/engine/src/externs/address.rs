@@ -641,7 +641,7 @@ impl Address {
     }
 
     #[getter]
-    fn parameters_repr(&self) -> Cow<str> {
+    fn parameters_repr(&self) -> Cow<'_, str> {
         if self.parameters.is_empty() {
             return Cow::from("");
         }
@@ -768,7 +768,7 @@ impl Address {
         }
     }
 
-    fn maybe_convert_to_target_generator(self_: PyRef<Self>, py: Python) -> PyResult<PyObject> {
+    fn maybe_convert_to_target_generator(self_: PyRef<Self>, py: Python) -> PyResult<Py<PyAny>> {
         if !self_.is_generated_target() && !self_.is_parametrized() {
             return Ok(self_.into_pyobject(py)?.into_any().unbind());
         }
@@ -878,7 +878,7 @@ type ParsedSpec<'a> = (ParsedAddress<'a>, Option<&'a str>);
 
 /// Parses an "address spec" from the CLI.
 #[pyfunction]
-fn address_spec_parse(spec_str: &str) -> PyResult<ParsedSpec> {
+fn address_spec_parse(spec_str: &str) -> PyResult<ParsedSpec<'_>> {
     let spec = address::parse_address_spec(spec_str).map_err(AddressParseException::new_err)?;
     Ok((
         (

@@ -15,7 +15,7 @@ pub struct RunId;
 
 impl RunId {
     pub(super) async fn run_node(self, context: Context) -> NodeResult<Value> {
-        Ok(Python::with_gil(|py| {
+        Ok(Python::attach(|py| {
             externs::unsafe_call(
                 py,
                 context.core.types.run_id,

@@ -17,6 +17,7 @@ from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.utils.yaml import snake_case_attr_dict
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.util_rules import external_tool
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.external_tool import (
     ExternalToolRequest,
     TemplatedExternalTool,
@@ -40,7 +41,6 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.intrinsics import (
     add_prefix,
     create_digest,

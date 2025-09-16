@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use grpc_util::prost::MessageExt;
 use hashing::EMPTY_DIGEST;
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::pb::build::bazel::remote::execution::v2 as remexec;
 
 #[derive(Clone)]
 pub struct TestData {

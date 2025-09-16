@@ -9,14 +9,14 @@ from pants.backend.java.subsystems.javac import JavacSubsystem
 from pants.backend.java.target_types import JavaFieldSet
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.engine.addresses import Addresses
-from pants.engine.internals.graph import coarsened_targets as coarsened_targets_get
-from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.internals.graph import resolve_coarsened_targets as coarsened_targets_get
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import CoarsenedTargets
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import (
     ClasspathEntryRequest,
     ClasspathEntryRequestFactory,
-    FallibleClasspathEntry,
+    get_fallible_classpath_entry,
 )
 from pants.jvm.resolve.coursier_fetch import select_coursier_resolve_for_targets
 from pants.util.logging import LogLevel
@@ -46,10 +46,14 @@ async def javac_check(
     )
 
     results = await concurrently(
-        Get(
-            FallibleClasspathEntry,
-            ClasspathEntryRequest,
-            classpath_entry_request.for_targets(component=target, resolve=resolve),
+        get_fallible_classpath_entry(
+            **implicitly(
+                {
+                    classpath_entry_request.for_targets(
+                        component=target, resolve=resolve
+                    ): ClasspathEntryRequest
+                }
+            )
         )
         for target, resolve in zip(coarsened_targets, resolves)
     )

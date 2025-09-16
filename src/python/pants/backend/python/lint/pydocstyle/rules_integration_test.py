@@ -90,7 +90,7 @@ def assert_success(
 @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
-    all_major_minor_python_versions(["CPython>=3.8,<4"]),
+    all_major_minor_python_versions(["CPython>=3.9,<4"]),
 )
 def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"})
