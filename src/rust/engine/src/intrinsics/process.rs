@@ -24,7 +24,7 @@ fn execute_process(process: Value, process_config: Value) -> PyGeneratorResponse
         let context = task_get_context();
 
         let process_config: externs::process::PyProcessExecutionEnvironment =
-            Python::with_gil(|py| process_config.bind(py).extract()).map_err(|e| format!("{e}"))?;
+            Python::attach(|py| process_config.bind(py).extract()).map_err(|e| format!("{e}"))?;
         let process_request = ExecuteProcess::lift(&context.core.store(), process, process_config)
             .map_err(|e| e.enrich("Error lifting Process"))
             .await?;
@@ -41,7 +41,7 @@ fn execute_process(process: Value, process_config: Value) -> PyGeneratorResponse
                 .map_err(|e| e.enrich("Bytes from stderr"))
         )?;
 
-        Python::with_gil(|py| -> NodeResult<Value> {
+        Python::attach(|py| -> NodeResult<Value> {
             Ok(externs::unsafe_call(
                 py,
                 context.core.types.process_result,

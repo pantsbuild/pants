@@ -37,7 +37,7 @@ impl ExecuteProcess {
         store: &Store,
         value: &Value,
     ) -> Result<InputDigests, StoreError> {
-        let input_digests_fut: Result<_, String> = Python::with_gil(|py| {
+        let input_digests_fut: Result<_, String> = Python::attach(|py| {
             let value = value.bind(py);
             let input_files = {
                 let input_files_py_value: Bound<'_, PyAny> =
@@ -188,7 +188,7 @@ impl ExecuteProcess {
         process_config: externs::process::PyProcessExecutionEnvironment,
     ) -> Result<Self, StoreError> {
         let input_digests = Self::lift_process_input_digests(store, &value).await?;
-        let process = Python::with_gil(|py| {
+        let process = Python::attach(|py| {
             Self::lift_process_fields(value.bind(py), input_digests, process_config)
         })?;
         Ok(Self { process })
