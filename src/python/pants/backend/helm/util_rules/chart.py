@@ -51,7 +51,7 @@ from pants.engine.intrinsics import (
     digest_to_snapshot,
     merge_digests,
 )
-from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import DependenciesRequest, Target, WrappedTargetRequest
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -152,18 +152,20 @@ async def _find_charts_by_targets(
     # which calls this function.
     requests = [
         *(
-            Get(HelmChart, HelmChartRequest, HelmChartRequest.from_target(target))
+            get_helm_chart(HelmChartRequest.from_target(target), **implicitly())
             for target in targets
             if HelmChartFieldSet.is_applicable(target)
         ),
         *(
-            Get(
-                HelmChart,
-                FetchHelmArtifactRequest,
-                FetchHelmArtifactRequest.from_target(
-                    target,
-                    description_of_origin=description_of_origin,
-                ),
+            create_chart_from_artifact(
+                **implicitly(
+                    {
+                        FetchHelmArtifactRequest.from_target(
+                            target,
+                            description_of_origin=description_of_origin,
+                        ): FetchHelmArtifactRequest
+                    }
+                )
             )
             for target in targets
             if HelmArtifactFieldSet.is_applicable(target)
