@@ -49,7 +49,7 @@ from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
 from pants.testutil.python_rule_runner import PythonRuleRunner
-from pants.testutil.rule_runner import MockGet, QueryRule, run_rule_with_mocks
+from pants.testutil.rule_runner import QueryRule, run_rule_with_mocks
 
 
 @pytest.fixture
@@ -329,11 +329,7 @@ def test_pex3_venv_create_extra_args_are_passed_through() -> None:
     run_rule_with_mocks(
         package_python_google_cloud_function,
         rule_args=[field_set],
-        mock_gets=[
-            MockGet(
-                output_type=BuiltPackage, input_types=(BuildPythonFaaSRequest,), mock=mocked_build
-            )
-        ],
+        mock_calls={"pants.backend.python.util_rules.faas.build_python_faas": mocked_build},
     )
 
     # Verify

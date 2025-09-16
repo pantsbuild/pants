@@ -25,7 +25,7 @@ from pants.backend.python.util_rules.pex import (
     create_venv_pex,
     setup_venv_pex_process,
 )
-from pants.core.goals.run import RunFieldSet, RunRequest
+from pants.core.goals.run import RunFieldSet, RunRequest, generate_run_request
 from pants.core.util_rules.system_binaries import CatBinary
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
@@ -33,7 +33,7 @@ from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.graph import find_valid_field_sets, resolve_targets
 from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.intrinsics import create_digest, merge_digests
-from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import FieldSetsPerTargetRequest
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -173,7 +173,8 @@ async def _resolve_post_renderers(
         **implicitly(),
     )
     return await concurrently(
-        Get(RunRequest, RunFieldSet, field_set) for field_set in field_sets_per_target.field_sets
+        generate_run_request(**implicitly({field_set: RunFieldSet}))
+        for field_set in field_sets_per_target.field_sets
     )
 
 

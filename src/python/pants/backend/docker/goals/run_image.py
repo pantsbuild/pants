@@ -14,12 +14,12 @@ from pants.backend.docker.target_types import (
     DockerImageSourceField,
 )
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
-from pants.core.goals.package import BuiltPackage, PackageFieldSet
+from pants.core.goals.package import PackageFieldSet, build_package
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.internals.graph import resolve_target
-from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import WrappedTargetRequest
 
 
@@ -58,7 +58,7 @@ async def docker_image_run_request(
             break
     env, image = await concurrently(
         environment_vars_subset(EnvironmentVarsRequest(options_env_aware.env_vars), **implicitly()),
-        Get(BuiltPackage, PackageFieldSet, build_request),
+        build_package(**implicitly({build_request: PackageFieldSet})),
     )
 
     tag = cast(BuiltDockerImage, image.artifacts[0]).tags[0]

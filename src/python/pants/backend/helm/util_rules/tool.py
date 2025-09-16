@@ -52,7 +52,7 @@ from pants.engine.intrinsics import (
 )
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
-from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.unions import UnionMembership, union
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
@@ -213,6 +213,13 @@ class ExternalHelmPluginRequest(EngineAwareParameter):
         return {"platform": self.platform, "url": self._tool_request.download_file_request.url}
 
 
+@rule(polymorphic=True)
+async def get_external_plugin_request(
+    binding: ExternalHelmPluginBinding, env_name: EnvironmentName
+) -> ExternalHelmPluginRequest:
+    raise NotImplementedError()
+
+
 @dataclass(frozen=True)
 class HelmPlugin(EngineAwareReturnType):
     info: HelmPluginInfo
@@ -250,9 +257,14 @@ class HelmPlugins(Collection[HelmPlugin]):
 @rule
 async def all_helm_plugins(union_membership: UnionMembership) -> HelmPlugins:
     bindings = union_membership.get(ExternalHelmPluginBinding)
-    external_plugins = await concurrently(
-        Get(HelmPlugin, ExternalHelmPluginBinding, binding.create()) for binding in bindings
+    external_plugin_requests = await concurrently(
+        get_external_plugin_request(**implicitly({binding.create(): ExternalHelmPluginBinding}))
+        for binding in bindings
     )
+    external_plugins = await concurrently(
+        download_external_helm_plugin(req) for req in external_plugin_requests
+    )
+
     if logger.isEnabledFor(LogLevel.DEBUG.level):
         plugins_desc = [f"{p.name}, version: {p.version}" for p in external_plugins]
         logger.debug(
