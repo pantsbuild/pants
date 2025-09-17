@@ -24,6 +24,7 @@ from pants.backend.python.macros.poetry_requirements import (
     parse_str_version,
 )
 from pants.backend.python.target_types import PythonRequirementTarget
+from pants.backend.python.util_rules import pex
 from pants.core.target_types import TargetGeneratorSourcesHelperTarget
 from pants.engine.addresses import Address
 from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
@@ -446,6 +447,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *lockfile.rules(),
+            *pex.rules(),
             *poetry_requirements.rules(),
             QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
         ],
