@@ -10,7 +10,7 @@ from pants.backend.project_info.list_targets import ListSubsystem, list_targets
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import DescriptionField, Target, UnexpandedTargets
 from pants.testutil.option_util import create_goal_subsystem, create_options_bootstrapper
-from pants.testutil.rule_runner import MockGet, mock_console, run_rule_with_mocks
+from pants.testutil.rule_runner import mock_console, run_rule_with_mocks
 
 
 class MockTarget(Target):
@@ -32,13 +32,11 @@ def run_goal(targets: list[MockTarget], *, show_documented: bool = False) -> tup
                 ),
                 console,
             ],
-            mock_gets=[
-                MockGet(
-                    output_type=UnexpandedTargets,
-                    input_types=(Addresses,),
-                    mock=lambda _: UnexpandedTargets(targets),
+            mock_calls={
+                "pants.engine.internals.graph.resolve_unexpanded_targets": lambda _: UnexpandedTargets(
+                    targets
                 )
-            ],
+            },
         )
         return stdio_reader.get_stdout(), stdio_reader.get_stderr()
 
