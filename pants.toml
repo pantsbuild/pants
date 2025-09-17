@@ -180,6 +180,7 @@ args = ["--external-sources"]
 args = ["-i 2", "-ci", "-sr"]
 
 [pytest]
+# TODO: Add ["-m", "'not call_by_type'"] to args to skip testing Gets.
 args = ["--no-header", "--noskip", "-vv"]
 execution_slot_var = "TEST_EXECUTION_SLOT"
 install_from_resolve = "pytest"
