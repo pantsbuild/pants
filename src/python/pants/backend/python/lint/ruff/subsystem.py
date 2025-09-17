@@ -37,8 +37,12 @@ class Ruff(TemplatedExternalTool):
     name = "Ruff"
     help = "The Ruff Python formatter (https://github.com/astral-sh/ruff)."
 
-    default_version = "0.12.5"
+    default_version = "0.13.0"
     default_known_versions = [
+        "0.13.0|macos_x86_64|ac47ad1ac90f3070c064d2f5fceef4fe609fec7c073fd29d0814ed126c492e6d|12924617",
+        "0.13.0|macos_arm64|0d706798534537b6655b79fd95c2955c0a0013d4c54d36679d3306825a6bd6aa|12098971",
+        "0.13.0|linux_x86_64|b56ac90cc6987401bafdcf1b931ef044074c5b9451286afa4606a983f64f4fdd|13437622",
+        "0.13.0|linux_arm64|bdee6f1376470b74b1dc5ed48eca52ec9c3e4512bd7f3204e0df100f0bed4741|12137114",
         "0.12.5|macos_x86_64|5af0b2931581a5ed91743c9f669c23cb0db9bb1f0c49f8695ad1443dbc6a9e50|12478716",
         "0.12.5|macos_arm64|8819b61cff645c1d1671df331bb57c1ab230094b686942bccedde1f888feb522|11719060",
         "0.12.5|linux_x86_64|79beb4eac07beaea24774709eeb88a87115f1b53f857dcc1155431e642e01ade|12995071",
