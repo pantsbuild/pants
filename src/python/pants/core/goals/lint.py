@@ -1,4 +1,4 @@
-# Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
@@ -55,6 +55,24 @@ class LintResult(EngineAwareReturnType):
     partition_description: str | None = None
     report: Digest = EMPTY_DIGEST
     _render_message: bool = True
+
+    @classmethod
+    def noop(cls) -> "LintResult":
+        """Return a LintResult representing a skipped/no-op run.
+
+        This mirrors semantics used across other goals (e.g. fmt/fix) where a tool run is
+        intentionally skipped or there are no applicable files. We suppress rendering in the
+        console to avoid noisy empty output.
+        """
+        return cls(
+            exit_code=0,
+            stdout="",
+            stderr="",
+            linter_name="",
+            partition_description=None,
+            report=EMPTY_DIGEST,
+            _render_message=False,
+        )
 
     @classmethod
     def create(
