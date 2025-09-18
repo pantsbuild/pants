@@ -265,6 +265,7 @@ class Example(Goal):
     subsystem_cls = ExampleSubsystem
     environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
+
 @rule
 async def str_to_a(s: str) -> A:
     raise NotImplementedError()
@@ -282,9 +283,7 @@ class TestRule:
         res = run_rule_with_mocks(
             a_goal_rule_generator,
             rule_args=[Console()],
-            mock_calls={
-                "pants.engine.rules_test.str_to_a": lambda _: A()
-            }
+            mock_calls={"pants.engine.rules_test.str_to_a": lambda _: A()},
         )
         assert res == Example(0)
 
@@ -475,7 +474,6 @@ class TestRuleGraph:
             "If it should be provided by a caller, ensure that it is included in any relevant "
             "Query or Get."
         ) in str(cm.value)
-
 
     def test_smallest_full_test(self) -> None:
         @rule
