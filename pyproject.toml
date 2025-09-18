@@ -6,7 +6,7 @@ known_first_party = ["internal_plugins", "pants", "pants_test"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-markers = ["platform_specific_behavior"]
+markers = ["platform_specific_behavior", "call_by_type"]
 
 [tool.coverage.report]
 # We inject this file at test time (see src/python/pants/conftest.py), and so
