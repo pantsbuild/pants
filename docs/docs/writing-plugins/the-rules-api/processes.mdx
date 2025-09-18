@@ -74,7 +74,7 @@ To capture output files from the process, set `output_files: Iterable[str]` and/
 
 To use a timeout, set the `timeout_seconds: int` field. Otherwise, the process will never time out, unless the user cancels Pants.
 
-:::note `Process` caching
+## Caching and Restarting
 By default, a `Process` will be cached to `~/.cache/pants/lmdb_store` if the `exit_code` is `0`.
 
 If it's not safe to cache your `Process` -- usually the case when you know that a process accesses files outside its sandbox -- you can change the cacheability of your `Process` using the `ProcessCacheScope` parameter:
@@ -92,8 +92,52 @@ async def demo(...) -> Foo:
     ...
 ```
 
-`ProcessCacheScope` supports other options as well, including `ALWAYS`.
+`ProcessCacheScope` supports other modes as well, including `ALWAYS`. `Process` caching is a component of more general [caching semantics](../../tutorials/advanced-plugin-concepts.mdx#exploring-caching).
+
+:::note Cache Scoping
+`ProcessCacheScope.LOCAL_SUCCESSFUL` is particularly useful for [interactive processes](#interactiveprocess) in [goal rules](./goal-rules.mdx) with `Goal.EnvironmentBehavior.LOCAL_ONLY`. This paradigm allows a user to repeatedly execute a command in the foreground to debug failures, then instantaneously retrieve the cached result once success is achieved.
 :::
+
+### `InteractiveProcess`
+
+`InteractiveProcess` is similar to Python's `subprocess.run()`. The process will run in the foreground, optionally with access to the workspace.
+
+You may either set the parameter `input_digest: Digest`, or you may set `run_in_workspace=True`. When running in the workspace, you will have access to any file in the build root. If the process can safely be restarted, set the `restartable=True` flag, which will allow the engine to interrupt and restart the process if its inputs have changed. To set environment variables, use the parameter `env: Mapping[str, str]`, like you would with `Process`.
+
+Because the process is potentially side-effecting, you may only run an `InteractiveProcess` in an [`@goal_rule`](./goal-rules.mdx) as an `Effect`. This would typically be expressed with `await Effect(InteractiveProcessResult, ...)`, but in pants 2.27 the `run_interactive_process()` is now required, and the `restartable=True` argument must be provided. This call will return an `InteractiveProcessResult`, which has a single field `exit_code: int`, matching the single field of a `Goal` return type.
+
+```python
+from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.intrinsics import run_interactive_process
+from pants.engine.process import InteractiveProcess
+from pants.engine.rules import goal_rule
+
+
+class HelloWorldSubsystem(GoalSubsystem):
+    name = "hello-world"
+    help = "An example goal."
+
+
+class HelloWorld(Goal):
+    subsystem_cls = HelloWorldSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
+
+
+@goal_rule
+async def hello_world() -> HelloWorld:
+    # This demonstrates opening a Python REPL.
+    result = await run_interactive_process(InteractiveProcess(
+        argv=["/usr/bin/python"],
+        restartable=True,
+    ))
+    return HelloWorld(exit_code=result.exit_code)
+```
+
+## Failure and Retries
+
+In a complex build process, not all process executions can be expected to return `0`. While a nonzero exit code is conventionally interpreted as a failure result, the type of error may be significant. Some tools use the exit code as an additional signalling mechanism to the caller, and it can be unwieldy or non-portable to provide e.g. a shell script wrapper to handle all such cases.
+
+Wrapping a command line with a shell or python script also modifies the [cache key](#caching-and-restarting), and pants loses some insight into the error as a result. Users of your plugin should find it easier to debug errors and cache successes with these alternate subprocess variants for specific failure modes. If these fail to capture your use case, we also invite you to share your ideas at https://github.com/pantsbuild/pants/issues/new/choose.
 
 ### FallibleProcessResult
 
@@ -102,32 +146,6 @@ Normally, a `ProcessResult` will raise an exception if the return code is not `0
 Use `Get(FallibleProcessResult, Process)` if you expect that the process may fail, such as when running a linter or tests.
 
 Like `ProcessResult`, `FallibleProcessResult` has the attributes `stdout: bytes`, `stderr: bytes`, and `output_digest: Digest`, and it adds `exit_code: int`.
-
-## `InteractiveProcess`
-
-`InteractiveProcess` is similar to Python's `subprocess.run()`. The process will run in the foreground, optionally with access to the workspace.
-
-Because the process is potentially side-effecting, you may only run an `InteractiveProcess` in an [`@goal_rule`](./goal-rules.mdx) as an `Effect`.
-
-```python
-from pants.engine.rules import Effect, goal_rule
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult
-
-@goal_rule
-async def hello_world() -> HelloWorld:
-    # This demonstrates opening a Python REPL.
-    result = await Effect(
-        InteractiveProcessResult,
-        InteractiveProcess(argv=["/usr/bin/python"]),
-    )
-    return HelloWorld(exit_code=result.exit_code)
-```
-
-You may either set the parameter `input_digest: Digest`, or you may set `run_in_workspace=True`. When running in the workspace, you will have access to any file in the build root. If the process can safely be restarted, set the `restartable=True` flag, which will allow the engine to interrupt and restart the process if its inputs have changed.
-
-To set environment variables, use the parameter `env: Mapping[str, str]`, like you would with `Process`. You can also set `hermetic_env=False` to inherit the environment variables from the parent `pants` process.
-
-The `Effect` will return an `InteractiveProcessResult`, which has a single field `exit_code: int`.
 
 ### ProcessWithRetries
 
