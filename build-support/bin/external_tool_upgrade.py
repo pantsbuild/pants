@@ -160,6 +160,7 @@ EXCLUDE_TOOLS = {
     "ExternalCCSubsystem",  # Doesn't define default_url_template.
     "ExternalHelmPlugin",  # Is a base class itself.
     "MakeselfSubsystem",  # Weird git tag format, skip for now.
+    "PexCli",  # Custom code
     # google.protobuf.runtime_version.VersionError: Detected mismatched
     # Protobuf Gencode/Runtime major versions when loading codegen/hello.proto:
     # gencode 6.30.0 runtime 5.29.3. Same major version is required.
