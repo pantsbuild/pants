@@ -11,6 +11,7 @@ from pants.backend.scala.lint.scalafmt.skip_field import SkipScalafmtField
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import (
     GatherConfigFilesByDirectoriesRequest,
@@ -47,7 +48,7 @@ class ScalafmtFieldSet(FieldSet):
 
 class ScalafmtRequest(FmtTargetsRequest):
     field_set_type = ScalafmtFieldSet
-    tool_subsystem = ScalafmtSubsystem
+    tool_subsystem = cast(type[SkippableSubsystem], ScalafmtSubsystem)
 
 
 @dataclass(frozen=True)

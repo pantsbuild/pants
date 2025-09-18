@@ -5,9 +5,11 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import cast
 
 from pants.backend.tools.trufflehog.subsystem import Trufflehog
 from pants.core.goals.lint import LintFilesRequest, LintResult
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.config_files import find_config_file
 from pants.core.util_rules.external_tool import download_external_tool
 from pants.core.util_rules.partitions import Partitions
@@ -28,7 +30,7 @@ from pants.util.strutil import pluralize
 
 
 class TrufflehogRequest(LintFilesRequest):
-    tool_subsystem = Trufflehog
+    tool_subsystem = cast(type[SkippableSubsystem], Trufflehog)
 
 
 @rule

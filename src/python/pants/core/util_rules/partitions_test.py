@@ -2,12 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
 from pants.build_graph.address import Address
 from pants.core.goals.fix import Partitions
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.partitions import PartitionerType, _PartitionFieldSetsRequestBase
 from pants.engine.rules import QueryRule
 from pants.engine.target import FieldSet, MultipleSourcesField, SingleSourceField
@@ -71,7 +72,7 @@ def test_default_single_partition_partitioner(kitchen_field_set_type, field_sets
         class PartitionRequest(_PartitionFieldSetsRequestBase[Any]):
             pass
 
-        tool_subsystem = KitchenSubsystem
+        tool_subsystem = cast(type[SkippableSubsystem], KitchenSubsystem)
         field_set_type = kitchen_field_set_type
 
     rules = [
@@ -120,7 +121,7 @@ def test_default_one_partition_per_input_partitioner(kitchen_field_set_type, fie
         class PartitionRequest(_PartitionFieldSetsRequestBase[Any]):
             pass
 
-        tool_subsystem = KitchenSubsystem
+        tool_subsystem = cast(type[SkippableSubsystem], KitchenSubsystem)
         field_set_type = kitchen_field_set_type
 
     rules = [

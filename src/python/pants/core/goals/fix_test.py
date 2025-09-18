@@ -11,6 +11,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from textwrap import dedent
+from typing import cast
 
 import pytest
 
@@ -25,6 +26,7 @@ from pants.core.goals.fix import (
 )
 from pants.core.goals.fix import rules as fix_rules
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules import source_files
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import EMPTY_SNAPSHOT, CreateDigest, FileContent, Snapshot
@@ -533,7 +535,7 @@ def test_default_single_partition_partitioner(kitchen_field_set_type, field_sets
 
     class FixKitchenRequest(FixTargetsRequest):
         field_set_type = kitchen_field_set_type
-        tool_subsystem = KitchenSubsystem
+        tool_subsystem = cast(type[SkippableSubsystem], KitchenSubsystem)
         partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
     rules = [

@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import os
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from pants.backend.javascript.subsystems import nodejs_tool
 from pants.backend.openapi.lint.spectral.skip_field import SkipSpectralField
@@ -13,6 +13,7 @@ from pants.backend.openapi.target_types import (
     OpenApiSourceField,
 )
 from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.fs import CreateDigest, FileContent, MergeDigests
@@ -38,7 +39,7 @@ class SpectralFieldSet(FieldSet):
 
 class SpectralRequest(LintTargetsRequest):
     field_set_type = SpectralFieldSet
-    tool_subsystem = SpectralSubsystem
+    tool_subsystem = cast(type[SkippableSubsystem], SpectralSubsystem)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

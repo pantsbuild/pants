@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
-from typing import Any
+from typing import Any, cast
 
 from pants.backend.shell.subsystems.shell_test_subsys import ShellTestSubsystem
 from pants.backend.shell.target_types import (
@@ -18,6 +18,7 @@ from pants.backend.shell.util_rules.shell_command import (
     prepare_process_request_from_target,
 )
 from pants.core.environments.target_types import EnvironmentField
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.test import (
     TestDebugRequest,
     TestExtraEnv,
@@ -58,7 +59,7 @@ class TestShellCommandFieldSet(TestFieldSet):
 
 
 class ShellTestRequest(TestRequest):
-    tool_subsystem = ShellTestSubsystem
+    tool_subsystem = cast(type[SkippableSubsystem], ShellTestSubsystem)
     field_set_type = TestShellCommandFieldSet
     supports_debug = True
 

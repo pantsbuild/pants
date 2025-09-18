@@ -11,6 +11,7 @@ from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import VenvPexProcess, create_venv_pex
 from pants.core.goals.fmt import AbstractFmtRequest, FmtResult, FmtTargetsRequest, Partitions
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.config_files import find_config_file
 from pants.engine.fs import MergeDigests
 from pants.engine.intrinsics import merge_digests
@@ -22,7 +23,7 @@ from pants.util.strutil import pluralize, softwrap
 
 class BlackRequest(FmtTargetsRequest):
     field_set_type = BlackFieldSet
-    tool_subsystem = Black
+    tool_subsystem = cast(type[SkippableSubsystem], Black)
 
 
 async def _run_black(

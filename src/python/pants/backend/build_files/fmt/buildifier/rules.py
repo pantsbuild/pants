@@ -1,9 +1,12 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import cast
+
 from pants.backend.build_files.fmt.base import FmtBuildFilesRequest
 from pants.backend.build_files.fmt.buildifier.subsystem import Buildifier
 from pants.core.goals.fmt import AbstractFmtRequest, FmtResult
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.external_tool import download_external_tool
 from pants.engine.internals.native_engine import MergeDigests
@@ -17,7 +20,7 @@ from pants.util.strutil import pluralize
 
 
 class BuildifierRequest(FmtBuildFilesRequest):
-    tool_subsystem = Buildifier
+    tool_subsystem = cast(type[SkippableSubsystem], Buildifier)
 
 
 async def _run_buildifier_fmt(

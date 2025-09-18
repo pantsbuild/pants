@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
 from pants.backend.rust.lint.rustfmt import skip_field
 from pants.backend.rust.lint.rustfmt.skip_field import SkipRustfmtField
@@ -11,6 +12,7 @@ from pants.backend.rust.lint.rustfmt.subsystem import RustfmtSubsystem
 from pants.backend.rust.target_types import RustPackageSourcesField
 from pants.backend.rust.util_rules.toolchains import RustToolchainProcess
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.process import execute_process_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
@@ -32,7 +34,7 @@ class RustfmtFieldSet(FieldSet):
 
 class RustfmtRequest(FmtTargetsRequest):
     field_set_type = RustfmtFieldSet
-    tool_subsystem = RustfmtSubsystem
+    tool_subsystem = cast(type[SkippableSubsystem], RustfmtSubsystem)
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
