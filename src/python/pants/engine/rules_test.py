@@ -18,7 +18,6 @@ from pants.engine.internals.native_engine import PyExecutor
 from pants.engine.internals.scheduler import Scheduler
 from pants.engine.rules import (
     DuplicateRuleError,
-    Get,
     MissingParameterTypeAnnotation,
     MissingReturnTypeAnnotation,
     QueryRule,
@@ -29,7 +28,7 @@ from pants.engine.rules import (
 )
 from pants.engine.unions import UnionMembership
 from pants.option.bootstrap_options import DEFAULT_EXECUTION_OPTIONS, DEFAULT_LOCAL_STORE_OPTIONS
-from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
+from pants.testutil.rule_runner import run_rule_with_mocks
 from pants.util.enums import match
 from pants.util.logging import LogLevel
 
@@ -267,9 +266,14 @@ class Example(Goal):
     environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
+@rule
+async def str_to_a(s: str) -> A:
+    raise NotImplementedError()
+
+
 @goal_rule
 async def a_goal_rule_generator(console: Console) -> Example:
-    a = await Get(A, str, "a str!")
+    a = await str_to_a("a str!")
     console.print_stdout(str(a))
     return Example(exit_code=0)
 
@@ -279,7 +283,7 @@ class TestRule:
         res = run_rule_with_mocks(
             a_goal_rule_generator,
             rule_args=[Console()],
-            mock_gets=[MockGet(output_type=A, input_types=(str,), mock=lambda _: A())],
+            mock_calls={"pants.engine.rules_test.str_to_a": lambda _: A()},
         )
         assert res == Example(0)
 
@@ -471,80 +475,6 @@ class TestRuleGraph:
             "Query or Get."
         ) in str(cm.value)
 
-    @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
-    @pytest.mark.no_error_if_skipped
-    def test_not_fulfillable_duplicated_dependency(self) -> None:
-        # If a rule depends on another rule+subject in two ways, and one of them is unfulfillable,
-        # only the unfulfillable one should be in the errors.
-
-        @rule
-        async def a_from_c(c: C) -> A:
-            return A()
-
-        @rule
-        async def b_from_d(d: D) -> B:
-            return B()
-
-        @rule
-        async def d_from_a_and_suba(a: A, suba: SubA) -> D:  # type: ignore[return]
-            _ = await Get(A, C, C())  # noqa: F841
-
-        rules = [
-            a_from_c,
-            b_from_d,
-            d_from_a_and_suba,
-        ]
-
-        with pytest.raises(Exception) as cm:
-            create_scheduler(rules)
-
-        assert_equal_graph_output(
-            dedent(
-                f"""\
-                Rules with errors: 2
-
-                  {fmt_rule(a_from_c)}:
-                    Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
-
-                  {fmt_rule(d_from_a_and_suba, gets=[("A", "C")])}:
-                    No rule was able to compute A.:
-                      {fmt_rule(a_from_c)} for SubA: Was unfulfillable.
-                """
-            ).strip(),
-            str(cm.value),
-        )
-
-    @pytest.mark.skip(
-        reason="TODO(#10649): Fix and re-enable once reachability checks are restored."
-    )
-    @pytest.mark.no_error_if_skipped
-    def test_unreachable_rule(self) -> None:
-        """Test that when one rule "shadows" another, we get an error."""
-
-        @rule
-        async def d_singleton() -> D:
-            return D()
-
-        @rule
-        async def d_for_b(b: B) -> D:
-            return D()
-
-        rules = [d_singleton, d_for_b, QueryRule(D, (B,))]
-        with pytest.raises(Exception) as cm:
-            create_scheduler(rules)
-
-        assert_equal_with_printing(
-            dedent(
-                f"""\
-                Rules with errors: 1
-
-                  {fmt_rule(d_for_b)}:
-                    Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
-                """
-            ).strip(),
-            str(cm.value),
-        )
-
     def test_smallest_full_test(self) -> None:
         @rule
         async def a_from_suba(suba: SubA) -> A:
@@ -655,49 +585,6 @@ class TestRuleGraph:
                 {fmt_non_param_edge(b, (), rule_type=GraphVertexType.singleton)}
                 {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba_and_b), RuleFormatRequest(b, ()))}
                 }}"""
-            ).strip(),
-            subgraph,
-        )
-
-    def test_potentially_ambiguous_get(self) -> None:
-        # In this case, we validate that a Get is satisfied by a rule that actually consumes its
-        # parameter, rather than by having the same dependency rule consume a parameter that was
-        # already in the context.
-        #
-        # This accounts for the fact that when someone uses Get (rather than Select), it's because
-        # they intend for the Get's parameter to be consumed in the subgraph. Anything else would
-        # be surprising.
-        @rule
-        async def a(sub_a: SubA) -> A:  # type: ignore[return]
-            _ = await Get(B, C())  # noqa: F841
-
-        @rule
-        async def b_from_suba(suba: SubA) -> B:
-            return B()
-
-        @rule
-        async def suba_from_c(c: C) -> SubA:
-            return SubA()
-
-        rules = [a, b_from_suba, suba_from_c, QueryRule(A, (SubA,))]
-        subgraph = self.create_subgraph(A, rules, SubA())
-        assert_equal_graph_output(
-            dedent(
-                f"""\
-                digraph {{
-                  /*
-                  queries:
-                    Query(A for SubA)
-                  */
-                  // root entries
-                {fmt_non_param_edge(A, SubA)}
-                {fmt_non_param_edge(A, SubA, return_func=RuleFormatRequest(a, gets=[("B", "C")]))}
-                  // internal entries
-                {fmt_non_param_edge(b_from_suba, C, return_func=RuleFormatRequest(suba_from_c))}
-                {fmt_param_edge(C, C, RuleFormatRequest(suba_from_c))}
-                {fmt_param_edge(SubA, SubA, via_func=RuleFormatRequest(a, gets=[("B", "C")]), return_func=RuleFormatRequest(b_from_suba, C))}
-                }}
-                """
             ).strip(),
             subgraph,
         )
@@ -990,52 +877,6 @@ class TestRuleGraph:
                 }}"""
             ).strip(),
             fullgraph,
-        )
-
-    @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
-    @pytest.mark.no_error_if_skipped
-    def test_get_simple(self) -> None:
-        @rule
-        async def a() -> A:  # type: ignore[return]
-            _ = await Get(B, D, D())  # noqa: F841
-
-        @rule
-        async def b_from_d(d: D) -> B:
-            return B()
-
-        rules = [a, b_from_d, QueryRule(A, (SubA,))]
-        subgraph = self.create_subgraph(A, rules, SubA())
-        assert_equal_graph_output(
-            dedent(
-                f"""\
-                digraph {{
-                  /*
-                  queries:
-                    Query(A for SubA)
-                  */
-                  // root entries
-                {fmt_non_param_edge(A, ())}
-                {
-                    fmt_non_param_edge(
-                        RuleFormatRequest(a, gets=[("B", "D")]),
-                        (),
-                        rule_type=GraphVertexType.singleton,
-                    )
-                }
-                {fmt_non_param_edge(A, (), RuleFormatRequest(a, gets=[("B", "D")]))}
-                  // internal entries
-                {
-                    fmt_non_param_edge(
-                        RuleFormatRequest(a, (), gets=[("B", "D")]),
-                        D,
-                        RuleFormatRequest(b_from_d),
-                        append_for_product=False,
-                    )
-                }
-                {fmt_param_edge(D, D, RuleFormatRequest(b_from_d))}
-                }}"""
-            ).strip(),
-            subgraph,
         )
 
     def create_full_graph(self, rules, validate=True):

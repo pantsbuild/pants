@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import atexit
 import dataclasses
+import difflib
 import functools
 import inspect
 import os
@@ -154,6 +155,9 @@ def engine_error(
             else:
                 errmsg = str(underlying)
             if contains not in errmsg:
+                diff = "\n".join(
+                    difflib.Differ().compare(contains.splitlines(), errmsg.splitlines())
+                )
                 raise AssertionError(
                     softwrap(
                         f"""
@@ -162,6 +166,8 @@ def engine_error(
                         => Expected: {contains}
 
                         => Actual: {errmsg}
+
+                        => Diff: {diff}
                         """
                     )
                 )
