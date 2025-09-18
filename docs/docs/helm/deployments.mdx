@@ -257,6 +257,65 @@ You should always favor using static values (or value files) VS dynamic values i
 Be careful when chossing the values that are going to be calculated dynamically.
 :::
 
+## Using custom resource definitions
+
+Pants uses [hikaru](https://github.com/haxsaw/hikaru) to analyze Helm charts and detect required first-party Docker images by resolving Pants' target addresses. However, by default, hikaru cannot parse custom resource definitions (CRDs), so Pants will not automatically detect Docker images referenced within CRDs.
+
+To enable Pants to recognize Docker images in your CRDs, you need to extend hikaru with your custom resource definitions. This process is documented in the [hikaru CRD guide](https://hikaru.readthedocs.io/en/latest/crd.html).
+
+For example, consider the following CRD manifest:
+
+```apiVersion: pants/v1alpha1
+   kind: CustomResourceDefinition
+   metadata:
+     name: crd_foo
+   spec:
+    containers:
+      - name: myapp-container
+          image: busybox:1.28
+    initContainers:
+      - name: init-service
+        image: busybox:1.29
+```
+
+By default, Pants will not be able to parse Docker image references inside your CRDs, because the CRD is not registered with Hikaru. To enable Pants to recognize these images, you need to define and register your custom resource with Hikaru.
+
+Create a Python file at `pantsbuild/crd.py` with content similar to:
+```
+
+        from __future__ import annotations
+        from hikaru.model.rel_1_28.v1 import *
+
+        from hikaru import (HikaruBase, HikaruDocumentBase,
+                            set_default_release)
+        from hikaru.crd import HikaruCRDDocumentMixin
+        from typing import Optional, List
+        from dataclasses import dataclass
+
+        set_default_release("rel_1_28")
+
+        @dataclass
+        class ContainersSpec(HikaruBase):
+            containers: List[Container]
+            initContainers: List[Container]
+
+        @dataclass
+        class CRD(HikaruDocumentBase, HikaruCRDDocumentMixin):
+            spec: ContainersSpec
+            metadata: ObjectMeta
+            apiVersion: str = f"pants/v1alpha1"
+            kind: str = "CustomResourceDefinition"
+```
+For more details on extending Hikaru with your CRDs, see the official documentation: https://hikaru.readthedocs.io/en/latest/crd.html.
+
+After defining your CRD Python class, you must register the new file and class name with Pants:
+
+```
+[helm-k8s-parser.crd]
+"pantsbuild/crd.py"="CRD"
+"pantsbuild/crd_cron2.py"="CRD2"
+```
+
 ## Third party chart artifacts
 
 Previous examples on the usage of the `helm_deployment` target are all based on the fact that the deployment declares a dependency on a Helm chart that is also part of the same repository. Since charts support having dependencies with other charts in the same repository or with external 3rd party Helm artifacts (declared as `helm_artifact`), all that dependency resolution is handled for us.
