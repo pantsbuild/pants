@@ -6,6 +6,7 @@ import ast
 import inspect
 import itertools
 import logging
+import os
 import sys
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
@@ -369,6 +370,8 @@ class _AwaitableCollector(ast.NodeVisitor):
                 self.awaitables.append(
                     self._get_legacy_awaitable(call_node, is_effect=issubclass(func, Effect))
                 )
+                if os.environ.get("PANTS_DISABLE_GETS", "").lower() in {"1", "t", "true"}:
+                    raise Exception("Get() is disabled!")
             elif (inspect.isfunction(func) or isinstance(func, RuleDescriptor)) and (
                 rule_id := getattr(func, "rule_id", None)
             ) is not None:
