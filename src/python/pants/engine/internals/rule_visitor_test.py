@@ -70,6 +70,7 @@ def assert_awaitables(func, awaitable_types: Iterable[tuple[OutT, InT | list[InT
     assert actual_types == expected_types
 
 
+@pytest.mark.call_by_type
 def test_single_get() -> None:
     async def rule():
         await Get(STR, INT, 42)
@@ -77,6 +78,7 @@ def test_single_get() -> None:
     assert_awaitables(rule, [(str, int)])
 
 
+@pytest.mark.call_by_type
 def test_single_no_args_syntax() -> None:
     async def rule():
         await Get(STR)
@@ -84,6 +86,7 @@ def test_single_no_args_syntax() -> None:
     assert_awaitables(rule, [(str, [])])
 
 
+@pytest.mark.call_by_type
 def test_get_multi_param_syntax() -> None:
     async def rule():
         await Get(str, {42: int, "towel": str})
@@ -91,6 +94,7 @@ def test_get_multi_param_syntax() -> None:
     assert_awaitables(rule, [(str, [int, str])])
 
 
+@pytest.mark.call_by_type
 def test_multiple_gets() -> None:
     async def rule():
         a = await Get(STR, INT, 42)
@@ -100,6 +104,7 @@ def test_multiple_gets() -> None:
     assert_awaitables(rule, [(str, int), (bool, str)])
 
 
+@pytest.mark.call_by_type
 def test_multiget_homogeneous() -> None:
     async def rule():
         await MultiGet(Get(STR, INT(x)) for x in range(5))
@@ -107,6 +112,7 @@ def test_multiget_homogeneous() -> None:
     assert_awaitables(rule, [(str, int)])
 
 
+@pytest.mark.call_by_type
 def test_multiget_heterogeneous() -> None:
     async def rule():
         await MultiGet(Get(STR, INT, 42), Get(INT, STR("bob")))
@@ -114,6 +120,7 @@ def test_multiget_heterogeneous() -> None:
     assert_awaitables(rule, [(str, int), (int, str)])
 
 
+@pytest.mark.call_by_type
 def test_attribute_lookup() -> None:
     async def rule1():
         await Get(InnerScope.STR, InnerScope.INT, 42)
@@ -122,6 +129,7 @@ def test_attribute_lookup() -> None:
     assert_awaitables(rule1, [(str, int), (str, int)])
 
 
+@pytest.mark.call_by_type
 def test_get_no_index_call_no_subject_call_allowed() -> None:
     async def rule() -> None:
         get_type: type = Get  # noqa: F841
@@ -211,6 +219,7 @@ def test_byname_mutual_recursion(tmp_path: Path) -> None:
         assert_awaitables(module.mutually_recursive_rule_2, [(int, [])])
 
 
+@pytest.mark.call_by_type
 def test_rule_helpers_free_functions() -> None:
     async def rule():
         _top_helper(1)
@@ -218,6 +227,7 @@ def test_rule_helpers_free_functions() -> None:
     assert_awaitables(rule, [(str, int), (int, str)])
 
 
+@pytest.mark.call_by_type
 def test_rule_helpers_class_methods() -> None:
     async def rule1():
         HelperContainer()._static_helper(1)
@@ -254,6 +264,7 @@ def test_rule_helpers_class_methods() -> None:
     assert_awaitables(rule4_inner, [(str, int)])
 
 
+@pytest.mark.call_by_type
 def test_valid_get_unresolvable_product_type() -> None:
     async def rule():
         Get(DNE, STR(42))  # noqa: F821
@@ -262,6 +273,7 @@ def test_valid_get_unresolvable_product_type() -> None:
         collect_awaitables(rule)
 
 
+@pytest.mark.call_by_type
 def test_valid_get_unresolvable_subject_declared_type() -> None:
     async def rule():
         Get(int, DNE, "bob")  # noqa: F821
@@ -270,6 +282,7 @@ def test_valid_get_unresolvable_subject_declared_type() -> None:
         collect_awaitables(rule)
 
 
+@pytest.mark.call_by_type
 def test_invalid_get_no_args() -> None:
     async def rule():
         Get()
@@ -278,6 +291,7 @@ def test_invalid_get_no_args() -> None:
         collect_awaitables(rule)
 
 
+@pytest.mark.call_by_type
 def test_invalid_get_too_many_subject_args() -> None:
     async def rule():
         Get(STR, INT, "bob", 3)
@@ -286,6 +300,7 @@ def test_invalid_get_too_many_subject_args() -> None:
         collect_awaitables(rule)
 
 
+@pytest.mark.call_by_type
 def test_invalid_get_invalid_subject_arg_no_constructor_call() -> None:
     async def rule():
         Get(STR, "bob")
@@ -294,6 +309,7 @@ def test_invalid_get_invalid_subject_arg_no_constructor_call() -> None:
         collect_awaitables(rule)
 
 
+@pytest.mark.call_by_type
 def test_invalid_get_invalid_product_type_not_a_type_name() -> None:
     async def rule():
         Get(call(), STR("bob"))  # noqa: F821
@@ -302,6 +318,7 @@ def test_invalid_get_invalid_product_type_not_a_type_name() -> None:
         collect_awaitables(rule)
 
 
+@pytest.mark.call_by_type
 def test_invalid_get_dict_value_not_type() -> None:
     async def rule():
         Get(int, {"str": "not a type"})
@@ -328,6 +345,7 @@ class Request:
         return Request("uh", 4.2)
 
 
+@pytest.mark.call_by_type
 def test_deep_infer_types() -> None:
     async def rule(request: Request):
         # 1
@@ -368,6 +386,7 @@ def test_deep_infer_types() -> None:
     )
 
 
+@pytest.mark.call_by_type
 def test_missing_type_annotation() -> None:
     async def myrule(request: Request):
         Get(str, request.bad_meth())
@@ -384,6 +403,7 @@ def test_missing_type_annotation() -> None:
         collect_awaitables(myrule)
 
 
+@pytest.mark.call_by_type
 def test_closure() -> None:
     def closure_func() -> int:
         return 44
@@ -399,6 +419,7 @@ class McUnion:
     v: int | float
 
 
+@pytest.mark.call_by_type
 def test_union_types() -> None:
     async def somerule(mc: McUnion):
         Get(str, mc.b)

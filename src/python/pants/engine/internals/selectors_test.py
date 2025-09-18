@@ -10,6 +10,8 @@ import pytest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.unions import union
 
+pytestmark = pytest.mark.call_by_type
+
 
 class AClass:
     pass
