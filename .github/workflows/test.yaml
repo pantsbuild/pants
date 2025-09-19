@@ -1,6 +1,6 @@
 # GENERATED, DO NOT EDIT!
 # To change, edit `src/python/pants_release/generate_github_workflows.py` and run:
-#   ./pants run src/python/pants_release/generate_github_workflows.py
+#   pants run src/python/pants_release/generate_github_workflows.py
 
 
 concurrency:
@@ -9,6 +9,7 @@ concurrency:
 env:
   HONEYCOMB_API_KEY: --DISABLED--
   PANTS_CONFIG_FILES: +['pants.ci.toml']
+  PANTS_DISABLE_GETS: '1'
   PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: 'False'
   RUST_BACKTRACE: all
 jobs:
