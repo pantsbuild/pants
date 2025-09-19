@@ -10,8 +10,6 @@ import pytest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.unions import union
 
-pytestmark = pytest.mark.call_by_type
-
 
 class AClass:
     pass
@@ -22,6 +20,16 @@ class BClass:
     pass
 
 
+# A dummy test so that at least one test is collected when we exclude the call_by_type mark.
+# Otherwise pytest returns exit code 5 ("No tests were collected") which we interpret as failure.
+# See https://docs.pytest.org/en/stable/reference/exit-codes.html
+# TODO: Modify our test support to optionally accept exit code 5 as success. Seems generally
+#  useful to allow users to opt for this. See https://github.com/pantsbuild/pants/issues/22668
+def test_dummy() -> None:
+    pass
+
+
+@pytest.mark.call_by_type
 def test_create_get() -> None:
     get1 = Get(AClass)
     assert get1.output_type is AClass
@@ -52,6 +60,7 @@ def assert_invalid_get(create_get: Callable[[], Get], *, expected: str) -> None:
     assert str(exc.value) == expected
 
 
+@pytest.mark.call_by_type
 def test_invalid_get() -> None:
     # Bad output type.
     assert_invalid_get(
@@ -91,6 +100,7 @@ def test_invalid_get() -> None:
     )
 
 
+@pytest.mark.call_by_type
 def test_invalid_get_input_does_not_match_type() -> None:
     assert_invalid_get(
         lambda: Get(AClass, str, 1),
@@ -110,6 +120,7 @@ def test_invalid_get_input_does_not_match_type() -> None:
     assert union_get.inputs == [1]
 
 
+@pytest.mark.call_by_type
 def test_multiget_invalid_types() -> None:
     with pytest.raises(
         expected_exception=TypeError,
@@ -118,6 +129,7 @@ def test_multiget_invalid_types() -> None:
         next(MultiGet(Get(AClass, BClass()), "bob").__await__())  # type: ignore[call-overload]
 
 
+@pytest.mark.call_by_type
 def test_multiget_invalid_Nones() -> None:
     with pytest.raises(
         expected_exception=ValueError,
@@ -135,6 +147,7 @@ def test_multiget_invalid_Nones() -> None:
 #
 # Here we test that the runtime actually accepts 11 or more Gets. This is really just a regression
 # test that checks MultiGet retains a trailing *args slot.
+@pytest.mark.call_by_type
 @pytest.mark.parametrize("count", list(range(1, 20)))
 def test_homogenous(count) -> None:
     gets = tuple(Get(AClass, BClass()) for _ in range(count))

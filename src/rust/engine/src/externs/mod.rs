@@ -16,8 +16,8 @@ use pyo3::{create_exception, import_exception, intern};
 use smallvec::{SmallVec, smallvec};
 use std::collections::BTreeMap;
 use std::convert::TryInto;
-use std::fmt;
 use std::sync::LazyLock;
+use std::{env, fmt};
 
 use logging::PythonLogLevel;
 use rule_graph::RuleId;
@@ -648,6 +648,14 @@ impl PyGeneratorResponseGet {
         input_arg0: Option<Bound<'_, PyAny>>,
         input_arg1: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
+        if ["1", "t", "true"].contains(
+            &env::var("PANTS_DISABLE_GETS")
+                .map(|s| s.to_lowercase())
+                .unwrap_or("".to_string())
+                .as_str(),
+        ) {
+            panic!("Get() is disabled!");
+        }
         let product = product.downcast::<PyType>().map_err(|_| {
             let actual_type = product.get_type();
             PyTypeError::new_err(format!(
