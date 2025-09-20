@@ -39,7 +39,9 @@ def _partition_by_interpreter_constraints_and_resolve(
     ] = defaultdict(lambda: OrderedSet())
     for field_set in field_sets:
         resolve = field_set.resolve.normalized_value(python_setup)
-        interpreter_constraints = InterpreterConstraints.create_from_field_sets([field_set], python_setup)
+        interpreter_constraints = InterpreterConstraints.create_from_field_sets(
+            [field_set], python_setup
+        )
         resolve_and_interpreter_constraints_to_field_sets[(resolve, interpreter_constraints)].add(
             field_set
         )
@@ -47,7 +49,6 @@ def _partition_by_interpreter_constraints_and_resolve(
     return resolve_and_interpreter_constraints_to_field_sets
 
 
-# TODO: Nick to revisit
 async def _find_all_unique_interpreter_constraints(
     python_setup: PythonSetup,
     field_set_type: type[FieldSet],
@@ -65,9 +66,16 @@ async def _find_all_unique_interpreter_constraints(
     Returns the global interpreter constraints if no relevant targets were matched.
     """
     all_tgts = await find_all_targets(**implicitly())
+    extra_constraints_blank_resolves = [
+        (ics_field, None) for ics_field in extra_constraints_per_tgt
+    ]
     unique_constraints = {
         InterpreterConstraints.create_from_compatibility_fields(
-            [tgt[InterpreterConstraintsField], *extra_constraints_per_tgt], python_setup
+            [
+                (tgt[InterpreterConstraintsField], tgt.get(PythonResolveField)),
+                *extra_constraints_blank_resolves,
+            ],
+            python_setup,
         )
         for tgt in all_tgts
         if tgt.has_field(InterpreterConstraintsField) and field_set_type.is_applicable(tgt)
@@ -75,7 +83,7 @@ async def _find_all_unique_interpreter_constraints(
     if not unique_constraints and extra_constraints_per_tgt:
         unique_constraints.add(
             InterpreterConstraints.create_from_compatibility_fields(
-                extra_constraints_per_tgt,
+                extra_constraints_blank_resolves,
                 python_setup,
             )
         )

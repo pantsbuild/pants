@@ -14,6 +14,7 @@ from pants.backend.python.target_types import (
     Executable,
     InterpreterConstraintsField,
     PexEntryPointField,
+    PythonResolveField,
     PythonRunGoalUseSandboxField,
     PythonSourceField,
 )
@@ -42,6 +43,7 @@ class PythonSourceFieldSet(RunFieldSet):
 
     source: PythonSourceField
     interpreter_constraints: InterpreterConstraintsField
+    resolve: PythonResolveField
     _run_goal_use_sandbox: PythonRunGoalUseSandboxField
 
     def should_use_sandbox(self, python_setup: PythonSetup) -> bool:
@@ -101,7 +103,9 @@ async def create_python_source_debug_adapter_request(
 ) -> RunDebugAdapterRequest:
     debugpy_pex = await create_pex(
         debugpy.to_pex_request(
-            interpreter_constraints=InterpreterConstraints.create_from_field_sets([field_set], python_setup)
+            interpreter_constraints=InterpreterConstraints.create_from_field_sets(
+                [field_set], python_setup
+            )
         )
     )
 

@@ -197,14 +197,21 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         if not fields:
             return None
         return cls.create_from_compatibility_fields(fields, python_setup)
-    
+
     @classmethod
-    def create_from_field_sets(cls, fs: Iterable[_FS], python_setup: PythonSetup) -> InterpreterConstraints:
-        return cls.create_from_compatibility_fields([(field_set.interpreter_constraints, field_set.resolve) for field_set in fs], python_setup)
+    def create_from_field_sets(
+        cls, fs: Iterable[_FS], python_setup: PythonSetup
+    ) -> InterpreterConstraints:
+        return cls.create_from_compatibility_fields(
+            [(field_set.interpreter_constraints, field_set.resolve) for field_set in fs],
+            python_setup,
+        )
 
     @classmethod
     def create_from_compatibility_fields(
-        cls, fields: Iterable[tuple[InterpreterConstraintsField, PythonResolveField | None]], python_setup: PythonSetup
+        cls,
+        fields: Iterable[tuple[InterpreterConstraintsField, PythonResolveField | None]],
+        python_setup: PythonSetup,
     ) -> InterpreterConstraints:
         """Returns merged InterpreterConstraints for the given `InterpreterConstraintsField`s.
 
@@ -212,7 +219,9 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         dependencies, merging constraints like this is only necessary when you are _mixing_ code
         which might not have any inter-dependencies, such as when you're merging un-related roots.
         """
-        constraint_sets = {ics.value_or_configured_default(python_setup, resolve) for ics, resolve in fields}
+        constraint_sets = {
+            ics.value_or_configured_default(python_setup, resolve) for ics, resolve in fields
+        }
         # This will OR within each field and AND across fields.
         merged_constraints = cls.merge_constraint_sets(constraint_sets)
         return InterpreterConstraints(merged_constraints)
@@ -224,7 +233,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         results = defaultdict(set)
         for fs in field_sets:
             constraints = cls.create_from_compatibility_fields(
-                [fs.interpreter_constraints], python_setup
+                [(fs.interpreter_constraints, fs.resolve)], python_setup
             )
             results[constraints].add(fs)
         return FrozenDict(
