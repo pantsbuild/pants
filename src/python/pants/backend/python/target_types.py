@@ -108,7 +108,7 @@ class InterpreterConstraintsField(StringSequenceField, AsyncFieldMixin):
         """
     )
 
-    def value_or_global_default(self, python_setup: PythonSetup) -> tuple[str, ...]:
+    def value_or_configured_default(self, python_setup: PythonSetup, resolve: PythonResolveField | None) -> tuple[str, ...]:
         """Return either the given `compatibility` field or the global interpreter constraints.
 
         If interpreter constraints are supplied by the CLI flag, return those only.
@@ -123,8 +123,7 @@ class InterpreterConstraintsField(StringSequenceField, AsyncFieldMixin):
                 self.value,
                 description_of_origin=f"the `{self.alias}` field on target at `{self.address}`",
             )
-
-        return python_setup.compatibility_or_constraints(self.value)
+        return python_setup.compatibility_or_constraints(self.value, resolve.normalized_value(python_setup) if resolve and python_setup.enable_resolves else None)
 
 
 class PythonResolveField(StringField, AsyncFieldMixin):

@@ -495,9 +495,7 @@ async def partition_python_tests(
 
     for field_set in request.field_sets:
         metadata = TestMetadata(
-            interpreter_constraints=InterpreterConstraints.create_from_compatibility_fields(
-                [field_set.interpreter_constraints], python_setup
-            ),
+            interpreter_constraints=InterpreterConstraints.create_from_field_sets([field_set], python_setup),
             extra_env_vars=field_set.extra_env_vars.sorted(),
             xdist_concurrency=field_set.xdist_concurrency.value,
             resolve=field_set.resolve.normalized_value(python_setup),
@@ -607,9 +605,7 @@ async def debugpy_python_test(
 ) -> TestDebugAdapterRequest:
     debugpy_pex = await create_pex(
         debugpy.to_pex_request(
-            interpreter_constraints=InterpreterConstraints.create_from_compatibility_fields(
-                [field_set.interpreter_constraints for field_set in batch.elements], python_setup
-            )
+            interpreter_constraints=InterpreterConstraints.create_from_field_sets(batch.elements, python_setup)
         )
     )
 

@@ -39,9 +39,7 @@ def _partition_by_interpreter_constraints_and_resolve(
     ] = defaultdict(lambda: OrderedSet())
     for field_set in field_sets:
         resolve = field_set.resolve.normalized_value(python_setup)
-        interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
-            [field_set.interpreter_constraints], python_setup
-        )
+        interpreter_constraints = InterpreterConstraints.create_from_field_sets([field_set], python_setup)
         resolve_and_interpreter_constraints_to_field_sets[(resolve, interpreter_constraints)].add(
             field_set
         )
@@ -49,6 +47,7 @@ def _partition_by_interpreter_constraints_and_resolve(
     return resolve_and_interpreter_constraints_to_field_sets
 
 
+# TODO: Nick to revisit
 async def _find_all_unique_interpreter_constraints(
     python_setup: PythonSetup,
     field_set_type: type[FieldSet],

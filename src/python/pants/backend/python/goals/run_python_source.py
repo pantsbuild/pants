@@ -101,9 +101,7 @@ async def create_python_source_debug_adapter_request(
 ) -> RunDebugAdapterRequest:
     debugpy_pex = await create_pex(
         debugpy.to_pex_request(
-            interpreter_constraints=InterpreterConstraints.create_from_compatibility_fields(
-                [field_set.interpreter_constraints], python_setup
-            )
+            interpreter_constraints=InterpreterConstraints.create_from_field_sets([field_set], python_setup)
         )
     )
 

@@ -63,6 +63,7 @@ async def partition_flake8(
 
     results: dict[InterpreterConstraints, list[Flake8FieldSet]] = defaultdict(list)
     for fs in request.field_sets:
+        # TODO: Nick to revisit
         constraints = InterpreterConstraints.create_from_compatibility_fields(
             [fs.interpreter_constraints, *first_party_plugins.interpreter_constraints_fields],
             python_setup,

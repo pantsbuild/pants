@@ -621,6 +621,7 @@ class DependencyValidationFieldSet(FieldSet):
     required_fields = (InterpreterConstraintsField,)
 
     interpreter_constraints: InterpreterConstraintsField
+    resolve: PythonResolveField | None
 
 
 class PythonValidateDependenciesRequest(ValidateDependenciesRequest):
@@ -643,12 +644,12 @@ async def validate_python_dependencies(
     )
 
     # Validate that the ICs for dependencies are all compatible with our own.
-    target_ics = request.field_set.interpreter_constraints.value_or_global_default(python_setup)
+    target_ics = request.field_set.interpreter_constraints.value_or_configured_default(python_setup, request.field_set.resolve)
     non_subset_items = []
     for dep in dependencies:
         if not dep.target.has_field(InterpreterConstraintsField):
             continue
-        dep_ics = dep.target[InterpreterConstraintsField].value_or_global_default(python_setup)
+        dep_ics = dep.target[InterpreterConstraintsField].value_or_configured_default(python_setup, dep.target.get(PythonResolveField))
         if not interpreter_constraints_contains(
             dep_ics, target_ics, python_setup.interpreter_versions_universe
         ):

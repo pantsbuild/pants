@@ -83,6 +83,7 @@ async def partition_pylint(
     if pylint.skip:
         return Partitions()
 
+    # TODO: Nick to revisit
     first_party_ics = InterpreterConstraints.create_from_compatibility_fields(
         first_party_plugins.interpreter_constraints_fields, python_setup
     )

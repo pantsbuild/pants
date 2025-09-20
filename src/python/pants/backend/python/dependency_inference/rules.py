@@ -369,9 +369,7 @@ async def _exec_parse_deps(
     field_set: PythonImportDependenciesInferenceFieldSet,
     python_setup: PythonSetup,
 ) -> ParsedPythonDependencies:
-    interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
-        [field_set.interpreter_constraints], python_setup
-    )
+    interpreter_constraints = InterpreterConstraints.create_from_field_sets([field_set], python_setup)
     resp = await parse_python_dependencies_get(
         ParsePythonDependenciesRequest(
             field_set.source,

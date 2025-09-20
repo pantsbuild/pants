@@ -244,6 +244,30 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
+    _default_to_resolve_interpreter_constraints = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            For Python targets with both `resolve` and `interpreter_constraints` fields, default to using the `interpreter_constraints` field of the resolve if `interpreter_constraints` is not set on the target itself.
+
+            `[python].enable_resolves` must be `True` for this option to also be enabled.
+            """
+        ),
+        advanced=True,
+    )
+
+    @memoized_property
+    def default_to_resolve_interpreter_constraints(self) -> bool:
+        if self._default_to_resolve_interpreter_constraints and not self.enable_resolves:
+            raise OptionsError(softwrap(
+                """
+                You cannot set `[python].default_to_resolve_interpreter_constraints = true` without setting `[python].enable_resolves = true`.
+
+                Please either enable resolves or set `[python].default_to_resolve_interpreter_constraints = false` (the default setting).
+                """
+            ))
+        return self._default_to_resolve_interpreter_constraints
+
     default_run_goal_use_sandbox = BoolOption(
         default=True,
         help=softwrap(
@@ -756,20 +780,15 @@ class PythonSetup(Subsystem):
     def scratch_dir(self):
         return os.path.join(self.options.pants_workdir, *self.options_scope.split("."))
 
-    def compatibility_or_constraints(self, compatibility: Iterable[str] | None) -> tuple[str, ...]:
+    def compatibility_or_constraints(self, compatibility: Iterable[str] | None, resolve: str | None) -> tuple[str, ...]:
         """Return either the given `compatibility` field or the global interpreter constraints.
 
         If interpreter constraints are supplied by the CLI flag, return those only.
         """
         if self.options.is_flagged("interpreter_constraints"):
             return self.interpreter_constraints
-        return tuple(compatibility or self.interpreter_constraints)
-
-    def compatibilities_or_constraints(
-        self, compatibilities: Iterable[Iterable[str] | None]
-    ) -> tuple[str, ...]:
-        return tuple(
-            constraint
-            for compatibility in compatibilities
-            for constraint in self.compatibility_or_constraints(compatibility)
-        )
+        if compatibility:
+            return tuple(compatibility)
+        if resolve:
+            return self.resolves_to_interpreter_constraints[resolve]
+        return self.interpreter_constraints

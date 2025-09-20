@@ -13,7 +13,7 @@ from typing import Protocol, TypeVar
 from packaging.requirements import InvalidRequirement, Requirement
 
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import InterpreterConstraintsField
+from pants.backend.python.target_types import InterpreterConstraintsField, PythonResolveField
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.target import Target
@@ -34,6 +34,9 @@ class FieldSetWithInterpreterConstraints(Protocol):
 
     @property
     def interpreter_constraints(self) -> InterpreterConstraintsField: ...
+
+    @property
+    def resolve(self) -> PythonResolveField | None: ...
 
 
 _FS = TypeVar("_FS", bound=FieldSetWithInterpreterConstraints)
@@ -187,17 +190,21 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         which might not have any interdependencies, such as when you're merging unrelated roots.
         """
         fields = [
-            tgt[InterpreterConstraintsField]
+            (tgt[InterpreterConstraintsField], tgt.get(PythonResolveField))
             for tgt in targets
             if tgt.has_field(InterpreterConstraintsField)
         ]
         if not fields:
             return None
         return cls.create_from_compatibility_fields(fields, python_setup)
+    
+    @classmethod
+    def create_from_field_sets(cls, fs: Iterable[_FS], python_setup: PythonSetup) -> InterpreterConstraints:
+        return cls.create_from_compatibility_fields([(field_set.interpreter_constraints, field_set.resolve) for field_set in fs], python_setup)
 
     @classmethod
     def create_from_compatibility_fields(
-        cls, fields: Iterable[InterpreterConstraintsField], python_setup: PythonSetup
+        cls, fields: Iterable[tuple[InterpreterConstraintsField, PythonResolveField | None]], python_setup: PythonSetup
     ) -> InterpreterConstraints:
         """Returns merged InterpreterConstraints for the given `InterpreterConstraintsField`s.
 
@@ -205,7 +212,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         dependencies, merging constraints like this is only necessary when you are _mixing_ code
         which might not have any inter-dependencies, such as when you're merging un-related roots.
         """
-        constraint_sets = {field.value_or_global_default(python_setup) for field in fields}
+        constraint_sets = {ics.value_or_configured_default(python_setup, resolve) for ics, resolve in fields}
         # This will OR within each field and AND across fields.
         merged_constraints = cls.merge_constraint_sets(constraint_sets)
         return InterpreterConstraints(merged_constraints)
