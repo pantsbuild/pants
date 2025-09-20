@@ -81,9 +81,8 @@ async def partition_black(
     if black.options.is_default("interpreter_constraints"):
         try:
             # Don't compute this unless we have to, since it might fail.
-            all_interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
-                (field_set.interpreter_constraints for field_set in request.field_sets),
-                python_setup,
+            all_interpreter_constraints = InterpreterConstraints.create_from_field_sets(
+                request.field_sets, python_setup
             )
         except ValueError:
             raise ValueError(

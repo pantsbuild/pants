@@ -66,8 +66,8 @@ async def _django_migration_dependencies(
                 output_filename="__visitor.pex",
                 internal_only=True,
                 main=EntryPoint("__visitor"),
-                interpreter_constraints=InterpreterConstraints.create_from_compatibility_fields(
-                    [request.field_set.interpreter_constraints], python_setup=python_setup
+                interpreter_constraints=InterpreterConstraints.create_from_field_sets(
+                    [request.field_set], python_setup=python_setup
                 ),
                 sources=visitor_digest,
             )
