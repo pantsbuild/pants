@@ -196,7 +196,7 @@ mod tests {
                             ))
                         })?;
                         if user_agent.contains(EXPECTED_USER_AGENT) {
-                            Ok(Response::new(pn::Output {}))
+                            Ok(Response::new(pb::Output {}))
                         } else {
                             Err(Status::invalid_argument(format!(
                                 "user-agent header did not contain expected value: actual={user_agent}"
