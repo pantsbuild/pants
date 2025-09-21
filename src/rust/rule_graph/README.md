@@ -17,7 +17,7 @@ A successfully constructed `RuleGraph` contains a graph where nodes have one of 
 A `Rule` is a function or coroutine with all of its inputs declared as part of its type signature. The end user type signature is made up of:
 1. the return type of the `Rule`
 2. the positional arguments to the `Rule`
-3. a set of `Get`s which declare the runtime requirements of a coroutine, of the form `Get(output_type, input_type)`
+3. a set of awaitables which declare the runtime requirements of a coroutine, of the form `(output_type, input_type)`
 
 In the `RuleGraph`, these are encoded in a [Rule](https://github.com/pantsbuild/pants/blob/3a188a1e06d8c27ff86d8c311ff1b2bdea0d39ff/src/rust/engine/rule_graph/src/rules.rs#L76-L95) trait, with a [DependencyKey](https://github.com/pantsbuild/pants/blob/3a188a1e06d8c27ff86d8c311ff1b2bdea0d39ff/src/rust/engine/rule_graph/src/rules.rs#L21-L41) trait representing both the positional arguments (which have no provided `Param`) and the `Get`s (which provide their input type as a `Param`).
 

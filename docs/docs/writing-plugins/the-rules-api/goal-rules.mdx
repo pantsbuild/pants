@@ -9,7 +9,7 @@ How to create new goals.
 
 For many [plugin tasks](../common-plugin-tasks/index.mdx), you will be extending existing goals, such as adding a new linter to the `lint` goal. However, you may instead want to create a new goal, such as a `publish` goal. This page explains how to create a new goal.
 
-As explained in [Concepts](./concepts.mdx), `@goal_rule`s are the entry-point into the rule graph. When a user runs `pants my-goal`, the Pants engine will look for the respective `@goal_rule`. That `@goal_rule` will usually request other types, either as parameters in the `@goal_rule` signature or through `await Get`. But unlike a `@rule`, a `@goal_rule` may also trigger side effects (such as running interactive processes, writing to the filesystem, etc) via `await Effect`.
+As explained in [Concepts](./concepts.mdx), `@goal_rule`s are the entry-point into the rule graph. When a user runs `pants my-goal`, the Pants engine will look for the respective `@goal_rule`. That `@goal_rule` will usually request other types, either as parameters in the `@goal_rule` signature or through `await`ing another rule. But unlike a `@rule`, a `@goal_rule` may also trigger side effects (such as running interactive processes, writing to the filesystem, etc) via `await Effect`.
 
 Often, you can keep all of your logic inline in the `@goal_rule`. As your `@goal_rule` gets more complex, you may end up factoring out helper `@rule`s, but you do not need to start with writing helper `@rule`s.
 
@@ -201,7 +201,14 @@ async def hello_world(console: Console, specs_paths: SpecsPaths) -> HelloWorld:
 
 `SpecsPaths.files` will list all files matched by the specs, e.g. `::` will match every file in the project (regardless of if targets own the files).
 
-To convert `SpecsPaths` into a [`Digest`](./file-system.mdx), use `await Get(Digest, PathGlobs(globs=specs_paths.files))`.
+To convert `SpecsPaths` into a [`Digest`](./file-system.mdx), use:
+
+```python
+from pants.engine.intrinsics import path_globs_to_digest
+...
+await path_globs_to_digest(PathGlobs(globs=specs_paths.files))
+```
+
 
 :::note Name clashing
 It is very unlikely, but is still possible that adding a custom goal with an unfortunate name may cause issues when certain existing Pants options are passed in the command line. For instance, executing a goal named `local` with a particular option (in this case, the global `local_cache` option), e.g. `pants --no-local-cache local ...` would fail since there's no `--no-cache` flag defined for the `local` goal.
