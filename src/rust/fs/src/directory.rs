@@ -643,36 +643,36 @@ impl DigestTrie {
         for entry in &*self.0 {
             let path = path_so_far.join(entry.name().as_ref());
             let mut entry = entry;
-            if let SymlinkBehavior::Oblivious = symlink_behavior {
-                if let Entry::Symlink(s) = entry {
-                    link_depth += 1;
-                    if s.target == Component::CurDir.as_os_str() {
-                        if link_depth >= MAX_LINK_DEPTH {
-                            let mut logical_path = PathBuf::new();
-                            for component in path_so_far.components() {
-                                let cs = component.as_os_str();
-                                logical_path.push(cs);
-                                if cs == entry.name().as_str() {
-                                    break;
-                                }
+            if let SymlinkBehavior::Oblivious = symlink_behavior
+                && let Entry::Symlink(s) = entry
+            {
+                link_depth += 1;
+                if s.target == Component::CurDir.as_os_str() {
+                    if link_depth >= MAX_LINK_DEPTH {
+                        let mut logical_path = PathBuf::new();
+                        for component in path_so_far.components() {
+                            let cs = component.as_os_str();
+                            logical_path.push(cs);
+                            if cs == entry.name().as_str() {
+                                break;
                             }
-                            warn!(
-                                "Exceeded the maximum link depth while traversing link {:#?} to path {:#?}. Stopping traversal.",
-                                logical_path, s.target
-                            );
-                            return;
                         }
-                        self.walk_helper(root, path.clone(), symlink_behavior, link_depth, f);
+                        warn!(
+                            "Exceeded the maximum link depth while traversing link {:#?} to path {:#?}. Stopping traversal.",
+                            logical_path, s.target
+                        );
                         return;
                     }
+                    self.walk_helper(root, path.clone(), symlink_behavior, link_depth, f);
+                    return;
+                }
 
-                    let destination_path = path_so_far.join(s.target.clone());
-                    let destination_entry = root.entry_helper(root, &destination_path, link_depth);
-                    if let Ok(Some(valid_entry)) = destination_entry {
-                        entry = valid_entry;
-                    } else {
-                        continue;
-                    }
+                let destination_path = path_so_far.join(s.target.clone());
+                let destination_entry = root.entry_helper(root, &destination_path, link_depth);
+                if let Ok(Some(valid_entry)) = destination_entry {
+                    entry = valid_entry;
+                } else {
+                    continue;
                 }
             }
 
