@@ -56,14 +56,14 @@ where
                 "All children must have one path segment, but found {name}"
             ));
         }
-        if let Some(p) = prev {
-            if name <= get_name(p) {
-                return Err(format!(
-                    "Children must be sorted and unique, but {} was before {}",
-                    get_name(p),
-                    name,
-                ));
-            }
+        if let Some(p) = prev
+            && name <= get_name(p)
+        {
+            return Err(format!(
+                "Children must be sorted and unique, but {} was before {}",
+                get_name(p),
+                name,
+            ));
         }
         prev = Some(node);
     }
