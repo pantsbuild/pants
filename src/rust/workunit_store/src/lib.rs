@@ -770,9 +770,8 @@ impl WorkunitStore {
     }
 }
 
-#[macro_export]
-macro_rules! format_workunit_duration_ms {
-    ($workunit_duration_ms:expr) => {{ format_args!("{:.2}s", ($workunit_duration_ms as f64) / 1000.0) }};
+pub fn format_workunit_duration_ms(duration: Duration) -> String {
+    format!("{:.2}s", (duration.as_millis() as f64) / 1000.0)
 }
 
 ///

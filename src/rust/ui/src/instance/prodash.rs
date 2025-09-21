@@ -166,8 +166,8 @@ impl prodash::unit::DisplayValue for MillisAsFloatingPointSecs {
     ) -> fmt::Result {
         // Convert back from millis-since-epoch to millis elapsed.
         let start_time = UNIX_EPOCH + Duration::from_millis(value as u64);
-        let elapsed_ms = start_time.elapsed().map(|d| d.as_millis()).unwrap_or(0);
-        w.write_fmt(format_workunit_duration_ms!(elapsed_ms))
+        let elapsed_ms = start_time.elapsed().unwrap_or_else(|_| Duration::new(0, 0));
+        w.write_str(&format_workunit_duration_ms(elapsed_ms))
     }
     fn display_unit(&self, _w: &mut dyn fmt::Write, _value: Step) -> fmt::Result {
         Ok(())
