@@ -53,9 +53,9 @@ impl<R: Rule> EntryWithDeps<R> {
 
     pub fn params(&self) -> &ParamTypes<R::TypeId> {
         match self {
-            EntryWithDeps::Rule(ref ie) => &ie.params,
-            EntryWithDeps::Root(ref re) => &re.0.params,
-            EntryWithDeps::Reentry(ref re) => &re.params,
+            EntryWithDeps::Rule(ie) => &ie.params,
+            EntryWithDeps::Root(re) => &re.0.params,
+            EntryWithDeps::Reentry(re) => &re.params,
         }
     }
 }
@@ -367,7 +367,7 @@ impl<R: Rule> RuleGraph<R> {
             .rule_dependency_edges
             .iter()
             .filter_map(|(entry, edges)| match entry.as_ref() {
-                EntryWithDeps::Root(ref root_entry)
+                EntryWithDeps::Root(root_entry)
                     if root_entry.0.product == product
                         && root_entry.0.params.is_subset(&params) =>
                 {
@@ -388,7 +388,7 @@ impl<R: Rule> RuleGraph<R> {
                     .rule_dependency_edges
                     .keys()
                     .filter_map(|entry| match entry.as_ref() {
-                        EntryWithDeps::Root(ref root_entry) if root_entry.0.product == product => {
+                        EntryWithDeps::Root(root_entry) if root_entry.0.product == product => {
                             Some(format!("Params({})", params_str(&root_entry.0.params)))
                         }
                         _ => None,
@@ -432,7 +432,7 @@ impl<R: Rule> RuleGraph<R> {
     /// entries, but it would be good to make it typesafe instead.
     ///
     pub fn edges_for_inner(&self, entry: &Entry<R>) -> Option<RuleEdges<R>> {
-        if let Entry::WithDeps(ref e) = entry {
+        if let Entry::WithDeps(e) = entry {
             self.rule_dependency_edges.get(e).cloned()
         } else {
             panic!("not an inner entry! {entry:?}")
