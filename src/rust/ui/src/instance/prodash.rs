@@ -99,13 +99,14 @@ impl ProdashInstance {
         // Drop all tasks to clear the Tree. The call to shutdown will render a final "Tick" with the
         // empty Tree, which will clear the screen.
         self.tasks_to_display.clear();
-        self.executor
-            .clone()
-            .spawn_blocking(
-                move || self.handle.shutdown_and_wait(),
-                |e| fatal_log!("Failed to teardown UI: {e}"),
-            )
-            .boxed()
+        let executor = self.executor.clone();
+        let shutdown = executor.native_spawn_blocking(move || self.handle.shutdown_and_wait());
+        async move {
+            if let Err(e) = shutdown.await {
+                fatal_log!("Failed to teardown UI: {e}");
+            }
+        }
+        .boxed()
     }
 
     pub fn render(&mut self, heavy_hitters: &HashMap<SpanId, (String, SystemTime)>) {

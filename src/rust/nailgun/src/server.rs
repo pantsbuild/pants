@@ -240,26 +240,28 @@ impl Nail for RawFdNail {
 
         // Spawn the underlying function as a blocking task, and capture its exit code to append to the
         // output stream.
+        let executor = self.executor.clone();
         let nail = self.clone();
-        let exit_code = self
-            .executor
-            .spawn_blocking(
-                move || {
-                    // NB: This closure captures the stdio handles, and will drop/close them when it completes.
-                    (nail.runner)(RawFdExecution {
-                        cmd,
-                        cancelled,
-                        stdin_fd: stdin_handle.as_raw_fd(),
-                        stdout_fd: stdout_handle.as_raw_fd(),
-                        stderr_fd: stderr_handle.as_raw_fd(),
-                    })
-                },
-                |e| {
+        let exit_code_join = executor.native_spawn_blocking(move || {
+            // NB: This closure captures the stdio handles, and will drop/close them when it completes.
+            (nail.runner)(RawFdExecution {
+                cmd,
+                cancelled,
+                stdin_fd: stdin_handle.as_raw_fd(),
+                stdout_fd: stdout_handle.as_raw_fd(),
+                stderr_fd: stderr_handle.as_raw_fd(),
+            })
+        });
+        let exit_code = async move {
+            match exit_code_join.await {
+                Ok(code) => code,
+                Err(e) => {
                     log::warn!("Server exited uncleanly: {e}");
                     ExitCode(1)
-                },
-            )
-            .boxed();
+                }
+            }
+        }
+        .boxed();
 
         // Select a single stdout/stderr stream.
         let stdout_stream = stdout_stream.map_ok(ChildOutput::Stdout);
