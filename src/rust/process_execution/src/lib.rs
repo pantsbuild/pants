@@ -1150,12 +1150,12 @@ fn maybe_make_wrapper_script(
                 writeln!(&mut fragment, "/bin/mkdir -p {cache_path}",)
                     .map_err(|err| format!("write! failed: {err:?}"))?;
 
-                if let Some(parent) = path.parent() {
-                    if !parent.as_os_str().is_empty() {
-                        let parent_quoted = quote_path(parent)?;
-                        writeln!(&mut fragment, "/bin/mkdir -p {}", &parent_quoted)
-                            .map_err(|err| format!("write! failed: {err}"))?;
-                    }
+                if let Some(parent) = path.parent()
+                    && !parent.as_os_str().is_empty()
+                {
+                    let parent_quoted = quote_path(parent)?;
+                    writeln!(&mut fragment, "/bin/mkdir -p {}", &parent_quoted)
+                        .map_err(|err| format!("write! failed: {err}"))?;
                 }
                 writeln!(
                     &mut fragment,
