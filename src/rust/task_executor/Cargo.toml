@@ -1,6 +1,6 @@
 [package]
 version = "0.0.1"
-edition = "2024"
+edition = "2021"
 name = "task_executor"
 authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
