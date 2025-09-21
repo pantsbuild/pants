@@ -109,11 +109,9 @@ pub fn expand_aliases<I: IntoIterator<Item = String>>(
             expand = false;
         }
         expanded_args.push(arg_str);
-        if expand {
-            if let Some(replacement) = alias_map.0.get(expanded_args.last().unwrap()) {
-                expanded_args.pop();
-                expanded_args.extend(replacement.clone())
-            }
+        if expand && let Some(replacement) = alias_map.0.get(expanded_args.last().unwrap()) {
+            expanded_args.pop();
+            expanded_args.extend(replacement.clone())
         }
     }
     expanded_args

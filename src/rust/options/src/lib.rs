@@ -580,10 +580,10 @@ impl OptionParser {
         };
 
         // Apply the bin name set by the user, if any.
-        if let Ok(val) = parser.parse_string_optional(&option_id!("pants", "bin", "name"), None) {
-            if let Some(bin_name) = val.value {
-                *BIN_NAME.lock() = munge_bin_name(bin_name, &buildroot);
-            }
+        if let Ok(val) = parser.parse_string_optional(&option_id!("pants", "bin", "name"), None)
+            && let Some(bin_name) = val.value
+        {
+            *BIN_NAME.lock() = munge_bin_name(bin_name, &buildroot);
         }
 
         // Step #5: Return the final OptionParser, with any extra specs from spec_files added
@@ -730,10 +730,10 @@ impl OptionParser {
                 }],
             )];
             for (source_type, source) in self.sources.iter() {
-                if let Some(list_edits) = getter(source, id)? {
-                    if !list_edits.is_empty() {
-                        derivations.push((source_type, list_edits));
-                    }
+                if let Some(list_edits) = getter(source, id)?
+                    && !list_edits.is_empty()
+                {
+                    derivations.push((source_type, list_edits));
                 }
             }
             derivation = Some(derivations);
@@ -898,15 +898,15 @@ impl OptionParser {
     ) -> Vec<String> {
         let mut errors = vec![];
         for (source_type, source) in self.sources.iter() {
-            if let Source::Config { ordinal: _, path } = source_type {
-                if let Some(config_reader) = source.as_any().downcast_ref::<ConfigReader>() {
-                    errors.extend(
-                        config_reader
-                            .validate(section_to_valid_keys)
-                            .iter()
-                            .map(|err| format!("{err} in {path}")),
-                    );
-                }
+            if let Source::Config { ordinal: _, path } = source_type
+                && let Some(config_reader) = source.as_any().downcast_ref::<ConfigReader>()
+            {
+                errors.extend(
+                    config_reader
+                        .validate(section_to_valid_keys)
+                        .iter()
+                        .map(|err| format!("{err} in {path}")),
+                );
             }
         }
         errors
