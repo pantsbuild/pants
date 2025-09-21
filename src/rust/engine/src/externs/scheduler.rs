@@ -15,7 +15,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
 // NB: This exists because we need the PyInterpreterState to pass to PyThreadState_New,
 // however PyInterpreterState_Get wasn't added until Py 3.9. They vary in implementation, but because
 // we don't have any sub-interpreters they should both return the same object.
-extern "C" {
+unsafe extern "C" {
     pub fn PyInterpreterState_Main() -> *mut ffi::PyInterpreterState;
 }
 
