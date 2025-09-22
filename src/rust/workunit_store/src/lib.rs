@@ -770,9 +770,8 @@ impl WorkunitStore {
     }
 }
 
-#[macro_export]
-macro_rules! format_workunit_duration_ms {
-    ($workunit_duration_ms:expr) => {{ format_args!("{:.2}s", ($workunit_duration_ms as f64) / 1000.0) }};
+pub fn format_workunit_duration_ms(duration: Duration) -> String {
+    format!("{:.2}s", (duration.as_millis() as f64) / 1000.0)
 }
 
 ///
@@ -912,13 +911,12 @@ impl RunningWorkunit {
     where
         F: FnOnce(Option<(WorkunitMetadata, Level)>) -> Option<(WorkunitMetadata, Level)>,
     {
-        if let Some(ref mut workunit) = self.workunit {
-            if let Some((metadata, level)) =
+        if let Some(ref mut workunit) = self.workunit
+            && let Some((metadata, level)) =
                 f(workunit.metadata.clone().map(|m| (m, workunit.level)))
-            {
-                workunit.level = level;
-                workunit.metadata = Some(metadata);
-            }
+        {
+            workunit.level = level;
+            workunit.metadata = Some(metadata);
         }
     }
 
@@ -927,11 +925,11 @@ impl RunningWorkunit {
     ///
     pub fn blocking(&mut self) -> BlockingWorkunitToken {
         let mut token = BlockingWorkunitToken(None);
-        if let Some(ref mut workunit) = self.workunit {
-            if let WorkunitState::Started { blocked, .. } = &mut workunit.state {
-                blocked.store(true, atomic::Ordering::Relaxed);
-                token.0 = Some(blocked.clone());
-            }
+        if let Some(ref mut workunit) = self.workunit
+            && let WorkunitState::Started { blocked, .. } = &mut workunit.state
+        {
+            blocked.store(true, atomic::Ordering::Relaxed);
+            token.0 = Some(blocked.clone());
         }
         token
     }
