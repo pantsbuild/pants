@@ -485,10 +485,10 @@ impl<N: Node> Graph<N> {
             }
         };
 
-        if src_id.is_some() {
-            if let Err(e) = context.dep_record(entry_id, generation, uncacheable) {
-                return (Err(e), generation);
-            }
+        if src_id.is_some()
+            && let Err(e) = context.dep_record(entry_id, generation, uncacheable)
+        {
+            return (Err(e), generation);
         }
 
         (result, generation)
@@ -599,20 +599,20 @@ impl<N: Node> Graph<N> {
                 //
                 // If the RunToken still matches, clear all edges of the Node before returning.
                 let mut inner = self.inner.lock();
-                if let Some(entry) = inner.entry_for_id_mut(entry_id) {
-                    if entry.cleaning_failed(run_token).is_ok() {
-                        // Clear the deps. We remove edges in reverse index order, because `remove_edge` is
-                        // implemented in terms of `swap_remove`, and so affects edge ids greater than the removed edge
-                        // id. See https://docs.rs/petgraph/0.5.1/petgraph/graph/struct.Graph.html#method.remove_edge
-                        let mut edge_ids = inner
-                            .pg
-                            .edges_directed(entry_id, Direction::Outgoing)
-                            .map(|e| e.id())
-                            .collect::<Vec<_>>();
-                        edge_ids.sort_by_key(|id| std::cmp::Reverse(id.index()));
-                        for edge_id in edge_ids {
-                            inner.pg.remove_edge(edge_id);
-                        }
+                if let Some(entry) = inner.entry_for_id_mut(entry_id)
+                    && entry.cleaning_failed(run_token).is_ok()
+                {
+                    // Clear the deps. We remove edges in reverse index order, because `remove_edge` is
+                    // implemented in terms of `swap_remove`, and so affects edge ids greater than the removed edge
+                    // id. See https://docs.rs/petgraph/0.5.1/petgraph/graph/struct.Graph.html#method.remove_edge
+                    let mut edge_ids = inner
+                        .pg
+                        .edges_directed(entry_id, Direction::Outgoing)
+                        .map(|e| e.id())
+                        .collect::<Vec<_>>();
+                    edge_ids.sort_by_key(|id| std::cmp::Reverse(id.index()));
+                    for edge_id in edge_ids {
+                        inner.pg.remove_edge(edge_id);
                     }
                 }
                 Err(())

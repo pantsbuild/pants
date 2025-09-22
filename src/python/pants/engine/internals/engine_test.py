@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
+import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,8 +30,8 @@ from pants.engine.internals.engine_testutil import (
     assert_equal_with_printing,
     remove_locations_from_traceback,
 )
-from pants.engine.internals.scheduler import ExecutionError, SchedulerSession
-from pants.engine.internals.scheduler_test_base import SchedulerTestBase
+from pants.engine.internals.native_engine import PyExecutor, UnionMembership
+from pants.engine.internals.scheduler import ExecutionError, Scheduler, SchedulerSession
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import create_digest, merge_digests
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
@@ -43,8 +44,10 @@ from pants.engine.streaming_workunit_handler import (
 )
 from pants.engine.unions import UnionRule, union
 from pants.goal.run_tracker import RunTracker
+from pants.option.bootstrap_options import DEFAULT_EXECUTION_OPTIONS, DEFAULT_LOCAL_STORE_OPTIONS
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
+from pants.util.dirutil import safe_mkdtemp
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
@@ -181,94 +184,126 @@ async def rule_A(i: Input) -> Alpha:
     return a
 
 
-class TestEngine(SchedulerTestBase):
-    def scheduler(self, tmp_path: Path, rules, include_trace_on_error):
-        return self.mk_scheduler(
-            tmp_path, rules=rules, include_trace_on_error=include_trace_on_error
-        )
+def mk_scheduler(
+    tmp_path: Path,
+    rules,
+    include_trace_on_error: bool = True,
+    max_workunit_verbosity: LogLevel = LogLevel.DEBUG,
+) -> SchedulerSession:
+    """Creates a SchedulerSession for a Scheduler with the given Rules installed."""
+    _executor = PyExecutor(core_threads=2, max_threads=4)
 
-    def test_recursive_multi_get(self, tmp_path: Path) -> None:
-        # Tests that a rule that "uses itself" multiple times per invoke works.
-        rules = [fib, QueryRule(Fib, (int,))]
-        (fib_10,) = self.mk_scheduler(tmp_path, rules=rules).product_request(Fib, subjects=[10])
-        assert 55 == fib_10.val
+    build_root = tmp_path / "build_root"
+    build_root.mkdir(parents=True, exist_ok=True)
 
-    def test_no_include_trace_error_raises_boring_error(self, tmp_path: Path) -> None:
-        rules = [nested_raise, QueryRule(A, (B,))]
-        scheduler = self.scheduler(tmp_path, rules, include_trace_on_error=False)
-        with pytest.raises(ExecutionError) as cm:
-            list(scheduler.product_request(A, subjects=[(B())]))
-        assert_equal_with_printing(
-            "1 Exception encountered:\n\nException: An exception for B\n", str(cm.value)
-        )
+    local_execution_root_dir = os.path.realpath(safe_mkdtemp())
+    named_caches_dir = os.path.realpath(safe_mkdtemp())
+    scheduler = Scheduler(
+        ignore_patterns=[],
+        use_gitignore=False,
+        build_root=build_root.as_posix(),
+        pants_workdir=str(build_root / ".pants.d" / "workdir"),
+        local_execution_root_dir=local_execution_root_dir,
+        named_caches_dir=named_caches_dir,
+        ca_certs_path=None,
+        rules=rules,
+        union_membership=UnionMembership.empty(),
+        executor=_executor,
+        execution_options=DEFAULT_EXECUTION_OPTIONS,
+        local_store_options=DEFAULT_LOCAL_STORE_OPTIONS,
+        include_trace_on_error=include_trace_on_error,
+    )
+    return scheduler.new_session(
+        build_id="buildid_for_test",
+        max_workunit_level=max_workunit_verbosity,
+    )
 
-    def test_no_include_trace_error_multiple_paths_raises_executionerror(
-        self, tmp_path: Path
-    ) -> None:
-        rules = [nested_raise, QueryRule(A, (B,))]
-        scheduler = self.scheduler(tmp_path, rules, include_trace_on_error=False)
-        with pytest.raises(ExecutionError) as cm:
-            list(scheduler.product_request(A, subjects=[B(), B()]))
-        assert_equal_with_printing(
-            dedent(
-                """
-                2 Exceptions encountered:
 
-                Exception: An exception for B
+def test_recursive_multi_get(tmp_path: Path) -> None:
+    # Tests that a rule that "uses itself" multiple times per invoke works.
+    rules = [fib, QueryRule(Fib, (int,))]
+    (fib_10,) = mk_scheduler(tmp_path, rules=rules).product_request(Fib, subjects=[10])
+    assert 55 == fib_10.val
 
-                (and 1 more)
-                """
-            ).lstrip(),
-            str(cm.value),
-        )
 
-    def test_include_trace_error_raises_error_with_trace(self, tmp_path: Path) -> None:
-        rules = [nested_raise, QueryRule(A, (B,))]
-        scheduler = self.scheduler(tmp_path, rules, include_trace_on_error=True)
-        with pytest.raises(ExecutionError) as cm:
-            list(scheduler.product_request(A, subjects=[(B())]))
-        assert_equal_with_printing(
-            dedent(
-                """
-                1 Exception encountered:
+def test_no_include_trace_error_raises_boring_error(tmp_path: Path) -> None:
+    rules = [nested_raise, QueryRule(A, (B,))]
+    scheduler = mk_scheduler(tmp_path, rules, include_trace_on_error=False)
+    with pytest.raises(ExecutionError) as cm:
+        list(scheduler.product_request(A, subjects=[(B())]))
+    assert_equal_with_printing(
+        "1 Exception encountered:\n\nException: An exception for B\n", str(cm.value)
+    )
 
-                Engine traceback:
-                  in root
-                    ..
-                  in pants.engine.internals.engine_test.nested_raise
-                    ..
 
-                Traceback (most recent call last):
-                  File LOCATION-INFO, in nested_raise
-                    fn_raises(x)
-                  File LOCATION-INFO, in fn_raises
-                    raise Exception(f"An exception for {type(x).__name__}")
-                Exception: An exception for B
+def test_no_include_trace_error_multiple_paths_raises_executionerror(tmp_path: Path) -> None:
+    rules = [nested_raise, QueryRule(A, (B,))]
+    scheduler = mk_scheduler(tmp_path, rules, include_trace_on_error=False)
+    with pytest.raises(ExecutionError) as cm:
+        list(scheduler.product_request(A, subjects=[B(), B()]))
+    assert_equal_with_printing(
+        dedent(
+            """
+            2 Exceptions encountered:
 
-                """
-            ).lstrip(),
-            remove_locations_from_traceback(str(cm.value)),
-        )
+            Exception: An exception for B
 
-    def test_nonexistent_root(self, tmp_path: Path) -> None:
-        rules = [QueryRule(A, [B])]
-        # No rules are available to compute A.
-        with pytest.raises(ValueError) as cm:
-            self.scheduler(tmp_path, rules, include_trace_on_error=False)
-        assert (
-            "No installed rules return the type A, and it was not provided by potential callers of "
-        ) in str(cm.value)
+            (and 1 more)
+            """
+        ).lstrip(),
+        str(cm.value),
+    )
 
-    def test_missing_query_rule(self, tmp_path: Path) -> None:
-        # Even if we register the rule to go from MyInt -> MyFloat, we must register a QueryRule
-        # for the graph to work when making a synchronous call via `Scheduler.product_request`.
-        scheduler = self.mk_scheduler(tmp_path, rules=[upcast], include_trace_on_error=False)
-        with pytest.raises(Exception) as cm:
-            scheduler.product_request(MyFloat, subjects=[MyInt(0)])
-        assert (
-            "No installed QueryRules return the type MyFloat. Try registering QueryRule(MyFloat "
-            "for MyInt)."
-        ) in str(cm.value)
+
+def test_include_trace_error_raises_error_with_trace(tmp_path: Path) -> None:
+    rules = [nested_raise, QueryRule(A, (B,))]
+    scheduler = mk_scheduler(tmp_path, rules, include_trace_on_error=True)
+    with pytest.raises(ExecutionError) as cm:
+        list(scheduler.product_request(A, subjects=[(B())]))
+    assert_equal_with_printing(
+        dedent(
+            """
+            1 Exception encountered:
+
+            Engine traceback:
+              in root
+                ..
+              in pants.engine.internals.engine_test.nested_raise
+                ..
+
+            Traceback (most recent call last):
+              File LOCATION-INFO, in nested_raise
+                fn_raises(x)
+              File LOCATION-INFO, in fn_raises
+                raise Exception(f"An exception for {type(x).__name__}")
+            Exception: An exception for B
+
+            """
+        ).lstrip(),
+        remove_locations_from_traceback(str(cm.value)),
+    )
+
+
+def test_nonexistent_root(tmp_path: Path) -> None:
+    rules = [QueryRule(A, [B])]
+    # No rules are available to compute A.
+    with pytest.raises(ValueError) as cm:
+        mk_scheduler(tmp_path, rules, include_trace_on_error=False)
+    assert (
+        "No installed rules return the type A, and it was not provided by potential callers of "
+    ) in str(cm.value)
+
+
+def test_missing_query_rule(tmp_path: Path) -> None:
+    # Even if we register the rule to go from MyInt -> MyFloat, we must register a QueryRule
+    # for the graph to work when making a synchronous call via `Scheduler.product_request`.
+    scheduler = mk_scheduler(tmp_path, rules=[upcast], include_trace_on_error=False)
+    with pytest.raises(Exception) as cm:
+        scheduler.product_request(MyFloat, subjects=[MyInt(0)])
+    assert (
+        "No installed QueryRules return the type MyFloat. Try registering QueryRule(MyFloat "
+        "for MyInt)."
+    ) in str(cm.value)
 
 
 def new_run_tracker() -> RunTracker:
@@ -283,361 +318,359 @@ def run_tracker() -> RunTracker:
     return new_run_tracker()
 
 
-class TestStreamingWorkunit(SchedulerTestBase):
-    def _fixture_for_rules(
-        self, tmp_path: Path, rules, max_workunit_verbosity: LogLevel = LogLevel.INFO
-    ) -> tuple[SchedulerSession, WorkunitTracker, StreamingWorkunitHandler]:
-        scheduler = self.mk_scheduler(
-            tmp_path,
-            rules,
-            include_trace_on_error=False,
-            max_workunit_verbosity=max_workunit_verbosity,
-        )
-        tracker = WorkunitTracker()
-        handler = StreamingWorkunitHandler(
-            scheduler,
-            run_tracker=new_run_tracker(),
-            callbacks=[tracker],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=max_workunit_verbosity,
-            specs=Specs.empty(),
-            options_bootstrapper=create_options_bootstrapper([]),
-            allow_async_completion=False,
-        )
-        return scheduler, tracker, handler
+def _fixture_for_rules(
+    tmp_path: Path, rules, max_workunit_verbosity: LogLevel = LogLevel.INFO
+) -> tuple[SchedulerSession, WorkunitTracker, StreamingWorkunitHandler]:
+    scheduler = mk_scheduler(
+        tmp_path,
+        rules,
+        include_trace_on_error=False,
+        max_workunit_verbosity=max_workunit_verbosity,
+    )
+    tracker = WorkunitTracker()
+    handler = StreamingWorkunitHandler(
+        scheduler,
+        run_tracker=new_run_tracker(),
+        callbacks=[tracker],
+        report_interval_seconds=0.01,
+        max_workunit_verbosity=max_workunit_verbosity,
+        specs=Specs.empty(),
+        options_bootstrapper=create_options_bootstrapper([]),
+        allow_async_completion=False,
+    )
+    return scheduler, tracker, handler
 
-    def test_streaming_workunits_reporting(self, tmp_path: Path) -> None:
-        scheduler, tracker, handler = self._fixture_for_rules(
-            tmp_path / "start", [fib, QueryRule(Fib, (int,))]
-        )
-        with handler:
-            scheduler.product_request(Fib, subjects=[0])
-        flattened = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
-        # The execution of the single named @rule "fib" should be providing this one workunit.
-        assert len(flattened) == 1
 
-        scheduler, tracker, handler = self._fixture_for_rules(
-            tmp_path / "second", [fib, QueryRule(Fib, (int,))]
-        )
-        with handler:
-            scheduler.product_request(Fib, subjects=[10])
+def test_streaming_workunits_reporting(tmp_path: Path) -> None:
+    scheduler, tracker, handler = _fixture_for_rules(
+        tmp_path / "start", [fib, QueryRule(Fib, (int,))]
+    )
+    with handler:
+        scheduler.product_request(Fib, subjects=[0])
+    flattened = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+    # The execution of the single named @rule "fib" should be providing this one workunit.
+    assert len(flattened) == 1
 
-        # Requesting a bigger fibonacci number will result in more rule executions and thus
-        # more reported workunits. In this case, we expect 11 invocations of the `fib` rule.
-        flattened = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
-        assert len(flattened) == 11
-        assert tracker.finished
+    scheduler, tracker, handler = _fixture_for_rules(
+        tmp_path / "second", [fib, QueryRule(Fib, (int,))]
+    )
+    with handler:
+        scheduler.product_request(Fib, subjects=[10])
 
-    def test_streaming_workunits_parent_id_and_rule_metadata(self, tmp_path: Path) -> None:
-        scheduler, tracker, handler = self._fixture_for_rules(
-            tmp_path,
-            [rule_one_function, rule_two, rule_three, rule_four, QueryRule(Beta, (Input,))],
-        )
-        with handler:
-            i = Input()
-            scheduler.product_request(Beta, subjects=[i])
-        assert tracker.finished
+    # Requesting a bigger fibonacci number will result in more rule executions and thus
+    # more reported workunits. In this case, we expect 11 invocations of the `fib` rule.
+    flattened = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+    assert len(flattened) == 11
+    assert tracker.finished
 
-        # rule_one should complete well-after the other rules because of the artificial delay in
-        # it caused by the sleep().
-        assert {item["name"] for item in tracker.finished_workunit_chunks[0]} == {
+
+def test_streaming_workunits_parent_id_and_rule_metadata(tmp_path: Path) -> None:
+    scheduler, tracker, handler = _fixture_for_rules(
+        tmp_path,
+        [rule_one_function, rule_two, rule_three, rule_four, QueryRule(Beta, (Input,))],
+    )
+    with handler:
+        i = Input()
+        scheduler.product_request(Beta, subjects=[i])
+    assert tracker.finished
+
+    # rule_one should complete well-after the other rules because of the artificial delay in
+    # it caused by the sleep().
+    assert {item["name"] for item in tracker.finished_workunit_chunks[0]} == {
+        "pants.engine.internals.engine_test.rule_two",
+        "pants.engine.internals.engine_test.rule_three",
+        "pants.engine.internals.engine_test.rule_four",
+    }
+
+    # Because of the artificial delay in rule_one, it should have time to be reported as
+    # started but not yet finished.
+    started = list(itertools.chain.from_iterable(tracker.started_workunit_chunks))
+    assert len([item for item in started if item["name"] == "canonical_rule_one"]) > 0
+
+    assert {item["name"] for item in tracker.finished_workunit_chunks[1]} == {"canonical_rule_one"}
+
+    finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+
+    r1 = next(item for item in finished if item["name"] == "canonical_rule_one")
+    r2 = next(
+        item for item in finished if item["name"] == "pants.engine.internals.engine_test.rule_two"
+    )
+    r3 = next(
+        item for item in finished if item["name"] == "pants.engine.internals.engine_test.rule_three"
+    )
+    r4 = next(
+        item for item in finished if item["name"] == "pants.engine.internals.engine_test.rule_four"
+    )
+
+    # rule_one should have no parent_id because its actual parent workunit was filtered based
+    # on level.
+    assert r1.get("parent_id", None) is None
+
+    assert r2["parent_id"] == r1["span_id"]
+    assert r3["parent_id"] == r1["span_id"]
+    assert r4["parent_id"] == r2["span_id"]
+
+    assert r3["description"] == "Rule number 3"
+    assert r4["description"] == "Rule number 4"
+    assert r4["level"] == "INFO"
+
+
+def test_streaming_workunit_log_levels(tmp_path: Path) -> None:
+    scheduler, tracker, handler = _fixture_for_rules(
+        tmp_path,
+        [rule_one_function, rule_two, rule_three, rule_four, QueryRule(Beta, (Input,))],
+        max_workunit_verbosity=LogLevel.TRACE,
+    )
+    with handler:
+        i = Input()
+        scheduler.product_request(Beta, subjects=[i])
+
+    assert tracker.finished
+    finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+
+    # With the max_workunit_verbosity set to TRACE, we should see the workunit corresponding
+    # to the Select node.
+    root = next(
+        item
+        for item in finished
+        if item["name"]
+        not in {
+            "canonical_rule_one",
             "pants.engine.internals.engine_test.rule_two",
             "pants.engine.internals.engine_test.rule_three",
             "pants.engine.internals.engine_test.rule_four",
         }
+    )
+    assert root["name"] == "root"
+    assert root["level"] == "TRACE"
 
-        # Because of the artificial delay in rule_one, it should have time to be reported as
-        # started but not yet finished.
-        started = list(itertools.chain.from_iterable(tracker.started_workunit_chunks))
-        assert len([item for item in started if item["name"] == "canonical_rule_one"]) > 0
+    r1 = next(item for item in finished if item["name"] == "canonical_rule_one")
+    assert r1["parent_id"] == root["span_id"]
 
-        assert {item["name"] for item in tracker.finished_workunit_chunks[1]} == {
-            "canonical_rule_one"
-        }
 
-        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+def test_streaming_workunit_log_level_parent_rewrite(tmp_path: Path) -> None:
+    rules = [rule_A, rule_B, rule_C, QueryRule(Alpha, (Input,))]
 
-        r1 = next(item for item in finished if item["name"] == "canonical_rule_one")
-        r2 = next(
-            item
-            for item in finished
-            if item["name"] == "pants.engine.internals.engine_test.rule_two"
-        )
-        r3 = next(
-            item
-            for item in finished
-            if item["name"] == "pants.engine.internals.engine_test.rule_three"
-        )
-        r4 = next(
-            item
-            for item in finished
-            if item["name"] == "pants.engine.internals.engine_test.rule_four"
-        )
+    scheduler, tracker, info_level_handler = _fixture_for_rules(tmp_path, rules)
+    with info_level_handler:
+        i = Input()
+        scheduler.product_request(Alpha, subjects=[i])
 
-        # rule_one should have no parent_id because its actual parent workunit was filtered based
-        # on level.
-        assert r1.get("parent_id", None) is None
+    assert tracker.finished
+    finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
 
-        assert r2["parent_id"] == r1["span_id"]
-        assert r3["parent_id"] == r1["span_id"]
-        assert r4["parent_id"] == r2["span_id"]
+    assert len(finished) == 2
+    r_A = next(
+        item for item in finished if item["name"] == "pants.engine.internals.engine_test.rule_A"
+    )
+    r_C = next(
+        item for item in finished if item["name"] == "pants.engine.internals.engine_test.rule_C"
+    )
+    assert "parent_id" not in r_A
+    assert r_C["parent_id"] == r_A["span_id"]
 
-        assert r3["description"] == "Rule number 3"
-        assert r4["description"] == "Rule number 4"
-        assert r4["level"] == "INFO"
+    scheduler, tracker, debug_level_handler = _fixture_for_rules(
+        tmp_path, rules, max_workunit_verbosity=LogLevel.TRACE
+    )
+    with debug_level_handler:
+        i = Input()
+        scheduler.product_request(Alpha, subjects=[i])
 
-    def test_streaming_workunit_log_levels(self, tmp_path: Path) -> None:
-        scheduler, tracker, handler = self._fixture_for_rules(
-            tmp_path,
-            [rule_one_function, rule_two, rule_three, rule_four, QueryRule(Beta, (Input,))],
-            max_workunit_verbosity=LogLevel.TRACE,
-        )
-        with handler:
-            i = Input()
-            scheduler.product_request(Beta, subjects=[i])
+    assert tracker.finished
+    finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
 
-        assert tracker.finished
-        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+    r_A = next(
+        item for item in finished if item["name"] == "pants.engine.internals.engine_test.rule_A"
+    )
+    r_B = next(
+        item for item in finished if item["name"] == "pants.engine.internals.engine_test.rule_B"
+    )
+    r_C = next(
+        item for item in finished if item["name"] == "pants.engine.internals.engine_test.rule_C"
+    )
+    assert r_B["parent_id"] == r_A["span_id"]
+    assert r_C["parent_id"] == r_B["span_id"]
 
-        # With the max_workunit_verbosity set to TRACE, we should see the workunit corresponding
-        # to the Select node.
-        root = next(
-            item
-            for item in finished
-            if item["name"]
-            not in {
-                "canonical_rule_one",
-                "pants.engine.internals.engine_test.rule_two",
-                "pants.engine.internals.engine_test.rule_three",
-                "pants.engine.internals.engine_test.rule_four",
-            }
-        )
-        assert root["name"] == "root"
-        assert root["level"] == "TRACE"
 
-        r1 = next(item for item in finished if item["name"] == "canonical_rule_one")
-        assert r1["parent_id"] == root["span_id"]
+def test_engine_aware_rule(tmp_path: Path) -> None:
+    @dataclass(frozen=True)
+    class ModifiedOutput(EngineAwareReturnType):
+        _level: LogLevel
+        val: int
 
-    def test_streaming_workunit_log_level_parent_rewrite(self, tmp_path: Path) -> None:
-        rules = [rule_A, rule_B, rule_C, QueryRule(Alpha, (Input,))]
+        def level(self):
+            return self._level
 
-        scheduler, tracker, info_level_handler = self._fixture_for_rules(tmp_path, rules)
-        with info_level_handler:
-            i = Input()
-            scheduler.product_request(Alpha, subjects=[i])
+    @rule(desc="a_rule")
+    async def a_rule(n: int) -> ModifiedOutput:
+        return ModifiedOutput(val=n, _level=LogLevel.ERROR)
 
-        assert tracker.finished
-        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+    scheduler, tracker, handler = _fixture_for_rules(
+        tmp_path,
+        [a_rule, QueryRule(ModifiedOutput, (int,))],
+        max_workunit_verbosity=LogLevel.TRACE,
+    )
+    with handler:
+        scheduler.product_request(ModifiedOutput, subjects=[0])
 
-        assert len(finished) == 2
-        r_A = next(
-            item for item in finished if item["name"] == "pants.engine.internals.engine_test.rule_A"
-        )
-        r_C = next(
-            item for item in finished if item["name"] == "pants.engine.internals.engine_test.rule_C"
-        )
-        assert "parent_id" not in r_A
-        assert r_C["parent_id"] == r_A["span_id"]
+    finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+    workunit = next(
+        item
+        for item in finished
+        if item["name"] == "pants.engine.internals.engine_test.test_engine_aware_rule.a_rule"
+    )
+    assert workunit["level"] == "ERROR"
 
-        scheduler, tracker, debug_level_handler = self._fixture_for_rules(
-            tmp_path, rules, max_workunit_verbosity=LogLevel.TRACE
-        )
-        with debug_level_handler:
-            i = Input()
-            scheduler.product_request(Alpha, subjects=[i])
 
-        assert tracker.finished
-        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+def test_engine_aware_param(tmp_path: Path) -> None:
+    @dataclass(frozen=True)
+    class ModifiedMetadata(EngineAwareParameter):
+        def metadata(self):
+            return {"example": "thing"}
 
-        r_A = next(
-            item for item in finished if item["name"] == "pants.engine.internals.engine_test.rule_A"
-        )
-        r_B = next(
-            item for item in finished if item["name"] == "pants.engine.internals.engine_test.rule_B"
-        )
-        r_C = next(
-            item for item in finished if item["name"] == "pants.engine.internals.engine_test.rule_C"
-        )
-        assert r_B["parent_id"] == r_A["span_id"]
-        assert r_C["parent_id"] == r_B["span_id"]
+    @rule
+    async def a_rule(_: ModifiedMetadata) -> int:
+        return 1
 
-    def test_engine_aware_rule(self, tmp_path: Path) -> None:
-        @dataclass(frozen=True)
-        class ModifiedOutput(EngineAwareReturnType):
-            _level: LogLevel
-            val: int
+    scheduler, tracker, handler = _fixture_for_rules(
+        tmp_path,
+        [a_rule, QueryRule(int, (ModifiedMetadata,))],
+        max_workunit_verbosity=LogLevel.TRACE,
+    )
+    with handler:
+        scheduler.product_request(int, subjects=[ModifiedMetadata()])
 
-            def level(self):
-                return self._level
+    finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+    workunit = next(
+        item
+        for item in finished
+        if item["name"] == "pants.engine.internals.engine_test.test_engine_aware_param.a_rule"
+    )
+    assert workunit["metadata"] == {"example": "thing"}
 
-        @rule(desc="a_rule")
-        async def a_rule(n: int) -> ModifiedOutput:
-            return ModifiedOutput(val=n, _level=LogLevel.ERROR)
 
-        scheduler, tracker, handler = self._fixture_for_rules(
-            tmp_path,
-            [a_rule, QueryRule(ModifiedOutput, (int,))],
-            max_workunit_verbosity=LogLevel.TRACE,
-        )
-        with handler:
-            scheduler.product_request(ModifiedOutput, subjects=[0])
+def test_engine_aware_none_case(tmp_path: Path) -> None:
+    @dataclass(frozen=True)
+    # If level() returns None, the engine shouldn't try to set
+    # a new workunit level.
+    class ModifiedOutput(EngineAwareReturnType):
+        _level: LogLevel | None
+        val: int
 
-        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
-        workunit = next(
-            item
-            for item in finished
-            if item["name"]
-            == "pants.engine.internals.engine_test.TestStreamingWorkunit.test_engine_aware_rule.a_rule"
-        )
-        assert workunit["level"] == "ERROR"
+        def level(self):
+            return self._level
 
-    def test_engine_aware_param(self, tmp_path: Path) -> None:
-        @dataclass(frozen=True)
-        class ModifiedMetadata(EngineAwareParameter):
-            def metadata(self):
-                return {"example": "thing"}
+    @rule(desc="a_rule")
+    async def a_rule(n: int) -> ModifiedOutput:
+        return ModifiedOutput(val=n, _level=None)
 
-        @rule
-        async def a_rule(_: ModifiedMetadata) -> int:
-            return 1
+    scheduler, tracker, handler = _fixture_for_rules(
+        tmp_path,
+        [a_rule, QueryRule(ModifiedOutput, (int,))],
+        max_workunit_verbosity=LogLevel.TRACE,
+    )
+    with handler:
+        scheduler.product_request(ModifiedOutput, subjects=[0])
 
-        scheduler, tracker, handler = self._fixture_for_rules(
-            tmp_path,
-            [a_rule, QueryRule(int, (ModifiedMetadata,))],
-            max_workunit_verbosity=LogLevel.TRACE,
-        )
-        with handler:
-            scheduler.product_request(int, subjects=[ModifiedMetadata()])
+    finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+    workunit = next(
+        item
+        for item in finished
+        if item["name"] == "pants.engine.internals.engine_test.test_engine_aware_none_case.a_rule"
+    )
+    assert workunit["level"] == "TRACE"
 
-        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
-        workunit = next(
-            item
-            for item in finished
-            if item["name"]
-            == "pants.engine.internals.engine_test.TestStreamingWorkunit.test_engine_aware_param.a_rule"
-        )
-        assert workunit["metadata"] == {"example": "thing"}
 
-    def test_engine_aware_none_case(self, tmp_path: Path) -> None:
-        @dataclass(frozen=True)
-        # If level() returns None, the engine shouldn't try to set
-        # a new workunit level.
-        class ModifiedOutput(EngineAwareReturnType):
-            _level: LogLevel | None
-            val: int
+def test_artifacts_on_engine_aware_type(tmp_path: Path) -> None:
+    @dataclass(frozen=True)
+    class Output(EngineAwareReturnType):
+        val: int
 
-            def level(self):
-                return self._level
+        def artifacts(self):
+            return {"some_arbitrary_key": EMPTY_SNAPSHOT}
 
-        @rule(desc="a_rule")
-        async def a_rule(n: int) -> ModifiedOutput:
-            return ModifiedOutput(val=n, _level=None)
+    @rule(desc="a_rule")
+    async def a_rule(n: int) -> Output:
+        return Output(val=n)
 
-        scheduler, tracker, handler = self._fixture_for_rules(
-            tmp_path,
-            [a_rule, QueryRule(ModifiedOutput, (int,))],
-            max_workunit_verbosity=LogLevel.TRACE,
-        )
-        with handler:
-            scheduler.product_request(ModifiedOutput, subjects=[0])
+    scheduler, tracker, handler = _fixture_for_rules(
+        tmp_path, [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
+    )
+    with handler:
+        scheduler.product_request(Output, subjects=[0])
 
-        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
-        workunit = next(
-            item
-            for item in finished
-            if item["name"]
-            == "pants.engine.internals.engine_test.TestStreamingWorkunit.test_engine_aware_none_case.a_rule"
-        )
-        assert workunit["level"] == "TRACE"
+    finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+    workunit = next(
+        item
+        for item in finished
+        if item["name"]
+        == "pants.engine.internals.engine_test.test_artifacts_on_engine_aware_type.a_rule"
+    )
+    artifacts = workunit["artifacts"]
+    assert artifacts["some_arbitrary_key"] == EMPTY_SNAPSHOT
 
-    def test_artifacts_on_engine_aware_type(self, tmp_path: Path) -> None:
-        @dataclass(frozen=True)
-        class Output(EngineAwareReturnType):
-            val: int
 
-            def artifacts(self):
-                return {"some_arbitrary_key": EMPTY_SNAPSHOT}
+def test_metadata_on_engine_aware_type(tmp_path: Path) -> None:
+    @dataclass(frozen=True)
+    class Output(EngineAwareReturnType):
+        val: int
 
-        @rule(desc="a_rule")
-        async def a_rule(n: int) -> Output:
-            return Output(val=n)
+        def metadata(self):
+            return {"k1": 1, "k2": "a string", "k3": [1, 2, 3]}
 
-        scheduler, tracker, handler = self._fixture_for_rules(
-            tmp_path, [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
-        )
-        with handler:
-            scheduler.product_request(Output, subjects=[0])
+    @rule(desc="a_rule")
+    async def a_rule(n: int) -> Output:
+        return Output(val=n)
 
-        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
-        workunit = next(
-            item
-            for item in finished
-            if item["name"]
-            == "pants.engine.internals.engine_test.TestStreamingWorkunit.test_artifacts_on_engine_aware_type.a_rule"
-        )
-        artifacts = workunit["artifacts"]
-        assert artifacts["some_arbitrary_key"] == EMPTY_SNAPSHOT
+    scheduler, tracker, handler = _fixture_for_rules(
+        tmp_path, [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
+    )
+    with handler:
+        scheduler.product_request(Output, subjects=[0])
 
-    def test_metadata_on_engine_aware_type(self, tmp_path: Path) -> None:
-        @dataclass(frozen=True)
-        class Output(EngineAwareReturnType):
-            val: int
+    finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+    workunit = next(
+        item
+        for item in finished
+        if item["name"]
+        == "pants.engine.internals.engine_test.test_metadata_on_engine_aware_type.a_rule"
+    )
 
-            def metadata(self):
-                return {"k1": 1, "k2": "a string", "k3": [1, 2, 3]}
+    metadata = workunit["metadata"]
+    assert metadata == {"k1": 1, "k2": "a string", "k3": [1, 2, 3]}
 
-        @rule(desc="a_rule")
-        async def a_rule(n: int) -> Output:
-            return Output(val=n)
 
-        scheduler, tracker, handler = self._fixture_for_rules(
-            tmp_path, [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
-        )
-        with handler:
-            scheduler.product_request(Output, subjects=[0])
+def test_metadata_non_string_key_behavior(tmp_path: Path) -> None:
+    # If someone passes a non-string key in a metadata() method,
+    # this should fail to produce a meaningful metadata entry on
+    # the workunit (with a warning), but not fail.
 
-        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
-        workunit = next(
-            item
-            for item in finished
-            if item["name"]
-            == "pants.engine.internals.engine_test.TestStreamingWorkunit.test_metadata_on_engine_aware_type.a_rule"
-        )
+    @dataclass(frozen=True)
+    class Output(EngineAwareReturnType):
+        val: int
 
-        metadata = workunit["metadata"]
-        assert metadata == {"k1": 1, "k2": "a string", "k3": [1, 2, 3]}
+        def metadata(self):
+            return {10: "foo", "other_key": "other value"}
 
-    def test_metadata_non_string_key_behavior(self, tmp_path: Path) -> None:
-        # If someone passes a non-string key in a metadata() method,
-        # this should fail to produce a meaningful metadata entry on
-        # the workunit (with a warning), but not fail.
+    @rule(desc="a_rule")
+    async def a_rule(n: int) -> Output:
+        return Output(val=n)
 
-        @dataclass(frozen=True)
-        class Output(EngineAwareReturnType):
-            val: int
+    scheduler, tracker, handler = _fixture_for_rules(
+        tmp_path, [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
+    )
+    with handler:
+        scheduler.product_request(Output, subjects=[0])
 
-            def metadata(self):
-                return {10: "foo", "other_key": "other value"}
+    finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+    workunit = next(
+        item
+        for item in finished
+        if item["name"]
+        == "pants.engine.internals.engine_test.test_metadata_non_string_key_behavior.a_rule"
+    )
 
-        @rule(desc="a_rule")
-        async def a_rule(n: int) -> Output:
-            return Output(val=n)
-
-        scheduler, tracker, handler = self._fixture_for_rules(
-            tmp_path, [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
-        )
-        with handler:
-            scheduler.product_request(Output, subjects=[0])
-
-        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
-        workunit = next(
-            item
-            for item in finished
-            if item["name"]
-            == "pants.engine.internals.engine_test.TestStreamingWorkunit.test_metadata_non_string_key_behavior.a_rule"
-        )
-
-        assert workunit["metadata"] == {}
+    assert workunit["metadata"] == {}
 
 
 @dataclass(frozen=True)

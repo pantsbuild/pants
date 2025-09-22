@@ -158,7 +158,7 @@ async fn select(
     });
     match entry.as_ref() {
         &rule_graph::Entry::WithDeps(wd) => match wd.as_ref() {
-            rule_graph::EntryWithDeps::Rule(ref rule) => {
+            rule_graph::EntryWithDeps::Rule(rule) => {
                 context
                     .get(Task {
                         params: params.clone(),
@@ -351,7 +351,7 @@ impl NodeKey {
 
     fn workunit_level(&self) -> Level {
         match self {
-            NodeKey::Task(ref task) => task.task.display_info.level,
+            NodeKey::Task(task) => task.task.display_info.level,
             NodeKey::ExecuteProcess(..) => {
                 // NB: The Node for a Process is statically rendered at Debug (rather than at
                 // Process.level) because it is very likely to wrap a BoundedCommandRunner which
@@ -369,7 +369,7 @@ impl NodeKey {
     ///
     pub fn workunit_name(&self) -> &'static str {
         match self {
-            NodeKey::Task(ref task) => &task.task.as_ref().display_info.name,
+            NodeKey::Task(task) => &task.task.as_ref().display_info.name,
             NodeKey::ExecuteProcess(..) => "process",
             NodeKey::Snapshot(..) => "snapshot",
             NodeKey::DigestFile(..) => "digest_file",
@@ -392,7 +392,7 @@ impl NodeKey {
     ///
     fn workunit_desc(&self, context: &Context) -> Option<String> {
         match self {
-            NodeKey::Task(ref task) => {
+            NodeKey::Task(task) => {
                 let task_desc = task.task.display_info.desc.as_ref().map(|s| s.to_owned())?;
 
                 let displayable_param_names: Vec<_> = Python::attach(|py| {
@@ -413,7 +413,7 @@ impl NodeKey {
 
                 Some(desc)
             }
-            NodeKey::Snapshot(ref s) => Some(format!("Snapshotting: {}", s.path_globs)),
+            NodeKey::Snapshot(s) => Some(format!("Snapshotting: {}", s.path_globs)),
             NodeKey::ExecuteProcess(epr) => {
                 // NB: See Self::workunit_level for more information on why this is prefixed.
                 Some(format!("Scheduling: {}", epr.process.description))
@@ -490,7 +490,7 @@ impl Node for NodeKey {
         let workunit_name = self.workunit_name();
         let workunit_desc = self.workunit_desc(&context);
         let maybe_params = match &self {
-            NodeKey::Task(ref task) => Some(&task.params),
+            NodeKey::Task(task) => Some(&task.params),
             _ => None,
         };
         let context2 = context.clone();
@@ -587,7 +587,7 @@ impl Node for NodeKey {
 
     fn cacheable_item(&self, output: &NodeOutput) -> bool {
         match (self, output) {
-            (NodeKey::ExecuteProcess(ref ep), NodeOutput::ProcessResult(ref process_result)) => {
+            (NodeKey::ExecuteProcess(ep), NodeOutput::ProcessResult(process_result)) => {
                 match ep.process.cache_scope {
                     ProcessCacheScope::Always
                     | ProcessCacheScope::LocalAlways
@@ -600,7 +600,7 @@ impl Node for NodeKey {
                     ProcessCacheScope::PerSession => false,
                 }
             }
-            (NodeKey::Task(ref t), NodeOutput::Value(ref v)) if t.task.engine_aware_return_type => {
+            (NodeKey::Task(t), NodeOutput::Value(v)) if t.task.engine_aware_return_type => {
                 Python::attach(|py| EngineAwareReturnType::is_cacheable(v.bind(py)).unwrap_or(true))
             }
             _ => true,

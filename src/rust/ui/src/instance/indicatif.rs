@@ -98,9 +98,7 @@ impl IndicatifInstance {
                 let (label, start_time) = heavy_hitters.get(span_id).unwrap();
                 let duration_label = match now.duration_since(*start_time).ok() {
                     None => "(Waiting)".to_string(),
-                    Some(duration) => {
-                        format_workunit_duration_ms!((duration).as_millis()).to_string()
-                    }
+                    Some(duration) => format_workunit_duration_ms(duration),
                 };
                 format!("{duration_label} {label}")
             });

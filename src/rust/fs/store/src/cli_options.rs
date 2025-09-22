@@ -176,7 +176,7 @@ impl StoreCliOpt {
         oauth_bearer_token_path: &Option<PathBuf>,
     ) -> Result<BTreeMap<String, String>, String> {
         let mut headers: BTreeMap<String, String> = collection_from_keyvalues(self.header.iter());
-        if let Some(ref oauth_path) = oauth_bearer_token_path {
+        if let Some(oauth_path) = oauth_bearer_token_path {
             let token = std::fs::read_to_string(oauth_path)
                 .map_err(|e| format!("Error reading oauth bearer token file: {e}"))?;
             headers.insert(
