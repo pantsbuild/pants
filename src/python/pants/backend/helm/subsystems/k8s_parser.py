@@ -6,7 +6,6 @@ from __future__ import annotations
 import json
 import logging
 import pkgutil
-from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Any
@@ -71,7 +70,7 @@ class HelmKubeParserSubsystem(PythonToolRequirementsBase):
 @dataclass(frozen=True)
 class _HelmKubeParserTool:
     pex: VenvPex
-    crd: dict[str] = defaultdict
+    crd: str
 
 
 @rule
