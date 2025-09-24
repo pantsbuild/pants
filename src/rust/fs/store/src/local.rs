@@ -203,21 +203,20 @@ impl ShardedFSDB {
                 .map_err(|e| format!("Failed to create directory: {e}"))?;
             let (src_file, dst_dir) = fsdb
                 .executor
-                .spawn_blocking(
-                    move || {
-                        let src_file = Builder::new()
-                            .suffix(".hardlink_canary")
-                            .tempfile_in(&fsdb.root)
-                            .map_err(|e| format!("Failed to create hardlink canary file: {e}"))?;
-                        let dst_dir = Builder::new()
-                            .suffix(".hardlink_canary")
-                            .tempdir_in(dst_parent_dir)
-                            .map_err(|e| format!("Failed to create hardlink canary dir: {e}"))?;
-                        Ok((src_file, dst_dir))
-                    },
-                    |e| Err(format!("hardlink canary temp files task failed: {e}")),
-                )
-                .await?;
+                .native_spawn_blocking(move || {
+                    let src_file = Builder::new()
+                        .suffix(".hardlink_canary")
+                        .tempfile_in(&fsdb.root)
+                        .map_err(|e| format!("Failed to create hardlink canary file: {e}"))?;
+                    let dst_dir = Builder::new()
+                        .suffix(".hardlink_canary")
+                        .tempdir_in(dst_parent_dir)
+                        .map_err(|e| format!("Failed to create hardlink canary dir: {e}"))?;
+                    Ok((src_file, dst_dir))
+                })
+                .await
+                .map_err(|e| format!("Failed to join Tokio task: {e}"))?
+                .map_err(|e: String| format!("hardlink canary temp files task failed: {e}"))?;
             let dst_file = dst_dir.path().join("hard_link");
             let is_hardlinkable = hard_link(src_file, dst_file).await.is_ok();
             log::debug!("{src_display} -> {dst_display} hardlinkable: {is_hardlinkable}");
@@ -289,16 +288,15 @@ impl ShardedFSDB {
             // have to worry about parent dirs.
             let named_temp_file = self
                 .executor
-                .spawn_blocking(
-                    move || {
-                        Builder::new()
-                            .suffix(".tmp")
-                            .tempfile_in(dest_path2.parent().unwrap())
-                            .map_err(|e| format!("Failed to create temp file: {e}"))
-                    },
-                    |e| Err(format!("temp file creation task failed: {e}")),
-                )
-                .await?;
+                .native_spawn_blocking(move || {
+                    Builder::new()
+                        .suffix(".tmp")
+                        .tempfile_in(dest_path2.parent().unwrap())
+                        .map_err(|e| format!("Failed to create temp file: {e}"))
+                })
+                .await
+                .map_err(|e| format!("Failed to join Tokio task: {e}"))?
+                .map_err(|e| format!("temp file creation task failed: {e}"))?;
             let (std_file, tmp_path) = named_temp_file
                 .keep()
                 .map_err(|e| format!("Failed to keep temp file: {e}"))?;
@@ -366,14 +364,13 @@ impl UnderlyingByteStore for ShardedFSDB {
     async fn lease(&self, fingerprint: Fingerprint) -> Result<(), String> {
         let path = self.get_path(fingerprint);
         self.executor
-            .spawn_blocking(
-                move || {
-                    fs_set_times::set_mtime(&path, fs_set_times::SystemTimeSpec::SymbolicNow)
-                        .map_err(|e| format!("Failed to extend mtime of {path:?}: {e}"))
-                },
-                |e| Err(format!("`lease` task failed: {e}")),
-            )
+            .native_spawn_blocking(move || {
+                fs_set_times::set_mtime(&path, fs_set_times::SystemTimeSpec::SymbolicNow)
+                    .map_err(|e| format!("Failed to extend mtime of {path:?}: {e}"))
+            })
             .await
+            .map_err(|e| format!("Failed to join Tokio task: {e}"))?
+            .map_err(|e| format!("`lease` task failed: {e}"))
     }
 
     async fn remove(&self, fingerprint: Fingerprint) -> Result<bool, String> {
@@ -470,61 +467,57 @@ impl UnderlyingByteStore for ShardedFSDB {
         let root = self.root.clone();
         let expiration_time = SystemTime::now() - self.lease_time;
         self.executor
-            .spawn_blocking(
-                move || {
-                    let maybe_shards = std::fs::read_dir(&root);
-                    let mut fingerprints = vec![];
-                    if let Ok(shards) = maybe_shards {
-                        for entry in shards {
-                            let shard =
-                                entry.map_err(|e| format!("Error iterating dir {root:?}: {e}."))?;
-                            let large_files = std::fs::read_dir(shard.path())
-                                .map_err(|e| format!("Failed to read shard directory: {e}."))?;
-                            for entry in large_files {
-                                let large_file = entry.map_err(|e| {
-                                    format!(
-                                        "Error iterating dir {:?}: {e}",
-                                        shard.path().file_name()
-                                    )
-                                })?;
-                                let path = large_file.path();
-                                if path.extension().is_some() {
-                                    continue; // NB: This is a tempfile
-                                }
-
-                                let hash = path.file_name().unwrap().to_str().unwrap();
-                                let (length, mtime) = large_file
-                                    .metadata()
-                                    .and_then(|metadata| {
-                                        let length = metadata.len();
-                                        let mtime = metadata.modified()?;
-                                        Ok((length, mtime))
-                                    })
-                                    .map_err(|e| {
-                                        format!("Could not access metadata for {path:?}: {e}")
-                                    })?;
-
-                                let expired_seconds_ago = expiration_time
-                                    .duration_since(mtime)
-                                    .map(|t| t.as_secs())
-                                    // 0 indicates unexpired.
-                                    .unwrap_or(0);
-
-                                fingerprints.push(AgedFingerprint {
-                                    expired_seconds_ago,
-                                    fingerprint: Fingerprint::from_hex_string(hash).map_err(
-                                        |e| format!("Invalid file store entry at {path:?}: {e}"),
-                                    )?,
-                                    size_bytes: length as usize,
-                                });
+            .native_spawn_blocking(move || {
+                let maybe_shards = std::fs::read_dir(&root);
+                let mut fingerprints = vec![];
+                if let Ok(shards) = maybe_shards {
+                    for entry in shards {
+                        let shard =
+                            entry.map_err(|e| format!("Error iterating dir {root:?}: {e}."))?;
+                        let large_files = std::fs::read_dir(shard.path())
+                            .map_err(|e| format!("Failed to read shard directory: {e}."))?;
+                        for entry in large_files {
+                            let large_file = entry.map_err(|e| {
+                                format!("Error iterating dir {:?}: {e}", shard.path().file_name())
+                            })?;
+                            let path = large_file.path();
+                            if path.extension().is_some() {
+                                continue; // NB: This is a tempfile
                             }
+
+                            let hash = path.file_name().unwrap().to_str().unwrap();
+                            let (length, mtime) = large_file
+                                .metadata()
+                                .and_then(|metadata| {
+                                    let length = metadata.len();
+                                    let mtime = metadata.modified()?;
+                                    Ok((length, mtime))
+                                })
+                                .map_err(|e| {
+                                    format!("Could not access metadata for {path:?}: {e}")
+                                })?;
+
+                            let expired_seconds_ago = expiration_time
+                                .duration_since(mtime)
+                                .map(|t| t.as_secs())
+                                // 0 indicates unexpired.
+                                .unwrap_or(0);
+
+                            fingerprints.push(AgedFingerprint {
+                                expired_seconds_ago,
+                                fingerprint: Fingerprint::from_hex_string(hash).map_err(|e| {
+                                    format!("Invalid file store entry at {path:?}: {e}")
+                                })?,
+                                size_bytes: length as usize,
+                            });
                         }
                     }
-                    Ok(fingerprints)
-                },
-                |e| Err(format!("`aged_fingerprints` task failed: {e}")),
-            )
+                }
+                Ok(fingerprints)
+            })
             .await
+            .map_err(|e| format!("Failed to join Tokio task: {e}"))?
+            .map_err(|e: String| format!("`aged_fingerprints` task failed: {e}"))
     }
 }
 
