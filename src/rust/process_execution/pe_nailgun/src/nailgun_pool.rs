@@ -389,7 +389,7 @@ impl NailgunProcess {
 
         // Spawn the process and read its port from stdout.
         let (child, port) = executor
-            .native_spawn_blocking({
+            .spawn_blocking({
                 let workdir = workdir.path().to_owned();
                 move || spawn_and_read_port(startup_options, workdir)
             })
@@ -548,7 +548,7 @@ async fn clear_workdir(
     future::try_join_all(moves).await?;
 
     // And drop it in the background.
-    let fut = executor.native_spawn_blocking(move || std::mem::drop(garbage_dir));
+    let fut = executor.spawn_blocking(move || std::mem::drop(garbage_dir));
     drop(fut);
 
     Ok(())

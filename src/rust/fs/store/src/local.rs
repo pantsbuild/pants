@@ -203,7 +203,7 @@ impl ShardedFSDB {
                 .map_err(|e| format!("Failed to create directory: {e}"))?;
             let (src_file, dst_dir) = fsdb
                 .executor
-                .native_spawn_blocking(move || {
+                .spawn_blocking(move || {
                     let src_file = Builder::new()
                         .suffix(".hardlink_canary")
                         .tempfile_in(&fsdb.root)
@@ -288,7 +288,7 @@ impl ShardedFSDB {
             // have to worry about parent dirs.
             let named_temp_file = self
                 .executor
-                .native_spawn_blocking(move || {
+                .spawn_blocking(move || {
                     Builder::new()
                         .suffix(".tmp")
                         .tempfile_in(dest_path2.parent().unwrap())
@@ -364,7 +364,7 @@ impl UnderlyingByteStore for ShardedFSDB {
     async fn lease(&self, fingerprint: Fingerprint) -> Result<(), String> {
         let path = self.get_path(fingerprint);
         self.executor
-            .native_spawn_blocking(move || {
+            .spawn_blocking(move || {
                 fs_set_times::set_mtime(&path, fs_set_times::SystemTimeSpec::SymbolicNow)
                     .map_err(|e| format!("Failed to extend mtime of {path:?}: {e}"))
             })
@@ -467,7 +467,7 @@ impl UnderlyingByteStore for ShardedFSDB {
         let root = self.root.clone();
         let expiration_time = SystemTime::now() - self.lease_time;
         self.executor
-            .native_spawn_blocking(move || {
+            .spawn_blocking(move || {
                 let maybe_shards = std::fs::read_dir(&root);
                 let mut fingerprints = vec![];
                 if let Ok(shards) = maybe_shards {

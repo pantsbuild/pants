@@ -242,7 +242,7 @@ impl Nail for RawFdNail {
         // output stream.
         let executor = self.executor.clone();
         let nail = self.clone();
-        let exit_code_join = executor.native_spawn_blocking(move || {
+        let exit_code_join = executor.spawn_blocking(move || {
             // NB: This closure captures the stdio handles, and will drop/close them when it completes.
             (nail.runner)(RawFdExecution {
                 cmd,

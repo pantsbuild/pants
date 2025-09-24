@@ -271,7 +271,7 @@ impl ShardedLmdb {
     pub async fn remove(&self, fingerprint: Fingerprint) -> Result<bool, String> {
         let store = self.clone();
         self.executor
-            .native_spawn_blocking(move || {
+            .spawn_blocking(move || {
                 let effective_key =
                     VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION);
                 let (env, db, lease_database) = store.get(&fingerprint);
@@ -319,7 +319,7 @@ impl ShardedLmdb {
     ) -> Result<HashSet<Fingerprint>, String> {
         let store = self.clone();
         self.executor
-            .native_spawn_blocking(move || {
+            .spawn_blocking(move || {
                 // Group the items by the Environment that they will be applied to.
                 let mut items_by_env = HashMap::new();
                 let mut exists = HashSet::new();
@@ -376,7 +376,7 @@ impl ShardedLmdb {
     pub async fn all_fingerprints(&self) -> Result<Vec<AgedFingerprint>, String> {
         let store = self.clone();
         self.executor
-            .native_spawn_blocking(move || {
+            .spawn_blocking(move || {
                 let mut fingerprints = Vec::new();
                 for (env, database, lease_database) in &store.all_lmdbs() {
                     let txn = env.begin_ro_txn().map_err(|err| {
@@ -458,7 +458,7 @@ impl ShardedLmdb {
     ) -> Result<(), String> {
         let store = self.clone();
         self.executor
-            .native_spawn_blocking(move || {
+            .spawn_blocking(move || {
                 // Group the items by the Environment that they will be applied to.
                 let mut items_by_env = HashMap::new();
                 let mut fingerprints = Vec::new();
@@ -537,7 +537,7 @@ impl ShardedLmdb {
     {
         let store = self.clone();
         self.executor
-            .native_spawn_blocking(move || {
+            .spawn_blocking(move || {
                 let mut attempts = 0;
                 loop {
                     let effective_key = VersionedFingerprint::new(
@@ -616,7 +616,7 @@ impl ShardedLmdb {
     pub async fn lease(&self, fingerprint: Fingerprint) -> Result<(), String> {
         let store = self.clone();
         self.executor
-            .native_spawn_blocking(move || {
+            .spawn_blocking(move || {
                 let until_secs_since_epoch: u64 = store.lease_until_secs_since_epoch();
                 let (env, _, lease_database) = store.get(&fingerprint);
                 env.begin_rw_txn()
@@ -669,7 +669,7 @@ impl ShardedLmdb {
         let store = self.clone();
         let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION);
         self.executor
-            .native_spawn_blocking(move || {
+            .spawn_blocking(move || {
                 let (env, db, _) = store.get(&fingerprint);
                 let ro_txn = env
                     .begin_ro_txn()

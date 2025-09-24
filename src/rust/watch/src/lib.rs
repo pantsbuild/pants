@@ -290,7 +290,7 @@ impl InvalidationWatcher {
 
         let watcher = self.clone();
         executor
-            .native_spawn_blocking(move || {
+            .spawn_blocking(move || {
                 let mut inner = watcher.0.lock();
                 inner
                     .watcher

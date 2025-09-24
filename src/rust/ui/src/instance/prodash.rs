@@ -77,7 +77,7 @@ impl ProdashInstance {
         // TODO: There is a shutdown race here, where if the UI is torn down before exclusive access is
         // dropped, we might drop stderr on the floor. That likely causes:
         //   https://github.com/pantsbuild/pants/issues/13276
-        let _stderr_task = executor.native_spawn_blocking({
+        let _stderr_task = executor.spawn_blocking({
             let mut tree = tree.clone();
             move || {
                 while let Ok(stderr) = stderr_receiver.recv() {
@@ -100,7 +100,7 @@ impl ProdashInstance {
         // empty Tree, which will clear the screen.
         self.tasks_to_display.clear();
         let executor = self.executor.clone();
-        let shutdown = executor.native_spawn_blocking(move || self.handle.shutdown_and_wait());
+        let shutdown = executor.spawn_blocking(move || self.handle.shutdown_and_wait());
         async move {
             if let Err(e) = shutdown.await {
                 fatal_log!("Failed to teardown UI: {e}");

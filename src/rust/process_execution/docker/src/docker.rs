@@ -279,7 +279,7 @@ async fn credentials_for_image(
     let server = server.to_owned();
 
     executor
-        .native_spawn_blocking(move || {
+        .spawn_blocking(move || {
             // Resolve the server as a DNS name to confirm that it is actually a registry.
             let Ok(_) = (server.as_ref(), 80)
                 .to_socket_addrs()

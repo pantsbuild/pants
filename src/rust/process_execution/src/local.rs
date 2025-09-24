@@ -817,7 +817,7 @@ impl AsyncDropSandbox {
 impl Drop for AsyncDropSandbox {
     fn drop(&mut self) {
         if let Some(sandbox) = self.2.take() {
-            let _background_cleanup = self.0.native_spawn_blocking(|| std::mem::drop(sandbox));
+            let _background_cleanup = self.0.spawn_blocking(|| std::mem::drop(sandbox));
         }
     }
 }

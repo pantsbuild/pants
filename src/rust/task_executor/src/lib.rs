@@ -178,7 +178,7 @@ impl Executor {
     /// Spawn a Future on threads specifically reserved for I/O tasks which are allowed to be
     /// long-running and return a JoinHandle
     ///
-    pub fn native_spawn_blocking<F: FnOnce() -> R + Send + 'static, R: Send + 'static>(
+    pub fn spawn_blocking<F: FnOnce() -> R + Send + 'static, R: Send + 'static>(
         &self,
         f: F,
     ) -> JoinHandle<R> {
