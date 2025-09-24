@@ -298,8 +298,8 @@ impl InvalidationWatcher {
                     .map_err(|e| maybe_enrich_notify_error(&path, e))
             })
             .await
-            .map_err(|e| format!("Failed to join Tokio task: {e}"))?
             .map_err(|e| format!("Watch attempt failed: {e}"))
+            .flatten()
     }
 }
 

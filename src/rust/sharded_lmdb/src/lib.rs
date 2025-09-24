@@ -296,8 +296,8 @@ impl ShardedLmdb {
                 }
             })
             .await
-            .map_err(|e| format!("Failed to join Tokio task: {e}"))?
             .map_err(|e| format!("`remove` task failed: {e}"))
+            .flatten()
     }
 
     ///
@@ -366,8 +366,8 @@ impl ShardedLmdb {
                 Ok(exists)
             })
             .await
-            .map_err(|e| format!("Failed to join Tokio task: {e}"))?
-            .map_err(|e: String| format!("`exists_batch` task failed: {e}"))
+            .map_err(|e| format!("`exists_batch` task failed: {e}"))
+            .flatten()
     }
 
     ///
@@ -426,8 +426,8 @@ impl ShardedLmdb {
                 Ok(fingerprints)
             })
             .await
-            .map_err(|e| format!("Failed to join Tokio task: {e}"))?
-            .map_err(|e: String| format!("`all_fingerprints` task failed: {e}"))
+            .map_err(|e| format!("`all_fingerprints` task failed: {e}"))
+            .flatten()
     }
 
     ///
@@ -513,8 +513,8 @@ impl ShardedLmdb {
                 Ok(())
             })
             .await
-            .map_err(|e| format!("Failed to join Tokio task: {e}"))?
-            .map_err(|e: String| format!("`store_bytes_batch` task failed: {e}"))
+            .map_err(|e| format!("`store_bytes_batch` task failed: {e}"))
+            .flatten()
     }
 
     ///
@@ -609,8 +609,8 @@ impl ShardedLmdb {
                 }
             })
             .await
-            .map_err(|e| format!("Failed to join Tokio task: {e}"))?
             .map_err(|e| format!("`store` task failed: {e}"))
+            .flatten()
     }
 
     pub async fn lease(&self, fingerprint: Fingerprint) -> Result<(), String> {
@@ -632,8 +632,8 @@ impl ShardedLmdb {
                     .map_err(|e| format!("Error leasing {fingerprint:?}: {e}"))
             })
             .await
-            .map_err(|e| format!("Failed to join Tokio task: {e}"))?
             .map_err(|e| format!("`lease` task failed: {e}"))
+            .flatten()
     }
 
     fn lease_inner(
@@ -685,8 +685,8 @@ impl ShardedLmdb {
                 }
             })
             .await
-            .map_err(|e| format!("Failed to join Tokio task: {e}"))?
             .map_err(|e| format!("`load_bytes_with` task failed: {e}"))
+            .flatten()
     }
 
     #[allow(clippy::useless_conversion)] // False positive: https://github.com/rust-lang/rust-clippy/issues/3913
