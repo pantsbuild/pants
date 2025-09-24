@@ -389,14 +389,13 @@ impl NailgunProcess {
 
         // Spawn the process and read its port from stdout.
         let (child, port) = executor
-            .spawn_blocking(
-                {
-                    let workdir = workdir.path().to_owned();
-                    move || spawn_and_read_port(startup_options, workdir)
-                },
-                |e| Err(format!("Nailgun spawn task failed: {e}")),
-            )
-            .await?;
+            .spawn_blocking({
+                let workdir = workdir.path().to_owned();
+                move || spawn_and_read_port(startup_options, workdir)
+            })
+            .await
+            .map_err(|e| format!("Failed to join Tokio task: {e}"))?
+            .map_err(|e| format!("Nailgun spawn task failed: {e}"))?;
         debug!(
             "Created nailgun server process with pid {} and port {}",
             child.id(),
@@ -549,7 +548,7 @@ async fn clear_workdir(
     future::try_join_all(moves).await?;
 
     // And drop it in the background.
-    let fut = executor.native_spawn_blocking(move || std::mem::drop(garbage_dir));
+    let fut = executor.spawn_blocking(move || std::mem::drop(garbage_dir));
     drop(fut);
 
     Ok(())

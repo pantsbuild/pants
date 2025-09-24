@@ -290,17 +290,16 @@ impl InvalidationWatcher {
 
         let watcher = self.clone();
         executor
-            .spawn_blocking(
-                move || {
-                    let mut inner = watcher.0.lock();
-                    inner
-                        .watcher
-                        .watch(&path, RecursiveMode::NonRecursive)
-                        .map_err(|e| maybe_enrich_notify_error(&path, e))
-                },
-                |e| Err(format!("Watch attempt failed: {e}")),
-            )
+            .spawn_blocking(move || {
+                let mut inner = watcher.0.lock();
+                inner
+                    .watcher
+                    .watch(&path, RecursiveMode::NonRecursive)
+                    .map_err(|e| maybe_enrich_notify_error(&path, e))
+            })
             .await
+            .map_err(|e| format!("Failed to join Tokio task: {e}"))?
+            .map_err(|e| format!("Watch attempt failed: {e}"))
     }
 }
 

@@ -175,31 +175,10 @@ impl Executor {
     }
 
     ///
-    /// Spawn a Future on a threadpool specifically reserved for I/O tasks which are allowed to be
-    /// long-running.
-    ///
-    /// If the background Task exits abnormally, the given closure will be called to recover: usually
-    /// it should convert the resulting Error to a relevant error type.
-    ///
-    /// If the returned Future is dropped, the computation will still continue to completion: see
-    /// <https://docs.rs/tokio/0.2.20/tokio/task/struct.JoinHandle.html>
-    ///
-    pub fn spawn_blocking<F: FnOnce() -> R + Send + 'static, R: Send + 'static>(
-        &self,
-        f: F,
-        rescue_join_error: impl FnOnce(JoinError) -> R,
-    ) -> impl Future<Output = R> {
-        self.native_spawn_blocking(f).map(|res| match res {
-            Ok(o) => o,
-            Err(e) => rescue_join_error(e),
-        })
-    }
-
-    ///
     /// Spawn a Future on threads specifically reserved for I/O tasks which are allowed to be
     /// long-running and return a JoinHandle
     ///
-    pub fn native_spawn_blocking<F: FnOnce() -> R + Send + 'static, R: Send + 'static>(
+    pub fn spawn_blocking<F: FnOnce() -> R + Send + 'static, R: Send + 'static>(
         &self,
         f: F,
     ) -> JoinHandle<R> {
