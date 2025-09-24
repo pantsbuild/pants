@@ -42,13 +42,13 @@ pub async fn execute_command(
                 debug!("Failed to save terminal attributes for file descriptor {raw_fd}: {err}")
             }
         }
-        if connection_settings.dynamic_ui {
-            if let Ok(path) = nix::unistd::ttyname(*raw_fd) {
-                env.push((
-                    format!("NAILGUN_TTY_PATH_{raw_fd}"),
-                    path.display().to_string(),
-                ));
-            }
+        if connection_settings.dynamic_ui
+            && let Ok(path) = nix::unistd::ttyname(*raw_fd)
+        {
+            env.push((
+                format!("NAILGUN_TTY_PATH_{raw_fd}"),
+                path.display().to_string(),
+            ));
         }
     }
 

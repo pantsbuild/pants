@@ -159,7 +159,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    mod gen {
+    mod pb {
         tonic::include_proto!("test");
     }
 
@@ -183,11 +183,11 @@ mod tests {
         struct UserAgentResponder;
 
         #[async_trait]
-        impl gen::test_server::Test for UserAgentResponder {
+        impl pb::test_server::Test for UserAgentResponder {
             async fn call(
                 &self,
-                request: Request<gen::Input>,
-            ) -> Result<Response<gen::Output>, Status> {
+                request: Request<pb::Input>,
+            ) -> Result<Response<pb::Output>, Status> {
                 match request.metadata().get("user-agent") {
                     Some(user_agent_value) => {
                         let user_agent = user_agent_value.to_str().map_err(|err| {
@@ -196,7 +196,7 @@ mod tests {
                             ))
                         })?;
                         if user_agent.contains(EXPECTED_USER_AGENT) {
-                            Ok(Response::new(gen::Output {}))
+                            Ok(Response::new(pb::Output {}))
                         } else {
                             Err(Status::invalid_argument(format!(
                                 "user-agent header did not contain expected value: actual={user_agent}"
@@ -217,7 +217,7 @@ mod tests {
         tokio::spawn(async move {
             let incoming_stream = TcpListenerStream::new(listener);
             let mut server = Server::builder();
-            let router = server.add_service(gen::test_server::TestServer::new(UserAgentResponder));
+            let router = server.add_service(pb::test_server::TestServer::new(UserAgentResponder));
             router
                 .serve_with_incoming_shutdown(incoming_stream, shutdown_receiver.map(drop))
                 .await
@@ -239,7 +239,7 @@ mod tests {
 
         let client = layered_service(channel, 1, headers, None);
 
-        let mut client = gen::test_client::TestClient::new(client);
-        client.call(gen::Input {}).await.expect("success");
+        let mut client = pb::test_client::TestClient::new(client);
+        client.call(pb::Input {}).await.expect("success");
     }
 }

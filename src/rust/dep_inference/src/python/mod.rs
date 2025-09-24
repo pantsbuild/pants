@@ -171,19 +171,19 @@ impl ImportCollector<'_> {
 
     fn is_pragma_ignored_recursive(&self, node: tree_sitter::Node) -> bool {
         let node_end_point = node.range().end_point;
-        if let Some(sibling) = node.next_named_sibling() {
-            if self.is_pragma_ignored_at_row(sibling, node_end_point.row) {
-                return true;
-            }
+        if let Some(sibling) = node.next_named_sibling()
+            && self.is_pragma_ignored_at_row(sibling, node_end_point.row)
+        {
+            return true;
         }
 
         let mut current = node;
         loop {
             if let Some(parent) = current.parent() {
-                if let Some(sibling) = parent.next_named_sibling() {
-                    if self.is_pragma_ignored_at_row(sibling, node_end_point.row) {
-                        return true;
-                    }
+                if let Some(sibling) = parent.next_named_sibling()
+                    && self.is_pragma_ignored_at_row(sibling, node_end_point.row)
+                {
+                    return true;
                 }
                 current = parent;
                 continue;
@@ -257,13 +257,12 @@ impl ImportCollector<'_> {
     }
 
     fn handle_string_candidate(&mut self, node: tree_sitter::Node) {
-        if let Some(text) = self.extract_string(node) {
-            if !text.contains(|c: char| c.is_ascii_whitespace() || c == '\\')
-                && !self.is_pragma_ignored_recursive(node)
-            {
-                self.string_candidates
-                    .insert(text, (node.range().start_point.row + 1) as u64);
-            }
+        if let Some(text) = self.extract_string(node)
+            && !text.contains(|c: char| c.is_ascii_whitespace() || c == '\\')
+            && !self.is_pragma_ignored_recursive(node)
+        {
+            self.string_candidates
+                .insert(text, (node.range().start_point.row + 1) as u64);
         }
     }
 }
@@ -390,12 +389,11 @@ impl Visitor for ImportCollector<'_> {
         }
 
         let args = node.named_child(1).unwrap();
-        if let Some(arg) = args.named_child(0) {
-            if let Some(content) = self.extract_string(arg) {
-                if !self.is_pragma_ignored(node.parent().unwrap()) {
-                    self.insert_import(BaseNode::StringNode(content, arg), None);
-                }
-            }
+        if let Some(arg) = args.named_child(0)
+            && let Some(content) = self.extract_string(arg)
+            && !self.is_pragma_ignored(node.parent().unwrap())
+        {
+            self.insert_import(BaseNode::StringNode(content, arg), None);
         }
 
         // Do not descend below the `__import__` call statement.

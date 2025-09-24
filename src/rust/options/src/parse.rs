@@ -63,10 +63,8 @@ peg::parser! {
         rule single_quoted_character() -> char
             = escaped_character() / quoted_character("'")
 
-        // NB: ##method(X) is an undocumented peg feature expression that calls input.method(pos, X)
-        // (see https://github.com/kevinmehall/rust-peg/issues/283).
         rule quoted_character(quote_char: &'static str) -> char
-            = !(##parse_string_literal(quote_char) / "\\x") c:$([_]) { c.chars().next().unwrap() }
+            = !(#{|input, pos| input.parse_string_literal(pos, quote_char)} / "\\x") c:$([_]) { c.chars().next().unwrap() }
 
         // Python string literal escape sequences.
         // See https://docs.python.org/3/reference/lexical_analysis.html#escape-sequences.
