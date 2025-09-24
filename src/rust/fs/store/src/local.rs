@@ -215,8 +215,8 @@ impl ShardedFSDB {
                     Ok((src_file, dst_dir))
                 })
                 .await
-                .map_err(|e| format!("Failed to join Tokio task: {e}"))?
-                .map_err(|e: String| format!("hardlink canary temp files task failed: {e}"))?;
+                .map_err(|e| format!("hardlink canary temp files task failed: {e}"))
+                .flatten()?;
             let dst_file = dst_dir.path().join("hard_link");
             let is_hardlinkable = hard_link(src_file, dst_file).await.is_ok();
             log::debug!("{src_display} -> {dst_display} hardlinkable: {is_hardlinkable}");
@@ -295,8 +295,8 @@ impl ShardedFSDB {
                         .map_err(|e| format!("Failed to create temp file: {e}"))
                 })
                 .await
-                .map_err(|e| format!("Failed to join Tokio task: {e}"))?
-                .map_err(|e| format!("temp file creation task failed: {e}"))?;
+                .map_err(|e| format!("temp file creation task failed: {e}"))
+                .flatten()?;
             let (std_file, tmp_path) = named_temp_file
                 .keep()
                 .map_err(|e| format!("Failed to keep temp file: {e}"))?;
@@ -369,8 +369,8 @@ impl UnderlyingByteStore for ShardedFSDB {
                     .map_err(|e| format!("Failed to extend mtime of {path:?}: {e}"))
             })
             .await
-            .map_err(|e| format!("Failed to join Tokio task: {e}"))?
             .map_err(|e| format!("`lease` task failed: {e}"))
+            .flatten()
     }
 
     async fn remove(&self, fingerprint: Fingerprint) -> Result<bool, String> {
@@ -516,8 +516,8 @@ impl UnderlyingByteStore for ShardedFSDB {
                 Ok(fingerprints)
             })
             .await
-            .map_err(|e| format!("Failed to join Tokio task: {e}"))?
-            .map_err(|e: String| format!("`aged_fingerprints` task failed: {e}"))
+            .map_err(|e| format!("`aged_fingerprints` task failed: {e}"))
+            .flatten()
     }
 }
 
