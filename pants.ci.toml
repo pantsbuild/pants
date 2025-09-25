@@ -7,9 +7,14 @@ sandboxer = true
 [test]
 report = true
 attempts_default = 3
+use_coverage = true
 
 [pytest]
 args = ["--no-header", "--noskip", "-vv"]
+
+[coverage-py]
+report = ["raw", "xml"]
+global_report = true
 
 [subprocess-environment]
 env_vars.add = [
