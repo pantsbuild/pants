@@ -897,10 +897,13 @@ jobs:
         name: logs-python-test-Linux-ARM64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
-    - name: Coveralls Parallel
+    - continue-on-error: true
+      if: always()
+      name: Coveralls Parallel
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
+        debug: true
         file: dist/coverage/python/coverage.xml
         flag-name: test_python_linux_arm64
         format: cobertura
@@ -1006,10 +1009,13 @@ jobs:
         name: logs-python-test-0_10-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
-    - name: Coveralls Parallel
+    - continue-on-error: true
+      if: always()
+      name: Coveralls Parallel
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
+        debug: true
         file: dist/coverage/python/coverage.xml
         flag-name: test_python_linux_x86_64_0/10
         format: cobertura
@@ -1115,10 +1121,13 @@ jobs:
         name: logs-python-test-1_10-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
-    - name: Coveralls Parallel
+    - continue-on-error: true
+      if: always()
+      name: Coveralls Parallel
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
+        debug: true
         file: dist/coverage/python/coverage.xml
         flag-name: test_python_linux_x86_64_1/10
         format: cobertura
@@ -1224,10 +1233,13 @@ jobs:
         name: logs-python-test-2_10-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
-    - name: Coveralls Parallel
+    - continue-on-error: true
+      if: always()
+      name: Coveralls Parallel
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
+        debug: true
         file: dist/coverage/python/coverage.xml
         flag-name: test_python_linux_x86_64_2/10
         format: cobertura
@@ -1333,10 +1345,13 @@ jobs:
         name: logs-python-test-3_10-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
-    - name: Coveralls Parallel
+    - continue-on-error: true
+      if: always()
+      name: Coveralls Parallel
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
+        debug: true
         file: dist/coverage/python/coverage.xml
         flag-name: test_python_linux_x86_64_3/10
         format: cobertura
@@ -1442,10 +1457,13 @@ jobs:
         name: logs-python-test-4_10-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
-    - name: Coveralls Parallel
+    - continue-on-error: true
+      if: always()
+      name: Coveralls Parallel
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
+        debug: true
         file: dist/coverage/python/coverage.xml
         flag-name: test_python_linux_x86_64_4/10
         format: cobertura
@@ -1551,10 +1569,13 @@ jobs:
         name: logs-python-test-5_10-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
-    - name: Coveralls Parallel
+    - continue-on-error: true
+      if: always()
+      name: Coveralls Parallel
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
+        debug: true
         file: dist/coverage/python/coverage.xml
         flag-name: test_python_linux_x86_64_5/10
         format: cobertura
@@ -1660,10 +1681,13 @@ jobs:
         name: logs-python-test-6_10-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
-    - name: Coveralls Parallel
+    - continue-on-error: true
+      if: always()
+      name: Coveralls Parallel
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
+        debug: true
         file: dist/coverage/python/coverage.xml
         flag-name: test_python_linux_x86_64_6/10
         format: cobertura
@@ -1769,10 +1793,13 @@ jobs:
         name: logs-python-test-7_10-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
-    - name: Coveralls Parallel
+    - continue-on-error: true
+      if: always()
+      name: Coveralls Parallel
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
+        debug: true
         file: dist/coverage/python/coverage.xml
         flag-name: test_python_linux_x86_64_7/10
         format: cobertura
@@ -1878,10 +1905,13 @@ jobs:
         name: logs-python-test-8_10-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
-    - name: Coveralls Parallel
+    - continue-on-error: true
+      if: always()
+      name: Coveralls Parallel
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
+        debug: true
         file: dist/coverage/python/coverage.xml
         flag-name: test_python_linux_x86_64_8/10
         format: cobertura
@@ -1987,10 +2017,13 @@ jobs:
         name: logs-python-test-9_10-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
-    - name: Coveralls Parallel
+    - continue-on-error: true
+      if: always()
+      name: Coveralls Parallel
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
+        debug: true
         file: dist/coverage/python/coverage.xml
         flag-name: test_python_linux_x86_64_9/10
         format: cobertura
@@ -2065,10 +2098,13 @@ jobs:
         name: logs-python-test-macOS13-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
-    - name: Coveralls Parallel
+    - continue-on-error: true
+      if: always()
+      name: Coveralls Parallel
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
+        debug: true
         file: dist/coverage/python/coverage.xml
         flag-name: test_python_macos13_x86_64
         format: cobertura

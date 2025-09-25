@@ -657,12 +657,15 @@ class Helper:
         return {
             "name": "Coveralls Parallel",
             "uses": action("coverallsapp"),
+            "if": "always()",
+            "continue-on-error": True,
             "with": {
                 "flag-name": flag,
                 "parallel": True,
                 "file": "dist/coverage/python/coverage.xml",
                 "format": "cobertura",
                 "allow-empty": True,
+                "debug": True,  # FIXME
             },
         }
 
