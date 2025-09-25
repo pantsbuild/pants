@@ -1099,6 +1099,7 @@ def test_workflow_jobs() -> Jobs:
             },
         }
     )
+    jobs.update(coveralls_done())
     return jobs
 
 
@@ -1840,8 +1841,14 @@ def merge_ok(pr_jobs: list[str]) -> Jobs:
     }
 
 
-# def coveralls_done(self) -> Job:
-#     pass
+def coveralls_done() -> Jobs:
+    return {
+        "coveralls_done": {
+            "name": "Coveralls Done",
+            "uses": action("coverallsapp"),
+            "with": {"parallel-finished": True},
+        }
+    }
 
 
 def generate() -> dict[Path, str]:

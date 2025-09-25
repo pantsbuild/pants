@@ -690,6 +690,14 @@ jobs:
         for i in ${change_labels}; do
           echo "${i}=true" | tee -a $GITHUB_OUTPUT
         done
+  coveralls_done:
+    if: needs.classify_changes.outputs.no_code != 'true'
+    name: Coveralls Done
+    needs:
+    - classify_changes
+    uses: coverallsapp/github-action@v2
+    with:
+      parallel-finished: true
   lint_python:
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
     name: Lint Python and Shell
@@ -793,6 +801,7 @@ jobs:
     - build_wheels_macos14_arm64
     - check_release_notes
     - classify_changes
+    - coveralls_done
     - lint_python
     - test_python_linux_arm64
     - test_python_linux_x86_64_0
