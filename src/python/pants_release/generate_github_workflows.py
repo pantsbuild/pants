@@ -307,8 +307,6 @@ def launch_bazel_remote() -> Sequence[Step]:
 def global_env() -> Env:
     return {
         "PANTS_CONFIG_FILES": "+['pants.ci.toml']",
-        # TODO
-        "PANTS_RUST_TOOLCHAIN": "default",
         "RUST_BACKTRACE": "all",
         # Default to disabling OpenTelemetry so GHA steps not using Pants directly do not try
         # to use Honeycomb if they do invoke Pants indirectly (e.g., Rust integration tests).
@@ -339,6 +337,8 @@ def install_rustup() -> list[Step]:
             "name": "Install Rust toolchain",
             "run": dedent(
                 f"""\
+            # install the stable toolchain for rust backend tests
+            rustup install stable
             # Set the default toolchain. Installs the toolchain if it is not already installed.
             rustup default {rust_channel()}
             cargo version

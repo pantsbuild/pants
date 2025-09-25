@@ -39,6 +39,8 @@ jobs:
         echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
     - name: Install Rust toolchain
       run: |
+        # install the stable toolchain for rust backend tests
+        rustup install stable
         # Set the default toolchain. Installs the toolchain if it is not already installed.
         rustup default 1.89.0
         cargo version
@@ -145,6 +147,8 @@ jobs:
         echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
     - name: Install Rust toolchain
       run: |
+        # install the stable toolchain for rust backend tests
+        rustup install stable
         # Set the default toolchain. Installs the toolchain if it is not already installed.
         rustup default 1.89.0
         cargo version

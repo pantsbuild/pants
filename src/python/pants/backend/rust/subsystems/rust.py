@@ -16,8 +16,7 @@ class RustSubsystem(Subsystem):
 
     toolchain = StrOption(
         "--toolchain",
-        #default="stable",
-        default="default",
+        default="stable",
         help=softwrap(
             """
             Name of a Rust toolchain to use for all builds. The toolchain name will be provided to
