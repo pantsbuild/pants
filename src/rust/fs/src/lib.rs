@@ -426,11 +426,9 @@ impl PosixFS {
     pub async fn scandir(&self, dir_relative_to_root: Dir) -> Result<DirectoryListing, io::Error> {
         let vfs = self.clone();
         self.executor
-            .spawn_blocking(
-                move || vfs.scandir_sync(&dir_relative_to_root),
-                |e| Err(io::Error::other(format!("Synchronous scandir failed: {e}"))),
-            )
-            .await
+            .spawn_blocking(move || vfs.scandir_sync(&dir_relative_to_root))
+            .await?
+            .map_err(|e| io::Error::other(format!("Synchronous scandir failed: {e}")))
     }
 
     fn scandir_sync(&self, dir_relative_to_root: &Dir) -> Result<DirectoryListing, io::Error> {

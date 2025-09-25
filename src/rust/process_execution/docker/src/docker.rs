@@ -279,50 +279,45 @@ async fn credentials_for_image(
     let server = server.to_owned();
 
     executor
-        .spawn_blocking(
-            move || {
-                // Resolve the server as a DNS name to confirm that it is actually a registry.
-                let Ok(_) = (server.as_ref(), 80)
-                    .to_socket_addrs()
-                    .or_else(|_| server.to_socket_addrs())
-                else {
+        .spawn_blocking(move || {
+            // Resolve the server as a DNS name to confirm that it is actually a registry.
+            let Ok(_) = (server.as_ref(), 80)
+                .to_socket_addrs()
+                .or_else(|_| server.to_socket_addrs())
+            else {
+                return Ok(None);
+            };
+
+            // TODO: https://github.com/keirlawson/docker_credential/issues/7 means that this will only
+            // work for credential helpers and credentials encoded directly in the docker config,
+            // rather than for general credStore implementations.
+            let credential = match docker_credential::get_credential(&server) {
+                Ok(credential) => credential,
+                Err(e) => {
+                    log::warn!("Failed to retrieve Docker credentials for server `{server}`: {e}");
                     return Ok(None);
-                };
+                }
+            };
 
-                // TODO: https://github.com/keirlawson/docker_credential/issues/7 means that this will only
-                // work for credential helpers and credentials encoded directly in the docker config,
-                // rather than for general credStore implementations.
-                let credential = match docker_credential::get_credential(&server) {
-                    Ok(credential) => credential,
-                    Err(e) => {
-                        log::warn!(
-                            "Failed to retrieve Docker credentials for server `{server}`: {e}"
-                        );
-                        return Ok(None);
+            let bollard_credentials = match credential {
+                docker_credential::DockerCredential::IdentityToken(token) => DockerCredentials {
+                    identitytoken: Some(token),
+                    ..DockerCredentials::default()
+                },
+                docker_credential::DockerCredential::UsernamePassword(username, password) => {
+                    DockerCredentials {
+                        username: Some(username),
+                        password: Some(password),
+                        ..DockerCredentials::default()
                     }
-                };
+                }
+            };
 
-                let bollard_credentials = match credential {
-                    docker_credential::DockerCredential::IdentityToken(token) => {
-                        DockerCredentials {
-                            identitytoken: Some(token),
-                            ..DockerCredentials::default()
-                        }
-                    }
-                    docker_credential::DockerCredential::UsernamePassword(username, password) => {
-                        DockerCredentials {
-                            username: Some(username),
-                            password: Some(password),
-                            ..DockerCredentials::default()
-                        }
-                    }
-                };
-
-                Ok(Some(bollard_credentials))
-            },
-            |e| Err(format!("Credentials task failed: {e}")),
-        )
+            Ok(Some(bollard_credentials))
+        })
         .await
+        .map_err(|e| format!("Credentials task failed: {e}"))
+        .flatten()
 }
 
 /// Pull an image given its name and the image pull policy. This method is debounced by
