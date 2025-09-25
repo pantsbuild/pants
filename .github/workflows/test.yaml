@@ -707,6 +707,8 @@ jobs:
     - test_python_linux_arm64
     - test_python_macos13_x86_64
     - classify_changes
+    runs-on:
+    - ubuntu-22.04
     steps:
     - uses: coverallsapp/github-action@v2
       with:

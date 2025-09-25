@@ -1844,8 +1844,9 @@ def merge_ok(pr_jobs: list[str]) -> Jobs:
 def coveralls_done(test_job_keys: list[str]) -> Jobs:
     return {
         "coveralls_done": {
-            "needs": test_job_keys,
             "name": "Coveralls Done",
+            "runs-on": Helper(Platform.LINUX_X86_64).runs_on(),
+            "needs": test_job_keys,
             "steps": [
                 {
                     "uses": action("coverallsapp"),
