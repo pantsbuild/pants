@@ -694,6 +694,18 @@ jobs:
     if: needs.classify_changes.outputs.no_code != 'true'
     name: Coveralls Done
     needs:
+    - test_python_linux_x86_64_0
+    - test_python_linux_x86_64_1
+    - test_python_linux_x86_64_2
+    - test_python_linux_x86_64_3
+    - test_python_linux_x86_64_4
+    - test_python_linux_x86_64_5
+    - test_python_linux_x86_64_6
+    - test_python_linux_x86_64_7
+    - test_python_linux_x86_64_8
+    - test_python_linux_x86_64_9
+    - test_python_linux_arm64
+    - test_python_macos13_x86_64
     - classify_changes
     uses: coverallsapp/github-action@v2
     with:

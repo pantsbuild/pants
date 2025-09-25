@@ -1099,7 +1099,7 @@ def test_workflow_jobs() -> Jobs:
             },
         }
     )
-    jobs.update(coveralls_done())
+    jobs.update(coveralls_done([key for key in jobs.keys() if key.startswith("test_")]))
     return jobs
 
 
@@ -1841,9 +1841,10 @@ def merge_ok(pr_jobs: list[str]) -> Jobs:
     }
 
 
-def coveralls_done() -> Jobs:
+def coveralls_done(test_job_keys: list[str]) -> Jobs:
     return {
         "coveralls_done": {
+            "needs": test_job_keys,
             "name": "Coveralls Done",
             "uses": action("coverallsapp"),
             "with": {"parallel-finished": True},
