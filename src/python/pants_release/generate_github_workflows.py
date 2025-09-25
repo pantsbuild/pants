@@ -780,6 +780,7 @@ def test_jobs(
                 else []
             ),
             *helper.setup_pythons(),
+            *helper.rust_caches(),
             *helper.native_binaries_download(),
             {"name": "WTF", "run": "ls /home/runner/.rustup/toolchains/"},
             {
