@@ -46,13 +46,14 @@ A `Snapshot` is useful when you want to know which files a `Digest` refers to. F
 Given a `Digest`, you may use the engine to enrich it into a `Snapshot`:
 
 ```python
-from pants.engine.fs import Digest, Snapshot
-from pants.engine.rules import Get, rule
+from pants.engine.fs import Snapshot
+from pants.engine.intrinsics import digest_to_snapshot
+from pants.engine.rules import rule
 
 @rule
 async def demo(...) -> Foo:
     ...
-    snapshot = await Get(Snapshot, Digest, my_digest)
+    snapshot: Snapshot = await digest_to_snapshot(my_digest)
 ```
 
 ## `CreateDigest`: create new files
@@ -61,12 +62,15 @@ async def demo(...) -> Foo:
 
 ```python
 from pants.engine.fs import CreateDigest, Digest, FileContent
-from pants.engine.rules import Get, rule
+from pants.engine.intrinsics import create_digest
+from pants.engine.rules import rule
 
 @rule
 async def demo(...) -> Foo:
     ...
-    digest = await Get(Digest, CreateDigest([FileContent("f1.txt", b"hello world")]))
+    digest: Digest = await create_digest(
+        CreateDigest([FileContent("f1.txt", b"hello world")])
+    )
 ```
 
 The `CreateDigest` constructor expects an iterable including any of these types:
@@ -83,12 +87,15 @@ This does _not_ write the `Digest` to the build root. Use `Workspace.write_diges
 
 ```python
 from pants.engine.fs import Digest, PathGlobs
-from pants.engine.rules import Get, rule
+from pants.engine.intrinsics import path_globs_to_digest
+from pants.engine.rules import rule
 
 @rule
 async def demo(...) -> Foo:
     ...
-    digest = await Get(Digest, PathGlobs(["**/*.txt", "!ignore_me.txt"]))
+    digest: Digest = await path_globs_to_digest(
+        PathGlobs(["**/*.txt", "!ignore_me.txt"])
+    )
 ```
 
 - All globs must be relative paths, relative to the build root.
@@ -120,16 +127,17 @@ PathGlobs(
 )
 ```
 
-If you only need to resolve the file names—and don't actually need to use the file content—you can use `await Get(Paths, PathGlobs)` instead of `await Get(Digest, PathGlobs)` or `await Get(Snapshot, PathGlobs)`. This will avoid "digesting" the files to the LMDB Store cache as a performance optimization. `Paths` has two properties: `files: tuple[str, ...]` and `dirs: tuple[str, ...]`.
+If you only need to resolve the file names—and don't actually need to use the file content—you can use `await path_globs_to_paths()` instead of `await path_globs_to_digest()` or `await digest_to_snapshot(**implicitly(PathGlobs(...)))`. This will avoid "digesting" the files to the LMDB Store cache, as a performance optimization. The returned `Paths` instance has two properties: `files: tuple[str, ...]` and `dirs: tuple[str, ...]`.
 
 ```python
-from pants.engine.fs import Paths, PathGlobs
-from pants.engine.rules import Get, rule
+from pants.engine.fs import PathGlobs, Paths
+from pants.engine.intrinsics import path_globs_to_paths
+from pants.engine.rules import rule
 
 @rule
 async def demo(...) -> Foo:
     ...
-    paths = await Get(Paths, PathGlobs(["**/*.txt", "!ignore_me.txt"]))
+    paths: Paths = await path_globs_to_paths(["**/*.txt", "!ignore_me.txt"]))
     logger.info(paths.files)
 ```
 
@@ -139,12 +147,13 @@ async def demo(...) -> Foo:
 
 ```python
 from pants.engine.fs import Digest, DigestContents
-from pants.engine.rules import Get, rule
+from pants.engine.intrinsics import path_globs_to_paths
+from pants.engine.rules import rule
 
 @rule
 async def demo(...) -> Foo:
     ...
-    digest_contents = await Get(DigestContents, Digest, my_digest)
+    digest_contents: DigestContents = await get_digest_contents(my_digest)
     for file_content in digest_contents:
         logger.info(file_content.path)
         logger.info(file_content.content)  # This will be `bytes`.
@@ -155,9 +164,9 @@ The result will be a sequence of `FileContent` objects, which each have a proper
 :::caution You may not need `DigestContents`
 Only use `DigestContents` if you need to read and operate on the content of files directly in your rule.
 
-- If you are running a `Process`, you only need to pass the `Digest` as input and that process will be able to read all the files in its environment. If you only need a list of files included in the digest, use `Get(Snapshot, Digest)`.
+- If you are running a `Process`, you only need to pass the `Digest` as input and that process will be able to read all the files in its environment. If you only need the list of files included in the digest, use `get_digest_entries()`.
 
-- If you just need to manipulate the directory structure of a `Digest`, such as renaming files, use `DigestEntries` with `CreateDigest` or use `AddPrefix` and `RemovePrefix`. These avoid reading the file content into memory.
+- If you only need to manipulate the directory structure of a `Digest`, by renaming files, use `DigestEntries` with `create_digest()` or use `add_prefix()` and `remove_prefix()`. These avoid reading the file content into memory.
 
 :::
 
@@ -172,13 +181,14 @@ Only use `DigestContents` if you need to read and operate on the content of file
 This is useful if you need to manipulate the directory structure of a `Digest` without actually needing to bring the file contents into memory (which is what occurs if you were to use `DigestContents`).
 
 ```python
-from pants.engine.fs import Digest, DigestEntries, Directory, FileEntry
-from pants.engine.rules import Get, rule
+from pants.engine.fs import DigestEntries, Directory, FileEntry
+from pants.engine.intrinsics import get_digest_entries
+from pants.engine.rules import rule
 
 @rule
 async def demo(...) -> Foo:
     ...
-    digest_entries = await Get(DigestEntries, Digest, my_digest)
+    digest_entries: DigestEntries = await get_digest_entries(my_digest)
     for entry in digest_entries:
         if isinstance(entry, FileEntry):
             logger.info(entry.path)
@@ -194,20 +204,24 @@ Often, you will need to provide a single `Digest` somewhere in your plugin—suc
 
 ```python
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.rules import Get, rule
+from pants.engine.intrinsics import merge_digests
+from pants.engine.rules import rule
 
 @rule
 async def demo(...) -> Foo:
     ...
-    digest = await Get(
-        Digest,
-        MergeDigests([downloaded_tool_digest, config_file_digest, source_files_snapshot.digest],
+    digest: Digest = await merge_digests(
+        MergeDigests([
+            downloaded_tool_digest,
+            config_file_digest,
+            source_files_snapshot.digest
+        ])
     )
 ```
 
 - It is okay if multiple digests include the same file, so long as they have identical content.
-- If any digests have different content for the same file, the engine will error. Unlike Git, the engine does not attempt to resolve merge conflicts.
-- It is okay if some digests are empty, i.e. `EMPTY_DIGEST`.
+- If any digests have different content for the same file, the engine will error.
+- It is okay if some digests are empty. The `pants.engine.fs.EMPTY_DIGEST` constant represents an empty digest.
 
 ## `DigestSubset`: extract certain files from a `Digest`
 
@@ -215,13 +229,14 @@ To get certain files out of a `Digest`, use `DigestSubset`.
 
 ```python
 from pants.engine.fs import Digest, DigestSubset, PathGlobs
-from pants.engine.rules import Get, rule
+from pants.engine.intrinsics import digest_subset_to_digest
+from pants.engine.rules import rule
 
 @rule
 async def demo(...) -> Foo:
     ...
-    new_digest = await Get(
-        Digest, DigestSubset(original_digest, PathGlobs(["file1.txt"])
+    new_digest: Digest = await digest_subset_to_digest(
+        DigestSubset(original_digest, PathGlobs(["file1.txt"]))
     )
 ```
 
@@ -233,13 +248,18 @@ Use `AddPrefix` and `RemovePrefix` to change the paths of every file in the dige
 
 ```python
 from pants.engine.fs import AddPrefix, Digest, RemovePrefix
-from pants.engine.rules import Get, rule
+from pants.engine.intrinsics import add_prefix, remove_prefix
+from pants.engine.rules import rule
 
 @rule
 async def demo(...) -> Foo:
     ...
-    added_prefix = await Get(Digest, AddPrefix(original_digest, "new_prefix/subdir"))
-    removed_prefix = await Get(Digest, RemovePrefix(added_prefix, "new_prefix/subdir"))
+    added_prefix: Digest = await add_prefix(
+        AddPrefix(original_digest, "new_prefix/subdir")
+    )
+    removed_prefix: Digest = await remove_prefix(
+        RemovePrefix(added_prefix, "new_prefix/subdir")
+    )
     assert removed_prefix == original_digest
 ```
 
@@ -256,7 +276,7 @@ from pants.engine.rules import goal_rule
 @goal_rule
 async def run_my_goal(..., workspace: Workspace) -> MyGoal:
     ...
-    # Note that this is a normal method; we do not use `await Get`.
+    # Note that this is a regular synchronous method; we do not use `await`.
     workspace.write_digest(digest)
 ```
 
@@ -277,7 +297,7 @@ for digest in all_digests:
 Good:
 
 ```python
-merged_digest = await Get(Digest, MergeDigests(all_digests))
+merged_digest = await merge_digests(MergeDigests(all_digests))
 workspace.write_digest(merged_digest)
 ```
 
@@ -286,8 +306,9 @@ workspace.write_digest(merged_digest)
 `DownloadFile` allows you to download an asset using a `GET` request.
 
 ```python
-from pants.engine.fs import DownloadFile, FileDigest
-from pants.engine.rules import Get, rule
+from pants.engine.fs import Digest, DownloadFile, FileDigest
+from pants.engine.download_file import download_file
+from pants.engine.rules import rule
 
 @rule
 async def demo(...) -> Foo:
@@ -297,7 +318,9 @@ async def demo(...) -> Foo:
         "12937da9ad5ad2c60564aa35cb4b3992ba3cc5ef7efedd44159332873da6fe46",
         2637138
     )
-    downloaded = await Get(Digest, DownloadFile(url, file_digest)
+    downloaded: Digest = await download_file(
+        DownloadFile(url, file_digest), **implicitly()
+    )
 ```
 
 `DownloadFile` expects a `url: str` parameter pointing to a stable URL for the asset, along with an `expected_digest: FileDigest` parameter. A `FileDigest` is like a normal `Digest`, but represents a single file, rather than a set of files/directories. To determine the `expected_digest`, manually download the file, then run `shasum -a 256` to compute the fingerprint and `wc -c` to compute the expected length of the downloaded file in bytes.

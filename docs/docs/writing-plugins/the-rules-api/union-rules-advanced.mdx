@@ -9,19 +9,44 @@ Polymorphism for the engine.
 
 Union rules solve the same problem that polymorphism solves in general: how to write generic code that operates on types not known about at the time of writing.
 
-For example, Pants has many generic goals like `lint` and `test`. Those `@goal_rule` definitions cannot know about every concrete linter or test implementation ahead-of-time.
+For example, Pants has many generic goals like `lint` and `test`. Those `@goal_rule` definitions cannot know about every concrete linter or test implementation ahead of time.
 
-Unions allow a specific linter to be registered with `UnionRule(LintTargetsRequest, ShellcheckRequest)`, and then for `lint.py` to access its type:
+The solution involves two related declarations:
+
+1) A registration mechanism, `UnionRule`, that declares a specific class to be a member of a generic union.
+2) A `polymorphic` keyword on the `@rule` decorator, that tells the engine that calls to the rule should be dispatched to some other rule based on the runtime type of the union member provided.
+
+This is best understood via example:
 
 ```python title="pants/core/goals/lint.py"
-from pants.engine.rules import Get, MultiGet, goal_rule
+from dataclasses import dataclass
+from pants.engine.rules import concurrently, goal_rule, rule
 from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership
 
-..
+
+@union
+class LintTargetsRequest(ABC):
+    # The union base for all specific linters.
+    # Can have fields common to all linter requests here.
+    ...
+
+
+@dataclass(frozen=True)
+class LintResults:
+    ...
+
+
+@rule(polymorphic=True)
+async def lint_target(req: LintTargetsRequest) -> LintResults:
+    # If no implementation for the member type is found, this generic
+    # implementation will be invoked. In this case that is not useful,
+    # so we raise.
+    raise NotImplementedError(f"Must be implemented for {type(req)}")
+
 
 @goal_rule
-async def lint(..., targets: Targets, union_membership: UnionMembership) -> Lint:
+async def lint(targets: Targets, union_membership: UnionMembership) -> Lint:
     lint_request_types = union_membership[LintTargetsRequest]
     concrete_requests = [
         request_type(
@@ -31,37 +56,49 @@ async def lint(..., targets: Targets, union_membership: UnionMembership) -> Lint
         )
         for request_type in lint_request_types
     ]
-    results = await MultiGet(
-        Get(LintResults, LintTargetsRequest, concrete_request)
+    results = await concurrently(
+        lint_target(**implicitly({concrete_request: LintTargetsRequest}))
         for concrete_request in concrete_requests
     )
 ```
 
 ```python title="pants-plugins/bash/shellcheck.py"
-from pants.core.goals.lint import LintTargetsRequest
+from pants.core.goals.lint import LintResults, LintTargetsRequest
+from pants.engine.rules import collect_rules, rule
 
 
+# It is common for the union member to also subclass the union base.
+# It's not strictly required, but it may be in the future, so it is
+# good practice today.
 class ShellcheckRequest(LintTargetsRequest):
     ...
 
 
-...
+@rule
+async def shellcheck_target(req: ShellcheckRequest) -> LintResults:
+    # At runtime, calls to the generic `lint_target()` on a
+    # `ShellcheckRequest` will be dispatched here.
+    ...
 
 
 def rules():
-    return [*ShellcheckRequest.rules()]
+    return [
+        *collect_rules(),
+        UnionRule(LintTargetsRequest, ShellcheckRequest),
+    ]
 ```
 
-This example will find all registered linter implementations by looking up `union_membership[LintTargetsRequest]`, which returns a tuple of all `LintTargetsRequest ` types that were registered with a `UnionRule`, such as `ShellcheckRequest` and `Flake8Request`.
+This example will find all registered linter implementations by looking up `union_membership[LintTargetsRequest]`, which returns a tuple of all `LintTargetsRequest` members that were registered with a `UnionRule`, such as `ShellcheckRequest` or `Flake8Request`.
 
 ## How to create a new Union
 
-To set up a new union, create a class for the union "base". Typically, this should be an [abstract class](https://docs.python.org/3/library/abc.html) that is subclassed by the union members, but it does not need to be. Mark the class with `@union`.
+To set up a new union, create a class for the union base. Typically, this should be an [abstract class](https://docs.python.org/3/library/abc.html) that is subclassed by the union members. Mark the class with `@union`.
 
 ```python
 from abc import ABC, abstractmethod
 
-from pants.engine.unions import union
+from pants.engine.unions import UnionRule, union
+
 
 @union
 class Vehicle(ABC):
@@ -77,8 +114,13 @@ class Truck(Vehicle):
     def num_wheels(self) -> int:
         return 4
 
+
 def rules():
     return [UnionRule(Vehicle, Truck)]
 ```
 
 Now, your rules can request `UnionMembership` as a parameter in the `@rule`, and then look up `union_membership[Vehicle]` to get a tuple of all relevant types that are registered via `UnionRule`.
+
+There are many instructive examples of Union use in the Pants codebase.
+
+We hope to simplify this mechanism in the future to rely more heavily on Python subclassing, instead of the Pants-specific boilerplate currently required. This is why we strongly recommend making your union members subclasses of the union base.
