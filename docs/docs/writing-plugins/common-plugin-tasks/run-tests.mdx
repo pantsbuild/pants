@@ -257,14 +257,14 @@ async def setup_example_debug_adapter_test(
 Running the process without retries could look like this:
 
 ```python
-result = await Get(FallibleProcessResult, Process, my_test_process)
+result: FallibleProcessResult = await execute_process(my_test_process)
 ```
 
-Simply wrap the process in types that request the retries:
+To retry, you can do:
 
 ```python
-results = await Get(
-    ProcessResultWithRetries, ProcessWithRetries(my_test_process, retry_count)
+results = await execute_process_with_retry(
+    ProcessWithRetries(my_test_process, retry_count)
 )
 last_result = results.last
 ```
