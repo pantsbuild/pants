@@ -9,6 +9,7 @@ concurrency:
 env:
   HONEYCOMB_API_KEY: --DISABLED--
   PANTS_CONFIG_FILES: +['pants.ci.toml']
+  PANTS_RUST_TOOLCHAIN: default
   PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: 'False'
   RUST_BACKTRACE: all
 jobs:

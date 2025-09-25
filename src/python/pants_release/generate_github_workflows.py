@@ -307,6 +307,8 @@ def launch_bazel_remote() -> Sequence[Step]:
 def global_env() -> Env:
     return {
         "PANTS_CONFIG_FILES": "+['pants.ci.toml']",
+        # TODO
+        "PANTS_RUST_TOOLCHAIN": "default",
         "RUST_BACKTRACE": "all",
         # Default to disabling OpenTelemetry so GHA steps not using Pants directly do not try
         # to use Honeycomb if they do invoke Pants indirectly (e.g., Rust integration tests).
