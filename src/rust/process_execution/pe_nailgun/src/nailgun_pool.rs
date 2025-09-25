@@ -394,8 +394,8 @@ impl NailgunProcess {
                 move || spawn_and_read_port(startup_options, workdir)
             })
             .await
-            .map_err(|e| format!("Failed to join Tokio task: {e}"))?
-            .map_err(|e| format!("Nailgun spawn task failed: {e}"))?;
+            .map_err(|e| format!("Nailgun spawn task failed: {e}"))
+            .flatten()?;
         debug!(
             "Created nailgun server process with pid {} and port {}",
             child.id(),

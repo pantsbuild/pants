@@ -316,8 +316,8 @@ async fn credentials_for_image(
             Ok(Some(bollard_credentials))
         })
         .await
-        .map_err(|e| format!("Failed to join Tokio task: {e}"))?
-        .map_err(|e: String| format!("Credentials task failed: {e}"))
+        .map_err(|e| format!("Credentials task failed: {e}"))
+        .flatten()
 }
 
 /// Pull an image given its name and the image pull policy. This method is debounced by
