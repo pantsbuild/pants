@@ -132,10 +132,15 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
 
             assert (spec := importlib.util.find_spec(rule.__module__)) is not None
             assert spec.origin is not None
-            spec_origin = PurePath(spec.origin)
+
+            try:
+                spec_origin = str(PurePath(spec.origin).relative_to(build_root))
+            except ValueError:
+                logger.debug(f"Ignoring migration plan item located outside of build_root ({build_root}) - file was located at {spec.origin}")
+                continue
 
             item: RuleGraphGet = {
-                "filepath": str(spec_origin.relative_to(build_root)),
+                "filepath": spec_origin,
                 "module": rule.__module__,
                 "function": rule.__name__,
                 "gets": [],
