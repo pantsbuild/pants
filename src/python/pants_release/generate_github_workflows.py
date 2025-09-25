@@ -517,7 +517,8 @@ class Helper:
             {
                 "name": "Set rustup profile",
                 # install the stable toolchain for rust backend tests as well
-                "run": dedent("""
+                "run": dedent(
+                    """
                 rustup set profile default
                 rustup install stable
                 rustup component add rustfmt --toolchain stable

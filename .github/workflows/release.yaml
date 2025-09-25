@@ -39,9 +39,6 @@ jobs:
         echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
     - name: Install Rust toolchain
       run: |
-        # install the stable toolchain for rust backend tests
-        rustup install stable
-        rustup component add rustfmt --toolchain stable
         # Set the default toolchain. Installs the toolchain if it is not already installed.
         rustup default 1.89.0
         cargo version
@@ -148,9 +145,6 @@ jobs:
         echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
     - name: Install Rust toolchain
       run: |
-        # install the stable toolchain for rust backend tests
-        rustup install stable
-        rustup component add rustfmt --toolchain stable
         # Set the default toolchain. Installs the toolchain if it is not already installed.
         rustup default 1.89.0
         cargo version
@@ -283,7 +277,11 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Set rustup profile
-      run: rustup set profile default
+      run: |2
+
+        rustup set profile default
+        rustup install stable
+        rustup component add rustfmt --toolchain stable
     - name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
@@ -403,7 +401,11 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Set rustup profile
-      run: rustup set profile default
+      run: |2
+
+        rustup set profile default
+        rustup install stable
+        rustup component add rustfmt --toolchain stable
     - name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
@@ -522,7 +524,11 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Set rustup profile
-      run: rustup set profile default
+      run: |2
+
+        rustup set profile default
+        rustup install stable
+        rustup component add rustfmt --toolchain stable
     - name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
