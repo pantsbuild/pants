@@ -337,9 +337,6 @@ def install_rustup() -> list[Step]:
             "name": "Install Rust toolchain",
             "run": dedent(
                 f"""\
-            # install the stable toolchain for rust backend tests
-            rustup install stable
-            rustup component add rustfmt --toolchain stable
             # Set the default toolchain. Installs the toolchain if it is not already installed.
             rustup default {rust_channel()}
             cargo version
@@ -519,7 +516,12 @@ class Helper:
             install_protoc(),  # for `prost` crate
             {
                 "name": "Set rustup profile",
-                "run": "rustup set profile default",
+                # install the stable toolchain for rust backend tests as well
+                "run": dedent("""
+                rustup set profile default
+                rustup install stable
+                rustup component add rustfmt --toolchain stable
+                """)
             },
             {
                 "name": "Cache Rust toolchain",
