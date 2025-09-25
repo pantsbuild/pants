@@ -524,7 +524,7 @@ class Helper:
                 "name": "Cache Rust toolchain",
                 "uses": action("cache"),
                 "with": {
-                    "path": f"~/.rustup/toolchains/{rust_channel()}-*\n~/.rustup/update-hashes\n~/.rustup/settings.toml\n",
+                    "path": f"~/.rustup/toolchains/*\n~/.rustup/update-hashes\n~/.rustup/settings.toml\n",
                     "key": f"{self.platform_name()}-rustup-{hash_files('src/rust/rust-toolchain')}-v2",
                 },
             },

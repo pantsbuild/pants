@@ -287,7 +287,7 @@ jobs:
       with:
         key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.89.0-*
+          ~/.rustup/toolchains/*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
@@ -407,7 +407,7 @@ jobs:
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.89.0-*
+          ~/.rustup/toolchains/*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
@@ -526,7 +526,7 @@ jobs:
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.89.0-*
+          ~/.rustup/toolchains/*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
