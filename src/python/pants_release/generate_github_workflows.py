@@ -1846,8 +1846,12 @@ def coveralls_done(test_job_keys: list[str]) -> Jobs:
         "coveralls_done": {
             "needs": test_job_keys,
             "name": "Coveralls Done",
-            "uses": action("coverallsapp"),
-            "with": {"parallel-finished": True},
+            "steps": [
+                {
+                    "uses": action("coverallsapp"),
+                    "with": {"parallel-finished": True},
+                }
+            ],
         }
     }
 

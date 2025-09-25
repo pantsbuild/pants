@@ -707,9 +707,10 @@ jobs:
     - test_python_linux_arm64
     - test_python_macos13_x86_64
     - classify_changes
-    uses: coverallsapp/github-action@v2
-    with:
-      parallel-finished: true
+    steps:
+    - uses: coverallsapp/github-action@v2
+      with:
+        parallel-finished: true
   lint_python:
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
     name: Lint Python and Shell
