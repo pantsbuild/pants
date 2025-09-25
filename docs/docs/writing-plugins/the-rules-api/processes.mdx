@@ -7,7 +7,7 @@ How to safely run subprocesses in your plugin.
 
 ---
 
-It is not safe to use `subprocess.run()` like you normally would, because this can break caching and will not leverage Pants's concurrency mechanisms. Instead, Pants has the safe alternatives  `Process` and `InteractiveProcess`.
+It is not safe to use `subprocess.run()` like you normally would, because this can break caching and will not leverage Pants's concurrency mechanisms. Instead, Pants has the safe alternatives `Process` and `InteractiveProcess`.
 
 ## `Process`
 

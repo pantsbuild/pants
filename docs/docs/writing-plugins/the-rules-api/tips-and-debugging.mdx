@@ -41,9 +41,8 @@ from pants.core.util_rules.source_files import (
     determine_source_files
 )
 from pants.engine.fs import AddPrefix
-from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import add_prefix
-from pants.engine.rules import rule
+from pants.engine.rules import concurrently, rule
 
 @rule
 async def demo(...) -> Foo:

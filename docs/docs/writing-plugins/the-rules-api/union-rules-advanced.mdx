@@ -20,8 +20,7 @@ This is best understood via example:
 
 ```python title="pants/core/goals/lint.py"
 from dataclasses import dataclass
-from pants.engine.internals.selectors import concurrently
-from pants.engine.rules import goal_rule, rule
+from pants.engine.rules import concurrently, goal_rule, rule
 from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership
 

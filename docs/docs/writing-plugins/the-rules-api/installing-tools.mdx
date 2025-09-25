@@ -197,7 +197,7 @@ There are several other optional parameters that may be helpful.
 
 The resulting `Pex` object has a `digest: Digest` field containing the built `.pex` file. This digest should be included in the `input_digest` to the `Process` you run.
 
-Instead of the usual execute_process(Process), you should use `execute_process(**implicitly(PexProcess))`, which will set up the environment properly for your Pex to execute. There is a  rule to convert `PexProcess -> Process`, so this will cause the engine to run `PexProcess -> Process -> FallibleProcessResult`.
+Instead of the usual execute_process(Process), you should use `execute_process(**implicitly(PexProcess))`, which will set up the environment properly for your Pex to execute. There is a rule to convert `PexProcess -> Process`, so this will cause the engine to run `PexProcess -> Process -> FallibleProcessResult`.
 
 `PexProcess` requires arguments for `pex: Pex`, `argv: Iterable[str]`, and `description: str`. It has several optional parameters that mirror the arguments to `Process`. If you specify `input_digest`, be careful to first use `merge_digests()` on the `pex.digest` and any of the other input digests.
 
@@ -237,7 +237,7 @@ Then, you can set up your `Pex` like this:
 ```python
 @rule
 async def demo(black: Black, ...) -> Foo:
-    pex = await create_pex(black.to_pex_request())
+    pex = await create_pex(black.to_pex_request(...))
 ```
 
 :::

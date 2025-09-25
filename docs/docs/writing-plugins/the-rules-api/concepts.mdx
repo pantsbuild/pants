@@ -23,9 +23,9 @@ async def int_to_str(i: int) -> str:
     return str(i)
 ```
 
-Rules are typically module-level functions. In some cases you can define rules in nested scopes,  such as inside a class or function body. But this is useful only in specific, special cases in the Pants codebase, and you are unlikely to need to use this in practice.
+Rules are typically module-level functions. In some cases you can define rules in nested scopes, such as inside a class or function body. But this is useful only in specific, special cases in the Pants codebase, and you are unlikely to need to use this in practice.
 
-Although any immutable Python type, including builtin types like `int`, can be a parameter or a return type of a rule, in almost all cases rules will deal with values of custom Python classes. These are are typically implemented as [frozen dataclasses](https://docs.python.org/3/library/dataclasses.html).
+Although any immutable Python type, including builtin types like `int`, can be a parameter or a return type of a rule, in almost all cases rules will deal with values of custom Python classes. These are are typically implemented as [frozen dataclasses](https://docs.python.org/3/library/dataclasses.html), for reasons we'll get into [below](#dataclasses).
 
 Generally, a rule corresponds to a step in your build process. For example, when implementing a rule to run [shellcheck](https://www.shellcheck.net/) on a set of shell scripts, you could have a rule that maps `(Target, Shellcheck) -> LintResult`:
 
@@ -33,7 +33,7 @@ Generally, a rule corresponds to a step in your build process. For example, when
 @rule
 async def run_shellcheck(target: Target, shellcheck: Shellcheck) -> LintResult:
     # Your logic.
-    return LintResult(stdout=..., stderr=.., exit_code=...)
+    return LintResult(stdout=..., stderr=..., exit_code=...)
 ```
 
 In this example the `target` argument points to the set of files to check, the `shellcheck` argument points to the `shellcheck` binary to run, and the return value contains the result of running `shellcheck` on those files. We will see later how the values of the rule parameters, `target` and `shellcheck` in this example, are provided.
@@ -52,12 +52,16 @@ This requirement of rule purity is worth emphasizing: a rule must yield the same
 
 One obvious way for a rule to depend on values of given types is to declare input parameters of those types. However it is very common to request extra values in the rule body by explicitly calling other rules. This is useful when you want programmatic control over the inputs to those other rules, or when you want to invoke other rules conditionally.
 
-To call a rule explicitly, you `await` it, and pass explicit and/or implicit params to it. The following snippet shows this in action (note that Pants ships with real shellcheck support that is more complicated, this example is simplified for clarity):
+To call a rule explicitly, you `await` it, and pass explicit and/or implicit params to it. The following contrived example shows a couple of rule calls (note that Pants ships with real shellcheck support that is more complicated, this example is simplified for clarity):
 
 ```python
 from pants.engine.rules import rule
 from pants.engine.intrinsics import execute_process
-from pants.engine.process import fallible_to_exec_result_or_raise
+from pants.engine.process import (
+    ProcessResult,
+    FallibleProcessResult,
+    fallible_to_exec_result_or_raise,
+)
 
 @rule
 async def run_shellcheck(target: Target, shellcheck: Shellcheck) -> LintResult:
@@ -66,10 +70,12 @@ async def run_shellcheck(target: Target, shellcheck: Shellcheck) -> LintResult:
         ["/bin/echo", str(target.address)],
         description=f"Echo {target.address}",
     )
-    fallible_process_result = await execute_process(
+    # Get a process result that allows failure.
+    fallible_process_result: FallibleProcessResult = await execute_process(
         process_request, **implicitly()
     )
-    process_result = await fallible_to_exec_result_or_raise(
+    # Raise if the process failed, or return its info if it succeeded.
+    process_result: ProcessResult = await fallible_to_exec_result_or_raise(
         fallible_process_result, **implicitly()
     )
     return LintResult(
@@ -77,10 +83,11 @@ async def run_shellcheck(target: Target, shellcheck: Shellcheck) -> LintResult:
     )
 ```
 
-The Pants engine will run your rule as straight-line Python code until it encounters the `await`, which will yield execution back to the engine. The engine will then see if it has a memoized result for the requested rule invocation. If not, it will execute the rule to obtain such a value.  Once the engine gives back the resulting output value, control will be returned back to your Python code,
-until the next `await`.
+The Pants engine will run your rule as straight-line Python code until it encounters the `await`, which will yield execution back to the engine. The engine will then see if it has a memoized result for the requested rule invocation. If not, it will execute the rule to obtain such a value.  Once the engine gives back the resulting output value, control will be returned back to your Python code, until the next `await`.
 
 In this example, we could not have requested the `process_result` as a parameter to our rule because we needed to create the `Process` object dynamically.
+
+We will revisit process execution [below](#extra-context-for-implicit-parameters) and cover it in a lot more detail [here](./processes.mdx).
 
 ## Explicit vs. implicit rule parameters
 
@@ -211,8 +218,7 @@ The engine pauses execution on each `await` in your rule until the result is ret
 If your rules can be executed concurrently (because nether depends on the result of the other) then you can use `concurrently(...)` to instead get multiple results in a single `await`:
 
 ```python
-from pants.engine.rules import rule
-from pants.engine.internals.selectors import concurrently
+from pants.engine.rules import concurrently, rule
 
 @rule
 async def lint_single_target(target: Target) -> LintResult:
@@ -231,8 +237,7 @@ The result of `concurrently` is a tuple with each individual result, in the same
 `concurrently` can either take an iterable of rule calls, as above, or take multiple individual rule calls. For example:
 
 ```python
-from pants.engine.rules import rule
-from pants.engine.internals.selectors import concurrently
+from pants.engine.rules import concurrently, rule
 
 @rule
 async def my_rule() -> MyResult:
