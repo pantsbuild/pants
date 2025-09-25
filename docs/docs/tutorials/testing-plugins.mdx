@@ -1,6 +1,6 @@
 ---
     title: Testing plugins
-    sidebar_position: 0
+    sidebar_position: 2
 ---
 
 How to write tests for your custom plugin code.
@@ -20,7 +20,7 @@ To author a test suite, it may make sense to write a very high level test first 
 
 ### Testing with a complete Pants process
 
-Pants provides a convenient way to run a full Pants process as it would run on the command line. Writing such a test would be equal to having, say, a Shell script to confirm that the output of the `pants project-version myapp:` command is `{"path": "myapp/VERSION", "version": "0.0.1"}`. Keep in mind that running custom scripts with this type of tests would require having a Pants repository set up (including the `pants.toml` configuration), creating `BUILD` metadata files and so on. When writing custom acceptance tests using `pants.testutil` package, you, in contrast, don't have to worry about that and can focus on testing your plugin logic in the very minimalistic environment containing only what's absolutely necessary to run your plugin code.
+Pants provides a convenient way to execute a full Pants process as it would run on the command line. Writing such a test would be equal to having, say, a shell script to confirm that the output of the `pants project-version myapp:` command is `{"path": "myapp/VERSION", "version": "0.0.1"}`. Keep in mind that running custom scripts with this type of tests would require having a Pants repository set up (including the `pants.toml` configuration), creating `BUILD` metadata files and so on. When writing custom acceptance tests using the `pants.testutil` package, you don't have to worry about all that, and can focus on testing your plugin logic in the very minimalistic environment containing only what's absolutely necessary to run your plugin code.
 
 In the following code snippet, we define a set of files to be created (in a temporary directory that Pants manages for us), the backends to be used (Python and our custom plugin), and a Pants command to be run. By reading the `stdout` of a process, we can confirm the plugin works as expected (conveniently ignoring any unrelated warnings that Pants may have produced).
 
@@ -61,11 +61,11 @@ def test_reading_project_version_target() -> None:
     build_root_marker.unlink()
 ```
 
-These tests do not need any special bootstrapping and can be run just like any other tests you may have in the repository with the `test` goal. They, however, are slow, and if there are lots of test cases to check (e.g. you want to test usage of flags and targets with various fields set), it may soon become impractical to run them often enough. You would most likely want to test your plugin logic in a more isolated fashion.
+These tests do not need any special bootstrapping and can be run just like any other tests you may have in the repository with the `test` goal. However they can be slow, and if there are lots of test cases to check (e.g. you want to test usage of flags and targets with various fields set), it may soon become impractical to run them with the desired frequency. In this case you might want to test your plugin logic in a more isolated fashion.
 
 ### Testing goal rules
 
-You can exercise the goal rule by using [`rule_runner.run_goal_rule()`](../writing-plugins/the-rules-api/testing-plugins.mdx#testing-goal_rules) which runs very fast and does not start a full Pants process. In the test below, we register all rules from the `project_version` plugin with the `RuleRunner` so that the engine can find them when a test is run. These tests scale nicely and if your plugins are fairly simple, they may suffice.
+You can exercise the goal rule by using [`rule_runner.run_goal_rule()`](../writing-plugins/the-rules-api/testing-plugins.mdx#testing-goal_rules) which does not start a full Pants process and so runs more quickly. In the test below, we register all rules from the `project_version` plugin with the `RuleRunner` so that the engine can find them when a test is run. These tests scale nicely and if your plugins are relatively straightforward, they can often suffice.
 
 ```python
 import pytest
@@ -138,7 +138,7 @@ def rule_runner() -> RuleRunner:
 
 
 def test_get_project_version_file_view(rule_runner: RuleRunner) -> None:
-    """Test plugin rules in isolation (not specifying what rules need to be run)."""
+    """Test plugin rules in isolation."""
     rule_runner.write_files(
         {"project/VERSION": "10.6.1", "project/BUILD": "version_file(source='VERSION')"}
     )
@@ -224,7 +224,7 @@ def test_find_putative_avnpkg_files_targets(rule_runner: RuleRunner) -> None:
 
 ### Unit testing for rules
 
-Finally, if your plugin is very complex and would benefit from a more rigorous testing, you may consider writing [unit tests for the rules](../writing-plugins/the-rules-api/testing-plugins.mdx#approach-2-run_rule_with_mocks-unit-tests-for-rules) where some parts of the rules are going to be patched with mocks. For instance, there's `get_git_repo_version` rule which calls Git (in a subprocess) to describe the repository status. We could mock the `Process` call to make sure the inline logic of the rule is correct instead.
+Finally, if your plugin is complex and would benefit from even more rigorous testing, you may consider writing [unit tests for the rules](../writing-plugins/the-rules-api/testing-plugins.mdx#approach-2-run_rule_with_mocks-unit-tests-for-rules) where the underlying rule invocations are mocked out. For example, there's `get_git_repo_version` rule which calls Git (in a subprocess) to describe the repository status. We could mock the `Process` call to make sure the inline logic of the rule is correct without incurring the cost and complexity of a git invocation.
 
 ```python
 from unittest.mock import Mock
@@ -236,7 +236,7 @@ from pants.core.util_rules.system_binaries import (
     BinaryPaths,
 )
 from pants.engine.process import Process, ProcessResult
-from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
+from pants.testutil.rule_runner import run_rule_with_mocks
 
 from internal_plugins.project_version.rules import GitTagVersion, get_git_repo_version
 
@@ -253,33 +253,15 @@ def test_get_git_version() -> None:
     result: GitTagVersion = run_rule_with_mocks(
         get_git_repo_version,
         rule_args=[BuildRoot, ""],
-        mock_gets=[
-            MockGet(
-                output_type=BinaryPaths,
-                input_types=(BinaryPathRequest,),
-                mock=mock_binary_paths,
-            ),
-            MockGet(
-                output_type=ProcessResult,
-                input_types=(Process,),
-                mock=mock_process_git_describe,
-            ),
+        mock_calls=[
+            "pants.core.util_rules.system_binaries.find_binary": mock_binary_paths,
+            "pants.engine.process.execute_process_or_raise": mock_process_git_describe,
         ],
     )
     assert result == GitTagVersion("10.6.1")
 ```
 
-You could write the helper functions returning the mock objects as lambdas, if you like, for instance:
-
-```python
-MockGet(
-    output_type=BinaryPaths,
-    input_types=(BinaryPathRequest,),
-    mock=lambda request: BinaryPaths(binary_name="git", paths=[BinaryPath("/usr/bin/git")]),
-),
-```
-
-however if you have many `Get` requests that are being mocked, because `lambda`'s syntax does not support type annotations, it can make your tests slightly harder to read. For instance, in the example above, the type of the `request` argument is unknown.
+You can use lambdas for simple mocks, but in more complex situations it can make your tests slightly harder to read due to the absence of type annotations.
 
 ---
 

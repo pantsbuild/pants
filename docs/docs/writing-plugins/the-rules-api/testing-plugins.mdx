@@ -78,7 +78,7 @@ For Approach #4, you should use `setup_tmpdir()` to set up BUILD files.
 
 ## Approach 2: `run_rule_with_mocks()` (unit tests for rules)
 
-`run_rule_with_mocks()` will run your rule's logic, but with each argument to your `@rule` provided explicitly by you and with mocks for any `await Get`s. This means that the test is fully mocked; for example, `run_rule_with_mocks()` will not actually run a `Process`, nor will it use the file system operations. This is useful when you want to test the inlined logic in your rule, but usually, you will want to use Approach #3.
+`run_rule_with_mocks()` will run your rule's logic, but with each argument to your `@rule` provided explicitly by you and with mocks for any `await`s. This means that the test is fully mocked; for example, `run_rule_with_mocks()` will not actually run a `Process`, nor will it use the file system operations. This is useful when you want to test the inlined logic in your rule, but usually, you will want to use Approach #3.
 
 To use `run_rule_with_mocks`, pass the `@rule` as its first arg, then `rule_args=[arg1, arg2, ...]` in the same order as the arguments to the `@rule`.
 
@@ -95,11 +95,11 @@ async def int_to_str(i: int) -> str:
 
 
 def test_int_to_str() -> None:
-    result: str = run_rule_with_mocks(int_to_str, rule_args=[42], mock_gets=[])
+    result: str = run_rule_with_mocks(int_to_str, rule_args=[42], mock_calls={})
     assert result == "42"
 ```
 
-If your `@rule` has any `await Get`s or `await Effect`s, set the argument `mock_gets=[]` with `MockGet`/`MockEffect` objects corresponding to each of them. A `MockGet` takes three arguments: `output_type: type`, `input_types: tuple[type, ...]`, and `mock: Callable[..., InputType]`, which is a function that takes an instance of each of the `input_types` and returns a single instance of the `output_type`.
+If your `@rule` has any `await`s, set the argument `mock_calls={}` to a mapping from the fully-qualified name of the awaited rule, to the function that mocks it.
 
 For example, given this contrived rule to find all targets with `sources` with a certain filename included (find a "needle in the haystack"):
 
@@ -110,8 +110,14 @@ from dataclasses import dataclass
 from pathlib import PurePath
 
 from pants.engine.collection import Collection
-from pants.engine.rules import Get, MultiGet, rule
-from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, Target
+from pants.engine.internals.graph import hydrate_sources
+from pants.engine.rules import rule
+from pants.engine.target import (
+    HydratedSources,
+    HydrateSourcesRequest,
+    SourcesField,
+    Target
+)
 
 
 @dataclass(frozen=True)
@@ -129,13 +135,15 @@ class TargetsWithNeedle(Collection[Target]):
 
 @rule
 async def find_needle_in_haystack(find_needle: FindNeedle) -> TargetsWithNeedle:
-    all_hydrated_sources = await MultiGet(
-        [Get(HydratedSources, HydrateSourcesRequest(tgt.get(SourcesField))) for tgt in find_needle.targets]
-    )
+    all_hydrated_sources = await concurrently([
+        hydrate_sources(HydrateSourcesRequest(tgt.get(SourcesField)), **implicitly())
+        for tgt in find_needle.targets
+    ])
     return TargetsWithNeedle(
         tgt
         for tgt, hydrated_sources in zip(find_needle.targets, all_hydrated_sources)
-        if any(PurePath(fp).name == find_needle.needle_filename for fp in hydrated_sources.snapshot.files)
+        if any(PurePath(fp).name == find_needle.needle_filename
+        for fp in hydrated_sources.snapshot.files)
     )
 ```
 
@@ -144,8 +152,9 @@ We can write this test:
 ```python
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, Snapshot
+from pants.engine.internals.graph import hydrate_sources
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, Target, Sources
-from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
+from pants.testutil.rule_runner import run_rule_with_mocks
 
 class MockTarget(Target):
     alias = "mock_target"
@@ -172,13 +181,9 @@ def test_find_needle_in_haystack() -> None:
     result: TargetsWithNeedle = run_rule_with_mocks(
         find_needle_in_haystack,
         rule_args=[find_needles_request],
-        mock_gets=[
-            MockGet(
-                output_type=HydratedSources,
-                input_types=(HydrateSourcesRequest,),
-                mock=mock_hydrate_sources,
-            )
-        ],
+        mock_calls={
+            "pants.engine.internals.graph.hydrate_sources": mock_hydrate_sources,
+        },
     )
     assert list(result) == [tgt2]
 ```
@@ -378,11 +383,11 @@ Now that you have your `RuleRunner` set up, along with any options and the conte
 
 Unlike Approach #2, you will not explicitly say which `@rule` you want to run. Instead, look at the return type of your `@rule`. Use `rule_runner.request(MyOutput, [input1, ...])`, where `MyOutput` is the return type.
 
-`rule_runner.request()` is equivalent to how you would normally use `await Get(MyOuput, Input1, input1_instance)` in a rule (See [Concepts](./concepts.mdx)). For example, if you would normally say `await Get(Digest, MergeDigests([digest1, digest2])`, you'd instead say `rule_runner.request(Digest, [MergeDigests([digest1, digest2])`.
+`rule_runner.request()` is a way to request a value of an output type given a set of values of input types. It invokes the engine's "fill in the blanks" capability (See [Concepts](./concepts.mdx)).
 
-You will also need to add a `QueryRule` to your `RuleRunner` setup, which gives a hint to the engine for what requests you are going to make. The `QueryRule` takes the same form as your `rule_runner.request()`, except that the inputs are types, rather than instances of those types.
+You will need to add a `QueryRule` to your `RuleRunner` setup, which tells the engine what requests you are going to make. The `QueryRule` takes the same form as your `rule_runner.request()`, except that the inputs are types, rather than instances of those types.
 
-For example, given this rule signature (from the above Approach #2 example):
+For example, given this rule signature (from the Approach #2 example above):
 
 ```python
 @rule
