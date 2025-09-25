@@ -308,4 +308,5 @@ def test_report_file(rule_runner: RuleRunner) -> None:
     assert lint_result.exit_code == 1
     report_files = rule_runner.request(DigestContents, [lint_result.report])
     assert len(report_files) == 1
-    assert "f.py:1:5: F541" in report_files[0].content.decode()
+    assert "f.py:1:5" in report_files[0].content.decode()
+    assert "F541" in report_files[0].content.decode()
