@@ -516,14 +516,21 @@ class Helper:
             install_protoc(),  # for `prost` crate
             {
                 "name": "Set rustup profile",
-                "run": "rustup set profile default",
+                # install the stable toolchain for rust backend tests as well
+                "run": dedent(
+                    """\
+                    rustup set profile default
+                    rustup install stable
+                    rustup component add rustfmt --toolchain stable
+                    """
+                ),
             },
             {
                 "name": "Cache Rust toolchain",
                 "uses": action("cache"),
                 "with": {
-                    "path": f"~/.rustup/toolchains/{rust_channel()}-*\n~/.rustup/update-hashes\n~/.rustup/settings.toml\n",
-                    "key": f"{self.platform_name()}-rustup-{hash_files('src/rust/rust-toolchain')}-v2",
+                    "path": "~/.rustup/toolchains/*\n~/.rustup/update-hashes\n~/.rustup/settings.toml\n",
+                    "key": f"stable-and-{self.platform_name()}-rustup-{hash_files('src/rust/rust-toolchain')}-v2",
                 },
             },
             {
@@ -773,6 +780,7 @@ def test_jobs(
                 else []
             ),
             *helper.setup_pythons(),
+            *helper.rust_caches(),
             *helper.native_binaries_download(),
             {
                 "name": human_readable_step_name,
