@@ -519,16 +519,17 @@ class Helper:
                 # install the stable toolchain for rust backend tests as well
                 "run": dedent(
                     """
-                rustup set profile default
-                rustup install stable
-                rustup component add rustfmt --toolchain stable
-                """)
+                    rustup set profile default
+                    rustup install stable
+                    rustup component add rustfmt --toolchain stable
+                """
+                ),
             },
             {
                 "name": "Cache Rust toolchain",
                 "uses": action("cache"),
                 "with": {
-                    "path": f"~/.rustup/toolchains/*\n~/.rustup/update-hashes\n~/.rustup/settings.toml\n",
+                    "path": "~/.rustup/toolchains/*\n~/.rustup/update-hashes\n~/.rustup/settings.toml\n",
                     "key": f"stable-and-{self.platform_name()}-rustup-{hash_files('src/rust/rust-toolchain')}-v2",
                 },
             },
@@ -780,6 +781,7 @@ def test_jobs(
             ),
             *helper.setup_pythons(),
             *helper.native_binaries_download(),
+            {"name": "WTF", "run": "ls /home/runner/.rustup/toolchains/"},
             {
                 "name": human_readable_step_name,
                 "run": pants_args_str,
