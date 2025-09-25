@@ -50,6 +50,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     ResolvePexConfigRequest,
     determine_resolve_pex_config,
     get_lockfile_for_resolve,
+    is_pylock_path,
     load_lockfile,
     validate_metadata,
 )
@@ -587,7 +588,11 @@ async def _setup_pex_requirements(
     )
     if loaded_lockfile:
         argv = (
-            ["--lock", loaded_lockfile.lockfile_path, *pex_lock_resolver_args]
+            [
+                "--pylock" if is_pylock_path(loaded_lockfile.lockfile_path) else "--lock",
+                loaded_lockfile.lockfile_path,
+                *pex_lock_resolver_args,
+            ]
             if loaded_lockfile.is_pex_native
             # We use pip to resolve a requirements.txt pseudo-lockfile, possibly with hashes.
             else [
@@ -662,7 +667,7 @@ async def _setup_pex_requirements(
             [loaded_lockfile.lockfile_digest],
             [
                 *reqs_info.req_strings,
-                "--lock",
+                "--pylock" if is_pylock_path(loaded_lockfile.lockfile_path) else "--lock",
                 loaded_lockfile.lockfile_path,
                 *pex_lock_resolver_args,
             ],
