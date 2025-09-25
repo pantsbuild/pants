@@ -526,7 +526,7 @@ class Helper:
                 "uses": action("cache"),
                 "with": {
                     "path": f"~/.rustup/toolchains/*\n~/.rustup/update-hashes\n~/.rustup/settings.toml\n",
-                    "key": f"{self.platform_name()}-rustup-{hash_files('src/rust/rust-toolchain')}-v2",
+                    "key": f"stable-and-{self.platform_name()}-rustup-{hash_files('src/rust/rust-toolchain')}-v2",
                 },
             },
             {
