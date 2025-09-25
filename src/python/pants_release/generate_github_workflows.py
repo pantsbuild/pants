@@ -665,7 +665,6 @@ class Helper:
                 "file": "dist/coverage/python/coverage.xml",
                 "format": "cobertura",
                 "allow-empty": True,
-                "debug": True,  # FIXME
             },
         }
 
@@ -1849,6 +1848,7 @@ def coveralls_done(test_job_keys: list[str]) -> Jobs:
         "coveralls_done": {
             "name": "Coveralls Done",
             "runs-on": Helper(Platform.LINUX_X86_64).runs_on(),
+            "if": "always()",
             "needs": test_job_keys,
             "steps": [
                 {
