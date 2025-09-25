@@ -339,6 +339,7 @@ def install_rustup() -> list[Step]:
                 f"""\
             # install the stable toolchain for rust backend tests
             rustup install stable
+            rustup component add rustfmt --toolchain stable
             # Set the default toolchain. Installs the toolchain if it is not already installed.
             rustup default {rust_channel()}
             cargo version
