@@ -136,7 +136,9 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
             try:
                 spec_origin = str(PurePath(spec.origin).relative_to(build_root))
             except ValueError:
-                logger.debug(f"Ignoring migration plan item located outside of build_root ({build_root}) - file was located at {spec.origin}")
+                logger.debug(
+                    f"Ignoring migration plan item located outside of build_root ({build_root}) - file was located at {spec.origin}"
+                )
                 continue
 
             item: RuleGraphGet = {
