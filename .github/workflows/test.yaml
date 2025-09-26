@@ -37,13 +37,16 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Set rustup profile
-      run: rustup set profile default
+      run: |
+        rustup set profile default
+        rustup install stable
+        rustup component add rustfmt --toolchain stable
     - name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
-        key: Linux-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
+        key: stable-and-Linux-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.89.0-*
+          ~/.rustup/toolchains/*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
@@ -135,13 +138,16 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Set rustup profile
-      run: rustup set profile default
+      run: |
+        rustup set profile default
+        rustup install stable
+        rustup component add rustfmt --toolchain stable
     - name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
-        key: Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
+        key: stable-and-Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.89.0-*
+          ~/.rustup/toolchains/*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
@@ -243,13 +249,16 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Set rustup profile
-      run: rustup set profile default
+      run: |
+        rustup set profile default
+        rustup install stable
+        rustup component add rustfmt --toolchain stable
     - name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
-        key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
+        key: stable-and-macOS13-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.89.0-*
+          ~/.rustup/toolchains/*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
@@ -493,13 +502,16 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Set rustup profile
-      run: rustup set profile default
+      run: |
+        rustup set profile default
+        rustup install stable
+        rustup component add rustfmt --toolchain stable
     - name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
-        key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
+        key: stable-and-macOS13-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.89.0-*
+          ~/.rustup/toolchains/*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
@@ -576,13 +588,16 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Set rustup profile
-      run: rustup set profile default
+      run: |
+        rustup set profile default
+        rustup install stable
+        rustup component add rustfmt --toolchain stable
     - name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
-        key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
+        key: stable-and-macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.89.0-*
+          ~/.rustup/toolchains/*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
@@ -840,6 +855,30 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: 1.19.5
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Set rustup profile
+      run: |
+        rustup set profile default
+        rustup install stable
+        rustup component add rustfmt --toolchain stable
+    - name: Cache Rust toolchain
+      uses: actions/cache@v4
+      with:
+        key: stable-and-Linux-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
+        path: |
+          ~/.rustup/toolchains/*
+          ~/.rustup/update-hashes
+          ~/.rustup/settings.toml
+    - name: Cache Cargo
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
+      with:
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -941,6 +980,30 @@ jobs:
           3.12
           3.13
           3.11
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Set rustup profile
+      run: |
+        rustup set profile default
+        rustup install stable
+        rustup component add rustfmt --toolchain stable
+    - name: Cache Rust toolchain
+      uses: actions/cache@v4
+      with:
+        key: stable-and-Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
+        path: |
+          ~/.rustup/toolchains/*
+          ~/.rustup/update-hashes
+          ~/.rustup/settings.toml
+    - name: Cache Cargo
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
+      with:
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1042,6 +1105,30 @@ jobs:
           3.12
           3.13
           3.11
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Set rustup profile
+      run: |
+        rustup set profile default
+        rustup install stable
+        rustup component add rustfmt --toolchain stable
+    - name: Cache Rust toolchain
+      uses: actions/cache@v4
+      with:
+        key: stable-and-Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
+        path: |
+          ~/.rustup/toolchains/*
+          ~/.rustup/update-hashes
+          ~/.rustup/settings.toml
+    - name: Cache Cargo
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
+      with:
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1143,6 +1230,30 @@ jobs:
           3.12
           3.13
           3.11
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Set rustup profile
+      run: |
+        rustup set profile default
+        rustup install stable
+        rustup component add rustfmt --toolchain stable
+    - name: Cache Rust toolchain
+      uses: actions/cache@v4
+      with:
+        key: stable-and-Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
+        path: |
+          ~/.rustup/toolchains/*
+          ~/.rustup/update-hashes
+          ~/.rustup/settings.toml
+    - name: Cache Cargo
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
+      with:
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1244,6 +1355,30 @@ jobs:
           3.12
           3.13
           3.11
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Set rustup profile
+      run: |
+        rustup set profile default
+        rustup install stable
+        rustup component add rustfmt --toolchain stable
+    - name: Cache Rust toolchain
+      uses: actions/cache@v4
+      with:
+        key: stable-and-Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
+        path: |
+          ~/.rustup/toolchains/*
+          ~/.rustup/update-hashes
+          ~/.rustup/settings.toml
+    - name: Cache Cargo
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
+      with:
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1345,6 +1480,30 @@ jobs:
           3.12
           3.13
           3.11
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Set rustup profile
+      run: |
+        rustup set profile default
+        rustup install stable
+        rustup component add rustfmt --toolchain stable
+    - name: Cache Rust toolchain
+      uses: actions/cache@v4
+      with:
+        key: stable-and-Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
+        path: |
+          ~/.rustup/toolchains/*
+          ~/.rustup/update-hashes
+          ~/.rustup/settings.toml
+    - name: Cache Cargo
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
+      with:
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1446,6 +1605,30 @@ jobs:
           3.12
           3.13
           3.11
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Set rustup profile
+      run: |
+        rustup set profile default
+        rustup install stable
+        rustup component add rustfmt --toolchain stable
+    - name: Cache Rust toolchain
+      uses: actions/cache@v4
+      with:
+        key: stable-and-Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
+        path: |
+          ~/.rustup/toolchains/*
+          ~/.rustup/update-hashes
+          ~/.rustup/settings.toml
+    - name: Cache Cargo
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
+      with:
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1547,6 +1730,30 @@ jobs:
           3.12
           3.13
           3.11
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Set rustup profile
+      run: |
+        rustup set profile default
+        rustup install stable
+        rustup component add rustfmt --toolchain stable
+    - name: Cache Rust toolchain
+      uses: actions/cache@v4
+      with:
+        key: stable-and-Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
+        path: |
+          ~/.rustup/toolchains/*
+          ~/.rustup/update-hashes
+          ~/.rustup/settings.toml
+    - name: Cache Cargo
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
+      with:
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1648,6 +1855,30 @@ jobs:
           3.12
           3.13
           3.11
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Set rustup profile
+      run: |
+        rustup set profile default
+        rustup install stable
+        rustup component add rustfmt --toolchain stable
+    - name: Cache Rust toolchain
+      uses: actions/cache@v4
+      with:
+        key: stable-and-Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
+        path: |
+          ~/.rustup/toolchains/*
+          ~/.rustup/update-hashes
+          ~/.rustup/settings.toml
+    - name: Cache Cargo
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
+      with:
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1749,6 +1980,30 @@ jobs:
           3.12
           3.13
           3.11
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Set rustup profile
+      run: |
+        rustup set profile default
+        rustup install stable
+        rustup component add rustfmt --toolchain stable
+    - name: Cache Rust toolchain
+      uses: actions/cache@v4
+      with:
+        key: stable-and-Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
+        path: |
+          ~/.rustup/toolchains/*
+          ~/.rustup/update-hashes
+          ~/.rustup/settings.toml
+    - name: Cache Cargo
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
+      with:
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1850,6 +2105,30 @@ jobs:
           3.12
           3.13
           3.11
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Set rustup profile
+      run: |
+        rustup set profile default
+        rustup install stable
+        rustup component add rustfmt --toolchain stable
+    - name: Cache Rust toolchain
+      uses: actions/cache@v4
+      with:
+        key: stable-and-Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
+        path: |
+          ~/.rustup/toolchains/*
+          ~/.rustup/update-hashes
+          ~/.rustup/settings.toml
+    - name: Cache Cargo
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
+      with:
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1920,6 +2199,30 @@ jobs:
           3.12
           3.13
           3.11
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Set rustup profile
+      run: |
+        rustup set profile default
+        rustup install stable
+        rustup component add rustfmt --toolchain stable
+    - name: Cache Rust toolchain
+      uses: actions/cache@v4
+      with:
+        key: stable-and-macOS13-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
+        path: |
+          ~/.rustup/toolchains/*
+          ~/.rustup/update-hashes
+          ~/.rustup/settings.toml
+    - name: Cache Cargo
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
+      with:
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
