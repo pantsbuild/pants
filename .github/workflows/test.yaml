@@ -899,7 +899,7 @@ jobs:
         path: .pants.d/workdir/*.log
     - continue-on-error: true
       if: always()
-      name: Coveralls Parallel
+      name: Report coverage to coveralls.io
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
@@ -1010,7 +1010,7 @@ jobs:
         path: .pants.d/workdir/*.log
     - continue-on-error: true
       if: always()
-      name: Coveralls Parallel
+      name: Report coverage to coveralls.io
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
@@ -1121,7 +1121,7 @@ jobs:
         path: .pants.d/workdir/*.log
     - continue-on-error: true
       if: always()
-      name: Coveralls Parallel
+      name: Report coverage to coveralls.io
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
@@ -1232,7 +1232,7 @@ jobs:
         path: .pants.d/workdir/*.log
     - continue-on-error: true
       if: always()
-      name: Coveralls Parallel
+      name: Report coverage to coveralls.io
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
@@ -1343,7 +1343,7 @@ jobs:
         path: .pants.d/workdir/*.log
     - continue-on-error: true
       if: always()
-      name: Coveralls Parallel
+      name: Report coverage to coveralls.io
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
@@ -1454,7 +1454,7 @@ jobs:
         path: .pants.d/workdir/*.log
     - continue-on-error: true
       if: always()
-      name: Coveralls Parallel
+      name: Report coverage to coveralls.io
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
@@ -1565,7 +1565,7 @@ jobs:
         path: .pants.d/workdir/*.log
     - continue-on-error: true
       if: always()
-      name: Coveralls Parallel
+      name: Report coverage to coveralls.io
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
@@ -1676,7 +1676,7 @@ jobs:
         path: .pants.d/workdir/*.log
     - continue-on-error: true
       if: always()
-      name: Coveralls Parallel
+      name: Report coverage to coveralls.io
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
@@ -1787,7 +1787,7 @@ jobs:
         path: .pants.d/workdir/*.log
     - continue-on-error: true
       if: always()
-      name: Coveralls Parallel
+      name: Report coverage to coveralls.io
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
@@ -1898,7 +1898,7 @@ jobs:
         path: .pants.d/workdir/*.log
     - continue-on-error: true
       if: always()
-      name: Coveralls Parallel
+      name: Report coverage to coveralls.io
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
@@ -2009,7 +2009,7 @@ jobs:
         path: .pants.d/workdir/*.log
     - continue-on-error: true
       if: always()
-      name: Coveralls Parallel
+      name: Report coverage to coveralls.io
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
@@ -2089,7 +2089,7 @@ jobs:
         path: .pants.d/workdir/*.log
     - continue-on-error: true
       if: always()
-      name: Coveralls Parallel
+      name: Report coverage to coveralls.io
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true

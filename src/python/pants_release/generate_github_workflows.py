@@ -655,7 +655,7 @@ class Helper:
 
     def coveralls_report(self, flag: str) -> Step:
         return {
-            "name": "Coveralls Parallel",
+            "name": "Report coverage to coveralls.io",
             "uses": action("coverallsapp"),
             "if": "always()",
             "continue-on-error": True,
