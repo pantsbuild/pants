@@ -14,7 +14,6 @@ args = ["--no-header", "--noskip", "-vv"]
 
 [coverage-py]
 report = ["raw", "xml"]
-global_report = true
 
 [subprocess-environment]
 env_vars.add = [
