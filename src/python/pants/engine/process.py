@@ -446,7 +446,7 @@ class InteractiveProcess(SideEffecting):
 
         Unlike `Process`, the result will not be cached.
 
-        To run the process, use `await Effect(InteractiveProcessResult, InteractiveProcess(..))`
+        To run the process, use `await run_interactive_process(InteractiveProcess(..))`
         in a `@goal_rule`.
 
         `forward_signals_to_process` controls whether pants will allow a SIGINT signal

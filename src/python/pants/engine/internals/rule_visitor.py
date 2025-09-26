@@ -8,6 +8,7 @@ import itertools
 import logging
 import os
 import sys
+import warnings
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -25,6 +26,7 @@ from pants.engine.internals.selectors import (
     GetParseError,
     MultiGet,
 )
+from pants.util.docutil import doc_url
 from pants.util.memo import memoized
 from pants.util.strutil import softwrap
 from pants.util.typing import patch_forward_ref
@@ -372,6 +374,14 @@ class _AwaitableCollector(ast.NodeVisitor):
                 )
                 if os.environ.get("PANTS_DISABLE_GETS", "").lower() in {"1", "t", "true"}:
                     raise Exception("Get() is disabled!")
+                else:
+                    lineno = call_node.lineno + self.func.__code__.co_firstlineno - 1
+                    warnings.warn(
+                        "Get() is deprecated, and will be removed in Pants 2.31.0. "
+                        f"Found a `Get() in {self.source_file}:{lineno}. See "
+                        f"{doc_url('docs/writing-plugins/the-rules-api/migrating-gets')} for how "
+                        "to migrate your plugins to use the new call-by-name idiom."
+                    )
             elif (inspect.isfunction(func) or isinstance(func, RuleDescriptor)) and (
                 rule_id := getattr(func, "rule_id", None)
             ) is not None:
