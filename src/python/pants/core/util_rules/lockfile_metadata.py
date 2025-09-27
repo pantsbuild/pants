@@ -85,6 +85,10 @@ class LockfileMetadata:
 
     scope: ClassVar[LockfileScope]
 
+    @staticmethod
+    def metadata_location_for_lockfile(lockfile_location: str) -> str:
+        return f"{lockfile_location}.metadata"
+
     @classmethod
     def from_lockfile(
         cls: type[_LockfileMetadataSubclass],
@@ -133,9 +137,8 @@ class LockfileMetadata:
             raise NoLockfileMetadataBlock(
                 f"Could not find a Pants metadata block in {lockfile_description}. {error_suffix}"
             )
-
         try:
-            metadata = json.loads(b"\n".join(metadata_lines))
+            json_dict = json.loads(b"\n".join(metadata_lines))
         except json.decoder.JSONDecodeError:
             raise InvalidLockfileError(
                 softwrap(
@@ -146,17 +149,25 @@ class LockfileMetadata:
                 )
                 + error_suffix
             )
+        return cls.from_json_dict(json_dict, lockfile_description, error_suffix)
 
-        version = metadata.get("version", 1)
+    @classmethod
+    def from_json_dict(
+        cls: type[_LockfileMetadataSubclass],
+        json_dict: dict[Any, Any],
+        lockfile_description: str,
+        error_suffix: str,
+    ) -> _LockfileMetadataSubclass:
+        version = json_dict.get("version", 1)
         concrete_class = _concrete_metadata_classes[(cls.scope, version)]
 
         assert issubclass(concrete_class, cls)
         assert concrete_class.scope == cls.scope, (
-            "The class used to call `from_lockfile` has a different scope than what was "
+            "The class used to call `from_json_dict` has a different scope than what was "
             f"expected given the metadata. Expected '{cls.scope}', got '{concrete_class.scope}'",
         )
 
-        return concrete_class._from_json_dict(metadata, lockfile_description, error_suffix)
+        return concrete_class._from_json_dict(json_dict, lockfile_description, error_suffix)
 
     @classmethod
     def _from_json_dict(
@@ -180,12 +191,17 @@ class LockfileMetadata:
             "`LockfileMetadata._from_json_dict` should not be directly called."
         )
 
+    def to_json(self, with_description: str | None = None) -> str:
+        metadata_dict = self.__render_header_dict()
+        if with_description is not None:
+            metadata_dict["description"] = with_description
+        return json.dumps(metadata_dict, ensure_ascii=True, indent=2)
+
     def add_header_to_lockfile(
         self, lockfile: bytes, *, delimeter: str, regenerate_command: str
     ) -> bytes:
-        metadata_dict = self.__render_header_dict()
-        metadata_json = json.dumps(metadata_dict, ensure_ascii=True, indent=2).splitlines()
-        metadata_as_a_comment = "\n".join(f"{delimeter} {l}" for l in metadata_json)
+        metadata_json = self.to_json()
+        metadata_as_a_comment = "\n".join(f"{delimeter} {l}" for l in metadata_json.splitlines())
 
         regenerate_command_bytes = "\n".join(
             [

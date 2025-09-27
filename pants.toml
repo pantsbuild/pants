@@ -212,6 +212,7 @@ template_by_globs = "@build-support/preambles/config.yaml"
 
 [generate-lockfiles]
 diff = true
+separate_metadata_file = false
 
 [pyupgrade]
 args = ["--keep-runtime-typing", "--py311-plus"]
