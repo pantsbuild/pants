@@ -225,11 +225,11 @@ async def setup_user_lockfile_requests(
 
     tools = ExportableTool.filter_for_subclasses(union_membership, JvmToolBase)
 
-    gets: list[Coroutine[Any, Any, GenerateJvmLockfile]] = []
+    rule_calls: list[Coroutine[Any, Any, GenerateJvmLockfile]] = []
     for resolve in requested:
-        gets.append(await _plan_generate_lockfile(resolve, resolve_to_artifacts, tools))
+        rule_calls.append(await _plan_generate_lockfile(resolve, resolve_to_artifacts, tools))
 
-    jvm_lockfile_requests = await concurrently(*gets)
+    jvm_lockfile_requests = await concurrently(rule_calls)
 
     return UserGenerateLockfiles(jvm_lockfile_requests)
 

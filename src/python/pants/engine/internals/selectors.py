@@ -549,12 +549,12 @@ async def MultiGet(
         raise ValueError(
             softwrap(
                 f"""
-                Unexpected MultiGet None arguments: {
+                Unexpected concurrently() None arguments: {
                     ", ".join(map(str, likely_args_explicitly_passed))
                 }
 
-                When constructing a MultiGet from individual Gets, all leading arguments must be
-                Gets.
+                When calling concurrently() on individual rule calls, all leading arguments must be
+                awaitables.
                 """
             )
         )
@@ -562,21 +562,21 @@ async def MultiGet(
     raise TypeError(
         softwrap(
             f"""
-            Unexpected MultiGet argument types: {", ".join(map(str, likely_args_explicitly_passed))}
+            Unexpected concurrently() argument types: {", ".join(map(str, likely_args_explicitly_passed))}
 
-            A MultiGet can be constructed in two ways:
-              1. MultiGet(Iterable[Get[T]]) -> Tuple[T]
-              2. MultiGet(Get[T1]], ...) -> Tuple[T1, T2, ...]
+            `concurrently` can be used in two ways:
+              1. concurrently(Iterable[awaitable[T]]) -> Tuple[T]
+              2. concurrently(awaitable[T1]], ...) -> Tuple[T1, T2, ...]
 
-            The 1st form is intended for homogenous collections of Gets and emulates an
+            The 1st form is intended for homogenous collections of rule calls and emulates an
             async `for ...` comprehension used to iterate over the collection in parallel and
             collect the results in a homogenous tuple when all are complete.
 
-            The 2nd form supports executing heterogeneous Gets in parallel and collecting them in a
-            heterogeneous tuple when all are complete. Currently up to 10 heterogeneous Gets can be
-            passed while still tracking their output types for type-checking by MyPy and similar
-            type checkers. If more than 10 Gets are passed, type checking will enforce the Gets are
-            homogeneous.
+            The 2nd form supports executing heterogeneous rule calls in parallel and collecting
+            them in a heterogeneous tuple when all are complete. Currently up to 10 heterogeneous
+            rule calls can be passed while still tracking their output types for type-checking by
+            MyPy and similar type checkers. If more than 10 rule calls are passed, type checking
+            will enforce that they are homogeneous.
             """
         )
     )
