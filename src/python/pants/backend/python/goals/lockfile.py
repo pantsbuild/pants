@@ -118,7 +118,7 @@ async def generate_lockfile(
             PexCliProcess(
                 subcommand=("lock", "create"),
                 extra_args=(
-                    "--output=lock.json",
+                    f"--output={req.lockfile_dest}",
                     # See https://github.com/pantsbuild/pants/issues/12458. For now, we always
                     # generate universal locks because they have the best compatibility. We may
                     # want to let users change this, as `style=strict` is safer.
@@ -150,7 +150,7 @@ async def generate_lockfile(
                     *req.requirements,
                 ),
                 additional_input_digest=pip_args_setup.digest,
-                output_files=("lock.json",),
+                output_files=(req.lockfile_dest,),
                 description=f"Generate lockfile for {req.resolve_name}",
                 # Instead of caching lockfile generation with LMDB, we instead use the invalidation
                 # scheme from `lockfile_metadata.py` to check for stale/invalid lockfiles. This is
