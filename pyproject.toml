@@ -10,6 +10,8 @@ markers = ["platform_specific_behavior", "call_by_type"]
 
 [tool.coverage.run]
 omit = [
+  # pants/engine/internals tests
+  "preludes/bad.py",
   # from testprojects/src/python/vcs_test/
   "tables.py",
   # While BUILD files are Python, during testing we create/inject/munge and do
