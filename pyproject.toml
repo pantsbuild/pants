@@ -8,6 +8,15 @@ known_first_party = ["internal_plugins", "pants", "pants_test"]
 asyncio_mode = "auto"
 markers = ["platform_specific_behavior", "call_by_type"]
 
+[tool.coverage.run]
+omit = [
+  # from testprojects/src/python/vcs_test/
+  "tables.py",
+  # While BUILD files are Python, during testing we create/inject/munge and do
+  # all sorts of things with them that is hard to track
+  "BUILD",
+]
+
 [tool.coverage.report]
 # We inject this file at test time (see src/python/pants/conftest.py), and so
 # coverage will gather stats for it, but it doesn't correspond to a real source file,
