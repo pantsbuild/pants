@@ -223,6 +223,11 @@ async def load_lockfile(
     lockfile_digest_entries = await get_digest_entries(lockfile_digest)
     lockfile_path = lockfile_digest_entries[0].path
 
+    lockfile_contents = await get_digest_contents(lockfile_digest)
+    lock_bytes = lockfile_contents[0].content
+    is_pex_native = is_probably_pex_json_lockfile(lock_bytes)
+    constraints_strings = None
+
     metadata_url = PythonLockfileMetadata.metadata_location_for_lockfile(lockfile.url)
     metadata = None
     try:
@@ -230,7 +235,8 @@ async def load_lockfile(
             metadata_url,
             description_of_origin="We squelch errors, so this is never seen by users",
         )
-        metadata_bytes = (await get_digest_contents(metadata_digest))[0].content
+        digest_contents = await get_digest_contents(metadata_digest)
+        metadata_bytes = digest_contents[0].content
         json_dict = json.loads(metadata_bytes)
         metadata = PythonLockfileMetadata.from_json_dict(
             json_dict,
@@ -242,16 +248,13 @@ async def load_lockfile(
                 """
             ),
         )
+        requirement_estimate = _pex_lockfile_requirement_count(lock_bytes)
     except (IntrinsicError, FileNotFoundError):
         # No metadata file or resource found, so fall through to finding a metadata
         # header block prepended to the lockfile itself.
         pass
 
     if not metadata:
-        lockfile_contents = await get_digest_contents(lockfile_digest)
-        lock_bytes = lockfile_contents[0].content
-
-        is_pex_native = is_probably_pex_json_lockfile(lock_bytes)
         if is_pex_native:
             header_delimiter = "//"
             stripped_lock_bytes = strip_comments_from_pex_json_lockfile(lock_bytes)
@@ -259,7 +262,6 @@ async def load_lockfile(
                 CreateDigest([FileContent(lockfile_path, stripped_lock_bytes)])
             )
             requirement_estimate = _pex_lockfile_requirement_count(lock_bytes)
-            constraints_strings = None
         else:
             header_delimiter = "#"
             lock_string = lock_bytes.decode()
