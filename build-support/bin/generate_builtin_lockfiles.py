@@ -50,6 +50,7 @@ from pants.backend.python.subsystems.setuptools_scm import SetuptoolsSCM
 from pants.backend.python.subsystems.twine import TwineSubsystem
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.backend.python.typecheck.pytype.subsystem import Pytype
+from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.sql.lint.sqlfluff.subsystem import Sqlfluff
@@ -254,6 +255,7 @@ def generate_python_tool_lockfiles(
             "--python-resolves-to-constraints-file={}",
             "--python-resolves-to-no-binary={}",
             "--python-resolves-to-only-binary={}",
+            "--python-separate-lockfile-metadata-file",
             "--pex-emit-warnings=true",
         ]
         generate(tmp_buildroot, tools, python_args, dry_run, keep_sandboxes)
@@ -333,10 +335,14 @@ def generate(
     # Copy the generated lockfiles from the tmp repo to the Pants repo.
     for tool in tools:
         lockfile_pkg, lockfile_filename = tool.cls.default_lockfile_resource
-        shutil.copy(
-            lockfile_buildroot_filename(tool.lockfile_name),
-            lockfile_inrepo_dest(lockfile_pkg, lockfile_filename),
-        )
+        src = lockfile_buildroot_filename(tool.lockfile_name)
+        dst = lockfile_inrepo_dest(lockfile_pkg, lockfile_filename)
+        shutil.copy(src, dst)
+        if os.path.exists(PythonLockfileMetadata.metadata_location_for_lockfile(src)):
+            shutil.copy(
+                PythonLockfileMetadata.metadata_location_for_lockfile(src),
+                PythonLockfileMetadata.metadata_location_for_lockfile(dst),
+            )
 
 
 def main() -> None:
