@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-import os.path
+import os
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
@@ -37,9 +37,9 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
-_PEX_VERSION = "v2.57.0"
-_PEX_BINARY_HASH = "82956c5fa92ee382a6eec4ea4be7a007eaef4fcfb52a166460e7d8244996aebd"
-_PEX_BINARY_SIZE = 4797155
+_PEX_VERSION = "v2.59.1"
+_PEX_BINARY_HASH = "d19b6cf2540965a7aebecabdea874c2dc8866652823f66beb904f1ceeee47571"
+_PEX_BINARY_SIZE = 4806995
 
 
 class PexCli(TemplatedExternalTool):
