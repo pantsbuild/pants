@@ -25,6 +25,7 @@ def action(name: str) -> str:
         "attest-build-provenance": "actions/attest-build-provenance@v2",
         "cache": "actions/cache@v4",
         "checkout": "actions/checkout@v4",
+        "coverallsapp": "coverallsapp/github-action@v2",
         "download-artifact": "actions/download-artifact@v4",
         "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
         "rust-cache": "benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a",
@@ -52,6 +53,8 @@ HEADER = dedent(
     #   ./pants run src/python/pants_release/generate_github_workflows.py
     """
 )
+
+TEST_PYTHON_JOB_PREFIX = "test_python"
 
 
 Step = dict[str, Any]
@@ -430,8 +433,11 @@ class Helper:
     def job_name_suffix(self) -> str:
         return self.platform_name().lower().replace("-", "_")
 
-    def job_name(self, prefix: str) -> str:
-        return f"{prefix}_{self.job_name_suffix()}"
+    def job_name(self, prefix: str, shard: str | None = None) -> str:
+        name = f"{prefix}_{self.job_name_suffix()}"
+        if shard:
+            name += f"_{shard}"
+        return name
 
     def runs_on(self) -> list[str]:
         # GHA strongly recommends targeting the self-hosted label as well as
@@ -647,6 +653,22 @@ class Helper:
             },
         }
 
+    def coveralls_report(self, flag: str) -> Step:
+        return {
+            "name": "Report coverage to coveralls.io",
+            "uses": action("coverallsapp"),
+            "if": "always()",
+            "continue-on-error": True,
+            "with": {
+                "flag-name": flag,
+                "parallel": True,
+                "file": "dist/coverage/python/coverage.xml",
+                "format": "cobertura",
+                "allow-empty": True,
+                "fail-on-error": False,
+            },
+        }
+
 
 class RustTesting(Enum):
     NONE = "NONE"
@@ -780,6 +802,7 @@ def test_jobs(
             },
             helper.upload_test_reports(),
             helper.upload_log_artifacts(name=log_name),
+            helper.coveralls_report(flag=helper.job_name(TEST_PYTHON_JOB_PREFIX, shard)),
         ],
     }
 
@@ -790,21 +813,20 @@ def linux_x86_64_test_jobs() -> Jobs:
     def test_python_linux(shard: str) -> dict[str, Any]:
         return test_jobs(helper, shard, platform_specific=False, with_remote_caching=True)
 
-    shard_name_prefix = helper.job_name("test_python")
     jobs = {
         helper.job_name("bootstrap_pants"): bootstrap_jobs(
             helper, validate_ci_config=True, rust_testing=RustTesting.ALL
         ),
-        f"{shard_name_prefix}_0": test_python_linux("0/10"),
-        f"{shard_name_prefix}_1": test_python_linux("1/10"),
-        f"{shard_name_prefix}_2": test_python_linux("2/10"),
-        f"{shard_name_prefix}_3": test_python_linux("3/10"),
-        f"{shard_name_prefix}_4": test_python_linux("4/10"),
-        f"{shard_name_prefix}_5": test_python_linux("5/10"),
-        f"{shard_name_prefix}_6": test_python_linux("6/10"),
-        f"{shard_name_prefix}_7": test_python_linux("7/10"),
-        f"{shard_name_prefix}_8": test_python_linux("8/10"),
-        f"{shard_name_prefix}_9": test_python_linux("9/10"),
+        helper.job_name(TEST_PYTHON_JOB_PREFIX, "0"): test_python_linux("0/10"),
+        helper.job_name(TEST_PYTHON_JOB_PREFIX, "1"): test_python_linux("1/10"),
+        helper.job_name(TEST_PYTHON_JOB_PREFIX, "2"): test_python_linux("2/10"),
+        helper.job_name(TEST_PYTHON_JOB_PREFIX, "3"): test_python_linux("3/10"),
+        helper.job_name(TEST_PYTHON_JOB_PREFIX, "4"): test_python_linux("4/10"),
+        helper.job_name(TEST_PYTHON_JOB_PREFIX, "5"): test_python_linux("5/10"),
+        helper.job_name(TEST_PYTHON_JOB_PREFIX, "6"): test_python_linux("6/10"),
+        helper.job_name(TEST_PYTHON_JOB_PREFIX, "7"): test_python_linux("7/10"),
+        helper.job_name(TEST_PYTHON_JOB_PREFIX, "8"): test_python_linux("8/10"),
+        helper.job_name(TEST_PYTHON_JOB_PREFIX, "9"): test_python_linux("9/10"),
     }
     return jobs
 
@@ -819,7 +841,7 @@ def linux_arm64_test_jobs() -> Jobs:
         ),
         # We run these on a dedicated host with ample local cache, so remote caching
         # just adds cost but little value.
-        helper.job_name("test_python"): test_jobs(
+        helper.job_name(TEST_PYTHON_JOB_PREFIX): test_jobs(
             helper, shard=None, platform_specific=True, with_remote_caching=False
         ),
     }
@@ -836,7 +858,7 @@ def macos13_x86_64_test_jobs() -> Jobs:
         ),
         # We run these on a dedicated host with ample local cache, so remote caching
         # just adds cost but little value.
-        helper.job_name("test_python"): test_jobs(
+        helper.job_name(TEST_PYTHON_JOB_PREFIX): test_jobs(
             helper, shard=None, platform_specific=True, with_remote_caching=False
         ),
     }
@@ -1080,6 +1102,7 @@ def test_workflow_jobs() -> Jobs:
             },
         }
     )
+    jobs.update(coveralls_done([key for key in jobs.keys() if key.startswith("test_")]))
     return jobs
 
 
@@ -1818,6 +1841,26 @@ def merge_ok(pr_jobs: list[str]) -> Jobs:
                 }
             ],
         },
+    }
+
+
+def coveralls_done(test_job_keys: list[str]) -> Jobs:
+    return {
+        "coveralls_done": {
+            "name": "Coveralls Done",
+            "runs-on": Helper(Platform.LINUX_X86_64).runs_on(),
+            "if": "always()",
+            "needs": test_job_keys,
+            "steps": [
+                {
+                    "uses": action("coverallsapp"),
+                    "with": {
+                        "parallel-finished": True,
+                        "fail-on-error": False,
+                    },
+                }
+            ],
+        }
     }
 
 
