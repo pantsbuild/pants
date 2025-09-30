@@ -478,18 +478,6 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
             """
         ),
     )
-    separate_metadata_file = BoolOption(
-        advanced=True,
-        default=False,
-        help=softwrap(
-            """
-            If set, lockfile metadata will be written to a separate sibling file, rather than
-            prepended as a header to the lockfile (which has various disadvantages).
-            This will soon become True by default and eventually the header option will be
-            deprecated and then removed.
-            """
-        ),
-    )
     custom_command = StrOption(
         advanced=True,
         default=None,

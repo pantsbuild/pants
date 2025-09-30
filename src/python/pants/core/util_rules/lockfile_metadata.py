@@ -85,10 +85,6 @@ class LockfileMetadata:
 
     scope: ClassVar[LockfileScope]
 
-    @staticmethod
-    def metadata_location_for_lockfile(lockfile_location: str) -> str:
-        return f"{lockfile_location}.metadata"
-
     @classmethod
     def from_lockfile(
         cls: type[_LockfileMetadataSubclass],

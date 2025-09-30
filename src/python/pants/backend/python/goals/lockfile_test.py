@@ -162,7 +162,7 @@ def test_pex_lockfile_generation(
     if only_binary:
         args.append(f"--python-resolves-to-only-binary={no_binary_arg}")
     if separate_metadata_file:
-        args.append("--generate-lockfiles-separate-metadata-file")
+        args.append("--python-separate-lockfile-metadata-file")
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
     lock_entry = json.loads(

@@ -150,6 +150,7 @@ interpreter_constraints = ["==3.11.*"]
 macos_big_sur_compatibility = true
 enable_resolves = true
 pip_version = "latest"
+separate_lockfile_metadata_file = false
 
 [python.resolves]
 python-default = "3rdparty/python/user_reqs.lock"
@@ -212,7 +213,6 @@ template_by_globs = "@build-support/preambles/config.yaml"
 
 [generate-lockfiles]
 diff = true
-separate_metadata_file = false
 
 [pyupgrade]
 args = ["--keep-runtime-typing", "--py311-plus"]
