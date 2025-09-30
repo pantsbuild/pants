@@ -665,6 +665,7 @@ class Helper:
                 "file": "dist/coverage/python/coverage.xml",
                 "format": "cobertura",
                 "allow-empty": True,
+                "fail-on-error": False,
             },
         }
 
@@ -1853,7 +1854,10 @@ def coveralls_done(test_job_keys: list[str]) -> Jobs:
             "steps": [
                 {
                     "uses": action("coverallsapp"),
-                    "with": {"parallel-finished": True},
+                    "with": {
+                        "parallel-finished": True,
+                        "fail-on-error": False,
+                    },
                 }
             ],
         }

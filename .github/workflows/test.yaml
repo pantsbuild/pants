@@ -712,6 +712,7 @@ jobs:
     steps:
     - uses: coverallsapp/github-action@v2
       with:
+        fail-on-error: false
         parallel-finished: true
   lint_python:
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
@@ -903,6 +904,7 @@ jobs:
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
+        fail-on-error: false
         file: dist/coverage/python/coverage.xml
         flag-name: test_python_linux_arm64
         format: cobertura
@@ -1014,6 +1016,7 @@ jobs:
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
+        fail-on-error: false
         file: dist/coverage/python/coverage.xml
         flag-name: test_python_linux_x86_64_0/10
         format: cobertura
@@ -1125,6 +1128,7 @@ jobs:
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
+        fail-on-error: false
         file: dist/coverage/python/coverage.xml
         flag-name: test_python_linux_x86_64_1/10
         format: cobertura
@@ -1236,6 +1240,7 @@ jobs:
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
+        fail-on-error: false
         file: dist/coverage/python/coverage.xml
         flag-name: test_python_linux_x86_64_2/10
         format: cobertura
@@ -1347,6 +1352,7 @@ jobs:
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
+        fail-on-error: false
         file: dist/coverage/python/coverage.xml
         flag-name: test_python_linux_x86_64_3/10
         format: cobertura
@@ -1458,6 +1464,7 @@ jobs:
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
+        fail-on-error: false
         file: dist/coverage/python/coverage.xml
         flag-name: test_python_linux_x86_64_4/10
         format: cobertura
@@ -1569,6 +1576,7 @@ jobs:
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
+        fail-on-error: false
         file: dist/coverage/python/coverage.xml
         flag-name: test_python_linux_x86_64_5/10
         format: cobertura
@@ -1680,6 +1688,7 @@ jobs:
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
+        fail-on-error: false
         file: dist/coverage/python/coverage.xml
         flag-name: test_python_linux_x86_64_6/10
         format: cobertura
@@ -1791,6 +1800,7 @@ jobs:
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
+        fail-on-error: false
         file: dist/coverage/python/coverage.xml
         flag-name: test_python_linux_x86_64_7/10
         format: cobertura
@@ -1902,6 +1912,7 @@ jobs:
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
+        fail-on-error: false
         file: dist/coverage/python/coverage.xml
         flag-name: test_python_linux_x86_64_8/10
         format: cobertura
@@ -2013,6 +2024,7 @@ jobs:
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
+        fail-on-error: false
         file: dist/coverage/python/coverage.xml
         flag-name: test_python_linux_x86_64_9/10
         format: cobertura
@@ -2093,6 +2105,7 @@ jobs:
       uses: coverallsapp/github-action@v2
       with:
         allow-empty: true
+        fail-on-error: false
         file: dist/coverage/python/coverage.xml
         flag-name: test_python_macos13_x86_64
         format: cobertura
