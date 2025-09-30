@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import itertools
+import json
 from collections.abc import Iterable
 
 import pytest
@@ -25,6 +26,25 @@ INTERPRETER_UNIVERSE = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
 
 def reqset(*a) -> set[PipRequirement]:
     return {PipRequirement.parse(i) for i in a}
+
+
+def test_metadata_json_round_trip() -> None:
+    input_metadata = PythonLockfileMetadata.new(
+        valid_for_interpreter_constraints=InterpreterConstraints(
+            ["CPython==2.7.*", "PyPy", "CPython>=3.6,<4,!=3.7.*"]
+        ),
+        requirements=reqset("ansicolors==0.1.0"),
+        manylinux="manylinux2014",
+        requirement_constraints={PipRequirement.parse("constraint")},
+        only_binary={"bdist"},
+        no_binary={"sdist"},
+        excludes=set(),
+        overrides=set(),
+    )
+    output_metadata = PythonLockfileMetadata.from_json_dict(
+        json.loads(input_metadata.to_json()), "", ""
+    )
+    assert input_metadata == output_metadata
 
 
 def test_metadata_header_round_trip() -> None:
@@ -100,6 +120,31 @@ dave==3.1.4 \\
         input_lockfile, regenerate_command="./pants lock", delimeter="#"
     )
     assert line_by_line(result) == line_by_line(expected)
+
+
+def test_to_json_v4() -> None:
+    metadata = PythonLockfileMetadataV4(
+        valid_for_interpreter_constraints=InterpreterConstraints([">=3.11"]),
+        requirements=reqset("cowsay==1.0"),
+        manylinux=None,
+        requirement_constraints=set(),
+        only_binary=set(),
+        no_binary=set(),
+        excludes={"hungry-wolves"},
+        overrides=set(),
+    )
+    expected = {
+        "version": 4,
+        "valid_for_interpreter_constraints": ["CPython>=3.11"],
+        "generated_with_requirements": ["cowsay==1.0"],
+        "manylinux": None,
+        "requirement_constraints": [],
+        "only_binary": [],
+        "no_binary": [],
+        "excludes": ["hungry-wolves"],
+        "overrides": [],
+    }
+    assert json.loads(metadata.to_json()) == expected
 
 
 def test_add_header_to_lockfile_v4() -> None:
