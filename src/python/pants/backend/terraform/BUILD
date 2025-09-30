@@ -16,7 +16,7 @@ python_sources(
     skip_pyupgrade=True,
 )
 
-resource(name="lockfile", source="hcl2.lock")
+resources(name="lockfile", sources=["hcl2.lock*"])
 
 python_tests(name="tests", sources=["*_test.py", "!dependency_inference_test.py"])
 python_tests(
