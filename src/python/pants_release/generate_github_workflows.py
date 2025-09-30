@@ -865,6 +865,21 @@ def macos13_x86_64_test_jobs() -> Jobs:
     return jobs
 
 
+def macos14_arm64_test_jobs() -> Jobs:
+    helper = Helper(Platform.MACOS14_ARM64)
+    jobs = {
+        helper.job_name("bootstrap_pants"): bootstrap_jobs(
+            helper,
+            validate_ci_config=False,
+            rust_testing=RustTesting.SOME,
+        ),
+        helper.job_name(TEST_PYTHON_JOB_PREFIX): test_jobs(
+            helper, shard=None, platform_specific=True, with_remote_caching=True
+        ),
+    }
+    return jobs
+
+
 def build_wheels_job(
     platform: Platform,
     for_deploy_ref: str | None,
@@ -1079,6 +1094,7 @@ def test_workflow_jobs() -> Jobs:
     jobs.update(**linux_x86_64_test_jobs())
     jobs.update(**linux_arm64_test_jobs())
     jobs.update(**macos13_x86_64_test_jobs())
+    jobs.update(**macos14_arm64_test_jobs())
     jobs.update(**build_wheels_jobs())
     jobs.update(
         {

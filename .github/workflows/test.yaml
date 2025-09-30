@@ -309,6 +309,102 @@ jobs:
       name: Test Rust
       run: ./cargo test --locked --tests -- --nocapture
     timeout-minutes: 60
+  bootstrap_pants_macos14_arm64:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
+    name: Bootstrap Pants, test Rust (macOS14-ARM64)
+    needs:
+    - classify_changes
+    runs-on:
+    - macos-14
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 10
+    - name: Set up Python 3.9, 3.10, 3.12, 3.13, 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: |-
+          3.9
+          3.10
+          3.12
+          3.13
+          3.11
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Set rustup profile
+      run: rustup set profile default
+    - name: Cache Rust toolchain
+      uses: actions/cache@v4
+      with:
+        key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
+        path: |
+          ~/.rustup/toolchains/1.89.0-*
+          ~/.rustup/update-hashes
+          ~/.rustup/settings.toml
+    - name: Cache Cargo
+      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
+      with:
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust
+    - id: get-engine-hash
+      name: Get native engine hash
+      run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
+      shell: bash
+    - name: Cache native engine
+      uses: actions/cache@v4
+      with:
+        key: macOS14-ARM64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
+        path: |-
+          src/python/pants/bin/native_client
+          src/python/pants/bin/sandboxer
+          src/python/pants/engine/internals/native_engine.so
+          src/python/pants/engine/internals/native_engine.so.metadata
+    - env:
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
+        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+      name: Bootstrap Pants
+      run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout ]]
+    - env:
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
+        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+      name: Run smoke tests
+      run: |
+        ./pants list ::
+        ./pants roots
+        ./pants help goals
+        ./pants help targets
+        ./pants help subsystems
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v4
+      with:
+        name: logs-bootstrap-macOS14-ARM64
+        overwrite: 'true'
+        path: .pants.d/workdir/*.log
+    - name: Upload native binaries
+      uses: actions/upload-artifact@v4
+      with:
+        name: native_binaries.${{ matrix.python-version }}.macOS14-ARM64
+        path: |-
+          src/python/pants/bin/native_client
+          src/python/pants/bin/sandboxer
+          src/python/pants/engine/internals/native_engine.so
+          src/python/pants/engine/internals/native_engine.so.metadata
+    - env:
+        TMPDIR: ${{ runner.temp }}
+      if: needs.classify_changes.outputs.rust == 'true'
+      name: Test Rust
+      run: ./cargo test --locked --tests -- --nocapture
+    timeout-minutes: 60
   build_wheels_linux_arm64:
     container:
       image: quay.io/pypa/manylinux_2_28_aarch64:latest
@@ -706,6 +802,7 @@ jobs:
     - test_python_linux_x86_64_9
     - test_python_linux_arm64
     - test_python_macos13_x86_64
+    - test_python_macos14_arm64
     - classify_changes
     runs-on:
     - ubuntu-22.04
@@ -811,6 +908,7 @@ jobs:
     - bootstrap_pants_linux_arm64
     - bootstrap_pants_linux_x86_64
     - bootstrap_pants_macos13_x86_64
+    - bootstrap_pants_macos14_arm64
     - build_wheels_linux_arm64
     - build_wheels_linux_x86_64
     - build_wheels_macos13_x86_64
@@ -831,6 +929,7 @@ jobs:
     - test_python_linux_x86_64_8
     - test_python_linux_x86_64_9
     - test_python_macos13_x86_64
+    - test_python_macos14_arm64
     outputs:
       merge_ok: ${{ steps.set_merge_ok.outputs.merge_ok }}
     runs-on:
@@ -2108,6 +2207,110 @@ jobs:
         fail-on-error: false
         file: dist/coverage/python/coverage.xml
         flag-name: test_python_macos13_x86_64
+        format: cobertura
+        parallel: true
+    timeout-minutes: 90
+  test_python_macos14_arm64:
+    env:
+      ARCHFLAGS: -arch arm64
+      _PYTHON_HOST_PLATFORM: macosx-14.0-arm64
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
+    name: Test Python (macOS14-ARM64)
+    needs:
+    - bootstrap_pants_macos14_arm64
+    - classify_changes
+    runs-on:
+    - macos-14
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 10
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Launch bazel-remote
+      run: |
+        mkdir -p ~/bazel-remote
+        if [[ -z "${AWS_ACCESS_KEY_ID}" ]]; then
+          CACHE_WRITE=false
+          # If no secret read/write creds, use hard-coded read-only creds, so that
+          # cross-fork PRs can at least read from the cache.
+          # These creds are hard-coded here in this public repo, which makes the bucket
+          # world-readable. But since putting raw AWS tokens in a public repo, even
+          # deliberately, is icky, we base64-them. This will at least help hide from
+          # automated scanners that look for checked in AWS keys.
+          # Not that it would be terrible if we were scanned, since this is public
+          # on purpose, but it's best not to draw attention.
+          AWS_ACCESS_KEY_ID=$(echo 'QUtJQVY2QTZHN1JRVkJJUVM1RUEK' | base64 -d)
+          AWS_SECRET_ACCESS_KEY=$(echo 'd3dOQ1k1eHJJWVVtejZBblV6M0l1endXV0loQWZWcW9GZlVjMDlKRwo=' | base64 -d)
+        else
+          CACHE_WRITE=true
+        fi
+        docker run --detach -u 1001:1000                   -v ~/bazel-remote:/data                   -p 9092:9092                   buchgr/bazel-remote-cache:v2.4.1                   --s3.auth_method=access_key                   --s3.access_key_id="${AWS_ACCESS_KEY_ID}"                   --s3.secret_access_key="${AWS_SECRET_ACCESS_KEY}"                   --s3.bucket=cache.pantsbuild.org                   --s3.endpoint=s3.us-east-1.amazonaws.com                   --max_size 30
+        echo "PANTS_REMOTE_STORE_ADDRESS=grpc://localhost:9092" >> "$GITHUB_ENV"
+        echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
+        echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
+    - name: Install AdoptJDK
+      uses: actions/setup-java@v4
+      with:
+        distribution: adopt
+        java-version: '11'
+    - name: Install Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.19.5
+    - name: Set up Python 3.9, 3.10, 3.12, 3.13, 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: |-
+          3.9
+          3.10
+          3.12
+          3.13
+          3.11
+    - name: Download native binaries
+      uses: actions/download-artifact@v4
+      with:
+        name: native_binaries.${{ matrix.python-version }}.macOS14-ARM64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
+    - env:
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
+        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+      name: Run Python tests
+      run: |
+        ./pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
+    - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
+        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+      if: always()
+      name: Upload test reports
+      run: |
+        export S3_DST=s3://logs.pantsbuild.org/test/reports/macOS14-ARM64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+        echo "Uploading test reports to ${S3_DST}"
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v4
+      with:
+        name: logs-python-test-macOS14-ARM64
+        overwrite: 'true'
+        path: .pants.d/workdir/*.log
+    - continue-on-error: true
+      if: always()
+      name: Report coverage to coveralls.io
+      uses: coverallsapp/github-action@v2
+      with:
+        allow-empty: true
+        fail-on-error: false
+        file: dist/coverage/python/coverage.xml
+        flag-name: test_python_macos14_arm64
         format: cobertura
         parallel: true
     timeout-minutes: 90
