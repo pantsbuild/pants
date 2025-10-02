@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-resource(name="lockfile", source="mypy.lock")
+resources(name="lockfile", sources=["mypy.lock*"])
 
 resources(
     name="test_lockfiles",

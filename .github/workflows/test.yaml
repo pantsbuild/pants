@@ -690,6 +690,30 @@ jobs:
         for i in ${change_labels}; do
           echo "${i}=true" | tee -a $GITHUB_OUTPUT
         done
+  coveralls_done:
+    if: (always()) && (needs.classify_changes.outputs.no_code != 'true')
+    name: Coveralls Done
+    needs:
+    - test_python_linux_x86_64_0
+    - test_python_linux_x86_64_1
+    - test_python_linux_x86_64_2
+    - test_python_linux_x86_64_3
+    - test_python_linux_x86_64_4
+    - test_python_linux_x86_64_5
+    - test_python_linux_x86_64_6
+    - test_python_linux_x86_64_7
+    - test_python_linux_x86_64_8
+    - test_python_linux_x86_64_9
+    - test_python_linux_arm64
+    - test_python_macos13_x86_64
+    - classify_changes
+    runs-on:
+    - ubuntu-22.04
+    steps:
+    - uses: coverallsapp/github-action@v2
+      with:
+        fail-on-error: false
+        parallel-finished: true
   lint_python:
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
     name: Lint Python and Shell
@@ -793,6 +817,7 @@ jobs:
     - build_wheels_macos14_arm64
     - check_release_notes
     - classify_changes
+    - coveralls_done
     - lint_python
     - test_python_linux_arm64
     - test_python_linux_x86_64_0
@@ -873,6 +898,17 @@ jobs:
         name: logs-python-test-Linux-ARM64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
+    - continue-on-error: true
+      if: always()
+      name: Report coverage to coveralls.io
+      uses: coverallsapp/github-action@v2
+      with:
+        allow-empty: true
+        fail-on-error: false
+        file: dist/coverage/python/coverage.xml
+        flag-name: test_python_linux_arm64
+        format: cobertura
+        parallel: true
     timeout-minutes: 90
   test_python_linux_x86_64_0:
     env:
@@ -974,6 +1010,17 @@ jobs:
         name: logs-python-test-0_10-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
+    - continue-on-error: true
+      if: always()
+      name: Report coverage to coveralls.io
+      uses: coverallsapp/github-action@v2
+      with:
+        allow-empty: true
+        fail-on-error: false
+        file: dist/coverage/python/coverage.xml
+        flag-name: test_python_linux_x86_64_0/10
+        format: cobertura
+        parallel: true
     timeout-minutes: 90
   test_python_linux_x86_64_1:
     env:
@@ -1075,6 +1122,17 @@ jobs:
         name: logs-python-test-1_10-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
+    - continue-on-error: true
+      if: always()
+      name: Report coverage to coveralls.io
+      uses: coverallsapp/github-action@v2
+      with:
+        allow-empty: true
+        fail-on-error: false
+        file: dist/coverage/python/coverage.xml
+        flag-name: test_python_linux_x86_64_1/10
+        format: cobertura
+        parallel: true
     timeout-minutes: 90
   test_python_linux_x86_64_2:
     env:
@@ -1176,6 +1234,17 @@ jobs:
         name: logs-python-test-2_10-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
+    - continue-on-error: true
+      if: always()
+      name: Report coverage to coveralls.io
+      uses: coverallsapp/github-action@v2
+      with:
+        allow-empty: true
+        fail-on-error: false
+        file: dist/coverage/python/coverage.xml
+        flag-name: test_python_linux_x86_64_2/10
+        format: cobertura
+        parallel: true
     timeout-minutes: 90
   test_python_linux_x86_64_3:
     env:
@@ -1277,6 +1346,17 @@ jobs:
         name: logs-python-test-3_10-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
+    - continue-on-error: true
+      if: always()
+      name: Report coverage to coveralls.io
+      uses: coverallsapp/github-action@v2
+      with:
+        allow-empty: true
+        fail-on-error: false
+        file: dist/coverage/python/coverage.xml
+        flag-name: test_python_linux_x86_64_3/10
+        format: cobertura
+        parallel: true
     timeout-minutes: 90
   test_python_linux_x86_64_4:
     env:
@@ -1378,6 +1458,17 @@ jobs:
         name: logs-python-test-4_10-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
+    - continue-on-error: true
+      if: always()
+      name: Report coverage to coveralls.io
+      uses: coverallsapp/github-action@v2
+      with:
+        allow-empty: true
+        fail-on-error: false
+        file: dist/coverage/python/coverage.xml
+        flag-name: test_python_linux_x86_64_4/10
+        format: cobertura
+        parallel: true
     timeout-minutes: 90
   test_python_linux_x86_64_5:
     env:
@@ -1479,6 +1570,17 @@ jobs:
         name: logs-python-test-5_10-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
+    - continue-on-error: true
+      if: always()
+      name: Report coverage to coveralls.io
+      uses: coverallsapp/github-action@v2
+      with:
+        allow-empty: true
+        fail-on-error: false
+        file: dist/coverage/python/coverage.xml
+        flag-name: test_python_linux_x86_64_5/10
+        format: cobertura
+        parallel: true
     timeout-minutes: 90
   test_python_linux_x86_64_6:
     env:
@@ -1580,6 +1682,17 @@ jobs:
         name: logs-python-test-6_10-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
+    - continue-on-error: true
+      if: always()
+      name: Report coverage to coveralls.io
+      uses: coverallsapp/github-action@v2
+      with:
+        allow-empty: true
+        fail-on-error: false
+        file: dist/coverage/python/coverage.xml
+        flag-name: test_python_linux_x86_64_6/10
+        format: cobertura
+        parallel: true
     timeout-minutes: 90
   test_python_linux_x86_64_7:
     env:
@@ -1681,6 +1794,17 @@ jobs:
         name: logs-python-test-7_10-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
+    - continue-on-error: true
+      if: always()
+      name: Report coverage to coveralls.io
+      uses: coverallsapp/github-action@v2
+      with:
+        allow-empty: true
+        fail-on-error: false
+        file: dist/coverage/python/coverage.xml
+        flag-name: test_python_linux_x86_64_7/10
+        format: cobertura
+        parallel: true
     timeout-minutes: 90
   test_python_linux_x86_64_8:
     env:
@@ -1782,6 +1906,17 @@ jobs:
         name: logs-python-test-8_10-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
+    - continue-on-error: true
+      if: always()
+      name: Report coverage to coveralls.io
+      uses: coverallsapp/github-action@v2
+      with:
+        allow-empty: true
+        fail-on-error: false
+        file: dist/coverage/python/coverage.xml
+        flag-name: test_python_linux_x86_64_8/10
+        format: cobertura
+        parallel: true
     timeout-minutes: 90
   test_python_linux_x86_64_9:
     env:
@@ -1883,6 +2018,17 @@ jobs:
         name: logs-python-test-9_10-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
+    - continue-on-error: true
+      if: always()
+      name: Report coverage to coveralls.io
+      uses: coverallsapp/github-action@v2
+      with:
+        allow-empty: true
+        fail-on-error: false
+        file: dist/coverage/python/coverage.xml
+        flag-name: test_python_linux_x86_64_9/10
+        format: cobertura
+        parallel: true
     timeout-minutes: 90
   test_python_macos13_x86_64:
     env:
@@ -1953,6 +2099,17 @@ jobs:
         name: logs-python-test-macOS13-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
+    - continue-on-error: true
+      if: always()
+      name: Report coverage to coveralls.io
+      uses: coverallsapp/github-action@v2
+      with:
+        allow-empty: true
+        fail-on-error: false
+        file: dist/coverage/python/coverage.xml
+        flag-name: test_python_macos13_x86_64
+        format: cobertura
+        parallel: true
     timeout-minutes: 90
 name: Pull Request CI
 'on':

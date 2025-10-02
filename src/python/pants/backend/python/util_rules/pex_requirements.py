@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib.resources
+import json
 import logging
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
@@ -27,7 +28,13 @@ from pants.core.util_rules.lockfile_metadata import (
 )
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import CreateDigest, Digest, FileContent, GlobMatchErrorBehavior, PathGlobs
-from pants.engine.intrinsics import create_digest, get_digest_contents, path_globs_to_digest
+from pants.engine.internals.native_engine import IntrinsicError
+from pants.engine.intrinsics import (
+    create_digest,
+    get_digest_contents,
+    get_digest_entries,
+    path_globs_to_digest,
+)
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.unions import UnionMembership
 from pants.util.docutil import bin_name, doc_url
@@ -173,73 +180,105 @@ def get_metadata(
     return metadata
 
 
+async def read_file_or_resource(url: str, description_of_origin: str) -> Digest:
+    """Read from a path, file:// or resource:// URL and return the digest of the content.
+
+    If no content is found at the path/URL, raise.
+    """
+    parts = urlparse(url)
+    # urlparse retains the leading / in URLs with a netloc.
+    path = parts.path[1:] if parts.path.startswith("/") else parts.path
+    if parts.scheme in {"", "file"}:
+        digest = await path_globs_to_digest(
+            PathGlobs(
+                [path],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                description_of_origin=description_of_origin,
+            )
+        )
+    elif parts.scheme == "resource":
+        _fc = FileContent(
+            path,
+            # The "netloc" in our made-up "resource://" scheme is the package.
+            importlib.resources.files(parts.netloc).joinpath(path).read_bytes(),
+        )
+        digest = await create_digest(CreateDigest([_fc]))
+    else:
+        raise ValueError(
+            f"Unsupported scheme {parts.scheme} for URL: {url} (origin: {description_of_origin})"
+        )
+    return digest
+
+
 @rule
 async def load_lockfile(
     request: LoadedLockfileRequest,
     python_setup: PythonSetup,
 ) -> LoadedLockfile:
     lockfile = request.lockfile
-    # TODO: Fold "resource://" URL support into the DownloadFile primitive, instead of
-    #  manually handling it here. That would also give us support for https:// URLs for tool
-    #  lockfiles (e.g., we could choose to download the default_lockfile_url instead of
-    #  embedding the lockfiles as resources). This would require capturing the SHA256 of
-    #  every current tool lockfile, and we need to think through the consequences of
-    #  downloading lockfiles, so we punt for now.
-    parts = urlparse(lockfile.url)
-    # urlparse retains the leading / in URLs with a netloc.
-    lockfile_path = parts.path[1:] if parts.path.startswith("/") else parts.path
-    if parts.scheme in {"", "file"}:
-        synthetic_lock = False
-        lockfile_digest = await path_globs_to_digest(
-            PathGlobs(
-                [lockfile_path],
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin=lockfile.url_description_of_origin,
-            )
-        )
-        _digest_contents = await get_digest_contents(lockfile_digest)
-        lock_bytes = _digest_contents[0].content
-    elif parts.scheme == "resource":
-        synthetic_lock = True
-        _fc = FileContent(
-            lockfile_path,
-            # The "netloc" in our made-up "resource://" scheme is the package.
-            importlib.resources.files(parts.netloc).joinpath(lockfile_path).read_bytes(),
-        )
-        lockfile_path, lock_bytes = (_fc.path, _fc.content)
-        lockfile_digest = await create_digest(CreateDigest([_fc]))
-    else:
-        raise ValueError(
-            f"Unsupported scheme {parts.scheme} for lockfile URL: {lockfile.url} "
-            f"(origin: {lockfile.url_description_of_origin})"
-        )
+    # TODO: This is temporary. Once we regenerate all embedded lockfiles to have sidecar metadata
+    #  files instead of metadata front matter, we won't need to call get_metadata() on them.
+    synthetic_lock = lockfile.url.startswith("resource://")
+    lockfile_digest = await read_file_or_resource(lockfile.url, lockfile.url_description_of_origin)
+    lockfile_digest_entries = await get_digest_entries(lockfile_digest)
+    lockfile_path = lockfile_digest_entries[0].path
 
+    lockfile_contents = await get_digest_contents(lockfile_digest)
+    lock_bytes = lockfile_contents[0].content
     is_pex_native = is_probably_pex_json_lockfile(lock_bytes)
-    if is_pex_native:
-        header_delimiter = "//"
-        stripped_lock_bytes = strip_comments_from_pex_json_lockfile(lock_bytes)
-        lockfile_digest = await create_digest(
-            CreateDigest([FileContent(lockfile_path, stripped_lock_bytes)])
+    constraints_strings = None
+
+    metadata_url = PythonLockfileMetadata.metadata_location_for_lockfile(lockfile.url)
+    metadata = None
+    try:
+        metadata_digest = await read_file_or_resource(
+            metadata_url,
+            description_of_origin="We squelch errors, so this is never seen by users",
+        )
+        digest_contents = await get_digest_contents(metadata_digest)
+        metadata_bytes = digest_contents[0].content
+        json_dict = json.loads(metadata_bytes)
+        metadata = PythonLockfileMetadata.from_json_dict(
+            json_dict,
+            lockfile_description=f"the lockfile for `{lockfile.resolve_name}`",
+            error_suffix=softwrap(
+                f"""
+                To resolve this error, you will need to regenerate the lockfile by running
+                `{bin_name()} generate-lockfiles --resolve={lockfile.resolve_name}.
+                """
+            ),
         )
         requirement_estimate = _pex_lockfile_requirement_count(lock_bytes)
-        constraints_strings = None
-    else:
-        header_delimiter = "#"
-        lock_string = lock_bytes.decode()
-        # Note: this is a very naive heuristic. It will overcount because entries often
-        # have >1 line due to `--hash`.
-        requirement_estimate = len(lock_string.splitlines())
-        constraints_strings = FrozenOrderedSet(
-            str(req) for req in parse_requirements_file(lock_string, rel_path=lockfile_path)
-        )
+    except (IntrinsicError, FileNotFoundError):
+        # No metadata file or resource found, so fall through to finding a metadata
+        # header block prepended to the lockfile itself.
+        pass
 
-    metadata = get_metadata(
-        python_setup,
-        lock_bytes,
-        None if synthetic_lock else lockfile_path,
-        lockfile.resolve_name,
-        header_delimiter,
-    )
+    if not metadata:
+        if is_pex_native:
+            header_delimiter = "//"
+            stripped_lock_bytes = strip_comments_from_pex_json_lockfile(lock_bytes)
+            lockfile_digest = await create_digest(
+                CreateDigest([FileContent(lockfile_path, stripped_lock_bytes)])
+            )
+            requirement_estimate = _pex_lockfile_requirement_count(lock_bytes)
+        else:
+            header_delimiter = "#"
+            lock_string = lock_bytes.decode()
+            # Note: this is a very naive heuristic. It will overcount because entries often
+            # have >1 line due to `--hash`.
+            requirement_estimate = len(lock_string.splitlines())
+            constraints_strings = FrozenOrderedSet(
+                str(req) for req in parse_requirements_file(lock_string, rel_path=lockfile_path)
+            )
+
+        metadata = get_metadata(
+            python_setup,
+            lock_bytes,
+            None if synthetic_lock else lockfile_path,
+            lockfile.resolve_name,
+            header_delimiter,
+        )
 
     return LoadedLockfile(
         lockfile_digest,

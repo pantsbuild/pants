@@ -70,6 +70,10 @@ class PythonLockfileMetadata(LockfileMetadata):
             overrides=overrides,
         )
 
+    @staticmethod
+    def metadata_location_for_lockfile(lockfile_location: str) -> str:
+        return f"{lockfile_location}.metadata"
+
     @classmethod
     def additional_header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
         instance = cast(PythonLockfileMetadata, instance)
