@@ -874,7 +874,11 @@ def macos14_arm64_test_jobs() -> Jobs:
             rust_testing=RustTesting.SOME,
         ),
         helper.job_name(TEST_PYTHON_JOB_PREFIX): test_jobs(
-            helper, shard=None, platform_specific=True, with_remote_caching=True
+            helper,
+            shard=None,
+            platform_specific=True,
+            # No docker for bazel-remote in default setup
+            with_remote_caching=False,
         ),
     }
     return jobs
