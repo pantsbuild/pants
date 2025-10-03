@@ -37,7 +37,7 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import collect_rules, concurrently, rule
 from pants.util.dirutil import group_by_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -587,16 +587,11 @@ async def download_and_analyze_third_party_packages(
         ),
     )
 
-    go_mod_digest = await Get(
-        Digest, MergeDigests([request.go_mod_digest, module_analysis.go_mods_digest])
-    )
-
-    analyzed_modules = await MultiGet(
-        Get(
-            AnalyzedThirdPartyModule,
+    analyzed_modules = await concurrently(
+        analyze_go_third_party_module(
             AnalyzeThirdPartyModuleRequest(
                 go_mod_address=request.go_mod_address,
-                go_mod_digest=go_mod_digest,
+                go_mod_digest=request.go_mod_digest,
                 go_mod_path=request.go_mod_path,
                 import_path=mod.name,
                 name=mod.name,
