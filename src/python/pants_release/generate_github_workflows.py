@@ -28,7 +28,7 @@ def action(name: str) -> str:
         "coverallsapp": "coverallsapp/github-action@v2",
         "download-artifact": "actions/download-artifact@v4",
         "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
-        "rust-cache": "benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a",
+        "rust-cache": "Swatinem/rust-cache@v2.8.1",
         "setup-go": "actions/setup-go@v5",
         "setup-java": "actions/setup-java@v4",
         "setup-node": "actions/setup-node@v4",
