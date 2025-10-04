@@ -37,7 +37,7 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.rules import Get, collect_rules, concurrently, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, concurrently, rule
 from pants.util.dirutil import group_by_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
