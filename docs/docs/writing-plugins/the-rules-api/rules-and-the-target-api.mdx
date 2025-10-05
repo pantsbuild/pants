@@ -225,7 +225,7 @@ async def demo(...) -> Foo:
     )
 ```
 
-`DependenciesRequest` takes a single argument: `field: Dependencies`. The return type `Targets` is a `Collection` of individual `Target` objects corresponding to each direct dependency of the original target. If you only need the addresses of a target's direct dependencies, you can hydrate to `Addresses instead.
+`DependenciesRequest` takes a single argument: `field: Dependencies`. The return type `Targets` is a `Collection` of individual `Target` objects corresponding to each direct dependency of the original target. If you only need the addresses of a target's direct dependencies, you can hydrate to `Addresses` instead.
 
 ### Transitive dependencies with `TransitiveTargets`
 

@@ -242,7 +242,8 @@ from pants.engine.rules import concurrently, rule
 @rule
 async def my_rule() -> MyResult:
     first_party_deps, third_party_deps = await concurrently(
-        FirstPartyDepsRequest(...), ThirdPartyDepsRequest(...)
+        get_first_party_deps(FirstPartyDepsRequest(...)),
+        get_third_party_deps(ThirdPartyDepsRequest(...)),
     )
 ```
 
