@@ -349,7 +349,7 @@ jobs:
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
-      uses: benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a
+      uses: Swatinem/rust-cache@v2.8.1
       with:
         cache-bin: 'false'
         shared-key: engine
