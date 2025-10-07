@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.selectors import Get, concurrently
 from pants.engine.unions import union
 
 
@@ -111,22 +111,26 @@ def test_invalid_get_input_does_not_match_type() -> None:
 def test_multiget_invalid_types() -> None:
     with pytest.raises(
         expected_exception=TypeError,
-        match=re.escape("Unexpected MultiGet argument types: Get(AClass, BClass, BClass()), 'bob'"),
+        match=re.escape(
+            "Unexpected concurrently() argument types: Get(AClass, BClass, BClass()), 'bob'"
+        ),
     ):
-        next(MultiGet(Get(AClass, BClass()), "bob").__await__())  # type: ignore[call-overload]
+        next(concurrently(Get(AClass, BClass()), "bob").__await__())  # type: ignore[call-overload]
 
 
 def test_multiget_invalid_Nones() -> None:
     with pytest.raises(
         expected_exception=ValueError,
-        match=re.escape("Unexpected MultiGet None arguments: None, Get(AClass, BClass, BClass())"),
+        match=re.escape(
+            "Unexpected concurrently() None arguments: None, Get(AClass, BClass, BClass())"
+        ),
     ):
         next(
-            MultiGet(None, Get(AClass, BClass()), None, None).__await__()  # type: ignore[call-overload]
+            concurrently(None, Get(AClass, BClass()), None, None).__await__()  # type: ignore[call-overload]
         )
 
 
-# N.B.: MultiGet takes either:
+# N.B.: concurrently takes either:
 # 1. One homogenous Get collection.
 # 2. Up to 10 homogeneous or heterogeneous Gets
 # 3. 11 or more homogenous Gets.
@@ -136,4 +140,4 @@ def test_multiget_invalid_Nones() -> None:
 @pytest.mark.parametrize("count", list(range(1, 20)))
 def test_homogenous(count) -> None:
     gets = tuple(Get(AClass, BClass()) for _ in range(count))
-    assert gets == next(MultiGet(*gets).__await__())
+    assert gets == next(concurrently(*gets).__await__())
