@@ -36,7 +36,7 @@ class Elfdeps(PythonToolBase):
     default_main = ConsoleScript("elfdeps")
     default_requirements = ["elfdeps>=0.2.0"]
 
-    default_interpreter_constraints = ["CPython>=3.10,<4"]
+    default_interpreter_constraints = ["CPython>=3.10,<3.14"]
     register_interpreter_constraints = True
 
     default_lockfile_resource = (_ELFDEPS_PACKAGE, "elfdeps.lock")
