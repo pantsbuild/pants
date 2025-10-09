@@ -8,6 +8,10 @@ from dataclasses import dataclass
 
 from pants.backend.nfpm.field_sets import NfpmRpmPackageFieldSet
 from pants.backend.nfpm.fields.rpm import NfpmRpmDependsField, NfpmRpmProvidesField
+from pants.backend.nfpm.native_libs.deb.rules import (
+    DebSearchForSonamesRequest,
+    deb_search_for_sonames,
+)
 from pants.backend.nfpm.native_libs.deb.rules import rules as deb_rules
 from pants.backend.nfpm.native_libs.elfdeps.rules import RequestPexELFInfo, elfdeps_analyze_pex
 from pants.backend.nfpm.native_libs.elfdeps.rules import rules as elfdeps_rules
@@ -27,6 +31,33 @@ from pants.engine.internals.selectors import concurrently
 from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.target import Field, Target
 from pants.engine.unions import UnionMembership, UnionRule
+
+
+@dataclass(frozen=True)
+class DebDependsFromPexRequest:
+    target_pex: Pex
+    distro: str
+    distro_codename: str
+    debian_arch: str
+
+
+@dataclass(frozen=True)
+class DebDependsInfo:
+    requires: tuple[str, ...]
+
+
+@rule
+async def deb_depends_from_pex(request: DebDependsFromPexRequest) -> DebDependsInfo:
+    pex_elf_info = await elfdeps_analyze_pex(RequestPexELFInfo(request.target_pex), **implicitly())
+
+    sonames = {so_info.soname for so_info in pex_elf_info.requires}
+
+    package_deps = await deb_search_for_sonames(
+        DebSearchForSonamesRequest(
+            request.distro, request.distro_codename, request.debian_arch, sonames
+        )
+    )
+    return DebDependsInfo(requires=package_deps.packages)
 
 
 @dataclass(frozen=True)

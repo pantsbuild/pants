@@ -12,6 +12,8 @@ import pytest
 from pants.backend.nfpm.dependency_inference import rules as nfpm_dependency_inference_rules
 from pants.backend.nfpm.fields.rpm import NfpmRpmDependsField, NfpmRpmProvidesField
 from pants.backend.nfpm.native_libs.rules import (
+    DebDependsFromPexRequest,
+    DebDependsInfo,
     NativeLibsNfpmPackageFieldsRequest,
     RpmDependsFromPexRequest,
     RpmDependsInfo,
@@ -80,6 +82,7 @@ def rule_runner() -> RuleRunner:
             *native_libs_rules(),
             QueryRule(PexFromTargetsRequestForBuiltPackage, (PexBinaryFieldSet,)),
             QueryRule(Pex, (PexFromTargetsRequest,)),
+            QueryRule(DebDependsInfo, (DebDependsFromPexRequest,)),
             QueryRule(RpmDependsInfo, (RpmDependsFromPexRequest,)),
             QueryRule(InjectedNfpmPackageFields, (NativeLibsNfpmPackageFieldsRequest,)),
         ],
@@ -105,6 +108,57 @@ def _get_pex_binary(rule_runner: RuleRunner, address: Address) -> Pex:
     )
     pex_binary = rule_runner.request(Pex, [build_pex_request.request])
     return pex_binary
+
+
+@pytest.mark.parametrize(
+    "pex_reqs,pex_script,distro,distro_codename,debian_arch,expected_packages",
+    (
+        pytest.param(
+            ["cowsay==4.0"],
+            "cowsay",
+            "ubuntu",
+            "jammy",
+            "arm64",
+            (),
+            id="cowsay-ubuntu-jammy-arm64",
+        ),
+        pytest.param(
+            ["setproctitle==1.3.6"],
+            None,
+            "ubuntu",
+            "jammy",
+            "arm64",
+            (),
+            id="setproctitle-ubuntu-jammy-arm64",
+        ),
+        # TODO: find a package w/ pre-compiled wheel that links to a system lib
+    ),
+)
+def test_deb_depends_from_pex_rule(
+    pex_reqs: list[str],
+    pex_script: str | None,
+    distro: str,
+    distro_codename: str,
+    debian_arch: str,
+    expected_packages: tuple[str, ...],
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                f"""
+                python_requirement(name="req", requirements={pex_reqs!r})
+                pex_binary(name="pex", script={pex_script!r}, dependencies=[":req"])
+                """
+            )
+        }
+    )
+
+    target_pex = _get_pex_binary(rule_runner, Address("", target_name="pex"))
+    result = rule_runner.request(
+        DebDependsInfo, [DebDependsFromPexRequest(target_pex, distro, distro_codename, debian_arch)]
+    )
+    assert result.requires == expected_packages
 
 
 @pytest.mark.parametrize(
