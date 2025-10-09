@@ -168,7 +168,7 @@ def main() -> int:
     if not packages:
         return 1
 
-    print(json.dumps(list(sorted(packages)), indent=None, separators=(",", ":")))
+    print(json.dumps(sorted(packages), indent=None, separators=(",", ":")))
 
     return 0
 
