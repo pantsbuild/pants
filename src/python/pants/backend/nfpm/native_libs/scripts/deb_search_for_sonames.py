@@ -43,7 +43,7 @@ async def deb_search_for_sonames(
         ]
 
     # result parsing is CPU bound
-    packages = set()
+    packages: set[str] = set()
     for task in tasks:
         html_doc = task.result()
         packages.update(package for package, _ in deb_packages_from_html_response(html_doc))
