@@ -166,6 +166,12 @@ def main() -> int:
     )
 
     if not packages:
+        print("[]")
+        print(
+            f"No {options.distro} {options.distro_codename} ({options.arch}) packages"
+            f" found for sonames: {options.sonames}",
+            file=sys.stderr,
+        )
         return 1
 
     print(json.dumps(sorted(packages), indent=None, separators=(",", ":")))

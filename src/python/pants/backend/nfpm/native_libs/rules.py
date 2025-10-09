@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib.metadata
 import json
+import logging
 import sys
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -14,8 +15,8 @@ from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.selectors import concurrently
-from pants.engine.intrinsics import create_digest
-from pants.engine.process import ProcessResult, execute_process_or_raise
+from pants.engine.intrinsics import create_digest, execute_process
+from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.init.import_util import find_matching_distributions
@@ -23,6 +24,8 @@ from pants.util.logging import LogLevel
 from pants.util.resources import read_resource
 
 from .elfdeps.rules import rules as elfdeps_rules
+
+logger = logging.getLogger(__name__)
 
 _SCRIPTS_PACKAGE = "pants.backend.nfpm.native_libs.scripts"
 _DEB_SEARCH_FOR_SONAMES_SCRIPT = "deb_search_for_sonames.py"
@@ -96,7 +99,7 @@ async def deb_search_for_sonames(
         ),
     )
 
-    result: ProcessResult = await execute_process_or_raise(
+    result: FallibleProcessResult = await execute_process(
         **implicitly(
             VenvPexProcess(
                 venv_pex,
@@ -114,7 +117,12 @@ async def deb_search_for_sonames(
         )
     )
 
-    packages = json.loads(result.stdout)
+    if result.exit_code == 0:
+        packages = json.loads(result.stdout)
+    else:
+        logger.warning(result.stderr)
+        packages = ()
+
     return DebPackagesForSonames(packages)
 
 
