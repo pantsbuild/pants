@@ -32,14 +32,14 @@ _PEX_NAME = "native_libs_scripts.pex"
 @dataclass(frozen=True)
 class DebSearchForSonamesRequest:
     distro: str
-    distro_id: str
-    arch: str
+    distro_codename: str
+    debian_arch: str
     sonames: tuple[str, ...]
 
-    def __init__(self, distro: str, distro_id: str, arch: str, sonames: Iterable[str]):
+    def __init__(self, distro: str, distro_codename: str, debian_arch: str, sonames: Iterable[str]):
         object.__setattr__(self, "distro", distro)
-        object.__setattr__(self, "distro_id", distro_id)
-        object.__setattr__(self, "arch", arch)
+        object.__setattr__(self, "distro_codename", distro_codename)
+        object.__setattr__(self, "debian_arch", debian_arch)
         object.__setattr__(self, "sonames", tuple(sorted(sonames)))
 
 
@@ -103,8 +103,8 @@ async def deb_search_for_sonames(
                 argv=(
                     script_content.path,
                     f"--distro={request.distro}",
-                    f"--distro-id={request.distro_id}",
-                    f"--arch={request.arch}",
+                    f"--distro-codename={request.distro_codename}",
+                    f"--arch={request.debian_arch}",
                     *request.sonames,
                 ),
                 input_digest=script_digest,
