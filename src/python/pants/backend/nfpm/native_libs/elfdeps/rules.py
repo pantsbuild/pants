@@ -12,7 +12,7 @@ from pants.backend.nfpm.native_libs.elfdeps.subsystem import rules as subsystem_
 from pants.backend.nfpm.native_libs.elfdeps.subsystem import setup_elfdeps_analyze_wheels_tool
 from pants.backend.python.util_rules.pex import Pex, PexProcess, VenvPexProcess
 from pants.backend.python.util_rules.pex_cli import PexPEX
-from pants.engine.process import ProcessResult, fallible_to_exec_result_or_raise
+from pants.engine.process import ProcessResult, execute_process_or_raise
 from pants.engine.rules import Rule, collect_rules, concurrently, implicitly, rule
 from pants.util.logging import LogLevel
 
@@ -40,7 +40,7 @@ async def elfdeps_analyze_pex_wheels(request: RequestPexELFInfo, pex_pex: PexPEX
     wheel_repo_dir = str(PurePath(request.target_pex.name).with_suffix(".wheel_repo"))
 
     extracted_wheels, elfdeps_analyze_wheels_tool = await concurrently(
-        fallible_to_exec_result_or_raise(
+        execute_process_or_raise(
             **implicitly(
                 PexProcess(
                     pex=Pex(
@@ -66,7 +66,7 @@ async def elfdeps_analyze_pex_wheels(request: RequestPexELFInfo, pex_pex: PexPEX
         setup_elfdeps_analyze_wheels_tool(**implicitly()),
     )
 
-    result: ProcessResult = await fallible_to_exec_result_or_raise(
+    result: ProcessResult = await execute_process_or_raise(
         **implicitly(
             VenvPexProcess(
                 elfdeps_analyze_wheels_tool.pex,
