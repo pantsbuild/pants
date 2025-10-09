@@ -1340,16 +1340,15 @@ def test_explicitly_provided_dependencies_disambiguated() -> None:
     assert get_disambiguated(all_addr, ignores=[addr_a.maybe_convert_to_target_generator()]) is None
     assert get_disambiguated(all_addr, ignores=all_addr) is None
     assert get_disambiguated([]) is None
-    # If any includes would disambiguate the ambiguous target, we don't consider disambiguating
-    # via excludes as the user has already explicitly disambiguated the module.
-    assert get_disambiguated(all_addr, ignores=[addr_a, addr_b], includes=[addr_a]) is None
+    # Verify that ignores take precedence over includes
+    assert get_disambiguated(all_addr, ignores=[addr_a, addr_b], includes=[addr_a]) is addr_c
     assert (
         get_disambiguated(
             ambiguous=all_addr,
             ignores=[addr_a, addr_b],
             includes=[addr_a.maybe_convert_to_target_generator()],
         )
-        is None
+        is addr_c
     )
 
     # You can also disambiguate via `owners_must_be_ancestors`.
@@ -1361,6 +1360,24 @@ def test_explicitly_provided_dependencies_disambiguated() -> None:
             [addr_a, addr_b, another_dir], ignores=[addr_b], owners_must_be_ancestors=True
         )
         == addr_a
+    )
+
+    # Verify that includes can resolve ambiguities
+    assert get_disambiguated(ambiguous=all_addr, includes=[addr_a]) is addr_a
+
+    # Verify that includes which do not resolve the ambiguity do not resolve the ambiguity
+    assert get_disambiguated(ambiguous=all_addr, includes=[addr_a, addr_b]) is None
+
+    # Verify that ignores works for parametrized targets
+    addr_param_a = Address(spec_path="", target_name="src", parameters={"tag": "a"})
+    addr_param_b = Address(spec_path="", target_name="src", parameters={"tag": "b"})
+    assert (
+        get_disambiguated(
+            ambiguous=[addr_param_a, addr_param_b],
+            includes=[addr_param_a],
+            ignores=[addr_param_b],
+        )
+        == addr_param_a
     )
 
 
