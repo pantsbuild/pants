@@ -10,8 +10,10 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 from pants.backend.python.subsystems.python_native_code import PythonNativeCodeSubsystem
+from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.util_rules import pex_environment
+from pants.backend.python.util_rules import keyring, pex_environment
+from pants.backend.python.util_rules.keyring import forge_keyring
 from pants.backend.python.util_rules.pex_environment import PexEnvironment, PexSubsystem
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import adhoc_binaries, external_tool
@@ -26,7 +28,7 @@ from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import create_digest, merge_digests
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions, ca_certs_path_to_file_content
 from pants.option.option_types import ArgsListOption
@@ -81,6 +83,7 @@ class PexCliProcess:
     level: LogLevel
     concurrency_available: int
     cache_scope: ProcessCacheScope
+    allow_keyring: bool
 
     def __init__(
         self,
@@ -95,6 +98,7 @@ class PexCliProcess:
         level: LogLevel = LogLevel.INFO,
         concurrency_available: int = 0,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
+        allow_keyring: bool = True,
     ) -> None:
         object.__setattr__(self, "subcommand", tuple(subcommand))
         object.__setattr__(self, "extra_args", tuple(extra_args))
@@ -108,6 +112,7 @@ class PexCliProcess:
         object.__setattr__(self, "level", level)
         object.__setattr__(self, "concurrency_available", concurrency_available)
         object.__setattr__(self, "cache_scope", cache_scope)
+        object.__setattr__(self, "allow_keyring", allow_keyring)
 
         self.__post_init__()
 
@@ -137,6 +142,7 @@ async def setup_pex_cli_process(
     pex_subsystem: PexSubsystem,
     pex_cli_subsystem: PexCli,
     python_setup: PythonSetup,
+    python_repos: PythonRepos,
 ) -> Process:
     tmpdir = ".tmp"
     gets = [create_digest(CreateDigest([Directory(tmpdir)]))]
@@ -151,6 +157,25 @@ async def setup_pex_cli_process(
     digests_to_merge.extend(await concurrently(gets))
     if request.additional_input_digest:
         digests_to_merge.append(request.additional_input_digest)
+
+    complete_pex_env = pex_env.in_sandbox(working_directory=None)
+    env = {
+        **complete_pex_env.environment_dict(python=bootstrap_python),
+        **python_native_code.subprocess_env_vars,
+        **(request.extra_env or {}),  # type: ignore[dict-item]
+        # If a subcommand is used, we need to use the `pex3` console script.
+        **({"PEX_SCRIPT": "pex3"} if request.subcommand else {}),
+    }
+
+    keyring_args = []
+    if request.allow_keyring and python_repos.indexes != (PythonRepos.pypi_index,):
+        maybe_keyring = await forge_keyring(**implicitly())
+        if maybe_keyring.bin_path:
+            keyring_args.append("--keyring-provider=subprocess")
+            digests_to_merge.append(maybe_keyring.digest)
+            # PATH is guaranteed to be in env
+            env["PATH"] = os.pathsep.join([env["PATH"], maybe_keyring.bin_path])
+
     input_digest = await merge_digests(MergeDigests(digests_to_merge))
 
     global_args = [
@@ -185,6 +210,7 @@ async def setup_pex_cli_process(
     # `pex3` console script do. So if invoked with a subcommand, the caller must selectively
     # set --pip-version only on subcommands that take it.
     pip_version_args = [] if request.subcommand else ["--pip-version", python_setup.pip_version]
+
     args = [
         *request.subcommand,
         *global_args,
@@ -192,21 +218,13 @@ async def setup_pex_cli_process(
         *warnings_args,
         *pip_version_args,
         *resolve_args,
+        *keyring_args,
         *pex_cli_subsystem.global_args,
         # NB: This comes at the end because it may use `--` passthrough args, # which must come at
         # the end.
         *request.extra_args,
     ]
-
-    complete_pex_env = pex_env.in_sandbox(working_directory=None)
     normalized_argv = complete_pex_env.create_argv(pex_pex.exe, *args)
-    env = {
-        **complete_pex_env.environment_dict(python=bootstrap_python),
-        **python_native_code.subprocess_env_vars,
-        **(request.extra_env or {}),  # type: ignore[dict-item]
-        # If a subcommand is used, we need to use the `pex3` console script.
-        **({"PEX_SCRIPT": "pex3"} if request.subcommand else {}),
-    }
 
     return Process(
         normalized_argv,
@@ -237,5 +255,6 @@ def rules():
         *external_tool.rules(),
         *pex_environment.rules(),
         *adhoc_binaries.rules(),
+        *keyring.rules(),
         UnionRule(ExportableTool, PexCli),
     ]

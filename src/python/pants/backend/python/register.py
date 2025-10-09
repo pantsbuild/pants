@@ -32,7 +32,7 @@ from pants.backend.python.macros.poetry_requirements import PoetryRequirementsTa
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.macros.python_requirements import PythonRequirementsTargetGenerator
 from pants.backend.python.macros.uv_requirements import UvRequirementsTargetGenerator
-from pants.backend.python.subsystems import debugpy
+from pants.backend.python.subsystems import debugpy, keyring
 from pants.backend.python.target_types import (
     PexBinariesGeneratorTarget,
     PexBinary,
@@ -70,6 +70,7 @@ def rules():
         # Subsystems
         *coverage_py.rules(),
         *debugpy.rules(),
+        *keyring.rules(),
         # Util rules
         *ancestor_files.rules(),
         *dependency_inference_rules.rules(),

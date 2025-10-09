@@ -189,6 +189,7 @@ class PexRequest(EngineAwareParameter):
     pex_path: tuple[Pex, ...]
     description: str | None = dataclasses.field(compare=False)
     cache_scope: ProcessCacheScope
+    allow_keyring: bool
 
     def __init__(
         self,
@@ -210,6 +211,7 @@ class PexRequest(EngineAwareParameter):
         pex_path: Iterable[Pex] = (),
         description: str | None = None,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
+        allow_keyring: bool = True,
     ) -> None:
         """A request to create a PEX from its inputs.
 
@@ -269,6 +271,7 @@ class PexRequest(EngineAwareParameter):
         object.__setattr__(self, "pex_path", tuple(pex_path))
         object.__setattr__(self, "description", description)
         object.__setattr__(self, "cache_scope", cache_scope)
+        object.__setattr__(self, "allow_keyring", allow_keyring)
 
         self.__post_init__()
 
@@ -408,6 +411,7 @@ async def find_interpreter(
                 ),
                 level=LogLevel.DEBUG,
                 cache_scope=env_target.executable_search_path_cache_scope(),
+                allow_keyring=False,
             )
         )
     )
@@ -816,6 +820,7 @@ async def build_pex(
                 output_directories=output_directories,
                 concurrency_available=requirements_setup.concurrency_available,
                 cache_scope=request.cache_scope,
+                allow_keyring=request.allow_keyring,
             )
         )
     )
