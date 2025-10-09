@@ -4,3 +4,7 @@
 python_sources(
     overrides={"rules.py": dict(dependencies=["./scripts"])},
 )
+
+python_tests(
+    name="tests",
+)

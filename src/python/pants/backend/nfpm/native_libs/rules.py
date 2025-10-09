@@ -10,7 +10,7 @@ import sys
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from pants.backend.python.util_rules.pex import PexRequest, VenvPexProcess, create_venv_pex
+from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPexProcess, create_venv_pex
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.engine.fs import CreateDigest, FileContent
@@ -23,6 +23,7 @@ from pants.init.import_util import find_matching_distributions
 from pants.util.logging import LogLevel
 from pants.util.resources import read_resource
 
+from .elfdeps.rules import RequestPexELFInfo, elfdeps_analyze_pex_wheels
 from .elfdeps.rules import rules as elfdeps_rules
 
 logger = logging.getLogger(__name__)
@@ -124,6 +125,51 @@ async def deb_search_for_sonames(
         packages = ()
 
     return DebPackagesForSonames(packages)
+
+
+@dataclass(frozen=True)
+class DebDependsFromPexRequest:
+    target_pex: Pex
+    distro: str
+    distro_codename: str
+    debian_arch: str
+
+
+@dataclass(frozen=True)
+class DebDependsInfo:
+    requires: tuple[str, ...]
+
+
+@rule
+async def deb_depends_from_pex(request: DebDependsFromPexRequest) -> DebDependsInfo:
+    pex_elf_info = await elfdeps_analyze_pex_wheels(
+        RequestPexELFInfo(request.target_pex), **implicitly()
+    )
+    package_deps = await deb_search_for_sonames(
+        DebSearchForSonamesRequest(
+            request.distro, request.distro_codename, request.debian_arch, pex_elf_info.requires
+        )
+    )
+    return DebDependsInfo(requires=package_deps.packages)
+
+
+@dataclass(frozen=True)
+class RpmDependsFromPexRequest:
+    target_pex: Pex
+
+
+@dataclass(frozen=True)
+class RpmDependsInfo:
+    provides: tuple[str, ...]
+    requires: tuple[str, ...]
+
+
+@rule
+async def rpm_depends_from_pex(request: RpmDependsFromPexRequest) -> RpmDependsInfo:
+    pex_elf_info = await elfdeps_analyze_pex_wheels(
+        RequestPexELFInfo(request.target_pex), **implicitly()
+    )
+    return RpmDependsInfo(provides=pex_elf_info.provides, requires=pex_elf_info.requires)
 
 
 def rules() -> Iterable[Rule | UnionRule]:
