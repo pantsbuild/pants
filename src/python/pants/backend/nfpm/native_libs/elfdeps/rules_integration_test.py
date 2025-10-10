@@ -76,7 +76,7 @@ _SETPROCTITLE_LIBC6_SO_VERSIONS = {
 @pytest.mark.parametrize(
     "pex_reqs,pex_script,expected_provides,expected_requires",
     (
-        pytest.param(["cowsay==4.0"], "cowsay", (), (), (), id="cowsay"),
+        pytest.param(["cowsay==4.0"], "cowsay", (), (), id="cowsay"),
         pytest.param(
             ["setproctitle==1.3.6"],
             None,

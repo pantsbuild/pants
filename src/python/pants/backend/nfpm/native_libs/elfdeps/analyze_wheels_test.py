@@ -50,21 +50,65 @@ WHEELS_ELF_INFO = WheelsELFInfo(
     ),
 )
 WHEELS_ELF_INFO_DICT = {
-    "provides": ["_setproctitle.cpython-311-x86_64-linux-gnu.so()(64bit)"],
+    "provides": [
+        {
+            "soname": "_setproctitle.cpython-311-x86_64-linux-gnu.so",
+            "version": "",
+            "marker": "(64bit)",
+            "so_info": "_setproctitle.cpython-311-x86_64-linux-gnu.so()(64bit)",
+        }
+    ],
     "requires": [
-        "libc.so.6()(64bit)",
-        "libc.so.6(GLIBC_2.2.5)(64bit)",
-        "libpthread.so.0()(64bit)",
-        "rtld(GNU_HASH)",
+        {
+            "soname": "libc.so.6",
+            "version": "",
+            "marker": "(64bit)",
+            "so_info": "libc.so.6()(64bit)",
+        },
+        {
+            "soname": "libc.so.6",
+            "version": "GLIBC_2.2.5",
+            "marker": "(64bit)",
+            "so_info": "libc.so.6(GLIBC_2.2.5)(64bit)",
+        },
+        {
+            "soname": "libpthread.so.0",
+            "version": "",
+            "marker": "(64bit)",
+            "so_info": "libpthread.so.0()(64bit)",
+        },
+        {"soname": "rtld", "version": "GNU_HASH", "marker": "", "so_info": "rtld(GNU_HASH)"},
     ],
 }
 WHEELS_ELF_INFO_JSON = """{\
-    "provides": ["_setproctitle.cpython-311-x86_64-linux-gnu.so()(64bit)"],\
+    "provides": [\
+        {\
+            "soname": "_setproctitle.cpython-311-x86_64-linux-gnu.so",\
+            "version": "",\
+            "marker": "(64bit)",\
+            "so_info": "_setproctitle.cpython-311-x86_64-linux-gnu.so()(64bit)"\
+        }\
+    ],\
     "requires": [\
-        "libc.so.6()(64bit)",\
-        "libc.so.6(GLIBC_2.2.5)(64bit)",\
-        "libpthread.so.0()(64bit)",\
-        "rtld(GNU_HASH)"\
+        {\
+            "soname": "libc.so.6",\
+            "version": "",\
+            "marker": "(64bit)",\
+            "so_info": "libc.so.6()(64bit)"\
+        },\
+        {\
+            "soname": "libc.so.6",\
+            "version": "GLIBC_2.2.5",\
+            "marker": "(64bit)",\
+            "so_info": "libc.so.6(GLIBC_2.2.5)(64bit)"\
+        },\
+        {\
+            "soname": "libpthread.so.0",\
+            "version": "",\
+            "marker": "(64bit)",\
+            "so_info": "libpthread.so.0()(64bit)"\
+        },\
+        {"soname": "rtld", "version": "GNU_HASH", "marker": "", "so_info": "rtld(GNU_HASH)"}\
     ]}\
 """.replace(" ", "")
 
