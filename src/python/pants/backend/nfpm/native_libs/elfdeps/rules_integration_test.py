@@ -23,7 +23,7 @@ from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
-from .rules import PexELFInfo, RequestPexELFInfo
+from .rules import PexELFInfo, RequestPexELFInfo, SOInfo
 from .rules import rules as elfdeps_rules
 
 # The tests build a pex with wheels for the current platform.
@@ -74,29 +74,39 @@ _SETPROCTITLE_LIBC6_SO_VERSIONS = {
 
 # @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
-    "pex_reqs,pex_script,expected_provides,expected_requires,expected_requires_sonames",
+    "pex_reqs,pex_script,expected_provides,expected_requires",
     (
         pytest.param(["cowsay==4.0"], "cowsay", (), (), (), id="cowsay"),
         pytest.param(
             ["setproctitle==1.3.6"],
             None,
-            (f"_setproctitle.cpython-{_PY_TAG}-{_PY_ARCH_TAG}-linux-gnu.so(){_ELF_BITS_MARKER}",)
-            if _PY_OS == "Linux"
-            else (),
             (
-                *(
-                    f"libc.so.6({so_version}){_ELF_BITS_MARKER}"
-                    for so_version in _SETPROCTITLE_LIBC6_SO_VERSIONS[_PY_ARCH_TAG]
+                SOInfo(
+                    soname=f"_setproctitle.cpython-{_PY_TAG}-{_PY_ARCH_TAG}-linux-gnu.so",
+                    version="",
+                    marker=_ELF_BITS_MARKER,
+                    so_info=f"_setproctitle.cpython-{_PY_TAG}-{_PY_ARCH_TAG}-linux-gnu.so(){_ELF_BITS_MARKER}",
                 ),
-                f"libpthread.so.0(){_ELF_BITS_MARKER}",
-                "rtld(GNU_HASH)",
             )
             if _PY_OS == "Linux"
             else (),
             (
-                "libc.so.6",
-                "libpthread.so.0",
-                "rtld",
+                *(
+                    SOInfo(
+                        soname="libc.so.6",
+                        version=so_version,
+                        marker=_ELF_BITS_MARKER,
+                        so_info=f"libc.so.6({so_version}){_ELF_BITS_MARKER}",
+                    )
+                    for so_version in _SETPROCTITLE_LIBC6_SO_VERSIONS[_PY_ARCH_TAG]
+                ),
+                SOInfo(
+                    soname="libpthread.so.0",
+                    version="",
+                    marker=_ELF_BITS_MARKER,
+                    so_info=f"libpthread.so.0(){_ELF_BITS_MARKER}",
+                ),
+                SOInfo(soname="rtld", version="GNU_HASH", marker="", so_info="rtld(GNU_HASH)"),
             )
             if _PY_OS == "Linux"
             else (),
@@ -107,9 +117,8 @@ _SETPROCTITLE_LIBC6_SO_VERSIONS = {
 def test_elfdeps_analyze_pex_wheels(
     pex_reqs: list[str],
     pex_script: str | None,
-    expected_provides: tuple[str, ...],
-    expected_requires: tuple[str, ...],
-    expected_requires_sonames: tuple[str, ...],
+    expected_provides: tuple[SOInfo, ...],
+    expected_requires: tuple[SOInfo, ...],
     rule_runner: RuleRunner,
 ) -> None:
     rule_runner.write_files(
@@ -133,4 +142,3 @@ def test_elfdeps_analyze_pex_wheels(
     result = rule_runner.request(PexELFInfo, [RequestPexELFInfo(pex_binary)])
     assert result.provides == expected_provides
     assert result.requires == expected_requires
-    assert result.requires_sonames == expected_requires_sonames

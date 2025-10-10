@@ -7,7 +7,7 @@ import json
 import sys
 import zipfile
 from collections.abc import Generator, Iterable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 # elfdeps 0.2.0 added analyze_zipfile
@@ -23,14 +23,17 @@ class WheelsELFInfo:
         object.__setattr__(self, "provides", tuple(sorted(provides)))
         object.__setattr__(self, "requires", tuple(sorted(requires)))
 
-    def to_dict(self) -> dict[str, str | list[str]]:
+    def to_dict(self) -> dict[str, list[dict[str, str]]]:
         # so_info: SOInfo(soname: str, version: str, marker: str)
         # marker is one of "(64bit)" or ""
         # str(so_info) = f"{soname}({version}){marker}"
+
+        def so_infos_to_dicts(so_infos: tuple[SOInfo, ...]) -> list[dict[str, str]]:
+            return [asdict(so_info) | {"so_info": str(so_info)} for so_info in so_infos]
+
         return {
-            "provides": [str(so_info) for so_info in self.provides],
-            "requires": [str(so_info) for so_info in self.requires],
-            "requires_sonames": sorted({so_info.soname for so_info in self.requires}),
+            "provides": so_infos_to_dicts(self.provides),
+            "requires": so_infos_to_dicts(self.requires),
         }
 
     def to_json(self, indent=None, separators=(",", ":")) -> str:

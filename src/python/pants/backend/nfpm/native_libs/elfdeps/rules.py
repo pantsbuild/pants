@@ -4,8 +4,9 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from pathlib import PurePath
 
 from pants.backend.nfpm.native_libs.elfdeps.subsystem import rules as subsystem_rules
@@ -22,18 +23,29 @@ class RequestPexELFInfo:
     target_pex: Pex
 
 
+@dataclass(frozen=True, order=True)
+class SOInfo:  # elfdeps should not be used in rules, so this holds the same data as elfdeps.SOInfo.
+    soname: str
+    version: str
+    marker: str
+    # so_info combines soname+version+marker using whatever standard elfdeps follows.
+    so_info: str = dataclass_field(compare=False)
+
+
 @dataclass(frozen=True)
 class PexELFInfo:
-    provides: tuple[str, ...]
-    requires: tuple[str, ...]
-    requires_sonames: tuple[str, ...]
+    provides: tuple[SOInfo, ...]
+    requires: tuple[SOInfo, ...]
 
     def __init__(
-        self, provides: Iterable[str], requires: Iterable[str], requires_sonames: Iterable[str]
+        self, provides: Iterable[Mapping[str, str]], requires: Iterable[Mapping[str, str]]
     ):
-        object.__setattr__(self, "provides", tuple(sorted(provides)))
-        object.__setattr__(self, "requires", tuple(sorted(requires)))
-        object.__setattr__(self, "requires_sonames", tuple(sorted(requires_sonames)))
+        object.__setattr__(
+            self, "provides", tuple(sorted(SOInfo(**so_info) for so_info in provides))
+        )
+        object.__setattr__(
+            self, "requires", tuple(sorted(SOInfo(**so_info) for so_info in requires))
+        )
 
 
 @rule(
@@ -86,7 +98,6 @@ async def elfdeps_analyze_pex_wheels(request: RequestPexELFInfo, pex_pex: PexPEX
     return PexELFInfo(
         provides=pex_elf_info["provides"],
         requires=pex_elf_info["requires"],
-        requires_sonames=pex_elf_info["requires_sonames"],
     )
 
 
