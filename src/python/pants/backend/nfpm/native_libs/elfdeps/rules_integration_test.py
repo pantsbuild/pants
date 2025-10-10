@@ -74,9 +74,9 @@ _SETPROCTITLE_LIBC6_SO_VERSIONS = {
 
 # @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
-    "pex_reqs,pex_script,expected_provides,expected_requires",
+    "pex_reqs,pex_script,expected_provides,expected_requires,expected_requires_sonames",
     (
-        pytest.param(["cowsay==4.0"], "cowsay", (), (), id="cowsay"),
+        pytest.param(["cowsay==4.0"], "cowsay", (), (), (), id="cowsay"),
         pytest.param(
             ["setproctitle==1.3.6"],
             None,
@@ -93,6 +93,13 @@ _SETPROCTITLE_LIBC6_SO_VERSIONS = {
             )
             if _PY_OS == "Linux"
             else (),
+            (
+                "libc.so.6",
+                "libpthread.so.0",
+                "rtld",
+            )
+            if _PY_OS == "Linux"
+            else (),
             id="setproctitle",
         ),
     ),
@@ -102,6 +109,7 @@ def test_elfdeps_analyze_pex_wheels(
     pex_script: str | None,
     expected_provides: tuple[str, ...],
     expected_requires: tuple[str, ...],
+    expected_requires_sonames: tuple[str, ...],
     rule_runner: RuleRunner,
 ) -> None:
     rule_runner.write_files(
@@ -125,3 +133,4 @@ def test_elfdeps_analyze_pex_wheels(
     result = rule_runner.request(PexELFInfo, [RequestPexELFInfo(pex_binary)])
     assert result.provides == expected_provides
     assert result.requires == expected_requires
+    assert result.requires_sonames == expected_requires_sonames

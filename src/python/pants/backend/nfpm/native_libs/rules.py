@@ -145,9 +145,10 @@ async def deb_depends_from_pex(request: DebDependsFromPexRequest) -> DebDependsI
     pex_elf_info = await elfdeps_analyze_pex_wheels(
         RequestPexELFInfo(request.target_pex), **implicitly()
     )
+    sonames = pex_elf_info.requires_sonames
     package_deps = await deb_search_for_sonames(
         DebSearchForSonamesRequest(
-            request.distro, request.distro_codename, request.debian_arch, pex_elf_info.requires
+            request.distro, request.distro_codename, request.debian_arch, sonames
         )
     )
     return DebDependsInfo(requires=package_deps.packages)
