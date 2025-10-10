@@ -30,6 +30,7 @@ class WheelsELFInfo:
         return {
             "provides": [str(so_info) for so_info in self.provides],
             "requires": [str(so_info) for so_info in self.requires],
+            "requires_sonames": sorted({so_info.soname for so_info in self.requires}),
         }
 
     def to_json(self, indent=None, separators=(",", ":")) -> str:

@@ -26,10 +26,14 @@ class RequestPexELFInfo:
 class PexELFInfo:
     provides: tuple[str, ...]
     requires: tuple[str, ...]
+    requires_sonames: tuple[str, ...]
 
-    def __init__(self, provides: Iterable[str], requires: Iterable[str]):
+    def __init__(
+        self, provides: Iterable[str], requires: Iterable[str], requires_sonames: Iterable[str]
+    ):
         object.__setattr__(self, "provides", tuple(sorted(provides)))
         object.__setattr__(self, "requires", tuple(sorted(requires)))
+        object.__setattr__(self, "requires_sonames", tuple(sorted(requires_sonames)))
 
 
 @rule(
@@ -82,6 +86,7 @@ async def elfdeps_analyze_pex_wheels(request: RequestPexELFInfo, pex_pex: PexPEX
     return PexELFInfo(
         provides=pex_elf_info["provides"],
         requires=pex_elf_info["requires"],
+        requires_sonames=pex_elf_info["requires_sonames"],
     )
 
 
