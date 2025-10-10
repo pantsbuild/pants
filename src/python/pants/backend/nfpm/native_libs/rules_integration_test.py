@@ -115,7 +115,6 @@ def _get_pex_binary(rule_runner: RuleRunner, address: Address) -> Pex:
             (),
             id="setproctitle-ubuntu-jammy-arm64",
         ),
-        # TODO: find a package w/ pre-compiled wheel that links to a system lib
     ),
 )
 def test_deb_depends_from_pex_rule(
@@ -135,6 +134,71 @@ def test_deb_depends_from_pex_rule(
                 pex_binary(name="pex", script={pex_script!r}, dependencies=[":req"])
                 """
             )
+        }
+    )
+
+    target_pex = _get_pex_binary(rule_runner, Address("", target_name="pex"))
+    result = rule_runner.request(
+        DebDependsInfo, [DebDependsFromPexRequest(target_pex, distro, distro_codename, debian_arch)]
+    )
+    assert result.requires == expected_packages
+
+
+@pytest.mark.parametrize(
+    "whl_dist,whl_resource,whl_py_tag,distro,distro_codename,debian_arch,expected_packages",
+    (
+        pytest.param(
+            "python-ldap",
+            "python_ldap-3.4.4-cp311-cp311-linux_x86_64.whl",
+            "cp311",
+            "ubuntu",
+            "jammy",
+            "amd64",
+            ("libldap-2.5-0",),
+            marks=_skip_unless(
+                os="Linux",
+                arch="x86_64",
+                extra_reason="(python-ldap wheel not included for other platforms)",
+            ),
+            id="ldap-ubuntu-jammy-amd64",
+        ),
+    ),
+)
+def test_deb_depends_from_pex_rule_with_whl_resource(
+    whl_dist: str,
+    whl_resource: str,
+    whl_py_tag: str,
+    distro: str,
+    distro_codename: str,
+    debian_arch: str,
+    expected_packages: tuple[str, ...],
+    rule_runner: RuleRunner,
+) -> None:
+    assert whl_resource.endswith(".whl")
+    whl_contents = read_resource(__name__, whl_resource)
+    assert whl_contents is not None
+
+    # NOTE: Renaming the wheel in this test is a hack for forwards compatibility.
+    # The test only needs a whl with an ELF .so that can be statically analyzed to look up packages.
+    # The other details (os, distro, distro_codename, arch) are hard-coded for this test,
+    # except for python version (the only variable that is likely to change over time).
+    # So, this replaces the python tag, pretending the wheel is for the current python version.
+    whl = whl_resource.replace(whl_py_tag, f"cp{_PY_TAG}")
+
+    rule_runner.write_files(
+        {
+            whl: whl_contents,
+            "BUILD": dedent(
+                f"""
+                file(name="whl", source={whl!r})
+                python_requirement(
+                    name="req",
+                    dependencies=[":whl"],
+                    requirements=["{whl_dist} @ file://{rule_runner.build_root}/{whl}"],
+                )
+                pex_binary(name="pex", dependencies=[":req"])
+                """
+            ),
         }
     )
 
