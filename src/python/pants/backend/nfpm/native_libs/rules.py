@@ -6,6 +6,7 @@ from __future__ import annotations
 import importlib.metadata
 import json
 import logging
+import re
 import sys
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -145,7 +146,9 @@ async def deb_depends_from_pex(request: DebDependsFromPexRequest) -> DebDependsI
     pex_elf_info = await elfdeps_analyze_pex_wheels(
         RequestPexELFInfo(request.target_pex), **implicitly()
     )
-    sonames = pex_elf_info.requires_sonames
+
+    sonames = {so_info.soname for so_info in pex_elf_info.requires}
+
     package_deps = await deb_search_for_sonames(
         DebSearchForSonamesRequest(
             request.distro, request.distro_codename, request.debian_arch, sonames
@@ -167,10 +170,14 @@ class RpmDependsInfo:
 
 @rule
 async def rpm_depends_from_pex(request: RpmDependsFromPexRequest) -> RpmDependsInfo:
+    # This rule provides a platform-agnostic replacement for `rpmdeps` in native rpm builds.
     pex_elf_info = await elfdeps_analyze_pex_wheels(
         RequestPexELFInfo(request.target_pex), **implicitly()
     )
-    return RpmDependsInfo(provides=pex_elf_info.provides, requires=pex_elf_info.requires)
+    return RpmDependsInfo(
+        provides=tuple(so_info.so_info for so_info in pex_elf_info.provides),
+        requires=tuple(so_info.so_info for so_info in pex_elf_info.requires),
+    )
 
 
 def rules() -> Iterable[Rule | UnionRule]:
