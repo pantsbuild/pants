@@ -22,6 +22,7 @@ from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsReque
 from pants.engine.internals.native_engine import Address
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
+from pants.util.resources import read_resource
 
 from .rules import (
     DebDependsFromPexRequest,
