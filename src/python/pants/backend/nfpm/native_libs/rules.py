@@ -143,17 +143,40 @@ class DebDependsInfo:
 
 @rule
 async def deb_depends_from_pex(request: DebDependsFromPexRequest) -> DebDependsInfo:
+    # This rule partially replaces `dh_shlibdeps` + `dpkg-shlibdeps` in native deb builds.
+    # `dpkg-shlibdeps` calculates deps that replace ${shlibs:<dep field>} vars in debian/control files.
+    #   - By default, `dpkg-shlibdeps` puts the package deps in ${shlibs:Depends}.
+    #   - When building an "Essential" package, it puts the deps in ${shlibs:Pre-Depends} instead.
+    #   - If requested, some deps can also go in ${shlibs:Recommends} or ${shilbs:Suggests}.
+    # This rule only calculates one list of deps (the equivalent of ${shlibs:Depends}).
+    # Consuming rules are responsible for putting these deps in one or more nfpm package dep field(s).
+
     pex_elf_info = await elfdeps_analyze_pex_wheels(
         RequestPexELFInfo(request.target_pex), **implicitly()
     )
 
-    sonames = {so_info.soname for so_info in pex_elf_info.requires}
+    # dpkg-shlibdeps ignores:
+    #   - sonames that do not look like .so files
+    #   - libm.so if libstdc++.so is already in deps
+    # dpkg-shlibdeps can also exclude deps based on command line args.
+    # Consuming rules are responsible for such exclusions, as this rule doesn't handle that.
+    so_patt = re.compile(r"^.*\.so(\..*)?$")
+    libm_patt = re.compile(r"^libm\.so\.\d+$")
+    libstdcpp_patt = re.compile(r"^libstdc\+\+\.so\.\d+$")
+    has_libstdcpp = any(libstdcpp_patt.match(so_info.soname) for so_info in pex_elf_info.requires)
+
+    sonames = {
+        so_info.soname
+        for so_info in pex_elf_info.requires
+        if so_patt.match(so_info.soname) and (not has_libstdcpp or libm_patt.match(so_info.soname))
+    }
 
     package_deps = await deb_search_for_sonames(
         DebSearchForSonamesRequest(
             request.distro, request.distro_codename, request.debian_arch, sonames
         )
     )
+    # TODO: handle libc.so.6 dep resolution based on so_info.version?
     return DebDependsInfo(requires=package_deps.packages)
 
 
