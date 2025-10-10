@@ -35,14 +35,21 @@ _PY_TAG = "".join(map(str, sys.version_info[:2]))
 _PY_OS = platform.system()  # Linux
 _PY_ARCH_TAG = platform.machine()  # x86_64
 
-skip_unless_linux_arm = pytest.mark.skipif(
-    _PY_OS != "Linux" or _PY_ARCH_TAG != "aarch64",
-    reason="Test case only runs on Linux ARM64",
-)
-skip_unless_linux_x86_64 = pytest.mark.skipif(
-    _PY_OS != "Linux" or _PY_ARCH_TAG != "x86_64",
-    reason="Test case only runs on Linux x86_64",
-)
+
+def _skip_unless(
+    os: str, arch: str, extra_reason: str | None = None
+) -> tuple[pytest.MarkDecorator, ...]:
+    return (
+        pytest.mark.no_error_if_skipped,
+        pytest.mark.skipif(
+            _PY_OS != os or _PY_ARCH_TAG != arch,
+            reason=f"Test case only runs on {os} {arch}{' ' + extra_reason if extra_reason else ''}",
+        ),
+    )
+
+
+skip_unless_linux_arm = _skip_unless(os="Linux", arch="aarch64")
+skip_unless_linux_x86_64 = _skip_unless(os="Linux", arch="x86_64")
 
 
 @pytest.fixture
@@ -152,7 +159,7 @@ def test_deb_depends_from_pex_rule(
                 "libpthread.so.0()(64bit)",
                 "rtld(GNU_HASH)",
             ),
-            marks=(skip_unless_linux_x86_64, pytest.mark.no_error_if_skipped),
+            marks=skip_unless_linux_x86_64,
             id="setproctitle-x86_64",
         ),
         pytest.param(
@@ -165,7 +172,7 @@ def test_deb_depends_from_pex_rule(
                 "libpthread.so.0()(64bit)",
                 "rtld(GNU_HASH)",
             ),
-            marks=(skip_unless_linux_arm, pytest.mark.no_error_if_skipped),
+            marks=skip_unless_linux_arm,
             id="setproctitle-arm64",
         ),
     ),
