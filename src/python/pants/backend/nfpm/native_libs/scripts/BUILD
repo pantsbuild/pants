@@ -5,4 +5,5 @@ python_sources()
 
 python_tests(
     name="tests",
+    overrides={"deb_search_for_sonames_integration_test.py": dict(timeout=150)},
 )
