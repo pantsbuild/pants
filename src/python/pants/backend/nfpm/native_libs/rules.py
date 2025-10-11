@@ -38,6 +38,7 @@ from pants.engine.unions import UnionMembership, UnionRule
 from pants.init.import_util import find_matching_distributions
 from pants.util.logging import LogLevel
 from pants.util.resources import read_resource
+from pants.version import VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +155,7 @@ async def deb_search_for_sonames(
                 venv_pex,
                 argv=(
                     script_content.path,
+                    f"--user-agent-suffix=pants/{VERSION}",
                     f"--distro={request.distro}",
                     f"--distro-codename={request.distro_codename}",
                     f"--arch={request.debian_arch}",
