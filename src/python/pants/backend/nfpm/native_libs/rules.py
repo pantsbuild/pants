@@ -30,8 +30,8 @@ async def rpm_depends_from_pex(request: RpmDependsFromPexRequest) -> RpmDependsI
     # This rule provides a platform-agnostic replacement for `rpmdeps` in native rpm builds.
     pex_elf_info = await elfdeps_analyze_pex(RequestPexELFInfo(request.target_pex), **implicitly())
     return RpmDependsInfo(
-        provides=tuple(so_info.so_info for so_info in pex_elf_info.provides),
-        requires=tuple(so_info.so_info for so_info in pex_elf_info.requires),
+        provides=tuple(provided.so_info for provided in pex_elf_info.provides),
+        requires=tuple(required.so_info for required in pex_elf_info.requires),
     )
 
 
