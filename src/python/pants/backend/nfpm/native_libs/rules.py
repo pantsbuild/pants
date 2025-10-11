@@ -23,6 +23,7 @@ from pants.engine.unions import UnionRule
 from pants.init.import_util import find_matching_distributions
 from pants.util.logging import LogLevel
 from pants.util.resources import read_resource
+from pants.version import VERSION
 
 from .elfdeps.rules import RequestPexELFInfo, elfdeps_analyze_pex_wheels
 from .elfdeps.rules import rules as elfdeps_rules
@@ -141,6 +142,7 @@ async def deb_search_for_sonames(
                 venv_pex,
                 argv=(
                     script_content.path,
+                    f"--user-agent-suffix=pants/{VERSION}",
                     f"--distro={request.distro}",
                     f"--distro-codename={request.distro_codename}",
                     f"--arch={request.debian_arch}",

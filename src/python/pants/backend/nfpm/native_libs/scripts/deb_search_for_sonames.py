@@ -12,6 +12,7 @@ from collections.abc import Generator, Iterable
 
 import aiohttp
 import aiohttp_retry
+from aiohttp.http import SERVER_SOFTWARE as DEFAULT_USER_AGENT
 from aiohttp_retry.types import ClientType
 from bs4 import BeautifulSoup
 
@@ -26,6 +27,7 @@ async def deb_search_for_sonames(
     distro_codename: str,
     debian_arch: str,
     sonames: Iterable[str],
+    user_agent: str = DEFAULT_USER_AGENT,
 ) -> dict[str, dict[str, list[str]]]:
     """Given a soname, lookup the deb package that provides it.
 
@@ -40,6 +42,7 @@ async def deb_search_for_sonames(
         asyncio.TaskGroup() as tg,
         aiohttp_retry.RetryClient(
             retry_options=aiohttp_retry.JitterRetry(attempts=5),
+            headers={aiohttp.hdrs.USER_AGENT: user_agent},
             # version=aiohttp.HttpVersion11,  # aiohttp does not support HTTP/2 (waiting for contribution)
             # timeout=aiohttp.ClientTimeout(total=5 * 60, sock_connect=30),
         ) as client,
@@ -155,6 +158,7 @@ def deb_packages_from_html_response(
 
 def main() -> int:
     arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument("--user-agent-suffix")
     arg_parser.add_argument(
         "--distro", default="ubuntu", choices=tuple(DISTRO_PACKAGE_SEARCH_URL.keys())
     )
@@ -163,12 +167,18 @@ def main() -> int:
     arg_parser.add_argument("sonames", nargs="+")
     options = arg_parser.parse_args()
 
+    user_agent_suffix = options.user_agent_suffix
+    user_agent = (
+        DEFAULT_USER_AGENT if not user_agent_suffix else f"{DEFAULT_USER_AGENT} {user_agent_suffix}"
+    )
+
     packages = asyncio.get_event_loop().run_until_complete(
         deb_search_for_sonames(
             distro=options.distro,
             distro_codename=options.distro_codename,
             debian_arch=options.arch,
             sonames=tuple(options.sonames),
+            user_agent=user_agent,
         )
     )
 
