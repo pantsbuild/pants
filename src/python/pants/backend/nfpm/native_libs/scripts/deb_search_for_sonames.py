@@ -24,7 +24,7 @@ async def deb_search_for_sonames(
     distro_codename: str,
     debian_arch: str,
     sonames: Iterable[str],
-) -> set[str]:
+) -> dict[str, dict[str, list[str]]]:
     """Given a soname, lookup the deb package that provides it.
 
     Tools like 'apt-get -S' and 'apt-file' only work for the host's active distro and distro
@@ -35,20 +35,23 @@ async def deb_search_for_sonames(
 
     # tasks are IO bound
     async with aiohttp.ClientSession() as client, asyncio.TaskGroup() as tg:
-        tasks = [
-            tg.create_task(
+        tasks = {
+            soname: tg.create_task(
                 deb_search_for_soname(client, search_url, distro_codename, debian_arch, soname)
             )
             for soname in sonames
-        ]
+        }
 
     # result parsing is CPU bound
-    packages: set[str] = set()
-    for task in tasks:
+    packages: defaultdict[str, dict[str, list[str]]] = defaultdict(dict)
+    for soname, task in tasks.items():
         html_doc = task.result()
-        packages.update(package for package, _ in deb_packages_from_html_response(html_doc))
+        for so_file, so_packages in deb_packages_from_html_response(html_doc):
+            packages[soname][so_file] = list(
+                so_packages
+            )  # list makes json serialization more predicatable
 
-    return packages
+    return dict(packages)
 
 
 async def deb_search_for_soname(
@@ -128,7 +131,6 @@ def deb_packages_from_html_response(
     #   </table>
     # But, html is semi-structured, so assume that it can be in a broken state.
 
-    packages2files: dict[str, list[str]] = defaultdict(list)
     for row in results_table.find_all("tr"):
         cells = tuple(row.find_all("td"))
         if len(cells) < 2:
@@ -137,11 +139,7 @@ def deb_packages_from_html_response(
         file_cell, pkgs_cell = cells[:2]
         file_text = file_cell.get_text(strip=True)
         packages = [pkg_a.get_text(strip=True) for pkg_a in pkgs_cell.find_all("a")]
-        for package in packages:
-            packages2files[package].append(file_text)
-
-    for package in sorted(packages2files):
-        yield package, tuple(packages2files[package])
+        yield file_text, tuple(packages)
 
     return
 
@@ -166,7 +164,7 @@ def main() -> int:
     )
 
     if not packages:
-        print("[]")
+        print("{}")
         print(
             f"No {options.distro} {options.distro_codename} ({options.arch}) packages"
             f" found for sonames: {options.sonames}",
@@ -174,7 +172,7 @@ def main() -> int:
         )
         return 1
 
-    print(json.dumps(sorted(packages), indent=None, separators=(",", ":")))
+    print(json.dumps(packages, indent=None, separators=(",", ":")))
 
     return 0
 

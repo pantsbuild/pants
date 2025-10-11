@@ -32,7 +32,6 @@ SAMPLE_HTML_RESPONSE = """
 def test_deb_packages_from_html_response():
     results = list(deb_packages_from_html_response(SAMPLE_HTML_RESPONSE))
     assert results == [
-        ("dnsmasq-base", ("/usr/sbin/dnsmasq",)),
-        ("dnsmasq-base-lua", ("/usr/sbin/dnsmasq",)),
-        ("libldap-2.5.0", ("/usr/lib/x86_64-linux-gnu/libldap-2.5.so.0",)),
+        ("/usr/lib/x86_64-linux-gnu/libldap-2.5.so.0", ("libldap-2.5.0",)),
+        ("/usr/sbin/dnsmasq", ("dnsmasq-base", "dnsmasq-base-lua")),
     ]

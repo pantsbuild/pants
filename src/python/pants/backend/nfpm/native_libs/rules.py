@@ -7,7 +7,7 @@ import importlib.metadata
 import json
 import logging
 import sys
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 from pants.backend.nfpm.field_sets import NfpmRpmPackageFieldSet
@@ -61,11 +61,45 @@ class DebSearchForSonamesRequest:
 
 
 @dataclass(frozen=True)
-class DebPackagesForSonames:
+class DebPackagesForSoFile:
+    so_file: str
     packages: tuple[str, ...]
 
-    def __init__(self, packages: Iterable[str]):
+    def __init__(self, so_file: str, packages: Iterable[str]):
+        object.__setattr__(self, "so_file", so_file)
         object.__setattr__(self, "packages", tuple(sorted(packages)))
+
+
+@dataclass(frozen=True)
+class DebPackagesForSoname:
+    soname: str
+    packages_for_so_files: tuple[DebPackagesForSoFile, ...]
+
+    def __init__(self, soname: str, packages_for_so_files: Iterable[DebPackagesForSoFile]):
+        object.__setattr__(self, "soname", soname)
+        object.__setattr__(self, "packages_for_so_files", tuple(packages_for_so_files))
+
+    # TODO: method to select best so_file for a soname
+
+
+@dataclass(frozen=True)
+class DebPackagesForSonames:
+    packages: tuple[DebPackagesForSoname, ...]
+
+    @classmethod
+    def from_dict(cls, raw: Mapping[str, Mapping[str, Iterable[str]]]) -> DebPackagesForSonames:
+        return cls(
+            tuple(
+                DebPackagesForSoname(
+                    soname,
+                    (
+                        DebPackagesForSoFile(so_file, packages)
+                        for so_file, packages in files_to_packages.items()
+                    ),
+                )
+                for soname, files_to_packages in raw.items()
+            )
+        )
 
 
 @rule
@@ -135,9 +169,9 @@ async def deb_search_for_sonames(
         packages = json.loads(result.stdout)
     else:
         logger.warning(result.stderr)
-        packages = ()
+        packages = {}
 
-    return DebPackagesForSonames(packages)
+    return DebPackagesForSonames.from_dict(packages)
 
 
 @dataclass(frozen=True)
