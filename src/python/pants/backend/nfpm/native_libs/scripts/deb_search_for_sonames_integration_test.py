@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import sys
+from typing import Any
 
 import pytest
 
@@ -22,15 +23,12 @@ _libldap_pkg = "libldap-2.5-0"
 _libc6_soname = "libc.so.6"
 
 
-def _libc6_pkgs(_arch) -> dict[str, list[str]]:
-    return dict(
-        sorted(
-            {
-                f"/lib/libc6-prof/{_arch}-linux-gnu/{_libc6_soname}": ["libc6-prof"],
-                f"/lib/{_arch}-linux-gnu/{_libc6_soname}": ["libc6"],
-            }.items()
-        )
-    )
+def _libc6_pkgs(_arch: str, prof: bool = True) -> dict[str, list[str]]:
+    pkgs = {}
+    if prof:
+        pkgs[f"/lib/libc6-prof/{_arch}-linux-gnu/{_libc6_soname}"] = ["libc6-prof"]
+    pkgs[f"/lib/{_arch}-linux-gnu/{_libc6_soname}"] = ["libc6"]
+    return dict(sorted(pkgs.items()))
 
 
 _libc6_pkgs_amd64 = {  # only x86_64 not aarch64
@@ -113,6 +111,7 @@ TEST_CASES = (
         "amd64",
         (_libldap_soname,),
         {_libldap_soname: {_libldap_so_file.format("x86_64"): [_libldap_pkg]}},
+        None,  # from_best_so_files is the same result
         id="debian-amd64-libldap",
     ),
     pytest.param(
@@ -121,6 +120,7 @@ TEST_CASES = (
         "arm64",
         (_libldap_soname,),
         {_libldap_soname: {_libldap_so_file.format("aarch64"): [_libldap_pkg]}},
+        None,  # from_best_so_files is the same result
         id="debian-arm64-libldap",
     ),
     pytest.param(
@@ -129,6 +129,7 @@ TEST_CASES = (
         "amd64",
         (_libldap_soname,),
         {_libldap_soname: {_libldap_so_file.format("x86_64"): [_libldap_pkg]}},
+        None,  # from_best_so_files is the same result
         id="ubuntu-amd64-libldap",
     ),
     pytest.param(
@@ -137,11 +138,14 @@ TEST_CASES = (
         "arm64",
         (_libldap_soname,),
         {_libldap_soname: {_libldap_so_file.format("aarch64"): [_libldap_pkg]}},
+        None,  # from_best_so_files is the same result
         id="ubuntu-arm64-libldap",
     ),
-    pytest.param("ubuntu", "foobar", "amd64", (_libldap_soname,), {}, id="bad-distro_codename"),
-    pytest.param("ubuntu", "jammy", "foobar", (_libldap_soname,), {}, id="bad-debian_arch"),
-    pytest.param("ubuntu", "jammy", "amd64", ("foobarbaz-9.9.so.9",), {}, id="bad-soname"),
+    pytest.param(
+        "ubuntu", "foobar", "amd64", (_libldap_soname,), {}, None, id="bad-distro_codename"
+    ),
+    pytest.param("ubuntu", "jammy", "foobar", (_libldap_soname,), {}, None, id="bad-debian_arch"),
+    pytest.param("ubuntu", "jammy", "amd64", ("foobarbaz-9.9.so.9",), {}, None, id="bad-soname"),
     pytest.param(
         "ubuntu",
         "jammy",
@@ -163,6 +167,15 @@ TEST_CASES = (
                 ],
             }
         },
+        {  # from_best_so_files is NOT the same result
+            "libcurl.so": {
+                "/usr/lib/x86_64-linux-gnu/libcurl.so": [
+                    "libcurl4-gnutls-dev",
+                    "libcurl4-nss-dev",
+                    "libcurl4-openssl-dev",
+                ],
+            }
+        },
         id="same-file-in-multiple-packages",
     ),
     pytest.param(
@@ -171,6 +184,7 @@ TEST_CASES = (
         "amd64",
         (_libc6_soname,),
         {_libc6_soname: _libc6_pkgs("x86_64") | _libc6_pkgs_amd64 | _libc6_cross_pkgs},
+        {_libc6_soname: _libc6_pkgs("x86_64", prof=False)},
         id="ubuntu-amd64-libc6",
     ),
     pytest.param(
@@ -179,18 +193,20 @@ TEST_CASES = (
         "arm64",
         (_libc6_soname,),
         {_libc6_soname: _libc6_pkgs("aarch64") | _libc6_cross_pkgs},
+        {_libc6_soname: _libc6_pkgs("aarch64", prof=False)},
         id="ubuntu-arm64-libc6",
     ),
 )
 
 
-@pytest.mark.parametrize("distro,distro_codename,debian_arch,sonames,expected", TEST_CASES)
+@pytest.mark.parametrize("distro,distro_codename,debian_arch,sonames,expected,_", TEST_CASES)
 async def test_deb_search_for_sonames(
     distro: str,
     distro_codename: str,
     debian_arch: str,
     sonames: tuple[str, ...],
     expected: dict[str, dict[str, list[str]]],
+    _: Any,  # unused. This is for the next test.
 ):
     result = await deb_search_for_sonames(distro, distro_codename, debian_arch, sonames)
     assert result == expected
@@ -218,18 +234,34 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-@pytest.mark.parametrize("distro,distro_codename,debian_arch,sonames,expected_raw", TEST_CASES)
+@pytest.mark.parametrize(
+    "distro,distro_codename,debian_arch,sonames,expected_raw,expected_raw_from_best_so_files",
+    TEST_CASES,
+)
 def test_deb_search_for_sonames_rule(
     distro: str,
     distro_codename: str,
     debian_arch: str,
     sonames: tuple[str, ...],
     expected_raw: dict[str, dict[str, list[str]]],
+    expected_raw_from_best_so_files: None | dict[str, dict[str, list[str]]],
     rule_runner: RuleRunner,
 ) -> None:
-    expected = DebPackagesForSonames.from_dict(expected_raw)
-    result = rule_runner.request(
-        DebPackagesForSonames,
-        [DebSearchForSonamesRequest(distro, distro_codename, debian_arch, sonames)],
-    )
-    assert result == expected
+    for from_best_so_files, _expected_raw in (
+        (False, expected_raw),
+        (True, expected_raw_from_best_so_files or expected_raw),
+    ):
+        expected = DebPackagesForSonames.from_dict(_expected_raw)
+        result = rule_runner.request(
+            DebPackagesForSonames,
+            [
+                DebSearchForSonamesRequest(
+                    distro,
+                    distro_codename,
+                    debian_arch,
+                    sonames,
+                    from_best_so_files=from_best_so_files,
+                )
+            ],
+        )
+        assert result == expected

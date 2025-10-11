@@ -9,7 +9,8 @@ import logging
 import re
 import sys
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from pathlib import PurePath
 
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPexProcess, create_venv_pex
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
@@ -41,16 +42,26 @@ class DebSearchForSonamesRequest:
     distro_codename: str
     debian_arch: str
     sonames: tuple[str, ...]
+    from_best_so_files: bool
 
-    def __init__(self, distro: str, distro_codename: str, debian_arch: str, sonames: Iterable[str]):
+    def __init__(
+        self,
+        distro: str,
+        distro_codename: str,
+        debian_arch: str,
+        sonames: Iterable[str],
+        *,
+        from_best_so_files: bool = False,
+    ):
         object.__setattr__(self, "distro", distro)
         object.__setattr__(self, "distro_codename", distro_codename)
         object.__setattr__(self, "debian_arch", debian_arch)
         object.__setattr__(self, "sonames", tuple(sorted(sonames)))
+        object.__setattr__(self, "from_best_so_files", from_best_so_files)
 
 
 @dataclass(frozen=True)
-class DebPackagesForSoFile:
+class DebPackagesPerSoFile:
     so_file: str
     packages: tuple[str, ...]
 
@@ -59,21 +70,57 @@ class DebPackagesForSoFile:
         object.__setattr__(self, "packages", tuple(sorted(packages)))
 
 
+_TYPICAL_LD_PATH_PATTERNS = (
+    # platform specific system libs (like libc) get selected first
+    # "/usr/local/lib/*-linux-*/",
+    "/lib/*-linux-*/",
+    "/usr/lib/*-linux-*/",
+    # Then look for a generic system libs
+    # "/usr/local/lib/",
+    "/lib/",
+    "/usr/lib/",
+    # Anything else has to be added manually to dependencies.
+    # These rules cannot use symbols or shlibs metadata to inform package selection.
+)
+
+
 @dataclass(frozen=True)
 class DebPackagesForSoname:
     soname: str
-    packages_for_so_files: tuple[DebPackagesForSoFile, ...]
+    packages_per_so_files: tuple[DebPackagesPerSoFile, ...]
 
-    def __init__(self, soname: str, packages_for_so_files: Iterable[DebPackagesForSoFile]):
+    def __init__(self, soname: str, packages_per_so_files: Iterable[DebPackagesPerSoFile]):
         object.__setattr__(self, "soname", soname)
-        object.__setattr__(self, "packages_for_so_files", tuple(packages_for_so_files))
+        object.__setattr__(self, "packages_per_so_files", tuple(packages_per_so_files))
 
-    # TODO: method to select best so_file for a soname
+    @property
+    def from_best_so_files(self) -> DebPackagesForSoname:
+        """Pick best so_files from packages_for_so_files using a simplified ld.so-like algorithm.
+
+        The most preferred is first. This is NOT a recursive match; Only match if direct child of
+        ld_path_patt dir. Anything that uses a subdir like /usr/lib/<app>/lib*.so.* uses rpath to
+        prefer the app's libs over system libs. If this vastly simplified form of ld.so-style
+        matching does not select the correct libs, then the package(s) that provide the shared lib
+        should be added manually to the nfpm requires field.
+        """
+        if len(self.packages_per_so_files) <= 1:  # shortcut; no filtering required for 0-1 results.
+            return self
+
+        remaining = list(self.packages_per_so_files)
+
+        packages_per_so_files = []
+        for ld_path_patt in _TYPICAL_LD_PATH_PATTERNS:
+            for packages_per_so_file in remaining[:]:
+                if PurePath(packages_per_so_file.so_file).parent.match(ld_path_patt):
+                    packages_per_so_files.append(packages_per_so_file)
+                    remaining.remove(packages_per_so_file)
+
+        return replace(self, packages_per_so_files=tuple(packages_per_so_files))
 
 
 @dataclass(frozen=True)
 class DebPackagesForSonames:
-    packages: tuple[DebPackagesForSoname, ...]
+    packages_for_sonames: tuple[DebPackagesForSoname, ...]
 
     @classmethod
     def from_dict(cls, raw: Mapping[str, Mapping[str, Iterable[str]]]) -> DebPackagesForSonames:
@@ -82,13 +129,20 @@ class DebPackagesForSonames:
                 DebPackagesForSoname(
                     soname,
                     (
-                        DebPackagesForSoFile(so_file, packages)
+                        DebPackagesPerSoFile(so_file, packages)
                         for so_file, packages in files_to_packages.items()
                     ),
                 )
                 for soname, files_to_packages in raw.items()
             )
         )
+
+    @property
+    def from_best_so_files(self) -> DebPackagesForSonames:
+        packages = []
+        for packages_for_soname in self.packages_for_sonames:
+            packages.append(packages_for_soname.from_best_so_files)
+        return DebPackagesForSonames(tuple(packages))
 
 
 @rule
@@ -165,7 +219,10 @@ async def deb_search_for_sonames(
         logger.warning(result.stderr.decode("utf-8"))
         packages = {}
 
-    return DebPackagesForSonames.from_dict(packages)
+    deb_packages_for_sonames = DebPackagesForSonames.from_dict(packages)
+    if request.from_best_so_files:
+        return deb_packages_for_sonames.from_best_so_files
+    return deb_packages_for_sonames
 
 
 @dataclass(frozen=True)
@@ -213,18 +270,22 @@ async def deb_depends_from_pex(request: DebDependsFromPexRequest) -> DebDependsI
 
     packages_for_sonames = await deb_search_for_sonames(
         DebSearchForSonamesRequest(
-            request.distro, request.distro_codename, request.debian_arch, sonames
+            request.distro,
+            request.distro_codename,
+            request.debian_arch,
+            sonames,
+            from_best_so_files=True,
         )
     )
 
     # this blindly grabs all of them, but we really need to select only one so_file per soname and use those packages
     package_deps = {
         package
-        for packages_for_soname in packages_for_sonames.packages
-        for packages_for_so_file in packages_for_soname.packages_for_so_files
-        for package in packages_for_so_file.packages
+        for packages_for_soname in packages_for_sonames.packages_for_sonames
+        for packages_per_so_file in packages_for_soname.packages_per_so_files
+        for package in packages_per_so_file.packages
     }
-    # TODO: handle libc.so.6 dep resolution based on so_info.version?
+    # TODO: Should there be a minimum version constraint for libc.so.6 based on so_info.version?
     return DebDependsInfo(requires=tuple(sorted(package_deps)))
 
 
