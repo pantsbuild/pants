@@ -11,6 +11,8 @@ from collections import defaultdict
 from collections.abc import Generator, Iterable
 
 import aiohttp
+import aiohttp_retry
+from aiohttp_retry.types import ClientType
 from bs4 import BeautifulSoup
 
 DISTRO_PACKAGE_SEARCH_URL = {
@@ -34,7 +36,14 @@ async def deb_search_for_sonames(
     search_url = DISTRO_PACKAGE_SEARCH_URL[distro]
 
     # tasks are IO bound
-    async with aiohttp.ClientSession() as client, asyncio.TaskGroup() as tg:
+    async with (
+        asyncio.TaskGroup() as tg,
+        aiohttp_retry.RetryClient(
+            retry_options=aiohttp_retry.JitterRetry(attempts=5),
+            # version=aiohttp.HttpVersion11,  # aiohttp does not support HTTP/2 (waiting for contribution)
+            # timeout=aiohttp.ClientTimeout(total=5 * 60, sock_connect=30),
+        ) as client,
+    ):
         tasks = {
             soname: tg.create_task(
                 deb_search_for_soname(client, search_url, distro_codename, debian_arch, soname)
@@ -55,7 +64,7 @@ async def deb_search_for_sonames(
 
 
 async def deb_search_for_soname(
-    http: aiohttp.ClientSession,
+    http: ClientType,
     search_url: str,
     distro_codename: str,
     debian_arch: str,

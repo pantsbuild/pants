@@ -156,7 +156,7 @@ async def deb_search_for_sonames(
     if result.exit_code == 0:
         packages = json.loads(result.stdout)
     else:
-        logger.warning(result.stderr)
+        logger.warning(result.stderr.decode("utf-8"))
         packages = {}
 
     return DebPackagesForSonames.from_dict(packages)
