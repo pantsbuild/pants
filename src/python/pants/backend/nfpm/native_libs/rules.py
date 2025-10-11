@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 
@@ -12,6 +11,7 @@ from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 
 from .deb.rules import DebSearchForSonamesRequest, deb_search_for_sonames
+from .deb.utils import shlibdeps_filter_sonames
 from .elfdeps.rules import RequestPexELFInfo, elfdeps_analyze_pex_wheels
 from .elfdeps.rules import rules as elfdeps_rules
 
@@ -43,21 +43,7 @@ async def deb_depends_from_pex(request: DebDependsFromPexRequest) -> DebDependsI
         RequestPexELFInfo(request.target_pex), **implicitly()
     )
 
-    # dpkg-shlibdeps ignores:
-    #   - sonames that do not look like .so files
-    #   - libm.so if libstdc++.so is already in deps
-    # dpkg-shlibdeps can also exclude deps based on command line args.
-    # Consuming rules are responsible for such exclusions, as this rule doesn't handle that.
-    so_patt = re.compile(r"^.*\.so(\..*)?$")
-    libm_patt = re.compile(r"^libm\.so\.\d+$")
-    libstdcpp_patt = re.compile(r"^libstdc\+\+\.so\.\d+$")
-    has_libstdcpp = any(libstdcpp_patt.match(so_info.soname) for so_info in pex_elf_info.requires)
-
-    sonames = {
-        so_info.soname
-        for so_info in pex_elf_info.requires
-        if so_patt.match(so_info.soname) and (not has_libstdcpp or libm_patt.match(so_info.soname))
-    }
+    sonames = shlibdeps_filter_sonames(so_info.soname for so_info in pex_elf_info.requires)
 
     packages_for_sonames = await deb_search_for_sonames(
         DebSearchForSonamesRequest(
