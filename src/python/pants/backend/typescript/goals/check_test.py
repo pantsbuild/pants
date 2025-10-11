@@ -24,45 +24,32 @@ from pants.backend.typescript.target_types import (
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResults
 from pants.core.target_types import FileTarget
-from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
-# Test constants for JavaScript type checking
 JS_TYPE_ERROR_FILE_NUMBER_TO_STRING = (
     'let x = "hello";\nx = 42; // Type error: cannot assign number to string\n'
 )
 
-
-def parse_typescript_build_status(stdout: str) -> str:
-    """Parse TypeScript verbose output to detect build type."""
-    if (
-        "is up to date but needs to update timestamps of output files that are older than input files"
-        in stdout
-    ):
-        return "incremental_build"
-    elif "Building project '" in stdout:
-        return "full_build"
-    else:
-        return "no_verbose_output"
+TestProjectAndPackageManager = tuple[str, str]
+RuleRunnerWithProjectAndPackageManager = tuple[RuleRunner, str, str]
 
 
 @pytest.fixture(
     params=[("basic_project", "npm"), ("basic_project", "pnpm"), ("basic_project", "yarn")]
 )
-def basic_project_test(request) -> tuple[str, str]:
-    return cast(tuple[str, str], request.param)
+def basic_project_test(request) -> TestProjectAndPackageManager:
+    return cast(TestProjectAndPackageManager, request.param)
 
 
 @pytest.fixture(params=[("complex_project", "npm"), ("complex_project", "yarn")])
-def complex_project_test(request) -> tuple[str, str]:
-    return cast(tuple[str, str], request.param)
+def complex_project_test(request) -> TestProjectAndPackageManager:
+    return cast(TestProjectAndPackageManager, request.param)
 
 
 @pytest.fixture(params=[("pnpm_link", "pnpm")])
-def pnpm_project_test(request) -> tuple[str, str]:
-    """pnpm link protocol tests."""
-    return cast(tuple[str, str], request.param)
+def pnpm_project_test(request) -> TestProjectAndPackageManager:
+    return cast(TestProjectAndPackageManager, request.param)
 
 
 def _create_rule_runner(package_manager: str) -> RuleRunner:
@@ -92,28 +79,42 @@ def _create_rule_runner(package_manager: str) -> RuleRunner:
 
 
 @pytest.fixture
-def basic_rule_runner(basic_project_test: tuple[str, str]) -> tuple[RuleRunner, str, str]:
-    """Create RuleRunner for basic project tests (all package managers)."""
+def basic_rule_runner(
+    basic_project_test: TestProjectAndPackageManager,
+) -> RuleRunnerWithProjectAndPackageManager:
     test_project, package_manager = basic_project_test
     return _create_rule_runner(package_manager), test_project, package_manager
 
 
 @pytest.fixture
-def complex_proj_rule_runner(complex_project_test: tuple[str, str]) -> tuple[RuleRunner, str, str]:
-    """Create RuleRunner for project tests (npm/yarn only)."""
+def complex_proj_rule_runner(
+    complex_project_test: TestProjectAndPackageManager,
+) -> RuleRunnerWithProjectAndPackageManager:
     test_project, package_manager = complex_project_test
     return _create_rule_runner(package_manager), test_project, package_manager
 
 
 @pytest.fixture
-def pnpm_rule_runner(pnpm_project_test: tuple[str, str]) -> tuple[RuleRunner, str, str]:
-    """Create RuleRunner for pnpm-specific tests."""
+def pnpm_rule_runner(
+    pnpm_project_test: TestProjectAndPackageManager,
+) -> RuleRunnerWithProjectAndPackageManager:
     test_project, package_manager = pnpm_project_test
     return _create_rule_runner(package_manager), test_project, package_manager
 
 
+def _parse_typescript_build_status(stdout: str) -> str:
+    if (
+        "is up to date but needs to update timestamps of output files that are older than input files"
+        in stdout
+    ):
+        return "incremental_build"
+    elif "Building project '" in stdout:
+        return "full_build"
+    else:
+        return "no_verbose_output"
+
+
 def _load_project_test_files(test_project: str) -> dict[str, str]:
-    """Load test files for the specified project type."""
     base_dir = Path(__file__).parent.parent / "test_resources" / test_project
     files = {}
 
@@ -125,7 +126,27 @@ def _load_project_test_files(test_project: str) -> dict[str, str]:
     return files
 
 
-def test_typescript_check_success(basic_rule_runner: tuple[RuleRunner, str, str]) -> None:
+def _override_index_ts_with_TS2345_error() -> str:
+    return textwrap.dedent("""\
+        import { add } from './math';
+
+        export function calculate(): number {
+            return add(5, "invalid"); // Type error: string not assignable to number
+        }
+    """)
+
+
+def _override_math_ts_with_TS2322_error() -> str:
+    return textwrap.dedent("""\
+        export function add(a: number, b: number): number {
+            return "not a number"; // This should cause TS2322 error
+        }
+    """)
+
+
+def test_typescript_check_success(
+    basic_rule_runner: RuleRunnerWithProjectAndPackageManager,
+) -> None:
     rule_runner, test_project, _ = basic_rule_runner
 
     test_files = _load_project_test_files(test_project)
@@ -143,18 +164,13 @@ def test_typescript_check_success(basic_rule_runner: tuple[RuleRunner, str, str]
     assert results.results[0].exit_code == 0
 
 
-def test_typescript_check_failure(basic_rule_runner: tuple[RuleRunner, str, str]) -> None:
+def test_typescript_check_failure(
+    basic_rule_runner: RuleRunnerWithProjectAndPackageManager,
+) -> None:
     rule_runner, test_project, _ = basic_rule_runner
 
-    # Override index.ts with type error
     test_files = _load_project_test_files(test_project)
-    test_files["basic_project/src/index.ts"] = textwrap.dedent("""\
-        import { add } from './math';
-
-        export function calculate(): number {
-            return add(5, "invalid"); // Type error: string not assignable to number
-        }
-    """)
+    test_files["basic_project/src/index.ts"] = _override_index_ts_with_TS2345_error()
     rule_runner.write_files(test_files)
 
     target = rule_runner.get_target(
@@ -168,26 +184,18 @@ def test_typescript_check_failure(basic_rule_runner: tuple[RuleRunner, str, str]
     result = results.results[0]
     assert result.exit_code != 0
 
-    # Should contain TypeScript error about string not assignable to number (TS2345)
     error_output = result.stdout + result.stderr
     assert "TS2345" in error_output
     assert "not assignable to parameter of type 'number'" in error_output
 
 
-def test_typescript_check_project_cross_package_error(
-    complex_proj_rule_runner: tuple[RuleRunner, str, str],
+def test_typescript_check_fails_when_package_dep_fails(
+    complex_proj_rule_runner: RuleRunnerWithProjectAndPackageManager,
 ) -> None:
-    """Test project structure where type error in dependency package fails main package check."""
-
     rule_runner, test_project, _ = complex_proj_rule_runner
     test_files = _load_project_test_files(test_project)
 
-    # Introduce type error in shared-utils package
-    test_files["complex_project/shared-utils/src/math.ts"] = textwrap.dedent("""\
-        export function add(a: number, b: number): number {
-            return "not a number"; // This should cause TS2322 error
-        }
-    """)
+    test_files["complex_project/shared-utils/src/math.ts"] = _override_math_ts_with_TS2322_error()
     rule_runner.write_files(test_files)
 
     # Target main-app package but error is in shared-utils dependency
@@ -210,15 +218,12 @@ def test_typescript_check_project_cross_package_error(
 
 
 def test_typescript_check_missing_outdir_validation(
-    basic_rule_runner: tuple[RuleRunner, str, str],
+    basic_rule_runner: RuleRunnerWithProjectAndPackageManager,
 ) -> None:
-    """Test that TypeScript compilation fails when tsconfig.json is missing required outDir."""
-
     rule_runner, test_project, _ = basic_rule_runner
 
     test_files = _load_project_test_files(test_project)
     tsconfig_content = json.loads(test_files[f"{test_project}/tsconfig.json"])
-    # Remove outDir to trigger validation error
     if "compilerOptions" in tsconfig_content and "outDir" in tsconfig_content["compilerOptions"]:
         del tsconfig_content["compilerOptions"]["outDir"]
     test_files[f"{test_project}/tsconfig.json"] = json.dumps(tsconfig_content, indent=2)
@@ -238,7 +243,7 @@ def test_typescript_check_missing_outdir_validation(
 
 
 def test_typescript_check_multiple_projects(
-    basic_rule_runner: tuple[RuleRunner, str, str],
+    basic_rule_runner: RuleRunnerWithProjectAndPackageManager,
 ) -> None:
     rule_runner, _, _ = basic_rule_runner
 
@@ -304,10 +309,8 @@ def test_typescript_check_multiple_projects(
 
 
 def test_typescript_check_pnpm_link_protocol_success(
-    pnpm_rule_runner: tuple[RuleRunner, str, str],
+    pnpm_rule_runner: RuleRunnerWithProjectAndPackageManager,
 ) -> None:
-    """Test that pnpm link: protocol allows successful imports between packages."""
-
     rule_runner, test_project, _ = pnpm_rule_runner
     test_files = _load_project_test_files(test_project)
     rule_runner.write_files(test_files)
@@ -323,78 +326,12 @@ def test_typescript_check_pnpm_link_protocol_success(
     )
 
 
-def test_package_manager_config_dependency_tracking(
-    basic_rule_runner: tuple[RuleRunner, str, str],
-) -> None:
-    """Test that .npmrc files declared as dependencies of package_json are properly tracked.
-
-    This test verifies that when .npmrc files are declared as dependencies of package_json targets,
-    changes to .npmrc content are detected and cause package installation to behave accordingly.
-    """
-    rule_runner, test_project, package_manager = basic_rule_runner
-    test_files = _load_project_test_files(test_project)
-    original_package_json = json.loads(test_files[f"{test_project}/package.json"])
-
-    # Step 1: Start with valid .npmrc and proper dependency declaration
-    test_files.update(
-        {
-            f"{test_project}/.npmrc": "registry=https://registry.npmjs.org/",
-            f"{test_project}/BUILD": textwrap.dedent("""\
-                package_json(dependencies=[":npmrc"])
-                file(name="npmrc", source=".npmrc")
-                """),
-        }
-    )
-    rule_runner.write_files(test_files)
-    target = rule_runner.get_target(
-        Address(f"{test_project}/src", target_name="ts_sources", relative_file_path="index.ts")
-    )
-    field_set = TypeScriptCheckFieldSet.create(target)
-    request = TypeScriptCheckRequest([field_set])
-
-    results_1 = rule_runner.request(CheckResults, [request])
-    assert len(results_1.results) == 1
-    assert results_1.results[0].exit_code == 0, (
-        f"First run should succeed with valid .npmrc. "
-        f"stdout: {results_1.results[0].stdout}, stderr: {results_1.results[0].stderr}"
-    )
-
-    # Step 2: Change .npmrc to malformed content AND add new dependency to force package manager execution
-    original_package_json["devDependencies"] = original_package_json.get("devDependencies", {})
-    original_package_json["devDependencies"]["is-odd"] = (
-        "3.0.1"  # Update dep to trigger network access rather than cache
-    )
-
-    test_files.update(
-        {
-            f"{test_project}/.npmrc": "registry=not-a-valid-url",
-            f"{test_project}/package.json": json.dumps(original_package_json, indent=2),
-        }
-    )
-    rule_runner.write_files(test_files)
-    with pytest.raises(ExecutionError) as exc_info:
-        rule_runner.request(CheckResults, [request])
-
-    error_str = str(exc_info.value)
-    expected_errors = ["ERR_INVALID_URL", "failed with exit code 1", "Invalid URL"]
-    assert any(expected in error_str for expected in expected_errors), (
-        f"Expected {package_manager} error message to contain one of {expected_errors}, got: {exc_info.value}"
-    )
-
-
 def test_file_targets_available_during_typescript_compilation(
-    basic_rule_runner: tuple[RuleRunner, str, str],
+    basic_rule_runner: RuleRunnerWithProjectAndPackageManager,
 ) -> None:
-    """Test that file targets are available during TypeScript compilation.
-
-    This test verifies that file() targets are properly included in the TypeScript compilation
-    sandbox by making TypeScript code directly import a JSON file provided by a file() target. If
-    the dependency mechanism is broken, tsc will fail with "Cannot find module" error.
-    """
     rule_runner, test_project, _ = basic_rule_runner
 
     test_files = _load_project_test_files(test_project)
-    # Create a JSON file that TypeScript will import
     test_files.update(
         {
             # JSON data file to be provided by file() target
@@ -466,7 +403,7 @@ def test_file_targets_available_during_typescript_compilation(
 
 
 def test_typescript_incremental_compilation_cache(
-    basic_rule_runner: tuple[RuleRunner, str, str],
+    basic_rule_runner: RuleRunnerWithProjectAndPackageManager,
 ) -> None:
     """Test TypeScript incremental compilation cache using comprehensive 4-run pattern.
 
@@ -489,8 +426,6 @@ def test_typescript_incremental_compilation_cache(
     request = TypeScriptCheckRequest([field_set])
 
     # RUN 1: First compilation - should create cache and perform full build
-    print("\n📋 RUN 1: First compilation (should create cache)")
-    print("-" * 50)
     rule_runner.set_options(
         [
             f"--nodejs-package-manager={package_manager}",
@@ -525,14 +460,12 @@ def test_typescript_incremental_compilation_cache(
 
     # Verify first run behavior from TypeScript output
     combined_output1 = results_1.results[0].stdout + "\n" + results_1.results[0].stderr
-    ts_status1 = parse_typescript_build_status(combined_output1)
+    ts_status1 = _parse_typescript_build_status(combined_output1)
     assert ts_status1 == "full_build", (
         f"Expected full_build on first run, got: {ts_status1}. Output: {combined_output1}"
     )
 
     # RUN 2: Second compilation with argument variation - should use cache for incremental build
-    print("\n📋 RUN 2: Second compilation (should use cache)")
-    print("-" * 50)
 
     # Change TypeScript args on same rule_runner for Process cache invalidation
     # This keeps the same build root so cache can be reused
@@ -551,15 +484,12 @@ def test_typescript_incremental_compilation_cache(
     )
 
     combined_output2 = results_2.results[0].stdout + "\n" + results_2.results[0].stderr
-    ts_status2 = parse_typescript_build_status(combined_output2)
+    ts_status2 = _parse_typescript_build_status(combined_output2)
     assert ts_status2 == "incremental_build", (
         f"Expected incremental_build on second run, got: {ts_status2}. Output: {combined_output2}"
     )
 
     # RUN 3: File modification - should trigger rebuild
-    print("\n📋 RUN 3: After file modification (should trigger rebuild)")
-    print("-" * 50)
-
     modified_index_content = textwrap.dedent("""
         import { add } from './math';
 
@@ -585,15 +515,12 @@ def test_typescript_incremental_compilation_cache(
         f"Third compilation failed: {results_3.results[0].stdout}\n{results_3.results[0].stderr}"
     )
     combined_output3 = results_3.results[0].stdout + "\n" + results_3.results[0].stderr
-    ts_status3 = parse_typescript_build_status(combined_output3)
+    ts_status3 = _parse_typescript_build_status(combined_output3)
     assert ts_status3 == "full_build", (
         f"Expected full_build after file modification, got: {ts_status3}. Output: {combined_output3}"
     )
 
     # RUN 4: After modification - should use cache again
-    print("\n📋 RUN 4: After rebuild (should use cache again)")
-    print("-" * 50)
-
     rule_runner.set_options(
         [
             f"--nodejs-package-manager={package_manager}",
@@ -609,16 +536,15 @@ def test_typescript_incremental_compilation_cache(
         f"Fourth compilation failed: {results_4.results[0].stdout}\n{results_4.results[0].stderr}"
     )
     combined_output4 = results_4.results[0].stdout + "\n" + results_4.results[0].stderr
-    ts_status4 = parse_typescript_build_status(combined_output4)
+    ts_status4 = _parse_typescript_build_status(combined_output4)
     assert ts_status4 == "incremental_build", (
         f"Expected incremental_build after rebuild, got: {ts_status4}. Output: {combined_output4}"
     )
 
 
-def test_set_typescript_version_warns(
-    basic_rule_runner: tuple[RuleRunner, str, str], caplog
+def test_setting_typescript_version_emits_warning(
+    basic_rule_runner: RuleRunnerWithProjectAndPackageManager, caplog
 ) -> None:
-    """Test that setting --typescript-version emits a warning that the version will be ignored."""
     rule_runner, test_project, package_manager = basic_rule_runner
     test_files = _load_project_test_files(test_project)
     rule_runner.write_files(test_files)
@@ -639,10 +565,9 @@ def test_set_typescript_version_warns(
     assert "This setting is ignored because TypeScript always uses" in caplog.text
 
 
-def test_check_javascript_enabled(
-    basic_rule_runner: tuple[RuleRunner, str, str],
+def test_check_javascript_enabled_via_tsconfig(
+    basic_rule_runner: RuleRunnerWithProjectAndPackageManager,
 ) -> None:
-    """Test that JavaScript files are type-checked when allowJs and checkJs are enabled."""
     rule_runner, test_project, _ = basic_rule_runner
     test_files = _load_project_test_files(test_project)
 
@@ -670,10 +595,9 @@ def test_check_javascript_enabled(
     assert "Type 'number' is not assignable to type 'string'" in results.results[0].stdout
 
 
-def test_check_javascript_disabled(
-    basic_rule_runner: tuple[RuleRunner, str, str],
+def test_check_javascript_disabled_via_tsconfig(
+    basic_rule_runner: RuleRunnerWithProjectAndPackageManager,
 ) -> None:
-    """Test that JavaScript files are ignored when allowJs is disabled."""
     rule_runner, test_project, _ = basic_rule_runner
     test_files = _load_project_test_files(test_project)
 

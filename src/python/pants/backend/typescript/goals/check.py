@@ -14,6 +14,7 @@ from pants.backend.javascript.nodejs_project import AllNodeJSProjects, find_node
 from pants.backend.javascript.package_json import (
     AllPackageJson,
     OwningNodePackageRequest,
+    PackageJson,
     all_package_json,
     find_owning_package,
 )
@@ -21,7 +22,6 @@ from pants.backend.javascript.resolve import RequestNodeResolve, resolve_for_pac
 from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolRequest, prepare_tool_process
 from pants.backend.javascript.target_types import JSRuntimeSourceField
 from pants.backend.typescript.subsystem import TypeScriptSubsystem
-from pants.backend.typescript.target_types import TypeScriptSourceField, TypeScriptTestSourceField
 from pants.backend.typescript.tsconfig import AllTSConfigs, TSConfig, construct_effective_ts_configs
 from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address
@@ -58,7 +58,7 @@ from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import OrderedSet
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 if TYPE_CHECKING:
     from pants.backend.javascript.nodejs_project import NodeJSProject
@@ -87,7 +87,9 @@ class TypeScriptCheckRequest(CheckRequest):
     tool_name = TypeScriptSubsystem.options_scope
 
 
-def _build_workspace_tsconfig_map(workspaces, all_ts_configs) -> dict[str, TSConfig]:
+def _build_workspace_tsconfig_map(
+    workspaces: FrozenOrderedSet[PackageJson], all_ts_configs: list[TSConfig]
+) -> dict[str, TSConfig]:
     workspace_dir_map = {os.path.normpath(pkg.root_dir): pkg for pkg in workspaces}
     workspace_dir_to_tsconfig: dict[str, TSConfig] = {}
 
@@ -293,22 +295,8 @@ async def _collect_project_targets(
     project: NodeJSProject,
     all_targets: AllTargets,
     all_projects: AllNodeJSProjects,
-    project_ts_configs: list[TSConfig],
 ) -> list[Target]:
-    has_allow_js = any(ts_config.allow_js for ts_config in project_ts_configs if ts_config.allow_js)
-
-    # TODO: I'm on the fence on whether this filtering is worthwhile - should we just always use JSRuntimeSourceField?
-    if has_allow_js:
-        targets = [target for target in all_targets if target.has_field(JSRuntimeSourceField)]
-    else:
-        targets = [
-            target
-            for target in all_targets
-            if (
-                target.has_field(TypeScriptSourceField)
-                or target.has_field(TypeScriptTestSourceField)
-            )
-        ]
+    targets = [target for target in all_targets if target.has_field(JSRuntimeSourceField)]
 
     target_owning_packages = await concurrently(
         find_owning_package(OwningNodePackageRequest(target.address), **implicitly())
@@ -436,9 +424,7 @@ async def _typecheck_single_project(
         project, all_package_jsons, all_ts_configs
     )
 
-    project_targets = await _collect_project_targets(
-        project, all_targets, all_projects, project_ts_configs
-    )
+    project_targets = await _collect_project_targets(project, all_targets, all_projects)
 
     if not project_targets:
         return CheckResult(
@@ -505,15 +491,13 @@ async def typecheck_typescript(
         ),
     )
 
-    projects_to_field_sets: dict[NodeJSProject, list[TypeScriptCheckFieldSet]] = {}
-    for field_set, owning_package in zip(field_sets, owning_packages):
+    projects: OrderedSet[NodeJSProject] = OrderedSet()
+    for owning_package in owning_packages:
         if owning_package.target:
             package_directory = owning_package.target.address.spec_path
             owning_project = all_projects.project_for_directory(package_directory)
             if owning_project:
-                if owning_project not in projects_to_field_sets:
-                    projects_to_field_sets[owning_project] = []
-                projects_to_field_sets[owning_project].append(field_set)
+                projects.add(owning_project)
 
     project_results = await concurrently(
         _typecheck_single_project(
@@ -526,7 +510,7 @@ async def typecheck_typescript(
             all_ts_configs,
             build_root,
         )
-        for project in projects_to_field_sets.keys()
+        for project in projects
     )
 
     return CheckResults(project_results, checker_name=request.tool_name)
