@@ -115,6 +115,7 @@ async def deb_search_for_sonames(
     constraints = tuple(f"{dist.name}=={dist.version}" for dist in distributions_in_pants_venv)
     requirements = {  # requirements (and transitive deps) are constrained to the versions in the pants venv
         "aiohttp",
+        "aiohttp-retry",
         "beautifulsoup4",
     }
 
