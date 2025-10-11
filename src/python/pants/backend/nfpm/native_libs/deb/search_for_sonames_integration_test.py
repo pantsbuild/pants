@@ -14,7 +14,7 @@ from pants.testutil.rule_runner import RuleRunner
 
 from ..rules import DebPackagesForSonames, DebSearchForSonamesRequest
 from ..rules import rules as native_libs_rules
-from .deb_search_for_sonames import deb_search_for_sonames
+from .search_for_sonames import deb_search_for_sonames
 
 _libldap_soname = "libldap-2.5.so.0"
 _libldap_so_file = "/usr/lib/{}-linux-gnu/" + _libldap_soname

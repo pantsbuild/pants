@@ -31,8 +31,8 @@ from .elfdeps.rules import rules as elfdeps_rules
 
 logger = logging.getLogger(__name__)
 
-_SCRIPTS_PACKAGE = "pants.backend.nfpm.native_libs.scripts"
-_DEB_SEARCH_FOR_SONAMES_SCRIPT = "deb_search_for_sonames.py"
+_SCRIPTS_PACKAGE = "pants.backend.nfpm.native_libs.deb"
+_DEB_SEARCH_FOR_SONAMES_SCRIPT = "search_for_sonames.py"
 _PEX_NAME = "native_libs_scripts.pex"
 
 

@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_sources(
-    overrides={"rules.py": dict(dependencies=["./scripts"])},
+    overrides={"rules.py": dict(dependencies=["./deb"])},
 )
 
 resources(

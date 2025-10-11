@@ -5,5 +5,5 @@ python_sources()
 
 python_tests(
     name="tests",
-    overrides={"deb_search_for_sonames_integration_test.py": dict(timeout=150)},
+    overrides={"search_for_sonames_integration_test.py": dict(timeout=150)},
 )

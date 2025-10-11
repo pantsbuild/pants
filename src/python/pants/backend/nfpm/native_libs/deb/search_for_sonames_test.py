@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from .deb_search_for_sonames import deb_packages_from_html_response
+from .search_for_sonames import deb_packages_from_html_response
 
 # simplified for readability and to keep it focused
 SAMPLE_HTML_RESPONSE = """
