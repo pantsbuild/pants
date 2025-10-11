@@ -94,7 +94,7 @@ async def deb_search_for_soname(
     async with http.get(search_url, params=query_params) as response:
         # response.status is 200 even if there was an error (like bad distro_codename),
         # unless the service is unavailable which happens somewhat frequently.
-        response.raise_for_status()  # TODO: retry this flaky API a few times instead of raising
+        response.raise_for_status()  # That was the last retry. Give up and alert the user.
 
         # sadly the "API" returns html and does not support other formats.
         html_doc = await response.text()

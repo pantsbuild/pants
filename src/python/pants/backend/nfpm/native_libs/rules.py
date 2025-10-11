@@ -158,6 +158,9 @@ async def deb_search_for_sonames(
     if result.exit_code == 0:
         packages = json.loads(result.stdout)
     else:
+        # The search API returns 200 even if no results were found.
+        # A 4xx or 5xx error means we gave up retrying because the server is unavailable.
+        # TODO: Should this raise an error instead of just a warning?
         logger.warning(result.stderr.decode("utf-8"))
         packages = {}
 
