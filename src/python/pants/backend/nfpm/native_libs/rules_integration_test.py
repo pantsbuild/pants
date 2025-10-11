@@ -19,6 +19,8 @@ from pants.backend.python.target_types import PexBinary, PythonRequirementTarget
 from pants.backend.python.util_rules import pex_cli, pex_from_targets
 from pants.backend.python.util_rules.pex import Pex
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.core.target_types import FileTarget
+from pants.core.target_types import rules as core_target_type_rules
 from pants.engine.internals.native_engine import Address
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
@@ -57,10 +59,12 @@ skip_unless_linux_x86_64 = _skip_unless(os="Linux", arch="x86_64")
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         target_types=[
+            FileTarget,
             PexBinary,
             PythonRequirementTarget,
         ],
         rules=[
+            *core_target_type_rules(),
             *package_pex_binary.rules(),
             *pex_from_targets.rules(),
             *target_types_rules.rules(),
