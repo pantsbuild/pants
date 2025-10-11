@@ -48,7 +48,6 @@ WHEELS_ELF_INFO = WheelsELFInfo(
         SOInfo("libpthread.so.0", "", "(64bit)"),
         SOInfo("rtld", "GNU_HASH", ""),
     ),
-    runpaths={},
 )
 WHEELS_ELF_INFO_DICT = {
     "provides": [
@@ -80,7 +79,6 @@ WHEELS_ELF_INFO_DICT = {
         },
         {"soname": "rtld", "version": "GNU_HASH", "marker": "", "so_info": "rtld(GNU_HASH)"},
     ],
-    "soname_runpaths": {},
 }
 WHEELS_ELF_INFO_JSON = """{\
     "provides": [\
@@ -111,9 +109,7 @@ WHEELS_ELF_INFO_JSON = """{\
             "so_info": "libpthread.so.0()(64bit)"\
         },\
         {"soname": "rtld", "version": "GNU_HASH", "marker": "", "so_info": "rtld(GNU_HASH)"}\
-    ],\
-    "soname_runpaths": {}\
-    }\
+    ]}\
 """.replace(" ", "")
 
 

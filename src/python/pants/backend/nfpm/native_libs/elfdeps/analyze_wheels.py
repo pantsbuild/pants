@@ -6,8 +6,7 @@ from __future__ import annotations
 import json
 import sys
 import zipfile
-from collections import defaultdict
-from collections.abc import Generator, Iterable, Mapping
+from collections.abc import Generator, Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -19,21 +18,10 @@ from elfdeps import ELFAnalyzeSettings, ELFInfo, SOInfo, analyze_zipfile
 class WheelsELFInfo:
     provides: tuple[SOInfo, ...]
     requires: tuple[SOInfo, ...]
-    soname_runpaths: tuple[tuple[str, tuple[str, ...]], ...]
 
-    def __init__(
-        self,
-        provides: Iterable[SOInfo],
-        requires: Iterable[SOInfo],
-        runpaths: Mapping[str, Iterable[str]],
-    ):
+    def __init__(self, provides: Iterable[SOInfo], requires: Iterable[SOInfo]):
         object.__setattr__(self, "provides", tuple(sorted(provides)))
         object.__setattr__(self, "requires", tuple(sorted(requires)))
-        object.__setattr__(
-            self,
-            "soname_runpaths",
-            tuple(sorted((soname, tuple(rpaths)) for soname, rpaths in runpaths.items())),
-        )
 
     def to_dict(self) -> dict[str, list[dict[str, str]]]:
         # so_info: SOInfo(soname: str, version: str, marker: str)
@@ -46,9 +34,6 @@ class WheelsELFInfo:
         return {
             "provides": so_infos_to_dicts(self.provides),
             "requires": so_infos_to_dicts(self.requires),
-            "soname_runpaths": dict(
-                (soname, list(rpaths)) for soname, rpaths in self.soname_runpaths
-            ),
         }
 
     def to_json(self, indent=None, separators=(",", ":")) -> str:
@@ -72,15 +57,11 @@ def analyze_wheels_repo(wheel_repo: Path) -> WheelsELFInfo:
 
     provides: set[SOInfo] = set()
     requires: set[SOInfo] = set()
-    runpaths: defaultdict[str, list[str]] = defaultdict(list)
     for elf_info in elf_infos:
         provides.update(elf_info.provides)  # elf_info.provides: list[SOInfo]
         requires.update(elf_info.requires)  # elf_info.requires: list[SOInfo]
-        if elf_info.runpath:
-            rpaths = runpaths[elf_info.soname]  # elf_info.runpath: list[str]
-            rpaths.extend(rpath for rpath in elf_info.runpath if rpath not in rpaths)
 
-    return WheelsELFInfo(provides, requires, runpaths)
+    return WheelsELFInfo(tuple(provides), tuple(requires))
 
 
 def main(args: list[str]) -> int:
