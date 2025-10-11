@@ -13,6 +13,7 @@ from pants.backend.nfpm.native_libs.deb.rules import (
     deb_search_for_sonames,
 )
 from pants.backend.nfpm.native_libs.deb.rules import rules as deb_rules
+from pants.backend.nfpm.native_libs.deb.utils import shlibdeps_filter_sonames
 from pants.backend.nfpm.native_libs.elfdeps.rules import RequestPexELFInfo, elfdeps_analyze_pex
 from pants.backend.nfpm.native_libs.elfdeps.rules import rules as elfdeps_rules
 from pants.backend.nfpm.util_rules.contents import (
@@ -58,21 +59,7 @@ async def deb_depends_from_pex(request: DebDependsFromPexRequest) -> DebDependsI
 
     pex_elf_info = await elfdeps_analyze_pex(RequestPexELFInfo(request.target_pex), **implicitly())
 
-    # dpkg-shlibdeps ignores:
-    #   - sonames that do not look like .so files
-    #   - libm.so if libstdc++.so is already in deps
-    # dpkg-shlibdeps can also exclude deps based on command line args.
-    # Consuming rules are responsible for such exclusions, as this rule doesn't handle that.
-    so_patt = re.compile(r"^.*\.so(\..*)?$")
-    libm_patt = re.compile(r"^libm\.so\.\d+$")
-    libstdcpp_patt = re.compile(r"^libstdc\+\+\.so\.\d+$")
-    has_libstdcpp = any(libstdcpp_patt.match(so_info.soname) for so_info in pex_elf_info.requires)
-
-    sonames = {
-        so_info.soname
-        for so_info in pex_elf_info.requires
-        if so_patt.match(so_info.soname) and (not has_libstdcpp or libm_patt.match(so_info.soname))
-    }
+    sonames = shlibdeps_filter_sonames(so_info.soname for so_info in pex_elf_info.requires)
 
     packages_for_sonames = await deb_search_for_sonames(
         DebSearchForSonamesRequest(
