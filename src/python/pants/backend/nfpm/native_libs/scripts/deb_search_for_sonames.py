@@ -39,13 +39,13 @@ async def deb_search_for_sonames(
 
     # tasks are IO bound
     async with (
-        asyncio.TaskGroup() as tg,
         aiohttp_retry.RetryClient(
             retry_options=aiohttp_retry.JitterRetry(attempts=5),
             headers={aiohttp.hdrs.USER_AGENT: user_agent},
             # version=aiohttp.HttpVersion11,  # aiohttp does not support HTTP/2 (waiting for contribution)
             # timeout=aiohttp.ClientTimeout(total=5 * 60, sock_connect=30),
         ) as client,
+        asyncio.TaskGroup() as tg,  # client must be before tg in this async with block
     ):
         tasks = {
             soname: tg.create_task(
