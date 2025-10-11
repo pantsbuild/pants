@@ -12,8 +12,8 @@ from pants.backend.python.util_rules import pex_from_targets
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
-from ..rules import DebPackagesForSonames, DebSearchForSonamesRequest
-from ..rules import rules as native_libs_rules
+from .rules import DebPackagesForSonames, DebSearchForSonamesRequest
+from .rules import rules as native_libs_deb_rules
 from .search_for_sonames import deb_search_for_sonames
 
 _libldap_soname = "libldap-2.5.so.0"
@@ -217,7 +217,7 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *pex_from_targets.rules(),
-            *native_libs_rules(),
+            *native_libs_deb_rules(),
             QueryRule(DebPackagesForSonames, (DebSearchForSonamesRequest,)),
         ],
     )
