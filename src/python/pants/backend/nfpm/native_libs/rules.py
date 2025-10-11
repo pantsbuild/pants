@@ -74,13 +74,21 @@ async def deb_depends_from_pex(request: DebDependsFromPexRequest) -> DebDependsI
         if so_patt.match(so_info.soname) and (not has_libstdcpp or libm_patt.match(so_info.soname))
     }
 
-    package_deps = await deb_search_for_sonames(
+    packages_for_sonames = await deb_search_for_sonames(
         DebSearchForSonamesRequest(
             request.distro, request.distro_codename, request.debian_arch, sonames
         )
     )
+
+    # this blindly grabs all of them, but we really need to select only one so_file per soname and use those packages
+    package_deps = {
+        package
+        for packages_for_soname in packages_for_sonames.packages
+        for packages_for_so_file in packages_for_soname.packages_for_so_files
+        for package in packages_for_so_file.packages
+    }
     # TODO: handle libc.so.6 dep resolution based on so_info.version?
-    return DebDependsInfo(requires=package_deps.packages)
+    return DebDependsInfo(requires=tuple(sorted(package_deps)))
 
 
 @dataclass(frozen=True)
