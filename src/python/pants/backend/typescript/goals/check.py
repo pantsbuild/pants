@@ -22,6 +22,7 @@ from pants.backend.javascript.resolve import RequestNodeResolve, resolve_for_pac
 from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolRequest, prepare_tool_process
 from pants.backend.javascript.target_types import JSRuntimeSourceField
 from pants.backend.typescript.subsystem import TypeScriptSubsystem
+from pants.backend.typescript.target_types import TypeScriptSourceField, TypeScriptTestSourceField
 from pants.backend.typescript.tsconfig import AllTSConfigs, TSConfig, construct_effective_ts_configs
 from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address
@@ -295,8 +296,23 @@ async def _collect_project_targets(
     project: NodeJSProject,
     all_targets: AllTargets,
     all_projects: AllNodeJSProjects,
+    project_ts_configs: list[TSConfig],
 ) -> list[Target]:
-    targets = [target for target in all_targets if target.has_field(JSRuntimeSourceField)]
+    has_check_js = any(
+        ts_config.allow_js and ts_config.check_js for ts_config in project_ts_configs
+    )
+
+    if has_check_js:
+        targets = [target for target in all_targets if target.has_field(JSRuntimeSourceField)]
+    else:
+        targets = [
+            target
+            for target in all_targets
+            if (
+                target.has_field(TypeScriptSourceField)
+                or target.has_field(TypeScriptTestSourceField)
+            )
+        ]
 
     target_owning_packages = await concurrently(
         find_owning_package(OwningNodePackageRequest(target.address), **implicitly())
@@ -424,7 +440,9 @@ async def _typecheck_single_project(
         project, all_package_jsons, all_ts_configs
     )
 
-    project_targets = await _collect_project_targets(project, all_targets, all_projects)
+    project_targets = await _collect_project_targets(
+        project, all_targets, all_projects, project_ts_configs
+    )
 
     if not project_targets:
         return CheckResult(
