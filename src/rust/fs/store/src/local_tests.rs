@@ -530,10 +530,10 @@ async fn garbage_collect_and_compact() {
     write_256kb(&store, b'6').await;
     write_256kb(&store, b'7').await;
 
-    let size = get_directory_size(dir.path());
+    let initial_size = get_directory_size(dir.path());
     assert!(
-        size >= 2 * 1024 * 1024,
-        "Expect size to be at least 2MB but was {size}"
+        initial_size >= 2 * 1024 * 1024,
+        "Expect size to be at least 2MB but was {initial_size}"
     );
 
     store
@@ -541,10 +541,14 @@ async fn garbage_collect_and_compact() {
         .await
         .expect("Error shrinking");
 
+    // How much shrinkage we can expect varies between OS versions. This currently works
+    // on all platforms we test on, and lets us establish that shrink() is doing... something.
+    // However future OS updates may cause this test to fail and these will need to be adjusted.
+    let max_expected_shrunk_size = initial_size * 3 / 4;
     let size = get_directory_size(dir.path());
     assert!(
-        size < 2 * 1024 * 1024,
-        "Expect size to be less than 2MB but was {size}"
+        size < max_expected_shrunk_size,
+        "Expect size to be less than {max_expected_shrunk_size} but was {size}"
     );
 }
 
@@ -569,10 +573,10 @@ async fn remove_big_file_and_store_again() {
     let digest1 = write_1mb(&store, b'0').await;
     let digest2 = write_1mb(&store, b'1').await;
 
-    let size = get_directory_size(dir.path());
+    let initial_size = get_directory_size(dir.path());
     assert!(
-        size >= 2 * 1024 * 1024,
-        "Expect size to be at least 2MB but was {size}"
+        initial_size >= 2 * 1024 * 1024,
+        "Expect size to be at least 2MB but was {initial_size}"
     );
 
     store
@@ -584,10 +588,14 @@ async fn remove_big_file_and_store_again() {
         .await
         .expect("Error removing");
 
+    // How much shrinkage we can expect varies between OS versions. This currently works
+    // on all platforms we test on, and lets us establish that deletion is doing... something.
+    // However future OS updates may cause this test to fail and these will need to be adjusted.
+    let max_expected_shrunk_size = initial_size * 3 / 4;
     let size = get_directory_size(dir.path());
     assert!(
-        size < 2 * 1024 * 1024,
-        "Expect size to be less than 2MB but was {size}"
+        size < max_expected_shrunk_size,
+        "Expect size to be less than {max_expected_shrunk_size} but was {size}"
     );
 
     write_1mb(&store, b'0').await;
