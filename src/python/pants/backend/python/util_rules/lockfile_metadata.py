@@ -31,6 +31,7 @@ class InvalidPythonLockfileReason(Enum):
     NO_BINARY_MISMATCH = "no_binary_mismatch"
     EXCLUDES_MISMATCH = "excludes_mismatch"
     OVERRIDES_MISMATCH = "overrides_mismatch"
+    SOURCES_MISMATCH = "sources_mismatch"
 
 
 @dataclass(frozen=True)
@@ -50,6 +51,7 @@ class PythonLockfileMetadata(LockfileMetadata):
         no_binary: set[str],
         excludes: set[str],
         overrides: set[str],
+        sources: set[str],
     ) -> PythonLockfileMetadata:
         """Call the most recent version of the `LockfileMetadata` class to construct a concrete
         instance.
@@ -68,6 +70,7 @@ class PythonLockfileMetadata(LockfileMetadata):
             no_binary=no_binary,
             excludes=excludes,
             overrides=overrides,
+            sources=sources,
         )
 
     @staticmethod
@@ -96,6 +99,7 @@ class PythonLockfileMetadata(LockfileMetadata):
         no_binary: Iterable[str],
         excludes: Iterable[str],
         overrides: Iterable[str],
+        sources: Iterable[str],
     ) -> LockfileMetadataValidation:
         """Returns Truthy if this `PythonLockfileMetadata` can be used in the current execution
         context."""
@@ -143,6 +147,7 @@ class PythonLockfileMetadataV1(PythonLockfileMetadata):
         no_binary: Iterable[str],
         excludes: Iterable[str],
         overrides: Iterable[str],
+        sources: Iterable[str],
     ) -> LockfileMetadataValidation:
         failure_reasons: set[InvalidPythonLockfileReason] = set()
 
@@ -214,6 +219,7 @@ class PythonLockfileMetadataV2(PythonLockfileMetadata):
         no_binary: Iterable[str],
         excludes: Iterable[str],
         overrides: Iterable[str],
+        sources: Iterable[str],
     ) -> LockfileMetadataValidation:
         failure_reasons = set()
         if not set(user_requirements).issubset(self.requirements):
@@ -290,6 +296,7 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
         # not used for V3
         excludes: Iterable[str],
         overrides: Iterable[str],
+        sources: Iterable[str],
     ) -> LockfileMetadataValidation:
         failure_reasons = (
             super()
@@ -303,7 +310,7 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
                 only_binary=only_binary,
                 no_binary=no_binary,
                 excludes=excludes,
-                overrides=overrides,
+                sources=sources,
             )
             .failure_reasons
         )
@@ -323,10 +330,11 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
 @_python_lockfile_metadata(4)
 @dataclass(frozen=True)
 class PythonLockfileMetadataV4(PythonLockfileMetadataV3):
-    """Lockfile version with excludes/overrides."""
+    """Lockfile version with excludes/overrides/sources."""
 
     excludes: set[str]
     overrides: set[str]
+    sources: set[str]
 
     @classmethod
     def _from_json_dict(
@@ -340,6 +348,7 @@ class PythonLockfileMetadataV4(PythonLockfileMetadataV3):
 
         excludes = metadata("excludes", set[str], lambda l: set(l))
         overrides = metadata("overrides", set[str], lambda l: set(l))
+        sources = metadata("sources", set[str], lambda l: set(l))
 
         return PythonLockfileMetadataV4(
             valid_for_interpreter_constraints=v3_metadata.valid_for_interpreter_constraints,
@@ -350,6 +359,7 @@ class PythonLockfileMetadataV4(PythonLockfileMetadataV3):
             no_binary=v3_metadata.no_binary,
             excludes=excludes,
             overrides=overrides,
+            sources=sources,
         )
 
     @classmethod
@@ -358,6 +368,7 @@ class PythonLockfileMetadataV4(PythonLockfileMetadataV3):
         return {
             "excludes": sorted(instance.excludes),
             "overrides": sorted(instance.overrides),
+            "sources": sorted(instance.sources),
         }
 
     def is_valid_for(
@@ -373,6 +384,7 @@ class PythonLockfileMetadataV4(PythonLockfileMetadataV3):
         no_binary: Iterable[str],
         excludes: Iterable[str],
         overrides: Iterable[str],
+        sources: Iterable[str],
     ) -> LockfileMetadataValidation:
         failure_reasons = (
             super()
@@ -387,6 +399,7 @@ class PythonLockfileMetadataV4(PythonLockfileMetadataV3):
                 no_binary=no_binary,
                 excludes=excludes,
                 overrides=overrides,
+                sources=sources,
             )
             .failure_reasons
         )
@@ -395,5 +408,7 @@ class PythonLockfileMetadataV4(PythonLockfileMetadataV3):
             failure_reasons.add(InvalidPythonLockfileReason.EXCLUDES_MISMATCH)
         if self.overrides != set(overrides):
             failure_reasons.add(InvalidPythonLockfileReason.OVERRIDES_MISMATCH)
+        if self.sources != set(sources):
+            failure_reasons.add(InvalidPythonLockfileReason.SOURCES_MISMATCH)
 
         return LockfileMetadataValidation(failure_reasons)

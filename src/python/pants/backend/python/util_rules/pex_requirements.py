@@ -378,6 +378,7 @@ class ResolvePexConfig:
     no_binary: FrozenOrderedSet[str]
     excludes: FrozenOrderedSet[str]
     overrides: FrozenOrderedSet[str]
+    sources: FrozenOrderedSet[str]
     path_mappings: tuple[str, ...]
 
     def pex_args(self) -> Iterator[str]:
@@ -428,6 +429,7 @@ class ResolvePexConfig:
 
         yield from (f"--exclude={exclude}" for exclude in self.excludes)
         yield from (f"--override={override}" for override in self.overrides)
+        yield from (f"--source={source}" for source in self.sources)
 
 
 @dataclass(frozen=True)
@@ -462,6 +464,7 @@ async def determine_resolve_pex_config(
             only_binary=FrozenOrderedSet(),
             excludes=FrozenOrderedSet(),
             overrides=FrozenOrderedSet(),
+            sources=FrozenOrderedSet(),
             path_mappings=python_repos.path_mappings,
         )
 
@@ -469,6 +472,7 @@ async def determine_resolve_pex_config(
     only_binary = python_setup.resolves_to_only_binary().get(request.resolve_name) or []
     excludes = python_setup.resolves_to_excludes().get(request.resolve_name) or []
     overrides = python_setup.resolves_to_overrides().get(request.resolve_name) or []
+    sources = python_setup.resolves_to_sources().get(request.resolve_name) or []
 
     constraints_file: ResolvePexConstraintsFile | None = None
     _constraints_file_path = python_setup.resolves_to_constraints_file().get(request.resolve_name)
@@ -518,6 +522,7 @@ async def determine_resolve_pex_config(
         only_binary=FrozenOrderedSet(only_binary),
         excludes=FrozenOrderedSet(excludes),
         overrides=FrozenOrderedSet(overrides),
+        sources=FrozenOrderedSet(sources),
         path_mappings=python_repos.path_mappings,
     )
 
@@ -550,6 +555,7 @@ def validate_metadata(
         no_binary=resolve_config.no_binary,
         excludes=resolve_config.excludes,
         overrides=resolve_config.overrides,
+        sources=resolve_config.sources,
     )
     if validation:
         return
