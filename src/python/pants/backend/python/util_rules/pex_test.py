@@ -732,6 +732,7 @@ def test_setup_pex_requirements() -> None:
                     path_mappings=(),
                     excludes=FrozenOrderedSet(),
                     overrides=FrozenOrderedSet(),
+                    sources=FrozenOrderedSet(),
                 ),
                 "pants.backend.python.util_rules.pex.get_req_strings": lambda _: PexRequirementsInfo(
                     (

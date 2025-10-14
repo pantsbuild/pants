@@ -40,6 +40,7 @@ def test_metadata_json_round_trip() -> None:
         no_binary={"sdist"},
         excludes=set(),
         overrides=set(),
+        sources=set(),
     )
     output_metadata = PythonLockfileMetadata.from_json_dict(
         json.loads(input_metadata.to_json()), "", ""
@@ -59,6 +60,7 @@ def test_metadata_header_round_trip() -> None:
         no_binary={"sdist"},
         excludes=set(),
         overrides=set(),
+        sources=set(),
     )
     serialized_lockfile = input_metadata.add_header_to_lockfile(
         b"req1==1.0", regenerate_command="./pants lock", delimeter="#"
@@ -132,6 +134,7 @@ def test_to_json_v4() -> None:
         no_binary=set(),
         excludes={"hungry-wolves"},
         overrides=set(),
+        sources=set(),
     )
     expected = {
         "version": 4,
@@ -143,6 +146,7 @@ def test_to_json_v4() -> None:
         "no_binary": [],
         "excludes": ["hungry-wolves"],
         "overrides": [],
+        "sources": [],
     }
     assert json.loads(metadata.to_json()) == expected
 
@@ -172,7 +176,8 @@ def test_add_header_to_lockfile_v4() -> None:
 #   "excludes": [
 #     "hungry-wolves"
 #   ],
-#   "overrides": []
+#   "overrides": [],
+#   "sources": []
 # }
 # --- END PANTS LOCKFILE METADATA ---
 cowsay==1.0 \\
@@ -187,6 +192,7 @@ cowsay==1.0 \\
         no_binary=set(),
         excludes={"hungry-wolves"},
         overrides=set(),
+        sources=set(),
     )
     result = metadata.add_header_to_lockfile(
         input_lockfile, regenerate_command="./pants lock", delimeter="#"
@@ -274,6 +280,7 @@ def test_is_valid_for_v1(user_digest, expected_digest, user_ic, expected_ic, mat
                 no_binary=set(),
                 excludes=set(),
                 overrides=set(),
+                sources=set(),
             )
         )
         == matches
@@ -350,6 +357,7 @@ def test_is_valid_for_interpreter_constraints_and_requirements(
             no_binary=set(),
             excludes=set(),
             overrides=set(),
+            sources=set(),
         )
         assert result.failure_reasons == set(expected)
 
@@ -374,6 +382,7 @@ def test_is_valid_for_v3_metadata() -> None:
         no_binary={"not-sdist"},
         excludes=set(),
         overrides=set(),
+        sources=set(),
     )
     assert result.failure_reasons == {
         InvalidPythonLockfileReason.CONSTRAINTS_FILE_MISMATCH,
@@ -394,6 +403,7 @@ def test_is_valid_for_v4_metadata() -> None:
         # Everything below is new to v4
         excludes={"terrible-horrible-no-good-very-bad-pkg"},
         overrides={"cowsay==1.0.0"},
+        sources={"pytorch=torch"},
     ).is_valid_for(
         expected_invalidation_digest="",
         user_interpreter_constraints=InterpreterConstraints([]),
@@ -405,8 +415,10 @@ def test_is_valid_for_v4_metadata() -> None:
         no_binary={"sdist"},
         excludes=set(),
         overrides={"deadbeef<=0"},
+        sources=set(),
     )
     assert result.failure_reasons == {
         InvalidPythonLockfileReason.EXCLUDES_MISMATCH,
         InvalidPythonLockfileReason.OVERRIDES_MISMATCH,
+        InvalidPythonLockfileReason.SOURCES_MISMATCH,
     }
