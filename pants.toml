@@ -159,6 +159,7 @@ mypy = "3rdparty/python/mypy.lock"
 pytest = "3rdparty/python/pytest.lock"
 pbs-script = "3rdparty/python/pbs-script-requirements.lock"
 external-tool-upgrade = "3rdparty/python/external-tool-upgrade.lock"
+lock-torch = "testprojects/src/python/lock_torch/lock-torch.lock"
 
 [python-infer]
 assets = true
