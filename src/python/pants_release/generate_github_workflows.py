@@ -759,13 +759,12 @@ def test_jobs(
     human_readable_job_name = f"Test Python ({helper.platform_name()})"
     human_readable_step_name = "Run Python tests"
     log_name = "python-test"
-    pants_args = ["test"]
+    pants_args = ["--changed-since=origin/main", "--changed-dependents=transitive", "test"]
     if shard:
         human_readable_job_name += f" Shard {shard}"
         human_readable_step_name = f"Run Python test shard {shard}"
         log_name += f"-{shard}"
         pants_args.append(f"--shard={shard}")
-    pants_args.append("::")
     if platform_specific:
         pants_args = (
             ["--tag=+platform_specific_behavior"]
@@ -1115,7 +1114,7 @@ def test_workflow_jobs() -> Jobs:
                     *linux_x86_64_helper.native_binaries_download(),
                     {
                         "name": "Lint",
-                        "run": "./pants lint check ::\n",
+                        "run": "./pants --changed-since=origin/main --changed-dependents=transitive lint check\n",
                     },
                     linux_x86_64_helper.upload_log_artifacts(name="lint"),
                 ],

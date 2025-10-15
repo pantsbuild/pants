@@ -976,7 +976,7 @@ jobs:
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run Python tests
       run: |
-        ./pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
+        ./pants --tag=+platform_specific_behavior --changed-since=origin/main --changed-dependents=transitive test -- -m platform_specific_behavior
     - continue-on-error: true
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -2177,7 +2177,7 @@ jobs:
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run Python tests
       run: |
-        ./pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
+        ./pants --tag=+platform_specific_behavior --changed-since=origin/main --changed-dependents=transitive test -- -m platform_specific_behavior
     - continue-on-error: true
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -2256,7 +2256,7 @@ jobs:
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run Python tests
       run: |
-        ./pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
+        ./pants --tag=+platform_specific_behavior --changed-since=origin/main --changed-dependents=transitive test -- -m platform_specific_behavior
     - continue-on-error: true
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
