@@ -205,7 +205,7 @@ def test_typescript(rule_runner: RuleRunner) -> None:
 
 UNFORMATTED_TSX_FILE = dedent(
     """\
-    const Foo: FunctionalComponent = () => {
+    const Foo: FunctionalComponent = () => { 
     return <div>Hello World!</div>;
     };
     """
