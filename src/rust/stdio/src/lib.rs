@@ -41,12 +41,12 @@ struct FileAndCFd(Option<File>, CFd);
 
 impl FileAndCFd {
     #[cfg(unix)]
-    unsafe fn from_cfd(cfd: CFd) -> Self {
+    fn from_cfd(cfd: CFd) -> Self {
         unsafe { Self(Some(File::from_raw_fd(cfd)), cfd) }
     }
 
     #[cfg(windows)]
-    unsafe fn from_cfd(cfd: CFd) -> Self {
+    fn from_cfd(cfd: CFd) -> Self {
         unsafe { Self(Some(File::from_raw_handle(_get_osfhandle(cfd))), cfd) }
     }
 }
@@ -79,17 +79,10 @@ struct Console {
 
 impl Console {
     fn new(stdin_fd: CFd, stdout_fd: CFd, stderr_fd: CFd) -> Console {
-        let (stdin, stdout, stderr) = unsafe {
-            (
-                FileAndCFd::from_cfd(stdin_fd),
-                FileAndCFd::from_cfd(stdout_fd),
-                FileAndCFd::from_cfd(stderr_fd),
-            )
-        };
         Console {
-            stdin_handle: stdin,
-            stdout_handle: stdout,
-            stderr_handle: stderr,
+            stdin_handle: FileAndCFd::from_cfd(stdin_fd),
+            stdout_handle: FileAndCFd::from_cfd(stdout_fd),
+            stderr_handle: FileAndCFd::from_cfd(stderr_fd),
             stderr_use_color: false,
         }
     }
