@@ -872,7 +872,7 @@ jobs:
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Lint
       run: |
-        ./pants lint check ::
+        ./pants --changed-since=origin/main --changed-dependents=transitive lint check
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -1088,7 +1088,7 @@ jobs:
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run Python test shard 0/10
       run: |
-        ./pants test --shard=0/10 ::
+        ./pants --changed-since=origin/main --changed-dependents=transitive test --shard=0/10
     - continue-on-error: true
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -1200,7 +1200,7 @@ jobs:
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run Python test shard 1/10
       run: |
-        ./pants test --shard=1/10 ::
+        ./pants --changed-since=origin/main --changed-dependents=transitive test --shard=1/10
     - continue-on-error: true
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -1312,7 +1312,7 @@ jobs:
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run Python test shard 2/10
       run: |
-        ./pants test --shard=2/10 ::
+        ./pants --changed-since=origin/main --changed-dependents=transitive test --shard=2/10
     - continue-on-error: true
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -1424,7 +1424,7 @@ jobs:
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run Python test shard 3/10
       run: |
-        ./pants test --shard=3/10 ::
+        ./pants --changed-since=origin/main --changed-dependents=transitive test --shard=3/10
     - continue-on-error: true
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -1536,7 +1536,7 @@ jobs:
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run Python test shard 4/10
       run: |
-        ./pants test --shard=4/10 ::
+        ./pants --changed-since=origin/main --changed-dependents=transitive test --shard=4/10
     - continue-on-error: true
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -1648,7 +1648,7 @@ jobs:
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run Python test shard 5/10
       run: |
-        ./pants test --shard=5/10 ::
+        ./pants --changed-since=origin/main --changed-dependents=transitive test --shard=5/10
     - continue-on-error: true
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -1760,7 +1760,7 @@ jobs:
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run Python test shard 6/10
       run: |
-        ./pants test --shard=6/10 ::
+        ./pants --changed-since=origin/main --changed-dependents=transitive test --shard=6/10
     - continue-on-error: true
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -1872,7 +1872,7 @@ jobs:
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run Python test shard 7/10
       run: |
-        ./pants test --shard=7/10 ::
+        ./pants --changed-since=origin/main --changed-dependents=transitive test --shard=7/10
     - continue-on-error: true
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -1984,7 +1984,7 @@ jobs:
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run Python test shard 8/10
       run: |
-        ./pants test --shard=8/10 ::
+        ./pants --changed-since=origin/main --changed-dependents=transitive test --shard=8/10
     - continue-on-error: true
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -2096,7 +2096,7 @@ jobs:
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run Python test shard 9/10
       run: |
-        ./pants test --shard=9/10 ::
+        ./pants --changed-since=origin/main --changed-dependents=transitive test --shard=9/10
     - continue-on-error: true
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
