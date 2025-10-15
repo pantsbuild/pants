@@ -782,7 +782,7 @@ def test_jobs(
         "timeout-minutes": 90,
         "if": IS_PANTS_OWNER,
         "steps": [
-            *checkout(),
+            *checkout(fetch_depth=0),
             *(launch_bazel_remote() if with_remote_caching else []),
             install_jdk(),
             install_go(),
@@ -1108,7 +1108,7 @@ def test_workflow_jobs() -> Jobs:
                 "timeout-minutes": 30,
                 "if": IS_PANTS_OWNER,
                 "steps": [
-                    *checkout(),
+                    *checkout(fetch_depth=0),
                     *launch_bazel_remote(),
                     *linux_x86_64_helper.setup_pythons(),
                     *linux_x86_64_helper.native_binaries_download(),

@@ -823,7 +823,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 10
+        fetch-depth: 0
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -954,7 +954,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 10
+        fetch-depth: 0
     - name: Install AdoptJDK
       uses: actions/setup-java@v4
       with:
@@ -1023,7 +1023,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 10
+        fetch-depth: 0
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -1135,7 +1135,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 10
+        fetch-depth: 0
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -1247,7 +1247,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 10
+        fetch-depth: 0
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -1359,7 +1359,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 10
+        fetch-depth: 0
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -1471,7 +1471,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 10
+        fetch-depth: 0
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -1583,7 +1583,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 10
+        fetch-depth: 0
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -1695,7 +1695,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 10
+        fetch-depth: 0
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -1807,7 +1807,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 10
+        fetch-depth: 0
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -1919,7 +1919,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 10
+        fetch-depth: 0
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -2031,7 +2031,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 10
+        fetch-depth: 0
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -2144,7 +2144,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 10
+        fetch-depth: 0
     - name: Install AdoptJDK
       uses: actions/setup-java@v4
       with:
@@ -2225,7 +2225,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 10
+        fetch-depth: 0
     - name: Install AdoptJDK
       uses: actions/setup-java@v4
       with:
