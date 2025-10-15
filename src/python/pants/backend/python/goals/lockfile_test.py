@@ -48,7 +48,8 @@ def _generate(
     no_binary: bool = False,
     only_binary: bool = False,
     requirement_constraints_str: str = '//   "requirement_constraints": [],\n',
-    excludes_and_overrides_str: str = '//   "excludes": [],\n//   "overrides": []',
+    excludes_and_overrides_str: str = '//   "excludes": [],\n//   "overrides": [],\n',
+    sources_str: str = '//   "sources": []',
 ) -> str:
     result = rule_runner.request(
         GenerateLockfileResult,
@@ -113,6 +114,7 @@ def _generate(
             else '//   "no_binary": [],\n'
         )
         + excludes_and_overrides_str
+        + sources_str
         + dedent(
             """
             // }
@@ -132,6 +134,7 @@ def _generate(
             "no_binary": ["ansicolors"] if no_binary else [],
             "only_binary": ["ansicolors"] if only_binary else [],
             "overrides": [],
+            "sources": [],
             "requirement_constraints": [],
         }
         return content
