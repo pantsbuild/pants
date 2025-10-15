@@ -27,6 +27,7 @@ use tokio::task_local;
 // - On Windows this wraps a RawHandle. Every CFd has a corresponding RawHandle,
 //   but the converse is not true in general. However it is true for the handles
 //   we care about, since those come from files opened in Python via the C stdlib.
+// Note: Instances must represent a valid C file descriptor, to avoid undefined behavior.
 type CFd = c_int;
 
 #[cfg(windows)]
@@ -41,12 +42,16 @@ struct FileAndCFd(Option<File>, CFd);
 
 impl FileAndCFd {
     #[cfg(unix)]
+    // cfd must represent a valid C file descriptor.
     fn from_cfd(cfd: CFd) -> Self {
+        // Assuming cfd is a valid C file descriptor, this call is safe.
         unsafe { Self(Some(File::from_raw_fd(cfd)), cfd) }
     }
 
     #[cfg(windows)]
+    // cfd must represent a valid C file descriptor.
     fn from_cfd(cfd: CFd) -> Self {
+        // Assuming cfd is a valid C file descriptor, this call is safe.
         unsafe { Self(Some(File::from_raw_handle(_get_osfhandle(cfd))), cfd) }
     }
 }
