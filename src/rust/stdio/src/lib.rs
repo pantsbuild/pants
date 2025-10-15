@@ -5,86 +5,125 @@ mod term;
 
 pub use term::{TermReadDestination, TermWriteDestination, TryCloneAsFile};
 
+use libc::c_int;
 use std::cell::RefCell;
 use std::fmt;
 use std::fs::File;
 use std::future::Future;
 use std::io::{Read, Write};
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+#[cfg(unix)]
+use std::os::unix::io::{FromRawFd, IntoRawFd};
+#[cfg(windows)]
+use std::os::windows::io::{FromRawHandle, IntoRawHandle};
+#[cfg(windows)]
+use std::os::windows::raw::HANDLE;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
 use tokio::task_local;
 
+// A C file descriptor type.
+// - On Unix this is directly the value of a RawFd.
+// - On Windows this wraps a RawHandle. Every CFd has a corresponding RawHandle,
+//   but the converse is not true in general. However it is true for the handles
+//   we care about, since those come from files opened in Python via the C stdlib.
+type CFd = c_int;
+
+#[cfg(windows)]
+unsafe extern "C" {
+    unsafe fn _get_osfhandle(fd: c_int) -> HANDLE;
+}
+
+// We cannot recover Python's CFd from a Windows RawHandle, so must carry it around with the File.
+// The File is optional only so that it may be "taken" during Drop.
+#[derive(Debug)]
+struct FileAndCFd(Option<File>, CFd);
+
+impl FileAndCFd {
+    #[cfg(unix)]
+    unsafe fn from_cfd(cfd: CFd) -> Self {
+        unsafe { Self(Some(File::from_raw_fd(cfd)), cfd) }
+    }
+
+    #[cfg(windows)]
+    unsafe fn from_cfd(cfd: CFd) -> Self {
+        unsafe { Self(Some(File::from_raw_handle(_get_osfhandle(cfd))), cfd) }
+    }
+}
+
+impl Drop for FileAndCFd {
+    #[cfg(unix)]
+    fn drop(&mut self) {
+        // "Forget" about our file handle without closing it.
+        let _ = self.0.take().unwrap().into_raw_fd();
+    }
+
+    #[cfg(windows)]
+    fn drop(&mut self) {
+        // "Forget" about our file handle without closing it.
+        let _ = self.0.take().unwrap().into_raw_handle();
+    }
+}
+
 ///
 /// A Console wraps some "borrowed" file handles: when it is dropped, we forget about the file
-/// handles rather than closing them. The file handles are optional only so that they may be
-/// "taken" during Drop.
+/// handles rather than closing them.
 ///
 #[derive(Debug)]
 struct Console {
-    stdin_handle: Option<File>,
-    stdout_handle: Option<File>,
-    stderr_handle: Option<File>,
+    stdin_handle: FileAndCFd,
+    stdout_handle: FileAndCFd,
+    stderr_handle: FileAndCFd,
     stderr_use_color: bool,
 }
 
 impl Console {
-    fn new(stdin_fd: RawFd, stdout_fd: RawFd, stderr_fd: RawFd) -> Console {
+    fn new(stdin_fd: CFd, stdout_fd: CFd, stderr_fd: CFd) -> Console {
         let (stdin, stdout, stderr) = unsafe {
             (
-                File::from_raw_fd(stdin_fd),
-                File::from_raw_fd(stdout_fd),
-                File::from_raw_fd(stderr_fd),
+                FileAndCFd::from_cfd(stdin_fd),
+                FileAndCFd::from_cfd(stdout_fd),
+                FileAndCFd::from_cfd(stderr_fd),
             )
         };
         Console {
-            stdin_handle: Some(stdin),
-            stdout_handle: Some(stdout),
-            stderr_handle: Some(stderr),
+            stdin_handle: stdin,
+            stdout_handle: stdout,
+            stderr_handle: stderr,
             stderr_use_color: false,
         }
     }
 
     fn read_stdin(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        self.stdin_handle.as_ref().unwrap().read(buf)
+        self.stdin_handle.0.as_ref().unwrap().read(buf)
     }
 
     fn write_stdout(&mut self, content: &[u8]) -> Result<(), std::io::Error> {
-        let mut stdout = self.stdout_handle.as_ref().unwrap();
+        let mut stdout = self.stdout_handle.0.as_ref().unwrap();
         stdout.write_all(content)?;
         stdout.flush()
     }
 
     fn write_stderr(&mut self, content: &[u8]) -> Result<(), std::io::Error> {
-        let mut stderr = self.stderr_handle.as_ref().unwrap();
+        let mut stderr = self.stderr_handle.0.as_ref().unwrap();
         stderr.write_all(content)?;
         stderr.flush()
     }
 
-    fn stdin_as_raw_fd(&self) -> RawFd {
-        self.stdin_handle.as_ref().unwrap().as_raw_fd()
+    fn stdin_as_c_fd(&self) -> CFd {
+        self.stdin_handle.1
     }
 
     fn stderr_set_use_color(&mut self, use_color: bool) {
         self.stderr_use_color = use_color;
     }
 
-    fn stdout_as_raw_fd(&self) -> RawFd {
-        self.stdout_handle.as_ref().unwrap().as_raw_fd()
+    fn stdout_as_c_fd(&self) -> CFd {
+        self.stdout_handle.1
     }
 
-    fn stderr_as_raw_fd(&self) -> RawFd {
-        self.stderr_handle.as_ref().unwrap().as_raw_fd()
-    }
-}
-
-impl Drop for Console {
-    fn drop(&mut self) {
-        // "Forget" about our file handles without closing them.
-        let _ = self.stdin_handle.take().unwrap().into_raw_fd();
-        let _ = self.stdout_handle.take().unwrap().into_raw_fd();
-        let _ = self.stderr_handle.take().unwrap().into_raw_fd();
+    fn stderr_as_c_fd(&self) -> CFd {
+        self.stderr_handle.1
     }
 }
 
@@ -338,9 +377,9 @@ impl Destination {
     /// but this method is additionally unsafe because the real file might have been closed by the
     /// time the caller interacts with it.
     ///
-    pub fn stdin_as_raw_fd(&self) -> Result<RawFd, String> {
+    pub fn stdin_as_c_fd(&self) -> Result<CFd, String> {
         match &*self.0.lock() {
-      InnerDestination::Console(console) => Ok(console.stdin_as_raw_fd()),
+      InnerDestination::Console(console) => Ok(console.stdin_as_c_fd()),
       InnerDestination::Logging => {
         Err("No associated file descriptor for the Logging destination".to_owned())
       }
@@ -355,9 +394,9 @@ impl Destination {
     /// but this method is additionally unsafe because the real file might have been closed by the
     /// time the caller interacts with it.
     ///
-    pub fn stdout_as_raw_fd(&self) -> Result<RawFd, String> {
+    pub fn stdout_as_c_fd(&self) -> Result<CFd, String> {
         match &*self.0.lock() {
-      InnerDestination::Console(console) => Ok(console.stdout_as_raw_fd()),
+      InnerDestination::Console(console) => Ok(console.stdout_as_c_fd()),
       InnerDestination::Logging => {
         Err("No associated file descriptor for the Logging destination".to_owned())
       }
@@ -372,9 +411,9 @@ impl Destination {
     /// but this method is additionally unsafe because the real file might have been closed by the
     /// time the caller interacts with it.
     ///
-    pub fn stderr_as_raw_fd(&self) -> Result<RawFd, String> {
+    pub fn stderr_as_c_fd(&self) -> Result<CFd, String> {
         match &*self.0.lock() {
-      InnerDestination::Console(console) => Ok(console.stderr_as_raw_fd()),
+      InnerDestination::Console(console) => Ok(console.stderr_as_c_fd()),
       InnerDestination::Logging => {
         Err("No associated file descriptor for the Logging destination".to_owned())
       }
@@ -403,11 +442,7 @@ task_local! {
 /// Creates a Console that borrows the given file handles, and which can be set for a Thread
 /// using `set_thread_destination`.
 ///
-pub fn new_console_destination(
-    stdin_fd: RawFd,
-    stdout_fd: RawFd,
-    stderr_fd: RawFd,
-) -> Arc<Destination> {
+pub fn new_console_destination(stdin_fd: CFd, stdout_fd: CFd, stderr_fd: CFd) -> Arc<Destination> {
     Arc::new(Destination(Mutex::new(InnerDestination::Console(
         Console::new(stdin_fd, stdout_fd, stderr_fd),
     ))))

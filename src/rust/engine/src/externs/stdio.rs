@@ -21,7 +21,7 @@ impl PyStdioRead {
 
     fn fileno(&self) -> PyResult<i32> {
         stdio::get_destination()
-            .stdin_as_raw_fd()
+            .stdin_as_c_fd()
             .map_err(PyException::new_err)
     }
 
@@ -81,9 +81,9 @@ impl PyStdioWrite {
     fn fileno(&self) -> PyResult<i32> {
         let destination = stdio::get_destination();
         let fd = if self.is_stdout {
-            destination.stdout_as_raw_fd()
+            destination.stdout_as_c_fd()
         } else {
-            destination.stderr_as_raw_fd()
+            destination.stderr_as_c_fd()
         };
         fd.map_err(PyException::new_err)
     }
