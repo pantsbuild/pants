@@ -115,7 +115,7 @@ class ThirdPartyPkgAnalysisRequest(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
-class AllThirdPartyPackages(FrozenDict[str, ThirdPartyPkgAnalysis]):
+class AllThirdPartyPackages:
     """All the packages downloaded from a go.mod, along with a digest of the downloaded files.
 
     The digest has files in the format `gopath/pkg/mod`, which is what `GoSdkProcess` sets `GOPATH`
