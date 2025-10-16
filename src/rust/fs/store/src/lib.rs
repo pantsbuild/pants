@@ -49,7 +49,7 @@ use sharded_lmdb::DEFAULT_LEASE_TIME;
 use tokio::fs::copy;
 #[cfg(not(target_os = "macos"))]
 use tokio::fs::hard_link;
-use tokio::fs::symlink;
+use tokio::fs::{metadata, set_permissions, symlink};
 use tryfuture::try_future;
 use workunit_store::{Level, Metric, in_workunit};
 
@@ -1372,7 +1372,7 @@ impl Store {
             }
 
             if perms == Permissions::ReadOnly {
-                tokio::fs::set_permissions(&destination, std::fs::Permissions::from_mode(0o555))
+                set_permissions(&destination, std::fs::Permissions::from_mode(0o555))
                     .await
                     .map_err(|e| {
                         format!(
@@ -1433,17 +1433,32 @@ impl Store {
                         destination.display()
                     )
                 })?;
-                tokio::fs::set_permissions(&destination, FSPermissions::from_mode(mode))
+                set_permissions(&destination, FSPermissions::from_mode(mode))
                     .await
                     .map_err(|e| {
                         format!(
-                            "Error setting permissions on {}: {e}",
+                            "Error setting permissions on file at {}: {e}",
                             destination.display()
                         )
                     })?;
                 Ok(())
             }
             None => {
+                // If the destination already exists and is readonly, make it writeable so
+                // we can overwrite it.
+                let existing_permissions = match metadata(&destination).await {
+                    Ok(meta) => {
+                        let mut perms = meta.permissions();
+                        if perms.mode() & 0o200 == 0 {
+                            perms.set_mode(perms.mode() | 0o222);
+                            set_permissions(&destination, perms.clone()).await.map_err(
+                                |e| format!("Failed to make existing file at {} writeable before writing there: {e}", destination.display())
+                            )?;
+                        }
+                        Some(perms)
+                    }
+                    _ => None,
+                };
                 self.load_file_bytes_with(digest, move |bytes| {
                     let mut f = OpenOptions::new()
                         .create(true)
@@ -1461,6 +1476,18 @@ impl Store {
                     f.write_all(bytes).map_err(|e| {
                         format!("Error writing file {}: {:?}", destination.display(), e)
                     })?;
+                    // If the destination existed before we wrote to it, ensure it has the right
+                    // permissions (OpenOptions::mode() only sets permissions on created files).
+                    if let Some(perms) = existing_permissions.as_ref() {
+                        let mut new_perms = perms.clone();
+                        new_perms.set_mode(mode);
+                        std::fs::set_permissions(&destination, new_perms).map_err(|e| {
+                            format!(
+                                "Error setting permissions on file at {}: {e}",
+                                destination.display()
+                            )
+                        })?;
+                    }
                     Ok(())
                 })
                 .await?
@@ -1468,34 +1495,66 @@ impl Store {
         }
     }
 
-    pub async fn materialize_symlink(
-        &self,
-        destination: PathBuf,
-        target: String,
-    ) -> Result<(), StoreError> {
-        // Overwriting a symlink, even with another symlink, fails if it exists. This can occur when
-        // materializing to a fixed directory like dist/. To avoid pessimising the more common case (no
-        // overwrite, e.g. materializing to a temp dir), only remove after noticing a failure.
-        //
-        // NB. #17758, #18849: this is a work-around for inaccurate management of the contents of dist/.
+    // Overwriting a symlink or a hardlink (and even copying, on macos) fails if the target exists.
+    // Since materialization is required to be idempotent (e.g., when materializing over an existing
+    // directory in dist/, or when the sandboxer retries materializing after a restart), we must
+    // handle the case where the target exists by deleting the target.
+    // To avoid pessimising the more common case (no overwrite, e.g. materializing to a temp
+    // dir), only remove after noticing a failure.
+    // NB. #17758, #18849: this is a workaround for inaccurate management of the contents of dist/.
+    async fn _safe_link<'a, 'b, R, F, Fut>(
+        link_fn: F,
+        link_type: &'static str,
+        target: &'a String,
+        destination: &'b PathBuf,
+    ) -> Result<(), StoreError>
+    where
+        F: Fn(&'a Path, &'b Path) -> Fut,
+        Fut: Future<Output = std::io::Result<R>>,
+    {
         for first in [true, false] {
-            match symlink(&target, &destination).await {
-                Ok(()) => break,
-                Err(e) if first && e.kind() == std::io::ErrorKind::AlreadyExists => {
-                    tokio::fs::remove_dir_all(&destination).await.map_err(|e| {
-                        format!(
-              "Failed to remove existing item at {} when creating symlink to {target} there: {e}",
-              destination.display()
-            )
+            let res = link_fn(target.as_ref(), destination.as_ref()).await;
+            match res {
+                Ok(_) => break,
+                Err(e)
+                    if first
+                        && (e.kind() == std::io::ErrorKind::AlreadyExists
+                            || e.kind() == std::io::ErrorKind::PermissionDenied) =>
+                {
+                    let meta = metadata(destination).await.map_err(
+                        |e| { format!("Failed to get file metadata for existing item at {} when creating {link_type} of {target} there: {e}", destination.display()) }
+                    )?;
+                    if e.kind() == std::io::ErrorKind::PermissionDenied {
+                        let mut perms = meta.permissions();
+                        perms.set_mode(perms.mode() | 0o200);
+                        set_permissions(destination, perms).await.map_err(
+                            |e| { format!("Failed to make existing item at {} writeable when creating {link_type} of {target} there: {e}", destination.display()) }
+                        )?;
+                    }
+                    let removal_res = if meta.is_dir() {
+                        tokio::fs::remove_dir_all(destination).await
+                    } else {
+                        tokio::fs::remove_file(destination).await
+                    };
+                    removal_res.map_err(|e| {
+                        format!("Failed to remove existing item at {} when creating {link_type} of {target} there: {e}", destination.display())
                     })?
                 }
                 Err(e) => Err(format!(
-                    "Failed to create symlink to {target} at {}: {e}",
+                    "Failed to create {link_type} of {target} at {}: {e}",
                     destination.display()
                 ))?,
             }
         }
         Ok(())
+    }
+
+    pub async fn materialize_symlink(
+        &self,
+        destination: PathBuf,
+        target: String,
+    ) -> Result<(), StoreError> {
+        Store::_safe_link(symlink, "symlink", &target, &destination).await
     }
 
     pub async fn materialize_hardlink(
@@ -1510,19 +1569,9 @@ impl Store {
         // It also has the benefit of playing nicely with Docker for macOS file virtualization: see
         // #18162.
         #[cfg(target_os = "macos")]
-        copy(&target, &destination).await.map_err(|e| {
-            format!(
-                "Failed to copy from {target} to {}: {e}",
-                destination.display()
-            )
-        })?;
+        Store::_safe_link(copy, "copy", &target, &destination).await?;
         #[cfg(not(target_os = "macos"))]
-        hard_link(&target, &destination).await.map_err(|e| {
-            format!(
-                "Failed to create hardlink to {target} at {}: {e}",
-                destination.display()
-            )
-        })?;
+        Store::_safe_link(hard_link, "hardlink", &target, &destination).await?;
         Ok(())
     }
 
