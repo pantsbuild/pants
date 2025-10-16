@@ -75,6 +75,7 @@ def _generate(
         metadata = None
     content = digest_contents[0].content.decode()
 
+    requirements_strings.sort()
     requirements_header_formatting = ",\n".join(
         f'            //     "{req}"' for req in requirements_strings
     )
@@ -320,3 +321,81 @@ def test_empty_requirements(rule_runner: PythonRuleRunner) -> None:
         "Cannot generate lockfile with no requirements. Please add some requirements to test."
         in str(excinfo.value)
     )
+
+
+def test_define_source_from_different_index(rule_runner: PythonRuleRunner) -> None:
+    args = [
+        "--python-resolves={'test': 'foo.lock'}",
+        "--python-repos-indexes=['https://pypi.org/simple/','test_pipy=https://test.pypi.org/simple/']",
+        "--python-resolves-to-sources={'test': ['test_pipy=cowsay']}",
+    ]
+    rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
+
+    lock_entry = json.loads(
+        _generate(
+            rule_runner=rule_runner,
+            requirements_strings=["cowsay==6.0", "ansicolors==1.1.8"],
+            sources_str=dedent(
+                """\
+                //   "sources": [
+                //     "test_pipy=cowsay"
+                //   ]"""
+            ),
+        )
+    )
+
+    reqs = lock_entry["locked_resolves"][0]["locked_requirements"]
+
+    assert len(reqs) == 2
+
+    # Ansicolors is from PyPI (https://files.pythonhosted.org)
+    assert reqs[0]["project_name"] == "ansicolors"
+    assert reqs[0]["version"] == "1.1.8"
+
+    wheel_ansicolors = {
+        "algorithm": "sha256",
+        "hash": "00d2dde5a675579325902536738dd27e4fac1fd68f773fe36c21044eb559e187",
+        "url": (
+            "https://files.pythonhosted.org/packages/53/18/"
+            + "a56e2fe47b259bb52201093a3a9d4a32014f9d85071ad07e9d60600890ca/"
+            + "ansicolors-1.1.8-py2.py3-none-any.whl"
+        ),
+    }
+    sdist_ansicolors = {
+        "algorithm": "sha256",
+        "hash": "99f94f5e3348a0bcd43c82e5fc4414013ccc19d70bd939ad71e0133ce9c372e0",
+        "url": (
+            "https://files.pythonhosted.org/packages/76/31/"
+            + "7faed52088732704523c259e24c26ce6f2f33fbeff2ff59274560c27628e/"
+            + "ansicolors-1.1.8.zip"
+        ),
+    }
+    artifacts = reqs[0]["artifacts"]
+    assert wheel_ansicolors in artifacts
+    assert sdist_ansicolors in artifacts
+
+    # Cowsay is from TestPyPI (https://test-files.pythonhosted.org)
+    assert reqs[1]["project_name"] == "cowsay"
+    assert reqs[1]["version"] == "6.0"
+
+    wheel_cowsay = {
+        "algorithm": "sha256",
+        "hash": "77b07c508af48aa300a90f3b3c5c013a12360a71fc5c87b1efb763fe2803a775",
+        "url": (
+            "https://test-files.pythonhosted.org/packages/73/56/"
+            + "7922bfc226ccd44221befb6b866aaa4da4170bc9d8b036ef0675ce0f1b53/"
+            + "cowsay-6.0-py2.py3-none-any.whl"
+        ),
+    }
+    sdist_cowsay = {
+        "algorithm": "sha256",
+        "hash": "47445cb273684618a1786db8e8d05ec9258455f7eb74893e5d0933daafeb44ba",
+        "url": (
+            "https://test-files.pythonhosted.org/packages/7e/b5/"
+            + "e8e802ddc7f5219417dc7d7953eec81ffe48ad129b793f3040361e4aff89/"
+            + "cowsay-6.0.tar.gz"
+        ),
+    }
+    artifacts = reqs[1]["artifacts"]
+    assert wheel_cowsay in artifacts
+    assert sdist_cowsay in artifacts
