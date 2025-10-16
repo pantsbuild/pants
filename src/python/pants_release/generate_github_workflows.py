@@ -890,7 +890,7 @@ def macos14_arm64_test_jobs() -> Jobs:
 def windows11_x86_64_test_jobs() -> Jobs:
     helper = Helper(Platform.WINDOWS11_X86_64)
     jobs = {
-            helper.job_name("build"): {
+        helper.job_name("build"): {
             "name": "Test in-progress Windows support",
             "runs-on": helper.runs_on(),
             "timeout-minutes": 60,
@@ -903,7 +903,7 @@ def windows11_x86_64_test_jobs() -> Jobs:
                     "with": {
                         "msystem": "UCRT64",
                         "install": "base-devel mingw-w64-x86_64-toolchain mingw-w64-ucrt-x86_64-nasm mingw-w64-x86_64-cmake mingw-w64-ucrt-x86_64-protobuf",
-                    }
+                    },
                 },
                 {
                     "name": "Set Up Rust Toolchain",
@@ -911,7 +911,7 @@ def windows11_x86_64_test_jobs() -> Jobs:
                     "with": {
                         "toolchain": "stable",
                         "target": "x86_64-pc-windows-gnu",
-                        "rust-src-dir": "src/rust"
+                        "rust-src-dir": "src/rust",
                     },
                 },
                 {
@@ -919,7 +919,7 @@ def windows11_x86_64_test_jobs() -> Jobs:
                     "shell": "msys2 {0}",
                     "run": dedent(
                         """\
-                        # $GITHUB_PATH affects the regular Windows path, not the MSYS2 path, 
+                        # $GITHUB_PATH affects the regular Windows path, not the MSYS2 path,
                         # so we must modify the MSYS2 PATH directly in each step that needs it.
                         export PATH=$PATH:$(cygpath $USERPROFILE)/.cargo/bin
                         cd src/rust
@@ -927,11 +927,12 @@ def windows11_x86_64_test_jobs() -> Jobs:
                         cargo test -p stdio
                         """
                     ),
-                }
-            ]
+                },
+            ],
         }
     }
     return jobs
+
 
 def build_wheels_job(
     platform: Platform,
