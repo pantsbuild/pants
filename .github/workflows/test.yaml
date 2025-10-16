@@ -743,7 +743,13 @@ jobs:
         target: x86_64-pc-windows-gnu
         toolchain: stable
     - name: Check and Test Rust Code
-      run: "# $GITHUB_PATH affects the regular Windows path, not the MSYS2 path, \n# so we must modify the MSYS2 PATH directly in each step that needs it.\nexport PATH=$PATH:$(cygpath $USERPROFILE)/.cargo/bin\ncd src/rust\ncargo check -p stdio\ncargo test -p stdio\n"
+      run: |
+        # $GITHUB_PATH affects the regular Windows path, not the MSYS2 path,
+        # so we must modify the MSYS2 PATH directly in each step that needs it.
+        export PATH=$PATH:$(cygpath $USERPROFILE)/.cargo/bin
+        cd src/rust
+        cargo check -p stdio
+        cargo test -p stdio
       shell: msys2 {0}
     timeout-minutes: 60
   check_release_notes:
