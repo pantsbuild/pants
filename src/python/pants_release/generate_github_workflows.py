@@ -22,12 +22,14 @@ from pants_release.common import die
 def action(name: str) -> str:
     version_map = {
         "action-send-mail": "dawidd6/action-send-mail@v3.8.0",
+        "actions-rust-lang": "actions-rust-lang/setup-rust-toolchain@v1",
         "attest-build-provenance": "actions/attest-build-provenance@v2",
         "cache": "actions/cache@v4",
         "checkout": "actions/checkout@v4",
         "coverallsapp": "coverallsapp/github-action@v2",
         "download-artifact": "actions/download-artifact@v4",
         "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
+        "msys2": "msys2/setup-msys2@v2",
         "rust-cache": "Swatinem/rust-cache@v2.8.1",
         "setup-go": "actions/setup-go@v5",
         "setup-java": "actions/setup-java@v4",
@@ -899,7 +901,7 @@ def windows11_x86_64_test_jobs() -> Jobs:
                 *checkout(),
                 {
                     "name": "Install MSYS2",
-                    "uses": "msys2/setup-msys2@v2",
+                    "uses": action("msys2"),
                     "with": {
                         "msystem": "UCRT64",
                         "install": "base-devel mingw-w64-x86_64-toolchain mingw-w64-ucrt-x86_64-nasm mingw-w64-x86_64-cmake mingw-w64-ucrt-x86_64-protobuf",
@@ -907,7 +909,7 @@ def windows11_x86_64_test_jobs() -> Jobs:
                 },
                 {
                     "name": "Set Up Rust Toolchain",
-                    "uses": "actions-rust-lang/setup-rust-toolchain@v1",
+                    "uses": action("actions-rust-lang"),
                     "with": {
                         "toolchain": "stable",
                         "target": "x86_64-pc-windows-gnu",
