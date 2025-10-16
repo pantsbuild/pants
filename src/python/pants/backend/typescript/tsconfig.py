@@ -35,11 +35,37 @@ class TSConfig:
     module_resolution: str | None = None
     paths: FrozenDict[str, tuple[str, ...]] | None = None
     base_url: str | None = None
+    out_dir: str | None = None
+    allow_js: bool | None = None
+    check_js: bool | None = None
 
     @property
     def resolution_root_dir(self) -> str:
         directory = os.path.dirname(self.path)
         return os.path.join(directory, self.base_url) if self.base_url else directory
+
+    def validate_outdir(self) -> None:
+        if not self.out_dir:
+            raise ValueError(
+                f"TypeScript configuration at '{self.path}' is missing required 'outDir' setting. "
+                f"TypeScript type-checking requires an explicit outDir in compilerOptions to work properly. "
+                f'Add \'"outDir": "./dist"\' (or your preferred output directory) to the compilerOptions '
+                f"in {self.path}."
+            )
+
+        if ".." in self.out_dir:
+            raise ValueError(
+                f"TypeScript configuration at '{self.path}' has outDir '{self.out_dir}' "
+                f"that uses '..' path components. Each package should use its own output directory "
+                f"within its package boundary (e.g., './dist', './build'). Cross-package output "
+                f"directories can cause build conflicts where packages overwrite each other's artifacts."
+            )
+
+        if os.path.isabs(self.out_dir):
+            raise ValueError(
+                f"TypeScript configuration at '{self.path}' has absolute outDir '{self.out_dir}'. "
+                f"Use a relative path within the package directory instead (e.g., './dist', './build')."
+            )
 
 
 class AllTSConfigs(Collection[TSConfig]):
@@ -116,6 +142,9 @@ def _parse_config_from_content(content: FileContent) -> tuple[TSConfig, str | No
         module_resolution=compiler_options.get("moduleResolution"),
         paths=compiler_options.get("paths"),
         base_url=compiler_options.get("baseUrl"),
+        out_dir=compiler_options.get("outDir"),
+        allow_js=compiler_options.get("allowJs"),
+        check_js=compiler_options.get("checkJs"),
     ), parsed_ts_config_json.get("extends")
 
 
@@ -140,6 +169,11 @@ async def parse_extended_ts_config(request: ParseTSConfigRequest) -> TSConfig:
         module_resolution=ts_config.module_resolution or extended_parent.module_resolution,
         paths=ts_config.paths or extended_parent.paths,
         base_url=ts_config.base_url or extended_parent.base_url,
+        # Do NOT inherit outDir - paths in extended configs are resolved relative to where they're defined,
+        # not where they're used, making inherited outDir values incorrect for child projects
+        out_dir=ts_config.out_dir,
+        allow_js=ts_config.allow_js if ts_config.allow_js is not None else extended_parent.allow_js,
+        check_js=ts_config.check_js if ts_config.check_js is not None else extended_parent.check_js,
     )
 
 
