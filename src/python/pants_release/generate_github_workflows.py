@@ -22,12 +22,14 @@ from pants_release.common import die
 def action(name: str) -> str:
     version_map = {
         "action-send-mail": "dawidd6/action-send-mail@v3.8.0",
+        "actions-rust-lang": "actions-rust-lang/setup-rust-toolchain@v1",
         "attest-build-provenance": "actions/attest-build-provenance@v2",
         "cache": "actions/cache@v4",
         "checkout": "actions/checkout@v4",
         "coverallsapp": "coverallsapp/github-action@v2",
         "download-artifact": "actions/download-artifact@v4",
         "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
+        "msys2": "msys2/setup-msys2@v2",
         "rust-cache": "Swatinem/rust-cache@v2.8.1",
         "setup-go": "actions/setup-go@v5",
         "setup-java": "actions/setup-java@v4",
@@ -67,6 +69,7 @@ class Platform(Enum):
     LINUX_ARM64 = "Linux-ARM64"
     MACOS13_X86_64 = "macOS13-x86_64"
     MACOS14_ARM64 = "macOS14-ARM64"
+    WINDOWS11_X86_64 = "Windows11-x86_64"
 
 
 GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS13_X86_64, Platform.MACOS14_ARM64}
@@ -457,6 +460,8 @@ class Helper:
                 "image=ubuntu22-full-arm64-python3.7-3.13",
                 "run-id=${{ github.run_id }}",
             ]
+        elif self.platform == Platform.WINDOWS11_X86_64:
+            ret += ["windows-2025"]
         else:
             raise ValueError(f"Unsupported platform: {self.platform_name()}")
         return ret
@@ -884,6 +889,53 @@ def macos14_arm64_test_jobs() -> Jobs:
     return jobs
 
 
+def windows11_x86_64_test_jobs() -> Jobs:
+    helper = Helper(Platform.WINDOWS11_X86_64)
+    jobs = {
+        helper.job_name("build"): {
+            "name": "Test in-progress Windows support",
+            "runs-on": helper.runs_on(),
+            "timeout-minutes": 60,
+            "if": IS_PANTS_OWNER,
+            "steps": [
+                *checkout(),
+                {
+                    "name": "Install MSYS2",
+                    "uses": action("msys2"),
+                    "with": {
+                        "msystem": "UCRT64",
+                        "install": "base-devel mingw-w64-x86_64-toolchain mingw-w64-ucrt-x86_64-nasm mingw-w64-x86_64-cmake mingw-w64-ucrt-x86_64-protobuf",
+                    },
+                },
+                {
+                    "name": "Set Up Rust Toolchain",
+                    "uses": action("actions-rust-lang"),
+                    "with": {
+                        "toolchain": "stable",
+                        "target": "x86_64-pc-windows-gnu",
+                        "rust-src-dir": "src/rust",
+                    },
+                },
+                {
+                    "name": "Check and Test Rust Code",
+                    "shell": "msys2 {0}",
+                    "run": dedent(
+                        """\
+                        # $GITHUB_PATH affects the regular Windows path, not the MSYS2 path,
+                        # so we must modify the MSYS2 PATH directly in each step that needs it.
+                        export PATH=$PATH:$(cygpath $USERPROFILE)/.cargo/bin
+                        cd src/rust
+                        cargo check -p stdio
+                        cargo test -p stdio
+                        """
+                    ),
+                },
+            ],
+        }
+    }
+    return jobs
+
+
 def build_wheels_job(
     platform: Platform,
     for_deploy_ref: str | None,
@@ -1100,6 +1152,7 @@ def test_workflow_jobs() -> Jobs:
     jobs.update(**macos13_x86_64_test_jobs())
     jobs.update(**macos14_arm64_test_jobs())
     jobs.update(**build_wheels_jobs())
+    jobs.update(**windows11_x86_64_test_jobs())
     jobs.update(
         {
             "lint_python": {

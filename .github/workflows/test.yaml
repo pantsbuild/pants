@@ -719,6 +719,39 @@ jobs:
         overwrite: 'true'
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
+  build_windows11_x86_64:
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
+    name: Test in-progress Windows support
+    needs:
+    - classify_changes
+    runs-on:
+    - windows-2025
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 10
+    - name: Install MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        install: base-devel mingw-w64-x86_64-toolchain mingw-w64-ucrt-x86_64-nasm mingw-w64-x86_64-cmake mingw-w64-ucrt-x86_64-protobuf
+        msystem: UCRT64
+    - name: Set Up Rust Toolchain
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        rust-src-dir: src/rust
+        target: x86_64-pc-windows-gnu
+        toolchain: stable
+    - name: Check and Test Rust Code
+      run: |
+        # $GITHUB_PATH affects the regular Windows path, not the MSYS2 path,
+        # so we must modify the MSYS2 PATH directly in each step that needs it.
+        export PATH=$PATH:$(cygpath $USERPROFILE)/.cargo/bin
+        cd src/rust
+        cargo check -p stdio
+        cargo test -p stdio
+      shell: msys2 {0}
+    timeout-minutes: 60
   check_release_notes:
     if: github.repository_owner == 'pantsbuild'
     name: Ensure PR has release notes
@@ -913,6 +946,7 @@ jobs:
     - build_wheels_linux_x86_64
     - build_wheels_macos13_x86_64
     - build_wheels_macos14_arm64
+    - build_windows11_x86_64
     - check_release_notes
     - classify_changes
     - coveralls_done
