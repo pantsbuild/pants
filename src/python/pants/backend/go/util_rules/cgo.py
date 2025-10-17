@@ -813,8 +813,8 @@ async def cgo_compile_request(
                     "-importpath",
                     request.import_path,
                     *maybe_disable_imports_flags,
-                    # TODO(#16835): Add -trimpath option to remove sandbox paths from source paths embedded in files.
-                    # This means using `__PANTS_SANDBOX_ROOT__` support of `GoSdkProcess`.
+                    "-trimpath",
+                    "__PANTS_SANDBOX_ROOT__",
                     "--",
                     *flags.cppflags,
                     *flags.cflags,
