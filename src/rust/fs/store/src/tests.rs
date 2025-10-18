@@ -1195,50 +1195,53 @@ async fn materialize_directory(perms: Permissions, executable_file: bool) {
         .await
         .expect("Error saving file bytes");
 
-    store
-        .materialize_directory(
-            materialize_dir.path().to_owned(),
-            materialize_dir.path(),
-            recursive_testdir.directory_digest(),
-            false,
-            &BTreeSet::new(),
-            perms,
-        )
-        .await
-        .expect("Error materializing");
+    // Materialize twice, to verify idempotency.
+    for _ in 0..2 {
+        store
+            .materialize_directory(
+                materialize_dir.path().to_owned(),
+                materialize_dir.path(),
+                recursive_testdir.directory_digest(),
+                false,
+                &BTreeSet::new(),
+                perms,
+            )
+            .await
+            .expect("Error materializing");
 
-    // Validate contents.
-    assert_eq!(list_dir(materialize_dir.path()), vec!["cats", "treats.ext"]);
-    assert_eq!(
-        file_contents(&materialize_dir.path().join("treats.ext")),
-        catnip.bytes()
-    );
-    assert_eq!(
-        list_dir(&materialize_dir.path().join("cats")),
-        vec!["feed.ext", "food.ext"]
-    );
-    assert_eq!(
-        file_contents(&materialize_dir.path().join("cats").join("feed.ext")),
-        catnip.bytes()
-    );
+        // Validate contents.
+        assert_eq!(list_dir(materialize_dir.path()), vec!["cats", "treats.ext"]);
+        assert_eq!(
+            file_contents(&materialize_dir.path().join("treats.ext")),
+            catnip.bytes()
+        );
+        assert_eq!(
+            list_dir(&materialize_dir.path().join("cats")),
+            vec!["feed.ext", "food.ext"]
+        );
+        assert_eq!(
+            file_contents(&materialize_dir.path().join("cats").join("feed.ext")),
+            catnip.bytes()
+        );
 
-    // Validate executability.
-    assert_eq!(
-        executable_file,
-        is_executable(&materialize_dir.path().join("cats").join("feed.ext"))
-    );
-    assert!(!is_executable(
-        &materialize_dir.path().join("cats").join("food.ext")
-    ));
+        // Validate executability.
+        assert_eq!(
+            executable_file,
+            is_executable(&materialize_dir.path().join("cats").join("feed.ext"))
+        );
+        assert!(!is_executable(
+            &materialize_dir.path().join("cats").join("food.ext")
+        ));
 
-    // Validate read/write permissions for a file, a nested directory, and the root.
-    let readonly = perms == Permissions::ReadOnly;
-    assert_eq!(
-        readonly,
-        is_readonly(&materialize_dir.path().join("cats").join("feed.ext"))
-    );
-    assert_eq!(readonly, is_readonly(&materialize_dir.path().join("cats")));
-    assert_eq!(readonly, is_readonly(materialize_dir.path()));
+        // Validate read/write permissions for a file, a nested directory, and the root.
+        let readonly = perms == Permissions::ReadOnly;
+        assert_eq!(
+            readonly,
+            is_readonly(&materialize_dir.path().join("cats").join("feed.ext"))
+        );
+        assert_eq!(readonly, is_readonly(&materialize_dir.path().join("cats")));
+        assert_eq!(readonly, is_readonly(materialize_dir.path()));
+    }
 }
 
 #[tokio::test]
@@ -1743,30 +1746,33 @@ async fn big_file_immutable_link() {
         .await
         .expect("Error saving bytes");
 
-    store
-        .materialize_directory(
-            materialize_dir.path().to_owned(),
-            materialize_dir.path(),
-            directory_digest,
-            false,
-            &BTreeSet::from([
-                RelativePath::new("output_file").unwrap(),
-                RelativePath::new("output_dir").unwrap(),
-            ]),
-            Permissions::Writable,
-        )
-        .await
-        .expect("Error materializing file");
+    // Materialize twice, to verify idempotency.
+    for _ in 0..2 {
+        store
+            .materialize_directory(
+                materialize_dir.path().to_owned(),
+                materialize_dir.path(),
+                directory_digest.clone(),
+                false,
+                &BTreeSet::from([
+                    RelativePath::new("output_file").unwrap(),
+                    RelativePath::new("output_dir").unwrap(),
+                ]),
+                Permissions::Writable,
+            )
+            .await
+            .expect("Error materializing file");
 
-    let assert_is_linked = |path: &PathBuf, is_linked: bool| {
-        assert_eq!(file_contents(path), file_bytes);
-        assert!(is_executable(path));
-        assert_eq!(path.metadata().unwrap().permissions().readonly(), is_linked);
-    };
+        let assert_is_linked = |path: &PathBuf, is_linked: bool| {
+            assert_eq!(file_contents(path), file_bytes);
+            assert!(is_executable(path));
+            assert_eq!(path.metadata().unwrap().permissions().readonly(), is_linked);
+        };
 
-    assert_is_linked(&input_file, true);
-    assert_is_linked(&output_file, false);
-    assert_is_linked(&nested_output_file, false);
+        assert_is_linked(&input_file, true);
+        assert_is_linked(&output_file, false);
+        assert_is_linked(&nested_output_file, false);
+    }
 }
 
 #[tokio::test]
@@ -1813,24 +1819,27 @@ async fn big_file_mutable_root_dir() {
         &directory.to_bytes(),
     ));
 
-    store
-        .materialize_directory(
-            materialize_dir.path().to_owned(),
-            materialize_dir.path(),
-            directory_digest,
-            false,
-            &BTreeSet::from([RelativePath::new(".").unwrap()]),
-            Permissions::Writable,
-        )
-        .await
-        .expect("Error materializing files");
+    // Materialize twice, to verify idempotency.
+    for _ in 0..2 {
+        store
+            .materialize_directory(
+                materialize_dir.path().to_owned(),
+                materialize_dir.path(),
+                directory_digest.clone(),
+                false,
+                &BTreeSet::from([RelativePath::new(".").unwrap()]),
+                Permissions::Writable,
+            )
+            .await
+            .expect("Error materializing files");
 
-    let assert_path = |path: &PathBuf| {
-        assert_eq!(file_contents(path), file_bytes);
-        assert!(is_executable(path));
-        assert!(!path.metadata().unwrap().permissions().readonly());
-    };
+        let assert_path = |path: &PathBuf| {
+            assert_eq!(file_contents(path), file_bytes);
+            assert!(is_executable(path));
+            assert!(!path.metadata().unwrap().permissions().readonly());
+        };
 
-    assert_path(&materialize_dir.path().join("file"));
-    assert_path(&materialize_dir.path().join("nested").join("file"));
+        assert_path(&materialize_dir.path().join("file"));
+        assert_path(&materialize_dir.path().join("nested").join("file"));
+    }
 }
