@@ -49,7 +49,6 @@ def test_basic_package_shell_command(rule_runner: RuleRunner) -> None:
                   command="echo 'Hello, World!' > output.txt",
                   tools=["echo"],
                   output_files=["output.txt"],
-                  packaged_artifacts=["output.txt"],
                   output_path="",
                 )
                 """
@@ -80,7 +79,6 @@ def test_package_shell_command_with_multiple_outputs(rule_runner: RuleRunner) ->
                   command="echo 'file1' > output1.txt && echo 'file2' > output2.txt",
                   tools=["echo"],
                   output_files=["output1.txt", "output2.txt"],
-                  packaged_artifacts=["output1.txt", "output2.txt"],
                   output_path="",
                 )
                 """
@@ -115,7 +113,6 @@ def test_package_shell_command_with_output_directories(rule_runner: RuleRunner) 
                   command="mkdir -p dist && echo 'content' > dist/file.txt",
                   tools=["mkdir", "echo"],
                   output_directories=["dist"],
-                  packaged_artifacts=["dist"],
                   output_path="",
                 )
                 """
@@ -146,7 +143,6 @@ def test_package_shell_command_skip(rule_runner: RuleRunner) -> None:
                   command="echo test > output.txt",
                   tools=["echo"],
                   output_files=["output.txt"],
-                  packaged_artifacts=["output.txt"],
                   skip_package=True,
                 )
                 """
@@ -171,7 +167,6 @@ def test_outputs_match_mode_support(rule_runner: RuleRunner) -> None:
                     output_files=["some-file"],
                     output_directories=["some-directory"],
                     outputs_match_mode="all",
-                    packaged_artifacts=["some-file"],
                     output_path="",
                 )
                 package_shell_command(
@@ -181,7 +176,6 @@ def test_outputs_match_mode_support(rule_runner: RuleRunner) -> None:
                     output_files=["some-file"],
                     output_directories=["some-directory"],
                     outputs_match_mode="all",
-                    packaged_artifacts=["some-file"],
                     output_path="",
                 )
                 package_shell_command(
@@ -191,7 +185,6 @@ def test_outputs_match_mode_support(rule_runner: RuleRunner) -> None:
                     output_files=["some-file"],
                     output_directories=["some-directory"],
                     outputs_match_mode="at_least_one",
-                    packaged_artifacts=["some-file"],
                     output_path="",
                 )
                 package_shell_command(
@@ -201,7 +194,6 @@ def test_outputs_match_mode_support(rule_runner: RuleRunner) -> None:
                     output_files=["some-file"],
                     output_directories=["some-directory"],
                     outputs_match_mode="at_least_one",
-                    packaged_artifacts=["some-directory"],
                     output_path="",
                 )
                 """
@@ -258,7 +250,6 @@ def test_output_path_field(rule_runner: RuleRunner) -> None:
                     command="echo test",
                     tools=["echo"],
                     output_files=["output.txt"],
-                    packaged_artifacts=["output.txt"],
                 )
                 package_shell_command(
                     name="no-template",
@@ -266,7 +257,6 @@ def test_output_path_field(rule_runner: RuleRunner) -> None:
                     tools=["echo"],
                     output_files=["output.txt"],
                     output_path="custom/path",
-                    packaged_artifacts=["output.txt"],
                 )
                 package_shell_command(
                     name="with-spec-path",
@@ -274,7 +264,6 @@ def test_output_path_field(rule_runner: RuleRunner) -> None:
                     tools=["echo"],
                     output_files=["output.txt"],
                     output_path="${spec_path_normalized}/custom",
-                    packaged_artifacts=["output.txt"],
                 )
                 package_shell_command(
                     name="with-target-name",
@@ -282,7 +271,6 @@ def test_output_path_field(rule_runner: RuleRunner) -> None:
                     tools=["echo"],
                     output_files=["output.txt"],
                     output_path="build/${target_name_normalized}",
-                    packaged_artifacts=["output.txt"],
                 )
                 """
             )
@@ -309,9 +297,3 @@ def test_output_path_field(rule_runner: RuleRunner) -> None:
     # Test with target_name_normalized
     output_path_with_target = get_output_path("with-target-name")
     assert output_path_with_target == "build/with-target-name"
-
-
-def test_close_over_parent_paths() -> None:
-    assert shell_package._close_over_parent_paths(["a/b/c", "d"]) == frozenset(
-        ["a", "a/b", "a/b/c", "d"]
-    )

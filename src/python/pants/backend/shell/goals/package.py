@@ -4,13 +4,10 @@
 from __future__ import annotations
 
 import dataclasses
-import os
-from collections.abc import Iterable
 from dataclasses import dataclass
 
 from pants.backend.shell.target_types import (
     ShellCommandCommandField,
-    ShellCommandPackagedArtifactsField,
     ShellCommandPackageDependenciesField,
     SkipShellCommandPackageField,
 )
@@ -48,22 +45,10 @@ class PackageShellCommandFieldSet(PackageFieldSet):
 
     environment: EnvironmentField
     output_path: OutputPathField
-    packaged_artifacts: ShellCommandPackagedArtifactsField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
         return tgt.get(SkipShellCommandPackageField).value
-
-
-def _close_over_parent_paths(paths: Iterable[str]) -> frozenset[str]:
-    result: set[str] = set()
-    for path in paths:
-        path_parts = path.split(os.sep)
-        i = 1
-        while i <= len(path_parts):
-            result.add(os.path.join(*path_parts[0:i]))
-            i += 1
-    return frozenset(result)
 
 
 @rule(desc="Package with shell command", level=LogLevel.DEBUG)
@@ -100,27 +85,6 @@ async def package_shell_command(
             "The `package` goal is expected to produce output."
         )
 
-    # First, validate that packaged_artifacts exist in the output (before applying output_path).
-    output_digest_entries = await get_digest_entries(result.adjusted_digest)
-    captured_paths = _close_over_parent_paths(e.path for e in output_digest_entries)
-    configured_packaged_artifacts = field_set.packaged_artifacts.value or ()
-    validated_packaged_artifacts: list[str] = []
-    missing_packaged_artifacts: list[str] = []
-    for packaged_artifact in configured_packaged_artifacts:
-        if packaged_artifact in captured_paths:
-            if packaged_artifact not in validated_packaged_artifacts:
-                validated_packaged_artifacts.append(packaged_artifact)
-        else:
-            missing_packaged_artifacts.append(packaged_artifact)
-
-    # Raise an error for any `packaged_artifacts` entries not present in the output.
-    if missing_packaged_artifacts:
-        missing_packaged_artifacts_str = ", ".join(missing_packaged_artifacts)
-        raise ValueError(
-            f"The following `packaged_artifacts` for the `{target.alias}` at `{field_set.address}` did not match "
-            f"any file or directory in the captured output: {missing_packaged_artifacts_str}"
-        )
-
     # Apply the output path for the artifacts.
     output_path = field_set.output_path.value_or_default(file_ending=None)
     output_digest: Digest
@@ -129,24 +93,10 @@ async def package_shell_command(
     else:
         output_digest = result.adjusted_digest
 
-    # Create artifacts list with output_path applied to validated artifacts. If no artifacts were specified, then
-    # just make a single `BuiltPackageArtifact` for the entire output path.
-    artifacts: list[BuiltPackageArtifact] = []
-    if configured_packaged_artifacts:
-        for packaged_artifact in validated_packaged_artifacts:
-            relpath = (
-                os.path.join(output_path, packaged_artifact) if output_path else packaged_artifact
-            )
-            artifacts.append(BuiltPackageArtifact(relpath=relpath))
-    else:
-        if not output_path:
-            raise AssertionError(
-                f"No `packaged_artifacts` for the `{target.alias}` at `{field_set.address}` were configured and the "
-                "`output_path` is empty which means we cannot configure the internal `BuiltPackageArtifact` instance needed."
-            )
-        artifacts.append(BuiltPackageArtifact(relpath=output_path))
-
-    return BuiltPackage(output_digest, tuple(artifacts))
+    output_digest_entries = await get_digest_entries(result.adjusted_digest)
+    file_paths = sorted(e.path for e in output_digest_entries)
+    artifacts = tuple(BuiltPackageArtifact(relpath=path) for path in file_paths)
+    return BuiltPackage(output_digest, artifacts)
 
 
 def rules():

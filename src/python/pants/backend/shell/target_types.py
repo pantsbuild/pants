@@ -540,16 +540,6 @@ class ShellCommandPackageDependenciesField(ShellCommandExecutionDependenciesFiel
     pass
 
 
-class ShellCommandPackagedArtifactsField(StringSequenceField):
-    alias = "packaged_artifacts"
-    default = ()
-    help = help_text(
-        """
-        Specify the "built artifacts" exposed by the packaged ouputs.
-        """
-    )
-
-
 class ShellCommandPackageTarget(Target):
     alias = "package_shell_command"
 
@@ -576,7 +566,6 @@ class ShellCommandPackageTarget(Target):
         ShellCommandOutputsMatchMode,
         ShellCommandOutputDependenciesField,
         OutputPathField,
-        ShellCommandPackagedArtifactsField,
     )
 
     help = help_text(
