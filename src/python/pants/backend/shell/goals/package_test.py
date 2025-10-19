@@ -44,7 +44,7 @@ def test_basic_package_shell_command(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                experimental_package_shell_command(
+                package_shell_command(
                   name="build",
                   command="echo 'Hello, World!' > output.txt",
                   tools=["echo"],
@@ -75,7 +75,7 @@ def test_package_shell_command_with_multiple_outputs(rule_runner: RuleRunner) ->
         {
             "BUILD": dedent(
                 """\
-                experimental_package_shell_command(
+                package_shell_command(
                   name="build",
                   command="echo 'file1' > output1.txt && echo 'file2' > output2.txt",
                   tools=["echo"],
@@ -110,7 +110,7 @@ def test_package_shell_command_with_output_directories(rule_runner: RuleRunner) 
         {
             "BUILD": dedent(
                 """\
-                experimental_package_shell_command(
+                package_shell_command(
                   name="build",
                   command="mkdir -p dist && echo 'content' > dist/file.txt",
                   tools=["mkdir", "echo"],
@@ -141,7 +141,7 @@ def test_package_shell_command_skip(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                experimental_package_shell_command(
+                package_shell_command(
                   name="build",
                   command="echo test > output.txt",
                   tools=["echo"],
@@ -164,7 +164,7 @@ def test_outputs_match_mode_support(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                experimental_package_shell_command(
+                package_shell_command(
                     name="all_with_present_file",
                     command="touch some-file",
                     tools=["touch"],
@@ -174,7 +174,7 @@ def test_outputs_match_mode_support(rule_runner: RuleRunner) -> None:
                     packaged_artifacts=["some-file"],
                     output_path="",
                 )
-                experimental_package_shell_command(
+                package_shell_command(
                     name="all_with_present_directory",
                     command="mkdir some-directory",
                     tools=["mkdir"],
@@ -184,7 +184,7 @@ def test_outputs_match_mode_support(rule_runner: RuleRunner) -> None:
                     packaged_artifacts=["some-file"],
                     output_path="",
                 )
-                experimental_package_shell_command(
+                package_shell_command(
                     name="at_least_one_with_present_file",
                     command="touch some-file",
                     tools=["touch"],
@@ -194,7 +194,7 @@ def test_outputs_match_mode_support(rule_runner: RuleRunner) -> None:
                     packaged_artifacts=["some-file"],
                     output_path="",
                 )
-                experimental_package_shell_command(
+                package_shell_command(
                     name="at_least_one_with_present_directory",
                     command="mkdir some-directory && touch some-directory/foo.txt",
                     tools=["mkdir", "touch"],
@@ -253,14 +253,14 @@ def test_output_path_field(rule_runner: RuleRunner) -> None:
         {
             "src/foo/BUILD": dedent(
                 """\
-                experimental_package_shell_command(
+                package_shell_command(
                     name="default",
                     command="echo test",
                     tools=["echo"],
                     output_files=["output.txt"],
                     packaged_artifacts=["output.txt"],
                 )
-                experimental_package_shell_command(
+                package_shell_command(
                     name="no-template",
                     command="echo test",
                     tools=["echo"],
@@ -268,7 +268,7 @@ def test_output_path_field(rule_runner: RuleRunner) -> None:
                     output_path="custom/path",
                     packaged_artifacts=["output.txt"],
                 )
-                experimental_package_shell_command(
+                package_shell_command(
                     name="with-spec-path",
                     command="echo test",
                     tools=["echo"],
@@ -276,7 +276,7 @@ def test_output_path_field(rule_runner: RuleRunner) -> None:
                     output_path="${spec_path_normalized}/custom",
                     packaged_artifacts=["output.txt"],
                 )
-                experimental_package_shell_command(
+                package_shell_command(
                     name="with-target-name",
                     command="echo test",
                     tools=["echo"],

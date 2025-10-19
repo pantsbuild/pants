@@ -551,7 +551,7 @@ class ShellCommandPackagedArtifactsField(StringSequenceField):
 
 
 class ShellCommandPackageTarget(Target):
-    alias = "experimental_package_shell_command"
+    alias = "package_shell_command"
 
     core_fields = (
         *COMMON_TARGET_FIELDS,
