@@ -309,3 +309,9 @@ def test_output_path_field(rule_runner: RuleRunner) -> None:
     # Test with target_name_normalized
     output_path_with_target = get_output_path("with-target-name")
     assert output_path_with_target == "build/with-target-name"
+
+
+def test_close_over_parent_paths() -> None:
+    assert shell_package._close_over_parent_paths(["a/b/c", "d"]) == frozenset(
+        ["a", "a/b", "a/b/c", "d"]
+    )
