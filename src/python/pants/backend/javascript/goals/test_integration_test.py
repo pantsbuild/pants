@@ -23,6 +23,11 @@ from pants.backend.javascript.target_types import (
     JSTestsGeneratorTarget,
     JSTestTarget,
 )
+from pants.backend.tsx.target_types import (
+    TSXSourcesGeneratorTarget,
+    TSXTestsGeneratorTarget,
+    TSXTestTarget,
+)
 from pants.backend.typescript.target_types import (
     TypeScriptSourcesGeneratorTarget,
     TypeScriptTestsGeneratorTarget,
@@ -58,6 +63,9 @@ def rule_runner(package_manager: str) -> RuleRunner:
             TypeScriptSourcesGeneratorTarget,
             TypeScriptTestsGeneratorTarget,
             TypeScriptTestTarget,
+            TSXSourcesGeneratorTarget,
+            TSXTestsGeneratorTarget,
+            TSXTestTarget,
         ],
         objects=dict(package_json.build_file_aliases().objects),
     )
@@ -454,6 +462,49 @@ def test_typescript_test_files(
         }
     )
     tgt = rule_runner.get_target(Address("foo/src/tests", relative_file_path="index.test.ts"))
+    package = rule_runner.get_target(Address("foo", generated_name="pkg"))
+    result = rule_runner.request(TestResult, [given_request_for(tgt, package=package)])
+    assert b"Test Suites: 1 passed, 1 total" in result.stderr_bytes
+    assert result.exit_code == 0
+
+
+def test_tsx_test_files(
+    rule_runner: RuleRunner,
+    jest_lockfile: dict[str, str],
+    jest_dev_dependencies: dict[str, str],
+) -> None:
+    """Test that TSX test files are recognized and executed."""
+    rule_runner.write_files(
+        {
+            "foo/BUILD": "package_json()",
+            "foo/package.json": given_package_json(
+                test_script={"test": "jest"},
+                dev_dependencies=jest_dev_dependencies,
+                jest={"preset": "ts-jest", "globals": {"ts-jest": {"tsconfig": {"jsx": "react"}}}},
+            ),
+            **{f"foo/{key}": value for key, value in jest_lockfile.items()},
+            "foo/tsconfig.json": json.dumps({"compilerOptions": {"jsx": "react"}}),
+            "foo/src/BUILD": "tsx_sources()",
+            "foo/src/index.tsx": textwrap.dedent(
+                """\
+                export function add(x: number, y: number): number {
+                  return x + y;
+                }
+                """
+            ),
+            "foo/src/tests/BUILD": "tsx_tests(name='tests')",
+            "foo/src/tests/index.test.tsx": textwrap.dedent(
+                """\
+                import { add } from '../index';
+
+                test('adds 1 + 2 to equal 3', () => {
+                    expect(add(1, 2)).toBe(3);
+                });
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("foo/src/tests", relative_file_path="index.test.tsx"))
     package = rule_runner.get_target(Address("foo", generated_name="pkg"))
     result = rule_runner.request(TestResult, [given_request_for(tgt, package=package)])
     assert b"Test Suites: 1 passed, 1 total" in result.stderr_bytes
