@@ -310,6 +310,7 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
                 only_binary=only_binary,
                 no_binary=no_binary,
                 excludes=excludes,
+                overrides=overrides,
                 sources=sources,
             )
             .failure_reasons

@@ -895,6 +895,7 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
         manylinux=None,
         excludes=set(),
         overrides=set(),
+        sources=set(),
     ).add_header_to_lockfile(b"", regenerate_command="regen", delimeter="#")
     rule_runner.write_files({"lock.txt": lock_content.decode()})
 
