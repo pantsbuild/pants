@@ -400,8 +400,10 @@ impl PyRemovePrefix {
 #[allow(dead_code)]
 struct PyPathGlobs(PathGlobs);
 
-impl<'py> FromPyObject<'py> for PyPathGlobs {
-    fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
+impl<'a, 'py> FromPyObject<'a, 'py> for PyPathGlobs {
+    type Error = PyErr;
+
+    fn extract(obj: Borrowed<'a, 'py, PyAny>) -> PyResult<Self> {
         let globs: Vec<String> = obj.getattr("globs")?.extract()?;
 
         let description_of_origin_field = obj.getattr("description_of_origin")?;

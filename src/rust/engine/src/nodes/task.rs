@@ -313,7 +313,11 @@ impl Task {
                     // If there are explicit positional arguments, apply any computed arguments as
                     // keywords. Otherwise, apply computed arguments as positional.
                     let res = if let Some(args) = args {
-                        let args = args.value.bind(py).extract::<Bound<'_, PyTuple>>()?;
+                        let args = args
+                            .value
+                            .bind(py)
+                            .extract::<Bound<'_, PyTuple>>()
+                            .map_err(Into::<PyErr>::into)?;
                         let kwargs = PyDict::new(py);
                         for ((name, _), value) in self
                             .task

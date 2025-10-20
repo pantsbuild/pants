@@ -55,7 +55,7 @@ impl PreparedInferenceRequest {
         let PyNativeDependenciesRequest {
             directory_digest,
             metadata,
-        } = Python::attach(|py| deps_request.bind(py).extract())?;
+        } = Python::attach(|py| deps_request.bind(py).extract().map_err(Into::<PyErr>::into))?;
 
         let (path, digest) = Self::find_one_file(directory_digest, store, backend).await?;
         let str_path = path.display().to_string();

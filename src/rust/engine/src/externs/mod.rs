@@ -170,7 +170,8 @@ pub fn store_bool(py: Python, val: bool) -> Value {
 ///
 pub fn getattr<'py, T>(value: &Bound<'py, PyAny>, field: &str) -> Result<T, String>
 where
-    T: FromPyObject<'py>,
+    T: for<'a> FromPyObject<'a, 'py>,
+    for<'a> <T as FromPyObject<'a, 'py>>::Error: std::fmt::Debug,
 {
     value
         .getattr(field)
@@ -213,17 +214,18 @@ pub fn collect_iterable<'py>(value: &Bound<'py, PyAny>) -> Result<Vec<Bound<'py,
 }
 
 /// Read a `FrozenDict[str, T]`.
-pub fn getattr_from_str_frozendict<'py, T: FromPyObject<'py>>(
+pub fn getattr_from_str_frozendict<'py, T: for<'a> FromPyObject<'a, 'py>>(
     value: &Bound<'py, PyAny>,
     field: &str,
 ) -> BTreeMap<String, T> {
     let frozendict: Bound<PyAny> = getattr(value, field).unwrap();
     let pydict: Bound<PyDict> = getattr(&frozendict, "_data").unwrap();
-    pydict
+    let result: BTreeMap<String, T> = pydict
         .items()
         .into_iter()
-        .map(|kv_pair| kv_pair.extract().unwrap())
-        .collect()
+        .map(|kv_pair| kv_pair.extract::<(String, T)>().unwrap())
+        .collect();
+    result
 }
 
 pub fn getattr_as_optional_string(
@@ -305,7 +307,8 @@ pub(crate) fn generator_send(
                 let throw = err
                     .value(py)
                     .getattr(intern!(py, "failure"))?
-                    .extract::<PyRef<PyFailure>>()?
+                    .extract::<PyRef<PyFailure>>()
+                    .map_err(Into::<PyErr>::into)?
                     .get_error(py);
                 let response = throw_method.call1((&throw,));
                 (response, Some((throw, err)))
