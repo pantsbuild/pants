@@ -10,7 +10,7 @@ use parking_lot::{MappedRwLockReadGuard, Mutex, RwLock, RwLockReadGuard};
 use pyo3::FromPyObject;
 use pyo3::exceptions::{PyAssertionError, PyException, PyStopIteration, PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::sync::MutexExt;
+use pyo3::sync::{MutexExt, RwLockExt};
 use pyo3::types::{PyBool, PyBytes, PyDict, PySequence, PyString, PyTuple, PyType};
 use pyo3::{create_exception, import_exception, intern};
 use smallvec::{SmallVec, smallvec};
@@ -527,13 +527,8 @@ impl PyGeneratorResponseNativeCall {
 pub struct PyGeneratorResponseCall(RwLock<Option<Call>>);
 
 impl PyGeneratorResponseCall {
-    fn borrow_inner<'py>(
-        &'py self,
-        _py: Python<'py>,
-    ) -> PyResult<MappedRwLockReadGuard<'py, Call>> {
-        // TODO: This may deadlock with the GIL. The `read_py_attached` extenstion method available in
-        // https://github.com/PyO3/pyo3/pull/5435 should be used once available in PyO3.
-        let read_guard = self.0.read();
+    fn borrow_inner<'py>(&'py self, py: Python<'py>) -> PyResult<MappedRwLockReadGuard<'py, Call>> {
+        let read_guard = self.0.read_py_attached(py);
 
         if read_guard.is_some() {
             Ok(RwLockReadGuard::map(read_guard, |g| g.as_ref().unwrap()))
@@ -618,11 +613,9 @@ impl PyGeneratorResponseCall {
 }
 
 impl PyGeneratorResponseCall {
-    fn take(&self, _py: Python<'_>) -> Result<Call, String> {
-        // TODO: The write lock may deadlock with the GIL. The `write_py_attached` extenstion method available in
-        // https://github.com/PyO3/pyo3/pull/5435 should be used once available in PyO3.
+    fn take(&self, py: Python<'_>) -> Result<Call, String> {
         self.0
-            .write()
+            .write_py_attached(py)
             .take()
             .ok_or_else(|| "A `Call` may only be consumed once.".to_owned())
     }
