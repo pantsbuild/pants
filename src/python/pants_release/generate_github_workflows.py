@@ -52,7 +52,7 @@ HEADER = dedent(
     """\
     # GENERATED, DO NOT EDIT!
     # To change, edit `src/python/pants_release/generate_github_workflows.py` and run:
-    #   ./pants run src/python/pants_release/generate_github_workflows.py
+    #   pants run src/python/pants_release/generate_github_workflows.py
     """
 )
 
@@ -313,6 +313,7 @@ def launch_bazel_remote() -> Sequence[Step]:
 def global_env() -> Env:
     return {
         "PANTS_CONFIG_FILES": "+['pants.ci.toml']",
+        "PANTS_DISABLE_GETS": "1",
         "RUST_BACKTRACE": "all",
         # Default to disabling OpenTelemetry so GHA steps not using Pants directly do not try
         # to use Honeycomb if they do invoke Pants indirectly (e.g., Rust integration tests).
