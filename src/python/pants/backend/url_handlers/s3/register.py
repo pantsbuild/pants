@@ -189,7 +189,7 @@ async def download_from_s3(
         NativeDownloadFile(
             url=virtual_hosted_url,
             expected_digest=request.expected_digest,
-            auth_headers=http_request.headers,
+            auth_headers=dict(http_request.headers),
             retry_delay_duration=global_options.file_downloads_retry_delay,
             max_attempts=global_options.file_downloads_max_attempts,
         )

@@ -19,15 +19,16 @@ use std::convert::TryInto;
 use std::sync::LazyLock;
 use std::{env, fmt};
 
-use logging::PythonLogLevel;
-use rule_graph::RuleId;
-
+use crate::externs::frozendict::FrozenDict;
 use crate::interning::Interns;
 use crate::python::{Failure, Key, TypeId, Value};
+use logging::PythonLogLevel;
+use rule_graph::RuleId;
 
 mod address;
 pub mod dep_inference;
 pub mod engine_aware;
+mod frozendict;
 pub mod fs;
 mod interface;
 #[cfg(test)]
@@ -217,12 +218,10 @@ pub fn getattr_from_str_frozendict<'py, T: FromPyObject<'py>>(
     value: &Bound<'py, PyAny>,
     field: &str,
 ) -> BTreeMap<String, T> {
-    let frozendict: Bound<PyAny> = getattr(value, field).unwrap();
-    let pydict: Bound<PyDict> = getattr(&frozendict, "_data").unwrap();
-    pydict
-        .items()
-        .into_iter()
-        .map(|kv_pair| kv_pair.extract().unwrap())
+    let frozendict: Bound<FrozenDict> = getattr(value, field).unwrap();
+    FrozenDict::iter(frozendict)
+        .unwrap()
+        .map(|(k, v)| (k.extract().unwrap(), v.extract().unwrap()))
         .collect()
 }
 
