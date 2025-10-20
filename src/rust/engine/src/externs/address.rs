@@ -427,11 +427,11 @@ fn split_on_longest_dir_prefix<'a, 'b>(
     let mut longest_match = 0;
     let mut matched = None;
     for prefix in prefixes {
-        if prefix.len() > longest_match {
-            if let Ok(stripped) = Path::new(path).strip_prefix(prefix) {
-                longest_match = prefix.len();
-                matched = Some((*prefix, stripped.to_str().unwrap()));
-            }
+        if prefix.len() > longest_match
+            && let Ok(stripped) = Path::new(path).strip_prefix(prefix)
+        {
+            longest_match = prefix.len();
+            matched = Some((*prefix, stripped.to_str().unwrap()));
         }
     }
     matched
@@ -523,15 +523,15 @@ impl Address {
             relative_file_path,
         };
 
-        if let Some(file_name) = address.spec_path.file_name().and_then(|n| n.to_str()) {
-            if file_name.starts_with("BUILD") {
-                return Err(InvalidSpecPathError::new_err(format!(
-                    "The address {address} has {} as the last part of its \
+        if let Some(file_name) = address.spec_path.file_name().and_then(|n| n.to_str())
+            && file_name.starts_with("BUILD")
+        {
+            return Err(InvalidSpecPathError::new_err(format!(
+                "The address {address} has {} as the last part of its \
            path, but BUILD is a reserved name. Please make sure that you did not name any \
            directories BUILD.",
-                    Path::new(file_name).display(),
-                )));
-            }
+                Path::new(file_name).display(),
+            )));
         }
 
         Ok(address)

@@ -141,22 +141,22 @@ def rules():
 
 Then, run `pants package path/to:python_distribution` and inspect the generated `setup.py`to confirm that your plugin worked correctly.
 
-Often, you will want to read from a file in your project to set kwargs like `version` or `long_description`. Use `await Get(DigestContents, PathGlobs)` to do this (see [File system](../the-rules-api/file-system.mdx)):
+Often, you will want to read from a file in your project to set kwargs like `version` or `long_description`. Use `await get_digest_contents(**implicitly(PathGlobs(...)))` to do this (see [File system](../the-rules-api/file-system.mdx)):
 
 ```python
 from pants.backend.python.util_rules.package_dists import SetupKwargs
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
+from pants.engine.intrinsics import get_digest_contents
 from pants.engine.rules import rule
 
 @rule
 async def setup_kwargs_plugin(request: CustomSetupKwargsRequest) -> SetupKwargs:
-    digest_contents = await Get(
-        DigestContents,
-        PathGlobs(
+    digest_contents = await get_digest_contents(
+        **implicitly(PathGlobs(
             ["project/ABOUT.rst"],
             description_of_origin="`python_artifact()` plugin",
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
-        ),
+        ))
     )
     about_page_content = digest_contents[0].content.decode()
     return SetupKwargs(
@@ -186,6 +186,7 @@ import os.path
 
 from pants.backend.python.util_rules.package_dists import SetupKwargs
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
+from pants.engine.intrinsics import get_digest_contents
 from pants.engine.rules import rule
 
 @rule
@@ -201,13 +202,12 @@ async def setup_kwargs_plugin(request: CustomSetupKwargsRequest) -> SetupKwargs:
 
     build_file_path = request.target.address.spec_path
     long_description_path = os.path.join(build_file_path, long_description_relpath)
-    digest_contents = await Get(
-        DigestContents,
-        PathGlobs(
+    digest_contents = await get_digest_contents(
+        **implicitly(PathGlobs(
             [long_description_path],
             description_of_origin=f"the 'long_description_file' kwarg in {request.target.address}",
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
-        ),
+        ))
     )
     description_content = digest_contents[0].content.decode()
     return SetupKwargs(

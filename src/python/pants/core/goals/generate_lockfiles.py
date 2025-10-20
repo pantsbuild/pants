@@ -483,7 +483,7 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
         default=None,
         help=softwrap(
             f"""
-            If set, lockfile headers will say to run this command to regenerate the lockfile,
+            If set, lockfile metadata will say to run this command to regenerate the lockfile,
             rather than running `{bin_name()} generate-lockfiles --resolve=<name>` like normal.
             """
         ),

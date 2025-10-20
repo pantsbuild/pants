@@ -1348,7 +1348,7 @@ impl<R: Rule> Builder<R> {
         // Leaf errors have no dependencies in the errored map.
         let mut leaf_errors = errored
             .iter()
-            .filter(|(&node_id, _)| {
+            .filter(|&(&node_id, _)| {
                 !graph
                     .neighbors_directed(node_id, Direction::Outgoing)
                     .any(|dependency_id| {

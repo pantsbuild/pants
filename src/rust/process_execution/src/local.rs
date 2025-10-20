@@ -817,7 +817,7 @@ impl AsyncDropSandbox {
 impl Drop for AsyncDropSandbox {
     fn drop(&mut self) {
         if let Some(sandbox) = self.2.take() {
-            let _background_cleanup = self.0.native_spawn_blocking(|| std::mem::drop(sandbox));
+            let _background_cleanup = self.0.spawn_blocking(|| std::mem::drop(sandbox));
         }
     }
 }
@@ -852,7 +852,7 @@ pub fn setup_run_sh_script(
     }
 
     let stringified_cwd = {
-        let cwd = if let Some(ref working_directory) = working_directory {
+        let cwd = if let Some(working_directory) = working_directory {
             workdir_path.join(working_directory)
         } else {
             workdir_path.to_owned()

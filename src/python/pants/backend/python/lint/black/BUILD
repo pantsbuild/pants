@@ -4,10 +4,10 @@
 resources(
     name="lockfiles",
     sources=[
-        "black.lock",
+        "black.lock*",
         # Lockfile for the version of Black Pants used to provide (with the '23 stable style), to
         # make upgrading easier
-        "black-23.12.lock",
+        "black-23.12.lock*",
     ],
 )
 
@@ -18,7 +18,7 @@ python_sources(
 resources(
     name="black-py38-testing-lockfile",
     sources=[
-        "black-py38-testing.lock",
+        "black-py38-testing.lock*",
     ],
 )
 

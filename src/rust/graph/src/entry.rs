@@ -761,10 +761,8 @@ impl<N: Node> Entry<N> {
 
         test_trace_log!("Clearing node {:?}", self.node);
 
-        if graph_still_contains_edges {
-            if let Some(previous_result) = previous_result.as_mut() {
-                previous_result.dirty();
-            }
+        if graph_still_contains_edges && let Some(previous_result) = previous_result.as_mut() {
+            previous_result.dirty();
         }
 
         // Swap in a state with a new RunToken value, which invalidates any outstanding work.

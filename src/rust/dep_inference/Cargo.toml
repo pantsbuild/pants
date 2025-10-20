@@ -9,7 +9,7 @@
 # (A "breaking change" is one that changes the behavior of dependency parsing. This version is
 # embedded in the local cache. Therefore if behavior changes, the cache should be busted)
 version = "2.18.0"
-edition = "2021"
+edition = "2024"
 name = "dep_inference"
 authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false

@@ -322,19 +322,19 @@ fn spawn_and_read_port(
         .and_then(|res| res.map_err(|e| format!("Failed to read stdout from nailgun: {e}")));
 
     // If we failed to read a port line and the child has exited, report that.
-    if port_line.is_err() {
-        if let Some(exit_status) = child.try_wait().map_err(|e| e.to_string())? {
-            let mut stderr = String::new();
-            child
-                .stderr
-                .take()
-                .unwrap()
-                .read_to_string(&mut stderr)
-                .map_err(|e| e.to_string())?;
-            return Err(format!(
-                "Nailgun failed to start: exited with {exit_status}, stderr:\n{stderr}"
-            ));
-        }
+    if port_line.is_err()
+        && let Some(exit_status) = child.try_wait().map_err(|e| e.to_string())?
+    {
+        let mut stderr = String::new();
+        child
+            .stderr
+            .take()
+            .unwrap()
+            .read_to_string(&mut stderr)
+            .map_err(|e| e.to_string())?;
+        return Err(format!(
+            "Nailgun failed to start: exited with {exit_status}, stderr:\n{stderr}"
+        ));
     }
     let port_line = port_line?;
 
@@ -389,14 +389,13 @@ impl NailgunProcess {
 
         // Spawn the process and read its port from stdout.
         let (child, port) = executor
-            .spawn_blocking(
-                {
-                    let workdir = workdir.path().to_owned();
-                    move || spawn_and_read_port(startup_options, workdir)
-                },
-                |e| Err(format!("Nailgun spawn task failed: {e}")),
-            )
-            .await?;
+            .spawn_blocking({
+                let workdir = workdir.path().to_owned();
+                move || spawn_and_read_port(startup_options, workdir)
+            })
+            .await
+            .map_err(|e| format!("Nailgun spawn task failed: {e}"))
+            .flatten()?;
         debug!(
             "Created nailgun server process with pid {} and port {}",
             child.id(),
@@ -549,7 +548,7 @@ async fn clear_workdir(
     future::try_join_all(moves).await?;
 
     // And drop it in the background.
-    let fut = executor.native_spawn_blocking(move || std::mem::drop(garbage_dir));
+    let fut = executor.spawn_blocking(move || std::mem::drop(garbage_dir));
     drop(fut);
 
     Ok(())

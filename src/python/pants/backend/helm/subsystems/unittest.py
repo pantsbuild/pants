@@ -28,8 +28,12 @@ class HelmUnitTestSubsystem(ExternalHelmPlugin):
     plugin_name = "unittest"
     help = "BDD styled unit test framework for Kubernetes Helm charts as a Helm plugin. (https://github.com/helm-unittest)"
 
-    default_version = "0.8.0"
+    default_version = "1.0.1"
     default_known_versions = [
+        "1.0.1|macos_x86_64|3d6e88fce7d177025c47e840d804d1ef195c2fb07581797be477b002901f32d9|25991137",
+        "1.0.1|macos_arm64|92c5f3bcef1b75337d07ba05d48b40ec2190bc8a4fb4ba05e93664f93e28afa0|24374980",
+        "1.0.1|linux_x86_64|7e99822df43aaf25e198d0b5c950c1d31d1c5baa528adee8fa9b4063a761aced|26056496",
+        "1.0.1|linux_arm64|68e8ec894408bfd5a53de6299248cb438555a42b4cae1463a3fe4a4240dcbcd4|23979610",
         "0.8.0|macos_x86_64|4dfe519a0f0172e179f5a624f0a5fb20c3fa12737b182a1e244fda87e2dc2a7a|24199798",
         "0.8.0|macos_arm64|8275958346cc934c19b06bfc76f4a837ec7ab4c38f8cf8e980b7b93aa6b4d838|22776975",
         "0.8.0|linux_x86_64|3f436992adcc59a5e640d3d2889ccb275f22ad7cde8c8b8354b24728f4dd6f99|24293223",

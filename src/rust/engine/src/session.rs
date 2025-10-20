@@ -366,7 +366,7 @@ impl Session {
                                 .into_iter()
                                 .map(|(duration, desc)| format!(
                                     "{}\t{}",
-                                    format_workunit_duration_ms!(duration.as_millis()),
+                                    format_workunit_duration_ms(duration),
                                     desc
                                 ))
                                 .collect::<Vec<_>>()

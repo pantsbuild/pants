@@ -25,9 +25,13 @@ class KubeconformSubsystem(TemplatedExternalTool):
     name = "kubeconform"
     help = "Kubeconform tool (https://github.com/yannh/kubeconform)"
 
-    default_version = "0.6.7"
+    default_version = "0.7.0"
     default_url_template = "https://github.com/yannh/kubeconform/releases/download/v{version}/kubeconform-{platform}.tar.gz"
     default_known_versions = [
+        "0.7.0|macos_x86_64|c6771cc894d82e1b12f35ee797dcda1f7da6a3787aa30902a15c264056dd40d4|7420234",
+        "0.7.0|macos_arm64|b5d32b2cb77f9c781c976b20a85e2d0bc8f9184d5d1cfe665a2f31a19f99eeb9|7031569",
+        "0.7.0|linux_x86_64|c31518ddd122663b3f3aa874cfe8178cb0988de944f29c74a0b9260920d115d3|7491807",
+        "0.7.0|linux_arm64|cc907ccf9e3c34523f0f32b69745265e0a6908ca85b92f41931d4537860eb83c|6982794",
         "0.6.7|macos_x86_64|3b5324ac4fd38ac60a49823b4051ff42ff7eb70144f1e9741fed1d14bc4fdb4e|6225509",
         "0.6.7|macos_arm64|cbb47d938a8d18eb5f79cb33663b2cecdee0c8ac0bf562ebcfca903df5f0802f|5907133",
         "0.6.7|linux_x86_64|95f14e87aa28c09d5941f11bd024c1d02fdc0303ccaa23f61cef67bc92619d73|6264184",

@@ -22,12 +22,15 @@ from pants_release.common import die
 def action(name: str) -> str:
     version_map = {
         "action-send-mail": "dawidd6/action-send-mail@v3.8.0",
+        "actions-rust-lang": "actions-rust-lang/setup-rust-toolchain@v1",
         "attest-build-provenance": "actions/attest-build-provenance@v2",
         "cache": "actions/cache@v4",
         "checkout": "actions/checkout@v4",
+        "coverallsapp": "coverallsapp/github-action@v2",
         "download-artifact": "actions/download-artifact@v4",
         "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
-        "rust-cache": "benjyw/rust-cache@5ed697a6894712d2854c80635bb00a2496ea307a",
+        "msys2": "msys2/setup-msys2@v2",
+        "rust-cache": "Swatinem/rust-cache@v2.8.1",
         "setup-go": "actions/setup-go@v5",
         "setup-java": "actions/setup-java@v4",
         "setup-node": "actions/setup-node@v4",
@@ -53,6 +56,8 @@ HEADER = dedent(
     """
 )
 
+TEST_PYTHON_JOB_PREFIX = "test_python"
+
 
 Step = dict[str, Any]
 Jobs = dict[str, Any]
@@ -64,6 +69,7 @@ class Platform(Enum):
     LINUX_ARM64 = "Linux-ARM64"
     MACOS13_X86_64 = "macOS13-x86_64"
     MACOS14_ARM64 = "macOS14-ARM64"
+    WINDOWS11_X86_64 = "Windows11-x86_64"
 
 
 GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS13_X86_64, Platform.MACOS14_ARM64}
@@ -430,8 +436,11 @@ class Helper:
     def job_name_suffix(self) -> str:
         return self.platform_name().lower().replace("-", "_")
 
-    def job_name(self, prefix: str) -> str:
-        return f"{prefix}_{self.job_name_suffix()}"
+    def job_name(self, prefix: str, shard: str | None = None) -> str:
+        name = f"{prefix}_{self.job_name_suffix()}"
+        if shard:
+            name += f"_{shard}"
+        return name
 
     def runs_on(self) -> list[str]:
         # GHA strongly recommends targeting the self-hosted label as well as
@@ -451,6 +460,8 @@ class Helper:
                 "image=ubuntu22-full-arm64-python3.7-3.13",
                 "run-id=${{ github.run_id }}",
             ]
+        elif self.platform == Platform.WINDOWS11_X86_64:
+            ret += ["windows-2025"]
         else:
             raise ValueError(f"Unsupported platform: {self.platform_name()}")
         return ret
@@ -647,6 +658,22 @@ class Helper:
             },
         }
 
+    def coveralls_report(self, flag: str) -> Step:
+        return {
+            "name": "Report coverage to coveralls.io",
+            "uses": action("coverallsapp"),
+            "if": "always()",
+            "continue-on-error": True,
+            "with": {
+                "flag-name": flag,
+                "parallel": True,
+                "file": "dist/coverage/python/coverage.xml",
+                "format": "cobertura",
+                "allow-empty": True,
+                "fail-on-error": False,
+            },
+        }
+
 
 class RustTesting(Enum):
     NONE = "NONE"
@@ -780,6 +807,7 @@ def test_jobs(
             },
             helper.upload_test_reports(),
             helper.upload_log_artifacts(name=log_name),
+            helper.coveralls_report(flag=helper.job_name(TEST_PYTHON_JOB_PREFIX, shard)),
         ],
     }
 
@@ -790,21 +818,20 @@ def linux_x86_64_test_jobs() -> Jobs:
     def test_python_linux(shard: str) -> dict[str, Any]:
         return test_jobs(helper, shard, platform_specific=False, with_remote_caching=True)
 
-    shard_name_prefix = helper.job_name("test_python")
     jobs = {
         helper.job_name("bootstrap_pants"): bootstrap_jobs(
             helper, validate_ci_config=True, rust_testing=RustTesting.ALL
         ),
-        f"{shard_name_prefix}_0": test_python_linux("0/10"),
-        f"{shard_name_prefix}_1": test_python_linux("1/10"),
-        f"{shard_name_prefix}_2": test_python_linux("2/10"),
-        f"{shard_name_prefix}_3": test_python_linux("3/10"),
-        f"{shard_name_prefix}_4": test_python_linux("4/10"),
-        f"{shard_name_prefix}_5": test_python_linux("5/10"),
-        f"{shard_name_prefix}_6": test_python_linux("6/10"),
-        f"{shard_name_prefix}_7": test_python_linux("7/10"),
-        f"{shard_name_prefix}_8": test_python_linux("8/10"),
-        f"{shard_name_prefix}_9": test_python_linux("9/10"),
+        helper.job_name(TEST_PYTHON_JOB_PREFIX, "0"): test_python_linux("0/10"),
+        helper.job_name(TEST_PYTHON_JOB_PREFIX, "1"): test_python_linux("1/10"),
+        helper.job_name(TEST_PYTHON_JOB_PREFIX, "2"): test_python_linux("2/10"),
+        helper.job_name(TEST_PYTHON_JOB_PREFIX, "3"): test_python_linux("3/10"),
+        helper.job_name(TEST_PYTHON_JOB_PREFIX, "4"): test_python_linux("4/10"),
+        helper.job_name(TEST_PYTHON_JOB_PREFIX, "5"): test_python_linux("5/10"),
+        helper.job_name(TEST_PYTHON_JOB_PREFIX, "6"): test_python_linux("6/10"),
+        helper.job_name(TEST_PYTHON_JOB_PREFIX, "7"): test_python_linux("7/10"),
+        helper.job_name(TEST_PYTHON_JOB_PREFIX, "8"): test_python_linux("8/10"),
+        helper.job_name(TEST_PYTHON_JOB_PREFIX, "9"): test_python_linux("9/10"),
     }
     return jobs
 
@@ -819,7 +846,7 @@ def linux_arm64_test_jobs() -> Jobs:
         ),
         # We run these on a dedicated host with ample local cache, so remote caching
         # just adds cost but little value.
-        helper.job_name("test_python"): test_jobs(
+        helper.job_name(TEST_PYTHON_JOB_PREFIX): test_jobs(
             helper, shard=None, platform_specific=True, with_remote_caching=False
         ),
     }
@@ -836,9 +863,75 @@ def macos13_x86_64_test_jobs() -> Jobs:
         ),
         # We run these on a dedicated host with ample local cache, so remote caching
         # just adds cost but little value.
-        helper.job_name("test_python"): test_jobs(
+        helper.job_name(TEST_PYTHON_JOB_PREFIX): test_jobs(
             helper, shard=None, platform_specific=True, with_remote_caching=False
         ),
+    }
+    return jobs
+
+
+def macos14_arm64_test_jobs() -> Jobs:
+    helper = Helper(Platform.MACOS14_ARM64)
+    jobs = {
+        helper.job_name("bootstrap_pants"): bootstrap_jobs(
+            helper,
+            validate_ci_config=False,
+            rust_testing=RustTesting.SOME,
+        ),
+        helper.job_name(TEST_PYTHON_JOB_PREFIX): test_jobs(
+            helper,
+            shard=None,
+            platform_specific=True,
+            # No docker for bazel-remote in default setup
+            with_remote_caching=False,
+        ),
+    }
+    return jobs
+
+
+def windows11_x86_64_test_jobs() -> Jobs:
+    helper = Helper(Platform.WINDOWS11_X86_64)
+    jobs = {
+        helper.job_name("build"): {
+            "name": "Test in-progress Windows support",
+            "runs-on": helper.runs_on(),
+            "timeout-minutes": 60,
+            "if": IS_PANTS_OWNER,
+            "steps": [
+                *checkout(),
+                {
+                    "name": "Install MSYS2",
+                    "uses": action("msys2"),
+                    "with": {
+                        "msystem": "UCRT64",
+                        "install": "base-devel mingw-w64-x86_64-toolchain mingw-w64-ucrt-x86_64-nasm mingw-w64-x86_64-cmake mingw-w64-ucrt-x86_64-protobuf",
+                    },
+                },
+                {
+                    "name": "Set Up Rust Toolchain",
+                    "uses": action("actions-rust-lang"),
+                    "with": {
+                        "toolchain": "stable",
+                        "target": "x86_64-pc-windows-gnu",
+                        "rust-src-dir": "src/rust",
+                    },
+                },
+                {
+                    "name": "Check and Test Rust Code",
+                    "shell": "msys2 {0}",
+                    "run": dedent(
+                        """\
+                        # $GITHUB_PATH affects the regular Windows path, not the MSYS2 path,
+                        # so we must modify the MSYS2 PATH directly in each step that needs it.
+                        export PATH=$PATH:$(cygpath $USERPROFILE)/.cargo/bin
+                        cd src/rust
+                        cargo check -p stdio
+                        cargo test -p stdio
+                        """
+                    ),
+                },
+            ],
+        }
     }
     return jobs
 
@@ -1057,7 +1150,9 @@ def test_workflow_jobs() -> Jobs:
     jobs.update(**linux_x86_64_test_jobs())
     jobs.update(**linux_arm64_test_jobs())
     jobs.update(**macos13_x86_64_test_jobs())
+    jobs.update(**macos14_arm64_test_jobs())
     jobs.update(**build_wheels_jobs())
+    jobs.update(**windows11_x86_64_test_jobs())
     jobs.update(
         {
             "lint_python": {
@@ -1080,6 +1175,7 @@ def test_workflow_jobs() -> Jobs:
             },
         }
     )
+    jobs.update(coveralls_done([key for key in jobs.keys() if key.startswith("test_")]))
     return jobs
 
 
@@ -1818,6 +1914,26 @@ def merge_ok(pr_jobs: list[str]) -> Jobs:
                 }
             ],
         },
+    }
+
+
+def coveralls_done(test_job_keys: list[str]) -> Jobs:
+    return {
+        "coveralls_done": {
+            "name": "Coveralls Done",
+            "runs-on": Helper(Platform.LINUX_X86_64).runs_on(),
+            "if": "always()",
+            "needs": test_job_keys,
+            "steps": [
+                {
+                    "uses": action("coverallsapp"),
+                    "with": {
+                        "parallel-finished": True,
+                        "fail-on-error": False,
+                    },
+                }
+            ],
+        }
     }
 
 

@@ -593,12 +593,10 @@ impl ByteStoreProvider for Provider {
             / RPC_DIGEST_SIZE;
 
         let requests = blob_digests.chunks(max_digests_per_request).map(|digests| {
-            let msg = remexec::FindMissingBlobsRequest {
+            remexec::FindMissingBlobsRequest {
                 instance_name: self.instance_name.as_ref().cloned().unwrap_or_default(),
                 blob_digests: digests.to_vec(),
-            };
-
-            msg
+            }
         });
 
         let client = self.cas_client.as_ref();

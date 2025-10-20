@@ -19,14 +19,18 @@ If you instead want to allow the binary to be located anywhere on a user's machi
 from pants.core.util_rules.system_binaries import (
     BinaryPathRequest,
     BinaryPaths,
-    ProcessResult,
-    Process,
+    find_binary,
 )
+from pants.engine.process import (
+    Process,
+    ProcessResult,
+    execute_process_or_raise
+)
+from pants.engine.rules import implicitly
 
 @rule
 async def demo(...) -> Foo:
-    docker_paths = await Get(
-        BinaryPaths,
+    docker_paths: BinaryPaths = await find_binary(
         BinaryPathRequest(
             binary_name="docker",
             search_path=["/usr/bin", "/bin"],
@@ -35,7 +39,9 @@ async def demo(...) -> Foo:
     docker_bin = docker_paths.first_path
     if docker_bin is None:
         raise OSError("Could not find 'docker'.")
-    result = await Get(ProcessResult, Process(argv=[docker_bin.path, ...], ...))
+    result: ProcessResult = await execute_process_or_raise(
+        **implicitly(Process(argv=[docker_bin.path, ...], ...))
+    )
 ```
 
 `BinaryPaths` has a field called `paths: tuple[BinaryPath, ...]`, which stores all the discovered absolute paths to the specified binary. Each `BinaryPath` object has the fields `path: str`, such as `/usr/bin/docker`, and `fingerprint: str`, which is used to invalidate the cache if the binary changes. The results will be ordered by the order of `search_path`, meaning that earlier entries in `search_path` will show up earlier in the result.
@@ -113,26 +119,35 @@ You must also define the methods `generate_url`, which is the URL to make a GET 
 
 Because an `ExternalTool` is a subclass of [`Subsystem`](./options-and-subsystems.mdx), you must also define an `options_scope`. You may optionally register additional options from `pants.option.option_types`.
 
-In your rules, include the `ExternalTool` as a parameter of the rule, then use `Get(DownloadedExternalTool, ExternalToolRequest)` to download and extract the tool.
+In your rules, include the `ExternalTool` as a parameter of the rule, then `await download_external_tool()` to download and extract the tool.
 
 ```python
-from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
+from pants.core.util_rules.external_tool import (
+    DownloadedExternalTool,
+    ExternalToolRequest,
+    download_external_tool,
+)
 from pants.engine.platform import Platform
+from pants.engine.process import (
+    Process,
+    ProcessResult,
+    execute_process_or_raise
+)
+from pants.engine.rules import implicitly
 
 @rule
-async def demo(shellcheck: Shellcheck, ...) -> Foo:
-    shellcheck = await Get(
-        DownloadedExternalTool,
-        ExternalToolRequest,
+async def demo(shellcheck: Shellcheck, platform: Platform) -> Foo:
+    shellcheck: DownloadedExternalTool = await download_external_tool(
         shellcheck.get_request(platform)
     )
-    result = await Get(
-        ProcessResult,
-        Process(argv=[shellcheck.exe, ...], input_digest=shellcheck.digest, ...)
+    result: ProcessResult = await execute_process_or_raise(
+        **implicitly(
+            Process(argv=[shellcheck.exe, ...], input_digest=shellcheck.digest, ...)
+        )
     )
 ```
 
-A `DownloadedExternalTool` object has two fields: `digest: Digest` and `exe: str`. Use the `.exe` field as the first value of a `Process`'s `argv`, and use the `.digest` in the `Process's` `input_digest`. If you want to use multiple digests for the input, call `Get(Digest, MergeDigests)` with the `DownloadedExternalTool.digest` included.
+A `DownloadedExternalTool` object has two fields: `digest: Digest` and `exe: str`. Use the `.exe` field as the first value of a `Process`'s `argv`, and use the `.digest` in the `Process's` `input_digest`. If you want to use multiple digests for the input, call `merge_digests()` with the `DownloadedExternalTool.digest` included.
 
 ## `Pex`: Install binaries through pip
 
@@ -146,13 +161,15 @@ from pants.backend.python.util_rules.pex import (
     PexProcess,
     PexRequest,
     PexRequirements,
+    create_pex,
 )
+from pants.engine.intrinsics import execute_process
 from pants.engine.process import FallibleProcessResult
+from pants.engine.rules import implicitly
 
 @rule
 async def demo(...) -> Foo:
-    pex = await Get(
-        Pex,
+    pex: Pex = await create_pex(
         PexRequest(
             output_filename="black.pex",
             internal_only=True,
@@ -161,9 +178,8 @@ async def demo(...) -> Foo:
             main=ConsoleScript("black"),
         )
     )
-    result = await Get(
-        FallibleProcessResult,
-        PexProcess(pex, argv=["--check", ...], ...),
+    result: FallibleProcessResult = await execute_process(
+        **implicitly(PexProcess(pex, argv=["--check", ...], ...)),
     )
 ```
 
@@ -181,9 +197,9 @@ There are several other optional parameters that may be helpful.
 
 The resulting `Pex` object has a `digest: Digest` field containing the built `.pex` file. This digest should be included in the `input_digest` to the `Process` you run.
 
-Instead of the normal `Get(ProcessResult, Process)`, you should use `Get(ProcessResult, PexProcess)`, which will set up the environment properly for your Pex to execute. There is a predefined rule to go from `PexProcess -> Process`, so `Get(ProcessResult, PexProcess)` will cause the engine to run `PexProcess -> Process -> ProcessResult`.
+Instead of the usual execute_process(Process), you should use `execute_process(**implicitly(PexProcess))`, which will set up the environment properly for your Pex to execute. There is a rule to convert `PexProcess -> Process`, so this will cause the engine to run `PexProcess -> Process -> FallibleProcessResult`.
 
-`PexProcess` requires arguments for `pex: Pex`, `argv: Iterable[str]`, and `description: str`. It has several optional parameters that mirror the arguments to `Process`. If you specify `input_digest`, be careful to first use `Get(Digest, MergeDigests)` on the `pex.digest` and any of the other input digests.
+`PexProcess` requires arguments for `pex: Pex`, `argv: Iterable[str]`, and `description: str`. It has several optional parameters that mirror the arguments to `Process`. If you specify `input_digest`, be careful to first use `merge_digests()` on the `pex.digest` and any of the other input digests.
 
 :::note Use `PythonToolBase` when you need a Subsystem
 Often, you will want to create a [`Subsystem`](./options-and-subsystems.mdx) for your Python tool
@@ -221,7 +237,7 @@ Then, you can set up your `Pex` like this:
 ```python
 @rule
 async def demo(black: Black, ...) -> Foo:
-    pex = await Get(Pex, PexRequest, black.to_pex_request())
+    pex = await create_pex(black.to_pex_request(...))
 ```
 
 :::

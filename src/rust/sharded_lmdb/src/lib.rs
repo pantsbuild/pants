@@ -271,34 +271,33 @@ impl ShardedLmdb {
     pub async fn remove(&self, fingerprint: Fingerprint) -> Result<bool, String> {
         let store = self.clone();
         self.executor
-            .spawn_blocking(
-                move || {
-                    let effective_key =
-                        VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION);
-                    let (env, db, lease_database) = store.get(&fingerprint);
-                    let del_res = env.begin_rw_txn().and_then(|mut txn| {
-                        txn.del(db, &effective_key, None)?;
-                        txn.del(lease_database, &effective_key, None)
-                            .or_else(|err| match err {
-                                lmdb::Error::NotFound => Ok(()),
-                                err => Err(err),
-                            })?;
-                        txn.commit()
-                    });
+            .spawn_blocking(move || {
+                let effective_key =
+                    VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION);
+                let (env, db, lease_database) = store.get(&fingerprint);
+                let del_res = env.begin_rw_txn().and_then(|mut txn| {
+                    txn.del(db, &effective_key, None)?;
+                    txn.del(lease_database, &effective_key, None)
+                        .or_else(|err| match err {
+                            lmdb::Error::NotFound => Ok(()),
+                            err => Err(err),
+                        })?;
+                    txn.commit()
+                });
 
-                    match del_res {
-                        Ok(()) => Ok(true),
-                        Err(lmdb::Error::NotFound) => Ok(false),
-                        Err(err) => Err(format!(
-                            "Error removing versioned key {:?}: {}",
-                            effective_key.to_hex(),
-                            err
-                        )),
-                    }
-                },
-                |e| Err(format!("`remove` task failed: {e}")),
-            )
+                match del_res {
+                    Ok(()) => Ok(true),
+                    Err(lmdb::Error::NotFound) => Ok(false),
+                    Err(err) => Err(format!(
+                        "Error removing versioned key {:?}: {}",
+                        effective_key.to_hex(),
+                        err
+                    )),
+                }
+            })
             .await
+            .map_err(|e| format!("`remove` task failed: {e}"))
+            .flatten()
     }
 
     ///
@@ -320,56 +319,55 @@ impl ShardedLmdb {
     ) -> Result<HashSet<Fingerprint>, String> {
         let store = self.clone();
         self.executor
-            .spawn_blocking(
-                move || {
-                    // Group the items by the Environment that they will be applied to.
-                    let mut items_by_env = HashMap::new();
-                    let mut exists = HashSet::new();
+            .spawn_blocking(move || {
+                // Group the items by the Environment that they will be applied to.
+                let mut items_by_env = HashMap::new();
+                let mut exists = HashSet::new();
 
-                    for fingerprint in &fingerprints {
-                        let effective_key =
-                            VersionedFingerprint::new(*fingerprint, ShardedLmdb::SCHEMA_VERSION);
-                        let (env_id, _, env, db, _) = store.get_raw(&fingerprint.0);
+                for fingerprint in &fingerprints {
+                    let effective_key =
+                        VersionedFingerprint::new(*fingerprint, ShardedLmdb::SCHEMA_VERSION);
+                    let (env_id, _, env, db, _) = store.get_raw(&fingerprint.0);
 
-                        let (_, _, batch) = items_by_env
-                            .entry(*env_id)
-                            .or_insert_with(|| (env.clone(), *db, vec![]));
-                        batch.push(effective_key);
-                    }
+                    let (_, _, batch) = items_by_env
+                        .entry(*env_id)
+                        .or_insert_with(|| (env.clone(), *db, vec![]));
+                    batch.push(effective_key);
+                }
 
-                    // Open and commit a Transaction per Environment. Since we never have more than one
-                    // Transaction open at a time, we don't have to worry about ordering.
-                    for (_, (env, db, batch)) in items_by_env {
-                        env.begin_ro_txn()
-                            .and_then(|txn| {
-                                for effective_key in &batch {
-                                    let get_res = txn.get(db, &effective_key);
-                                    match get_res {
-                                        Ok(_) => {
-                                            exists.insert(effective_key.get_fingerprint());
-                                        }
-                                        Err(lmdb::Error::NotFound) => (),
-                                        Err(err) => return Err(err),
-                                    };
-                                }
-                                txn.commit()
-                            })
-                            .map_err(|e| {
-                                format!(
-                                    "Error checking existence of fingerprints {:?}: {}",
-                                    batch
-                                        .iter()
-                                        .map(|key| key.get_fingerprint())
-                                        .collect::<Vec<_>>(),
-                                    e
-                                )
-                            })?;
-                    }
-                    Ok(exists)
-                },
-                |e| Err(format!("`exists_batch` task failed: {e}")),
-            )
+                // Open and commit a Transaction per Environment. Since we never have more than one
+                // Transaction open at a time, we don't have to worry about ordering.
+                for (_, (env, db, batch)) in items_by_env {
+                    env.begin_ro_txn()
+                        .and_then(|txn| {
+                            for effective_key in &batch {
+                                let get_res = txn.get(db, &effective_key);
+                                match get_res {
+                                    Ok(_) => {
+                                        exists.insert(effective_key.get_fingerprint());
+                                    }
+                                    Err(lmdb::Error::NotFound) => (),
+                                    Err(err) => return Err(err),
+                                };
+                            }
+                            txn.commit()
+                        })
+                        .map_err(|e| {
+                            format!(
+                                "Error checking existence of fingerprints {:?}: {}",
+                                batch
+                                    .iter()
+                                    .map(|key| key.get_fingerprint())
+                                    .collect::<Vec<_>>(),
+                                e
+                            )
+                        })?;
+                }
+                Ok(exists)
+            })
             .await
+            .map_err(|e| format!("`exists_batch` task failed: {e}"))
+            .flatten()
     }
 
     ///
@@ -378,62 +376,58 @@ impl ShardedLmdb {
     pub async fn all_fingerprints(&self) -> Result<Vec<AgedFingerprint>, String> {
         let store = self.clone();
         self.executor
-            .spawn_blocking(
-                move || {
-                    let mut fingerprints = Vec::new();
-                    for (env, database, lease_database) in &store.all_lmdbs() {
-                        let txn = env.begin_ro_txn().map_err(|err| {
-                            format!("Error beginning transaction to garbage collect: {err}")
-                        })?;
-                        let mut cursor = txn
-                            .open_ro_cursor(*database)
-                            .map_err(|err| format!("Failed to open lmdb read cursor: {err}"))?;
-                        for key_res in cursor.iter() {
-                            let (key, bytes) = key_res.map_err(|err| {
-                                format!("Failed to advance lmdb read cursor: {err}")
-                            })?;
+            .spawn_blocking(move || {
+                let mut fingerprints = Vec::new();
+                for (env, database, lease_database) in &store.all_lmdbs() {
+                    let txn = env.begin_ro_txn().map_err(|err| {
+                        format!("Error beginning transaction to garbage collect: {err}")
+                    })?;
+                    let mut cursor = txn
+                        .open_ro_cursor(*database)
+                        .map_err(|err| format!("Failed to open lmdb read cursor: {err}"))?;
+                    for key_res in cursor.iter() {
+                        let (key, bytes) = key_res
+                            .map_err(|err| format!("Failed to advance lmdb read cursor: {err}"))?;
 
-                            // Random access into the lease_database is slower than iterating, but hopefully garbage
-                            // collection is rare enough that we can get away with this, rather than do two passes
-                            // here (either to populate leases into pre-populated AgedFingerprints, or to read sizes
-                            // when we delete from lmdb to track how much we've freed).
-                            let lease_until_unix_timestamp = txn
-                                .get(*lease_database, &key)
-                                .map(|b| {
-                                    let mut array = [0_u8; 8];
-                                    array.copy_from_slice(b);
-                                    u64::from_le_bytes(array)
-                                })
-                                .unwrap_or_else(|e| match e {
-                                    lmdb::Error::NotFound => 0,
-                                    e => panic!(
-                                        "Error reading lease, probable lmdb corruption: {e:?}"
-                                    ),
-                                });
-
-                            let leased_until =
-                                time::UNIX_EPOCH + Duration::from_secs(lease_until_unix_timestamp);
-
-                            let expired_seconds_ago = time::SystemTime::now()
-                                .duration_since(leased_until)
-                                .map(|t| t.as_secs())
-                                // 0 indicates unexpired.
-                                .unwrap_or(0);
-
-                            let v = VersionedFingerprint::from_bytes_unsafe(key);
-                            let fingerprint = v.get_fingerprint();
-                            fingerprints.push(AgedFingerprint {
-                                expired_seconds_ago,
-                                fingerprint,
-                                size_bytes: bytes.len(),
+                        // Random access into the lease_database is slower than iterating, but hopefully garbage
+                        // collection is rare enough that we can get away with this, rather than do two passes
+                        // here (either to populate leases into pre-populated AgedFingerprints, or to read sizes
+                        // when we delete from lmdb to track how much we've freed).
+                        let lease_until_unix_timestamp = txn
+                            .get(*lease_database, &key)
+                            .map(|b| {
+                                let mut array = [0_u8; 8];
+                                array.copy_from_slice(b);
+                                u64::from_le_bytes(array)
+                            })
+                            .unwrap_or_else(|e| match e {
+                                lmdb::Error::NotFound => 0,
+                                e => panic!("Error reading lease, probable lmdb corruption: {e:?}"),
                             });
-                        }
+
+                        let leased_until =
+                            time::UNIX_EPOCH + Duration::from_secs(lease_until_unix_timestamp);
+
+                        let expired_seconds_ago = time::SystemTime::now()
+                            .duration_since(leased_until)
+                            .map(|t| t.as_secs())
+                            // 0 indicates unexpired.
+                            .unwrap_or(0);
+
+                        let v = VersionedFingerprint::from_bytes_unsafe(key);
+                        let fingerprint = v.get_fingerprint();
+                        fingerprints.push(AgedFingerprint {
+                            expired_seconds_ago,
+                            fingerprint,
+                            size_bytes: bytes.len(),
+                        });
                     }
-                    Ok(fingerprints)
-                },
-                |e| Err(format!("`all_fingerprints` task failed: {e}")),
-            )
+                }
+                Ok(fingerprints)
+            })
             .await
+            .map_err(|e| format!("`all_fingerprints` task failed: {e}"))
+            .flatten()
     }
 
     ///
@@ -464,68 +458,63 @@ impl ShardedLmdb {
     ) -> Result<(), String> {
         let store = self.clone();
         self.executor
-            .spawn_blocking(
-                move || {
-                    // Group the items by the Environment that they will be applied to.
-                    let mut items_by_env = HashMap::new();
-                    let mut fingerprints = Vec::new();
-                    for (fingerprint, bytes) in items {
-                        let effective_key =
-                            VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION);
-                        let (env_id, _, env, db, lease_database) = store.get_raw(&fingerprint.0);
+            .spawn_blocking(move || {
+                // Group the items by the Environment that they will be applied to.
+                let mut items_by_env = HashMap::new();
+                let mut fingerprints = Vec::new();
+                for (fingerprint, bytes) in items {
+                    let effective_key =
+                        VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION);
+                    let (env_id, _, env, db, lease_database) = store.get_raw(&fingerprint.0);
 
-                        let (_, _, _, batch) = items_by_env
-                            .entry(*env_id)
-                            .or_insert_with(|| (env.clone(), *db, *lease_database, vec![]));
-                        batch.push((effective_key, bytes));
-                        fingerprints.push(fingerprint);
-                    }
+                    let (_, _, _, batch) = items_by_env
+                        .entry(*env_id)
+                        .or_insert_with(|| (env.clone(), *db, *lease_database, vec![]));
+                    batch.push((effective_key, bytes));
+                    fingerprints.push(fingerprint);
+                }
 
-                    // Open and commit a Transaction per Environment. Since we never have more than one
-                    // Transaction open at a time, we don't have to worry about ordering.
-                    for (_, (env, db, lease_database, batch)) in items_by_env {
-                        env.begin_rw_txn()
-                            .and_then(|mut txn| {
-                                for (effective_key, bytes) in &batch {
-                                    let put_res = txn.put(
-                                        db,
-                                        &effective_key,
-                                        &bytes,
-                                        WriteFlags::NO_OVERWRITE,
-                                    );
-                                    match put_res {
-                                        Ok(()) => (),
-                                        Err(lmdb::Error::KeyExist) => continue,
-                                        Err(err) => return Err(err),
-                                    }
-                                    if initial_lease {
-                                        store.lease_inner(
-                                            lease_database,
-                                            effective_key,
-                                            store.lease_until_secs_since_epoch(),
-                                            &mut txn,
-                                        )?;
-                                    }
+                // Open and commit a Transaction per Environment. Since we never have more than one
+                // Transaction open at a time, we don't have to worry about ordering.
+                for (_, (env, db, lease_database, batch)) in items_by_env {
+                    env.begin_rw_txn()
+                        .and_then(|mut txn| {
+                            for (effective_key, bytes) in &batch {
+                                let put_res =
+                                    txn.put(db, &effective_key, &bytes, WriteFlags::NO_OVERWRITE);
+                                match put_res {
+                                    Ok(()) => (),
+                                    Err(lmdb::Error::KeyExist) => continue,
+                                    Err(err) => return Err(err),
                                 }
-                                txn.commit()
-                            })
-                            .map_err(|e| {
-                                format!(
-                                    "Error storing fingerprints {:?}: {}",
-                                    batch
-                                        .iter()
-                                        .map(|(key, _)| key.to_hex())
-                                        .collect::<Vec<_>>(),
-                                    e
-                                )
-                            })?;
-                    }
+                                if initial_lease {
+                                    store.lease_inner(
+                                        lease_database,
+                                        effective_key,
+                                        store.lease_until_secs_since_epoch(),
+                                        &mut txn,
+                                    )?;
+                                }
+                            }
+                            txn.commit()
+                        })
+                        .map_err(|e| {
+                            format!(
+                                "Error storing fingerprints {:?}: {}",
+                                batch
+                                    .iter()
+                                    .map(|(key, _)| key.to_hex())
+                                    .collect::<Vec<_>>(),
+                                e
+                            )
+                        })?;
+                }
 
-                    Ok(())
-                },
-                |e| Err(format!("`store_bytes_batch` task failed: {e}")),
-            )
+                Ok(())
+            })
             .await
+            .map_err(|e| format!("`store_bytes_batch` task failed: {e}"))
+            .flatten()
     }
 
     ///
@@ -548,104 +537,103 @@ impl ShardedLmdb {
     {
         let store = self.clone();
         self.executor
-            .spawn_blocking(
-                move || {
-                    let mut attempts = 0;
-                    loop {
-                        let effective_key = VersionedFingerprint::new(
-                            expected_digest.hash,
-                            ShardedLmdb::SCHEMA_VERSION,
-                        );
-                        let (env, db, lease_database) = store.get(&expected_digest.hash);
-                        let put_res: Result<(), StoreError> =
-                            env.begin_rw_txn()
-                                .map_err(StoreError::Lmdb)
-                                .and_then(|mut txn| {
-                                    // Second pass: copy into the reserved memory.
-                                    let mut writer = txn
-                                        .reserve(
-                                            db,
-                                            &effective_key,
-                                            expected_digest.size_bytes,
-                                            WriteFlags::NO_OVERWRITE,
-                                        )?
-                                        .writer();
-                                    let mut read = data_provider()
-                                        .map_err(|e| format!("Failed to read: {e}"))?;
-                                    let should_retry =
-                  !sync_verified_copy(expected_digest, data_is_immutable, &mut read, &mut writer)
-                    .map_err(|e| {
-                    format!("Failed to copy from {read:?} or store in {env:?}: {e:?}")
-                  })?;
+            .spawn_blocking(move || {
+                let mut attempts = 0;
+                loop {
+                    let effective_key = VersionedFingerprint::new(
+                        expected_digest.hash,
+                        ShardedLmdb::SCHEMA_VERSION,
+                    );
+                    let (env, db, lease_database) = store.get(&expected_digest.hash);
+                    let put_res: Result<(), StoreError> = env
+                        .begin_rw_txn()
+                        .map_err(StoreError::Lmdb)
+                        .and_then(|mut txn| {
+                            // Second pass: copy into the reserved memory.
+                            let mut writer = txn
+                                .reserve(
+                                    db,
+                                    &effective_key,
+                                    expected_digest.size_bytes,
+                                    WriteFlags::NO_OVERWRITE,
+                                )?
+                                .writer();
+                            let mut read =
+                                data_provider().map_err(|e| format!("Failed to read: {e}"))?;
+                            let should_retry = !sync_verified_copy(
+                                expected_digest,
+                                data_is_immutable,
+                                &mut read,
+                                &mut writer,
+                            )
+                            .map_err(|e| {
+                                format!("Failed to copy from {read:?} or store in {env:?}: {e:?}")
+                            })?;
 
-                                    if should_retry {
-                                        let msg = format!("Input {read:?} changed while reading.");
-                                        log::debug!("{msg}");
-                                        return Err(StoreError::Retry(msg));
-                                    }
+                            if should_retry {
+                                let msg = format!("Input {read:?} changed while reading.");
+                                log::debug!("{msg}");
+                                return Err(StoreError::Retry(msg));
+                            }
 
-                                    if initial_lease {
-                                        store.lease_inner(
-                                            lease_database,
-                                            &effective_key,
-                                            store.lease_until_secs_since_epoch(),
-                                            &mut txn,
-                                        )?;
-                                    }
-                                    txn.commit()?;
-                                    Ok(())
-                                });
+                            if initial_lease {
+                                store.lease_inner(
+                                    lease_database,
+                                    &effective_key,
+                                    store.lease_until_secs_since_epoch(),
+                                    &mut txn,
+                                )?;
+                            }
+                            txn.commit()?;
+                            Ok(())
+                        });
 
-                        match put_res {
-                            Ok(()) => return Ok(()),
-                            Err(StoreError::Retry(msg)) => {
-                                // Input changed during reading: maybe retry.
-                                if attempts > 10 {
-                                    return Err(msg);
-                                } else {
-                                    attempts += 1;
-                                }
+                    match put_res {
+                        Ok(()) => return Ok(()),
+                        Err(StoreError::Retry(msg)) => {
+                            // Input changed during reading: maybe retry.
+                            if attempts > 10 {
+                                return Err(msg);
+                            } else {
+                                attempts += 1;
                             }
-                            Err(StoreError::Lmdb(lmdb::Error::KeyExist)) => return Ok(()),
-                            Err(StoreError::Lmdb(err)) => {
-                                return Err(format!("Error storing {expected_digest:?}: {err}"));
-                            }
-                            Err(StoreError::Io(err)) => {
-                                return Err(format!("Error storing {expected_digest:?}: {err}"));
-                            }
-                        };
-                    }
-                },
-                |e| Err(format!("`store` task failed: {e}")),
-            )
+                        }
+                        Err(StoreError::Lmdb(lmdb::Error::KeyExist)) => return Ok(()),
+                        Err(StoreError::Lmdb(err)) => {
+                            return Err(format!("Error storing {expected_digest:?}: {err}"));
+                        }
+                        Err(StoreError::Io(err)) => {
+                            return Err(format!("Error storing {expected_digest:?}: {err}"));
+                        }
+                    };
+                }
+            })
             .await
+            .map_err(|e| format!("`store` task failed: {e}"))
+            .flatten()
     }
 
     pub async fn lease(&self, fingerprint: Fingerprint) -> Result<(), String> {
         let store = self.clone();
         self.executor
-            .spawn_blocking(
-                move || {
-                    let until_secs_since_epoch: u64 = store.lease_until_secs_since_epoch();
-                    let (env, _, lease_database) = store.get(&fingerprint);
-                    env.begin_rw_txn()
-                        .and_then(|mut txn| {
-                            store.lease_inner(
-                                lease_database,
-                                &VersionedFingerprint::new(
-                                    fingerprint,
-                                    ShardedLmdb::SCHEMA_VERSION,
-                                ),
-                                until_secs_since_epoch,
-                                &mut txn,
-                            )?;
-                            txn.commit()
-                        })
-                        .map_err(|e| format!("Error leasing {fingerprint:?}: {e}"))
-                },
-                |e| Err(format!("`lease` task failed: {e}")),
-            )
+            .spawn_blocking(move || {
+                let until_secs_since_epoch: u64 = store.lease_until_secs_since_epoch();
+                let (env, _, lease_database) = store.get(&fingerprint);
+                env.begin_rw_txn()
+                    .and_then(|mut txn| {
+                        store.lease_inner(
+                            lease_database,
+                            &VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION),
+                            until_secs_since_epoch,
+                            &mut txn,
+                        )?;
+                        txn.commit()
+                    })
+                    .map_err(|e| format!("Error leasing {fingerprint:?}: {e}"))
+            })
             .await
+            .map_err(|e| format!("`lease` task failed: {e}"))
+            .flatten()
     }
 
     fn lease_inner(
@@ -681,25 +669,24 @@ impl ShardedLmdb {
         let store = self.clone();
         let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION);
         self.executor
-            .spawn_blocking(
-                move || {
-                    let (env, db, _) = store.get(&fingerprint);
-                    let ro_txn = env
-                        .begin_ro_txn()
-                        .map_err(|err| format!("Failed to begin read transaction: {err}"))?;
-                    match ro_txn.get(db, &effective_key) {
-                        Ok(bytes) => f(bytes).map(Some),
-                        Err(lmdb::Error::NotFound) => Ok(None),
-                        Err(err) => Err(format!(
-                            "Error loading versioned key {:?}: {}",
-                            effective_key.to_hex(),
-                            err,
-                        )),
-                    }
-                },
-                |e| Err(format!("`load_bytes_with` task failed: {e}")),
-            )
+            .spawn_blocking(move || {
+                let (env, db, _) = store.get(&fingerprint);
+                let ro_txn = env
+                    .begin_ro_txn()
+                    .map_err(|err| format!("Failed to begin read transaction: {err}"))?;
+                match ro_txn.get(db, &effective_key) {
+                    Ok(bytes) => f(bytes).map(Some),
+                    Err(lmdb::Error::NotFound) => Ok(None),
+                    Err(err) => Err(format!(
+                        "Error loading versioned key {:?}: {}",
+                        effective_key.to_hex(),
+                        err,
+                    )),
+                }
+            })
             .await
+            .map_err(|e| format!("`load_bytes_with` task failed: {e}"))
+            .flatten()
     }
 
     #[allow(clippy::useless_conversion)] // False positive: https://github.com/rust-lang/rust-clippy/issues/3913

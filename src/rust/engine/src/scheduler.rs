@@ -156,7 +156,7 @@ impl Scheduler {
         // TODO: Creation of a Context is exposed in https://github.com/Aeledfyr/deepsize/pull/31.
         let mut deep_context = deepsize::Context::new();
         self.core.graph.visit_live(&context, |k, v| {
-            if let NodeKey::Task(ref t) = k {
+            if let NodeKey::Task(t) = k {
                 items.extend(t.params.keys().map(|k| k.to_value()));
                 items.push(v.clone().try_into().unwrap());
             }
