@@ -352,7 +352,7 @@ pub(crate) fn generator_send(
         Ok(GeneratorResponse::Get(get.take(py)?))
     } else if let Ok(call) = response.extract::<PyRef<PyGeneratorResponseNativeCall>>() {
         Ok(GeneratorResponse::NativeCall(call.take(py)?))
-    } else if let Ok(get_multi) = response.downcast::<PySequence>() {
+    } else if let Ok(get_multi) = response.cast::<PySequence>() {
         // Was an `All` or `MultiGet`.
         let gogs = get_multi
             .try_iter()?
@@ -424,13 +424,13 @@ fn interpret_get_inputs(
             a constructor call, rather than a type, but given {input_arg0}."
                 )));
             }
-            if let Ok(d) = input_arg0.downcast::<PyDict>() {
+            if let Ok(d) = input_arg0.cast::<PyDict>() {
                 let mut input_types = SmallVec::new();
                 let mut inputs = SmallVec::new();
                 for (value, declared_type) in d.iter() {
                     input_types.push(TypeId::new(
                         &declared_type
-                            .downcast::<PyType>()
+                            .cast::<PyType>()
                             .map_err(|_| {
                                 PyTypeError::new_err(
                 "Invalid Get. Because the second argument was a dict, we expected the keys of the \
@@ -451,7 +451,7 @@ fn interpret_get_inputs(
             }
         }
         (Some(input_arg0), Some(input_arg1)) => {
-            let declared_type = input_arg0.downcast::<PyType>().map_err(|_| {
+            let declared_type = input_arg0.cast::<PyType>().map_err(|_| {
                 let input_arg0_type = input_arg0.get_type();
                 PyTypeError::new_err(format!(
           "Invalid Get. Because you are using the longhand form Get(OutputType, InputType, \
@@ -656,7 +656,7 @@ impl PyGeneratorResponseGet {
         ) {
             panic!("Get() is disabled!");
         }
-        let product = product.downcast::<PyType>().map_err(|_| {
+        let product = product.cast::<PyType>().map_err(|_| {
             let actual_type = product.get_type();
             PyTypeError::new_err(format!(
                 "Invalid Get. The first argument (the output type) must be a type, but given \
