@@ -317,7 +317,7 @@ impl Task {
                             .value
                             .bind(py)
                             .extract::<Bound<'_, PyTuple>>()
-                            .map_err(Into::<PyErr>::into)?;
+                            .map_err(PyErr::from)?;
                         let kwargs = PyDict::new(py);
                         for ((name, _), value) in self
                             .task
