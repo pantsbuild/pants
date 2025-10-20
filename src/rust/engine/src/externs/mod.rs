@@ -308,7 +308,7 @@ pub(crate) fn generator_send(
                     .value(py)
                     .getattr(intern!(py, "failure"))?
                     .extract::<PyRef<PyFailure>>()
-                    .map_err(Into::<PyErr>::into)?
+                    .map_err(PyErr::from)?
                     .get_error(py);
                 let response = throw_method.call1((&throw,));
                 (response, Some((throw, err)))
