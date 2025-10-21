@@ -714,6 +714,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "client_pants_ng"
+version = "0.0.1"
+dependencies = [
+ "options_pants_ng",
+]
+
+[[package]]
 name = "cmake"
 version = "0.1.53"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2689,6 +2696,14 @@ dependencies = [
  "tempfile",
  "toml",
  "whoami",
+]
+
+[[package]]
+name = "options_pants_ng"
+version = "0.0.1"
+dependencies = [
+ "regex",
+ "shlex",
 ]
 
 [[package]]
