@@ -259,8 +259,10 @@ impl fmt::Display for Key {
     }
 }
 
-impl<'py> FromPyObject<'py> for Key {
-    fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
+impl<'a, 'py> FromPyObject<'a, 'py> for Key {
+    type Error = PyErr;
+
+    fn extract(obj: Borrowed<'a, 'py, PyAny>) -> PyResult<Self> {
         let py = obj.py();
         externs::INTERNS.key_insert(py, obj.to_owned().unbind())
     }
@@ -351,8 +353,10 @@ impl fmt::Display for Value {
     }
 }
 
-impl<'py> FromPyObject<'py> for Value {
-    fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
+impl<'a, 'py> FromPyObject<'a, 'py> for Value {
+    type Error = PyErr;
+
+    fn extract(obj: Borrowed<'a, 'py, PyAny>) -> PyResult<Self> {
         Ok(Value::new(obj.to_owned().unbind()))
     }
 }
@@ -461,7 +465,9 @@ impl Failure {
         }
     }
 
-    pub fn from_py_err_with_gil(py: Python, py_err: PyErr) -> Failure {
+    pub fn from_py_err_with_gil<E: Into<PyErr>>(py: Python, py_err: E) -> Failure {
+        let py_err = py_err.into();
+
         // If this is a wrapped Failure, return it immediately.
         if let Some(failure) = Failure::from_wrapped_failure(py, &py_err) {
             return failure;
@@ -527,7 +533,7 @@ impl Failure {
 
 impl Failure {
     fn from_wrapped_failure(py: Python, py_err: &PyErr) -> Option<Failure> {
-        match py_err.value(py).downcast::<externs::NativeEngineFailure>() {
+        match py_err.value(py).cast::<externs::NativeEngineFailure>() {
             Ok(n_e_failure) => {
                 let failure = n_e_failure
                     .getattr("failure")
