@@ -1,12 +1,12 @@
-from pants.testutil.pants_integration_test import run_pants
-from textwrap import dedent
-
-
-from pants.testutil.pants_integration_test import setup_tmpdir
+# Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+import json
+import os
 import platform
 from collections.abc import Mapping, MutableMapping
-import os
-import json
+from textwrap import dedent
+
+from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
 
 SOURCES = {
     "src/python/foo.py": "import cowsay",
@@ -48,7 +48,7 @@ def build_config(tmpdir: str) -> Mapping:
 
 
 def test_lock_with_different_indexes() -> None:
-    """Test locking using a different index for macos and linux"""
+    """Test locking using a different index for macos and linux."""
     with setup_tmpdir(SOURCES) as tmpdir:
         pants_run = run_pants(
             [
@@ -61,16 +61,14 @@ def test_lock_with_different_indexes() -> None:
         pants_run.assert_success()
 
         lockfile_path = os.path.join(tmpdir, "test.lock")
-        with open(lockfile_path, "r") as f:
-            lockfile_contents = f.read()
+        with open(lockfile_path) as f:
+            lockfile = f.read()
 
         # Remove header
-        lockfile_contents = lockfile_contents.splitlines()
-        while lockfile_contents and lockfile_contents[0].startswith("//"):
-            lockfile_contents.pop(0)
-        lockfile_contents = "\n".join(lockfile_contents)
-
-        lockfile_json = json.loads(lockfile_contents)
+        lockfile_lines = lockfile.splitlines()
+        while lockfile_lines and lockfile_lines[0].startswith("//"):
+            lockfile_lines.pop(0)
+        lockfile_json = json.loads("\n".join(lockfile_lines))
 
         macos_marker_prefix = (
             'platform_system == "Darwin" and platform_python_implementation == "CPython"'
