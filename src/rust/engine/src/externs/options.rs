@@ -92,7 +92,7 @@ pub(crate) fn py_object_to_val(obj: &Bound<'_, PyAny>) -> Result<Val, PyErr> {
         Ok(Val::Float(obj.extract()?))
     } else if obj.is_instance_of::<PyDict>() {
         Ok(Val::Dict(
-            obj.downcast::<PyDict>()?
+            obj.cast::<PyDict>()?
                 .iter()
                 .map(|(k, v)| {
                     Ok::<(String, Val), PyErr>((k.extract::<String>()?, py_object_to_val(&v)?))
@@ -101,14 +101,14 @@ pub(crate) fn py_object_to_val(obj: &Bound<'_, PyAny>) -> Result<Val, PyErr> {
         ))
     } else if obj.is_instance_of::<PyList>() {
         Ok(Val::List(
-            obj.downcast::<PyList>()?
+            obj.cast::<PyList>()?
                 .iter()
                 .map(|v| py_object_to_val(&v))
                 .collect::<Result<Vec<_>, _>>()?,
         ))
     } else if obj.is_instance_of::<PyTuple>() {
         Ok(Val::List(
-            obj.downcast::<PyTuple>()?
+            obj.cast::<PyTuple>()?
                 .iter()
                 .map(|v| py_object_to_val(&v))
                 .collect::<Result<Vec<_>, _>>()?,
