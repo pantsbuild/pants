@@ -10,7 +10,7 @@ use parking_lot::{MappedRwLockReadGuard, Mutex, RwLock, RwLockReadGuard};
 use pyo3::FromPyObject;
 use pyo3::exceptions::{PyAssertionError, PyException, PyStopIteration, PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::sync::MutexExt;
+use pyo3::sync::{MutexExt, RwLockExt};
 use pyo3::types::{PyBool, PyBytes, PyDict, PySequence, PyString, PyTuple, PyType};
 use pyo3::{create_exception, import_exception, intern};
 use smallvec::{SmallVec, smallvec};
@@ -170,7 +170,8 @@ pub fn store_bool(py: Python, val: bool) -> Value {
 ///
 pub fn getattr<'py, T>(value: &Bound<'py, PyAny>, field: &str) -> Result<T, String>
 where
-    T: FromPyObject<'py>,
+    T: for<'a> FromPyObject<'a, 'py>,
+    for<'a> <T as FromPyObject<'a, 'py>>::Error: std::fmt::Debug,
 {
     value
         .getattr(field)
@@ -213,17 +214,18 @@ pub fn collect_iterable<'py>(value: &Bound<'py, PyAny>) -> Result<Vec<Bound<'py,
 }
 
 /// Read a `FrozenDict[str, T]`.
-pub fn getattr_from_str_frozendict<'py, T: FromPyObject<'py>>(
+pub fn getattr_from_str_frozendict<'py, T: for<'a> FromPyObject<'a, 'py>>(
     value: &Bound<'py, PyAny>,
     field: &str,
 ) -> BTreeMap<String, T> {
     let frozendict: Bound<PyAny> = getattr(value, field).unwrap();
     let pydict: Bound<PyDict> = getattr(&frozendict, "_data").unwrap();
-    pydict
+    let result: BTreeMap<String, T> = pydict
         .items()
         .into_iter()
-        .map(|kv_pair| kv_pair.extract().unwrap())
-        .collect()
+        .map(|kv_pair| kv_pair.extract::<(String, T)>().unwrap())
+        .collect();
+    result
 }
 
 pub fn getattr_as_optional_string(
@@ -305,7 +307,8 @@ pub(crate) fn generator_send(
                 let throw = err
                     .value(py)
                     .getattr(intern!(py, "failure"))?
-                    .extract::<PyRef<PyFailure>>()?
+                    .extract::<PyRef<PyFailure>>()
+                    .map_err(PyErr::from)?
                     .get_error(py);
                 let response = throw_method.call1((&throw,));
                 (response, Some((throw, err)))
@@ -352,7 +355,7 @@ pub(crate) fn generator_send(
         Ok(GeneratorResponse::Get(get.take(py)?))
     } else if let Ok(call) = response.extract::<PyRef<PyGeneratorResponseNativeCall>>() {
         Ok(GeneratorResponse::NativeCall(call.take(py)?))
-    } else if let Ok(get_multi) = response.downcast::<PySequence>() {
+    } else if let Ok(get_multi) = response.cast::<PySequence>() {
         // Was an `All` or `MultiGet`.
         let gogs = get_multi
             .try_iter()?
@@ -424,13 +427,13 @@ fn interpret_get_inputs(
             a constructor call, rather than a type, but given {input_arg0}."
                 )));
             }
-            if let Ok(d) = input_arg0.downcast::<PyDict>() {
+            if let Ok(d) = input_arg0.cast::<PyDict>() {
                 let mut input_types = SmallVec::new();
                 let mut inputs = SmallVec::new();
                 for (value, declared_type) in d.iter() {
                     input_types.push(TypeId::new(
                         &declared_type
-                            .downcast::<PyType>()
+                            .cast::<PyType>()
                             .map_err(|_| {
                                 PyTypeError::new_err(
                 "Invalid Get. Because the second argument was a dict, we expected the keys of the \
@@ -451,7 +454,7 @@ fn interpret_get_inputs(
             }
         }
         (Some(input_arg0), Some(input_arg1)) => {
-            let declared_type = input_arg0.downcast::<PyType>().map_err(|_| {
+            let declared_type = input_arg0.cast::<PyType>().map_err(|_| {
                 let input_arg0_type = input_arg0.get_type();
                 PyTypeError::new_err(format!(
           "Invalid Get. Because you are using the longhand form Get(OutputType, InputType, \
@@ -524,13 +527,8 @@ impl PyGeneratorResponseNativeCall {
 pub struct PyGeneratorResponseCall(RwLock<Option<Call>>);
 
 impl PyGeneratorResponseCall {
-    fn borrow_inner<'py>(
-        &'py self,
-        _py: Python<'py>,
-    ) -> PyResult<MappedRwLockReadGuard<'py, Call>> {
-        // TODO: This may deadlock with the GIL. The `read_py_attached` extenstion method available in
-        // https://github.com/PyO3/pyo3/pull/5435 should be used once available in PyO3.
-        let read_guard = self.0.read();
+    fn borrow_inner<'py>(&'py self, py: Python<'py>) -> PyResult<MappedRwLockReadGuard<'py, Call>> {
+        let read_guard = self.0.read_py_attached(py);
 
         if read_guard.is_some() {
             Ok(RwLockReadGuard::map(read_guard, |g| g.as_ref().unwrap()))
@@ -615,11 +613,9 @@ impl PyGeneratorResponseCall {
 }
 
 impl PyGeneratorResponseCall {
-    fn take(&self, _py: Python<'_>) -> Result<Call, String> {
-        // TODO: The write lock may deadlock with the GIL. The `write_py_attached` extenstion method available in
-        // https://github.com/PyO3/pyo3/pull/5435 should be used once available in PyO3.
+    fn take(&self, py: Python<'_>) -> Result<Call, String> {
         self.0
-            .write()
+            .write_py_attached(py)
             .take()
             .ok_or_else(|| "A `Call` may only be consumed once.".to_owned())
     }
@@ -656,7 +652,7 @@ impl PyGeneratorResponseGet {
         ) {
             panic!("Get() is disabled!");
         }
-        let product = product.downcast::<PyType>().map_err(|_| {
+        let product = product.cast::<PyType>().map_err(|_| {
             let actual_type = product.get_type();
             PyTypeError::new_err(format!(
                 "Invalid Get. The first argument (the output type) must be a type, but given \
