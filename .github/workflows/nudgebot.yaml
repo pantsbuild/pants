@@ -1,0 +1,37 @@
+name: Label inactive issues
+on:
+  schedule:
+    - cron: "30 1 * * *"
+  workflow_dispatch:
+
+jobs:
+  close-issues:
+    runs-on: ubuntu-latest
+    if: github.repository_owner == "pantsbuild"
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/stale@v10
+        with:
+          debug-only: true
+
+          days-before-issue-stale: 366
+          exempt-issue-labels: "bug"
+
+          stale-issue-label: "stale"
+          stale-issue-message: >
+            This issue has been open for over one year without activity and is not labeled as a "bug". 
+            It has been labeled "stale" to invite any further updates. 
+            If you can confirm whether the issue is still reproducible in the latest version of Pants, 
+            appears in other contexts, or its priority has changed, please let us know. 
+            Please feel free to close this issue if it is no longer relevant.
+          
+          # Don't close Issues
+          days-before-issue-close: -1
+
+          # Don't touch PRs
+          days-before-pr-stale: -1
+          days-before-pr-close: -1
+
+          operations-per-run: 1000
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
