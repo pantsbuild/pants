@@ -244,7 +244,7 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
-    
+
     _default_to_resolve_interpreter_constraints = BoolOption(
         default=False,
         help=softwrap(
