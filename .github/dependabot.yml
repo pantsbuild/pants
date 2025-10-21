@@ -6,6 +6,7 @@ updates:
     rebase-strategy: auto
     labels:
       - "category:internal"
+      - "release-notes:not-required"
     schedule:
       interval: "weekly" 
       day: "wednesday"
@@ -18,3 +19,11 @@ updates:
       - sureshjoshi
       - tdyas
       - tgolsson
+  
+  - package-ecosystem: pip
+    directory: "/3rdparty/python"
+    schedule:
+      interval: weekly
+    labels:
+      - "category:internal"
+      - "release-notes:not-required"
