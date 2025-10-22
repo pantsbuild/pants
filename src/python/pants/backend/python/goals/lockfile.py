@@ -147,7 +147,10 @@ async def generate_lockfile(
                     *(f"--find-links={link}" for link in req.find_links),
                     *pip_args_setup.args,
                     *req.interpreter_constraints.generate_pex_arg_list(),
-                    *(f"--override={override}" for override in pip_args_setup.resolve_config.overrides),
+                    *(
+                        f"--override={override}"
+                        for override in pip_args_setup.resolve_config.overrides
+                    ),
                     *req.requirements,
                 ),
                 additional_input_digest=pip_args_setup.digest,
