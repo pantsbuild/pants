@@ -428,7 +428,6 @@ class ResolvePexConfig:
         yield from (f"--path-mapping={v}" for v in self.path_mappings)
 
         yield from (f"--exclude={exclude}" for exclude in self.excludes)
-        yield from (f"--override={override}" for override in self.overrides)
         yield from (f"--source={source}" for source in self.sources)
 
 
