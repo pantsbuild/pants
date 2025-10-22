@@ -1,17 +1,36 @@
+# https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference
+
 version: 2
 updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      gha-deps:
+        patterns:
+          - "*"
+
   - package-ecosystem: "cargo"
     directory: "/src/rust"
-    open-pull-requests-limit: 5
-    rebase-strategy: auto
+    allow:
+      - dependency-type: "all"
+    groups:
+      rust-version-updates:
+        applies-to: version-updates
+        patterns:
+          - "*"
+      rust-security-updates:
+        applies-to: security-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
     labels:
       - "category:internal"
+      - "dependencies"
       - "release-notes:not-required"
-    schedule:
-      interval: "weekly" 
-      day: "wednesday"
-      time: "03:00"
-      timezone: "US/Pacific"
     reviewers:
       - benjyw
       - cburroughs
@@ -19,12 +38,28 @@ updates:
       - sureshjoshi
       - tdyas
       - tgolsson
+    schedule:
+      interval: "weekly"
   
   - package-ecosystem: pip
     directory: "/3rdparty/python"
-    schedule:
-      interval: daily
+    allow:
+      - dependency-type: "all"    
+    groups:
+      python-version-updates:
+        applies-to: version-updates
+        patterns:
+          - "*"
+      python-security-updates:
+        applies-to: security-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
     labels:
       - "category:internal"
       - "dependencies"
       - "release-notes:not-required"
+    schedule:
+      interval: weekly
