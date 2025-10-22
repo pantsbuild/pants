@@ -1,7 +1,9 @@
+# https://github.com/actions/stale
+
 name: Label inactive issues
 on:
   schedule:
-    - cron: "30 1 * * *"
+    - cron: "42 4 * * *"
   workflow_dispatch:
 
 jobs:
@@ -13,8 +15,6 @@ jobs:
     steps:
       - uses: actions/stale@v10
         with:
-          debug-only: true
-
           days-before-issue-stale: 366
           exempt-issue-labels: 'bug'
 
@@ -22,7 +22,7 @@ jobs:
           stale-issue-message: >
             This issue has been open for over one year without activity and is not labeled as a bug. 
             It has been labeled as stale to invite any further updates. 
-            If you can confirm whether the issue is still reproducible in the latest version of Pants, 
+            If you can confirm whether the issue is still applicable to the latest version of Pants, 
             appears in other contexts, or its priority has changed, please let us know. 
             Please feel free to close this issue if it is no longer relevant.
           
@@ -33,5 +33,5 @@ jobs:
           days-before-pr-stale: -1
           days-before-pr-close: -1
 
-          operations-per-run: 1000
+          operations-per-run: 100
           repo-token: ${{ secrets.GITHUB_TOKEN }}
