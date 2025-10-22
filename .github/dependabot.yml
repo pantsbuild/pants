@@ -23,7 +23,8 @@ updates:
   - package-ecosystem: pip
     directory: "/3rdparty/python"
     schedule:
-      interval: weekly
+      interval: daily
     labels:
       - "category:internal"
+      - "dependencies"
       - "release-notes:not-required"
