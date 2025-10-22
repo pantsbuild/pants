@@ -249,7 +249,7 @@ whoami = "1.5.2"
 # `src/rust/dep_inference/Cargo.toml`.
 tree-sitter = "0.20.10"
 tree-sitter-typescript = "0.20.5"
-tree-sitter-python = "0.20.4"
+tree-sitter-python = "0.23.0"
 # TODO: Waiting on https://github.com/camdencheek/tree-sitter-dockerfile/pull/58.
 tree-sitter-dockerfile = { git = "https://github.com/tobni/tree-sitter-dockerfile.git", rev = "ce1cbc3537995f0d968c8bc6315b6a62d6faacde" }
 
