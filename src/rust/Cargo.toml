@@ -166,7 +166,7 @@ humansize = "1.1"
 hyper = "1"
 hyper-rustls = "0.27"
 hyper-util = "0.1"
-ignore = "0.4.23"
+ignore = "0.4.24"
 indexmap = { version = "2.11", features = ["std", "serde"] }
 indicatif = "0.17.11"
 internment = "0.6"
