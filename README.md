@@ -1,5 +1,7 @@
 # Pants Build System
 
+[![Coverage Status](https://coveralls.io/repos/github/pantsbuild/pants/badge.svg?branch=main)](https://coveralls.io/github/pantsbuild/pants?branch=main)
+
 Pants is a scalable build system for _monorepos_: codebases containing 
 multiple projects, often using multiple programming languages and frameworks, 
 in a single unified code repository.
