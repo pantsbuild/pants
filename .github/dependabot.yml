@@ -13,8 +13,6 @@ updates:
 
   - package-ecosystem: "cargo"
     directory: "/src/rust"
-    allow:
-      - dependency-type: "all"
     groups:
       rust-security-updates:
         applies-to: security-updates
@@ -43,8 +41,6 @@ updates:
   
   - package-ecosystem: pip
     directory: "/3rdparty/python"
-    allow:
-      - dependency-type: "all"    
     groups:
       python-security-updates:
         applies-to: security-updates
@@ -70,8 +66,6 @@ updates:
       - "src/python/pants/backend/javascript/**/*"
       - "src/python/pants/backend/typescript/**/*"
       - "testprojects/src/js/**/*"
-    allow:
-      - dependency-type: "all"
     groups:
       js-security-updates:
         applies-to: security-updates
