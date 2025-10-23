@@ -1446,16 +1446,17 @@ impl Store {
             None => {
                 // If the destination already exists and is readonly, make it writeable so
                 // we can overwrite it.
-                let existing_permissions = match metadata(&destination).await {
+                let preexisting_perms_opt = match metadata(&destination).await {
                     Ok(meta) => {
-                        let mut perms = meta.permissions();
-                        if perms.mode() & 0o200 == 0 {
-                            perms.set_mode(perms.mode() | 0o222);
-                            set_permissions(&destination, perms.clone()).await.map_err(
+                        let preexisting_perms = meta.permissions();
+                        if preexisting_perms.mode() & 0o200 == 0 {
+                            let mut writeable_perms = preexisting_perms.clone();
+                            writeable_perms.set_mode(writeable_perms.mode() | 0o222);
+                            set_permissions(&destination, writeable_perms).await.map_err(
                                 |e| format!("Failed to make existing file at {} writeable before writing there: {e}", destination.display())
                             )?;
                         }
-                        Some(perms)
+                        Some(preexisting_perms)
                     }
                     _ => None,
                 };
@@ -1477,11 +1478,11 @@ impl Store {
                         format!("Error writing file {}: {:?}", destination.display(), e)
                     })?;
                     // If the destination existed before we wrote to it, ensure it has the right
-                    // permissions (OpenOptions::mode() only sets permissions on created files).
-                    if let Some(perms) = existing_permissions.as_ref() {
-                        let mut new_perms = perms.clone();
-                        new_perms.set_mode(mode);
-                        std::fs::set_permissions(&destination, new_perms).map_err(|e| {
+                    // mode (OpenOptions::mode() only sets permissions on created files).
+                    if let Some(preexisting_perms) = preexisting_perms_opt.as_ref() {
+                        let mut requested_perms = preexisting_perms.clone();
+                        requested_perms.set_mode(mode);
+                        std::fs::set_permissions(&destination, requested_perms).map_err(|e| {
                             format!(
                                 "Error setting permissions on file at {}: {e}",
                                 destination.display()
