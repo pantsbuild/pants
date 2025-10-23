@@ -147,6 +147,10 @@ async def generate_lockfile(
                     *(f"--find-links={link}" for link in req.find_links),
                     *pip_args_setup.args,
                     *req.interpreter_constraints.generate_pex_arg_list(),
+                    *(
+                        f"--override={override}"
+                        for override in pip_args_setup.resolve_config.overrides
+                    ),
                     *req.requirements,
                 ),
                 additional_input_digest=pip_args_setup.digest,
@@ -187,6 +191,7 @@ async def generate_lockfile(
         no_binary=set(pip_args_setup.resolve_config.no_binary),
         excludes=set(pip_args_setup.resolve_config.excludes),
         overrides=set(pip_args_setup.resolve_config.overrides),
+        sources=set(pip_args_setup.resolve_config.sources),
     )
     regenerate_command = (
         generate_lockfiles_subsystem.custom_command
