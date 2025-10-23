@@ -166,7 +166,7 @@ humansize = "1.1"
 hyper = "1"
 hyper-rustls = "0.27"
 hyper-util = "0.1"
-ignore = "0.4.23"
+ignore = "0.4.24"
 indexmap = { version = "2.11", features = ["std", "serde"] }
 indicatif = "0.17.11"
 internment = "0.6"
@@ -201,8 +201,8 @@ prodash = { git = "https://github.com/stuhood/prodash", rev = "stuhood/raw-messa
 prost = "0.13"
 prost-build = "0.13"
 prost-types = "0.13"
-pyo3 = { version = "0.26.0", features = ["parking_lot"] }
-pyo3-build-config = "0.26.0"
+pyo3 = { version = "0.27.0", features = ["parking_lot"] }
+pyo3-build-config = "0.27.0"
 rand = "0.9"
 regex = "1"
 reqwest = { version = "0.12", default-features = false }
@@ -228,7 +228,7 @@ tempfile = "3.23.0"
 terminal_size = "0.1.15"
 time = "0.3.44"
 tokio = "1.48"
-tokio-retry2 = "0.5"
+tokio-retry2 = "0.6"
 tokio-rustls = "0.26"
 tokio-stream = "0.1"
 tokio-util = "0.7"
