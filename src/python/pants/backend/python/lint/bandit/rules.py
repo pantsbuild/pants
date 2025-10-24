@@ -25,7 +25,7 @@ from pants.util.strutil import pluralize
 
 class BanditRequest(LintTargetsRequest):
     field_set_type = BanditFieldSet
-    tool_subsystem = Bandit # type: ignore[assignment]
+    tool_subsystem = Bandit  # type: ignore[assignment]
 
 
 def generate_argv(source_files: SourceFiles, bandit: Bandit) -> tuple[str, ...]:

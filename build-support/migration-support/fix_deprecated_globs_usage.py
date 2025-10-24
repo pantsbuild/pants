@@ -148,7 +148,7 @@ class GlobFunction(NamedTuple):
                     f"you are using variables instead of raw strings. Please manually update."
                 )
                 return None
-            exclude_globs = [arg.s for arg in combined_exclude_elements if isinstance(arg, ast.Str)] # type: ignore[misc]
+            exclude_globs = [arg.s for arg in combined_exclude_elements if isinstance(arg, ast.Str)]  # type: ignore[misc]
             exclude_glob_functions = (
                 cls.parse(glob, build_file=build_file)
                 for glob in combined_exclude_elements

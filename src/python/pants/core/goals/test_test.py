@@ -175,7 +175,7 @@ class MockTestSubsystem(Subsystem):
 
 class MockTestRequest(TestRequest):
     field_set_type = MockTestFieldSet
-    tool_subsystem = MockTestSubsystem # type: ignore[assignment]
+    tool_subsystem = MockTestSubsystem  # type: ignore[assignment]
 
     @staticmethod
     @abstractmethod

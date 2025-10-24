@@ -30,7 +30,7 @@ class AutoflakeFieldSet(FieldSet):
 
 class AutoflakeRequest(FixTargetsRequest):
     field_set_type = AutoflakeFieldSet
-    tool_subsystem = Autoflake # type: ignore[assignment]
+    tool_subsystem = Autoflake  # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

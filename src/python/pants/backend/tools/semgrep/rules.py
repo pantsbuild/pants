@@ -41,7 +41,7 @@ _DEFAULT_SEMGREP_CONFIG_DIR = ".semgrep"
 
 class SemgrepLintRequest(LintTargetsRequest):
     field_set_type = SemgrepFieldSet
-    tool_subsystem = SemgrepSubsystem # type: ignore[assignment]
+    tool_subsystem = SemgrepSubsystem  # type: ignore[assignment]
 
 
 @dataclass(frozen=True)

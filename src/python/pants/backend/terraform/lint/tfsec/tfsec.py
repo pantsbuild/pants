@@ -127,5 +127,5 @@ class TfSecFieldSet(TerraformFieldSet):
 
 class TfSecRequest(LintTargetsRequest):
     field_set_type = TfSecFieldSet
-    tool_subsystem = TFSec # type: ignore[assignment]
+    tool_subsystem = TFSec  # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION

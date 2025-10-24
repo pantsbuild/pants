@@ -6,7 +6,7 @@ import os
 from abc import ABC
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import ClassVar, Optional, cast
+from typing import ClassVar
 
 from pants.core.environments.rules import _warn_on_non_local_environments
 from pants.engine.addresses import Addresses

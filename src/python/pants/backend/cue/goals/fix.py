@@ -18,7 +18,7 @@ from pants.util.logging import LogLevel
 
 class CueFmtRequest(FmtTargetsRequest):
     field_set_type = CueFieldSet
-    tool_subsystem = Cue # type: ignore[assignment]
+    tool_subsystem = Cue  # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

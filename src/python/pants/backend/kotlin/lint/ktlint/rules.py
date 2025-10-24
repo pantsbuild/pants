@@ -36,7 +36,7 @@ class KtlintFieldSet(FieldSet):
 
 class KtlintRequest(FmtTargetsRequest):
     field_set_type = KtlintFieldSet
-    tool_subsystem = KtlintSubsystem # type: ignore[assignment]
+    tool_subsystem = KtlintSubsystem  # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

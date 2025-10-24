@@ -52,7 +52,7 @@ class GolangciLintFieldSet(FieldSet):
 
 class GolangciLintRequest(LintTargetsRequest):
     field_set_type = GolangciLintFieldSet
-    tool_subsystem = GolangciLint # type: ignore[assignment]
+    tool_subsystem = GolangciLint  # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

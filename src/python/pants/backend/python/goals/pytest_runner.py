@@ -478,7 +478,7 @@ async def setup_pytest_for_target(
 
 
 class PyTestRequest(TestRequest):
-    tool_subsystem = PyTest # type: ignore[assignment]
+    tool_subsystem = PyTest  # type: ignore[assignment]
     field_set_type = PythonTestFieldSet
     partitioner_type = PartitionerType.CUSTOM
     supports_debug = True

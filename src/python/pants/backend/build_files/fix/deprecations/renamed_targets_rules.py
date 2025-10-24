@@ -20,7 +20,7 @@ from pants.util.logging import LogLevel
 
 
 class RenameTargetsInFilesRequest(FixBuildFilesRequest):
-    tool_subsystem = BUILDDeprecationsFixer # type: ignore[assignment]
+    tool_subsystem = BUILDDeprecationsFixer  # type: ignore[assignment]
 
 
 class RenameTargetsInFileRequest(FixBUILDFileRequest):

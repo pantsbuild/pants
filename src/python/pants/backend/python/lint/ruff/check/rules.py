@@ -44,7 +44,7 @@ class RuffCheckFieldSet(FieldSet):
 
 class RuffLintRequest(LintTargetsRequest):
     field_set_type = RuffCheckFieldSet
-    tool_subsystem = Ruff # type: ignore[assignment]
+    tool_subsystem = Ruff  # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
     @classproperty
@@ -58,7 +58,7 @@ class RuffLintRequest(LintTargetsRequest):
 
 class RuffFixRequest(FixTargetsRequest):
     field_set_type = RuffCheckFieldSet
-    tool_subsystem = Ruff # type: ignore[assignment]
+    tool_subsystem = Ruff  # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
     # We don't need to include automatically added lint rules for this RuffFixRequest,

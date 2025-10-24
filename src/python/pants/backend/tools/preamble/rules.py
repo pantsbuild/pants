@@ -19,7 +19,7 @@ from pants.util.memo import memoized
 
 
 class PreambleRequest(FmtFilesRequest):
-    tool_subsystem = PreambleSubsystem # type: ignore[assignment]
+    tool_subsystem = PreambleSubsystem  # type: ignore[assignment]
 
 
 @memoized

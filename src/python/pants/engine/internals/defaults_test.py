@@ -248,7 +248,7 @@ Scenario = namedtuple(
                 args=(
                     {
                         Test1Target.alias: {
-                            "tags": Parametrize(["foo"], ["bar"], baz=["baz"]), # type: ignore[arg-type]
+                            "tags": Parametrize(["foo"], ["bar"], baz=["baz"]),  # type: ignore[arg-type]
                             **Parametrize(
                                 "splat", description="splat-desc", dependencies=["splat:dep"]
                             ),
@@ -310,7 +310,7 @@ Scenario = namedtuple(
                 args=(
                     {
                         TestGenTargetGenerator.alias: {
-                            "tags": Parametrize(["foo"], ["bar"], baz=["baz"]), # type: ignore[arg-type]
+                            "tags": Parametrize(["foo"], ["bar"], baz=["baz"]),  # type: ignore[arg-type]
                             **Parametrize(
                                 "splat", description="splat-desc", dependencies=["splat:dep"]
                             ),

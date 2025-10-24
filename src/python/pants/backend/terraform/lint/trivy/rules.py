@@ -32,7 +32,7 @@ from pants.util.logging import LogLevel
 
 
 class TrivyLintTerraformRequest(LintTargetsRequest, metaclass=ABCMeta):
-    tool_subsystem = Trivy # type: ignore[assignment]
+    tool_subsystem = Trivy  # type: ignore[assignment]
 
 
 @dataclass(frozen=True)

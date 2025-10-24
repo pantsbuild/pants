@@ -47,7 +47,7 @@ class ScalafmtFieldSet(FieldSet):
 
 class ScalafmtRequest(FmtTargetsRequest):
     field_set_type = ScalafmtFieldSet
-    tool_subsystem = ScalafmtSubsystem # type: ignore[assignment]
+    tool_subsystem = ScalafmtSubsystem  # type: ignore[assignment]
 
 
 @dataclass(frozen=True)

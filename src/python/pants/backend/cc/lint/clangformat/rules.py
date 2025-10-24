@@ -34,7 +34,7 @@ class ClangFormatFmtFieldSet(FieldSet):
 
 class ClangFormatRequest(FmtTargetsRequest):
     field_set_type = ClangFormatFmtFieldSet
-    tool_subsystem = ClangFormat # type: ignore[assignment]
+    tool_subsystem = ClangFormat  # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

@@ -260,7 +260,7 @@ class MultiMatcher:
 
 
 class RegexLintRequest(LintFilesRequest):
-    tool_subsystem = RegexLintSubsystem # type: ignore[assignment]
+    tool_subsystem = RegexLintSubsystem  # type: ignore[assignment]
 
 
 @rule

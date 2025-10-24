@@ -27,7 +27,7 @@ from pants.util.strutil import pluralize
 
 class SqlfluffFixRequest(FixTargetsRequest):
     field_set_type = SqlfluffFieldSet
-    tool_subsystem = Sqlfluff # type: ignore[assignment]
+    tool_subsystem = Sqlfluff  # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
     # We don't need to include automatically added lint rules for this SqlfluffFixRequest,
@@ -37,13 +37,13 @@ class SqlfluffFixRequest(FixTargetsRequest):
 
 class SqlfluffLintRequest(LintTargetsRequest):
     field_set_type = SqlfluffFieldSet
-    tool_subsystem = Sqlfluff # type: ignore[assignment]
+    tool_subsystem = Sqlfluff  # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 class SqlfluffFormatRequest(FmtTargetsRequest):
     field_set_type = SqlfluffFieldSet
-    tool_subsystem = Sqlfluff # type: ignore[assignment]
+    tool_subsystem = Sqlfluff  # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
     @classproperty

@@ -30,7 +30,7 @@ class VisibilityFieldSet(FieldSet):
 
 
 class EnforceVisibilityRules(LintTargetsRequest):
-    tool_subsystem = VisibilitySubsystem # type: ignore[assignment]
+    tool_subsystem = VisibilitySubsystem  # type: ignore[assignment]
     field_set_type = VisibilityFieldSet
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
