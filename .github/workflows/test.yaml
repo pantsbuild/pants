@@ -28,11 +28,11 @@ jobs:
     - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -115,11 +115,11 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -130,7 +130,7 @@ jobs:
           3.13
           3.11
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -223,11 +223,11 @@ jobs:
     - macos-13
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -238,7 +238,7 @@ jobs:
           3.13
           3.11
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -321,11 +321,11 @@ jobs:
     - macos-14
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - name: Set up Python 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.9
@@ -334,7 +334,7 @@ jobs:
           3.13
           3.11
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -429,7 +429,7 @@ jobs:
     - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - name: Configure Git
@@ -453,7 +453,7 @@ jobs:
         echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
         echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -498,7 +498,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - name: Configure Git
@@ -522,12 +522,12 @@ jobs:
         echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
         echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: 1.19.5
     - env:
@@ -569,11 +569,11 @@ jobs:
     - macos-13
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -584,7 +584,7 @@ jobs:
           3.13
           3.11
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -605,12 +605,12 @@ jobs:
         shared-key: engine
         workspaces: src/rust
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: 1.19.5
     - env:
@@ -654,11 +654,11 @@ jobs:
     - macos-14
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - name: Set up Python 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.9
@@ -667,7 +667,7 @@ jobs:
           3.13
           3.11
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -688,12 +688,12 @@ jobs:
         shared-key: engine
         workspaces: src/rust
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: 1.19.5
     - env:
@@ -728,7 +728,7 @@ jobs:
     - windows-2025
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - name: Install MSYS2
@@ -764,7 +764,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       if: github.event_name == 'pull_request' && !needs.classify_changes.outputs.notes
       name: Ensure appropriate label
-      uses: mheap/github-action-required-labels@v4.0.0
+      uses: mheap/github-action-required-labels@v5.5.1
       with:
         count: 1
         labels: release-notes:not-required, category:internal
@@ -797,7 +797,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - id: classify
@@ -854,7 +854,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - env:
@@ -883,7 +883,7 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -894,7 +894,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -986,20 +986,20 @@ jobs:
     - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - name: Install AdoptJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: 1.19.5
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
         path: src/python/pants
@@ -1055,7 +1055,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - env:
@@ -1084,12 +1084,12 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: 1.19.5
     - if: runner.os == 'Linux'
@@ -1100,7 +1100,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -1111,7 +1111,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1167,7 +1167,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - env:
@@ -1196,12 +1196,12 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: 1.19.5
     - if: runner.os == 'Linux'
@@ -1212,7 +1212,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -1223,7 +1223,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1279,7 +1279,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - env:
@@ -1308,12 +1308,12 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: 1.19.5
     - if: runner.os == 'Linux'
@@ -1324,7 +1324,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -1335,7 +1335,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1391,7 +1391,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - env:
@@ -1420,12 +1420,12 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: 1.19.5
     - if: runner.os == 'Linux'
@@ -1436,7 +1436,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -1447,7 +1447,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1503,7 +1503,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - env:
@@ -1532,12 +1532,12 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: 1.19.5
     - if: runner.os == 'Linux'
@@ -1548,7 +1548,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -1559,7 +1559,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1615,7 +1615,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - env:
@@ -1644,12 +1644,12 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: 1.19.5
     - if: runner.os == 'Linux'
@@ -1660,7 +1660,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -1671,7 +1671,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1727,7 +1727,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - env:
@@ -1756,12 +1756,12 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: 1.19.5
     - if: runner.os == 'Linux'
@@ -1772,7 +1772,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -1783,7 +1783,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1839,7 +1839,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - env:
@@ -1868,12 +1868,12 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: 1.19.5
     - if: runner.os == 'Linux'
@@ -1884,7 +1884,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -1895,7 +1895,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1951,7 +1951,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - env:
@@ -1980,12 +1980,12 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: 1.19.5
     - if: runner.os == 'Linux'
@@ -1996,7 +1996,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -2007,7 +2007,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -2063,7 +2063,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - env:
@@ -2092,12 +2092,12 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: 1.19.5
     - if: runner.os == 'Linux'
@@ -2108,7 +2108,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -2119,7 +2119,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -2176,20 +2176,20 @@ jobs:
     - macos-13
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - name: Install AdoptJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: 1.19.5
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -2200,7 +2200,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: native_binaries.${{ matrix.python-version }}.macOS13-x86_64
         path: src/python/pants
@@ -2257,20 +2257,20 @@ jobs:
     - macos-14
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - name: Install AdoptJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: 1.19.5
     - name: Set up Python 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.9
@@ -2279,7 +2279,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: native_binaries.${{ matrix.python-version }}.macOS14-ARM64
         path: src/python/pants

@@ -27,7 +27,7 @@ jobs:
     - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
@@ -52,7 +52,7 @@ jobs:
         echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
         echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -78,7 +78,7 @@ jobs:
         path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the pantsbuild.pants wheel
-      uses: actions/attest-build-provenance@v2
+      uses: actions/attest-build-provenance@v3
       with:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants-*.whl
     - if: needs.release_info.outputs.is-release == 'true'
@@ -93,7 +93,7 @@ jobs:
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
-      uses: actions/attest-build-provenance@v2
+      uses: actions/attest-build-provenance@v3
       with:
         subject-path: dist/src.python.pants/*.pex
     - if: needs.release_info.outputs.is-release == 'true'
@@ -133,7 +133,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
@@ -158,12 +158,12 @@ jobs:
         echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
         echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: 1.19.5
     - env:
@@ -188,7 +188,7 @@ jobs:
         path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the pantsbuild.pants wheel
-      uses: actions/attest-build-provenance@v2
+      uses: actions/attest-build-provenance@v3
       with:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants-*.whl
     - if: needs.release_info.outputs.is-release == 'true'
@@ -203,7 +203,7 @@ jobs:
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
-      uses: actions/attest-build-provenance@v2
+      uses: actions/attest-build-provenance@v3
       with:
         subject-path: dist/src.python.pants/*.pex
     - if: needs.release_info.outputs.is-release == 'true'
@@ -225,7 +225,7 @@ jobs:
             --data-binary "@$WHL";
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the pantsbuild.pants.testutil wheel
-      uses: actions/attest-build-provenance@v2
+      uses: actions/attest-build-provenance@v3
       with:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants_testutil*.whl
     - if: needs.release_info.outputs.is-release == 'true'
@@ -256,12 +256,12 @@ jobs:
     - macos-13
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -272,7 +272,7 @@ jobs:
           3.13
           3.11
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -293,12 +293,12 @@ jobs:
         shared-key: engine
         workspaces: src/rust
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: 1.19.5
     - env:
@@ -325,7 +325,7 @@ jobs:
         path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the pantsbuild.pants wheel
-      uses: actions/attest-build-provenance@v2
+      uses: actions/attest-build-provenance@v3
       with:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants-*.whl
     - if: needs.release_info.outputs.is-release == 'true'
@@ -340,7 +340,7 @@ jobs:
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
-      uses: actions/attest-build-provenance@v2
+      uses: actions/attest-build-provenance@v3
       with:
         subject-path: dist/src.python.pants/*.pex
     - if: needs.release_info.outputs.is-release == 'true'
@@ -378,12 +378,12 @@ jobs:
     - macos-14
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
     - name: Set up Python 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.9
@@ -392,7 +392,7 @@ jobs:
           3.13
           3.11
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -413,12 +413,12 @@ jobs:
         shared-key: engine
         workspaces: src/rust
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: 1.19.5
     - env:
@@ -445,7 +445,7 @@ jobs:
         path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the pantsbuild.pants wheel
-      uses: actions/attest-build-provenance@v2
+      uses: actions/attest-build-provenance@v3
       with:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants-*.whl
     - if: needs.release_info.outputs.is-release == 'true'
@@ -460,7 +460,7 @@ jobs:
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
-      uses: actions/attest-build-provenance@v2
+      uses: actions/attest-build-provenance@v3
       with:
         subject-path: dist/src.python.pants/*.pex
     - if: needs.release_info.outputs.is-release == 'true'
@@ -494,13 +494,13 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Checkout Pants at Release Tag
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: '0'
         fetch-tags: true
         ref: ${{ needs.release_info.outputs.build-ref }}
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -511,7 +511,7 @@ jobs:
           3.13
           3.11
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -553,12 +553,12 @@ jobs:
     - env:
         SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
       name: Announce to Slack
-      uses: slackapi/slack-github-action@v1.24.0
+      uses: slackapi/slack-github-action@v2.1.1
       with:
         channel-id: C18RRR4JK
         payload-file-path: ${{ runner.temp }}/slack_announcement.json
     - name: Announce to pants-devel
-      uses: dawidd6/action-send-mail@v3.8.0
+      uses: dawidd6/action-send-mail@v3.12.0
       with:
         body: file://${{ runner.temp }}/email_announcement_body.md
         connection_url: ${{ secrets.EMAIL_CONNECTION_URL }}
