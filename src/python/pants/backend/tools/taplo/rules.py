@@ -20,7 +20,7 @@ from pants.util.strutil import pluralize
 
 
 class TaploFmtRequest(FmtFilesRequest):
-    tool_subsystem = Taplo
+    tool_subsystem = Taplo # type: ignore[assignment]
 
 
 @rule

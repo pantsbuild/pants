@@ -23,7 +23,7 @@ from pants.util.strutil import pluralize
 
 class PydocstyleRequest(LintTargetsRequest):
     field_set_type = PydocstyleFieldSet
-    tool_subsystem = Pydocstyle
+    tool_subsystem = Pydocstyle # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

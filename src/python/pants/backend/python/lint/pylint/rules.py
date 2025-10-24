@@ -60,7 +60,7 @@ class PartitionMetadata:
 
 class PylintRequest(LintTargetsRequest):
     field_set_type = PylintFieldSet
-    tool_subsystem = Pylint
+    tool_subsystem = Pylint # type: ignore[assignment]
 
 
 def generate_argv(field_sets: tuple[PylintFieldSet, ...], pylint: Pylint) -> tuple[str, ...]:

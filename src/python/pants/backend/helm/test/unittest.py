@@ -83,7 +83,7 @@ class HelmUnitTestFieldSet(TestFieldSet, GenerateSnapshotsFieldSet):
 
 
 class HelmUnitTestRequest(TestRequest):
-    tool_subsystem = HelmUnitTestSubsystem
+    tool_subsystem = HelmUnitTestSubsystem # type: ignore[assignment]
     field_set_type = HelmUnitTestFieldSet
 
 

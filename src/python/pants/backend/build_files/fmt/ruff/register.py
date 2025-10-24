@@ -13,7 +13,7 @@ from pants.util.logging import LogLevel
 
 
 class RuffRequest(FmtBuildFilesRequest):
-    tool_subsystem = Ruff
+    tool_subsystem = Ruff # type: ignore[assignment]
 
 
 @rule(desc="Format with Ruff", level=LogLevel.DEBUG)

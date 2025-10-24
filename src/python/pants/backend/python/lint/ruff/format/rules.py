@@ -37,7 +37,7 @@ class RuffFormatFieldSet(FieldSet):
 
 class RuffFormatRequest(FmtTargetsRequest):
     field_set_type = RuffFormatFieldSet
-    tool_subsystem = Ruff
+    tool_subsystem = Ruff # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
     @classproperty

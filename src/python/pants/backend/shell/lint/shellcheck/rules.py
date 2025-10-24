@@ -39,7 +39,7 @@ class ShellcheckFieldSet(FieldSet):
 
 class ShellcheckRequest(LintTargetsRequest):
     field_set_type = ShellcheckFieldSet
-    tool_subsystem = Shellcheck
+    tool_subsystem = Shellcheck # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

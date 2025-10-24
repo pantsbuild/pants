@@ -34,7 +34,7 @@ class PyUpgradeFieldSet(FieldSet):
 
 class PyUpgradeRequest(FixTargetsRequest):
     field_set_type = PyUpgradeFieldSet
-    tool_subsystem = PyUpgrade
+    tool_subsystem = PyUpgrade # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

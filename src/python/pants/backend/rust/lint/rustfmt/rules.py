@@ -32,7 +32,7 @@ class RustfmtFieldSet(FieldSet):
 
 class RustfmtRequest(FmtTargetsRequest):
     field_set_type = RustfmtFieldSet
-    tool_subsystem = RustfmtSubsystem
+    tool_subsystem = RustfmtSubsystem # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

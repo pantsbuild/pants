@@ -38,7 +38,7 @@ class SpectralFieldSet(FieldSet):
 
 class SpectralRequest(LintTargetsRequest):
     field_set_type = SpectralFieldSet
-    tool_subsystem = SpectralSubsystem
+    tool_subsystem = SpectralSubsystem # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

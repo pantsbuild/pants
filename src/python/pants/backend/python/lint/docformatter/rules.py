@@ -32,7 +32,7 @@ class DocformatterFieldSet(FieldSet):
 
 class DocformatterRequest(FmtTargetsRequest):
     field_set_type = DocformatterFieldSet
-    tool_subsystem = Docformatter
+    tool_subsystem = Docformatter # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

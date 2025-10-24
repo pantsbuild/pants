@@ -21,7 +21,7 @@ from pants.util.strutil import pluralize
 
 class OpenApiFormatRequest(FmtTargetsRequest):
     field_set_type = OpenApiFormatFieldSet
-    tool_subsystem = OpenApiFormatSubsystem
+    tool_subsystem = OpenApiFormatSubsystem # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_ONE_PARTITION_PER_INPUT
 
 

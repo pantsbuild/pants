@@ -36,7 +36,7 @@ class GoogleJavaFormatFieldSet(FieldSet):
 
 class GoogleJavaFormatRequest(FmtTargetsRequest):
     field_set_type = GoogleJavaFormatFieldSet
-    tool_subsystem = GoogleJavaFormatSubsystem
+    tool_subsystem = GoogleJavaFormatSubsystem # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

@@ -67,7 +67,7 @@ class JunitTestFieldSet(TestFieldSet):
 
 
 class JunitTestRequest(TestRequest):
-    tool_subsystem = JUnit
+    tool_subsystem = JUnit # type: ignore[assignment]
     field_set_type = JunitTestFieldSet
     supports_debug = True
 

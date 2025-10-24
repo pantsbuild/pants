@@ -58,7 +58,7 @@ class TestShellCommandFieldSet(TestFieldSet):
 
 
 class ShellTestRequest(TestRequest):
-    tool_subsystem = ShellTestSubsystem
+    tool_subsystem = ShellTestSubsystem # type: ignore[assignment]
     field_set_type = TestShellCommandFieldSet
     supports_debug = True
 

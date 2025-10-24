@@ -17,7 +17,7 @@ from pants.util.strutil import pluralize
 
 
 class BuildifierRequest(FmtBuildFilesRequest):
-    tool_subsystem = Buildifier
+    tool_subsystem = Buildifier # type: ignore[assignment]
 
 
 async def _run_buildifier_fmt(

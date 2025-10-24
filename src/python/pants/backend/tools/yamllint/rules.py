@@ -26,7 +26,7 @@ from pants.util.strutil import pluralize
 
 
 class YamllintRequest(LintFilesRequest):
-    tool_subsystem = Yamllint
+    tool_subsystem = Yamllint # type: ignore[assignment]
 
 
 @dataclass(frozen=True)
