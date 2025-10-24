@@ -13,18 +13,18 @@ importers:
         version: link:child
     devDependencies:
       typescript:
-        specifier: ^5.7.3
-        version: 5.8.3
+        specifier: 5.9.3
+        version: 5.9.3
 
   child: {}
 
 packages:
 
-  typescript@5.8.3:
-    resolution: {integrity: sha512-p1diW6TqL9L07nNxvRMM7hMMw4c5XOo/1ibL4aAIGmSAt9slTE1Xgw5KWuof2uTOvCg9BY7ZRi+GaF+7sfgPeQ==}
+  typescript@5.9.3:
+    resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
     engines: {node: '>=14.17'}
     hasBin: true
 
 snapshots:
 
-  typescript@5.8.3: {}
+  typescript@5.9.3: {}
