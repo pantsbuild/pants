@@ -109,7 +109,7 @@ class Shunit2Shell(Enum):
 
     @property
     def binary_path_test(self) -> BinaryPathTest | None:
-        arg = match(  # type: ignore[misc]
+        arg = match(
             self,
             {
                 self.sh: None,
