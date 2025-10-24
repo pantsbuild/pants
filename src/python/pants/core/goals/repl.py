@@ -127,9 +127,7 @@ async def run_repl(
     #  on the targets.  For now we default to the python repl.
     repl_shell_name = repl_subsystem.shell or "python"
     implementations = {impl.name: impl for impl in union_membership[ReplImplementation]}
-    repl_implementation_cls = cast(
-        Optional[type[ReplImplementation]], implementations.get(repl_shell_name)
-    )
+    repl_implementation_cls = implementations.get(repl_shell_name)
     if repl_implementation_cls is None:
         available = sorted(implementations.keys())
         console.print_stderr(
