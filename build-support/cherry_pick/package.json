@@ -7,7 +7,7 @@
     "test": "jest"
   },
   "devDependencies": {
-    "jest": "^29.5.0",
-    "semver": "^6.0.0"
+    "jest": "^30.2.0",
+    "semver": "^7.7.3"
   }
 }
