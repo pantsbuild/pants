@@ -23,7 +23,7 @@ omit = [
 namespace_packages = true
 explicit_package_bases = true
 mypy_path = "src/python:tests/python:testprojects/src/python"
-plugins = "mypy_typing_asserts.mypy_plugin, strawberry.ext.mypy_plugin"
+plugins = "mypy_typing_asserts.mypy_plugin"
 
 no_implicit_optional = true
 implicit_reexport = false

@@ -33,7 +33,7 @@ class TfFmtSubsystem(Subsystem):
 
 class TffmtRequest(FmtTargetsRequest):
     field_set_type = TerraformFieldSet
-    tool_subsystem = TfFmtSubsystem
+    tool_subsystem = TfFmtSubsystem  # type: ignore[assignment]
 
 
 @dataclass(frozen=True)

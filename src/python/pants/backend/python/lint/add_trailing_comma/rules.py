@@ -30,7 +30,7 @@ class AddTrailingCommaFieldSet(FieldSet):
 
 class AddTrailingCommaRequest(FmtTargetsRequest):
     field_set_type = AddTrailingCommaFieldSet
-    tool_subsystem = AddTrailingComma
+    tool_subsystem = AddTrailingComma  # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

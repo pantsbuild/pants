@@ -28,7 +28,7 @@ from pants.util.strutil import pluralize
 
 
 class TrufflehogRequest(LintFilesRequest):
-    tool_subsystem = Trufflehog
+    tool_subsystem = Trufflehog  # type: ignore[assignment]
 
 
 @rule

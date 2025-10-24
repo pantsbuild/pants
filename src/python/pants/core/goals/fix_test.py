@@ -533,7 +533,7 @@ def test_default_single_partition_partitioner(kitchen_field_set_type, field_sets
 
     class FixKitchenRequest(FixTargetsRequest):
         field_set_type = kitchen_field_set_type
-        tool_subsystem = KitchenSubsystem
+        tool_subsystem = KitchenSubsystem  # type: ignore[assignment]
         partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
     rules = [

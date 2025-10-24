@@ -36,7 +36,7 @@ class PrettierFmtFieldSet(FieldSet):
 
 class PrettierFmtRequest(FmtTargetsRequest):
     field_set_type = PrettierFmtFieldSet
-    tool_subsystem = Prettier
+    tool_subsystem = Prettier  # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

@@ -22,7 +22,7 @@ from pants.util.strutil import pluralize, softwrap
 
 class BlackRequest(FmtTargetsRequest):
     field_set_type = BlackFieldSet
-    tool_subsystem = Black
+    tool_subsystem = Black  # type: ignore[assignment]
 
 
 async def _run_black(

@@ -140,7 +140,7 @@ class CheckRequest(Generic[_FS], EngineAwareParameter):
     Subclass and install a member of this type to provide a checker.
     """
 
-    field_set_type: ClassVar[type[_FS]]  # type: ignore[misc]
+    field_set_type: ClassVar[type[_FS]]
     tool_name: ClassVar[str]
 
     @classproperty

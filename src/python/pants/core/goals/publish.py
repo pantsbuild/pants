@@ -109,7 +109,7 @@ class PublishFieldSet(Generic[_T], FieldSet, metaclass=ABCMeta):
     """
 
     # Subclasses must provide this, to a union member (subclass) of `PublishRequest`.
-    publish_request_type: ClassVar[type[_T]]  # type: ignore[misc]
+    publish_request_type: ClassVar[type[_T]]
 
     @final
     def _request(self, packages: tuple[BuiltPackage, ...]) -> _T:
