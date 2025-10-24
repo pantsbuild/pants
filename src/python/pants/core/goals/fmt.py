@@ -110,7 +110,7 @@ async def fmt(
         union_membership.get(FmtTargetsRequest.PartitionRequest),
         union_membership.get(FmtFilesRequest.PartitionRequest),
         Fmt,
-        fmt_subsystem,
+        fmt_subsystem, # type: ignore[arg-type]
         specs,
         workspace,
         console,
