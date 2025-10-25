@@ -133,9 +133,22 @@ pub async fn interactive_process_inner(
     };
 
     let mut command = process::Command::new(program_name);
-    if !run_in_workspace {
-        command.current_dir(tempdir.path());
+
+    let cwd = match (&process.working_directory, run_in_workspace) {
+        (Some(working_directory), true) => Some(
+            current_dir()
+                .map_err(|e| format!("Could not detect current working directory: {e}"))?
+                .join(working_directory),
+        ),
+        (Some(working_directory), false) => Some(tempdir.path().join(working_directory)),
+        (None, false) => Some(tempdir.path().to_owned()),
+        (None, true) => None,
+    };
+
+    if let Some(cwd) = cwd {
+        command.current_dir(cwd);
     }
+
     for arg in process.argv[1..].iter() {
         command.arg(arg);
     }
