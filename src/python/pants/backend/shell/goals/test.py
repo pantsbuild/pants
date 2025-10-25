@@ -8,6 +8,7 @@ from typing import Any
 
 from pants.backend.shell.subsystems.shell_test_subsys import ShellTestSubsystem
 from pants.backend.shell.target_types import (
+    ShellCommandCacheScopeField,
     ShellCommandCommandField,
     ShellCommandTestDependenciesField,
     SkipShellCommandTestsField,
@@ -17,7 +18,7 @@ from pants.backend.shell.util_rules.shell_command import (
     ShellCommandProcessFromTargetRequest,
     prepare_process_request_from_target,
 )
-from pants.core.environments.target_types import EnvironmentField
+from pants.core.environments.target_types import EnvironmentField, EnvironmentTarget
 from pants.core.goals.test import (
     TestDebugRequest,
     TestExtraEnv,
@@ -51,6 +52,7 @@ class TestShellCommandFieldSet(TestFieldSet):
     )
 
     environment: EnvironmentField
+    cache_scope: ShellCommandCacheScopeField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -68,6 +70,7 @@ async def test_shell_command(
     batch: ShellTestRequest.Batch[TestShellCommandFieldSet, Any],
     test_subsystem: TestSubsystem,
     test_extra_env: TestExtraEnv,
+    env_target: EnvironmentTarget,
 ) -> TestResult:
     field_set = batch.single_element
     wrapped_tgt = await resolve_target(
@@ -81,9 +84,6 @@ async def test_shell_command(
 
     shell_process = dataclasses.replace(
         shell_process,
-        cache_scope=(
-            ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
-        ),
         env_vars=FrozenDict(
             {
                 **test_extra_env.env,
@@ -91,6 +91,16 @@ async def test_shell_command(
             }
         ),
     )
+
+    if field_set.cache_scope.value is None:
+        shell_process = dataclasses.replace(
+            shell_process,
+            cache_scope=(
+                ProcessCacheScope.PER_SESSION
+                if test_subsystem.force
+                else env_target.default_cache_scope
+            ),
+        )
 
     results: list[FallibleAdhocProcessResult] = []
     for _ in range(test_subsystem.attempts_default):

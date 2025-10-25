@@ -513,6 +513,7 @@ class ShellCommandTestTarget(Target):
         ShellCommandOutputDirectoriesField,
         ShellCommandOutputRootDirField,
         ShellCommandOutputsMatchMode,
+        ShellCommandCacheScopeField,
     )
     help = help_text(
         """
