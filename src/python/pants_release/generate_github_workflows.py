@@ -72,8 +72,8 @@ class Platform(Enum):
     WINDOWS11_X86_64 = "Windows11-x86_64"
 
 
-GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS13_X86_64, Platform.MACOS14_ARM64}
-SELF_HOSTED = {Platform.LINUX_ARM64}
+GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS14_ARM64}
+SELF_HOSTED = {Platform.MACOS13_X86_64, Platform.LINUX_ARM64}
 CARGO_AUDIT_IGNORED_ADVISORY_IDS = (
     "RUSTSEC-2020-0128",  # returns a false positive on the cache crate, which is a local crate not a 3rd party crate
 )
@@ -85,10 +85,10 @@ _BASE_PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.12", "3.13", "3.11"]
 
 PYTHON_VERSIONS_PER_PLATFORM = {
     Platform.LINUX_X86_64: _BASE_PYTHON_VERSIONS,
-    Platform.MACOS13_X86_64: _BASE_PYTHON_VERSIONS,
     # Python 3.7 or 3.8 aren't supported directly on arm64 macOS
     Platform.MACOS14_ARM64: [v for v in _BASE_PYTHON_VERSIONS if v not in ("3.7", "3.8")],
     # These runners have Python already installed
+    Platform.MACOS13_X86_64: None,
     Platform.LINUX_ARM64: None,
 }
 
@@ -479,6 +479,7 @@ class Helper:
             # macosx-10.9-universal2. Thus, without this env var, we tag our single-platform wheels
             # as universal2... this is a lie and understandably leads to installing the wrong wheel
             # and thus things do not work (see #21938 for an example).
+            # A similar issue may occur with the interpreters on self-hosted runners.
             ret["_PYTHON_HOST_PLATFORM"] = "macosx-13.0-x86_64"
         if self.platform in {Platform.MACOS14_ARM64}:
             ret["ARCHFLAGS"] = "-arch arm64"
