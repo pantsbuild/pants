@@ -18,7 +18,7 @@ from pants.backend.shell.util_rules.shell_command import (
     ShellCommandProcessFromTargetRequest,
     prepare_process_request_from_target,
 )
-from pants.core.environments.target_types import EnvironmentField, EnvironmentTarget
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.test import (
     TestDebugRequest,
     TestExtraEnv,
@@ -70,7 +70,6 @@ async def test_shell_command(
     batch: ShellTestRequest.Batch[TestShellCommandFieldSet, Any],
     test_subsystem: TestSubsystem,
     test_extra_env: TestExtraEnv,
-    env_target: EnvironmentTarget,
 ) -> TestResult:
     field_set = batch.single_element
     wrapped_tgt = await resolve_target(
@@ -92,14 +91,10 @@ async def test_shell_command(
         ),
     )
 
-    if field_set.cache_scope.value is None:
+    if field_set.cache_scope.value is None and test_subsystem.force:
         shell_process = dataclasses.replace(
             shell_process,
-            cache_scope=(
-                ProcessCacheScope.PER_SESSION
-                if test_subsystem.force
-                else env_target.default_cache_scope
-            ),
+            cache_scope=ProcessCacheScope.PER_SESSION,
         )
 
     results: list[FallibleAdhocProcessResult] = []
