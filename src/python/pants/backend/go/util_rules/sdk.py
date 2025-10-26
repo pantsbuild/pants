@@ -159,7 +159,7 @@ async def setup_go_sdk_process(
         env[GoSdkRunSetup.SANDBOX_ROOT_ENV] = "1"
 
     # Disable the "coverage redesign" experiment on Go v1.20+ for now since Pants does not yet support it.
-    if goroot.is_compatible_version("1.20"):
+    if not goroot.is_compatible_version("1.20"):
         exp_str = env.get("GOEXPERIMENT", "")
         exp_fields = exp_str.split(",") if exp_str != "" else []
         exp_fields = [exp for exp in exp_fields if exp != "coverageredesign"]
