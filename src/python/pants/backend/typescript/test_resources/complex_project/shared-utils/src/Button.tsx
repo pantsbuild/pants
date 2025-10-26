@@ -15,7 +15,7 @@ export function Button({
   disabled = false,
   variant = "primary",
   user,
-}: ButtonProps): JSX.Element {
+}: ButtonProps): React.JSX.Element {
   const className = `btn btn-${variant} ${disabled ? "disabled" : ""}`;
 
   return (
@@ -30,7 +30,7 @@ export function Button({
   );
 }
 
-export function UserCard({ user }: { user: User }): JSX.Element {
+export function UserCard({ user }: { user: User }): React.JSX.Element {
   return (
     <div className="user-card">
       <h3>{user.name}</h3>

@@ -1,16 +1,34 @@
+# https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference
+
 version: 2
 updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      gha-deps:
+        patterns:
+          - "*"
+
   - package-ecosystem: "cargo"
     directory: "/src/rust"
-    open-pull-requests-limit: 5
-    rebase-strategy: auto
+    groups:
+      rust-security-updates:
+        applies-to: security-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      rust-version-updates:
+        applies-to: version-updates
+        patterns:
+          - "*"
     labels:
       - "category:internal"
-    schedule:
-      interval: "weekly" 
-      day: "wednesday"
-      time: "03:00"
-      timezone: "US/Pacific"
+      - "dependencies"
+      - "release-notes:not-required"
     reviewers:
       - benjyw
       - cburroughs
@@ -18,3 +36,52 @@ updates:
       - sureshjoshi
       - tdyas
       - tgolsson
+    schedule:
+      interval: "weekly"
+  
+  - package-ecosystem: pip
+    directory: "/3rdparty/python"
+    groups:
+      python-security-updates:
+        applies-to: security-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      python-version-updates:
+        applies-to: version-updates
+        patterns:
+          - "*"
+    labels:
+      - "category:internal"
+      - "dependencies"
+      - "release-notes:not-required"
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: "npm"
+    directories: 
+      - "build-support/**/*"
+      - "src/python/pants/backend/javascript/**/*"
+      - "src/python/pants/backend/typescript/**/*"
+      - "testprojects/src/js/**/*"
+      - "testprojects/src/ts/**/*"
+    groups:
+      js-security-updates:
+        applies-to: security-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      js-version-updates:
+        applies-to: version-updates
+        patterns:
+          - "*"
+    labels:
+      - "category:internal"
+      - "dependencies"
+      - "release-notes:not-required"
+    schedule:
+      interval: "weekly"
