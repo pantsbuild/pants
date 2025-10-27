@@ -8,7 +8,8 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
-static NAME_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[a-z|A-Z]\w*$").unwrap());
+static NAME_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^[A-Za-z][0-9A-Za-z_\-]*$").unwrap());
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Args {
@@ -62,9 +63,9 @@ pub struct Command {
 //
 // pants --global-flags \
 //   cmd1 --cmd1-flags (subcmd1 --subcmd1-flags)? \
-//   @ cmd2 --cmd2-flags (subcmd2 --subcmd2-flags)? \
+//   + cmd2 --cmd2-flags (subcmd2 --subcmd2-flags)? \
 //   ... \
-//   @ cmdN --cmdN-flags (subcmdN --subcmdN-flags)? \
+//   + cmdN --cmdN-flags (subcmdN --subcmdN-flags)? \
 //   path/to/spec1 path/to/spec2 ... path/to/specM \
 //   (-- passthru-args)?
 //
@@ -171,7 +172,7 @@ impl PantsInvocation {
         let mut cmd_opt = consume_cmd(&mut unconsumed_args);
         while cmd_opt.is_some()
             && let Some(s) = unconsumed_args.peek()
-            && s == "@"
+            && s == "+"
         {
             unconsumed_args.next();
             commands.push(cmd_opt.unwrap());

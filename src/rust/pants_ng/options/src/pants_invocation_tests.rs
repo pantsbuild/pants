@@ -176,6 +176,49 @@ fn test_command_no_subcommand() {
 }
 
 #[test]
+fn test_valid_command_name() {
+    assert_eq!(
+        mk_invocation("pants foo").unwrap(),
+        PantsInvocation {
+            global_flags: vec![],
+            commands: vec![mk_command("foo", vec![], None,)],
+            specs: vec![],
+            passthru: None,
+        },
+    );
+
+    assert_eq!(
+        mk_invocation("pants foo-bar").unwrap(),
+        PantsInvocation {
+            global_flags: vec![],
+            commands: vec![mk_command("foo-bar", vec![], None,)],
+            specs: vec![],
+            passthru: None,
+        },
+    );
+
+    assert_eq!(
+        mk_invocation("pants foo2").unwrap(),
+        PantsInvocation {
+            global_flags: vec![],
+            commands: vec![mk_command("foo2", vec![], None,)],
+            specs: vec![],
+            passthru: None,
+        },
+    );
+
+    assert_eq!(
+        mk_invocation("pants foo2-bar").unwrap(),
+        PantsInvocation {
+            global_flags: vec![],
+            commands: vec![mk_command("foo2-bar", vec![], None,)],
+            specs: vec![],
+            passthru: None,
+        },
+    );
+}
+
+#[test]
 fn test_command_and_subcommand() {
     assert_eq!(
         mk_invocation("pants --foo --bar=baz cmd subcmd").unwrap(),
@@ -254,7 +297,7 @@ fn test_command_and_subcommand() {
 #[test]
 fn test_multiple_commands_and_subcommands() {
     assert_eq!(
-        mk_invocation("pants cmd1 subcmd1 @ cmd2 @ cmd3 subcmd3").unwrap(),
+        mk_invocation("pants cmd1 subcmd1 + cmd2 + cmd3 subcmd3").unwrap(),
         PantsInvocation {
             global_flags: vec![],
             commands: vec![
@@ -268,7 +311,7 @@ fn test_multiple_commands_and_subcommands() {
     );
 
     assert_eq!(
-        mk_invocation("pants --global-flag cmd1 --cmd1-flag subcmd1 --subcmd1-flag @ cmd2 --cmd2-flag @ cmd3 --cmd3-flag subcmd3 --subcmd3-flag path/to/spec -- passthru").unwrap(),
+        mk_invocation("pants --global-flag cmd1 --cmd1-flag subcmd1 --subcmd1-flag + cmd2 --cmd2-flag + cmd3 --cmd3-flag subcmd3 --subcmd3-flag path/to/spec -- passthru").unwrap(),
         PantsInvocation {
             global_flags: vec![mk_flag("global-flag", None)],
             commands: vec![mk_command(
@@ -295,6 +338,11 @@ fn test_errors() {
     assert_error(
         "pants cmd _bad_cmd_name",
         "Invalid command name `_bad_cmd_name`",
+    );
+
+    assert_error(
+        "pants cmd 0bad_cmd_name",
+        "Invalid command name `0bad_cmd_name`",
     );
 
     assert_error(
