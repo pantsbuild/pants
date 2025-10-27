@@ -630,3 +630,155 @@ def test_exports(rule_runner: RuleRunner) -> None:
         ),
         exports=FrozenOrderedSet([]),
     )
+
+
+@maybe_skip_jdk_test
+def test_infer_same_package_inner_class(rule_runner: RuleRunner) -> None:
+    """Test inference for inner class references from same package without imports."""
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                java_sources(
+                    name = 't',
+
+                )
+                """
+            ),
+            "Outer.java": dedent(
+                """\
+                package com.example;
+                public class Outer {
+                    public static class Inner {
+                        public void hello() {}
+                    }
+                }
+                """
+            ),
+            "Consumer.java": dedent(
+                """\
+                package com.example;
+                public class Consumer {
+                    private Outer.Inner inner;
+
+                    public void use() {
+                        inner = new Outer.Inner();
+                    }
+                }
+                """
+            ),
+        }
+    )
+
+    consumer = rule_runner.get_target(Address("", target_name="t", relative_file_path="Consumer.java"))
+    outer = rule_runner.get_target(Address("", target_name="t", relative_file_path="Outer.java"))
+
+    # Consumer should depend on Outer due to Outer.Inner reference
+    assert rule_runner.request(
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(consumer))],
+    ) == InferredDependencies([outer.address])
+
+
+@maybe_skip_jdk_test
+def test_infer_same_package_no_import(rule_runner: RuleRunner) -> None:
+    """Test inference for simple same-package references without imports."""
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                java_sources(
+                    name = 't',
+
+                )
+                """
+            ),
+            "ThingA.java": dedent(
+                """\
+                package com.example;
+                public class ThingA {
+                    public void use() {
+                        ThingB b = new ThingB();
+                    }
+                }
+                """
+            ),
+            "ThingB.java": dedent(
+                """\
+                package com.example;
+                public class ThingB {}
+                """
+            ),
+        }
+    )
+
+    thing_a = rule_runner.get_target(Address("", target_name="t", relative_file_path="ThingA.java"))
+    thing_b = rule_runner.get_target(Address("", target_name="t", relative_file_path="ThingB.java"))
+
+    # ThingA should depend on ThingB
+    assert rule_runner.request(
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(thing_a))],
+    ) == InferredDependencies([thing_b.address])
+
+
+@maybe_skip_jdk_test
+def test_infer_third_party_with_same_package_refs(rule_runner: RuleRunner) -> None:
+    """Test that third-party FQTNs still work alongside same-package refs."""
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/BUILD": dedent(
+                """\
+                jvm_artifact(
+                    name="guava",
+                    group="com.google.guava",
+                    artifact="guava",
+                    version="31.0-jre",
+                    packages=["com.google.common.**"],
+                )
+                """
+            ),
+            "BUILD": dedent(
+                """\
+                java_sources(
+                    name = 't',
+
+                )
+                """
+            ),
+            "MyClass.java": dedent(
+                """\
+                package com.example;
+
+                import com.google.common.collect.ImmutableList;
+
+                public class MyClass {
+                    private Helper helper;  // Same package, no import
+                    private ImmutableList<String> list;  // Third-party, with import
+
+                    // Inline FQTN reference without import
+                    private com.google.common.collect.ImmutableMap<String, String> map;
+                }
+                """
+            ),
+            "Helper.java": dedent(
+                """\
+                package com.example;
+                public class Helper {}
+                """
+            ),
+        }
+    )
+
+    my_class = rule_runner.get_target(Address("", target_name="t", relative_file_path="MyClass.java"))
+    helper = rule_runner.get_target(Address("", target_name="t", relative_file_path="Helper.java"))
+    guava = rule_runner.get_target(Address("3rdparty/jvm", target_name="guava"))
+
+    inferred = rule_runner.request(
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(my_class))],
+    )
+
+    # Should depend on both same-package Helper and third-party Guava
+    assert helper.address in inferred.include
+    assert guava.address in inferred.include
