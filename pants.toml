@@ -146,7 +146,7 @@ emit_warnings = true
 # + src/python/pants/testutil:testutil_wheel
 # And update the PythonBuildStandalone version/URL:
 # + src/python/pants/core/subsystems/python_bootstrap.py
-interpreter_constraints = ["==3.11.*"]
+interpreter_constraints = ["==3.14.*"]
 macos_big_sur_compatibility = true
 enable_resolves = true
 pip_version = "latest"
