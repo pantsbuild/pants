@@ -167,14 +167,18 @@ def workspace_files(package_manager: str) -> dict[str, str]:
         }
     if package_manager == "pnpm":
         return {
-            "src/js/pnpm-workspace.yaml": "",
+            "src/js/pnpm-workspace.yaml": json.dumps(
+                {
+                    "packages": ["a"],
+                }
+            ),
             "src/js/pnpm-lock.yaml": json.dumps(
                 {
                     "importers": {
                         ".": {},
                         "a": {},
                     },
-                    "lockfileVersion": "6.0",
+                    "lockfileVersion": "9.0",
                 }
             ),
         }
@@ -238,6 +242,9 @@ def test_packages_files_as_resource_in_workspace(
     result = rule_runner.request(
         GeneratedSources, [GenerateResourcesFromNodeBuildScriptRequest(snapshot, tgt)]
     )
+    print(result)
+    print(result.snapshot)
+    print(result.snapshot.digest)
     rule_runner.write_digest(result.snapshot.digest)
     with open(os.path.join(rule_runner.build_root, "src/js/a/dist/index.cjs")) as f:
         assert f.read() == "blarb\n"
