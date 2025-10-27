@@ -22,5 +22,5 @@ pex_binary(
     name="main",
     entry_point="main.py",
     dependencies=[":dist", ":main_lib"],
-    interpreter_constraints=["==3.11.*"],
+    interpreter_constraints=["==3.14.*"],
 )

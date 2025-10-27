@@ -12,7 +12,7 @@ def typecheck_file(path: str, filename: str) -> PantsResult:
         [
             "--backend-packages=pants.backend.python",
             "--backend-packages=pants.backend.python.typecheck.mypy",
-            "--python-interpreter-constraints=['==3.11.*']",
+            "--python-interpreter-constraints=['==3.14.*']",
             "check",
             f"{path}/{filename}",
         ],

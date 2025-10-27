@@ -12,7 +12,7 @@ python_test_utils(name="test_utils", resolve=parametrize("python-default", "exte
 # Used for experimenting with the new Docker support.
 docker_environment(
     name="docker_env",
-    image="python:3.11",
+    image="python:3.14",
     python_bootstrap_search_path=["<PATH>"],
 )
 

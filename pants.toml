@@ -206,7 +206,7 @@ requirements = ["//3rdparty/python:mypy"]
 
 
 [coverage-py]
-interpreter_constraints = ["==3.11.*"]
+interpreter_constraints = ["==3.14.*"]
 
 [preamble]
 template_by_globs = "@build-support/preambles/config.yaml"
