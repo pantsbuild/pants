@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import os
 import textwrap
 
 import pytest
@@ -41,9 +42,12 @@ from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.testutil.rule_runner import RuleRunner
 
+# Coverage tests require Go < 1.25 due to changes in coverage format.
+pytestmark = pytest.mark.require_go_version_max(1, 24)
+
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
+def rule_runner(go_binary_path: str) -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *test_rules(),
@@ -67,8 +71,16 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[GoModTarget, GoPackageTarget, FileTarget],
     )
+
+    # Configure Pants to use the specific Go binary.
+    go_binary_dir = os.path.dirname(go_binary_path)
     rule_runner.set_options(
-        ["--go-test-args=-v -bench=.", "--test-use-coverage"], env_inherit={"PATH"}
+        [
+            "--go-test-args=-v -bench=.",
+            "--test-use-coverage",
+            f"--golang-go-search-paths=[{repr(go_binary_dir)}]",
+        ],
+        env_inherit={"PATH"},
     )
     return rule_runner
 
