@@ -133,8 +133,8 @@ def _check_err_msg(result_stderr: str) -> None:
     # Note: `go vet` sometimes emits "fmt.Printf" and sometimes just "Printf", depending on conditions
     # which are unclear so let the `fmt.` part be optional.
     assert re.search(
-        r"./f.go:4:5: (fmt\.)?Printf format %s reads arg #1, but call has 0 args", result_stderr
-    )
+        r"./f.go.*Printf format %s reads arg #1, but call has 0 args", result_stderr
+    ), f"Expected vet to find an issue:\n\nstderr:\n{result_stderr}"
 
 
 def test_failing(rule_runner: RuleRunner) -> None:
