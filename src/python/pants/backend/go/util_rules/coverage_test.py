@@ -43,7 +43,10 @@ from pants.engine.target import Target
 from pants.testutil.rule_runner import RuleRunner
 
 # Coverage tests require Go < 1.25 due to changes in coverage format.
-pytestmark = pytest.mark.require_go_version_max(1, 24)
+pytestmark = [
+    pytest.mark.require_go_version_max(1, 24),
+    pytest.mark.no_error_if_skipped,
+]
 
 
 @pytest.fixture

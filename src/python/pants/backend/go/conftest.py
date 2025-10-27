@@ -103,25 +103,28 @@ def pytest_generate_tests(metafunc):
     # Filter for compatible versions (<= max_version)
     compatible_go = [(path, version) for path, version in available_go if version <= max_version]
 
-    if not compatible_go:
-        # Skip the test if no compatible Go version is available.
-        available_versions = [f"{v[0]}.{v[1]}" for _, v in available_go]
-        pytest.skip(
-            f"Test requires Go <= {max_major}.{max_minor}, but only found: "
-            f"{', '.join(available_versions) if available_versions else 'none'}"
-        )
-        return
-
-    # Use the newest compatible version.
-    best_go_path, best_version = compatible_go[0]
-
     # Parametrize the test if it accepts a `go_binary_path` fixture.
     if "go_binary_path" in metafunc.fixturenames:
-        metafunc.parametrize(
-            "go_binary_path",
-            [best_go_path],
-            ids=[f"go{best_version[0]}.{best_version[1]}"],
-        )
+        if compatible_go:
+            # Use the newest compatible version.
+            best_go_path, best_version = compatible_go[0]
+            metafunc.parametrize(
+                "go_binary_path",
+                [best_go_path],
+                ids=[f"go{best_version[0]}.{best_version[1]}"],
+            )
+        else:
+            # Parametrize with None and mark to skip, so the test shows as skipped rather than uncollected.
+            available_versions = [f"{v[0]}.{v[1]}" for _, v in available_go]
+            skip_msg = (
+                f"Test requires Go <= {max_major}.{max_minor}, but only found: "
+                f"{', '.join(available_versions) if available_versions else 'none'}"
+            )
+            metafunc.parametrize(
+                "go_binary_path",
+                [pytest.param(None, marks=pytest.mark.skip(reason=skip_msg))],
+                ids=["no-compatible-go"],
+            )
 
 
 def pytest_configure(config):
