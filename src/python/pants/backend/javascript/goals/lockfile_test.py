@@ -241,7 +241,7 @@ def test_generates_lockfile_for_pnpm_package_json_workspace(rule_runner: RuleRun
     rule_runner.write_files(
         {
             "src/js/BUILD": "package_json()",
-            "src/js/pnpm-workspace.yaml": "",
+            "src/js/pnpm-workspace.yaml": json.dumps({"packages": ["a"]}),
             "src/js/package.json": given_package_with_workspaces(
                 "ham", "1.0.0", {"spam": "workspace:*"}
             ),
