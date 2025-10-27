@@ -201,11 +201,7 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
     dependencies: OrderedSet[Address] = OrderedSet()
     exports: OrderedSet[Address] = OrderedSet()
     for typ in types:
-        matches_by_ns = symbol_mapping.addresses_for_symbol(typ, resolve)
-        if not matches_by_ns:
-            continue
-
-        for matches in matches_by_ns.values():
+        for matches in symbol_mapping.addresses_for_symbol(typ, resolve).values():
             explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
                 matches,
                 address,
