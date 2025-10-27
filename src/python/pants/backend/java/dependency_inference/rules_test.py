@@ -782,3 +782,307 @@ def test_infer_third_party_with_same_package_refs(rule_runner: RuleRunner) -> No
     # Should depend on both same-package Helper and third-party Guava
     assert helper.address in inferred.include
     assert guava.address in inferred.include
+
+
+@maybe_skip_jdk_test
+def test_infer_static_import_inner_class(rule_runner: RuleRunner) -> None:
+    """Test inference for static import of inner classes."""
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                java_sources(
+                    name = 't',
+
+                )
+                """
+            ),
+            "Outer.java": dedent(
+                """\
+                package com.example;
+                public class Outer {
+                    public static class Inner {
+                        public static void staticMethod() {}
+                    }
+                }
+                """
+            ),
+            "Consumer.java": dedent(
+                """\
+                package com.example;
+                import static com.example.Outer.Inner;
+                public class Consumer {
+                    private Inner inner;  // Should infer dep on Outer
+
+                    public void use() {
+                        inner = new Inner();
+                    }
+                }
+                """
+            ),
+        }
+    )
+
+    consumer = rule_runner.get_target(Address("", target_name="t", relative_file_path="Consumer.java"))
+    outer = rule_runner.get_target(Address("", target_name="t", relative_file_path="Outer.java"))
+
+    # Consumer should depend on Outer due to static import of Inner
+    assert rule_runner.request(
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(consumer))],
+    ) == InferredDependencies([outer.address])
+
+
+@maybe_skip_jdk_test
+def test_infer_multiple_nesting_levels(rule_runner: RuleRunner) -> None:
+    """Test inference for multiple levels of nested classes."""
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                java_sources(
+                    name = 't',
+
+                )
+                """
+            ),
+            "Outer.java": dedent(
+                """\
+                package com.example;
+                public class Outer {
+                    public static class Middle {
+                        public static class Inner {
+                            public void hello() {}
+                        }
+                    }
+                }
+                """
+            ),
+            "Consumer.java": dedent(
+                """\
+                package com.example;
+                public class Consumer {
+                    private Outer.Middle.Inner deepNested;
+
+                    public void use() {
+                        deepNested = new Outer.Middle.Inner();
+                    }
+                }
+                """
+            ),
+        }
+    )
+
+    consumer = rule_runner.get_target(Address("", target_name="t", relative_file_path="Consumer.java"))
+    outer = rule_runner.get_target(Address("", target_name="t", relative_file_path="Outer.java"))
+
+    # Consumer should depend on Outer (the top-level class)
+    assert rule_runner.request(
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(consumer))],
+    ) == InferredDependencies([outer.address])
+
+
+@maybe_skip_jdk_test
+def test_infer_unnamed_package_inner_class(rule_runner: RuleRunner) -> None:
+    """Test inference for inner classes in the unnamed package."""
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                java_sources(
+                    name = 't',
+
+                )
+                """
+            ),
+            "Outer.java": dedent(
+                """\
+                public class Outer {
+                    public static class Inner {
+                        public void hello() {}
+                    }
+                }
+                """
+            ),
+            "Consumer.java": dedent(
+                """\
+                public class Consumer {
+                    private Outer.Inner inner;
+
+                    public void use() {
+                        inner = new Outer.Inner();
+                    }
+                }
+                """
+            ),
+        }
+    )
+
+    consumer = rule_runner.get_target(Address("", target_name="t", relative_file_path="Consumer.java"))
+    outer = rule_runner.get_target(Address("", target_name="t", relative_file_path="Outer.java"))
+
+    # Consumer should depend on Outer even without package declaration
+    assert rule_runner.request(
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(consumer))],
+    ) == InferredDependencies([outer.address])
+
+
+@maybe_skip_jdk_test
+def test_infer_wildcard_import_prefers_same_package(rule_runner: RuleRunner) -> None:
+    """Test that same-package types are preferred over wildcard imports."""
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                java_sources(
+                    name = 't',
+
+                )
+                """
+            ),
+            "other/BUILD": dedent(
+                """\
+                java_sources(
+                    name = 't',
+
+                )
+                """
+            ),
+            "other/Thing.java": dedent(
+                """\
+                package com.example.other;
+                public class Thing {
+                    public void otherMethod() {}
+                }
+                """
+            ),
+            "Thing.java": dedent(
+                """\
+                package com.example;
+                public class Thing {
+                    public void samePackageMethod() {}
+                }
+                """
+            ),
+            "Consumer.java": dedent(
+                """\
+                package com.example;
+                import com.example.other.*;
+                public class Consumer {
+                    private Thing thing;  // Should prefer same-package Thing
+
+                    public void use() {
+                        thing = new Thing();
+                        thing.samePackageMethod();
+                    }
+                }
+                """
+            ),
+        }
+    )
+
+    consumer = rule_runner.get_target(Address("", target_name="t", relative_file_path="Consumer.java"))
+    same_package_thing = rule_runner.get_target(Address("", target_name="t", relative_file_path="Thing.java"))
+
+    # Consumer should depend on same-package Thing, not other.Thing
+    inferred = rule_runner.request(
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(consumer))],
+    )
+    assert same_package_thing.address in inferred.include
+
+
+@maybe_skip_jdk_test
+def test_infer_inner_class_same_name_as_top_level(rule_runner: RuleRunner) -> None:
+    """Test inference when inner class has same name as a top-level class."""
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                java_sources(
+                    name = 't',
+
+                )
+                """
+            ),
+            "Outer.java": dedent(
+                """\
+                package com.example;
+                public class Outer {
+                    public static class Consumer {
+                        public void innerMethod() {}
+                    }
+                }
+                """
+            ),
+            "Consumer.java": dedent(
+                """\
+                package com.example;
+                public class Consumer {
+                    private Outer.Consumer nested;  // Refers to inner class, not self
+
+                    public void use() {
+                        nested = new Outer.Consumer();
+                    }
+                }
+                """
+            ),
+        }
+    )
+
+    consumer = rule_runner.get_target(Address("", target_name="t", relative_file_path="Consumer.java"))
+    outer = rule_runner.get_target(Address("", target_name="t", relative_file_path="Outer.java"))
+
+    # Consumer should depend on Outer (which contains the nested Consumer class)
+    assert rule_runner.request(
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(consumer))],
+    ) == InferredDependencies([outer.address])
+
+
+@maybe_skip_jdk_test
+def test_infer_package_private_same_package_no_import(rule_runner: RuleRunner) -> None:
+    """Test inference for package-private classes without explicit imports."""
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                java_sources(
+                    name = 't',
+
+                )
+                """
+            ),
+            "Helper.java": dedent(
+                """\
+                package com.example;
+                class Helper {  // package-private
+                    void helpMethod() {}
+                }
+                """
+            ),
+            "Consumer.java": dedent(
+                """\
+                package com.example;
+                public class Consumer {
+                    private Helper helper;  // No import needed, same package
+
+                    public void use() {
+                        helper = new Helper();
+                    }
+                }
+                """
+            ),
+        }
+    )
+
+    consumer = rule_runner.get_target(Address("", target_name="t", relative_file_path="Consumer.java"))
+    helper = rule_runner.get_target(Address("", target_name="t", relative_file_path="Helper.java"))
+
+    # Consumer should depend on package-private Helper
+    assert rule_runner.request(
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(consumer))],
+    ) == InferredDependencies([helper.address])

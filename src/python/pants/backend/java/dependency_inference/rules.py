@@ -118,7 +118,10 @@ def qualify_consumed_type(
         # Also try as third-party FQTN
         return (qualified_outer, type_name)
     else:
-        return (type_name,)
+        # Unnamed package with dots - likely inner class (e.g., "Outer.Inner")
+        # Look up the outer class name
+        outer_class = type_name.split(".")[0]
+        return (outer_class, type_name)
 
 
 @dataclass(frozen=True)
