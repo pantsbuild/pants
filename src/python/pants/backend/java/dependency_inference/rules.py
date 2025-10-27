@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import logging
 from collections import defaultdict
 from dataclasses import dataclass
 
@@ -35,9 +34,6 @@ from pants.jvm.dependency_inference.symbol_mapper import SymbolMapping
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
-
-logger = logging.getLogger(__name__)
-
 
 # Java standard library package prefixes - types starting with these are always fully qualified
 JAVA_STDLIB_PREFIXES = frozenset([
@@ -207,10 +203,6 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
     for typ in types:
         matches_by_ns = symbol_mapping.addresses_for_symbol(typ, resolve)
         if not matches_by_ns:
-            logger.debug(
-                f"No matches found for type '{typ}' in resolve '{resolve}' "
-                f"(source file: {address})"
-            )
             continue
 
         for matches in matches_by_ns.values():
