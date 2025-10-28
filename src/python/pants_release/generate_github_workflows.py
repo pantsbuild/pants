@@ -31,7 +31,8 @@ def action(name: str) -> str:
         "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
         "msys2": "msys2/setup-msys2@v2",
         "rust-cache": "Swatinem/rust-cache@v2.8.1",
-        "setup-go": "actions/setup-go@v6",
+        # Switch to v6 once https://github.com/actions/setup-go/pull/665 is released
+        "setup-go": "actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25",
         "setup-java": "actions/setup-java@v4",
         "setup-node": "actions/setup-node@v4",
         "setup-protoc": "arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9",
