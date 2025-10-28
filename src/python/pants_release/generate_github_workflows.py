@@ -31,7 +31,7 @@ def action(name: str) -> str:
         "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
         "msys2": "msys2/setup-msys2@v2",
         "rust-cache": "Swatinem/rust-cache@v2.8.1",
-        "setup-go": "actions/setup-go@v5",
+        "setup-go": "actions/setup-go@v6",
         "setup-java": "actions/setup-java@v4",
         "setup-node": "actions/setup-node@v4",
         "setup-protoc": "arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9",
