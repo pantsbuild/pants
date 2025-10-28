@@ -8,6 +8,7 @@ from typing import Any
 
 from pants.backend.shell.subsystems.shell_test_subsys import ShellTestSubsystem
 from pants.backend.shell.target_types import (
+    ShellCommandCacheScopeField,
     ShellCommandCommandField,
     ShellCommandTestDependenciesField,
     SkipShellCommandTestsField,
@@ -51,6 +52,7 @@ class TestShellCommandFieldSet(TestFieldSet):
     )
 
     environment: EnvironmentField
+    cache_scope: ShellCommandCacheScopeField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -81,9 +83,6 @@ async def test_shell_command(
 
     shell_process = dataclasses.replace(
         shell_process,
-        cache_scope=(
-            ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
-        ),
         env_vars=FrozenDict(
             {
                 **test_extra_env.env,
@@ -91,6 +90,12 @@ async def test_shell_command(
             }
         ),
     )
+
+    if field_set.cache_scope.value is None and test_subsystem.force:
+        shell_process = dataclasses.replace(
+            shell_process,
+            cache_scope=ProcessCacheScope.PER_SESSION,
+        )
 
     results: list[FallibleAdhocProcessResult] = []
     for _ in range(test_subsystem.attempts_default):

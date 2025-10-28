@@ -102,12 +102,7 @@ def jest_lockfile(package_manager: str) -> dict[str, str]:
 
 @pytest.fixture
 def jest_dev_dependencies() -> dict[str, str]:
-    return {
-        "@types/jest": "^29.5.14",
-        "jest": "^29.7.0",
-        "ts-jest": "^29.2.5",
-        "typescript": "^5.7.3",
-    }
+    return {"@types/jest": "30.0.0", "jest": "30.2.0", "ts-jest": "29.4.5", "typescript": "5.9.3"}
 
 
 @pytest.fixture
@@ -117,7 +112,7 @@ def mocha_lockfile(package_manager: str) -> dict[str, str]:
 
 @pytest.fixture
 def mocha_dev_dependencies() -> dict[str, str]:
-    return {"mocha": "^11.1.0"}
+    return {"mocha": "11.7.4"}
 
 
 def make_source_to_test(passing: bool = True):
