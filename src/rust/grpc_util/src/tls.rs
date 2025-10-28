@@ -270,7 +270,7 @@ mod test {
 
     #[test]
     fn test_client_auth_cert_resolver_is_unconfigured_no_mtls() {
-        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+        crate::initialize().expect("init crate");
 
         let cert_pem = std::fs::read(
             PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -291,6 +291,8 @@ mod test {
 
     #[test]
     fn test_client_auth_cert_resolver_is_configured() {
+        crate::initialize().expect("init crate");
+
         let cert_pem = std::fs::read(
             PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .join("test-certs")

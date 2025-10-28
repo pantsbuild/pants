@@ -21,7 +21,7 @@ from pants.build_graph.address import Address
 from pants.core.goals import package
 from pants.core.goals.test import TestDebugRequest, TestResult, get_filtered_environment
 from pants.core.util_rules import archive, source_files, system_binaries
-from pants.engine.fs import DigestContents, FileContent
+from pants.engine.fs import EMPTY_DIGEST, Digest, DigestContents, FileContent
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
@@ -284,3 +284,69 @@ def test_outputs_match_mode_support(rule_runner: RuleRunner) -> None:
         Address("", target_name="at_least_one_with_present_directory"),
         {"some-directory/foo.txt": ""},
     )
+
+
+def test_cache_scope_support(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+            test_shell_command(
+              name="cmd_session_scope",
+              # Use a random value so we can detect when re-execution occurs.
+              command="echo $RANDOM > out.log",
+              output_files=["out.log"],
+              cache_scope="session",
+            )
+            test_shell_command(
+              name="cmd_success_scope",
+              # Use a random value so we can detect when re-execution occurs.
+              command="echo $RANDOM > out.log",
+              output_files=["out.log"],
+              cache_scope="success",
+            )
+            """
+            ),
+            "src/a-file": "",
+        }
+    )
+
+    def test_batch_for_target(test_target: Target) -> ShellTestRequest.Batch:
+        return ShellTestRequest.Batch("", (TestShellCommandFieldSet.create(test_target),), None)
+
+    def run_test(address: Address) -> TestResult:
+        test_target = rule_runner.get_target(address)
+        return rule_runner.request(TestResult, [test_batch_for_target(test_target)])
+
+    def test_output_equal(result1: TestResult, result2: TestResult) -> bool:
+        digest1: Digest = EMPTY_DIGEST
+        if result1.extra_output:
+            digest1 = result1.extra_output.digest
+
+        digest2: Digest = EMPTY_DIGEST
+        if result2.extra_output:
+            digest2 = result2.extra_output.digest
+
+        return digest1 == digest2
+
+    # Re-executing the initial execution of a session-scoped test should be cached if in the same session.
+    address_session = Address("src", target_name="cmd_session_scope")
+    session_result_1 = run_test(address_session)
+    session_result_2 = run_test(address_session)
+    assert test_output_equal(session_result_1, session_result_2)
+
+    # Execute the success-scoped test to ensure it is cached (for testing in the new session).
+    address_success = Address("src", target_name="cmd_success_scope")
+    success_result_1 = run_test(address_success)
+
+    # Create a new session.
+    rule_runner.new_session("second-session")
+    rule_runner.set_options([])
+
+    # In a new session, the session-scoped test should be re-executed.
+    session_result_3 = run_test(address_session)
+    assert not test_output_equal(session_result_2, session_result_3)
+
+    # In a new session, the success-scoped test should NOT be re-executed.
+    success_result_2 = run_test(address_success)
+    assert test_output_equal(success_result_1, success_result_2)
