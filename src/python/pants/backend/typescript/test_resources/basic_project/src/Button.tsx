@@ -12,7 +12,7 @@ export function Button({
   onClick,
   disabled = false,
   variant = "primary",
-}: ButtonProps): JSX.Element {
+}: ButtonProps): React.JSX.Element {
   const className = `btn btn-${variant} ${disabled ? "disabled" : ""}`;
 
   return (

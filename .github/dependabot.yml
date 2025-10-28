@@ -58,7 +58,7 @@ updates:
       - "dependencies"
       - "release-notes:not-required"
     schedule:
-      interval: weekly
+      interval: "monthly"
 
   - package-ecosystem: "npm"
     directories: 
@@ -66,6 +66,7 @@ updates:
       - "src/python/pants/backend/javascript/**/*"
       - "src/python/pants/backend/typescript/**/*"
       - "testprojects/src/js/**/*"
+      - "testprojects/src/ts/**/*"
     groups:
       js-security-updates:
         applies-to: security-updates

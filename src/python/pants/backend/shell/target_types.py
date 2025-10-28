@@ -513,6 +513,7 @@ class ShellCommandTestTarget(Target):
         ShellCommandOutputDirectoriesField,
         ShellCommandOutputRootDirField,
         ShellCommandOutputsMatchMode,
+        ShellCommandCacheScopeField,
     )
     help = help_text(
         """
@@ -574,7 +575,7 @@ class ShellCommandPackageTarget(Target):
 
         Example BUILD file:
 
-            experimental_package_shell_command(
+            package_shell_command(
                 name="build-rust-app",
                 tools=["cargo"],
                 command="cargo build --release",
