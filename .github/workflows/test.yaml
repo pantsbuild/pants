@@ -519,7 +519,11 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.24.9
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
         PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
@@ -592,7 +596,11 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.24.9
     - env:
         ARCHFLAGS: -arch x86_64
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
@@ -675,7 +683,11 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.24.9
     - env:
         ARCHFLAGS: -arch arm64
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
@@ -977,7 +989,11 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.24.9
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1071,7 +1087,11 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
@@ -1183,7 +1203,11 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
@@ -1295,7 +1319,11 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
@@ -1407,7 +1435,11 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
@@ -1519,7 +1551,11 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
@@ -1631,7 +1667,11 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
@@ -1743,7 +1783,11 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
@@ -1855,7 +1899,11 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
@@ -1967,7 +2015,11 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
@@ -2079,7 +2131,11 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
@@ -2168,7 +2224,11 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.24.9
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -2238,7 +2298,11 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.24.9
     - name: Set up Python 3.9, 3.10, 3.12, 3.13, 3.11
       uses: actions/setup-python@v5
       with:
