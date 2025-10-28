@@ -58,7 +58,7 @@ updates:
       - "dependencies"
       - "release-notes:not-required"
     schedule:
-      interval: weekly
+      interval: "monthly"
 
   - package-ecosystem: "npm"
     directories: 

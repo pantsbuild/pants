@@ -36,7 +36,6 @@
     "types-setuptools==80.9.0.20250822",
     "types-toml==0.10.8.20240310",
     "typing-extensions==4.15",
-    "urllib3==2.5.0",
     "uvicorn[standard]==0.38.0"
   ],
   "manylinux": "manylinux2014",
