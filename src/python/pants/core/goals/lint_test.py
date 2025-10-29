@@ -556,7 +556,7 @@ def test_default_single_partition_partitioner() -> None:
 
     class LintKitchenRequest(LintTargetsRequest):
         field_set_type = MockLinterFieldSet
-        tool_subsystem = KitchenSubsystem
+        tool_subsystem = KitchenSubsystem  # type: ignore[assignment]
         partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
     rules = [

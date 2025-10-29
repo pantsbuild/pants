@@ -77,12 +77,12 @@ class ScalafixFieldSet(FieldSet):
 
 class ScalafixFixRequest(FixTargetsRequest):
     field_set_type = ScalafixFieldSet
-    tool_subsystem = ScalafixSubsystem
+    tool_subsystem = ScalafixSubsystem  # type: ignore[assignment]
 
 
 class ScalafixLintRequest(LintTargetsRequest):
     field_set_type = ScalafixFieldSet
-    tool_subsystem = ScalafixSubsystem
+    tool_subsystem = ScalafixSubsystem  # type: ignore[assignment]
 
 
 @dataclass(frozen=True)

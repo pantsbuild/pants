@@ -42,7 +42,7 @@ class GoVetFieldSet(FieldSet):
 
 class GoVetRequest(LintTargetsRequest):
     field_set_type = GoVetFieldSet
-    tool_subsystem = GoVetSubsystem
+    tool_subsystem = GoVetSubsystem  # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

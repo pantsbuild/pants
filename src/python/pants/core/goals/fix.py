@@ -358,8 +358,8 @@ async def _do_fix(
         batches = partition_sequentially(
             files,
             key=lambda x: str(x),
-            size_target=subsystem.batch_size,
-            size_max=4 * subsystem.batch_size,
+            size_target=subsystem.batch_size,  # type: ignore[arg-type]
+            size_max=4 * subsystem.batch_size,  # type: ignore[operator]
         )
         for batch in batches:
             yield tuple(batch)
@@ -444,7 +444,7 @@ async def fix(
         union_membership.get(FixTargetsRequest.PartitionRequest),
         union_membership.get(FixFilesRequest.PartitionRequest),
         Fix,
-        fix_subsystem,
+        fix_subsystem,  # type: ignore[arg-type]
         specs,
         workspace,
         console,

@@ -24,7 +24,7 @@ from pants.util.logging import LogLevel
 
 
 class RenameFieldsInFilesRequest(FixBuildFilesRequest):
-    tool_subsystem = BUILDDeprecationsFixer
+    tool_subsystem = BUILDDeprecationsFixer  # type: ignore[assignment]
 
 
 class RenameFieldsInFileRequest(FixBUILDFileRequest):
