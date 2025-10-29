@@ -37,7 +37,7 @@ from pants.backend.python.util_rules.pex import (
     setup_venv_pex_process,
 )
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
-from pants.backend.python.util_rules.pex_requirements import PexRequirements
+from pants.backend.python.util_rules.pex_requirements import PexRequirements, Resolve
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
     prepare_python_sources,
@@ -265,7 +265,6 @@ async def setup_pytest_for_target(
     coverage_config: CoverageConfig,
     coverage_subsystem: CoverageSubsystem,
     test_extra_env: TestExtraEnv,
-    python_setup: PythonSetup,
 ) -> TestSetup:
     addresses = tuple(field_set.address for field_set in request.field_sets)
 
@@ -294,7 +293,24 @@ async def setup_pytest_for_target(
     requirements_pex_get = create_pex(**implicitly(RequirementsPexRequest(addresses)))
 
     pytest_pex_get = None
-    if not use_target_resolve_for_pytest:
+    if use_target_resolve_for_pytest:
+        # We still need to create a PEX with pytest requirements from the target resolve
+        # just need to make sure the versions are coming from the target resolve.
+        pytest_req_strings = pytest.requirements if pytest.requirements else pytest.default_requirements
+        pytest_requirements = PexRequirements(
+            pytest_req_strings,
+            from_superset=Resolve(target_resolve, use_entire_lockfile=False),
+            description_of_origin="pytest requirements from target resolve",
+        )
+        pytest_pex_get = create_pex(
+            PexRequest(
+                output_filename="pytest_from_target_resolve.pex",
+                internal_only=True,
+                requirements=pytest_requirements,
+                interpreter_constraints=interpreter_constraints,
+            )
+        )
+    else:
         pytest_pex_get = create_pex(
             pytest.to_pex_request(interpreter_constraints=interpreter_constraints)
         )
@@ -316,37 +332,21 @@ async def setup_pytest_for_target(
         EnvironmentVarsRequest(request.metadata.extra_env_vars), **implicitly()
     )
 
-    if pytest_pex_get is not None:
-        (
-            pytest_pex,
-            requirements_pex,
-            prepared_sources,
-            field_set_source_files,
-            field_set_extra_env,
-            extra_output_directory_digest,
-        ) = await concurrently(
-            pytest_pex_get,
-            requirements_pex_get,
-            prepared_sources_get,
-            field_set_source_files_get,
-            field_set_extra_env_get,
-            extra_output_directory_digest_get,
-        )
-    else:
-        pytest_pex = None
-        (
-            requirements_pex,
-            prepared_sources,
-            field_set_source_files,
-            field_set_extra_env,
-            extra_output_directory_digest,
-        ) = await concurrently(
-            requirements_pex_get,
-            prepared_sources_get,
-            field_set_source_files_get,
-            field_set_extra_env_get,
-            extra_output_directory_digest_get,
-        )
+    (
+        pytest_pex,
+        requirements_pex,
+        prepared_sources,
+        field_set_source_files,
+        field_set_extra_env,
+        extra_output_directory_digest,
+    ) = await concurrently(
+        pytest_pex_get,
+        requirements_pex_get,
+        prepared_sources_get,
+        field_set_source_files_get,
+        field_set_extra_env_get,
+        extra_output_directory_digest_get,
+    )
 
     local_dists = await build_local_dists(
         LocalDistsPexRequest(
@@ -356,9 +356,7 @@ async def setup_pytest_for_target(
         )
     )
 
-    pex_path_components: list[Pex] = [requirements_pex, local_dists.pex, *request.additional_pexes]
-    if pytest_pex is not None:
-        pex_path_components.insert(0, pytest_pex)
+    pex_path_components: list[Pex] = [pytest_pex, requirements_pex, local_dists.pex, *request.additional_pexes]
 
     pytest_runner_pex_get = create_venv_pex(
         **implicitly(
