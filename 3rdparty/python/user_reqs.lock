@@ -505,13 +505,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "84009182e530c47648da2f07eb380b44b69889a4acfd9e9035ee4605c5cfc469",
-              "url": "https://files.pythonhosted.org/packages/1d/60/7a639ceaba54aec4e1d5676498c568abc654b95762d456095b6cb529b1ca/fastapi-0.120.0-py3-none-any.whl"
+              "hash": "0e8a2c328e96c117272d8c794d3a97d205f753cc2e69dd7ee387b7488a75601f",
+              "url": "https://files.pythonhosted.org/packages/7e/bb/1a74dbe87e9a595bf63052c886dfef965dc5b91d149456a8301eb3d41ce2/fastapi-0.120.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "6ce2c1cfb7000ac14ffd8ddb2bc12e62d023a36c20ec3710d09d8e36fab177a0",
-              "url": "https://files.pythonhosted.org/packages/f7/0e/7f29e8f7219e4526747db182e1afb5a4b6abc3201768fb38d81fa2536241/fastapi-0.120.0.tar.gz"
+              "hash": "b5c6217e9ddca6dfcf54c97986180d4a1955e10c693d74943fc5327700178bff",
+              "url": "https://files.pythonhosted.org/packages/40/cc/28aff6e246ee85bd571b26e4a793b84d42700e3bdc3008c3d747eda7b06d/fastapi-0.120.1.tar.gz"
             }
           ],
           "project_name": "fastapi",
@@ -538,7 +538,7 @@
             "python-multipart>=0.0.18; extra == \"standard\"",
             "python-multipart>=0.0.18; extra == \"standard-no-fastapi-cloud-cli\"",
             "pyyaml>=5.3.1; extra == \"all\"",
-            "starlette<0.49.0,>=0.40.0",
+            "starlette<0.50.0,>=0.40.0",
             "typing-extensions>=4.8.0",
             "ujson!=4.0.2,!=4.1.0,!=4.2.0,!=4.3.0,!=5.0.0,!=5.1.0,>=4.0.1; extra == \"all\"",
             "uvicorn[standard]>=0.12.0; extra == \"all\"",
@@ -546,7 +546,7 @@
             "uvicorn[standard]>=0.12.0; extra == \"standard-no-fastapi-cloud-cli\""
           ],
           "requires_python": ">=3.8",
-          "version": "0.120.0"
+          "version": "0.120.1"
         },
         {
           "artifacts": [
@@ -1703,13 +1703,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "0764ca97b097582558ecb498132ed0c7d942f233f365b86ba37770e026510659",
-              "url": "https://files.pythonhosted.org/packages/be/72/2db2f49247d0a18b4f1bb9a5a39a0162869acf235f3a96418363947b3d46/starlette-0.48.0-py3-none-any.whl"
+              "hash": "d92ce9f07e4a3caa3ac13a79523bd18e3bc0042bb8ff2d759a8e7dd0e1859875",
+              "url": "https://files.pythonhosted.org/packages/51/da/545b75d420bb23b5d494b0517757b351963e974e79933f01e05c929f20a6/starlette-0.49.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "7e8cee469a8ab2352911528110ce9088fdc6a37d9876926e73da7ce4aa4c7a46",
-              "url": "https://files.pythonhosted.org/packages/a7/a5/d6f429d43394057b67a6b5bbe6eae2f77a6bf7459d961fdb224bf206eee6/starlette-0.48.0.tar.gz"
+              "hash": "481a43b71e24ed8c43b11ea02f5353d77840e01480881b8cb5a26b8cae64a8cb",
+              "url": "https://files.pythonhosted.org/packages/1b/3f/507c21db33b66fb027a332f2cb3abbbe924cc3a79ced12f01ed8645955c9/starlette-0.49.1.tar.gz"
             }
           ],
           "project_name": "starlette",
@@ -1723,7 +1723,7 @@
             "typing-extensions>=4.10.0; python_version < \"3.13\""
           ],
           "requires_python": ">=3.9",
-          "version": "0.48.0"
+          "version": "0.49.1"
         },
         {
           "artifacts": [
@@ -2223,7 +2223,7 @@
     "beautifulsoup4==4.11.1",
     "chevron==0.14.0",
     "debugpy==1.8.16",
-    "fastapi==0.120.0",
+    "fastapi==0.120.1",
     "fasteners==0.20.0",
     "freezegun==1.5.5",
     "hdrhistogram==0.10.3",
@@ -2241,7 +2241,7 @@
     "requests[security]==2.32.5",
     "setproctitle==1.3.7",
     "setuptools<81.0,>=63.1.0",
-    "starlette==0.48.0",
+    "starlette==0.49.1",
     "strawberry-graphql[fastapi]==0.284.1",
     "toml==0.10.2",
     "types-PyYAML==6.0.12.20250915",
