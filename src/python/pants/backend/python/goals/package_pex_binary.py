@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import dataclasses
 from dataclasses import dataclass
 
 from pants.backend.python.target_types import (
@@ -23,6 +24,7 @@ from pants.backend.python.target_types import (
     PexInheritPathField,
     PexLayout,
     PexLayoutField,
+    PexScieField,
     PexScriptField,
     PexShBootField,
     PexShebangField,
@@ -33,7 +35,10 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.target_types_rules import resolve_pex_entry_point
 from pants.backend.python.util_rules.pex import create_pex, digest_complete_platforms
-from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.util_rules.pex_from_targets import (
+    PexFromTargetsRequest,
+    create_pex_from_targets,
+)
 from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.package import (
     BuiltPackage,
@@ -81,6 +86,11 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     check: PexCheckField
     extra_build_args: PexExtraBuildArgsField
 
+    scie: PexScieField
+
+    def builds_pex_and_scie(self) -> bool:
+        return self.scie.value is not None
+
     @property
     def _execution_mode(self) -> PexExecutionMode:
         return PexExecutionMode(self.execution_mode.value)
@@ -113,6 +123,14 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
             args.append("--non-hermetic-venv-scripts")
         if self.extra_build_args.value:
             args.extend(self.extra_build_args.value)
+        return tuple(args)
+
+    def generate_scie_args(
+        self,
+    ) -> tuple[str, ...]:
+        args = []
+        if self.scie.value is not None:
+            args.append(f"--scie={self.scie.value}")
         return tuple(args)
 
 
@@ -165,8 +183,35 @@ async def built_package_for_pex_from_targets_request(
     field_set: PexBinaryFieldSet,
 ) -> BuiltPackage:
     pft_request = await package_pex_binary(field_set, **implicitly())
-    pex = await create_pex(**implicitly(pft_request.request))
-    return BuiltPackage(pex.digest, (BuiltPackageArtifact(pft_request.request.output_filename),))
+
+    if field_set.builds_pex_and_scie():
+        pex_request = dataclasses.replace(
+            await create_pex_from_targets(**implicitly(pft_request.request)),
+            additional_args=(*pft_request.request.additional_args, *field_set.generate_scie_args()),
+            scie_output_directories=(field_set.output_path.value_or_default(file_ending=""),),
+        )
+        artifacts = (
+            BuiltPackageArtifact(
+                pex_request.output_filename,
+            ),
+            BuiltPackageArtifact(
+                field_set.output_path.value_or_default(file_ending=""),
+            ),
+        )
+
+
+    else:
+        pex_request = await create_pex_from_targets(**implicitly(pft_request.request))
+        artifacts = (
+            BuiltPackageArtifact(
+                pex_request.output_filename,
+            ),
+        )
+        
+
+    pex = await create_pex(**implicitly(pex_request))
+
+    return BuiltPackage(pex.digest, artifacts)
 
 
 def rules():

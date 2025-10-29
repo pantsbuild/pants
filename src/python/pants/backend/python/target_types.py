@@ -725,6 +725,13 @@ class PexVenvHermeticScripts(BoolField):
     )
 
 
+class PexScieField(StringField):
+    alias = "scie"
+    valid_choices = (None, "lazy", "eager")
+    default = None
+    help = help_text("SCIENICE")
+
+
 _PEX_BINARY_COMMON_FIELDS = (
     EnvironmentField,
     InterpreterConstraintsField,
@@ -749,12 +756,16 @@ _PEX_BINARY_COMMON_FIELDS = (
     RestartableField,
 )
 
+_PEX_SCIE_BINARY_FIELDS = (
+    PexScieField,
+)
 
 class PexBinary(Target):
     alias = "pex_binary"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         *_PEX_BINARY_COMMON_FIELDS,
+        *_PEX_SCIE_BINARY_FIELDS,
         PexEntryPointField,
         PexScriptField,
         PexExecutableField,
@@ -772,6 +783,7 @@ class PexBinary(Target):
     )
 
     def validate(self) -> None:
+        # TODO: validate scie args make sense together
         got_entry_point = self[PexEntryPointField].value is not None
         got_script = self[PexScriptField].value is not None
         got_executable = self[PexExecutableField].value is not None
@@ -787,6 +799,15 @@ class PexBinary(Target):
                     """
                 )
             )
+
+# class PexScieBinary(PexBinary):
+#     alias = "pex_scie_binary"
+#     core_fields = (
+#         #*(FrozenOrderedSet(PythonTestTarget.core_fields) - {
+#         PexBinary.core_fields,
+#         *_PEX_SCIE_BINARY_FIELDS
+#     )
+#     help = help_test("SCIENCE")
 
 
 class PexEntryPointsField(StringSequenceField, AsyncFieldMixin):
