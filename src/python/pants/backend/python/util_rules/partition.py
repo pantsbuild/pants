@@ -6,7 +6,7 @@ from __future__ import annotations
 import itertools
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Protocol, TypeVar
+from typing import TypeVar
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField, PythonResolveField
