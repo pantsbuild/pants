@@ -60,7 +60,7 @@ async def resolve_first_party_plugins(
             requirements_fields.add(tgt[PythonRequirementsField])
         if tgt.has_field(InterpreterConstraintsField):
             interpreter_constraints_and_resolve_fields.add(
-                (tgt[InterpreterConstraintsField], tgt.get(PythonResolveField))
+                (tgt[InterpreterConstraintsField], tgt[PythonResolveField])
             )
 
     # NB: Flake8 source plugins must be explicitly loaded via PYTHONPATH (i.e. PEX_EXTRA_SYS_PATH).

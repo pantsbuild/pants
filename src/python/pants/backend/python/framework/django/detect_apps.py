@@ -105,7 +105,7 @@ async def detect_django_apps(python_setup: PythonSetup) -> DjangoApps:
     for tgt in targets:
         ics = InterpreterConstraints(
             tgt[InterpreterConstraintsField].value_or_configured_default(
-                python_setup, tgt.get(PythonResolveField)
+                python_setup, tgt[PythonResolveField] if tgt.has_field(PythonResolveField) else None
             )
         )
         ics_to_tgts[ics].append(tgt)

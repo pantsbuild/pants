@@ -67,7 +67,10 @@ async def _find_all_unique_interpreter_constraints(
     unique_constraints = {
         InterpreterConstraints.create_from_compatibility_fields(
             [
-                (tgt[InterpreterConstraintsField], tgt.get(PythonResolveField)),
+                (
+                    tgt[InterpreterConstraintsField],
+                    tgt[PythonResolveField] if tgt.has_field(PythonResolveField) else None,
+                ),
                 *extra_constraints_blank_resolves,
             ],
             python_setup,

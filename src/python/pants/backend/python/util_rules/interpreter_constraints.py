@@ -190,7 +190,10 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         which might not have any interdependencies, such as when you're merging unrelated roots.
         """
         fields = [
-            (tgt[InterpreterConstraintsField], tgt.get(PythonResolveField))
+            (
+                tgt[InterpreterConstraintsField],
+                tgt[PythonResolveField] if tgt.has_field(PythonResolveField) else None,
+            )
             for tgt in targets
             if tgt.has_field(InterpreterConstraintsField)
         ]
