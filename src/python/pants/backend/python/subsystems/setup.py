@@ -435,6 +435,21 @@ class PythonSetup(Subsystem):
         advanced=True,
     )
 
+    _resolves_to_sources = DictOption[list[str]](
+        help=softwrap(""" Defines a limited scope to use a named find links repo or
+            index for specific dependencies in a resolve and its lockfile.
+            Sources take the form `<name>=<scope>` where the name must match
+            a find links repo or index defined via `[python-repos].indexes` or
+            `[python-repos].find_links`. The scope can be a project name
+            (e.g., `internal=torch` to resolve the `torch` project from the
+            `internal` repo), a project name with a marker (e.g.,
+            `internal=torch; sys_platform != 'darwin'` to resolve `torch` from
+            the `internal` repo except on macOS), or just a marker (e.g.,
+            `piwheels=platform_machine == 'armv7l'` to resolve from the
+            `piwheels` repo when targeting 32bit ARM machines)."""),
+        advanced=True,
+    )
+
     invalid_lockfile_behavior = EnumOption(
         default=InvalidLockfileBehavior.error,
         help=softwrap(
@@ -764,6 +779,16 @@ class PythonSetup(Subsystem):
             for resolve, vals in self._resolves_to_option_helper(
                 self._resolves_to_overrides,
                 "resolves_to_overrides",
+            ).items()
+        }
+
+    @memoized_method
+    def resolves_to_sources(self) -> dict[str, list[str]]:
+        return {
+            resolve: sorted(vals)
+            for resolve, vals in self._resolves_to_option_helper(
+                self._resolves_to_sources,
+                "resolves_to_sources",
             ).items()
         }
 

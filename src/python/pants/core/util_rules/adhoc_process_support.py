@@ -500,7 +500,7 @@ async def create_tool_runner(
 
     append_only_caches = {
         **merged_extras.append_only_caches,
-        **(request.named_caches or {}),  # type: ignore[dict-item]
+        **(request.named_caches or {}),
     }
 
     return ToolRunner(

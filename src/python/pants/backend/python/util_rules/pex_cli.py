@@ -37,9 +37,9 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
-_PEX_VERSION = "v2.59.1"
-_PEX_BINARY_HASH = "d19b6cf2540965a7aebecabdea874c2dc8866652823f66beb904f1ceeee47571"
-_PEX_BINARY_SIZE = 4806995
+_PEX_VERSION = "v2.66.0"
+_PEX_BINARY_HASH = "f471dcbffecfdc7d0f9128b5ec839c60fb9e2567ab5c9506405feb5b2fb153fd"
+_PEX_BINARY_SIZE = 4927719
 
 
 class PexCli(TemplatedExternalTool):
@@ -203,7 +203,7 @@ async def setup_pex_cli_process(
     env = {
         **complete_pex_env.environment_dict(python=bootstrap_python),
         **python_native_code.subprocess_env_vars,
-        **(request.extra_env or {}),  # type: ignore[dict-item]
+        **(request.extra_env or {}),
         # If a subcommand is used, we need to use the `pex3` console script.
         **({"PEX_SCRIPT": "pex3"} if request.subcommand else {}),
     }

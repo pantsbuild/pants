@@ -23,7 +23,16 @@ from pants.backend.javascript.target_types import (
     JSTestsGeneratorTarget,
     JSTestTarget,
 )
-from pants.backend.typescript.target_types import TypeScriptSourcesGeneratorTarget
+from pants.backend.tsx.target_types import (
+    TSXSourcesGeneratorTarget,
+    TSXTestsGeneratorTarget,
+    TSXTestTarget,
+)
+from pants.backend.typescript.target_types import (
+    TypeScriptSourcesGeneratorTarget,
+    TypeScriptTestsGeneratorTarget,
+    TypeScriptTestTarget,
+)
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult, get_filtered_environment
 from pants.engine.rules import QueryRule
@@ -52,6 +61,11 @@ def rule_runner(package_manager: str) -> RuleRunner:
             JSTestsGeneratorTarget,
             JSTestTarget,
             TypeScriptSourcesGeneratorTarget,
+            TypeScriptTestsGeneratorTarget,
+            TypeScriptTestTarget,
+            TSXSourcesGeneratorTarget,
+            TSXTestsGeneratorTarget,
+            TSXTestTarget,
         ],
         objects=dict(package_json.build_file_aliases().objects),
     )
@@ -88,12 +102,7 @@ def jest_lockfile(package_manager: str) -> dict[str, str]:
 
 @pytest.fixture
 def jest_dev_dependencies() -> dict[str, str]:
-    return {
-        "@types/jest": "^29.5.14",
-        "jest": "^29.7.0",
-        "ts-jest": "^29.2.5",
-        "typescript": "^5.7.3",
-    }
+    return {"@types/jest": "30.0.0", "jest": "30.2.0", "ts-jest": "29.4.5", "typescript": "5.9.3"}
 
 
 @pytest.fixture
@@ -103,7 +112,7 @@ def mocha_lockfile(package_manager: str) -> dict[str, str]:
 
 @pytest.fixture
 def mocha_dev_dependencies() -> dict[str, str]:
-    return {"mocha": "^11.1.0"}
+    return {"mocha": "11.7.4"}
 
 
 def make_source_to_test(passing: bool = True):
@@ -408,3 +417,90 @@ def given_request_for(*js_test: Target, package: Target) -> JSTestRequest.Batch:
         tuple(JSTestFieldSet.create(tgt) for tgt in js_test),
         TestMetadata(tuple(), package),
     )
+
+
+def test_typescript_test_files(
+    rule_runner: RuleRunner,
+    jest_lockfile: dict[str, str],
+    jest_dev_dependencies: dict[str, str],
+) -> None:
+    """Test that TypeScript test files are recognized and executed."""
+    rule_runner.write_files(
+        {
+            "foo/BUILD": "package_json()",
+            "foo/package.json": given_package_json(
+                test_script={"test": "jest"},
+                dev_dependencies=jest_dev_dependencies,
+                jest={
+                    "preset": "ts-jest",
+                },
+            ),
+            **{f"foo/{key}": value for key, value in jest_lockfile.items()},
+            "foo/src/BUILD": "typescript_sources()",
+            "foo/src/index.ts": textwrap.dedent(
+                """\
+                export function add(x: number, y: number): number {
+                  return x + y;
+                }
+                """
+            ),
+            "foo/src/tests/BUILD": "typescript_tests(name='tests')",
+            "foo/src/tests/index.test.ts": textwrap.dedent(
+                """\
+                import { add } from '../index';
+
+                test('adds 1 + 2 to equal 3', () => {
+                    expect(add(1, 2)).toBe(3);
+                });
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("foo/src/tests", relative_file_path="index.test.ts"))
+    package = rule_runner.get_target(Address("foo", generated_name="pkg"))
+    result = rule_runner.request(TestResult, [given_request_for(tgt, package=package)])
+    assert b"Test Suites: 1 passed, 1 total" in result.stderr_bytes
+    assert result.exit_code == 0
+
+
+def test_tsx_test_files(
+    rule_runner: RuleRunner,
+    jest_lockfile: dict[str, str],
+    jest_dev_dependencies: dict[str, str],
+) -> None:
+    """Test that TSX test files are recognized and executed."""
+    rule_runner.write_files(
+        {
+            "foo/BUILD": "package_json()",
+            "foo/package.json": given_package_json(
+                test_script={"test": "jest"},
+                dev_dependencies=jest_dev_dependencies,
+                jest={"preset": "ts-jest", "globals": {"ts-jest": {"tsconfig": {"jsx": "react"}}}},
+            ),
+            **{f"foo/{key}": value for key, value in jest_lockfile.items()},
+            "foo/tsconfig.json": json.dumps({"compilerOptions": {"jsx": "react"}}),
+            "foo/src/BUILD": "tsx_sources()",
+            "foo/src/index.tsx": textwrap.dedent(
+                """\
+                export function add(x: number, y: number): number {
+                  return x + y;
+                }
+                """
+            ),
+            "foo/src/tests/BUILD": "tsx_tests(name='tests')",
+            "foo/src/tests/index.test.tsx": textwrap.dedent(
+                """\
+                import { add } from '../index';
+
+                test('adds 1 + 2 to equal 3', () => {
+                    expect(add(1, 2)).toBe(3);
+                });
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("foo/src/tests", relative_file_path="index.test.tsx"))
+    package = rule_runner.get_target(Address("foo", generated_name="pkg"))
+    result = rule_runner.request(TestResult, [given_request_for(tgt, package=package)])
+    assert b"Test Suites: 1 passed, 1 total" in result.stderr_bytes
+    assert result.exit_code == 0
