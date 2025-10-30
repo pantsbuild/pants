@@ -9,7 +9,7 @@ import os.path
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import TYPE_CHECKING, ClassVar, cast
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
@@ -727,9 +727,36 @@ class PexVenvHermeticScripts(BoolField):
 
 class PexScieField(StringField):
     alias = "scie"
-    valid_choices = (None, "lazy", "eager")
+    valid_choices = ("lazy", "eager")
     default = None
     help = help_text("SCIENICE")
+
+
+class ScieNameStyle(StrEnum):
+    DYNAMIC = "dynamic"
+    PLATFORM_PARENT_DIR =  "platform-parent-dir"
+    PLATFORM_FILE_SUFFIX = "platform-file-suffix"
+
+class PexScieNameStyleField(StringField):
+    alias = 'scie_name_style'
+    valid_choices = ScieNameStyle
+    expected_type = str
+    default = ScieNameStyle.DYNAMIC
+    help = help_text("SCIENICE")
+
+#class SciePlatform(StrEnum):
+#
+class PexSciePlatformField(StringSequenceField):
+    alias ='scie_platform'
+    valid_choices = ('linux-aarch64','linux-armv7l','linux-powerpc64','linux-riscv64','linux-s390x','linux-x86_64','macos-aarch64','macos-x86_64')
+    expected_type = str
+    help = help_text("SCIENICE")
+
+
+class PexScieHashAlgField(StringField):
+    alias = 'scie_hash_alg'
+    # from https://science.scie.app/cli.html#science-lift-build
+    valid_choices = ('blake2b','blake2s','md5','sha1','sha224','sha256','sha384','sha3_224','sha3_256','sha3_384','sha3_512','sha512','shake_128' , 'shake_256')
 
 
 _PEX_BINARY_COMMON_FIELDS = (
@@ -758,6 +785,17 @@ _PEX_BINARY_COMMON_FIELDS = (
 
 _PEX_SCIE_BINARY_FIELDS = (
     PexScieField,
+    PexScieNameStyleField,     # --scie-name-style
+    PexSciePlatformField,
+    PexScieHashAlgField,
+    # --scie-busybox
+    # --scie-busybox-pex-entrypoint-env-passthrough,
+    #   --scie-platform {linux-aarch64,linux-armv7l,linux-powerpc64,linux-riscv64,linux-s390x,linux-x86_64,macos-aarch64,macos-x86_64}
+    # --scie-pbs-release SCIE_PBS_RELEASE
+    # --scie-pypy-release SCIE_PYPY_RELEASE
+    # --scie-python-version SCIE_PYTHON_VERSION
+    # --scie-pbs-stripped, --no-scie-pbs-stripped
+    # --scie-hash-alg SCIE_HASH_ALGORITHMS
 )
 
 class PexBinary(Target):
