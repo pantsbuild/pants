@@ -567,6 +567,8 @@ async def _dynimport(
                     "cgo",
                     # record path to dynamic linker
                     *(["-dynlinker"] if import_path == "runtime/cgo" else []),
+                    "-trimpath",
+                    "__PANTS_SANDBOX_ROOT__",
                     "-dynpackage",
                     pkg_name,
                     "-dynimport",
@@ -578,6 +580,7 @@ async def _dynimport(
                 env={"TERM": "dumb"},
                 input_digest=cgo_binary_link_result.output_digest,
                 output_files=(import_go_path,),
+                replace_sandbox_root_in_args=True,
             ),
         )
     )

@@ -377,7 +377,7 @@ async def setup_golang_asm_check_binary() -> SetupAsmCheckBinary:
     compile_result = await execute_process_or_raise(
         **implicitly(
             GoSdkProcess(
-                command=("build", "-o", binary_name, src_file),
+                command=("build", "-trimpath", "-o", binary_name, src_file),
                 input_digest=sources_digest,
                 output_files=(binary_name,),
                 env={"CGO_ENABLED": "0"},
