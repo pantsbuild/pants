@@ -81,27 +81,40 @@ def test_first_party_plugins(rule_runner: PythonRuleRunner) -> None:
     assert first_party_plugins.requirement_strings == FrozenOrderedSet(
         ["ansicolors", "pylint==2.11.1"]
     )
-    assert first_party_plugins.interpreter_constraints_fields == FrozenOrderedSet(
+    assert first_party_plugins.interpreter_constraints_and_resolve_fields == FrozenOrderedSet(
         [
-            InterpreterConstraintsField(
+            (
+                InterpreterConstraintsField(
+                    None,
+                    Address(
+                        "pylint-plugins",
+                        target_name="pylint-plugins",
+                        relative_file_path="plugin.py",
+                    ),
+                ),
                 None,
-                Address(
-                    "pylint-plugins", target_name="pylint-plugins", relative_file_path="plugin.py"
-                ),
             ),
-            InterpreterConstraintsField(
-                ["==3.9.*"],
-                Address(
-                    "pylint-plugins/subdir1", target_name="subdir1", relative_file_path="util.py"
+            (
+                InterpreterConstraintsField(
+                    ["==3.9.*"],
+                    Address(
+                        "pylint-plugins/subdir1",
+                        target_name="subdir1",
+                        relative_file_path="util.py",
+                    ),
                 ),
+                None,
             ),
-            InterpreterConstraintsField(
-                ["==3.8.*"],
-                Address(
-                    "pylint-plugins/subdir2",
-                    target_name="subdir2",
-                    relative_file_path="another_util.py",
+            (
+                InterpreterConstraintsField(
+                    ["==3.8.*"],
+                    Address(
+                        "pylint-plugins/subdir2",
+                        target_name="subdir2",
+                        relative_file_path="another_util.py",
+                    ),
                 ),
+                None,
             ),
         ]
     )

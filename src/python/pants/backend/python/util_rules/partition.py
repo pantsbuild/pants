@@ -10,7 +10,10 @@ from typing import Protocol, TypeVar
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField, PythonResolveField
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints, FieldSetWithInterpreterConstraints
+from pants.backend.python.util_rules.interpreter_constraints import (
+    FieldSetWithInterpreterConstraints,
+    InterpreterConstraints,
+)
 from pants.engine.internals.graph import find_all_targets
 from pants.engine.rules import implicitly
 from pants.engine.target import FieldSet
