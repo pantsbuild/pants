@@ -251,7 +251,7 @@ class PythonSetup(Subsystem):
             """
             For Python targets with both `resolve` and `interpreter_constraints` fields, default to using the `interpreter_constraints` field of the resolve if `interpreter_constraints` is not set on the target itself.
 
-            `[python].enable_resolves` must be `True` for this option to also be enabled. This will become True by default in a future version of Pants and eventually the header option will be deprecated and then removed.
+            `[python].enable_resolves` must be `True` for this option to also be enabled. This will become True by default in a future version of Pants and eventually be deprecated and then removed.
             """
         ),
         advanced=True,
