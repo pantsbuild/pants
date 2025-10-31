@@ -14,6 +14,7 @@ from pants.backend.python.lint.pylint.subsystem import rules as subsystem_rules
 from pants.backend.python.target_types import (
     InterpreterConstraintsField,
     PythonRequirementTarget,
+    PythonResolveField,
     PythonSourcesGeneratorTarget,
 )
 from pants.backend.python.util_rules import python_sources
@@ -81,40 +82,45 @@ def test_first_party_plugins(rule_runner: PythonRuleRunner) -> None:
     assert first_party_plugins.requirement_strings == FrozenOrderedSet(
         ["ansicolors", "pylint==2.11.1"]
     )
+    pylint_plugins_address, subdir1_address, subdir2_address = (
+        Address(
+            "pylint-plugins",
+            target_name="pylint-plugins",
+            relative_file_path="plugin.py",
+        ),
+        Address(
+            "pylint-plugins/subdir1",
+            target_name="subdir1",
+            relative_file_path="util.py",
+        ),
+        Address(
+            "pylint-plugins/subdir2",
+            target_name="subdir2",
+            relative_file_path="another_util.py",
+        ),
+    )
     assert first_party_plugins.interpreter_constraints_and_resolve_fields == FrozenOrderedSet(
         [
             (
                 InterpreterConstraintsField(
                     None,
-                    Address(
-                        "pylint-plugins",
-                        target_name="pylint-plugins",
-                        relative_file_path="plugin.py",
-                    ),
+                    pylint_plugins_address,
                 ),
-                None,
+                PythonResolveField(None, pylint_plugins_address),
             ),
             (
                 InterpreterConstraintsField(
                     ["==3.9.*"],
-                    Address(
-                        "pylint-plugins/subdir1",
-                        target_name="subdir1",
-                        relative_file_path="util.py",
-                    ),
+                    subdir1_address,
                 ),
-                None,
+                PythonResolveField(None, subdir1_address),
             ),
             (
                 InterpreterConstraintsField(
                     ["==3.8.*"],
-                    Address(
-                        "pylint-plugins/subdir2",
-                        target_name="subdir2",
-                        relative_file_path="another_util.py",
-                    ),
+                    subdir2_address,
                 ),
-                None,
+                PythonResolveField(None, subdir2_address),
             ),
         ]
     )
