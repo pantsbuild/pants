@@ -63,7 +63,7 @@ async def resolve_first_party_plugins(
                 (tgt[InterpreterConstraintsField], tgt[PythonResolveField])
             )
 
-    # NB: Flake8 source plugins must be explicitly loaded via PYTHONPATH (i.e. PEX_EXTRA_SYS_PATH).
+    # NB: Flake8 and Pylint source plugins must be explicitly loaded via PYTHONPATH (i.e. PEX_EXTRA_SYS_PATH).
     # The value must point to the plugin's directory, rather than to a parent's directory, because
     # `flake8:local-plugins` values take a module name rather than a path to the module;
     # i.e. `plugin`, but not `path/to/plugin`.
