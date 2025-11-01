@@ -247,11 +247,10 @@ whoami = "1.5.2"
 
 # NB: If a change to these versions requires cache busting, bump the version of
 # `src/rust/dep_inference/Cargo.toml`.
-tree-sitter = "0.20.10"
-tree-sitter-typescript = "0.20.5"
-tree-sitter-python = "0.20.4"
-# TODO: Waiting on https://github.com/camdencheek/tree-sitter-dockerfile/pull/58.
-tree-sitter-dockerfile = { git = "https://github.com/tobni/tree-sitter-dockerfile.git", rev = "ce1cbc3537995f0d968c8bc6315b6a62d6faacde" }
+tree-sitter = "0.25.10"
+tree-sitter-dockerfile = { git = "https://github.com/pantsbuild/tree-sitter-dockerfile.git", rev = "508588913c93a30e7ef09a4ac3ecdee955b7b950" }
+tree-sitter-python = "0.25.0"
+tree-sitter-typescript = "0.23.2"
 
 # Default lints adopted by most crates in this workspace.
 
