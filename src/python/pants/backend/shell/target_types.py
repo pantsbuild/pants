@@ -269,7 +269,7 @@ class ShellSourcesGeneratorTarget(TargetFilesGenerator):
 # -----------------------------------------------------------------------------------------------
 
 
-class ShellCommandCommandField(StringField):
+class ShellCommandCommandFieldBase(StringField):
     alias = "command"
     required = True
     help = help_text(
@@ -281,6 +281,10 @@ class ShellCommandCommandField(StringField):
         set.
         """
     )
+
+
+class ShellCommandCommandField(ShellCommandCommandFieldBase):
+    pass
 
 
 class ShellCommandOutputFilesField(AdhocToolOutputFilesField):
@@ -438,7 +442,14 @@ class ShellCommandTarget(Target):
     )
     help = help_text(
         """
-        Execute any external tool for its side effects.
+        Execute any external tool for its side effects, or run it interactively.
+
+        This target provides hermetic execution with explicit tool dependencies via the
+        `tools` field. It can be used for:
+
+        - Code generation (produces output files consumed by other targets)
+        - Running scripts interactively with explicit dependencies (via `pants run`)
+        - Build-time hermetic execution (via `pants experimental_run_in_sandbox`)
 
         Example BUILD file:
 
@@ -452,13 +463,22 @@ class ShellCommandTarget(Target):
 
             shell_sources(name="scripts")
 
-        Remember to add this target to the dependencies of each consumer, such as your
-        `python_tests` or `docker_image`. When relevant, Pants will run your `command` and
-        insert the `outputs` into that consumer's context.
+        When used as a dependency of other targets (e.g., `python_tests` or `docker_image`),
+        Pants will run your `command` and insert the `outputs` into that consumer's context.
+
+        When used with `pants run :target`, the command runs interactively in the workspace
+        with all dependencies and tools available.
 
         The command may be retried and/or cancelled, so ensure that it is idempotent.
+
+        For simpler, workspace-oriented scripts that use system PATH tools, consider
+        `run_shell_command` instead.
         """
     )
+
+
+class RunShellCommandCommandField(ShellCommandCommandFieldBase):
+    pass
 
 
 class ShellCommandRunTarget(Target):
@@ -467,12 +487,15 @@ class ShellCommandRunTarget(Target):
         *COMMON_TARGET_FIELDS,
         RunShellCommandExecutionDependenciesField,
         RunShellCommandRunnableDependenciesField,
-        ShellCommandCommandField,
+        RunShellCommandCommandField,
         RunShellCommandWorkdirField,
     )
     help = help_text(
         """
-        Run a script in the workspace, with all dependencies packaged/copied into a chroot.
+        Run a script in the workspace with dependencies packaged into a chroot.
+
+        This target is designed for quick, workspace-oriented interactive scripts that use
+        tools from the system PATH.
 
         Example BUILD file:
 
@@ -484,10 +507,13 @@ class ShellCommandRunTarget(Target):
         The `command` may use either `{chroot}` on the command line, or the `$CHROOT`
         environment variable to get the root directory for where any dependencies are located.
 
-        In contrast to the `shell_command`, in addition to `workdir` you only have
-        the `command` and `execution_dependencies` fields as the `tools` you are going to use are
-        already on the PATH which is inherited from the Pants environment. Also, the `outputs` does
-        not apply, as any output files produced will end up directly in your project tree.
+        In contrast to `shell_command`, this target:
+        - Uses tools from the system PATH (not explicit `tools` field)
+        - Does not support `output_files` (outputs go directly to workspace)
+        - Is simpler to use for quick workspace scripts
+
+        For more hermetic execution with explicit tool dependencies, consider using
+        `shell_command` instead, which provides better reproducibility and caching.
         """
     )
 
