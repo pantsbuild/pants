@@ -167,7 +167,7 @@ impl ImportCollector<'_> {
     pub fn collect(&mut self) {
         let mut parser = Parser::new();
         parser
-            .set_language(tree_sitter_typescript::language_tsx())
+            .set_language(&tree_sitter_typescript::LANGUAGE_TSX.into())
             .expect("Error loading Javascript grammar");
         let parsed = parser.parse(self.code, None);
         let tree = parsed.unwrap();
