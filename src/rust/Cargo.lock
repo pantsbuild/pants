@@ -4738,7 +4738,7 @@ dependencies = [
 [[package]]
 name = "tree-sitter-dockerfile"
 version = "0.3.0"
-source = "git+https://github.com/sureshjoshi/tree-sitter-dockerfile.git?rev=a3ce20be54a78eb32c40e31d80bbb855f7ac552f#a3ce20be54a78eb32c40e31d80bbb855f7ac552f"
+source = "git+https://github.com/pantsbuild/tree-sitter-dockerfile.git?rev=508588913c93a30e7ef09a4ac3ecdee955b7b950#508588913c93a30e7ef09a4ac3ecdee955b7b950"
 dependencies = [
  "cc",
  "tree-sitter-language",

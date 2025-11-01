@@ -830,8 +830,10 @@ fn relative_imports_resolution() {
 }
 
 #[test]
-fn syntax_errors_and_other_fun() {
-    // These tests aren't specifically testing what we parse, so much as we don't "crash and burn".
+fn syntax_errors_shouldnt_crash() {
+    // These are syntax errors and we're parsing them to ensure nothing panics and they return bounded/sane results
+    // If updating tree-sitter causes these to fail, update the imports array with the correct result (from the assertion error) to ensure these pass
+    // Unless the failure is a panic/memory exhaustion/really large array - in which case, something has gone terribly wrong
 
     assert_imports("imprt a", &[]);
     assert_imports("form a import b", &["b"]);
@@ -845,7 +847,7 @@ fn syntax_errors_and_other_fun() {
     assert_imports("from a imp x", &[]);
     assert_imports("from from import a as .as", &[]);
     assert_imports("from a import ......g", &["a.g"]);
-    // assert_imports("from a. import b", &[]); // TODO: Latest tree-sitter parses this as ["a.b"]
+    assert_imports("from a. import b", &["a.b"]);
     assert_imports("from a as c import b as d", &["a.b"]);
     assert_imports("from a import *, b", &["a"]);
     assert_imports("from a import b, *", &["a.b"]);
