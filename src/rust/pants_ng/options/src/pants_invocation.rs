@@ -166,7 +166,7 @@ impl PantsInvocation {
 
         let mut unconsumed_args = args.arg_strings.into_iter().peekable();
 
-        let global_flags = consume_flags(&mut unconsumed_args);
+        let mut global_flags = consume_flags(&mut unconsumed_args);
 
         let mut commands = vec![];
         let mut cmd_opt = consume_cmd(&mut unconsumed_args);
@@ -190,6 +190,10 @@ impl PantsInvocation {
                 specs.join(" ")
             ));
         }
+
+        // Any flags after specs (but before passthru args) are considered to be global flags.
+        // This makes it convenient to tack flags on at the end of an existing cmd line.
+        global_flags.append(&mut consume_flags(&mut unconsumed_args));
 
         let mut passthru = None;
         if let Some(s) = unconsumed_args.next() {

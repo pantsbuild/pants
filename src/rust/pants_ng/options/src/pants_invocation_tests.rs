@@ -277,9 +277,23 @@ fn test_command_and_subcommand() {
     );
 
     assert_eq!(
-        mk_invocation("pants --foo cmd --bar=baz subcmd --qux=quux path/to/file1 ./path2 -- passthru_arg --passthru-flag").unwrap(),
+        mk_invocation("pants --foo cmd --bar=baz subcmd --qux=quux path/to/file1 ./path2 --global-flag-after-specs=val").unwrap(),
         PantsInvocation {
-            global_flags: vec![mk_flag("foo", None),],
+            global_flags: vec![mk_flag("foo", None), mk_flag("global-flag-after-specs", Some("val")),],
+            commands: vec![mk_command(
+                "cmd",
+                vec![mk_flag("bar", Some("baz")),],
+                Some(mk_subcommand("subcmd", vec![mk_flag("qux", Some("quux"))]))
+            )],
+            specs: vec!["path/to/file1".to_string(), "./path2".to_string()],
+            passthru: None,
+        },
+    );
+
+    assert_eq!(
+        mk_invocation("pants --foo cmd --bar=baz subcmd --qux=quux path/to/file1 ./path2 --global-flag-after-specs -- passthru_arg --passthru-flag").unwrap(),
+        PantsInvocation {
+            global_flags: vec![mk_flag("foo", None), mk_flag("global-flag-after-specs", None),],
             commands: vec![mk_command(
                 "cmd",
                 vec![mk_flag("bar", Some("baz")),],
@@ -311,9 +325,9 @@ fn test_multiple_commands_and_subcommands() {
     );
 
     assert_eq!(
-        mk_invocation("pants --global-flag cmd1 --cmd1-flag subcmd1 --subcmd1-flag + cmd2 --cmd2-flag + cmd3 --cmd3-flag subcmd3 --subcmd3-flag path/to/spec -- passthru").unwrap(),
+        mk_invocation("pants --global-flag cmd1 --cmd1-flag subcmd1 --subcmd1-flag + cmd2 --cmd2-flag + cmd3 --cmd3-flag subcmd3 --subcmd3-flag path/to/spec --another-global-flag -- passthru").unwrap(),
         PantsInvocation {
-            global_flags: vec![mk_flag("global-flag", None)],
+            global_flags: vec![mk_flag("global-flag", None), mk_flag("another-global-flag", None),],
             commands: vec![mk_command(
                 "cmd1",
                 vec![mk_flag("cmd1-flag", None)],
