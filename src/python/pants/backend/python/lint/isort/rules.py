@@ -39,7 +39,7 @@ class IsortFieldSet(FieldSet):
 
 class IsortRequest(FmtTargetsRequest):
     field_set_type = IsortFieldSet
-    tool_subsystem = Isort
+    tool_subsystem = Isort  # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

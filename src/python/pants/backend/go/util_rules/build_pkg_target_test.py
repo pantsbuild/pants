@@ -42,7 +42,11 @@ from pants.backend.go.util_rules.build_pkg_target import (
     setup_build_go_package_target_request,
 )
 from pants.backend.go.util_rules.go_mod import OwningGoModRequest, find_owning_go_mod
-from pants.backend.go.util_rules.import_analysis import GoStdLibPackages, GoStdLibPackagesRequest
+from pants.backend.go.util_rules.import_analysis import (
+    GoStdLibPackage,
+    GoStdLibPackages,
+    GoStdLibPackagesRequest,
+)
 from pants.core.target_types import FilesGeneratorTarget, FileSourceField, FileTarget
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, FileContent, Snapshot
@@ -649,15 +653,21 @@ def test_xtest_deps(rule_runner: RuleRunner) -> None:
     )
 
 
+@pytest.mark.no_error_if_skipped
 def test_stdlib_embed_config(rule_runner: RuleRunner) -> None:
-    import_path = "crypto/internal/nistec"
     stdlib_packages = rule_runner.request(
         GoStdLibPackages, [GoStdLibPackagesRequest(with_race_detector=False, cgo_enabled=False)]
     )
-    pkg_info = stdlib_packages.get(import_path)
+
+    pkg_info: GoStdLibPackage | None = None
+    for import_path in ("crypto/internal/nistec", "internal/trace/traceviewer/http"):
+        pkg_info = stdlib_packages.get(import_path)
+        if pkg_info:
+            break
+
     if not pkg_info:
         pytest.skip(
-            f"Skipping test since `{import_path}` import path not available in Go standard library."
+            "Skipping test since no known stdlib import paths using embed are available for the test."
         )
 
     assert "embed" in pkg_info.imports
@@ -668,7 +678,7 @@ def test_stdlib_embed_config(rule_runner: RuleRunner) -> None:
         BuildGoPackageRequest,
         [
             BuildGoPackageRequestForStdlibRequest(
-                import_path=import_path, build_opts=GoBuildOptions(cgo_enabled=False)
+                import_path=pkg_info.import_path, build_opts=GoBuildOptions(cgo_enabled=False)
             )
         ],
     )

@@ -40,7 +40,7 @@ def rule_runner() -> PythonRuleRunner:
     return rule_runner
 
 
-def _generate(
+def _generate_and_check_metadata(
     *,
     rule_runner: PythonRuleRunner,
     separate_metadata_file: bool = False,
@@ -149,6 +149,24 @@ def _generate(
         return strip_prefix(content, pex_header)
 
 
+def _generate(rule_runner: PythonRuleRunner, **kwargs) -> str:
+    result = rule_runner.request(
+        GenerateLockfileResult,
+        [
+            GeneratePythonLockfile(
+                resolve_name="test",
+                lockfile_dest="test.lock",
+                diff=False,
+                **kwargs,
+            )
+        ],
+    )
+    digest_contents = rule_runner.request(DigestContents, [result.digest])
+    content = digest_contents[0].content.decode()
+
+    return content
+
+
 @pytest.mark.parametrize(
     ("no_binary", "only_binary", "separate_metadata_file"),
     (
@@ -175,7 +193,7 @@ def test_pex_lockfile_generation(
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
     lock_entry = json.loads(
-        _generate(
+        _generate_and_check_metadata(
             rule_runner=rule_runner,
             separate_metadata_file=separate_metadata_file,
             no_binary=no_binary,
@@ -231,7 +249,7 @@ def test_constraints_file(rule_runner: PythonRuleRunner) -> None:
     )
 
     lock_entry = json.loads(
-        _generate(
+        _generate_and_check_metadata(
             rule_runner=rule_runner,
             requirements_strings=["ansicolors>=1.0"],
             requirement_constraints_str=dedent(
@@ -311,7 +329,7 @@ def test_multiple_resolves() -> None:
 def test_empty_requirements(rule_runner: PythonRuleRunner) -> None:
     with pytest.raises(ExecutionError) as excinfo:
         json.loads(
-            _generate(
+            _generate_and_check_metadata(
                 rule_runner=rule_runner,
                 requirements_strings=[],
             )
@@ -332,7 +350,7 @@ def test_define_source_from_different_index(rule_runner: PythonRuleRunner) -> No
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
     lock_entry = json.loads(
-        _generate(
+        _generate_and_check_metadata(
             rule_runner=rule_runner,
             requirements_strings=["cowsay==6.0", "ansicolors==1.1.8"],
             sources_str=dedent(
@@ -399,3 +417,57 @@ def test_define_source_from_different_index(rule_runner: PythonRuleRunner) -> No
     artifacts = reqs[1]["artifacts"]
     assert wheel_cowsay in artifacts
     assert sdist_cowsay in artifacts
+
+
+def test_override_version(rule_runner: PythonRuleRunner) -> None:
+    args = [
+        "--python-resolves={'test': 'test.lock'}",
+        "--python-separate-lockfile-metadata-file",
+        "--python-resolves-to-overrides={'test': ['python-dateutil==2.6.0']}",
+    ]
+
+    rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
+
+    lock_entry = json.loads(
+        _generate(
+            rule_runner=rule_runner,
+            requirements=FrozenOrderedSet(["freezegun==1.2.1"]),
+            interpreter_constraints=InterpreterConstraints(),
+            find_links=FrozenOrderedSet(),
+        )
+    )
+
+    reqs = lock_entry["locked_resolves"][0]["locked_requirements"]
+    print(reqs)
+    assert reqs[0]["project_name"] == "freezegun"
+    assert reqs[1]["project_name"] == "python-dateutil"
+    # Without Override: python-dateutil>=2.7
+    assert reqs[1]["version"] == "2.6.0"
+
+
+def test_excluded_by_excludes(rule_runner: PythonRuleRunner) -> None:
+    args = [
+        "--python-resolves={'test': 'test.lock'}",
+        "--python-separate-lockfile-metadata-file",
+        "--python-resolves-to-excludes={'test': ['six']}",
+    ]
+
+    rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
+
+    lock_entry = json.loads(
+        _generate(
+            rule_runner=rule_runner,
+            requirements=FrozenOrderedSet(["fasteners==0.16.3"]),
+            interpreter_constraints=InterpreterConstraints(),
+            find_links=FrozenOrderedSet(),
+        )
+    )
+
+    reqs = lock_entry["locked_resolves"][0]["locked_requirements"]
+    print(reqs)
+
+    assert reqs[0]["project_name"] == "fasteners"
+    # Kept in in the metadata
+    assert "six" in reqs[0]["requires_dists"]
+    # But excluded as a project
+    assert "six" not in {req["project_name"]: req for req in reqs}
