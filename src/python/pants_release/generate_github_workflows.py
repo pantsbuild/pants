@@ -34,7 +34,8 @@ def action(name: str) -> str:
         "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
         "msys2": "msys2/setup-msys2@v2",
         "rust-cache": "Swatinem/rust-cache@v2.8.1",
-        "setup-go": "actions/setup-go@v5",
+        # Switch to v6 once https://github.com/actions/setup-go/pull/665 is released
+        "setup-go": "actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25",
         "setup-java": "actions/setup-java@v4",
         "setup-node": "actions/setup-node@v4",
         "setup-protoc": "arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9",
@@ -385,12 +386,15 @@ def install_jdk() -> Step:
     }
 
 
-def install_go() -> Step:
-    return {
-        "name": "Install Go",
-        "uses": action("setup-go"),
-        "with": {"go-version": "1.19.5"},
-    }
+def install_go() -> list[Step]:
+    def go_cfg(go_version: str) -> Step:
+        return {
+            "name": "Install Go",
+            "uses": action("setup-go"),
+            "with": {"go-version": go_version},
+        }
+
+    return [go_cfg(go_version) for go_version in ("1.25.3", "1.24.9")]
 
 
 def install_python_headers_in_manylinux_container() -> Step:
@@ -795,7 +799,7 @@ def test_jobs(
             *checkout(),
             *(launch_bazel_remote() if with_remote_caching else []),
             install_jdk(),
-            install_go(),
+            *install_go(),
             *(
                 [download_apache_thrift()]
                 if helper.platform == Platform.LINUX_X86_64
@@ -1019,7 +1023,7 @@ def build_wheels_job(
                 *(
                     [install_python_headers_in_manylinux_container()]
                     if platform == Platform.LINUX_ARM64
-                    else [install_go()]
+                    else install_go()
                 ),
                 {
                     "name": "Build wheels",
@@ -1717,7 +1721,7 @@ def public_repos() -> PublicReposOutput:
             "steps": [
                 *checkout(repository=repo.name, **repo.checkout_options),
                 install_pythons([repo.python_version]),
-                *([install_go()] if repo.install_go else []),
+                *(install_go() if repo.install_go else []),
                 *([install_node(repo.node_version)] if repo.node_version else []),
                 *([download_apache_thrift()] if repo.install_thrift else []),
                 {

@@ -49,6 +49,7 @@ Created as part of the release process.
 + Caleb Lloyd
 + Carina C. Zona
 + Caspar Krieger
++ Chiara
 + Chris Aniszczyk
 + Chris Borckholder
 + Chris Burroughs
@@ -384,6 +385,7 @@ Created as part of the release process.
 + Yoav Alon
 + Yuhan GUO
 + Yujie Chen
++ Yusuf Jabri
 + achrafmam2
 + andreaimprovised
 + azban

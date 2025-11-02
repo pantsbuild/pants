@@ -5,30 +5,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pants.backend.python.lint.first_party_plugins import (
+    BaseFirstPartyPlugins,
+    resolve_first_party_plugins,
+)
 from pants.backend.python.lint.flake8.skip_field import SkipFlake8Field
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import (
     ConsoleScript,
     InterpreterConstraintsField,
-    PythonRequirementsField,
+    PythonResolveField,
     PythonSourceField,
 )
 from pants.backend.python.util_rules import python_sources
-from pants.backend.python.util_rules.pex_requirements import PexRequirements
-from pants.backend.python.util_rules.python_sources import (
-    PythonSourceFilesRequest,
-    strip_python_sources,
-)
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.addresses import UnparsedAddressInputs
-from pants.engine.fs import AddPrefix, Digest
-from pants.engine.internals.graph import resolve_unparsed_address_inputs
-from pants.engine.internals.graph import transitive_targets as transitive_targets_get
-from pants.engine.internals.native_engine import EMPTY_DIGEST
-from pants.engine.intrinsics import add_prefix
-from pants.engine.rules import collect_rules, implicitly, rule
-from pants.engine.target import FieldSet, Target, TransitiveTargetsRequest
+from pants.engine.rules import collect_rules, rule
+from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.option.option_types import (
     ArgsListOption,
@@ -40,7 +34,6 @@ from pants.option.option_types import (
 )
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
 
 
@@ -50,6 +43,7 @@ class Flake8FieldSet(FieldSet):
 
     source: PythonSourceField
     interpreter_constraints: InterpreterConstraintsField
+    resolve: PythonResolveField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -158,59 +152,13 @@ class Flake8(PythonToolBase):
 # --------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
-class Flake8FirstPartyPlugins:
-    requirement_strings: FrozenOrderedSet[str]
-    interpreter_constraints_fields: FrozenOrderedSet[InterpreterConstraintsField]
-    sources_digest: Digest
-
-    PREFIX = "__plugins"
-
-    def __bool__(self) -> bool:
-        return self.sources_digest != EMPTY_DIGEST
+class Flake8FirstPartyPlugins(BaseFirstPartyPlugins):
+    pass
 
 
 @rule(desc="Prepare [flake8].source_plugins", level=LogLevel.DEBUG)
 async def flake8_first_party_plugins(flake8: Flake8) -> Flake8FirstPartyPlugins:
-    if not flake8.source_plugins:
-        return Flake8FirstPartyPlugins(FrozenOrderedSet(), FrozenOrderedSet(), EMPTY_DIGEST)
-
-    plugin_target_addresses = await resolve_unparsed_address_inputs(
-        flake8.source_plugins, **implicitly()
-    )
-    transitive_targets = await transitive_targets_get(
-        TransitiveTargetsRequest(plugin_target_addresses), **implicitly()
-    )
-
-    requirements_fields: OrderedSet[PythonRequirementsField] = OrderedSet()
-    interpreter_constraints_fields: OrderedSet[InterpreterConstraintsField] = OrderedSet()
-    for tgt in transitive_targets.closure:
-        if tgt.has_field(PythonRequirementsField):
-            requirements_fields.add(tgt[PythonRequirementsField])
-        if tgt.has_field(InterpreterConstraintsField):
-            interpreter_constraints_fields.add(tgt[InterpreterConstraintsField])
-
-    # NB: Flake8 source plugins must be explicitly loaded via PYTHONPATH (i.e. PEX_EXTRA_SYS_PATH).
-    # The value must point to the plugin's directory, rather than to a parent's directory, because
-    # `flake8:local-plugins` values take a module name rather than a path to the module;
-    # i.e. `plugin`, but not `path/to/plugin`.
-    # (This means users must have specified the parent directory as a source root.)
-    stripped_sources = await strip_python_sources(
-        **implicitly(PythonSourceFilesRequest(transitive_targets.closure))
-    )
-    prefixed_sources = await add_prefix(
-        AddPrefix(
-            stripped_sources.stripped_source_files.snapshot.digest, Flake8FirstPartyPlugins.PREFIX
-        )
-    )
-
-    return Flake8FirstPartyPlugins(
-        requirement_strings=PexRequirements.req_strings_from_requirement_fields(
-            requirements_fields,
-        ),
-        interpreter_constraints_fields=FrozenOrderedSet(interpreter_constraints_fields),
-        sources_digest=prefixed_sources,
-    )
+    return await resolve_first_party_plugins(flake8.source_plugins, Flake8FirstPartyPlugins)
 
 
 def rules():

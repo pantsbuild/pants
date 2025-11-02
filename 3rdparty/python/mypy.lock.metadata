@@ -4,9 +4,8 @@
     "CPython==3.14.*"
   ],
   "generated_with_requirements": [
-    "mypy-typing-asserts",
-    "mypy==1.15.0",
-    "strawberry-graphql==0.240.4"
+    "mypy-typing-asserts==0.1.1",
+    "mypy==1.18.2"
   ],
   "manylinux": "manylinux2014",
   "requirement_constraints": [],

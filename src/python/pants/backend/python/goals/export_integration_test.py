@@ -75,6 +75,7 @@ def test_export(py_resolve_format: PythonResolveExportFormat, py_hermetic_script
         resolve_names = ["a", "b"]
         run_pants(
             [
+                "--print-stacktrace",
                 "generate-lockfiles",
                 "export",
                 *(f"--resolve={name}" for name in resolve_names),

@@ -290,7 +290,7 @@ class CodeQualityToolRuleBuilder:
             skip = SkipOption("lint")
 
         class CodeQualityProcessingRequest(LintFilesRequest):
-            tool_subsystem = CodeQualityToolInstance
+            tool_subsystem = CodeQualityToolInstance  # type: ignore[assignment]
 
         @rule(canonical_name_suffix=self.scope)
         async def partition_inputs(
@@ -342,7 +342,7 @@ class CodeQualityToolRuleBuilder:
             skip = SkipOption("lint", "fmt")
 
         class CodeQualityProcessingRequest(FmtFilesRequest):
-            tool_subsystem = CodeQualityToolInstance
+            tool_subsystem = CodeQualityToolInstance  # type: ignore[assignment]
 
         @rule(canonical_name_suffix=self.scope)
         async def partition_inputs(
@@ -403,7 +403,7 @@ class CodeQualityToolRuleBuilder:
             skip = SkipOption("lint", "fmt", "fix")
 
         class CodeQualityProcessingRequest(FixFilesRequest):
-            tool_subsystem = CodeQualityToolInstance
+            tool_subsystem = CodeQualityToolInstance  # type: ignore[assignment]
 
         @rule(canonical_name_suffix=self.scope)
         async def partition_inputs(

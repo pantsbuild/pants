@@ -12,6 +12,7 @@ from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import (
     ConsoleScript,
     InterpreterConstraintsField,
+    PythonResolveField,
     PythonSourceField,
 )
 from pants.core.goals.resolves import ExportableTool
@@ -29,6 +30,7 @@ class BlackFieldSet(FieldSet):
 
     source: PythonSourceField
     interpreter_constraints: InterpreterConstraintsField
+    resolve: PythonResolveField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:

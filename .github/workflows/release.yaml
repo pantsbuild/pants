@@ -165,9 +165,13 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      with:
+        go-version: 1.24.9
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
         PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
@@ -290,9 +294,13 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      with:
+        go-version: 1.24.9
     - env:
         ARCHFLAGS: -arch x86_64
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
@@ -411,9 +419,13 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      with:
+        go-version: 1.24.9
     - env:
         ARCHFLAGS: -arch arm64
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
