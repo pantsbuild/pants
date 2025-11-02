@@ -1015,8 +1015,8 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.65.0",
-  "pip_version": "25.2",
+  "pex_version": "2.66.0",
+  "pip_version": "25.3",
   "prefer_older_binary": false,
   "requirements": [
     "ipdb",
