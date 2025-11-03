@@ -13,78 +13,37 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "427318ce031701fea540783410126f03899a97ffc6f61596ad581ac2e40e3bc3",
-              "url": "https://files.pythonhosted.org/packages/77/06/bb80f5f86020c4551da315d78b3ab75e8228f89f0162f2c3a819e407941a/attrs-25.3.0-py3-none-any.whl"
+              "hash": "adcf7e2a1fb3b36ac48d97835bb6d8ade15b8dcce26aba8bf1d14847b57a3373",
+              "url": "https://files.pythonhosted.org/packages/3a/2a/7cc015f5b9f5db42b7d48157e23356022889fc354a2813c15934b7cb5c0e/attrs-25.4.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "75d7cefc7fb576747b2c81b4442d4d4a1ce0900973527c011d1030fd3bf4af1b",
-              "url": "https://files.pythonhosted.org/packages/5a/b0/1367933a8532ee6ff8d63537de4f1177af4bff9f3e829baf7331f595bb24/attrs-25.3.0.tar.gz"
+              "hash": "16d5969b87f0859ef33a48b35d55ac1be6e42ae49d5e853b597db70c35c57e11",
+              "url": "https://files.pythonhosted.org/packages/6b/5c/685e6633917e101e5dcb62b9dd76946cbb57c26e133bae9e0cd36033c0a9/attrs-25.4.0.tar.gz"
             }
           ],
           "project_name": "attrs",
-          "requires_dists": [
-            "cloudpickle; platform_python_implementation == \"CPython\" and extra == \"benchmark\"",
-            "cloudpickle; platform_python_implementation == \"CPython\" and extra == \"cov\"",
-            "cloudpickle; platform_python_implementation == \"CPython\" and extra == \"dev\"",
-            "cloudpickle; platform_python_implementation == \"CPython\" and extra == \"tests\"",
-            "cogapp; extra == \"docs\"",
-            "coverage[toml]>=5.3; extra == \"cov\"",
-            "furo; extra == \"docs\"",
-            "hypothesis; extra == \"benchmark\"",
-            "hypothesis; extra == \"cov\"",
-            "hypothesis; extra == \"dev\"",
-            "hypothesis; extra == \"tests\"",
-            "mypy>=1.11.1; (platform_python_implementation == \"CPython\" and python_version >= \"3.10\") and extra == \"benchmark\"",
-            "mypy>=1.11.1; (platform_python_implementation == \"CPython\" and python_version >= \"3.10\") and extra == \"cov\"",
-            "mypy>=1.11.1; (platform_python_implementation == \"CPython\" and python_version >= \"3.10\") and extra == \"dev\"",
-            "mypy>=1.11.1; (platform_python_implementation == \"CPython\" and python_version >= \"3.10\") and extra == \"tests\"",
-            "mypy>=1.11.1; (platform_python_implementation == \"CPython\" and python_version >= \"3.10\") and extra == \"tests-mypy\"",
-            "myst-parser; extra == \"docs\"",
-            "pre-commit-uv; extra == \"dev\"",
-            "pympler; extra == \"benchmark\"",
-            "pympler; extra == \"cov\"",
-            "pympler; extra == \"dev\"",
-            "pympler; extra == \"tests\"",
-            "pytest-codspeed; extra == \"benchmark\"",
-            "pytest-mypy-plugins; (platform_python_implementation == \"CPython\" and python_version >= \"3.10\") and extra == \"benchmark\"",
-            "pytest-mypy-plugins; (platform_python_implementation == \"CPython\" and python_version >= \"3.10\") and extra == \"cov\"",
-            "pytest-mypy-plugins; (platform_python_implementation == \"CPython\" and python_version >= \"3.10\") and extra == \"dev\"",
-            "pytest-mypy-plugins; (platform_python_implementation == \"CPython\" and python_version >= \"3.10\") and extra == \"tests\"",
-            "pytest-mypy-plugins; (platform_python_implementation == \"CPython\" and python_version >= \"3.10\") and extra == \"tests-mypy\"",
-            "pytest-xdist[psutil]; extra == \"benchmark\"",
-            "pytest-xdist[psutil]; extra == \"cov\"",
-            "pytest-xdist[psutil]; extra == \"dev\"",
-            "pytest-xdist[psutil]; extra == \"tests\"",
-            "pytest>=4.3.0; extra == \"benchmark\"",
-            "pytest>=4.3.0; extra == \"cov\"",
-            "pytest>=4.3.0; extra == \"dev\"",
-            "pytest>=4.3.0; extra == \"tests\"",
-            "sphinx-notfound-page; extra == \"docs\"",
-            "sphinx; extra == \"docs\"",
-            "sphinxcontrib-towncrier; extra == \"docs\"",
-            "towncrier; extra == \"docs\""
-          ],
-          "requires_python": ">=3.8",
-          "version": "25.3.0"
+          "requires_dists": [],
+          "requires_python": ">=3.9",
+          "version": "25.4.0"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "c56a26ced38c236f79e74af3ccce53772827cef5c3bce7cab33ff2060f756373",
-              "url": "https://files.pythonhosted.org/packages/59/56/25ca7b848164b7d93dbd5fc97dd7751700c93e324fe854afbeb562ee2f98/immutabledict-4.2.1-py3-none-any.whl"
+              "hash": "97c31d098a2c850e93a958badeef765e4736ed7942ec73e439facd764a3a7217",
+              "url": "https://files.pythonhosted.org/packages/63/7b/04ab6afa1ff7eb9ccb09049918c0407b205f5009092c0416147d163e4e2b/immutabledict-4.2.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "d91017248981c72eb66c8ff9834e99c2f53562346f23e7f51e7a5ebcf66a3bcc",
-              "url": "https://files.pythonhosted.org/packages/e0/c5/4240186fbabc58fba41bbe17c5f0cd37ffd4c0b85a5029ab104f946df175/immutabledict-4.2.1.tar.gz"
+              "hash": "cb6ed3090df593148f94cb407d218ca526fd2639694afdb553dc4f50ce6feeca",
+              "url": "https://files.pythonhosted.org/packages/ce/12/1da8e1a9050d0603ba65fb1796ed8860a705b906701c96e77f85cc7490be/immutabledict-4.2.2.tar.gz"
             }
           ],
           "project_name": "immutabledict",
           "requires_dists": [],
-          "requires_python": ">=3.8",
-          "version": "4.2.1"
+          "requires_python": "<4.0,>=3.8",
+          "version": "4.2.2"
         },
         {
           "artifacts": [
@@ -1299,8 +1258,8 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.57.0",
-  "pip_version": "25.2",
+  "pex_version": "2.66.0",
+  "pip_version": "25.3",
   "prefer_older_binary": false,
   "requirements": [
     "pytype==2024.9.13"
