@@ -75,6 +75,7 @@ def main() -> None:
         "slack_announcement.json",
         json.dumps(
             {
+                "channel": "C18RRR4JK",
                 "blocks": [
                     {
                         "type": "section",
