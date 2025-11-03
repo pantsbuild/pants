@@ -83,9 +83,22 @@ class InjectNfpmPackageFieldsRequest(ABC):
     nfpm.yaml config file for nFPM. To customize this, subclass `InjectNfpmPackageFieldsRequest`,
     register `UnionRule(InjectNfpmPackageFieldsRequest, MyCustomInjectNfpmPackageFieldsRequest)`,
     and add a rule that takes your subclass as a parameter and returns `InjectedNfpmPackageFields`.
+
+    The `target` attribute of this class holds the original target as defined in BUILD files.
+    The `injected_fields` attribute of this class is `None` when this rule is the first rule
+    in a chain of `inject_nfpm_package_fields` rules. For subsequent rules in the chain,
+    `injected_fields` contains the results of the previous rule. These injected_fields will only
+    have affect if they are copied into the `InjectedNfpmPackageFields` returned by each rule,
+    which allows rules to reset or extend previously overridden fields. The final rule in
+    the chain returns the final `InjectedNfpmPackageFields` instance that is used to actually
+    generate the nfpm config.
+
+    Chaining rules like this allows pants to inject some fields, while allowing in-repo plugins
+    to override or remove them.
     """
 
     target: Target
+    injected_fields: FrozenDict[type[Field], Field] | None
 
     @classmethod
     @abstractmethod
@@ -125,28 +138,24 @@ async def determine_injected_nfpm_package_fields(
     if not applicable_inject_nfpm_config_requests:
         return InjectedNfpmPackageFields((), address=target.address)
 
+    # When more than one request is registered, we need to sort them before chaining the requests.
     if len(applicable_inject_nfpm_config_requests) > 1:
-        possible_requests = sorted(
-            plugin.__name__ for plugin in applicable_inject_nfpm_config_requests
+        applicable_inject_nfpm_config_requests = tuple(
+            # TODO: more intelligent sorting than using __name__ (eg so pants-internal rules always run first)
+            sorted(applicable_inject_nfpm_config_requests, key=lambda request: request.__name__)
         )
-        raise ValueError(
-            softwrap(
-                f"""
-                Multiple registered `InjectNfpmPackageFieldsRequest`s can work on the target
-                {target.address}, and it's ambiguous which to use: {possible_requests}
 
-                Please activate fewer implementations, or make the classmethod `is_applicable()`
-                more precise so that only one implementation is applicable for this target.
-                """
-            )
+    injected: InjectedNfpmPackageFields
+    injected_fields: FrozenDict[type[Field], Field] | None = None
+    for request_type in applicable_inject_nfpm_config_requests:
+        chained_request: InjectNfpmPackageFieldsRequest = request_type(target, injected_fields)  # type: ignore[abstract]
+        injected = await inject_nfpm_package_fields(
+            **implicitly({chained_request: InjectNfpmPackageFieldsRequest})
         )
-    inject_nfpm_config_request_type = applicable_inject_nfpm_config_requests[0]
-    inject_nfpm_config_request: InjectNfpmPackageFieldsRequest = inject_nfpm_config_request_type(
-        target
-    )  # type: ignore[abstract]
-    return await inject_nfpm_package_fields(
-        **implicitly({inject_nfpm_config_request: InjectNfpmPackageFieldsRequest})
-    )
+        injected_fields = injected.field_values
+
+    # return the last result in the chain of results
+    return injected
 
 
 def rules():
