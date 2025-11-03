@@ -84,7 +84,7 @@ def main() -> None:
                             "text": announcement,
                         },
                     },
-                ]
+                ],
             }
         ),
     )
