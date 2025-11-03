@@ -166,6 +166,8 @@ unowned_dependency_behavior = "error"
 
 [docformatter]
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
+# Does not work on 3.14 https://github.com/PyCQA/docformatter/issues/327
+skip = true
 
 [flake8]
 config = "build-support/flake8/.flake8"
@@ -215,8 +217,9 @@ template_by_globs = "@build-support/preambles/config.yaml"
 diff = true
 
 [pyupgrade]
-args = ["--keep-runtime-typing", "--py311-plus"]
-
+args = ["--keep-runtime-typing", "--py314-plus"]
+# TODO: Re-enable this in a follow-up PR, as this churns against every file removing "from __future__ ..."
+skip = true
 
 [jvm]
 default_resolve = "jvm_testprojects"

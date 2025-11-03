@@ -11,8 +11,6 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-# import pkg_resources
-
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.native_engine import PyExecutor
@@ -31,6 +29,9 @@ from pants.option.errors import UnknownFlagsError
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.requirements import parse_requirements_file
+
+# import pkg_resources
+
 
 logger = logging.getLogger(__name__)
 
