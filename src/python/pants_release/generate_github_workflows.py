@@ -37,7 +37,7 @@ def action(name: str) -> str:
         "setup-node": "actions/setup-node@v6",
         "setup-protoc": "arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623",
         "setup-python": "actions/setup-python@v6",
-        "slack-github-action": "slackapi/slack-github-action@v1.24.0",
+        "slack-github-action": "slackapi/slack-github-action@v2.1.1",
         "upload-artifact": "actions/upload-artifact@v5",
     }
     try:

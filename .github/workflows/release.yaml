@@ -553,7 +553,7 @@ jobs:
       run: |
         ./pants run src/python/pants_release/generate_release_announcement.py                         -- --output-dir=${{ runner.temp }}
     - name: Announce release to Slack
-      uses: slackapi/slack-github-action@v1.24.0
+      uses: slackapi/slack-github-action@v2.1.1
       with:
         method: chat.postMessage
         payload-file-path: ${{ runner.temp }}/slack_announcement.json
