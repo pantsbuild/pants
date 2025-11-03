@@ -35,7 +35,7 @@ class TrivyDockerFieldSet(FieldSet):
 
 class TrivyDockerRequest(LintTargetsRequest):
     field_set_type = TrivyDockerFieldSet
-    tool_subsystem = Trivy
+    tool_subsystem = Trivy  # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_ONE_PARTITION_PER_INPUT
 
 

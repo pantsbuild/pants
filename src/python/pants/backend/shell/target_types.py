@@ -26,6 +26,7 @@ from pants.backend.adhoc.target_types import (
 )
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.core.environments.target_types import EnvironmentField
+from pants.core.goals.package import OutputPathField
 from pants.core.goals.test import RuntimePackageDependenciesField, TestTimeoutField
 from pants.core.util_rules.system_binaries import BinaryPathTest
 from pants.engine.rules import collect_rules, rule
@@ -108,7 +109,7 @@ class Shunit2Shell(Enum):
 
     @property
     def binary_path_test(self) -> BinaryPathTest | None:
-        arg = match(  # type: ignore[misc]
+        arg = match(
             self,
             {
                 self.sh: None,
@@ -405,6 +406,12 @@ class SkipShellCommandTestsField(BoolField):
     help = "If true, don't run this tests for target."
 
 
+class SkipShellCommandPackageField(BoolField):
+    alias = "skip_package"
+    default = False
+    help = "If true, don't run this package for target."
+
+
 class ShellCommandTarget(Target):
     alias = "shell_command"
     core_fields = (
@@ -506,6 +513,7 @@ class ShellCommandTestTarget(Target):
         ShellCommandOutputDirectoriesField,
         ShellCommandOutputRootDirField,
         ShellCommandOutputsMatchMode,
+        ShellCommandCacheScopeField,
     )
     help = help_text(
         """
@@ -525,6 +533,64 @@ class ShellCommandTestTarget(Target):
 
         In contrast to the `run_shell_command`, this target is intended to run shell commands as tests
         and will only run them via the `test` goal.
+        """
+    )
+
+
+class ShellCommandPackageDependenciesField(ShellCommandExecutionDependenciesField):
+    pass
+
+
+class ShellCommandPackageTarget(Target):
+    alias = "package_shell_command"
+
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        ShellCommandPackageDependenciesField,
+        ShellCommandRunnableDependenciesField,
+        ShellCommandCommandField,
+        ShellCommandLogOutputField,
+        ShellCommandSourcesField,
+        ShellCommandTimeoutField,
+        ShellCommandToolsField,
+        ShellCommandExtraEnvVarsField,
+        ShellCommandPathEnvModifyModeField,
+        ShellCommandNamedCachesField,
+        ShellCommandWorkspaceInvalidationSourcesField,
+        ShellCommandCacheScopeField,
+        EnvironmentField,
+        SkipShellCommandPackageField,
+        ShellCommandWorkdirField,
+        ShellCommandOutputFilesField,
+        ShellCommandOutputDirectoriesField,
+        ShellCommandOutputRootDirField,
+        ShellCommandOutputsMatchMode,
+        ShellCommandOutputDependenciesField,
+        OutputPathField,
+    )
+
+    help = help_text(
+        """
+        Run a script to produce distributable outputs via the `package` goal.
+
+        Example BUILD file:
+
+            package_shell_command(
+                name="build-rust-app",
+                tools=["cargo"],
+                command="cargo build --release",
+                output_files=["target/release/binary"],
+            )
+
+        The `command` may use the `{chroot}` marker on the command line or in environment variables
+        to get the root directory where any dependencies are materialized during execution.
+
+        The outputs specified via `output_files` and `output_directories` will be captured and
+        made available for other Pants targets to depend on. They will also be copied to the path
+        specified via the `output_path` field (relative to the dist directory) when running
+        `pants package`.
+
+        This target is experimental and its behavior may change in future versions.
         """
     )
 

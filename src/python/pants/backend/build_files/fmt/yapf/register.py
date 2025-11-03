@@ -12,7 +12,7 @@ from pants.util.logging import LogLevel
 
 
 class YapfRequest(FmtBuildFilesRequest):
-    tool_subsystem = Yapf
+    tool_subsystem = Yapf  # type: ignore[assignment]
 
 
 @rule(desc="Format with Yapf", level=LogLevel.DEBUG)

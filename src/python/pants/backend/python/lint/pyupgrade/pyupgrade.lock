@@ -13,13 +13,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "cd5bf842b863f50adad324a01c30aef60b9f698a9814848094818659c92cd1f4",
-              "url": "https://files.pythonhosted.org/packages/63/1c/8412744f89cbd251f159f790980492b38468530117f614108196665d3b1a/pyupgrade-3.20.0-py2.py3-none-any.whl"
+              "hash": "3a200cdc537980f371b4867f1d662e37166a7869d7713f309c1c3241c310c754",
+              "url": "https://files.pythonhosted.org/packages/a4/4a/d18f2d6b2f9b90ec7e10843ea10e4cde0dc36091782443ee923e29d653bb/pyupgrade-3.21.0-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "dd6a16c13fc1a7db45796008689a9a35420bd364d681430f640c5e54a3d351ea",
-              "url": "https://files.pythonhosted.org/packages/c0/75/3df66861bca41394f05c5b818943fd0535bc02d5c5c512f9d859dec921f3/pyupgrade-3.20.0.tar.gz"
+              "hash": "3e63a882ec1d16f5621736d938952df3cdc2446501fb049e711415cb8d273960",
+              "url": "https://files.pythonhosted.org/packages/cb/11/b08f5e4d50575c944e4ea0a86f070a1ba2c0d5a4dc42fac571a605ada78d/pyupgrade-3.21.0.tar.gz"
             }
           ],
           "project_name": "pyupgrade",
@@ -27,7 +27,7 @@
             "tokenize-rt>=6.1.0"
           ],
           "requires_python": ">=3.9",
-          "version": "3.20.0"
+          "version": "3.21.0"
         },
         {
           "artifacts": [
@@ -56,8 +56,8 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.57.0",
-  "pip_version": "25.2",
+  "pex_version": "2.66.0",
+  "pip_version": "25.3",
   "prefer_older_binary": false,
   "requirements": [
     "pyupgrade<4,>=2.33.0"

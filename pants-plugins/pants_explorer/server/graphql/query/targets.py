@@ -78,7 +78,7 @@ class Target:
         address = json.pop("address")
         target_type = json.pop("target_type")
         fields = json
-        return cls(address=address, target_type=target_type, fields=fields)  # type: ignore[call-arg]
+        return cls(address=address, target_type=target_type, fields=fields)
 
 
 @strawberry.input(

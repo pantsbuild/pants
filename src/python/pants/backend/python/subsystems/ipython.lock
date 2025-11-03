@@ -247,21 +247,26 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "df192d39a4ff8f21b1895d72e6a13f5fcc5099f00fa84384e0ea28c2cc0653ca",
-              "url": "https://files.pythonhosted.org/packages/8f/8e/9ad090d3553c280a8060fbf6e24dc1c0c29704ee7d1c372f0c174aa59285/matplotlib_inline-0.1.7-py3-none-any.whl"
+              "hash": "d56ce5156ba6085e00a9d54fead6ed29a9c47e215cd1bba2e976ef39f5710a76",
+              "url": "https://files.pythonhosted.org/packages/af/33/ee4519fa02ed11a94aef9559552f3b17bb863f2ecfe1a35dc7f548cde231/matplotlib_inline-0.2.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "8423b23ec666be3d16e16b60bdd8ac4e86e840ebd1dd11a30b9f117f2fa0ab90",
-              "url": "https://files.pythonhosted.org/packages/99/5b/a36a337438a14116b16480db471ad061c36c3694df7c2084a0da7ba538b7/matplotlib_inline-0.1.7.tar.gz"
+              "hash": "e1ee949c340d771fc39e241ea75683deb94762c8fa5f2927ec57c83c4dffa9fe",
+              "url": "https://files.pythonhosted.org/packages/c7/74/97e72a36efd4ae2bccb3463284300f8953f199b5ffbc04cbbb0ec78f74b1/matplotlib_inline-0.2.1.tar.gz"
             }
           ],
           "project_name": "matplotlib-inline",
           "requires_dists": [
+            "flake8; extra == \"test\"",
+            "nbdime; extra == \"test\"",
+            "nbval; extra == \"test\"",
+            "notebook; extra == \"test\"",
+            "pytest; extra == \"test\"",
             "traitlets"
           ],
-          "requires_python": ">=3.8",
-          "version": "0.1.7"
+          "requires_python": ">=3.9",
+          "version": "0.2.1"
         },
         {
           "artifacts": [
@@ -485,8 +490,8 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.57.0",
-  "pip_version": "25.2",
+  "pex_version": "2.66.0",
+  "pip_version": "25.3",
   "prefer_older_binary": false,
   "requirements": [
     "ipython<9,>=7.34"

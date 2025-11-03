@@ -3,4 +3,5 @@
 
 tsx_tests(
     name="tests",
+    dependencies=["testprojects/src/ts/hello_react_ts/src:setupTests"],
 )

@@ -183,6 +183,7 @@ def test_validate_lockfiles(
             only_binary=FrozenOrderedSet(["not-bdist" if invalid_only_binary else "bdist"]),
             overrides=FrozenOrderedSet(),
             excludes=FrozenOrderedSet(),
+            sources=FrozenOrderedSet(),
             path_mappings=(),
         ),
     )
@@ -352,13 +353,6 @@ def test_pex_lockfile_requirement_count() -> None:
 
 
 class TestResolvePexConfigPexArgs:
-    def pairwise(self, iterable):
-        # Drop once on 3.10
-        # https://docs.python.org/3/library/itertools.html#itertools.pairwise
-        a, b = itertools.tee(iterable)
-        next(b, None)
-        return zip(a, b)
-
     def simple_config_args(self, manylinux=None, only_binary=None, no_binary=None):
         return tuple(
             ResolvePexConfig(
@@ -370,6 +364,7 @@ class TestResolvePexConfigPexArgs:
                 only_binary=FrozenOrderedSet(only_binary) if only_binary else FrozenOrderedSet(),
                 excludes=FrozenOrderedSet(),
                 overrides=FrozenOrderedSet(),
+                sources=FrozenOrderedSet(),
                 path_mappings=[],
             ).pex_args()
         )
@@ -384,11 +379,11 @@ class TestResolvePexConfigPexArgs:
         many = "manylinux2014_ppc64le"
         args = self.simple_config_args(manylinux=many)
         assert len(args) == 3
-        assert ("--manylinux", many) in self.pairwise(args)
+        assert ("--manylinux", many) in itertools.pairwise(args)
 
     def test_only_binary(self):
         assert "--only-binary=foo" in self.simple_config_args(only_binary=["foo"])
-        assert ("--only-binary=foo", "--only-binary=bar") in self.pairwise(
+        assert ("--only-binary=foo", "--only-binary=bar") in itertools.pairwise(
             self.simple_config_args(only_binary=["foo", "bar"])
         )
 
@@ -410,7 +405,7 @@ class TestResolvePexConfigPexArgs:
 
     def test_no_binary(self):
         assert "--only-build=foo" in self.simple_config_args(no_binary=["foo"])
-        assert ("--only-build=foo", "--only-build=bar") in self.pairwise(
+        assert ("--only-build=foo", "--only-build=bar") in itertools.pairwise(
             self.simple_config_args(no_binary=["foo", "bar"])
         )
 

@@ -23,21 +23,22 @@ def action(name: str) -> str:
     version_map = {
         "action-send-mail": "dawidd6/action-send-mail@v3.8.0",
         "actions-rust-lang": "actions-rust-lang/setup-rust-toolchain@v1",
-        "attest-build-provenance": "actions/attest-build-provenance@v2",
+        "attest-build-provenance": "actions/attest-build-provenance@v3",
         "cache": "actions/cache@v4",
-        "checkout": "actions/checkout@v4",
+        "checkout": "actions/checkout@v5",
         "coverallsapp": "coverallsapp/github-action@v2",
-        "download-artifact": "actions/download-artifact@v4",
+        "download-artifact": "actions/download-artifact@v6",
         "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
         "msys2": "msys2/setup-msys2@v2",
         "rust-cache": "Swatinem/rust-cache@v2.8.1",
-        "setup-go": "actions/setup-go@v5",
-        "setup-java": "actions/setup-java@v4",
-        "setup-node": "actions/setup-node@v4",
+        # Switch to v6 once https://github.com/actions/setup-go/pull/665 is released
+        "setup-go": "actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25",
+        "setup-java": "actions/setup-java@v5",
+        "setup-node": "actions/setup-node@v6",
         "setup-protoc": "arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9",
-        "setup-python": "actions/setup-python@v5",
+        "setup-python": "actions/setup-python@v6",
         "slack-github-action": "slackapi/slack-github-action@v1.24.0",
-        "upload-artifact": "actions/upload-artifact@v4",
+        "upload-artifact": "actions/upload-artifact@v5",
     }
     try:
         return version_map[name]
@@ -52,7 +53,7 @@ HEADER = dedent(
     """\
     # GENERATED, DO NOT EDIT!
     # To change, edit `src/python/pants_release/generate_github_workflows.py` and run:
-    #   ./pants run src/python/pants_release/generate_github_workflows.py
+    #   pants run src/python/pants_release/generate_github_workflows.py
     """
 )
 
@@ -72,8 +73,8 @@ class Platform(Enum):
     WINDOWS11_X86_64 = "Windows11-x86_64"
 
 
-GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS13_X86_64, Platform.MACOS14_ARM64}
-SELF_HOSTED = {Platform.LINUX_ARM64}
+GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS14_ARM64}
+SELF_HOSTED = {Platform.MACOS13_X86_64, Platform.LINUX_ARM64}
 CARGO_AUDIT_IGNORED_ADVISORY_IDS = (
     "RUSTSEC-2020-0128",  # returns a false positive on the cache crate, which is a local crate not a 3rd party crate
 )
@@ -85,10 +86,10 @@ _BASE_PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.12", "3.13", "3.11"]
 
 PYTHON_VERSIONS_PER_PLATFORM = {
     Platform.LINUX_X86_64: _BASE_PYTHON_VERSIONS,
-    Platform.MACOS13_X86_64: _BASE_PYTHON_VERSIONS,
     # Python 3.7 or 3.8 aren't supported directly on arm64 macOS
     Platform.MACOS14_ARM64: [v for v in _BASE_PYTHON_VERSIONS if v not in ("3.7", "3.8")],
     # These runners have Python already installed
+    Platform.MACOS13_X86_64: None,
     Platform.LINUX_ARM64: None,
 }
 
@@ -313,6 +314,7 @@ def launch_bazel_remote() -> Sequence[Step]:
 def global_env() -> Env:
     return {
         "PANTS_CONFIG_FILES": "+['pants.ci.toml']",
+        "PANTS_DISABLE_GETS": "1",
         "RUST_BACKTRACE": "all",
         # Default to disabling OpenTelemetry so GHA steps not using Pants directly do not try
         # to use Honeycomb if they do invoke Pants indirectly (e.g., Rust integration tests).
@@ -382,12 +384,15 @@ def install_jdk() -> Step:
     }
 
 
-def install_go() -> Step:
-    return {
-        "name": "Install Go",
-        "uses": action("setup-go"),
-        "with": {"go-version": "1.19.5"},
-    }
+def install_go() -> list[Step]:
+    def go_cfg(go_version: str) -> Step:
+        return {
+            "name": "Install Go",
+            "uses": action("setup-go"),
+            "with": {"go-version": go_version},
+        }
+
+    return [go_cfg(go_version) for go_version in ("1.25.3", "1.24.9")]
 
 
 def install_python_headers_in_manylinux_container() -> Step:
@@ -479,6 +484,7 @@ class Helper:
             # macosx-10.9-universal2. Thus, without this env var, we tag our single-platform wheels
             # as universal2... this is a lie and understandably leads to installing the wrong wheel
             # and thus things do not work (see #21938 for an example).
+            # A similar issue may occur with the interpreters on self-hosted runners.
             ret["_PYTHON_HOST_PLATFORM"] = "macosx-13.0-x86_64"
         if self.platform in {Platform.MACOS14_ARM64}:
             ret["ARCHFLAGS"] = "-arch arm64"
@@ -791,7 +797,7 @@ def test_jobs(
             *checkout(),
             *(launch_bazel_remote() if with_remote_caching else []),
             install_jdk(),
-            install_go(),
+            *install_go(),
             *(
                 [download_apache_thrift()]
                 if helper.platform == Platform.LINUX_X86_64
@@ -1014,7 +1020,7 @@ def build_wheels_job(
                 *(
                     [install_python_headers_in_manylinux_container()]
                     if platform == Platform.LINUX_ARM64
-                    else [install_go()]
+                    else install_go()
                 ),
                 {
                     "name": "Build wheels",
@@ -1712,7 +1718,7 @@ def public_repos() -> PublicReposOutput:
             "steps": [
                 *checkout(repository=repo.name, **repo.checkout_options),
                 install_pythons([repo.python_version]),
-                *([install_go()] if repo.install_go else []),
+                *(install_go() if repo.install_go else []),
                 *([install_node(repo.node_version)] if repo.node_version else []),
                 *([download_apache_thrift()] if repo.install_thrift else []),
                 {

@@ -165,7 +165,7 @@ async def prepare_process_request_from_target(
 
     append_only_caches = {
         **merged_extras.append_only_caches,
-        **(shell_command.get(ShellCommandNamedCachesField).value or {}),  # type: ignore[dict-item]
+        **(shell_command.get(ShellCommandNamedCachesField).value or {}),
     }
 
     cache_scope = env_target.default_cache_scope

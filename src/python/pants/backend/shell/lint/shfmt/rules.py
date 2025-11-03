@@ -35,7 +35,7 @@ class ShfmtFieldSet(FieldSet):
 
 class ShfmtRequest(FmtTargetsRequest):
     field_set_type = ShfmtFieldSet
-    tool_subsystem = Shfmt
+    tool_subsystem = Shfmt  # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

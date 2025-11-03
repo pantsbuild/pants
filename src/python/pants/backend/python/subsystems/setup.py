@@ -244,6 +244,33 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
+
+    _default_to_resolve_interpreter_constraints = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            For Python targets with both `resolve` and `interpreter_constraints` fields, default to using the `interpreter_constraints` field of the resolve if `interpreter_constraints` is not set on the target itself.
+
+            `[python].enable_resolves` must be `True` for this option to also be enabled. This will become True by default in a future version of Pants and eventually be deprecated and then removed.
+            """
+        ),
+        advanced=True,
+    )
+
+    @memoized_property
+    def default_to_resolve_interpreter_constraints(self) -> bool:
+        if self._default_to_resolve_interpreter_constraints and not self.enable_resolves:
+            raise OptionsError(
+                softwrap(
+                    """
+                You cannot set `[python].default_to_resolve_interpreter_constraints = true` without setting `[python].enable_resolves = true`.
+
+                Please either enable resolves or set `[python].default_to_resolve_interpreter_constraints = false` (the default setting).
+                """
+                )
+            )
+        return self._default_to_resolve_interpreter_constraints
+
     separate_lockfile_metadata_file = BoolOption(
         advanced=True,
         default=False,
@@ -405,6 +432,21 @@ class PythonSetup(Subsystem):
             combination of extras, version constraints or markers with the
             requirement `my-cowsay>2`."""
         ),
+        advanced=True,
+    )
+
+    _resolves_to_sources = DictOption[list[str]](
+        help=softwrap(""" Defines a limited scope to use a named find links repo or
+            index for specific dependencies in a resolve and its lockfile.
+            Sources take the form `<name>=<scope>` where the name must match
+            a find links repo or index defined via `[python-repos].indexes` or
+            `[python-repos].find_links`. The scope can be a project name
+            (e.g., `internal=torch` to resolve the `torch` project from the
+            `internal` repo), a project name with a marker (e.g.,
+            `internal=torch; sys_platform != 'darwin'` to resolve `torch` from
+            the `internal` repo except on macOS), or just a marker (e.g.,
+            `piwheels=platform_machine == 'armv7l'` to resolve from the
+            `piwheels` repo when targeting 32bit ARM machines)."""),
         advanced=True,
     )
 
@@ -740,6 +782,16 @@ class PythonSetup(Subsystem):
             ).items()
         }
 
+    @memoized_method
+    def resolves_to_sources(self) -> dict[str, list[str]]:
+        return {
+            resolve: sorted(vals)
+            for resolve, vals in self._resolves_to_option_helper(
+                self._resolves_to_sources,
+                "resolves_to_sources",
+            ).items()
+        }
+
     @property
     def manylinux(self) -> str | None:
         manylinux = cast(Optional[str], self.resolver_manylinux)
@@ -768,20 +820,19 @@ class PythonSetup(Subsystem):
     def scratch_dir(self):
         return os.path.join(self.options.pants_workdir, *self.options_scope.split("."))
 
-    def compatibility_or_constraints(self, compatibility: Iterable[str] | None) -> tuple[str, ...]:
+    def compatibility_or_constraints(
+        self, compatibility: Iterable[str] | None, resolve: str | None
+    ) -> tuple[str, ...]:
         """Return either the given `compatibility` field or the global interpreter constraints.
 
         If interpreter constraints are supplied by the CLI flag, return those only.
         """
         if self.options.is_flagged("interpreter_constraints"):
             return self.interpreter_constraints
-        return tuple(compatibility or self.interpreter_constraints)
-
-    def compatibilities_or_constraints(
-        self, compatibilities: Iterable[Iterable[str] | None]
-    ) -> tuple[str, ...]:
-        return tuple(
-            constraint
-            for compatibility in compatibilities
-            for constraint in self.compatibility_or_constraints(compatibility)
-        )
+        if compatibility:
+            return tuple(compatibility)
+        if resolve and self.default_to_resolve_interpreter_constraints:
+            return self.resolves_to_interpreter_constraints.get(
+                resolve, self.interpreter_constraints
+            )
+        return self.interpreter_constraints
