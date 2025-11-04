@@ -101,7 +101,7 @@
     "flake8<7,>=5.0.4"
   ],
   "requires_python": [
-    "CPython<3.14,>=3.9"
+    "CPython<4,>=3.9"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",

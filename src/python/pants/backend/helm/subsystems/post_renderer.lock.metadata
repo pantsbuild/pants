@@ -1,7 +1,7 @@
 {
   "version": 5,
   "valid_for_interpreter_constraints": [
-    "CPython<3.14,>=3.9"
+    "CPython<4,>=3.9"
   ],
   "generated_with_requirements": [
     "ruamel.yaml!=0.17.0,!=0.17.1,!=0.17.2,!=0.17.5,<=0.17.21,>=0.15.96",
