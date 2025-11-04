@@ -383,7 +383,7 @@ jobs:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
     - name: Set up Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.9
@@ -505,7 +505,7 @@ jobs:
         fetch-tags: true
         ref: ${{ needs.release_info.outputs.build-ref }}
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7

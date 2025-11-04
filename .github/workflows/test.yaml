@@ -119,7 +119,7 @@ jobs:
       uses: actions/checkout@v5
       with:
         fetch-depth: 10
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
       uses: actions/setup-python@v6
       with:
         python-version: |-
@@ -316,7 +316,7 @@ jobs:
       uses: actions/checkout@v5
       with:
         fetch-depth: 10
-    - name: Set up Python 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
       uses: actions/setup-python@v6
       with:
         python-version: |-
@@ -650,7 +650,7 @@ jobs:
       uses: actions/checkout@v5
       with:
         fetch-depth: 10
-    - name: Set up Python 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
       uses: actions/setup-python@v6
       with:
         python-version: |-
@@ -880,7 +880,7 @@ jobs:
         echo "PANTS_REMOTE_STORE_ADDRESS=grpc://localhost:9092" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
       uses: actions/setup-python@v6
       with:
         python-version: |-
@@ -1106,7 +1106,7 @@ jobs:
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
       uses: actions/setup-python@v6
       with:
         python-version: |-
@@ -1223,7 +1223,7 @@ jobs:
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
       uses: actions/setup-python@v6
       with:
         python-version: |-
@@ -1340,7 +1340,7 @@ jobs:
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
       uses: actions/setup-python@v6
       with:
         python-version: |-
@@ -1457,7 +1457,7 @@ jobs:
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
       uses: actions/setup-python@v6
       with:
         python-version: |-
@@ -1574,7 +1574,7 @@ jobs:
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
       uses: actions/setup-python@v6
       with:
         python-version: |-
@@ -1691,7 +1691,7 @@ jobs:
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
       uses: actions/setup-python@v6
       with:
         python-version: |-
@@ -1808,7 +1808,7 @@ jobs:
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
       uses: actions/setup-python@v6
       with:
         python-version: |-
@@ -1925,7 +1925,7 @@ jobs:
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
       uses: actions/setup-python@v6
       with:
         python-version: |-
@@ -2042,7 +2042,7 @@ jobs:
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
       uses: actions/setup-python@v6
       with:
         python-version: |-
@@ -2159,7 +2159,7 @@ jobs:
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
       uses: actions/setup-python@v6
       with:
         python-version: |-
@@ -2320,7 +2320,7 @@ jobs:
       uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
       with:
         go-version: 1.24.9
-    - name: Set up Python 3.9, 3.10, 3.12, 3.13, 3.11
+    - name: Set up Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
       uses: actions/setup-python@v6
       with:
         python-version: |-
