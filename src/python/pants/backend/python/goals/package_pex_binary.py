@@ -154,7 +154,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     def output_pex_filename(self) -> str:
         return self.output_path.value_or_default(file_ending="pex")
 
-    def scie_output_filenames(self) -> tuple[str] | None:
+    def scie_output_filenames(self) -> tuple[str, ...] | None:
         if not self.builds_pex_and_scie():
             return None
         return _scie_output_filenames(
@@ -166,7 +166,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
             self.scie_hash_alg.value,
         )
 
-    def scie_output_directories(self) -> tuple[str] | None:
+    def scie_output_directories(self) -> tuple[str, ...] | None:
         if not self.builds_pex_and_scie():
             return None
         return _scie_output_directories(
@@ -195,7 +195,7 @@ def _scie_output_filenames(
     scie_name_style: str,
     scie_platform: Iterable[str] | None,
     scie_hash_alg: str | None,
-) -> tuple[str] | None:
+) -> tuple[str, ...] | None:
     filenames: list[str] = []
 
     if scie_name_style == ScieNameStyle.DYNAMIC:
@@ -222,7 +222,7 @@ def _scie_output_directories(
     no_suffix_output_path: str,
     scie_name_style: str,
     scie_platform: Iterable[str] | None,
-) -> tuple[str] | None:
+) -> tuple[str, ...] | None:
     if scie_name_style != ScieNameStyle.PLATFORM_PARENT_DIR:
         return None
 
@@ -234,23 +234,20 @@ def _scie_output_directories(
             ]
         )
     else:
-        return os.path.join(os.path.dirname(no_suffix_output_path), _current_scie_platform())
+        return tuple(os.path.join(os.path.dirname(no_suffix_output_path), _current_scie_platform()))
 
 
-def _scie_build_package_artifacts(field_set: PexBinaryFieldSet) -> tuple[BuiltPackageArtifact]:
+def _scie_build_package_artifacts(field_set: PexBinaryFieldSet) -> tuple[BuiltPackageArtifact, ...]:
     artifacts = []
 
-    if field_set.scie_output_filenames():
+    scie_output_filenames = field_set.scie_output_filenames()
+    if scie_output_filenames is not None:
         artifacts.extend(
-            [
-                BuiltPackageArtifact(scie_filename)
-                for scie_filename in field_set.scie_output_filenames()
-            ]
+            [BuiltPackageArtifact(scie_filename) for scie_filename in scie_output_filenames]
         )
-    if field_set.scie_output_directories():
-        artifacts.extend(
-            [BuiltPackageArtifact(scie_dir) for scie_dir in field_set.scie_output_directories()]
-        )
+    scie_output_directories = field_set.scie_output_directories()
+    if scie_output_directories is not None:
+        artifacts.extend([BuiltPackageArtifact(scie_dir) for scie_dir in scie_output_directories])
     return tuple(artifacts)
 
 
