@@ -179,10 +179,12 @@ def _current_scie_platform() -> str:
     # This is only a subset of the platforms that Pex can prodice
     # scies for.  While Pants can produce foreign platform scies, the
     # "current" platform can only be one Pants itself can run on.
-    return Platform.create_for_localhost().replace("_", "-")
+    platform = Platform.create_for_localhost().replace("_", "-")
+    if platform == Platform.linux_arm64:
+        return platform.replace('arm64', 'aarch64')
+    else:
+        return platform
 
-
-# TODO: NEED OT REPLACE ARM-->aarch
 
 
 def _scie_output_filenames(
