@@ -55,7 +55,7 @@ class HelmPostRendererSubsystem(PythonToolRequirementsBase):
     ]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.9,<3.14"]
+    default_interpreter_constraints = ["CPython>=3.9,<4"]
 
     default_lockfile_resource = (_HELM_POSTRENDERER_PACKAGE, "post_renderer.lock")
 
