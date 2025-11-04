@@ -734,29 +734,55 @@ class PexScieField(StringField):
 
 class ScieNameStyle(StrEnum):
     DYNAMIC = "dynamic"
-    PLATFORM_PARENT_DIR =  "platform-parent-dir"
+    PLATFORM_PARENT_DIR = "platform-parent-dir"
     PLATFORM_FILE_SUFFIX = "platform-file-suffix"
 
+
 class PexScieNameStyleField(StringField):
-    alias = 'scie_name_style'
+    alias = "scie_name_style"
     valid_choices = ScieNameStyle
     expected_type = str
     default = ScieNameStyle.DYNAMIC
     help = help_text("SCIENICE")
 
-#class SciePlatform(StrEnum):
+
+# class SciePlatform(StrEnum):
 #
 class PexSciePlatformField(StringSequenceField):
-    alias ='scie_platform'
-    valid_choices = ('linux-aarch64','linux-armv7l','linux-powerpc64','linux-riscv64','linux-s390x','linux-x86_64','macos-aarch64','macos-x86_64')
+    alias = "scie_platform"
+    valid_choices = (
+        "linux-aarch64",
+        "linux-armv7l",
+        "linux-powerpc64",
+        "linux-riscv64",
+        "linux-s390x",
+        "linux-x86_64",
+        "macos-aarch64",
+        "macos-x86_64",
+    )
     expected_type = str
     help = help_text("SCIENICE")
 
 
 class PexScieHashAlgField(StringField):
-    alias = 'scie_hash_alg'
+    alias = "scie_hash_alg"
     # from https://science.scie.app/cli.html#science-lift-build
-    valid_choices = ('blake2b','blake2s','md5','sha1','sha224','sha256','sha384','sha3_224','sha3_256','sha3_384','sha3_512','sha512','shake_128' , 'shake_256')
+    valid_choices = (
+        "blake2b",
+        "blake2s",
+        "md5",
+        "sha1",
+        "sha224",
+        "sha256",
+        "sha384",
+        "sha3_224",
+        "sha3_256",
+        "sha3_384",
+        "sha3_512",
+        "sha512",
+        "shake_128",
+        "shake_256",
+    )
 
 
 _PEX_BINARY_COMMON_FIELDS = (
@@ -785,7 +811,7 @@ _PEX_BINARY_COMMON_FIELDS = (
 
 _PEX_SCIE_BINARY_FIELDS = (
     PexScieField,
-    PexScieNameStyleField,     # --scie-name-style
+    PexScieNameStyleField,  # --scie-name-style
     PexSciePlatformField,
     PexScieHashAlgField,
     # --scie-busybox
@@ -797,6 +823,7 @@ _PEX_SCIE_BINARY_FIELDS = (
     # --scie-pbs-stripped, --no-scie-pbs-stripped
     # --scie-hash-alg SCIE_HASH_ALGORITHMS
 )
+
 
 class PexBinary(Target):
     alias = "pex_binary"
@@ -837,6 +864,7 @@ class PexBinary(Target):
                     """
                 )
             )
+
 
 # class PexScieBinary(PexBinary):
 #     alias = "pex_scie_binary"

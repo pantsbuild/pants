@@ -159,7 +159,9 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
             return None
         return _scie_output_filenames(
             self.output_path.value_or_default(file_ending=None),
-            self.scie_name_style.value,
+            self.scie_name_style.value
+            if self.scie_name_style.value
+            else self.scie_name_style.default,
             self.scie_platform.value,
             self.scie_hash_alg.value,
         )
@@ -169,7 +171,9 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
             return None
         return _scie_output_directories(
             self.output_path.value_or_default(file_ending=None),
-            self.scie_name_style.value,
+            self.scie_name_style.value
+            if self.scie_name_style.value
+            else self.scie_name_style.default,
             self.scie_platform.value,
         )
 
@@ -181,10 +185,9 @@ def _current_scie_platform() -> str:
     # "current" platform can only be one Pants itself can run on.
     platform = Platform.create_for_localhost().replace("_", "-")
     if platform == Platform.linux_arm64:
-        return platform.replace('arm64', 'aarch64')
+        return platform.replace("arm64", "aarch64")
     else:
         return platform
-
 
 
 def _scie_output_filenames(
@@ -193,10 +196,10 @@ def _scie_output_filenames(
     scie_platform: Iterable[str] | None,
     scie_hash_alg: str | None,
 ) -> tuple[str] | None:
-    filenames = []
+    filenames: list[str] = []
 
     if scie_name_style == ScieNameStyle.DYNAMIC:
-        filenames = (no_suffix_output_path,)
+        filenames = [no_suffix_output_path]
     elif scie_name_style == ScieNameStyle.PLATFORM_PARENT_DIR:
         return None  # handed by output_directories
     elif scie_name_style == ScieNameStyle.PLATFORM_FILE_SUFFIX:

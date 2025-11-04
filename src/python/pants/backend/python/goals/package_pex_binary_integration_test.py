@@ -532,6 +532,7 @@ def test_scie_defaults(rule_runner: PythonRuleRunner) -> None:
     expected_scie_relpath = "src.py.project/project"
     assert expected_scie_relpath == result.artifacts[1].relpath
 
+
 @pytest.mark.parametrize("scie_hash_alg", ["md5", "sha1", "sha256", "sha384", "sha512"])
 def test_scie_hash_present(rule_runner: PythonRuleRunner, scie_hash_alg: str) -> None:
     rule_runner.write_files(
@@ -563,38 +564,7 @@ def test_scie_hash_present(rule_runner: PythonRuleRunner, scie_hash_alg: str) ->
     assert expected_scie_relpath == result.artifacts[1].relpath
     expected_scie_hash_relpath = f"src.py.project/project.{scie_hash_alg}"
     assert expected_scie_hash_relpath == result.artifacts[2].relpath
- 
-@pytest.mark.parametrize("scie_hash_alg", ["md5", "sha1", "sha256", "sha384", "sha512"])
-def test_scie_hash_present(rule_runner: PythonRuleRunner, scie_hash_alg: str) -> None:
-    rule_runner.write_files(
-        {
-            "src/py/project/app.py": dedent(
-                """\
-                print("hello")
-                """
-            ),
-            "src/py/project/BUILD": dedent(
-                f"""\
-                python_sources(name="lib")
-                pex_binary(
-                    entry_point="app.py",
-                    scie="lazy",
-                    scie_hash_alg="{scie_hash_alg}"
-                )
-                """
-            ),
-        }
-    )
-    tgt = rule_runner.get_target(Address("src/py/project"))
-    field_set = PexBinaryFieldSet.create(tgt)
-    result = rule_runner.request(BuiltPackage, [field_set])
-    assert len(result.artifacts) == 3
-    expected_pex_relpath = "src.py.project/project.pex"
-    assert expected_pex_relpath == result.artifacts[0].relpath
-    expected_scie_relpath = "src.py.project/project"
-    assert expected_scie_relpath == result.artifacts[1].relpath
-    expected_scie_hash_relpath = f"src.py.project/project.{scie_hash_alg}"
-    assert expected_scie_hash_relpath == result.artifacts[2].relpath
+
 
 def test_scie_platform_file_suffix(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
@@ -621,11 +591,13 @@ def test_scie_platform_file_suffix(rule_runner: PythonRuleRunner) -> None:
     field_set = PexBinaryFieldSet.create(tgt)
     result = rule_runner.request(BuiltPackage, [field_set])
     assert len(result.artifacts) == 3
-    expected_relpaths = {"src.py.project/project.pex", "src.py.project/project-linux-aarch64", "src.py.project/project-linux-x86_64"}
+    expected_relpaths = {
+        "src.py.project/project.pex",
+        "src.py.project/project-linux-aarch64",
+        "src.py.project/project-linux-x86_64",
+    }
     relpaths = {artifact.relpath for artifact in result.artifacts}
     assert expected_relpaths == relpaths
-
-
 
 
 def test_scie_platform_parent_dir(rule_runner: PythonRuleRunner) -> None:
@@ -659,5 +631,4 @@ def test_scie_platform_parent_dir(rule_runner: PythonRuleRunner) -> None:
     # the right files are there
     rule_runner.write_digest(result.digest)
     os.path.exists(os.path.join(rule_runner.build_root, "src.py.project/linux-aarch64/project"))
-    os.path.exists(os.path.join(rule_runner.build_root, "src.py.project/linux-x86_64/project"))    
-
+    os.path.exists(os.path.join(rule_runner.build_root, "src.py.project/linux-x86_64/project"))
