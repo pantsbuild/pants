@@ -1,0 +1,15 @@
+[package]
+version = "0.0.1"
+edition = "2024"
+name = "options_pants_ng"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[dependencies]
+regex = { workspace = true }
+shlex = { workspace = true }
+
+[dev-dependencies]
+
+[lints]
+workspace = true

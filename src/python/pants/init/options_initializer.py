@@ -54,7 +54,6 @@ def _initialize_build_configuration(
     for path in bootstrap_options.pythonpath:
         if path not in sys.path:
             sys.path.append(path)
-            # pkg_resources.fixup_namespace_packages(path)
 
     # Resolve the actual Python code for any plugins. `sys.path` is modified as a side effect if
     # plugins were configured.
