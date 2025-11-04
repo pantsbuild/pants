@@ -1,6 +1,6 @@
 # GENERATED, DO NOT EDIT!
 # To change, edit `src/python/pants_release/generate_github_workflows.py` and run:
-#   ./pants run src/python/pants_release/generate_github_workflows.py
+#   pants run src/python/pants_release/generate_github_workflows.py
 
 
 jobs:
@@ -27,7 +27,7 @@ jobs:
     - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
@@ -72,14 +72,14 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: logs-wheels-and-pex-Linux-ARM64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the pantsbuild.pants wheel
-      uses: actions/attest-build-provenance@v2
+      uses: actions/attest-build-provenance@v3
       with:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants-*.whl
     - if: needs.release_info.outputs.is-release == 'true'
@@ -94,7 +94,7 @@ jobs:
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
-      uses: actions/attest-build-provenance@v2
+      uses: actions/attest-build-provenance@v3
       with:
         subject-path: dist/src.python.pants/*.pex
     - if: needs.release_info.outputs.is-release == 'true'
@@ -134,7 +134,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
@@ -187,14 +187,14 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: logs-wheels-and-pex-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the pantsbuild.pants wheel
-      uses: actions/attest-build-provenance@v2
+      uses: actions/attest-build-provenance@v3
       with:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants-*.whl
     - if: needs.release_info.outputs.is-release == 'true'
@@ -209,7 +209,7 @@ jobs:
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
-      uses: actions/attest-build-provenance@v2
+      uses: actions/attest-build-provenance@v3
       with:
         subject-path: dist/src.python.pants/*.pex
     - if: needs.release_info.outputs.is-release == 'true'
@@ -231,7 +231,7 @@ jobs:
             --data-binary "@$WHL";
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the pantsbuild.pants.testutil wheel
-      uses: actions/attest-build-provenance@v2
+      uses: actions/attest-build-provenance@v3
       with:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants_testutil*.whl
     - if: needs.release_info.outputs.is-release == 'true'
@@ -263,7 +263,7 @@ jobs:
     - macos-13
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
@@ -318,14 +318,14 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: logs-wheels-and-pex-macOS13-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the pantsbuild.pants wheel
-      uses: actions/attest-build-provenance@v2
+      uses: actions/attest-build-provenance@v3
       with:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants-*.whl
     - if: needs.release_info.outputs.is-release == 'true'
@@ -340,7 +340,7 @@ jobs:
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
-      uses: actions/attest-build-provenance@v2
+      uses: actions/attest-build-provenance@v3
       with:
         subject-path: dist/src.python.pants/*.pex
     - if: needs.release_info.outputs.is-release == 'true'
@@ -378,7 +378,7 @@ jobs:
     - macos-14
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
@@ -443,14 +443,14 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: logs-wheels-and-pex-macOS14-ARM64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the pantsbuild.pants wheel
-      uses: actions/attest-build-provenance@v2
+      uses: actions/attest-build-provenance@v3
       with:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants-*.whl
     - if: needs.release_info.outputs.is-release == 'true'
@@ -465,7 +465,7 @@ jobs:
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
-      uses: actions/attest-build-provenance@v2
+      uses: actions/attest-build-provenance@v3
       with:
         subject-path: dist/src.python.pants/*.pex
     - if: needs.release_info.outputs.is-release == 'true'
@@ -499,7 +499,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Checkout Pants at Release Tag
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: '0'
         fetch-tags: true

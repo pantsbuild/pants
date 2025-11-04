@@ -26,22 +26,22 @@ def action(name: str) -> str:
     version_map = {
         "action-send-mail": "dawidd6/action-send-mail@v3.8.0",
         "actions-rust-lang": "actions-rust-lang/setup-rust-toolchain@v1",
-        "attest-build-provenance": "actions/attest-build-provenance@v2",
+        "attest-build-provenance": "actions/attest-build-provenance@v3",
         "cache": "actions/cache@v4",
-        "checkout": "actions/checkout@v4",
+        "checkout": "actions/checkout@v5",
         "coverallsapp": "coverallsapp/github-action@v2",
-        "download-artifact": "actions/download-artifact@v4",
+        "download-artifact": "actions/download-artifact@v6",
         "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
         "msys2": "msys2/setup-msys2@v2",
         "rust-cache": "Swatinem/rust-cache@v2.8.1",
         # Switch to v6 once https://github.com/actions/setup-go/pull/665 is released
         "setup-go": "actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25",
-        "setup-java": "actions/setup-java@v4",
-        "setup-node": "actions/setup-node@v4",
+        "setup-java": "actions/setup-java@v5",
+        "setup-node": "actions/setup-node@v6",
         "setup-protoc": "arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9",
-        "setup-python": "actions/setup-python@v5",
+        "setup-python": "actions/setup-python@v6",
         "slack-github-action": "slackapi/slack-github-action@v1.24.0",
-        "upload-artifact": "actions/upload-artifact@v4",
+        "upload-artifact": "actions/upload-artifact@v5",
     }
     try:
         return version_map[name]
@@ -56,7 +56,7 @@ HEADER = dedent(
     """\
     # GENERATED, DO NOT EDIT!
     # To change, edit `src/python/pants_release/generate_github_workflows.py` and run:
-    #   ./pants run src/python/pants_release/generate_github_workflows.py
+    #   pants run src/python/pants_release/generate_github_workflows.py
     """
 )
 
@@ -317,6 +317,7 @@ def launch_bazel_remote() -> Sequence[Step]:
 def global_env() -> Env:
     return {
         "PANTS_CONFIG_FILES": "+['pants.ci.toml']",
+        "PANTS_DISABLE_GETS": "1",
         "RUST_BACKTRACE": "all",
         # Default to disabling OpenTelemetry so GHA steps not using Pants directly do not try
         # to use Honeycomb if they do invoke Pants indirectly (e.g., Rust integration tests).
