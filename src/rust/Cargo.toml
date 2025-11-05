@@ -40,6 +40,8 @@ members = [
   "logging",
   "nailgun",
   "options",
+  "pants_ng/client",
+  "pants_ng/options",
   "pantsd",
   "process_execution",
   "process_execution/docker",

@@ -1,0 +1,16 @@
+[package]
+version = "0.0.1"
+edition = "2024"
+name = "client_pants_ng"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[[bin]]
+name = "pants_ng"
+path = "src/main.rs"
+
+[dependencies]
+options_pants_ng = { path = "../options" }
+
+[lints]
+workspace = true

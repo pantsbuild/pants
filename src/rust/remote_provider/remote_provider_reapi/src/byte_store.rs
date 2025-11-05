@@ -537,7 +537,7 @@ impl ByteStoreProvider for Provider {
                                 .map(|(d, res)| (d, res.unwrap()))
                                 .collect::<Vec<_>>();
 
-                            let digests = to_write.iter().map(|(d, _)| (*d)).collect::<Vec<_>>();
+                            let digests = to_write.iter().map(|(d, _)| *d).collect::<Vec<_>>();
 
                             destination
                                 .lock()
