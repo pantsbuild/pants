@@ -16,6 +16,8 @@ from aiohttp.http import SERVER_SOFTWARE as DEFAULT_USER_AGENT
 from aiohttp_retry.types import ClientType
 from bs4 import BeautifulSoup
 
+# When adding distros to this map, make sure to add them to:
+# ..target_types.DebDistroField.valid_choices
 DISTRO_PACKAGE_SEARCH_URL = {
     "debian": "https://packages.debian.org/search",
     "ubuntu": "https://packages.ubuntu.com/search",

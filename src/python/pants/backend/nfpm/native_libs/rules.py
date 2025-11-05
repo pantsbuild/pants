@@ -15,6 +15,7 @@ from .deb.rules import rules as deb_rules
 from .deb.utils import shlibdeps_filter_sonames
 from .elfdeps.rules import RequestPexELFInfo, elfdeps_analyze_pex_wheels
 from .elfdeps.rules import rules as elfdeps_rules
+from .target_types import rules as target_types_rules
 
 
 @dataclass(frozen=True)
@@ -94,5 +95,6 @@ def rules() -> Iterable[Rule | UnionRule]:
     return (
         *deb_rules(),
         *elfdeps_rules(),
+        *target_types_rules(),
         *collect_rules(),
     )
