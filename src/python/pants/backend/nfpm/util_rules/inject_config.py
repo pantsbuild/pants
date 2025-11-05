@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABC, ABCMeta, abstractmethod
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import Any, ClassVar
 
 from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
 from pants.engine.environment import EnvironmentName
@@ -71,12 +72,31 @@ class InjectedNfpmPackageFields:
         )
 
 
+class _PrioritizedSortableClassMetaclass(ABCMeta):
+    """This metaclass implements prioritized sorting of subclasses (not class instances)."""
+
+    priority: ClassVar[int]
+
+    def __lt__(self, other: Any) -> bool:
+        """Determine if this class is lower priority than `other` (when chaining request rules).
+
+        The rule that runs the lowest priority request goes first, and the rule that runs the
+        highest priority request goes last. The results (the `injected_fields`) of lower priority
+        rules can be overridden by higher priority rules. The last rule to run, the rule for the
+        highest priority request class, can override any of the fields injected by lower priority
+        request rules.
+        """
+        if isinstance(other, _PrioritizedSortableClassMetaclass):
+            return self.priority < other.priority
+        return NotImplemented
+
+
 # Note: This only exists as a hook for additional logic for nFPM config generation, e.g. for plugin
 # authors. To resolve `InjectedNfpmPackageFields`, call `determine_injected_nfpm_package_fields`,
 # which handles running any custom implementations vs. using the default implementation.
 @union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
-class InjectNfpmPackageFieldsRequest(ABC):
+class InjectNfpmPackageFieldsRequest(ABC, metaclass=_PrioritizedSortableClassMetaclass):
     """A request to inject nFPM config for nfpm_package_* targets.
 
     By default, Pants will use the nfpm_package_* fields in the BUILD file unchanged to generate the
@@ -101,6 +121,17 @@ class InjectNfpmPackageFieldsRequest(ABC):
 
     target: Target
     injected_fields: FrozenDict[type[Field], Field] | None
+
+    # Classes in pants-provided backends should be _priority<10 so that in-repo and external
+    # plugins are higher priority by default. This way, the fields that get injected by default
+    # can be overridden as needed in the in-repo or external plugins.
+    priority: ClassVar[int] = 10
+
+    def __init_subclass__(cls, **kwargs) -> None:
+        super().__init_subclass__(**kwargs)
+        if cls.priority == getattr(super(), "priority", cls.priority):
+            # subclasses are higher priority than their parent class (unless set otherwise).
+            cls.priority += 1
 
     @classmethod
     @abstractmethod
@@ -130,26 +161,25 @@ async def determine_injected_nfpm_package_fields(
     wrapper: NfpmPackageTargetWrapper, union_membership: UnionMembership
 ) -> InjectedNfpmPackageFields:
     target = wrapper.target
-    inject_nfpm_config_requests = union_membership.get(InjectNfpmPackageFieldsRequest)
-    applicable_inject_nfpm_config_requests = tuple(
-        request for request in inject_nfpm_config_requests if request.is_applicable(target)
+    inject_nfpm_config_request_types = union_membership.get(InjectNfpmPackageFieldsRequest)
+
+    # Requests are sorted (w/ priority ClassVar) before chaining the rules that take them.
+    applicable_inject_nfpm_config_request_types = tuple(
+        sorted(
+            request_type
+            for request_type in inject_nfpm_config_request_types
+            if request_type.is_applicable(target)
+        )
     )
 
     # If no provided implementations, fall back to our default implementation that simply returns
     # what the user explicitly specified in the BUILD file.
-    if not applicable_inject_nfpm_config_requests:
+    if not applicable_inject_nfpm_config_request_types:
         return InjectedNfpmPackageFields((), address=target.address)
-
-    # When more than one request is registered, we need to sort them before chaining the requests.
-    if len(applicable_inject_nfpm_config_requests) > 1:
-        applicable_inject_nfpm_config_requests = tuple(
-            # TODO: more intelligent sorting than using __name__ (eg so pants-internal rules always run first)
-            sorted(applicable_inject_nfpm_config_requests, key=lambda request: request.__name__)
-        )
 
     injected: InjectedNfpmPackageFields
     injected_fields: FrozenDict[type[Field], Field] | None = None
-    for request_type in applicable_inject_nfpm_config_requests:
+    for request_type in applicable_inject_nfpm_config_request_types:
         chained_request: InjectNfpmPackageFieldsRequest = request_type(target, injected_fields)  # type: ignore[abstract]
         injected = await inject_nfpm_package_fields(
             **implicitly({chained_request: InjectNfpmPackageFieldsRequest})
