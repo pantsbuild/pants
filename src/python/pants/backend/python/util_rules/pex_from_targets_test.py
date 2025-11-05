@@ -442,7 +442,7 @@ class Project:
     version: str
 
 
-build_deps = ["setuptools==54.1.2", "wheel==0.36.2"]
+build_deps = ["setuptools==66.1.0", "wheel==0.37.0"]
 
 
 setuptools_poetry_lockfile = r"""
