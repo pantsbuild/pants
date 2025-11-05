@@ -16,6 +16,7 @@ from pants.backend.nfpm.native_libs.deb.rules import rules as deb_rules
 from pants.backend.nfpm.native_libs.deb.utils import shlibdeps_filter_sonames
 from pants.backend.nfpm.native_libs.elfdeps.rules import RequestPexELFInfo, elfdeps_analyze_pex
 from pants.backend.nfpm.native_libs.elfdeps.rules import rules as elfdeps_rules
+from pants.backend.nfpm.native_libs.target_types import rules as target_types_rules
 from pants.backend.nfpm.util_rules.contents import (
     GetPackageFieldSetsForNfpmContentFileDepsRequest,
     get_package_field_sets_for_nfpm_content_file_deps,
@@ -173,6 +174,7 @@ def rules() -> Iterable[Rule | UnionRule]:
     return (
         *deb_rules(),
         *elfdeps_rules(),
+        *target_types_rules(),
         *collect_rules(),
         UnionRule(InjectNfpmPackageFieldsRequest, NativeLibsNfpmPackageFieldsRequest),
     )
