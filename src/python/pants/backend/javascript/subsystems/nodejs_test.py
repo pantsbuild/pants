@@ -3,11 +3,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import stat
 from asyncio import Future
 from pathlib import Path
 from textwrap import dedent
-from typing import NoReturn
+from typing import Generator, NoReturn
 from unittest.mock import MagicMock, Mock
 
 import pytest
@@ -160,12 +161,13 @@ def given_known_version(version: str) -> str:
 
 
 @pytest.fixture
-def mock_nodejs_subsystem() -> Mock:
-    nodejs_subsystem = Mock(spec=NodeJS)
-    future: Future[DownloadedExternalTool] = Future()
-    future.set_result(DownloadedExternalTool(EMPTY_DIGEST, ""))
-    nodejs_subsystem.download_known_version = MagicMock(return_value=future)
-    return nodejs_subsystem
+def mock_nodejs_subsystem() -> Generator[Mock, None, None]:
+    with asyncio.Runner():
+        nodejs_subsystem = Mock(spec=NodeJS)
+        future: Future[DownloadedExternalTool] = Future()
+        future.set_result(DownloadedExternalTool(EMPTY_DIGEST, ""))
+        nodejs_subsystem.download_known_version = MagicMock(return_value=future)
+        yield nodejs_subsystem
 
 
 _SEMVER_1_1_0 = given_known_version("1.1.0")
