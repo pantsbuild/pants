@@ -37,11 +37,9 @@ async def inject_nfpm_package_fields_plugin(
     request: PluginInjectFieldsRequest,
 ) -> InjectedNfpmPackageFields:
     address = request.target.address
-    fields: list[Field] = []
-    if request.injected_fields is not None:
-        # preserve fields from earlier rules in chain
-        fields.extend(request.injected_fields.values())
-    if request.injected_fields is None or NfpmVersionField not in request.injected_fields:
+    # preserve fields from earlier rules in chain
+    fields: list[Field] = list(request.injected_fields.values())
+    if NfpmVersionField not in request.injected_fields:
         fields.extend(
             [
                 NfpmVersionField("9.8.7-dev+git", address),
@@ -60,13 +58,11 @@ async def inject_nfpm_package_fields_subclass(
     request: SubclassPluginInjectFieldsRequest,
 ) -> InjectedNfpmPackageFields:
     address = request.target.address
-    fields: list[Field] = []
-    if request.injected_fields is not None:
-        # preserve fields from earlier rules in chain
-        fields.extend(request.injected_fields.values())
-    if request.injected_fields is None or NfpmVersionReleaseField in request.injected_fields:
+    # preserve fields from earlier rules in chain
+    fields: list[Field] = list(request.injected_fields.values())
+    if not fields or NfpmVersionReleaseField in request.injected_fields:
         release = 0
-        if request.injected_fields is not None:
+        if NfpmVersionReleaseField in request.injected_fields:
             old_release = request.injected_fields[NfpmVersionReleaseField].value
             assert old_release is not None
             release = 10 + old_release
@@ -91,11 +87,9 @@ async def inject_nfpm_package_fields_high_priority(
     request: HighPriorityInjectFieldsRequest,
 ) -> InjectedNfpmPackageFields:
     address = request.target.address
-    fields: list[Field] = []
-    if request.injected_fields is not None:
-        # preserve fields from earlier rules in chain
-        fields.extend(request.injected_fields.values())
-    if request.injected_fields is None or NfpmVersionField not in request.injected_fields:
+    # preserve fields from earlier rules in chain
+    fields: list[Field] = list(request.injected_fields.values())
+    if not fields or NfpmVersionField not in request.injected_fields:
         fields.extend(
             [
                 NfpmVersionField("9.9.9-dev+git", address),

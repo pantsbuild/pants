@@ -6,7 +6,7 @@ from __future__ import annotations
 from abc import ABC, ABCMeta, abstractmethod
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, ClassVar
+from typing import Any, ClassVar, TypeVar, cast
 
 from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
 from pants.engine.environment import EnvironmentName
@@ -16,6 +16,9 @@ from pants.engine.target import Target
 from pants.engine.unions import UnionMembership, union
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
+
+# NB: This TypeVar serves the same purpose here as in pants.engine.target
+_F = TypeVar("_F", bound=Field)
 
 
 @dataclass(frozen=True)
@@ -105,13 +108,17 @@ class InjectNfpmPackageFieldsRequest(ABC, metaclass=_PrioritizedSortableClassMet
     and add a rule that takes your subclass as a parameter and returns `InjectedNfpmPackageFields`.
 
     The `target` attribute of this class holds the original target as defined in BUILD files.
-    The `injected_fields` attribute of this class is `None` when this rule is the first rule
-    in a chain of `inject_nfpm_package_fields` rules. For subsequent rules in the chain,
-    `injected_fields` contains the results of the previous rule. These injected_fields will only
-    have affect if they are copied into the `InjectedNfpmPackageFields` returned by each rule,
-    which allows rules to reset or extend previously overridden fields. The final rule in
-    the chain returns the final `InjectedNfpmPackageFields` instance that is used to actually
-    generate the nfpm config.
+    The `injected_fields` attribute of this class contains the results of any previous rule.
+    `injected_fields` will be empty for the first rule in the chain. Subsequent rules can remove
+    or replace fields injected by previous rules. The final rule in the chain returns the final
+    `InjectedNfpmPackageFields` instance that is used to actually generate the nfpm config.
+    In general, rules should include a copy `request.injected_fields` in their return value
+    with something like this:
+
+        address = request.target.address
+        fields: list[Field] = list(request.injected_fields.values())
+        fields.append(NfpmFoobarField("foobar", address))
+        return InjectedNfpmPackageFields(fields, address=address)
 
     Chaining rules like this allows pants to inject some fields, while allowing in-repo plugins
     to override or remove them. This is used by the nfpm.native_libs backend to generate package
@@ -120,7 +127,7 @@ class InjectNfpmPackageFieldsRequest(ABC, metaclass=_PrioritizedSortableClassMet
     """
 
     target: Target
-    injected_fields: FrozenDict[type[Field], Field] | None
+    injected_fields: FrozenDict[type[Field], Field]
 
     # Classes in pants-provided backends should be _priority<10 so that in-repo and external
     # plugins are higher priority by default. This way, the fields that get injected by default
@@ -137,6 +144,16 @@ class InjectNfpmPackageFieldsRequest(ABC, metaclass=_PrioritizedSortableClassMet
     @abstractmethod
     def is_applicable(cls, target: Target) -> bool:
         """Whether to use this InjectNfpmPackageFieldsRequest implementation for this target."""
+
+    def __init__(
+        self, target: Target, injected_fields: FrozenDict[type[Field], Field] | None
+    ) -> None:
+        super().__init__()
+        object.__setattr__(self, "target", target)
+        # injected_fields should only be None for the first rule in the chain
+        object.__setattr__(
+            self, "injected_fields", injected_fields if injected_fields else FrozenDict()
+        )
 
 
 @rule(polymorphic=True)
@@ -178,7 +195,7 @@ async def determine_injected_nfpm_package_fields(
         return InjectedNfpmPackageFields((), address=target.address)
 
     injected: InjectedNfpmPackageFields
-    injected_fields: FrozenDict[type[Field], Field] | None = None
+    injected_fields: FrozenDict[type[Field], Field] = FrozenDict()
     for request_type in applicable_inject_nfpm_config_request_types:
         chained_request: InjectNfpmPackageFieldsRequest = request_type(target, injected_fields)  # type: ignore[abstract]
         injected = await inject_nfpm_package_fields(
