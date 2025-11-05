@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from pants.backend.nfpm.target_types import NfpmDebPackage
 from pants.engine.addresses import Address
 from pants.engine.target import StringField
+from pants.engine.unions import UnionRule
 from pants.util.strutil import help_text
 
 
@@ -52,7 +55,7 @@ class DebDistroCodenameField(StringField):
     )
 
 
-def rules():
+def rules() -> Iterable[UnionRule]:
     return [
         NfpmDebPackage.register_plugin_field(DebDistroField),
         NfpmDebPackage.register_plugin_field(DebDistroCodenameField),
