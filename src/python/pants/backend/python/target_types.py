@@ -746,8 +746,20 @@ class PexScieNameStyleField(StringField):
     help = help_text("SCIENICE")
 
 
-# class SciePlatform(StrEnum):
-#
+class PexScieBusyBox(StringField):
+    alias = "scie_busybox"
+    default = None
+    # TODO: include note re entry_point limitation
+    help = help_text("SCIENICE")
+
+
+class PexScieBusyboxPexEntrypointEnvPassthrough(TriBoolField):
+    alias = "scie_busybox_pex_entrypoint_env_passthrough"
+    required = False
+    default = None
+    help = help_text("SCIENICE")
+
+
 class PexSciePlatformField(StringSequenceField):
     alias = "scie_platform"
     valid_choices = (
@@ -767,6 +779,7 @@ class PexSciePlatformField(StringSequenceField):
 class PexScieHashAlgField(StringField):
     alias = "scie_hash_alg"
     # from https://science.scie.app/cli.html#science-lift-build
+    # TODO: Maybe get out of the way?
     valid_choices = (
         "blake2b",
         "blake2s",
@@ -812,6 +825,8 @@ _PEX_BINARY_COMMON_FIELDS = (
 _PEX_SCIE_BINARY_FIELDS = (
     PexScieField,
     PexScieNameStyleField,  # --scie-name-style
+    PexScieBusyBox,
+    PexScieBusyboxPexEntrypointEnvPassthrough,
     PexSciePlatformField,
     PexScieHashAlgField,
     # --scie-busybox

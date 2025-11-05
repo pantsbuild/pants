@@ -27,6 +27,8 @@ from pants.backend.python.target_types import (
     PexInheritPathField,
     PexLayout,
     PexLayoutField,
+    PexScieBusyBox,
+    PexScieBusyboxPexEntrypointEnvPassthrough,
     PexScieField,
     PexScieHashAlgField,
     PexScieNameStyleField,
@@ -96,6 +98,8 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
 
     scie: PexScieField
     scie_name_style: PexScieNameStyleField
+    scie_busybox: PexScieBusyBox
+    scie_busybox_pex_entrypoint_env_passthrough: PexScieBusyboxPexEntrypointEnvPassthrough
     scie_platform: PexSciePlatformField
     scie_hash_alg: PexScieHashAlgField
 
@@ -144,6 +148,10 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
             args.append(f"--scie={self.scie.value}")
         if self.scie_name_style.value is not None:
             args.append(f"--scie-name-style={self.scie_name_style.value}")
+        if self.scie_busybox.value is not None:
+            args.append(f"--scie-busybox={self.scie_busybox.value}")
+        if self.scie_busybox_pex_entrypoint_env_passthrough.value is True:
+            args.append("--scie-busybox-pex-entrypoint-env-passthrough")
         if self.scie_platform.value is not None:
             args.extend([f"--scie-platform={platform}" for platform in self.scie_platform.value])
         if self.scie_hash_alg.value is not None:
