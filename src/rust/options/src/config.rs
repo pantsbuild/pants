@@ -254,12 +254,12 @@ impl ConfigSource {
 }
 
 #[derive(Clone)]
-pub(crate) struct Config {
+pub struct Config {
     value: Value,
 }
 
 impl Config {
-    pub(crate) fn parse(
+    pub fn parse(
         config_source: &ConfigSource,
         seed_values: &InterpolationMap,
     ) -> Result<Config, String> {

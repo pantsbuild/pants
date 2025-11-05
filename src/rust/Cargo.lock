@@ -2717,8 +2717,11 @@ dependencies = [
 name = "options_pants_ng"
 version = "0.0.1"
 dependencies = [
+ "glob",
+ "options",
  "regex",
  "shlex",
+ "tempfile",
 ]
 
 [[package]]

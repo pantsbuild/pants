@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::env;
+use std::fs::canonicalize;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
@@ -31,7 +32,8 @@ impl BuildRoot {
     }
 
     pub(crate) fn find_from(start: &Path) -> Result<BuildRoot, String> {
-        let mut build_root = start;
+        let start = canonicalize(start).map_err(|e| e.to_string())?;
+        let mut build_root = start.as_path();
         loop {
             for sentinel in Self::SENTINEL_FILES {
                 let sentinel_path = build_root.join(sentinel);
