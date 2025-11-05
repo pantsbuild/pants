@@ -9,6 +9,13 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.nfpm.dependency_inference import rules as nfpm_dependency_inference_rules
+from pants.backend.nfpm.fields.rpm import NfpmRpmDependsField, NfpmRpmProvidesField
+from pants.backend.nfpm.rules import rules as nfpm_rules
+from pants.backend.nfpm.subsystem import rules as nfpm_subsystem_rules
+from pants.backend.nfpm.target_types import target_types as nfpm_target_types
+from pants.backend.nfpm.target_types_rules import rules as nfpm_target_types_rules
+from pants.backend.nfpm.util_rules.inject_config import InjectedNfpmPackageFields
 from pants.backend.python import target_types_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import (
@@ -22,13 +29,16 @@ from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsReque
 from pants.engine.internals.native_engine import Address
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
+from pants.util.frozendict import FrozenDict
 
-from .rules import RpmDependsFromPexRequest, RpmDependsInfo
+from .rules import NativeLibsNfpmPackageFieldsRequest, RpmDependsFromPexRequest, RpmDependsInfo
 from .rules import rules as native_libs_rules
 
 _PY_TAG = "".join(map(str, sys.version_info[:2]))
 _PY_OS = platform.system()  # Linux
 _PY_ARCH_TAG = platform.machine()  # x86_64
+
+_PKG_NAME = "pkg"
 
 
 def _skip_unless(
@@ -53,16 +63,22 @@ def rule_runner() -> RuleRunner:
         target_types=[
             PexBinary,
             PythonRequirementTarget,
+            *nfpm_target_types(),
         ],
         rules=[
             *package_pex_binary.rules(),
             *pex_from_targets.rules(),
             *target_types_rules.rules(),
             *pex_cli.rules(),
+            *nfpm_subsystem_rules(),
+            *nfpm_target_types_rules(),
+            *nfpm_dependency_inference_rules(),
+            *nfpm_rules(),
             *native_libs_rules(),
             QueryRule(PexFromTargetsRequestForBuiltPackage, (PexBinaryFieldSet,)),
             QueryRule(Pex, (PexFromTargetsRequest,)),
             QueryRule(RpmDependsInfo, (RpmDependsFromPexRequest,)),
+            QueryRule(InjectedNfpmPackageFields, (NativeLibsNfpmPackageFieldsRequest,)),
         ],
     )
 
@@ -141,3 +157,89 @@ def test_rpm_depends_from_pex_rule(
     result = rule_runner.request(RpmDependsInfo, [RpmDependsFromPexRequest(target_pex)])
     assert result.provides == expected_provides
     assert result.requires == expected_requires
+
+
+@pytest.mark.parametrize(
+    "packager,pex_reqs,pex_script,nfpm_arch,expected_provides,expected_depends",
+    (
+        pytest.param(
+            "rpm",
+            ["setproctitle==1.3.6"],
+            None,
+            "amd64",
+            (f"_setproctitle.cpython-{_PY_TAG}-x86_64-linux-gnu.so()(64bit)",),
+            (
+                "libc.so.6()(64bit)",
+                "libc.so.6(GLIBC_2.2.5)(64bit)",
+                "libpthread.so.0()(64bit)",
+                "rtld(GNU_HASH)",
+            ),
+            marks=skip_unless_linux_x86_64,
+            id="rpm-setproctitle-amd64",
+        ),
+        pytest.param(
+            "rpm",
+            ["setproctitle==1.3.6"],
+            None,
+            "arm64",
+            (f"_setproctitle.cpython-{_PY_TAG}-aarch64-linux-gnu.so()(64bit)",),
+            (
+                "libc.so.6()(64bit)",
+                "libc.so.6(GLIBC_2.17)(64bit)",
+                "libpthread.so.0()(64bit)",
+                "rtld(GNU_HASH)",
+            ),
+            marks=skip_unless_linux_arm,
+            id="rpm-setproctitle-arm64",
+        ),
+    ),
+)
+def test_inject_native_libs_dependencies_in_package_fields_rule(
+    packager: str,
+    pex_reqs: list[str],
+    pex_script: str | None,
+    nfpm_arch: str,
+    expected_provides: tuple[str, ...],
+    expected_depends: tuple[str, ...],
+    rule_runner: RuleRunner,
+) -> None:
+    build_contents = dedent(
+        f"""
+        python_requirement(name="req", requirements={pex_reqs!r})
+        pex_binary(
+            name="pex", script={pex_script!r}, dependencies=[":req"], output_path="{_PKG_NAME}.pex"
+        )
+        nfpm_content_files(
+            name="contents",
+            files=[("{_PKG_NAME}.pex", "/opt/{_PKG_NAME}/{_PKG_NAME}.pex")],
+            dependencies=[":pex"],
+            file_owner="root",
+            file_group="root",
+            file_mode="755",  # same as 0o755 and "rwxr-xr-x"
+        )
+        nfpm_{packager}_package(
+            name="{_PKG_NAME}",
+            description="A {packager} package",
+            package_name="{_PKG_NAME}",
+            version="1.2.3",
+            dependencies=[":contents"],
+            arch="{nfpm_arch}",
+        )
+        """
+    )
+
+    rule_runner.write_files(
+        {
+            "BUILD": build_contents,
+        }
+    )
+
+    target = rule_runner.get_target(Address("", target_name=_PKG_NAME))
+    result = rule_runner.request(
+        InjectedNfpmPackageFields, [NativeLibsNfpmPackageFieldsRequest(target, FrozenDict())]
+    )
+    field_values = result.field_values
+    if packager == "rpm":
+        assert len(field_values) == 2
+        assert field_values[NfpmRpmProvidesField].value == expected_provides
+        assert field_values[NfpmRpmDependsField].value == expected_depends
