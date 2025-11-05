@@ -155,6 +155,16 @@ class InjectNfpmPackageFieldsRequest(ABC, metaclass=_PrioritizedSortableClassMet
             self, "injected_fields", injected_fields if injected_fields else FrozenDict()
         )
 
+    def get_field(self, field: type[_F]) -> _F:
+        """Get a `Field` from `injected_fields` (returned by earlier rules) or from the target.
+
+        This will throw a KeyError if the `Field` is not registered on the target (unless an earlier
+        rule added it to `injected_fields` which might be disallowed in the future).
+        """
+        if field in self.injected_fields:
+            return cast(_F, self.injected_fields[field])
+        return self.target[field]
+
 
 @rule(polymorphic=True)
 async def inject_nfpm_package_fields(
