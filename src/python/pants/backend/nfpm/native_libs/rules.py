@@ -6,7 +6,9 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from pants.backend.nfpm.field_sets import NfpmRpmPackageFieldSet
+from pants.backend.nfpm.field_sets import NfpmDebPackageFieldSet, NfpmRpmPackageFieldSet
+from pants.backend.nfpm.fields.all import NfpmArchField
+from pants.backend.nfpm.fields.deb import NfpmDebDependsField
 from pants.backend.nfpm.fields.rpm import NfpmRpmDependsField, NfpmRpmProvidesField
 from pants.backend.nfpm.native_libs.deb.rules import (
     DebSearchForSonamesRequest,
@@ -16,6 +18,7 @@ from pants.backend.nfpm.native_libs.deb.rules import rules as deb_rules
 from pants.backend.nfpm.native_libs.deb.utils import shlibdeps_filter_sonames
 from pants.backend.nfpm.native_libs.elfdeps.rules import RequestPexELFInfo, elfdeps_analyze_pex
 from pants.backend.nfpm.native_libs.elfdeps.rules import rules as elfdeps_rules
+from pants.backend.nfpm.native_libs.target_types import DebDistroCodenameField, DebDistroField
 from pants.backend.nfpm.native_libs.target_types import rules as target_types_rules
 from pants.backend.nfpm.util_rules.contents import (
     GetPackageFieldSetsForNfpmContentFileDepsRequest,
@@ -132,7 +135,10 @@ class NativeLibsNfpmPackageFieldsRequest(InjectNfpmPackageFieldsRequest):
 
     @classmethod
     def is_applicable(cls, target: Target) -> bool:
-        return NfpmRpmPackageFieldSet.is_applicable(target)
+        return any(
+            field_set_type.is_applicable(target)
+            for field_set_type in (NfpmDebPackageFieldSet, NfpmRpmPackageFieldSet)
+        )
 
 
 @rule
@@ -150,7 +156,25 @@ async def inject_native_libs_dependencies_in_package_fields(
     if not pex_binaries:
         return InjectedNfpmPackageFields(fields, address=address)
 
-    if NfpmRpmPackageFieldSet.is_applicable(request.target):
+    if NfpmDebPackageFieldSet.is_applicable(request.target):
+        # This is like running deb helper shlib-deps.
+        deb_depends_infos = await concurrently(
+            deb_depends_from_pex(
+                DebDependsFromPexRequest(
+                    pex,
+                    request.get_field(DebDistroField).value or "",
+                    request.get_field(DebDistroCodenameField).value or "",
+                    request.get_field(NfpmArchField).value or "",
+                )
+            )
+            for pex in pex_binaries
+        )
+        depends = list(request.get_field(NfpmDebDependsField).value or ())
+        for deb_depends_info in deb_depends_infos:
+            depends.extend(deb_depends_info.requires)
+        fields.append(NfpmDebDependsField(depends, address=address))
+
+    elif NfpmRpmPackageFieldSet.is_applicable(request.target):
         # This is like running rpmdeps -> elfdeps.
         rpm_depends_infos = await concurrently(
             rpm_depends_from_pex(RpmDependsFromPexRequest(pex)) for pex in pex_binaries
