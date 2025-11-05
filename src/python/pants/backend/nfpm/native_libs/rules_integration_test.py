@@ -10,6 +10,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.nfpm.dependency_inference import rules as nfpm_dependency_inference_rules
+from pants.backend.nfpm.fields.deb import NfpmDebDependsField
 from pants.backend.nfpm.fields.rpm import NfpmRpmDependsField, NfpmRpmProvidesField
 from pants.backend.nfpm.native_libs.rules import (
     DebDependsFromPexRequest,
@@ -304,11 +305,35 @@ def test_rpm_depends_from_pex_rule(
 
 
 @pytest.mark.parametrize(
-    "packager,pex_reqs,pex_script,nfpm_arch,expected_provides,expected_depends",
+    "packager,pex_reqs,pex_script,deb_distro,deb_distro_codename,nfpm_arch,expected_provides,expected_depends",
     (
+        pytest.param(
+            "deb",
+            ["setproctitle==1.3.6"],
+            None,
+            "ubuntu",
+            "jammy",
+            "amd64",
+            (),
+            ("libc6",),
+            id="deb-setproctitle-ubuntu-jammy-amd64",
+        ),
+        pytest.param(
+            "deb",
+            ["setproctitle==1.3.6"],
+            None,
+            "ubuntu",
+            "jammy",
+            "arm64",
+            (),
+            ("libc6",),
+            id="deb-setproctitle-ubuntu-jammy-arm64",
+        ),
         pytest.param(
             "rpm",
             ["setproctitle==1.3.6"],
+            None,
+            None,
             None,
             "amd64",
             (f"_setproctitle.cpython-{_PY_TAG}-x86_64-linux-gnu.so()(64bit)",),
@@ -324,6 +349,8 @@ def test_rpm_depends_from_pex_rule(
         pytest.param(
             "rpm",
             ["setproctitle==1.3.6"],
+            None,
+            None,
             None,
             "arm64",
             (f"_setproctitle.cpython-{_PY_TAG}-aarch64-linux-gnu.so()(64bit)",),
@@ -342,6 +369,8 @@ def test_inject_native_libs_dependencies_in_package_fields_rule(
     packager: str,
     pex_reqs: list[str],
     pex_script: str | None,
+    deb_distro: str | None,
+    deb_distro_codename: str | None,
     nfpm_arch: str,
     expected_provides: tuple[str, ...],
     expected_depends: tuple[str, ...],
@@ -366,11 +395,20 @@ def test_inject_native_libs_dependencies_in_package_fields_rule(
             description="A {packager} package",
             package_name="{_PKG_NAME}",
             version="1.2.3",
+            {"" if packager != "deb" else 'maintainer="Foo Bar <deb@example.com>",'}
             dependencies=[":contents"],
             arch="{nfpm_arch}",
-        )
         """
     )
+    if packager == "deb":
+        build_contents += "\n    "
+        build_contents += "\n    ".join(
+            [
+                f"distro={deb_distro!r},",
+                f"distro_codename={deb_distro_codename!r},",
+            ]
+        )
+    build_contents += "\n)"
 
     rule_runner.write_files(
         {
@@ -383,6 +421,9 @@ def test_inject_native_libs_dependencies_in_package_fields_rule(
         InjectedNfpmPackageFields, [NativeLibsNfpmPackageFieldsRequest(target, FrozenDict())]
     )
     field_values = result.field_values
+    if packager == "deb":
+        assert len(field_values) == 1
+        assert field_values[NfpmDebDependsField].value == expected_depends
     if packager == "rpm":
         assert len(field_values) == 2
         assert field_values[NfpmRpmProvidesField].value == expected_provides
