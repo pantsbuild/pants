@@ -85,13 +85,13 @@ impl ConfigFinder {
         dir: &Path,
         context: &HashSet<String>,
     ) -> Result<Vec<PathBuf>, String> {
-        let buildroot = self.buildroot.as_path();
+        let buildroot = canonicalize(self.buildroot.as_path()).map_err(|e| e.to_string())?;
         let dir = if dir.is_relative() {
             buildroot.join(dir)
         } else {
             dir.to_path_buf()
         };
-        if !dir.starts_with(buildroot) {
+        if !dir.starts_with(&buildroot) {
             return Err(format!(
                 "Path {} is not under buildroot {}",
                 dir.display(),
