@@ -12,7 +12,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 # elfdeps 0.2.0 added analyze_zipfile
-from elfdeps import ELFAnalyzeSettings, ELFInfo, SOInfo, analyze_zipfile
+from elfdeps import ELFAnalyzeSettings, ELFInfo, SOInfo, analyze_dirtree, analyze_zipfile
 
 
 @dataclass(frozen=True)
@@ -69,9 +69,19 @@ def analyze_wheels_repo(wheel_repo: Path) -> ELFInfoAnalysis:
     return ELFInfoAnalysis.from_elf_infos(elf_infos)
 
 
+def analyze_directory(directory: Path) -> ELFInfoAnalysis:
+    settings = ELFAnalyzeSettings(unique=True)
+
+    print(f"Analyzing files in {directory}", file=sys.stderr)
+    elf_infos: list[ELFInfo] = list(analyze_dirtree(directory, settings=settings))
+    print(f"Done analyzing files in {directory}.", file=sys.stderr)  # end progress indicators
+
+    return ELFInfoAnalysis.from_elf_infos(elf_infos)
+
+
 def main(args: list[str]) -> int:
     arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument("--mode", required=True, choices=("wheels",))
+    arg_parser.add_argument("--mode", required=True, choices=("wheels", "files"))
     arg_parser.add_argument("directory", nargs=1, type=Path)
     options = arg_parser.parse_args()
 
@@ -81,6 +91,8 @@ def main(args: list[str]) -> int:
 
     if options.mode == "wheels":
         elf_info_analysis = analyze_wheels_repo(wheel_repo=directory)
+    elif options.mode == "files":
+        elf_info_analysis = analyze_directory(directory=directory)
 
     print(elf_info_analysis.to_json())
 

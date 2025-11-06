@@ -1,6 +1,7 @@
 # Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import zipfile
 from pathlib import PosixPath
 from typing import cast
 
@@ -10,7 +11,7 @@ from _pytest.tmpdir import TempPathFactory
 from elfdeps import ELFAnalyzeSettings, ELFInfo, SOInfo
 from pytest import fixture
 
-from .analyze import ELFInfoAnalysis, analyze_wheel, analyze_wheels_repo
+from .analyze import ELFInfoAnalysis, analyze_directory, analyze_wheel, analyze_wheels_repo
 
 WHEELS = {
     # setproctitle has a native lib, and it's a small 31.2 kB file.
@@ -127,6 +128,20 @@ def wheels_repo(tmp_path_factory: TempPathFactory):
     return wheels_repo_path
 
 
+@fixture(scope="module")
+def directory(wheels_repo, tmp_path_factory: TempPathFactory):
+    dest = tmp_path_factory.mktemp("directory")
+    for wheel_filename, wheel_info in WHEELS.items():
+        assert wheel_filename.endswith(".whl")
+        wheel_path = wheels_repo / wheel_filename
+        dest_wheel_path = dest / wheel_filename
+        dest_wheel_path.mkdir()
+        with zipfile.ZipFile(wheel_path, mode="r") as wheel:
+            wheel.extractall(dest_wheel_path)
+
+    return dest
+
+
 def test_wheels_elf_info_to_dict():
     assert ELF_INFO_ANALYSIS.to_dict() == ELF_INFO_ANALYSIS_DICT
 
@@ -151,4 +166,9 @@ def test_analyze_wheel(wheels_repo, wheel_filename, expected) -> None:
 
 def test_analyze_wheels_repo(wheels_repo) -> None:
     result = analyze_wheels_repo(wheels_repo)
+    assert result == ELF_INFO_ANALYSIS
+
+
+def test_analyze_directory(directory) -> None:
+    result = analyze_directory(directory)
     assert result == ELF_INFO_ANALYSIS
