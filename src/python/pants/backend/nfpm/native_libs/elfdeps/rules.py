@@ -13,7 +13,8 @@ from pants.backend.nfpm.native_libs.elfdeps.subsystem import rules as subsystem_
 from pants.backend.nfpm.native_libs.elfdeps.subsystem import setup_elfdeps_analyze_tool
 from pants.backend.python.util_rules.pex import Pex, PexProcess, VenvPexProcess
 from pants.backend.python.util_rules.pex_cli import PexPEX
-from pants.engine.process import ProcessResult, execute_process_or_raise
+from pants.core.util_rules.system_binaries import UnzipBinary
+from pants.engine.process import Process, ProcessResult, execute_process_or_raise
 from pants.engine.rules import Rule, collect_rules, concurrently, implicitly, rule
 from pants.util.logging import LogLevel
 
@@ -41,21 +42,24 @@ class PexELFInfo:
         self, provides: Iterable[Mapping[str, str]], requires: Iterable[Mapping[str, str]]
     ):
         object.__setattr__(
-            self, "provides", tuple(sorted(SOInfo(**so_info) for so_info in provides))
+            self, "provides", tuple(sorted({SOInfo(**so_info) for so_info in provides}))
         )
         object.__setattr__(
-            self, "requires", tuple(sorted(SOInfo(**so_info) for so_info in requires))
+            self, "requires", tuple(sorted({SOInfo(**so_info) for so_info in requires}))
         )
 
 
 @rule(
-    desc="Analyze ELF (native lib) dependencies of wheels in a PEX",
+    desc="Analyze ELF (native lib) dependencies of wheels and files in a PEX",
     level=LogLevel.DEBUG,
 )
-async def elfdeps_analyze_pex(request: RequestPexELFInfo, pex_pex: PexPEX) -> PexELFInfo:
+async def elfdeps_analyze_pex(
+    request: RequestPexELFInfo, pex_pex: PexPEX, unzip: UnzipBinary
+) -> PexELFInfo:
     wheel_repo_dir = str(PurePath(request.target_pex.name).with_suffix(".wheel_repo"))
+    contents_dir = str(PurePath(request.target_pex.name).with_suffix(".wheel_repo"))
 
-    extracted_wheels, elfdeps_analyze_tool = await concurrently(
+    extracted_wheels, extracted_files, elfdeps_analyze_tool = await concurrently(
         execute_process_or_raise(
             **implicitly(
                 PexProcess(
@@ -79,22 +83,61 @@ async def elfdeps_analyze_pex(request: RequestPexELFInfo, pex_pex: PexPEX) -> Pe
                 )
             )
         ),
+        execute_process_or_raise(
+            **implicitly(
+                # pex-tools can only extract wheels and PEX-INFO,
+                # so unzip remaining files from pex manually
+                # (even though that means relying on pex implementation details)
+                Process(
+                    argv=[
+                        unzip.path,
+                        request.target_pex.name,
+                        "-x",  # exclude wheels
+                        ".deps/*",  # this ties us to this pex implementation detail :(
+                        "-d",
+                        wheel_repo_dir,
+                    ],
+                    input_digest=request.target_pex.digest,
+                    output_directories=(contents_dir,),
+                    description=f"Extract non-wheel files from {request.target_pex.name}",
+                    level=LogLevel.DEBUG,
+                ),
+            )
+        ),
         setup_elfdeps_analyze_tool(**implicitly()),
     )
 
-    result: ProcessResult = await execute_process_or_raise(
-        **implicitly(
-            VenvPexProcess(
+    process_results: tuple[ProcessResult, ProcessResult] = await concurrently(
+        execute_process_or_raise(
+            **implicitly(
+                VenvPexProcess(
                     elfdeps_analyze_tool.pex,
                     argv=("--mode", "wheels", wheel_repo_dir),
                     input_digest=extracted_wheels.output_digest,
                     description=f"Calculate ELF provides+requires for wheels in pex {request.target_pex.name}",
                     level=LogLevel.DEBUG,
+                )
             )
-        )
+        ),
+        execute_process_or_raise(
+            **implicitly(
+                VenvPexProcess(
+                    elfdeps_analyze_tool.pex,
+                    argv=("--mode", "files", contents_dir),
+                    input_digest=extracted_files.output_digest,
+                    description=f"Calculate ELF provides+requires for non-wheel files in pex {request.target_pex.name}",
+                    level=LogLevel.DEBUG,
+                )
+            )
+        ),
     )
 
-    pex_elf_info = json.loads(result.stdout)
+    pex_elf_info: dict[str, list[dict[str, str]]] = {"provides": [], "requires": []}
+    for process_result in process_results:
+        result = json.loads(process_result.stdout)
+        pex_elf_info["provides"].extend(result["provides"])
+        pex_elf_info["requires"].extend(result["requires"])
+
     return PexELFInfo(
         provides=pex_elf_info["provides"],
         requires=pex_elf_info["requires"],
