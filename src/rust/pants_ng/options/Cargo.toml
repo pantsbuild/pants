@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 glob = { workspace = true }
 options = { path = "../../options" }
+parking_lot = { workspace = true }
 regex = { workspace = true }
 shlex = { workspace = true }
 tempfile = { workspace = true }

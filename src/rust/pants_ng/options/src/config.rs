@@ -4,6 +4,7 @@
 use options::BuildRoot;
 use options::ConfigSource;
 use options::config::Config;
+use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs::canonicalize;
@@ -11,7 +12,6 @@ use std::path::MAIN_SEPARATOR_STR;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::Mutex;
 
 pub type InterpolationMap = HashMap<String, String>;
 
@@ -37,7 +37,7 @@ impl ConfigFinder {
     }
 
     fn get_config(&self, path: &Path) -> Result<Arc<Config>, String> {
-        let mut lock = self.parsed_configs.lock().map_err(|e| e.to_string())?;
+        let mut lock = self.parsed_configs.lock();
         if let Some(config) = lock.get(path) {
             return Ok(Arc::clone(config));
         }
