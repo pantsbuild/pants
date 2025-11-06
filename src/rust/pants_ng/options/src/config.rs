@@ -24,11 +24,9 @@ pub struct ConfigFinder {
 
 impl ConfigFinder {
     pub fn new(
-        buildroot: Option<BuildRoot>,
+        buildroot: BuildRoot,
         seed_values: InterpolationMap,
     ) -> Result<Self, String> {
-        let buildroot = buildroot.unwrap_or(BuildRoot::find()?);
-
         Ok(Self {
             buildroot,
             seed_values,
@@ -140,6 +138,10 @@ impl ConfigFinder {
             dir_configs.sort();
             dir_configs.reverse();
             configs.append(&mut dir_configs);
+
+            if ancestor == buildroot {
+                break;
+            }
         }
 
         // We discover configs from deep to shallow, but we want to process them from
