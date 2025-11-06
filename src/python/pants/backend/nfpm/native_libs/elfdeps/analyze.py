@@ -15,7 +15,7 @@ from elfdeps import ELFAnalyzeSettings, ELFInfo, SOInfo, analyze_zipfile
 
 
 @dataclass(frozen=True)
-class WheelsELFInfo:
+class ELFInfoAnalysis:
     provides: tuple[SOInfo, ...]
     requires: tuple[SOInfo, ...]
 
@@ -39,6 +39,16 @@ class WheelsELFInfo:
     def to_json(self, indent=None, separators=(",", ":")) -> str:
         return json.dumps(self.to_dict(), indent=indent, separators=separators)
 
+    @classmethod
+    def from_elf_infos(cls, elf_infos: Iterable[ELFInfo]) -> ELFInfoAnalysis:
+        provides: set[SOInfo] = set()
+        requires: set[SOInfo] = set()
+        for elf_info in elf_infos:
+            provides.update(elf_info.provides)  # elf_info.provides: list[SOInfo]
+            requires.update(elf_info.requires)  # elf_info.requires: list[SOInfo]
+
+        return cls(tuple(provides), tuple(requires))
+
 
 def analyze_wheel(wheel_path: Path, settings: ELFAnalyzeSettings) -> Generator[ELFInfo]:
     print(".", end="", file=sys.stderr)  # a progress indicator
@@ -46,7 +56,7 @@ def analyze_wheel(wheel_path: Path, settings: ELFAnalyzeSettings) -> Generator[E
         yield from analyze_zipfile(wheel, settings=settings)
 
 
-def analyze_wheels_repo(wheel_repo: Path) -> WheelsELFInfo:
+def analyze_wheels_repo(wheel_repo: Path) -> ELFInfoAnalysis:
     settings = ELFAnalyzeSettings(unique=True)
 
     print(f"Analyzing wheels in {wheel_repo}", file=sys.stderr)
@@ -55,13 +65,7 @@ def analyze_wheels_repo(wheel_repo: Path) -> WheelsELFInfo:
     ]
     print(f"Done analyzing wheels in {wheel_repo}.", file=sys.stderr)  # end progress indicators
 
-    provides: set[SOInfo] = set()
-    requires: set[SOInfo] = set()
-    for elf_info in elf_infos:
-        provides.update(elf_info.provides)  # elf_info.provides: list[SOInfo]
-        requires.update(elf_info.requires)  # elf_info.requires: list[SOInfo]
-
-    return WheelsELFInfo(tuple(provides), tuple(requires))
+    return ELFInfoAnalysis.from_elf_infos(elf_infos)
 
 
 def main(args: list[str]) -> int:
@@ -71,9 +75,9 @@ def main(args: list[str]) -> int:
     if not wheel_repo.resolve().is_dir():
         raise NotADirectoryError(f"{wheel_repo} is not a directory (or a symlink to a directory)!")
 
-    wheels_elf_info = analyze_wheels_repo(wheel_repo=wheel_repo)
+    elf_info_analysis = analyze_wheels_repo(wheel_repo=directory)
 
-    print(wheels_elf_info.to_json())
+    print(elf_info_analysis.to_json())
 
     return 0
 

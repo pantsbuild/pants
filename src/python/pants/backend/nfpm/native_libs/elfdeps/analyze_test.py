@@ -10,7 +10,7 @@ from _pytest.tmpdir import TempPathFactory
 from elfdeps import ELFAnalyzeSettings, ELFInfo, SOInfo
 from pytest import fixture
 
-from .analyze import WheelsELFInfo, analyze_wheel, analyze_wheels_repo
+from .analyze import ELFInfoAnalysis, analyze_wheel, analyze_wheels_repo
 
 WHEELS = {
     # setproctitle has a native lib, and it's a small 31.2 kB file.
@@ -40,7 +40,7 @@ WHEELS = {
         ),
     },
 }
-WHEELS_ELF_INFO = WheelsELFInfo(
+ELF_INFO_ANALYSIS = ELFInfoAnalysis(
     provides=(SOInfo("_setproctitle.cpython-311-x86_64-linux-gnu.so", "", "(64bit)"),),
     requires=(
         SOInfo("libc.so.6", "", "(64bit)"),
@@ -49,7 +49,7 @@ WHEELS_ELF_INFO = WheelsELFInfo(
         SOInfo("rtld", "GNU_HASH", ""),
     ),
 )
-WHEELS_ELF_INFO_DICT = {
+ELF_INFO_ANALYSIS_DICT = {
     "provides": [
         {
             "soname": "_setproctitle.cpython-311-x86_64-linux-gnu.so",
@@ -80,7 +80,7 @@ WHEELS_ELF_INFO_DICT = {
         {"soname": "rtld", "version": "GNU_HASH", "marker": "", "so_info": "rtld(GNU_HASH)"},
     ],
 }
-WHEELS_ELF_INFO_JSON = """{\
+ELF_INFO_ANALYSIS_JSON = """{\
     "provides": [\
         {\
             "soname": "_setproctitle.cpython-311-x86_64-linux-gnu.so",\
@@ -128,11 +128,11 @@ def wheels_repo(tmp_path_factory: TempPathFactory):
 
 
 def test_wheels_elf_info_to_dict():
-    assert WHEELS_ELF_INFO.to_dict() == WHEELS_ELF_INFO_DICT
+    assert ELF_INFO_ANALYSIS.to_dict() == ELF_INFO_ANALYSIS_DICT
 
 
 def test_wheels_elf_info_to_json():
-    assert WHEELS_ELF_INFO.to_json() == WHEELS_ELF_INFO_JSON
+    assert ELF_INFO_ANALYSIS.to_json() == ELF_INFO_ANALYSIS_JSON
 
 
 @pytest.mark.parametrize(
@@ -151,4 +151,4 @@ def test_analyze_wheel(wheels_repo, wheel_filename, expected) -> None:
 
 def test_analyze_wheels_repo(wheels_repo) -> None:
     result = analyze_wheels_repo(wheels_repo)
-    assert result == WHEELS_ELF_INFO
+    assert result == ELF_INFO_ANALYSIS
