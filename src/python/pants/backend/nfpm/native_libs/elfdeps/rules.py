@@ -85,11 +85,11 @@ async def elfdeps_analyze_pex(request: RequestPexELFInfo, pex_pex: PexPEX) -> Pe
     result: ProcessResult = await execute_process_or_raise(
         **implicitly(
             VenvPexProcess(
-                elfdeps_analyze_tool.pex,
-                argv=(wheel_repo_dir,),
-                input_digest=extracted_wheels.output_digest,
-                description=f"Calculate ELF provides+requires for wheels in pex {request.target_pex.name}",
-                level=LogLevel.DEBUG,
+                    elfdeps_analyze_tool.pex,
+                    argv=("--mode", "wheels", wheel_repo_dir),
+                    input_digest=extracted_wheels.output_digest,
+                    description=f"Calculate ELF provides+requires for wheels in pex {request.target_pex.name}",
+                    level=LogLevel.DEBUG,
             )
         )
     )

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 import zipfile
@@ -69,13 +70,17 @@ def analyze_wheels_repo(wheel_repo: Path) -> ELFInfoAnalysis:
 
 
 def main(args: list[str]) -> int:
-    if len(args) != 2:
-        raise RuntimeError(f"{args[0]} expects one positional arg, the wheel_repo path")
-    wheel_repo = Path(args[1])
-    if not wheel_repo.resolve().is_dir():
-        raise NotADirectoryError(f"{wheel_repo} is not a directory (or a symlink to a directory)!")
+    arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument("--mode", required=True, choices=("wheels",))
+    arg_parser.add_argument("directory", nargs=1, type=Path)
+    options = arg_parser.parse_args()
 
-    elf_info_analysis = analyze_wheels_repo(wheel_repo=directory)
+    directory = options.directory[0]
+    if not directory.resolve().is_dir():
+        raise NotADirectoryError(f"{directory} is not a directory (or a symlink to a directory)!")
+
+    if options.mode == "wheels":
+        elf_info_analysis = analyze_wheels_repo(wheel_repo=directory)
 
     print(elf_info_analysis.to_json())
 
