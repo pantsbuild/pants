@@ -782,6 +782,12 @@ class PexSciePbsReleaseField(StringField):
     help = help_text("SCIENICE")
 
 
+class PexSciePythonVersion(StringField):
+    alias = "scie_python_version"
+    default = None
+    help = help_text("SCIENICE")
+
+
 class PexScieHashAlgField(StringField):
     alias = "scie_hash_alg"
     # from https://science.scie.app/cli.html#science-lift-build
@@ -835,6 +841,7 @@ _PEX_SCIE_BINARY_FIELDS = (
     PexScieBusyboxPexEntrypointEnvPassthrough,
     PexSciePlatformField,
     PexSciePbsReleaseField,
+    PexSciePythonVersion,
     PexScieHashAlgField,
     # --scie-busybox
     # --scie-busybox-pex-entrypoint-env-passthrough,

@@ -37,6 +37,7 @@ from pants.core.target_types import (
     ResourcesGeneratorTarget,
 )
 from pants.core.target_types import rules as core_target_types_rules
+from pants.engine.internals.scheduler import ExecutionError
 from pants.testutil.python_interpreter_selection import skip_unless_python38_present
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import QueryRule
@@ -707,3 +708,66 @@ def test_scie_pbs_version(rule_runner: PythonRuleRunner) -> None:
     assert expected_pex_relpath == result.artifacts[0].relpath
     expected_scie_relpath = "src.py.project/project"
     assert expected_scie_relpath == result.artifacts[1].relpath
+
+
+def test_scie_python_version_available(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(name="lib")
+                pex_binary(
+                    entry_point="app.py",
+                    scie="lazy",
+                    scie_pbs_release="20251031",
+                    scie_python_version="3.12.12"
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+    # Just asserting the right files are there to avoid downloading the whole
+    # PBS during testing
+    assert len(result.artifacts) == 2
+    expected_pex_relpath = "src.py.project/project.pex"
+    assert expected_pex_relpath == result.artifacts[0].relpath
+    expected_scie_relpath = "src.py.project/project"
+    assert expected_scie_relpath == result.artifacts[1].relpath
+
+
+def test_scie_python_version_unavailable(rule_runner: PythonRuleRunner) -> None:
+    # The PBS project does not produce binaries for every patch release
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(name="lib")
+                pex_binary(
+                    entry_point="app.py",
+                    scie="lazy",
+                    scie_pbs_release="20251031",
+                    scie_python_version="3.12.2"
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    with pytest.raises(
+        ExecutionError, match="No released assets found for release 20251031 Python 3.12.2"
+    ):
+        rule_runner.request(BuiltPackage, [field_set])
