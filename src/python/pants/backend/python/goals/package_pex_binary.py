@@ -33,6 +33,7 @@ from pants.backend.python.target_types import (
     PexScieHashAlgField,
     PexScieNameStyleField,
     PexSciePbsReleaseField,
+    PexSciePbsStripped,
     PexSciePlatformField,
     PexSciePythonVersion,
     PexScriptField,
@@ -106,6 +107,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     scie_pbs_release: PexSciePbsReleaseField
     scie_python_version: PexSciePythonVersion
     scie_hash_alg: PexScieHashAlgField
+    scie_pbs_stripped: PexSciePbsStripped
 
     def builds_pex_and_scie(self) -> bool:
         return self.scie.value is not None
@@ -164,6 +166,8 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
             args.append(f"--scie-python-version={self.scie_python_version.value}")
         if self.scie_hash_alg.value is not None:
             args.append(f"--scie-hash-alg={self.scie_hash_alg.value}")
+        if self.scie_pbs_stripped.value is True:
+            args.append("--scie-pbs-stripped")
 
         return tuple(args)
 

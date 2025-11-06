@@ -771,3 +771,45 @@ def test_scie_python_version_unavailable(rule_runner: PythonRuleRunner) -> None:
         ExecutionError, match="No released assets found for release 20251031 Python 3.12.2"
     ):
         rule_runner.request(BuiltPackage, [field_set])
+
+
+@pytest.mark.parametrize(
+    "stripped",
+    [
+        "",
+        "scie_pbs_stripped=True,",
+        "scie_pbs_stripped=False,",
+    ],
+)
+def test_scie_pbs_stripped(rule_runner: PythonRuleRunner, stripped: str) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                f"""\
+                python_sources(name="lib")
+                python_requirement(name="cowsay", requirements=["cowsay==6.1"])
+                pex_binary(
+                    scie="lazy",
+                    dependencies=[":cowsay"],
+                    scie_busybox='@',
+                    {stripped}
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+    # Just asserting the right files are there to avoid downloading the whole
+    # PBS during testing
+    assert len(result.artifacts) == 2
+    expected_pex_relpath = "src.py.project/project.pex"
+    assert expected_pex_relpath == result.artifacts[0].relpath
+    expected_scie_relpath = "src.py.project/project"
+    assert expected_scie_relpath == result.artifacts[1].relpath
