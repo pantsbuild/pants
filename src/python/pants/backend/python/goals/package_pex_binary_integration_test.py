@@ -638,11 +638,45 @@ def test_scie_platform_parent_dir(rule_runner: PythonRuleRunner) -> None:
     "passthrough",
     [
         "",
-        "scie_busybox_pex_entrypoint_env_passthrough=True",
-        "scie_busybox_pex_entrypoint_env_passthrough=False",
+        "scie_busybox_pex_entrypoint_env_passthrough=True,",
+        "scie_busybox_pex_entrypoint_env_passthrough=False,",
     ],
 )
 def test_scie_busybox_moo(rule_runner: PythonRuleRunner, passthrough: str) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                f"""\
+                python_sources(name="lib")
+                python_requirement(name="cowsay", requirements=["cowsay==6.1"])
+                pex_binary(
+                    scie="lazy",
+                    dependencies=[":cowsay"],
+                    scie_busybox='@',
+                    {passthrough}
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+    # Just asserting the right files are there to avoid downloading the whole
+    # PBS during testing
+    assert len(result.artifacts) == 2
+    expected_pex_relpath = "src.py.project/project.pex"
+    assert expected_pex_relpath == result.artifacts[0].relpath
+    expected_scie_relpath = "src.py.project/project"
+    assert expected_scie_relpath == result.artifacts[1].relpath
+
+
+def test_scie_pbs_version(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/py/project/app.py": dedent(
@@ -655,10 +689,9 @@ def test_scie_busybox_moo(rule_runner: PythonRuleRunner, passthrough: str) -> No
                 python_sources(name="lib")
                 python_requirement(name="cowsay", requirements=["cowsay==6.1"])
                 pex_binary(
+                    entry_point="app.py",
                     scie="lazy",
-                    dependencies=[":cowsay"],
-                    scie_busybox='@',
-                    #scie_busybox_pex_entrypoint_env_passthrough=True,
+                    scie_pbs_release="20241219"
                 )
                 """
             ),

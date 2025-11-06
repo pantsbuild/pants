@@ -32,6 +32,7 @@ from pants.backend.python.target_types import (
     PexScieField,
     PexScieHashAlgField,
     PexScieNameStyleField,
+    PexSciePbsReleaseField,
     PexSciePlatformField,
     PexScriptField,
     PexShBootField,
@@ -101,6 +102,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     scie_busybox: PexScieBusyBox
     scie_busybox_pex_entrypoint_env_passthrough: PexScieBusyboxPexEntrypointEnvPassthrough
     scie_platform: PexSciePlatformField
+    scie_pbs_release: PexSciePbsReleaseField
     scie_hash_alg: PexScieHashAlgField
 
     def builds_pex_and_scie(self) -> bool:
@@ -154,6 +156,8 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
             args.append("--scie-busybox-pex-entrypoint-env-passthrough")
         if self.scie_platform.value is not None:
             args.extend([f"--scie-platform={platform}" for platform in self.scie_platform.value])
+        if self.scie_pbs_release.value is not None:
+            args.append(f"--scie-pbs-release={self.scie_pbs_release.value}")
         if self.scie_hash_alg.value is not None:
             args.append(f"--scie-hash-alg={self.scie_hash_alg.value}")
 
