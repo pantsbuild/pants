@@ -28,6 +28,7 @@ from pants.backend.helm.subsystems.post_renderer import HelmPostRendererSubsyste
 from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaFormatSubsystem
 from pants.backend.java.subsystems.junit import JUnit
 from pants.backend.kotlin.lint.ktlint.subsystem import KtlintSubsystem
+from pants.backend.nfpm.native_libs.elfdeps.subsystem import Elfdeps
 from pants.backend.python.goals.coverage_py import CoverageSubsystem
 from pants.backend.python.lint.add_trailing_comma.subsystem import AddTrailingComma
 from pants.backend.python.lint.autoflake.subsystem import Autoflake
@@ -113,6 +114,7 @@ all_python_tools = tuple(
             PythonTool(DebugPy, "pants.backend.python"),
             PythonTool(Docformatter, "pants.backend.python.lint.docformatter"),
             PythonTool(DockerfileParser, "pants.backend.docker"),
+            PythonTool(Elfdeps, "pants.backend.experimental.nfpm.native_libs"),
             PythonTool(Flake8, "pants.backend.python.lint.flake8"),
             PythonTool(HelmKubeParserSubsystem, "pants.backend.experimental.helm"),
             PythonTool(HelmPostRendererSubsystem, "pants.backend.experimental.helm"),
