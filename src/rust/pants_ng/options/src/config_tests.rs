@@ -46,8 +46,7 @@ fn test_config_discovery() {
     File::create(subsubdir_config.as_path()).unwrap();
     File::create(subsubdir_ci_macos_config.as_path()).unwrap();
 
-    let config_finder =
-        ConfigFinder::new(buildroot.clone(), InterpolationMap::new()).unwrap();
+    let config_finder = ConfigFinder::new(buildroot.clone(), InterpolationMap::new()).unwrap();
 
     let configs = config_finder
         .get_applicable_config_files(&subsubdir, &HashSet::new())

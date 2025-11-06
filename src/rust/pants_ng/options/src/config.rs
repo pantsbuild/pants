@@ -5,12 +5,9 @@ use options::BuildRoot;
 use options::ConfigSource;
 use options::config::Config;
 use parking_lot::Mutex;
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::canonicalize;
-use std::path::MAIN_SEPARATOR_STR;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{MAIN_SEPARATOR_STR, Path, PathBuf};
 use std::sync::Arc;
 
 pub type InterpolationMap = HashMap<String, String>;
@@ -23,10 +20,7 @@ pub struct ConfigFinder {
 }
 
 impl ConfigFinder {
-    pub fn new(
-        buildroot: BuildRoot,
-        seed_values: InterpolationMap,
-    ) -> Result<Self, String> {
+    pub fn new(buildroot: BuildRoot, seed_values: InterpolationMap) -> Result<Self, String> {
         Ok(Self {
             buildroot,
             seed_values,
