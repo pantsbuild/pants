@@ -11,7 +11,7 @@ python_sources(
         "subsystem.py": dict(
             dependencies=[
                 ":lockfile",
-                "./analyze_wheels.py",
+                "./analyze.py",
             ]
         ),
     },

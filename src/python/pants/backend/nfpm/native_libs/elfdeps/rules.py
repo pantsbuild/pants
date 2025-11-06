@@ -10,7 +10,7 @@ from dataclasses import field as dataclass_field
 from pathlib import PurePath
 
 from pants.backend.nfpm.native_libs.elfdeps.subsystem import rules as subsystem_rules
-from pants.backend.nfpm.native_libs.elfdeps.subsystem import setup_elfdeps_analyze_wheels_tool
+from pants.backend.nfpm.native_libs.elfdeps.subsystem import setup_elfdeps_analyze_tool
 from pants.backend.python.util_rules.pex import Pex, PexProcess, VenvPexProcess
 from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.engine.process import ProcessResult, execute_process_or_raise
@@ -52,10 +52,10 @@ class PexELFInfo:
     desc="Analyze ELF (native lib) dependencies of wheels in a PEX",
     level=LogLevel.DEBUG,
 )
-async def elfdeps_analyze_pex_wheels(request: RequestPexELFInfo, pex_pex: PexPEX) -> PexELFInfo:
+async def elfdeps_analyze_pex(request: RequestPexELFInfo, pex_pex: PexPEX) -> PexELFInfo:
     wheel_repo_dir = str(PurePath(request.target_pex.name).with_suffix(".wheel_repo"))
 
-    extracted_wheels, elfdeps_analyze_wheels_tool = await concurrently(
+    extracted_wheels, elfdeps_analyze_tool = await concurrently(
         execute_process_or_raise(
             **implicitly(
                 PexProcess(
@@ -79,13 +79,13 @@ async def elfdeps_analyze_pex_wheels(request: RequestPexELFInfo, pex_pex: PexPEX
                 )
             )
         ),
-        setup_elfdeps_analyze_wheels_tool(**implicitly()),
+        setup_elfdeps_analyze_tool(**implicitly()),
     )
 
     result: ProcessResult = await execute_process_or_raise(
         **implicitly(
             VenvPexProcess(
-                elfdeps_analyze_wheels_tool.pex,
+                elfdeps_analyze_tool.pex,
                 argv=(wheel_repo_dir,),
                 input_digest=extracted_wheels.output_digest,
                 description=f"Calculate ELF provides+requires for wheels in pex {request.target_pex.name}",

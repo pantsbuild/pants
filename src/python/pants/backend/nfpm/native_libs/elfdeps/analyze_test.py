@@ -10,7 +10,7 @@ from _pytest.tmpdir import TempPathFactory
 from elfdeps import ELFAnalyzeSettings, ELFInfo, SOInfo
 from pytest import fixture
 
-from .analyze_wheels import WheelsELFInfo, analyze_wheel, analyze_wheels_repo
+from .analyze import WheelsELFInfo, analyze_wheel, analyze_wheels_repo
 
 WHEELS = {
     # setproctitle has a native lib, and it's a small 31.2 kB file.
