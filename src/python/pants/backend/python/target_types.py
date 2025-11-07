@@ -744,7 +744,9 @@ class PexScieField(StringField):
         the PEX scie on a given machine if needed. Specifying `eager` will
         embed the portable CPython interpreter in your PEX scie making for a
         larger file, but requiring no internet access to boot. See
-        https://science.scie.app for further details
+        https://science.scie.app for further details.
+
+        This field must be set for any other `scie_*` fields to take effect.
 
         NOTE: `pants run` will always run the "regular" PEX, use `package` to
         create scie PEXs.  """
@@ -846,7 +848,8 @@ class PexSciePlatformField(StringSequenceField):
         interpreter running Pex as well as use of `complete_platforms` and
         `interpreter_constraints`. Note that, in general, `scie_platform`
         should only be used to select a subset of the platforms implied by the
-        targets selected via other options.  """)
+        targets selected via other options.  """
+    )
 
 
 class PexSciePbsReleaseField(StringField):
@@ -967,7 +970,6 @@ class PexBinary(Target):
     )
 
     def validate(self) -> None:
-        # TODO: validate scie args make sense together
         got_entry_point = self[PexEntryPointField].value is not None
         got_script = self[PexScriptField].value is not None
         got_executable = self[PexExecutableField].value is not None
