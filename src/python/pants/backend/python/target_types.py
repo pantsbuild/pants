@@ -797,24 +797,7 @@ class PexSciePbsStripped(TriBoolField):
 
 class PexScieHashAlgField(StringField):
     alias = "scie_hash_alg"
-    # from https://science.scie.app/cli.html#science-lift-build
-    # TODO: Maybe get out of the way?
-    valid_choices = (
-        "blake2b",
-        "blake2s",
-        "md5",
-        "sha1",
-        "sha224",
-        "sha256",
-        "sha384",
-        "sha3_224",
-        "sha3_256",
-        "sha3_384",
-        "sha3_512",
-        "sha512",
-        "shake_128",
-        "shake_256",
-    )
+    help = help_text("SCIENICE")
 
 
 _PEX_BINARY_COMMON_FIELDS = (
