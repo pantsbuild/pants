@@ -277,6 +277,7 @@ Created as part of the release process.
 + Neil Sanchala
 + Nicholas Gustafson
 + Nicholas Santos
++ Nick Dell'Osa
 + Nick Dellosa
 + Nik Shkrob
 + Nimrod Shlagman
