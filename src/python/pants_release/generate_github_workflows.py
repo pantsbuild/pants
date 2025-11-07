@@ -859,23 +859,6 @@ def linux_arm64_test_jobs() -> Jobs:
     return jobs
 
 
-def macos13_x86_64_test_jobs() -> Jobs:
-    helper = Helper(Platform.MACOS13_X86_64)
-    jobs = {
-        helper.job_name("bootstrap_pants"): bootstrap_jobs(
-            helper,
-            validate_ci_config=False,
-            rust_testing=RustTesting.SOME,
-        ),
-        # We run these on a dedicated host with ample local cache, so remote caching
-        # just adds cost but little value.
-        helper.job_name(TEST_PYTHON_JOB_PREFIX): test_jobs(
-            helper, shard=None, platform_specific=True, with_remote_caching=False
-        ),
-    }
-    return jobs
-
-
 def macos14_arm64_test_jobs() -> Jobs:
     helper = Helper(Platform.MACOS14_ARM64)
     jobs = {
@@ -1137,7 +1120,6 @@ def build_wheels_jobs(*, for_deploy_ref: str | None = None, needs: list[str] | N
     return {
         **build_wheels_job(Platform.LINUX_X86_64, for_deploy_ref, needs),
         **build_wheels_job(Platform.LINUX_ARM64, for_deploy_ref, needs),
-        **build_wheels_job(Platform.MACOS13_X86_64, for_deploy_ref, needs),
         **build_wheels_job(Platform.MACOS14_ARM64, for_deploy_ref, needs),
     }
 
@@ -1155,7 +1137,6 @@ def test_workflow_jobs() -> Jobs:
     }
     jobs.update(**linux_x86_64_test_jobs())
     jobs.update(**linux_arm64_test_jobs())
-    jobs.update(**macos13_x86_64_test_jobs())
     jobs.update(**macos14_arm64_test_jobs())
     jobs.update(**build_wheels_jobs())
     jobs.update(**windows11_x86_64_test_jobs())
