@@ -933,7 +933,7 @@ _PEX_BINARY_COMMON_FIELDS = (
 
 _PEX_SCIE_BINARY_FIELDS = (
     PexScieField,
-    PexScieNameStyleField,  # --scie-name-style
+    PexScieNameStyleField,
     PexScieBusyBox,
     PexScieBusyboxPexEntrypointEnvPassthrough,
     PexSciePlatformField,
@@ -941,14 +941,6 @@ _PEX_SCIE_BINARY_FIELDS = (
     PexSciePythonVersion,
     PexSciePbsStripped,
     PexScieHashAlgField,
-    # --scie-busybox
-    # --scie-busybox-pex-entrypoint-env-passthrough,
-    #   --scie-platform {linux-aarch64,linux-armv7l,linux-powerpc64,linux-riscv64,linux-s390x,linux-x86_64,macos-aarch64,macos-x86_64}
-    # --scie-pbs-release SCIE_PBS_RELEASE
-    # --scie-pypy-release SCIE_PYPY_RELEASE
-    # --scie-python-version SCIE_PYTHON_VERSION
-    # --scie-pbs-stripped, --no-scie-pbs-stripped
-    # --scie-hash-alg SCIE_HASH_ALGORITHMS
 )
 
 
@@ -991,16 +983,6 @@ class PexBinary(Target):
                     """
                 )
             )
-
-
-# class PexScieBinary(PexBinary):
-#     alias = "pex_scie_binary"
-#     core_fields = (
-#         #*(FrozenOrderedSet(PythonTestTarget.core_fields) - {
-#         PexBinary.core_fields,
-#         *_PEX_SCIE_BINARY_FIELDS
-#     )
-#     help = help_test("SCIENCE")
 
 
 class PexEntryPointsField(StringSequenceField, AsyncFieldMixin):
