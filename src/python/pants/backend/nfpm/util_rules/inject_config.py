@@ -89,9 +89,12 @@ class _PrioritizedSortableClassMetaclass(ABCMeta):
         highest priority request class, can override any of the fields injected by lower priority
         request rules.
         """
-        if isinstance(other, _PrioritizedSortableClassMetaclass):
+        if not isinstance(other, _PrioritizedSortableClassMetaclass):
+            return NotImplemented
+        if self.priority != other.priority:
             return self.priority < other.priority
-        return NotImplemented
+        # other has same priority: fall back to name comparison (ensures deterministic sort)
+        return (self.__module__, self.__qualname__) < (other.__module__, other.__qualname__)
 
 
 # Note: This only exists as a hook for additional logic for nFPM config generation, e.g. for plugin

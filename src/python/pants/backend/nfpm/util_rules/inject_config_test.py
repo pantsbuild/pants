@@ -53,6 +53,10 @@ class SubclassPluginInjectFieldsRequest(PluginInjectFieldsRequest):
     pass
 
 
+class AnotherSubclassPluginInjectFieldsRequest(PluginInjectFieldsRequest):
+    pass
+
+
 @rule
 async def inject_nfpm_package_fields_subclass(
     request: SubclassPluginInjectFieldsRequest,
@@ -108,6 +112,9 @@ async def inject_nfpm_package_fields_high_priority(
         (SubclassPluginInjectFieldsRequest, PluginInjectFieldsRequest, False),
         (PluginInjectFieldsRequest, HighPriorityInjectFieldsRequest, True),
         (PluginInjectFieldsRequest, SubclassPluginInjectFieldsRequest, True),
+        # Subclass* > AnotherSubclass* : with same priority, sort uses name of module+class
+        (SubclassPluginInjectFieldsRequest, AnotherSubclassPluginInjectFieldsRequest, False),
+        (AnotherSubclassPluginInjectFieldsRequest, SubclassPluginInjectFieldsRequest, True),
         # self is equal which is not less than
         (HighPriorityInjectFieldsRequest, HighPriorityInjectFieldsRequest, False),
     ),
