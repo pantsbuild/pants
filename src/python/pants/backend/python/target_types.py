@@ -729,7 +729,26 @@ class PexScieField(StringField):
     alias = "scie"
     valid_choices = ("lazy", "eager")
     default = None
-    help = help_text("SCIENICE")
+    help = help_text(
+        """
+        Create one or more native executable scies from your PEX that include
+        a portable CPython interpreter along with your PEX making for a truly
+        hermetic PEX that can run on machines with no Python installed at
+        all. If your PEX has multiple targets then one PEX scie will be made
+        for each platform, selecting the latest compatible portable CPython or
+        PyPy interpreter as appropriate. Note that only Python>=3.8 is
+        supported. If you'd like to explicitly control the target platforms or
+        the exact portable CPython selected, see `scie_platform`,
+        `scie_pbs_release` and `scie_python_version`.  Specifying `lazy` will
+        fetch the portable CPython interpreter just in time on first boot of
+        the PEX scie on a given machine if needed. Specifying `eager` will
+        embed the portable CPython interpreter in your PEX scie making for a
+        larger file, but requiring no internet access to boot. See
+        https://science.scie.app for further details
+
+        NOTE: `pants run` will always run the "regular" PEX, use `package` to
+        create scie PEXs.  """
+    )
 
 
 class ScieNameStyle(StrEnum):
@@ -743,26 +762,72 @@ class PexScieNameStyleField(StringField):
     valid_choices = ScieNameStyle
     expected_type = str
     default = ScieNameStyle.DYNAMIC
-    help = help_text("SCIENICE")
+    help = help_text(
+        """
+        Control how the output file translates to a scie name. By default
+        (`dynamic`), the platform is used as a file suffix only when needed
+        for disambiguation when targeting a local platform.  Specifying
+        `platform-file-suffix` forces the scie target platform name to be
+        added as a suffix of the output filename; Specifying
+        `platform-parent-dir` places the scie in a sub- directory with the
+        name of the platform it targets."""
+    )
 
 
 class PexScieBusyBox(StringField):
     alias = "scie_busybox"
     default = None
-    # TODO: include note re entry_point limitation
-    help = help_text("SCIENICE")
+    help = help_text(
+        """
+        Make the PEX scie a BusyBox over the specified entry points. The entry
+        points can either be console scripts or entry point specifiers. To
+        select all console scripts in all distributions contained in the PEX,
+        use `@`. To just pick all the console scripts from a particular
+        project name's distributions in the PEX, use `@<project name>`; e.g.:
+        `@ansible-core`. To exclude all the console scripts from a project,
+        prefix with a `!`; e.g.: `@,!@ansible-core` selects all console
+        scripts except those provided by the `ansible- core` project. To
+        select an individual console script, just use its name or prefix the
+        name with `!` to exclude that individual console script. To specify an
+        arbitrary entry point in a module contained within one of the
+        distributions in the PEX, use a string of the form
+        `<name>=<module>(:<function>)`; e.g.: 'run- baz=foo.bar:baz' to
+        execute the `baz` function in the `foo.bar` module as the entry point
+        named `run-baz`.
+
+        A BusyBox scie has no default entrypoint; instead, when run, it
+        inspects argv0; if that matches one of its embedded entry points, it
+        runs that entry point; if not, it lists all available entrypoints for
+        you to pick from. To run a given entry point, you specify it as the
+        first argument and all other arguments after that are forwarded to
+        that entry point. BusyBox PEX scies allow you to install all their
+        contained entry points into a given directory.  For more information,
+        run `SCIE=help <your PEX scie>` and review the `install` command help.
+
+        NOTE: This is only available for formal Python entry points
+        <https://packaging.python.org/en/latest/specifications/entry-points/>
+        and not the informal use by the `pex_binary` field `entry_point` to
+        run first party files.
+        """
+    )
 
 
 class PexScieBusyboxPexEntrypointEnvPassthrough(TriBoolField):
     alias = "scie_busybox_pex_entrypoint_env_passthrough"
     required = False
     default = None
-    help = help_text("SCIENICE")
+    help = help_text(
+        """ When creating a busybox, allow overriding the primary entrypoint
+        at runtime via PEX_INTERPRETER, PEX_SCRIPT and PEX_MODULE. Note that
+        when using the `venv` execution mode this adds modest startup overhead
+        on the order of 10ms.  """
+    )
 
 
 class PexSciePlatformField(StringSequenceField):
     alias = "scie_platform"
     valid_choices = (
+        "current",
         "linux-aarch64",
         "linux-armv7l",
         "linux-powerpc64",
@@ -773,31 +838,73 @@ class PexSciePlatformField(StringSequenceField):
         "macos-x86_64",
     )
     expected_type = str
-    help = help_text("SCIENICE")
+    help = help_text(
+        """ The platform to produce the native PEX scie executable for.  You
+        can use a value of `current` to select the current platform. If left
+        unspecified, the platforms implied by the targets selected to build
+        the PEX with are used. Those targets are influenced by the current
+        interpreter running Pex as well as use of `complete_platforms` and
+        `interpreter_constraints`. Note that, in general, `scie_platform`
+        should only be used to select a subset of the platforms implied by the
+        targets selected via other options.  """)
 
 
 class PexSciePbsReleaseField(StringField):
     alias = "scie_pbs_release"
     default = None
-    help = help_text("SCIENICE")
+    help = help_text(
+        """ The Python Standalone Builds release to use when a CPython
+        interpreter distribution is needed for the PEX scie. Currently,
+        releases are dates of the form YYYYMMDD, e.g.: '20240713'. See their
+        GitHub releases page at
+        <https://github.com/astral-sh/python-build-standalone/releases> to
+        discover available releases. If left unspecified the latest release is
+        used.
+        """
+    )
 
 
 class PexSciePythonVersion(StringField):
     alias = "scie_python_version"
     default = None
-    help = help_text("SCIENICE")
+    help = help_text(
+        """ The portable CPython version to select. Can be either in
+        `<major>.<minor>` form; e.g.: '3.11', or else fully specified as
+        `<major>.<minor>.<patch>`; e.g.: '3.11.3'. If you don't specify this
+        option, Pex will do its best to guess appropriate portable CPython
+        versions. N.B.: Python Standalone Builds does not provide all patch
+        versions; so you should check their releases at
+        <https://github.com/astral-sh/python-build-standalone/releases> if you
+        wish to pin down to the patch level.
+        """
+    )
 
 
 class PexSciePbsStripped(TriBoolField):
     alias = "scie_pbs_stripped"
     required = False
     default = None
-    help = help_text("SCIENICE")
+    help = help_text(
+        """ Should the Python Standalone Builds CPython distributions used be
+        stripped of debug symbols or not. For Linux and Windows particularly,
+        the stripped distributions are less than half the size of the
+        distributions that ship with debug symbols.  """
+    )
 
 
 class PexScieHashAlgField(StringField):
     alias = "scie_hash_alg"
-    help = help_text("SCIENICE")
+    help = help_text(
+        """ Output a checksum file for each scie generated that is compatible
+        with the shasum family of tools. For each unique algorithm specified,
+        a sibling file to each scie executable will be generated with the same
+        stem as that scie file and hash algorithm name suffix.  The file will
+        contain the hex fingerprint of the scie executable using that
+        algorithm to hash it. Supported algorithms include at least md5, sha1,
+        sha256, sha384 and sha512. For the complete list of supported hash
+        algorithms, see the science tool --hash documentation here:
+        <https://science.scie.app/cli.html#science-lift-build>.  """
+    )
 
 
 _PEX_BINARY_COMMON_FIELDS = (
