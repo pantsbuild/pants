@@ -1,9 +1,9 @@
 // Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use options::BuildRoot;
-use options::ConfigSource;
-use options::config::Config;
+use options::config::{Config, ConfigReader};
+use options::fromfile::FromfileExpander;
+use options::{BuildRoot, ConfigSource};
 use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
 use std::fs::canonicalize;
@@ -15,26 +15,30 @@ pub type InterpolationMap = HashMap<String, String>;
 pub struct ConfigFinder {
     buildroot: BuildRoot,
     seed_values: InterpolationMap,
+    fromfile_expander: FromfileExpander,
     // Populated lazily as we encounter config files.
-    parsed_configs: Arc<Mutex<HashMap<PathBuf, Arc<Config>>>>,
+    parsed_configs: Arc<Mutex<HashMap<PathBuf, Arc<ConfigReader>>>>,
 }
 
 impl ConfigFinder {
     pub fn new(buildroot: BuildRoot, seed_values: InterpolationMap) -> Result<Self, String> {
+        let fromfile_expander = FromfileExpander::relative_to(buildroot.clone());
         Ok(Self {
             buildroot,
             seed_values,
+            fromfile_expander,
             parsed_configs: Arc::new(Mutex::new(HashMap::new())),
         })
     }
 
-    fn get_config(&self, path: &Path) -> Result<Arc<Config>, String> {
+    fn get_config(&self, path: &Path) -> Result<Arc<ConfigReader>, String> {
         let mut lock = self.parsed_configs.lock();
         if let Some(config) = lock.get(path) {
             return Ok(Arc::clone(config));
         }
         let config = Config::parse(&ConfigSource::from_file(path)?, &self.seed_values)?;
-        let ret = Arc::new(config);
+        let config_reader = ConfigReader::new(config, self.fromfile_expander.clone());
+        let ret = Arc::new(config_reader);
         lock.insert(path.to_path_buf(), Arc::clone(&ret));
         Ok(ret)
     }
@@ -47,7 +51,7 @@ impl ConfigFinder {
         &self,
         dir: &Path,
         context: &HashSet<String>,
-    ) -> Result<Vec<Arc<Config>>, String> {
+    ) -> Result<Vec<Arc<ConfigReader>>, String> {
         self.get_applicable_config_files(dir, context)?
             .into_iter()
             .map(|path| self.get_config(path.as_path()))

@@ -338,7 +338,7 @@ impl Config {
     }
 }
 
-pub(crate) struct ConfigReader {
+pub struct ConfigReader {
     config: Config,
     fromfile_expander: FromfileExpander,
 }
