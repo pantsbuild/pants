@@ -66,7 +66,7 @@ impl ConfigFinder {
     // A valid config file name is `pants.toml` or `pants_(context tags).toml` where the context
     // tags are dot-separated strings.
     //
-    // For example, "pants.ci.macos.arm64.toml" has the context tags "ci", "macos" and "arm64",
+    // For example, "pants_ci.macos.arm64.toml" has the context tags "ci", "macos" and "arm64",
     // and the file will only be applicable if all those tags are in the given `context` set.
     //
     // Configs are returned in precedence order, with later files overriding earlier ones.
