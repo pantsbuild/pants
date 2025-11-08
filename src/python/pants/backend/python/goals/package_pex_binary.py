@@ -200,7 +200,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
 
 # Stand alone functions for ease of testing
 def _current_scie_platform() -> str:
-    # This is only a subset of the platforms that Pex can prodice
+    # This is only a subset of the platforms that Pex can produce
     # scies for.  While Pants can produce foreign platform scies, the
     # "current" platform can only be one Pants itself can run on.
     platform = Platform.create_for_localhost().replace("_", "-")
