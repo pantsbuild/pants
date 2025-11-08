@@ -322,7 +322,6 @@ async def built_package_for_pex_from_targets_request(
     pft_request = await package_pex_binary(field_set, **implicitly())
 
     if field_set.builds_pex_and_scie():
-        field_set.scie_output_filenames()
         pex_request = dataclasses.replace(
             await create_pex_from_targets(**implicitly(pft_request.request)),
             additional_args=(*pft_request.request.additional_args, *field_set.generate_scie_args()),
