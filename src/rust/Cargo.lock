@@ -2717,6 +2717,7 @@ dependencies = [
 name = "options_pants_ng"
 version = "0.0.1"
 dependencies = [
+ "fs",
  "glob",
  "options",
  "parking_lot 0.12.4",

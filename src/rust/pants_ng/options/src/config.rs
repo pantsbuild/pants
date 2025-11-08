@@ -1,12 +1,12 @@
 // Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use fs::RelativePath;
 use options::config::{Config, ConfigReader};
 use options::fromfile::FromfileExpander;
 use options::{BuildRoot, ConfigSource};
 use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
-use std::fs::canonicalize;
 use std::path::{MAIN_SEPARATOR_STR, Path, PathBuf};
 use std::sync::Arc;
 
@@ -81,30 +81,22 @@ impl ConfigFinder {
         dir: &Path,
         context: &HashSet<String>,
     ) -> Result<Vec<PathBuf>, String> {
-        let buildroot = canonicalize(self.buildroot.as_path()).map_err(|e| e.to_string())?;
-        let dir = if dir.is_relative() {
-            buildroot.join(dir)
+        let buildroot = self.buildroot.as_path();
+        let reldir = RelativePath::new(if dir.is_absolute() {
+            dir.strip_prefix(buildroot).map_err(|e| e.to_string())?
         } else {
-            dir.to_path_buf()
-        };
-        if !dir.starts_with(&buildroot) {
-            return Err(format!(
-                "Path {} is not under buildroot {}",
-                dir.display(),
-                buildroot.display()
-            ));
-        }
-        let dir = canonicalize(dir).map_err(|e| e.to_string())?;
-
+            dir
+        })?;
         let unqualified_config_file = PathBuf::from("pants.toml");
         let mut configs = vec![];
 
         // For each ancestor dir, find all applicable config files in that dir.
-        for ancestor in dir.ancestors() {
+        for ancestor_relpath in reldir.ancestors() {
             let mut dir_configs = vec![];
+            let ancestor_abspath = buildroot.join(ancestor_relpath);
             // First look at the unqualified pants.toml.
-            let ancestor_str = ancestor.to_string_lossy();
-            let config_path = ancestor.join(&unqualified_config_file);
+            let ancestor_str = ancestor_abspath.to_string_lossy();
+            let config_path = ancestor_abspath.join(&unqualified_config_file);
             if config_path.exists() {
                 dir_configs.push(config_path);
             }
@@ -137,7 +129,7 @@ impl ConfigFinder {
             dir_configs.reverse();
             configs.append(&mut dir_configs);
 
-            if ancestor == buildroot {
+            if ancestor_relpath == buildroot {
                 break;
             }
         }

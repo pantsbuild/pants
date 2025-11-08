@@ -6,6 +6,7 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
+fs = { path = "../../fs" }
 glob = { workspace = true }
 options = { path = "../../options" }
 parking_lot = { workspace = true }
