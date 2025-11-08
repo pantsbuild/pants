@@ -128,10 +128,6 @@ impl ConfigFinder {
             dir_configs.sort();
             dir_configs.reverse();
             configs.append(&mut dir_configs);
-
-            if ancestor_relpath == buildroot {
-                break;
-            }
         }
 
         // We discover configs from deep to shallow, but we want to process them from
