@@ -13,7 +13,7 @@ use crate::fromfile::FromfileExpander;
 use crate::parse::Parseable;
 use crate::scope::Scope;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Env {
     pub(crate) env: HashMap<String, String>,
 }
@@ -55,14 +55,13 @@ impl Env {
     }
 }
 
-pub(crate) struct EnvReader {
+pub struct EnvReader {
     env: Env,
-    #[allow(dead_code)]
     fromfile_expander: FromfileExpander,
 }
 
 impl EnvReader {
-    pub(crate) fn new(env: Env, fromfile_expander: FromfileExpander) -> Self {
+    pub fn new(env: Env, fromfile_expander: FromfileExpander) -> Self {
         Self {
             env,
             fromfile_expander,

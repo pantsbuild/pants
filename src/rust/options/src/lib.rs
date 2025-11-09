@@ -33,6 +33,10 @@ mod id;
 #[cfg(test)]
 mod id_tests;
 
+pub mod pants_ng_flags;
+#[cfg(test)]
+pub mod pants_ng_flags_tests;
+
 mod parse;
 #[cfg(test)]
 mod parse_tests;
@@ -149,7 +153,7 @@ pub struct DictEdit {
     pub items: HashMap<String, Val>,
 }
 
-pub(crate) trait OptionsSource: Send + Sync {
+pub trait OptionsSource: Send + Sync {
     ///
     /// Get a display version of the option `id` that most closely matches the syntax used to supply
     /// the id at runtime. For example, an global option of "bob" would display as "--bob" for use in
@@ -613,6 +617,22 @@ impl OptionParser {
                 include_derivation,
                 command: parser.command.add_specs(extra_specs),
             })
+        }
+    }
+
+    // The pants_ng options code uses an old OptionParser for convenience,
+    // but sets up the sources itself.
+    pub fn new_pants_ng(
+        sources: BTreeMap<Source, Arc<dyn OptionsSource>>,
+        include_derivation: bool,
+    ) -> Self {
+        // pants_ng has its own type to represent a Pants command line, which is not
+        // compatible with the old PantsCommand, so we set this to a dummy
+        let dummy_command = PantsCommand::empty();
+        Self {
+            sources,
+            include_derivation,
+            command: dummy_command,
         }
     }
 
