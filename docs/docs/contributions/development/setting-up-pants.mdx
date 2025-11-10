@@ -102,20 +102,19 @@ Pants sets up its development virtualenv at `~/.cache/pants/pants_dev_deps/<arch
 
 ### VSCode guide
 
+Install and enable the official `Flake8` and `Black Formatter` extensions from Microsoft.
+
 Add this to your `settings.json` file inside the build root's `.vscode` folder:
 
 ```json title="settings.json"
 {
   "python.analysis.extraPaths": ["src/python"],
-  "python.formatting.provider": "black",
-  "python.linting.enabled": true,
-  "python.linting.flake8Enabled": true,
-  "python.linting.flake8Args": ["--config=build-support/flake8/.flake8"],
-  "rust-analyzer.linkedProjects": ["src/rust/Cargo.toml"]
+  "rust-analyzer.linkedProjects": ["src/rust/Cargo.toml"],
+  "flake8.args": ["--config=build-support/flake8/.flake8"],
 }
 ```
 
-`python.analysis.extraPaths` lets VSCode know where to find Pants's source root. The other config enables `black` and `flake8`.
+`python.analysis.extraPaths` lets VSCode know where to find Pants's source root.
 
 ## Alternative with the Dev Container
 
