@@ -244,7 +244,7 @@ def no_exception():
             dict(type=list, member_type=int, default="[1, 2.1, 3]"),
             pytest.raises(
                 DefaultValueType,
-                match=r"Default member value type mismatch\.\n\n    Member value float\(2\.1\) does not match list option type int\.",
+                match=r"Default member value type mismatch\.\n\nMember value float\(2\.1\) does not match list option type int\.",
             ),
         ),
         (
