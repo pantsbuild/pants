@@ -247,9 +247,6 @@ def lookup_type_with_fallback(
             parent_type = ".".join(parts[:i])
             matches = symbol_mapping.addresses_for_symbol(parent_type, resolve)
             if matches:
-                logger.debug(
-                    f"Found parent type '{parent_type}' for inner class reference '{typ}'"
-                )
                 return matches
 
     return {}
