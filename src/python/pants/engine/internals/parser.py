@@ -19,6 +19,7 @@ from pathlib import PurePath
 from typing import Annotated, Any, TypeVar
 
 import typing_extensions
+from annotationlib import Format, ForwardRef, call_annotate_function
 
 from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import MappingError
@@ -67,15 +68,12 @@ class BuildFilePreludeSymbols(BuildFileSymbolsInfo):
 
     @classmethod
     def create(cls, ns: Mapping[str, Any], env_vars: Iterable[str]) -> BuildFilePreludeSymbols:
-        info = {}
-        annotations_name = "__annotations__"
-        annotations = ns.get(annotations_name, {})
-        for name, symb in ns.items():
-            if name == annotations_name:
-                # don't include the annotations themselves as a symbol
-                continue
+        annotations: dict[str, Any | ForwardRef] = {}
+        if annotation_function := ns.get("__annotate__"):
+            annotations = call_annotate_function(annotation_function, format=Format.FORWARDREF)
 
-            info[name] = BuildFileSymbolInfo(
+        info = {
+            name: BuildFileSymbolInfo(
                 name,
                 symb,
                 # We only need type hints via `annotations` for top-level values which doesn't work with `inspect`.
@@ -83,6 +81,9 @@ class BuildFilePreludeSymbols(BuildFileSymbolsInfo):
                 # If the user has defined a _ symbol, we assume they don't want it in `pants help` output.
                 hide_from_help=name.startswith("_"),
             )
+            for name, symb in ns.items()
+            if name not in ["__annotate__", "__annotations__", "__conditional_annotations__"]
+        }
 
         return cls(info=FrozenDict(info), referenced_env_vars=tuple(sorted(env_vars)))
 
