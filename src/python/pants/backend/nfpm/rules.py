@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from pants.backend.nfpm.field_sets import (
@@ -14,6 +15,7 @@ from pants.backend.nfpm.field_sets import (
 )
 from pants.backend.nfpm.field_sets import rules as field_sets_rules
 from pants.backend.nfpm.subsystem import NfpmSubsystem
+from pants.backend.nfpm.util_rules.contents import rules as contents_rules
 from pants.backend.nfpm.util_rules.generate_config import (
     NfpmPackageConfigRequest,
     generate_nfpm_yaml,
@@ -34,7 +36,8 @@ from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import create_digest, digest_to_snapshot, merge_digests, remove_prefix
 from pants.engine.platform import Platform
 from pants.engine.process import Process, execute_process_or_raise
-from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
+from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
 
@@ -157,12 +160,13 @@ async def package_nfpm_rpm_package(field_set: NfpmRpmPackageFieldSet) -> BuiltPa
     return built_package
 
 
-def rules():
+def rules() -> Iterable[Rule | UnionRule]:
     return [
         *package.rules(),
         *field_sets_rules(),
         *inject_config_rules(),
         *generate_config_rules(),
         *sandbox_rules(),
+        *contents_rules(),
         *collect_rules(),
     ]
