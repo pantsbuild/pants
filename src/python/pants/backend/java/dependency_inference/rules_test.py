@@ -804,3 +804,370 @@ def test_infer_third_party_with_same_package_refs(rule_runner: RuleRunner) -> No
     # Should depend on both same-package Helper and third-party Guava
     assert helper.address in inferred.include
     assert guava.address in inferred.include
+
+
+@maybe_skip_jdk_test
+def test_infer_java_exports_public_static_field(rule_runner: RuleRunner) -> None:
+    """Test transitive dependency through public static field.
+
+    A imports B, B has public static field of type C.
+    A should transitively depend on C even though A never imports C.
+    """
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                java_sources(name='lib')
+                """
+            ),
+            "C.java": dedent(
+                """\
+                package com.example;
+
+                public abstract class C {
+                    public void doThing() { }
+                }
+                """
+            ),
+            "B.java": dedent(
+                """\
+                package com.example;
+
+                public class B {
+                    public static C someField = new C() { };
+                }
+                """
+            ),
+            "A.java": dedent(
+                """\
+                package com.example;
+
+                import com.example.B;  // Only imports B, NOT C!
+
+                public class A {
+                    void use() {
+                        B.someField.doThing();  // Calls method on C without importing C
+                    }
+                }
+                """
+            ),
+        }
+    )
+
+    target_a = rule_runner.get_target(Address("", target_name="lib", relative_file_path="A.java"))
+    target_b = rule_runner.get_target(Address("", target_name="lib", relative_file_path="B.java"))
+    target_c = rule_runner.get_target(Address("", target_name="lib", relative_file_path="C.java"))
+
+    inferred = rule_runner.request(
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_a))],
+    )
+
+    # A should depend on both B (direct import) and C (transitive through B's exported field)
+    assert target_b.address in inferred.include
+    assert target_c.address in inferred.include
+
+
+@maybe_skip_jdk_test
+def test_infer_java_exports_method_return_type(rule_runner: RuleRunner) -> None:
+    """Test transitive dependency through method return type.
+
+    A imports B, B has method returning C.
+    A should transitively depend on C.
+    """
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                java_sources(name='lib')
+                """
+            ),
+            "C.java": dedent(
+                """\
+                package com.example;
+
+                public class C {
+                    public void process() { }
+                }
+                """
+            ),
+            "B.java": dedent(
+                """\
+                package com.example;
+
+                public class B {
+                    public C getC() { return new C(); }
+                }
+                """
+            ),
+            "A.java": dedent(
+                """\
+                package com.example;
+
+                import com.example.B;
+
+                public class A {
+                    void use(B b) {
+                        b.getC().process();
+                    }
+                }
+                """
+            ),
+        }
+    )
+
+    target_a = rule_runner.get_target(Address("", target_name="lib", relative_file_path="A.java"))
+    target_b = rule_runner.get_target(Address("", target_name="lib", relative_file_path="B.java"))
+    target_c = rule_runner.get_target(Address("", target_name="lib", relative_file_path="C.java"))
+
+    inferred = rule_runner.request(
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_a))],
+    )
+
+    assert target_b.address in inferred.include
+    assert target_c.address in inferred.include
+
+
+@maybe_skip_jdk_test
+def test_infer_java_exports_method_parameter_type(rule_runner: RuleRunner) -> None:
+    """Test transitive dependency through method parameter type.
+
+    A imports B, B has method taking C as parameter.
+    A should transitively depend on C.
+    """
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                java_sources(name='lib')
+                """
+            ),
+            "C.java": dedent(
+                """\
+                package com.example;
+
+                public class C { }
+                """
+            ),
+            "B.java": dedent(
+                """\
+                package com.example;
+
+                public class B {
+                    public void process(C param) { }
+                }
+                """
+            ),
+            "A.java": dedent(
+                """\
+                package com.example;
+
+                import com.example.B;
+
+                public class A {
+                    void use(B b) {
+                        b.process(null);
+                    }
+                }
+                """
+            ),
+        }
+    )
+
+    target_a = rule_runner.get_target(Address("", target_name="lib", relative_file_path="A.java"))
+    target_b = rule_runner.get_target(Address("", target_name="lib", relative_file_path="B.java"))
+    target_c = rule_runner.get_target(Address("", target_name="lib", relative_file_path="C.java"))
+
+    inferred = rule_runner.request(
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_a))],
+    )
+
+    assert target_b.address in inferred.include
+    assert target_c.address in inferred.include
+
+
+@maybe_skip_jdk_test
+def test_infer_java_exports_superclass(rule_runner: RuleRunner) -> None:
+    """Test transitive dependency through superclass.
+
+    A imports B, B extends C.
+    A should transitively depend on C.
+    """
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                java_sources(name='lib')
+                """
+            ),
+            "C.java": dedent(
+                """\
+                package com.example;
+
+                public abstract class C {
+                    public abstract void doWork();
+                }
+                """
+            ),
+            "B.java": dedent(
+                """\
+                package com.example;
+
+                public class B extends C {
+                    @Override
+                    public void doWork() { }
+                }
+                """
+            ),
+            "A.java": dedent(
+                """\
+                package com.example;
+
+                import com.example.B;
+
+                public class A {
+                    void use() {
+                        B b = new B();
+                        b.doWork();
+                    }
+                }
+                """
+            ),
+        }
+    )
+
+    target_a = rule_runner.get_target(Address("", target_name="lib", relative_file_path="A.java"))
+    target_b = rule_runner.get_target(Address("", target_name="lib", relative_file_path="B.java"))
+    target_c = rule_runner.get_target(Address("", target_name="lib", relative_file_path="C.java"))
+
+    inferred = rule_runner.request(
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_a))],
+    )
+
+    assert target_b.address in inferred.include
+    assert target_c.address in inferred.include
+
+
+@maybe_skip_jdk_test
+def test_infer_java_exports_interface(rule_runner: RuleRunner) -> None:
+    """Test transitive dependency through implemented interface.
+
+    A imports B, B implements C.
+    A should transitively depend on C.
+    """
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                java_sources(name='lib')
+                """
+            ),
+            "C.java": dedent(
+                """\
+                package com.example;
+
+                public interface C {
+                    void execute();
+                }
+                """
+            ),
+            "B.java": dedent(
+                """\
+                package com.example;
+
+                public class B implements C {
+                    @Override
+                    public void execute() { }
+                }
+                """
+            ),
+            "A.java": dedent(
+                """\
+                package com.example;
+
+                import com.example.B;
+
+                public class A {
+                    void use() {
+                        B b = new B();
+                        b.execute();
+                    }
+                }
+                """
+            ),
+        }
+    )
+
+    target_a = rule_runner.get_target(Address("", target_name="lib", relative_file_path="A.java"))
+    target_b = rule_runner.get_target(Address("", target_name="lib", relative_file_path="B.java"))
+    target_c = rule_runner.get_target(Address("", target_name="lib", relative_file_path="C.java"))
+
+    inferred = rule_runner.request(
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_a))],
+    )
+
+    assert target_b.address in inferred.include
+    assert target_c.address in inferred.include
+
+
+@maybe_skip_jdk_test
+def test_infer_java_exports_private_field_not_exported(rule_runner: RuleRunner) -> None:
+    """Test that private fields are NOT exported.
+
+    B has private field of type C. A imports B but should NOT depend on C.
+    """
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                java_sources(name='lib')
+                """
+            ),
+            "C.java": dedent(
+                """\
+                package com.example;
+
+                public class C { }
+                """
+            ),
+            "B.java": dedent(
+                """\
+                package com.example;
+
+                public class B {
+                    private C privateField;  // Private field - should NOT be exported
+                }
+                """
+            ),
+            "A.java": dedent(
+                """\
+                package com.example;
+
+                import com.example.B;
+
+                public class A {
+                    void use() {
+                        B b = new B();
+                    }
+                }
+                """
+            ),
+        }
+    )
+
+    target_a = rule_runner.get_target(Address("", target_name="lib", relative_file_path="A.java"))
+    target_b = rule_runner.get_target(Address("", target_name="lib", relative_file_path="B.java"))
+    target_c = rule_runner.get_target(Address("", target_name="lib", relative_file_path="C.java"))
+
+    inferred = rule_runner.request(
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_a))],
+    )
+
+    # A should depend on B (direct import) but NOT on C (private field not exported)
+    assert target_b.address in inferred.include
+    assert target_c.address not in inferred.include

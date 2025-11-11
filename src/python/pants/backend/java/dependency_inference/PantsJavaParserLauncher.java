@@ -6,10 +6,12 @@ import com.github.javaparser.ParserConfiguration;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.ImportDeclaration;
+import com.github.javaparser.ast.Modifier;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.PackageDeclaration;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.body.TypeDeclaration;
@@ -180,11 +182,34 @@ public class PantsJavaParserLauncher {
             }
             if (node instanceof MethodDeclaration) {
               MethodDeclaration methodDecl = (MethodDeclaration) node;
-              export.accept(methodDecl.getType());
-              for (Parameter param : methodDecl.getParameters()) {
-                export.accept(param.getType());
+              // Only export types from non-private methods
+              if (!methodDecl.isPrivate()) {
+                export.accept(methodDecl.getType());
+                for (Parameter param : methodDecl.getParameters()) {
+                  export.accept(param.getType());
+                }
+              } else {
+                // Private methods still consume types internally
+                consumed.accept(methodDecl.getType());
+                for (Parameter param : methodDecl.getParameters()) {
+                  consumed.accept(param.getType());
+                }
               }
               methodDecl.getThrownExceptions().stream().forEach(consumed);
+            }
+            if (node instanceof FieldDeclaration) {
+              FieldDeclaration fieldDecl = (FieldDeclaration) node;
+              // Export field types from non-private fields (public, protected, package-private)
+              if (!fieldDecl.isPrivate()) {
+                for (VariableDeclarator var : fieldDecl.getVariables()) {
+                  export.accept(var.getType());
+                }
+              } else {
+                // Private fields still consume types internally
+                for (VariableDeclarator var : fieldDecl.getVariables()) {
+                  consumed.accept(var.getType());
+                }
+              }
             }
             if (node instanceof ClassOrInterfaceDeclaration) {
               ClassOrInterfaceDeclaration classOrIntfDecl = (ClassOrInterfaceDeclaration) node;
