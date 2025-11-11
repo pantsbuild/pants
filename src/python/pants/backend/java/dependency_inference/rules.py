@@ -35,6 +35,13 @@ from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
+# Java standard library package prefixes - types starting with these are always fully qualified
+JAVA_STDLIB_PREFIXES = frozenset([
+    "java.", "javax.", "jakarta.", "jdk.",
+    "com.sun.", "sun.",  # Oracle internal
+    "org.w3c.", "org.xml.", "org.ietf.", "org.omg.",  # Standards
+])
+
 
 @dataclass(frozen=True)
 class JavaSourceDependenciesInferenceFieldSet(FieldSet):
@@ -91,15 +98,13 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
     if java_infer_subsystem.consumed_types:
         package = analysis.declared_package
 
-        # 13545: `analysis.consumed_types` may be unqualified (package-local or imported) or qualified
-        # (prefixed by package name). Heuristic for now is that if there's a `.` in the type name, it's
-        # probably fully qualified. This is probably fine for now.
-        maybe_qualify_types = (
-            f"{package}.{consumed_type}" if package and "." not in consumed_type else consumed_type
-            for consumed_type in analysis.consumed_types
-        )
+        # Qualify each consumed type, potentially generating multiple candidates
+        type_candidates: OrderedSet[str] = OrderedSet()
+        for consumed_type in analysis.consumed_types:
+            candidates = qualify_consumed_type(consumed_type, package, analysis.imports)
+            type_candidates.update(candidates)
 
-        types.update(maybe_qualify_types)
+        types.update(type_candidates)
 
     # Resolve the export types into (probable) types:
     # First produce a map of known consumed unqualified types to possible qualified names
@@ -122,7 +127,7 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
     dependencies: OrderedSet[Address] = OrderedSet()
     exports: OrderedSet[Address] = OrderedSet()
     for typ in types:
-        for matches in symbol_mapping.addresses_for_symbol(typ, resolve).values():
+        for matches in lookup_type_with_fallback(typ, symbol_mapping, resolve).values():
             explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
                 matches,
                 address,
@@ -155,6 +160,99 @@ async def infer_java_dependencies_via_source_analysis(
         JavaInferredDependenciesAndExportsRequest(request.field_set.source), **implicitly()
     )
     return InferredDependencies(jids.dependencies)
+
+
+def qualify_consumed_type(
+    type_name: str,
+    source_package: str | None,
+    imports: tuple[JavaImport, ...],
+) -> tuple[str, ...]:
+    """
+    Qualify a consumed type name, returning possible qualified names to try.
+
+    Returns a tuple of candidates in priority order. The symbol map should be checked
+    for each candidate until a match is found.
+
+    Args:
+        type_name: The type name as it appears in the source (may be qualified or unqualified)
+        source_package: The package of the source file, or None if unnamed package
+        imports: The imports declared in the source file
+
+    Returns:
+        Tuple of possible fully-qualified type names, in priority order
+    """
+    # Case 1: No dots → definitely unqualified, needs package prefix
+    if "." not in type_name:
+        if source_package:
+            return (f"{source_package}.{type_name}",)
+        else:
+            return (type_name,)  # Unnamed package
+
+    # Case 2: Known JDK/stdlib type → already fully qualified
+    if any(type_name.startswith(prefix) for prefix in JAVA_STDLIB_PREFIXES):
+        return (type_name,)
+
+    # Case 3: Type fully qualified name appears in imports → already resolved
+    import_names = {imp.name for imp in imports}
+    if type_name in import_names:
+        return (type_name,)
+
+    # Case 4: Outer class is imported → resolve inner class through import
+    # E.g., "B.InnerB" where "com.other.B" is imported → "com.other.B.InnerB"
+    first_part = type_name.split(".")[0]
+    for imp in imports:
+        if imp.name.endswith(f".{first_part}"):
+            # Found import for outer class, construct fully qualified inner class name
+            qualified = imp.name + type_name[len(first_part):]
+            return (qualified,)
+
+    # Case 5: Ambiguous - has dots but not stdlib, not imported
+    # Most likely: same-package inner class like "B.InnerB" → "com.example.B.InnerB"
+    # Less likely: third-party FQTN without import
+    if source_package:
+        # Try same-package first (most common), then as-is (fallback for third-party)
+        return (f"{source_package}.{type_name}", type_name)
+    else:
+        return (type_name,)
+
+
+def lookup_type_with_fallback(
+    typ: str,
+    symbol_mapping: SymbolMapping,
+    resolve: str
+) -> dict[str, FrozenOrderedSet[Address]]:
+    """
+    Look up a type in the symbol map, with fallback to parent types for inner classes.
+
+    Args:
+        typ: Fully qualified type name (e.g., "com.example.B.InnerB")
+        symbol_mapping: The symbol map to search
+        resolve: The JVM resolve to search within
+
+    Returns:
+        Dict mapping namespaces to addresses, empty if no match found
+    """
+    # Try exact match first
+    matches = symbol_mapping.addresses_for_symbol(typ, resolve)
+    if matches:
+        return matches
+
+    # If not found and typ looks like it might be an inner class (has dots after package)
+    # Try stripping inner class parts one by one
+    # E.g., "com.example.B.InnerB" → try "com.example.B"
+    #       "com.example.Outer.Middle.Inner" → try "com.example.Outer.Middle", then "com.example.Outer"
+    parts = typ.split(".")
+    if len(parts) > 2:  # At least package + outer + inner
+        for i in range(len(parts) - 1, 1, -1):  # Don't try single-part names
+            parent_type = ".".join(parts[:i])
+            matches = symbol_mapping.addresses_for_symbol(parent_type, resolve)
+            if matches:
+                logger.debug(
+                    f"Found parent type '{parent_type}' for inner class reference '{typ}'"
+                )
+                return matches
+
+    return {}
 
 
 def dependency_name(imp: JavaImport):
