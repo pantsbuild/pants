@@ -37,7 +37,7 @@ from pants.backend.python.util_rules.pex import (
     setup_venv_pex_process,
 )
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
-from pants.backend.python.util_rules.pex_requirements import PexRequirements
+from pants.backend.python.util_rules.pex_requirements import PexRequirements, Resolve
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
     prepare_python_sources,
@@ -276,10 +276,44 @@ async def setup_pytest_for_target(
 
     interpreter_constraints = request.metadata.interpreter_constraints
 
-    requirements_pex_get = create_pex(**implicitly(RequirementsPexRequest(addresses)))
-    pytest_pex_get = create_pex(
-        pytest.to_pex_request(interpreter_constraints=interpreter_constraints)
+    target_resolve = request.metadata.resolve
+    pytest_resolve = pytest.install_from_resolve
+
+    # Check if pytest should use the target resolve:
+    # 1. If explicitly configured via install_from_target_resolve
+    # 2. Or if install_from_resolve matches the target's resolve (backward compatibility)
+    use_target_resolve_for_pytest = (
+        pytest.install_from_target_resolve
+        or (
+            pytest_resolve is not None
+            and pytest_resolve == target_resolve
+        )
     )
+
+    requirements_pex_get = create_pex(**implicitly(RequirementsPexRequest(addresses)))
+
+    pytest_pex_get = None
+    if use_target_resolve_for_pytest:
+        # We still need to create a PEX with pytest requirements from the target resolve
+        # just need to make sure the versions are coming from the target resolve.
+        pytest_req_strings = pytest.requirements if pytest.requirements else pytest.default_requirements
+        pytest_requirements = PexRequirements(
+            pytest_req_strings,
+            from_superset=Resolve(target_resolve, use_entire_lockfile=False),
+            description_of_origin="pytest requirements from target resolve",
+        )
+        pytest_pex_get = create_pex(
+            PexRequest(
+                output_filename="pytest_from_target_resolve.pex",
+                internal_only=True,
+                requirements=pytest_requirements,
+                interpreter_constraints=interpreter_constraints,
+            )
+        )
+    else:
+        pytest_pex_get = create_pex(
+            pytest.to_pex_request(interpreter_constraints=interpreter_constraints)
+        )
 
     # Ensure that the empty extra output dir exists.
     extra_output_directory_digest_get = create_digest(CreateDigest([Directory(_EXTRA_OUTPUT_DIR)]))
@@ -322,6 +356,8 @@ async def setup_pytest_for_target(
         )
     )
 
+    pex_path_components: list[Pex] = [pytest_pex, requirements_pex, local_dists.pex, *request.additional_pexes]
+
     pytest_runner_pex_get = create_venv_pex(
         **implicitly(
             PexRequest(
@@ -329,7 +365,7 @@ async def setup_pytest_for_target(
                 interpreter_constraints=interpreter_constraints,
                 main=pytest.main,
                 internal_only=True,
-                pex_path=[pytest_pex, requirements_pex, local_dists.pex, *request.additional_pexes],
+                pex_path=tuple(pex_path_components),
             )
         )
     )
