@@ -164,6 +164,7 @@ class CodeQualityTool:
     file_glob_include: tuple[str, ...]
     file_glob_exclude: tuple[str, ...]
     target: Target
+    runnable_address_field_alias: str
 
 
 @rule
@@ -195,6 +196,7 @@ async def find_code_quality_tool(request: CodeQualityToolAddressString) -> CodeQ
         file_glob_include=target[CodeQualityToolFileGlobIncludeField].value or (),
         file_glob_exclude=target[CodeQualityToolFileGlobExcludeField].value or (),
         target=target,
+        runnable_address_field_alias=CodeQualityToolRunnableField.alias,
     )
 
 
@@ -244,6 +246,7 @@ async def runner_request_for_code_quality_tool(
         execution_dependencies=cqt.execution_dependencies,
         runnable_dependencies=cqt.runnable_dependencies,
         target=cqt.target,
+        runnable_address_field_alias=cqt.runnable_address_field_alias,
     )
 
 
@@ -290,7 +293,7 @@ class CodeQualityToolRuleBuilder:
             skip = SkipOption("lint")
 
         class CodeQualityProcessingRequest(LintFilesRequest):
-            tool_subsystem = CodeQualityToolInstance
+            tool_subsystem = CodeQualityToolInstance  # type: ignore[assignment]
 
         @rule(canonical_name_suffix=self.scope)
         async def partition_inputs(
@@ -342,7 +345,7 @@ class CodeQualityToolRuleBuilder:
             skip = SkipOption("lint", "fmt")
 
         class CodeQualityProcessingRequest(FmtFilesRequest):
-            tool_subsystem = CodeQualityToolInstance
+            tool_subsystem = CodeQualityToolInstance  # type: ignore[assignment]
 
         @rule(canonical_name_suffix=self.scope)
         async def partition_inputs(
@@ -403,7 +406,7 @@ class CodeQualityToolRuleBuilder:
             skip = SkipOption("lint", "fmt", "fix")
 
         class CodeQualityProcessingRequest(FixFilesRequest):
-            tool_subsystem = CodeQualityToolInstance
+            tool_subsystem = CodeQualityToolInstance  # type: ignore[assignment]
 
         @rule(canonical_name_suffix=self.scope)
         async def partition_inputs(

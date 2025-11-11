@@ -377,7 +377,7 @@ async def setup_golang_asm_check_binary() -> SetupAsmCheckBinary:
     compile_result = await execute_process_or_raise(
         **implicitly(
             GoSdkProcess(
-                command=("build", "-o", binary_name, src_file),
+                command=("build", "-trimpath", "-o", binary_name, src_file),
                 input_digest=sources_digest,
                 output_files=(binary_name,),
                 env={"CGO_ENABLED": "0"},
@@ -777,6 +777,8 @@ async def build_go_package(
         request.import_path,
         "-importcfg",
         import_config.CONFIG_PATH,
+        "-trimpath",
+        "__PANTS_SANDBOX_ROOT__",
     ]
 
     # See https://github.com/golang/go/blob/f229e7031a6efb2f23241b5da000c3b3203081d6/src/cmd/go/internal/work/gc.go#L79-L100
@@ -892,6 +894,7 @@ async def build_go_package(
                 description=f"Compile Go package: {request.import_path}",
                 output_files=("__pkg__.a", *([asm_header_path] if asm_header_path else [])),
                 env={"__PANTS_GO_COMPILE_ACTION_ID": action_id_result.action_id},
+                replace_sandbox_root_in_args=True,
             )
         )
     )

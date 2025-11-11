@@ -75,6 +75,7 @@ from pants.engine.process import (
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     FieldSetsPerTargetRequest,
+    InvalidFieldException,
     SourcesField,
     Target,
     TransitiveTargetsRequest,
@@ -157,6 +158,7 @@ class ToolRunnerRequest:
     execution_dependencies: tuple[str, ...]
     runnable_dependencies: tuple[str, ...]
     target: Target
+    runnable_address_field_alias: str
     named_caches: FrozenDict[str, str] | None = None
 
 
@@ -445,6 +447,16 @@ async def create_tool_runner(
         ),
     )
 
+    if not run_field_sets.field_sets:
+        raise InvalidFieldException(
+            f"The `{request.runnable_address_field_alias}` field in target `{request.target.address}` must be set to the "
+            f"address of a target which can be run by the `run` goal. Instead, the `{request.runnable_address_field_alias}` field is "
+            f"set to `{request.runnable_address_str}` which refers to the `{runnable_targets[0].alias}` target "
+            f"at `{runnable_targets[0].address}` that cannot be run by the `run` goal."
+        )
+
+    run_field_set: RunFieldSet = run_field_sets.field_sets[0]
+
     req = ResolveExecutionDependenciesRequest(
         address=request.target.address,
         execution_dependencies=request.execution_dependencies,
@@ -453,8 +465,6 @@ async def create_tool_runner(
     execution_environment = await resolve_execution_environment(
         **implicitly({req: ResolveExecutionDependenciesRequest, environment_name: EnvironmentName}),
     )
-
-    run_field_set: RunFieldSet = run_field_sets.field_sets[0]
 
     # Must be run in target environment so that the binaries/envvars match the execution
     # environment when we actually run the process.
@@ -500,7 +510,7 @@ async def create_tool_runner(
 
     append_only_caches = {
         **merged_extras.append_only_caches,
-        **(request.named_caches or {}),  # type: ignore[dict-item]
+        **(request.named_caches or {}),
     }
 
     return ToolRunner(

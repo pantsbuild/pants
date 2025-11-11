@@ -4,12 +4,12 @@ version: 2
 updates:
   - package-ecosystem: "github-actions"
     directory: "/"
-    schedule:
-      interval: "monthly"
     groups:
       gha-deps:
         patterns:
           - "*"
+    schedule:
+      interval: "monthly"
 
   - package-ecosystem: "cargo"
     directory: "/src/rust"
@@ -37,7 +37,7 @@ updates:
       - tdyas
       - tgolsson
     schedule:
-      interval: "weekly"
+      interval: "monthly"
   
   - package-ecosystem: pip
     directory: "/3rdparty/python"
@@ -58,7 +58,7 @@ updates:
       - "dependencies"
       - "release-notes:not-required"
     schedule:
-      interval: weekly
+      interval: "monthly"
 
   - package-ecosystem: "npm"
     directories: 
@@ -84,4 +84,4 @@ updates:
       - "dependencies"
       - "release-notes:not-required"
     schedule:
-      interval: "weekly"
+      interval: "monthly"

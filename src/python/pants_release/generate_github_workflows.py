@@ -23,21 +23,22 @@ def action(name: str) -> str:
     version_map = {
         "action-send-mail": "dawidd6/action-send-mail@v3.8.0",
         "actions-rust-lang": "actions-rust-lang/setup-rust-toolchain@v1",
-        "attest-build-provenance": "actions/attest-build-provenance@v2",
+        "attest-build-provenance": "actions/attest-build-provenance@v3",
         "cache": "actions/cache@v4",
-        "checkout": "actions/checkout@v4",
+        "checkout": "actions/checkout@v5",
         "coverallsapp": "coverallsapp/github-action@v2",
-        "download-artifact": "actions/download-artifact@v4",
+        "download-artifact": "actions/download-artifact@v6",
         "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
         "msys2": "msys2/setup-msys2@v2",
         "rust-cache": "Swatinem/rust-cache@v2.8.1",
-        "setup-go": "actions/setup-go@v5",
-        "setup-java": "actions/setup-java@v4",
-        "setup-node": "actions/setup-node@v4",
+        # Switch to v6 once https://github.com/actions/setup-go/pull/665 is released
+        "setup-go": "actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25",
+        "setup-java": "actions/setup-java@v5",
+        "setup-node": "actions/setup-node@v6",
         "setup-protoc": "arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9",
-        "setup-python": "actions/setup-python@v5",
+        "setup-python": "actions/setup-python@v6",
         "slack-github-action": "slackapi/slack-github-action@v1.24.0",
-        "upload-artifact": "actions/upload-artifact@v4",
+        "upload-artifact": "actions/upload-artifact@v5",
     }
     try:
         return version_map[name]
@@ -52,7 +53,7 @@ HEADER = dedent(
     """\
     # GENERATED, DO NOT EDIT!
     # To change, edit `src/python/pants_release/generate_github_workflows.py` and run:
-    #   ./pants run src/python/pants_release/generate_github_workflows.py
+    #   pants run src/python/pants_release/generate_github_workflows.py
     """
 )
 
@@ -313,6 +314,7 @@ def launch_bazel_remote() -> Sequence[Step]:
 def global_env() -> Env:
     return {
         "PANTS_CONFIG_FILES": "+['pants.ci.toml']",
+        "PANTS_DISABLE_GETS": "1",
         "RUST_BACKTRACE": "all",
         # Default to disabling OpenTelemetry so GHA steps not using Pants directly do not try
         # to use Honeycomb if they do invoke Pants indirectly (e.g., Rust integration tests).
@@ -382,12 +384,15 @@ def install_jdk() -> Step:
     }
 
 
-def install_go() -> Step:
-    return {
-        "name": "Install Go",
-        "uses": action("setup-go"),
-        "with": {"go-version": "1.19.5"},
-    }
+def install_go() -> list[Step]:
+    def go_cfg(go_version: str) -> Step:
+        return {
+            "name": "Install Go",
+            "uses": action("setup-go"),
+            "with": {"go-version": go_version},
+        }
+
+    return [go_cfg(go_version) for go_version in ("1.25.3", "1.24.9")]
 
 
 def install_python_headers_in_manylinux_container() -> Step:
@@ -792,7 +797,7 @@ def test_jobs(
             *checkout(),
             *(launch_bazel_remote() if with_remote_caching else []),
             install_jdk(),
-            install_go(),
+            *install_go(),
             *(
                 [download_apache_thrift()]
                 if helper.platform == Platform.LINUX_X86_64
@@ -1015,7 +1020,7 @@ def build_wheels_job(
                 *(
                     [install_python_headers_in_manylinux_container()]
                     if platform == Platform.LINUX_ARM64
-                    else [install_go()]
+                    else install_go()
                 ),
                 {
                     "name": "Build wheels",
@@ -1713,7 +1718,7 @@ def public_repos() -> PublicReposOutput:
             "steps": [
                 *checkout(repository=repo.name, **repo.checkout_options),
                 install_pythons([repo.python_version]),
-                *([install_go()] if repo.install_go else []),
+                *(install_go() if repo.install_go else []),
                 *([install_node(repo.node_version)] if repo.node_version else []),
                 *([download_apache_thrift()] if repo.install_thrift else []),
                 {
