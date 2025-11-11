@@ -35,90 +35,6 @@ from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
-# Java standard library package prefixes - types starting with these are always fully qualified
-JAVA_STDLIB_PREFIXES = frozenset([
-    "java.",
-    "javax.",
-    "jakarta.",
-    "jdk.",
-    "com.sun.",
-    "sun.",  # Oracle internal
-    "org.w3c.",
-    "org.xml.",
-    "org.ietf.",
-    "org.omg.",  # Standards
-])
-
-
-def qualify_consumed_type(
-    type_name: str,
-    source_package: str | None,
-    imports: tuple[JavaImport, ...],
-) -> tuple[str, ...]:
-    """
-    Qualify a consumed type name, returning all possible qualified names to try.
-
-    Returns a tuple of candidates in priority order. The symbol map should be checked
-    for each candidate until a match is found.
-
-    For inner classes, we return both the full inner class name and the outer class name,
-    since the symbol mapper only indexes top-level types.
-
-    Args:
-        type_name: The type name as it appears in the source (may be qualified or unqualified)
-        source_package: The package of the source file, or None if unnamed package
-        imports: The imports declared in the source file
-
-    Returns:
-        Tuple of possible fully-qualified type names, in priority order
-    """
-    # Case 1: No dots - definitely unqualified, needs package prefix
-    if "." not in type_name:
-        if source_package:
-            return (f"{source_package}.{type_name}",)
-        else:
-            return (type_name,)  # Unnamed package
-
-    # Case 2: Known JDK/stdlib type - already fully qualified
-    if any(type_name.startswith(prefix) for prefix in JAVA_STDLIB_PREFIXES):
-        return (type_name,)
-
-    # Case 3: Type appears in imports - already resolved
-    # Check both regular imports and static imports
-    import_names = {imp.name for imp in imports}
-    if type_name in import_names:
-        return (type_name,)
-
-    # Also check if the first part of a dotted name is imported
-    # E.g., "Outer.Inner" where "com.example.Outer" is imported
-    first_part = type_name.split(".")[0]
-    for imp in imports:
-        if imp.name.endswith(f".{first_part}"):
-            # The outer class is imported, so this is likely a reference to its inner class
-            # Return the outer class name from the import for symbol lookup
-            return (imp.name,)
-
-    # Case 4: Ambiguous - has dots but not stdlib, not imported
-    # Could be:
-    #   a) Inner class from same package: "Outer.Inner" -> look up "com.example.Outer"
-    #   b) Third-party FQTN: "org.apache.commons.Lang" -> "org.apache.commons.Lang"
-    #   c) Inner class from imported outer: handled above
-
-    # Strategy: For same-package inner classes, look up the outer class
-    # The symbol mapper only indexes top-level types, so "com.example.Outer.Inner"
-    # should be looked up as "com.example.Outer"
-    if source_package:
-        # Try as inner class first (look up outer class)
-        outer_class = type_name.split(".")[0]
-        qualified_outer = f"{source_package}.{outer_class}"
-        # Also try as third-party FQTN
-        return (qualified_outer, type_name)
-    else:
-        # Unnamed package with dots - likely inner class (e.g., "Outer.Inner")
-        # Look up the outer class name
-        outer_class = type_name.split(".")[0]
-        return (outer_class, type_name)
-
 
 @dataclass(frozen=True)
 class JavaSourceDependenciesInferenceFieldSet(FieldSet):
@@ -175,10 +91,15 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
     if java_infer_subsystem.consumed_types:
         package = analysis.declared_package
 
-        # Qualify each consumed type, potentially generating multiple candidates
-        for consumed_type in analysis.consumed_types:
-            candidates = qualify_consumed_type(consumed_type, package, analysis.imports)
-            types.update(candidates)
+        # 13545: `analysis.consumed_types` may be unqualified (package-local or imported) or qualified
+        # (prefixed by package name). Heuristic for now is that if there's a `.` in the type name, it's
+        # probably fully qualified. This is probably fine for now.
+        maybe_qualify_types = (
+            f"{package}.{consumed_type}" if package and "." not in consumed_type else consumed_type
+            for consumed_type in analysis.consumed_types
+        )
+
+        types.update(maybe_qualify_types)
 
     # Resolve the export types into (probable) types:
     # First produce a map of known consumed unqualified types to possible qualified names
