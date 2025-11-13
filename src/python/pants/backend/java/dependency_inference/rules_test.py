@@ -600,7 +600,7 @@ def test_exports(rule_runner: RuleRunner) -> None:
     target_a = rule_runner.get_target(Address("", target_name="t", relative_file_path="A.java"))
     target_b = rule_runner.get_target(Address("", target_name="t", relative_file_path="B.java"))
 
-    # B should depend on C and D, but only export C
+    # B should depend on C and D. Exports are no longer tracked.
     assert rule_runner.request(
         JavaInferredDependencies,
         [JavaInferredDependenciesAndExportsRequest(target_b[JavaSourceField])],
@@ -611,11 +611,7 @@ def test_exports(rule_runner: RuleRunner) -> None:
                 Address("", target_name="t", relative_file_path="D.java"),
             ]
         ),
-        exports=FrozenOrderedSet(
-            [
-                Address("", target_name="t", relative_file_path="C.java"),
-            ]
-        ),
+        exports=FrozenOrderedSet([]),
     )
 
     # A should depend on B, but not B's dependencies or export types
@@ -863,9 +859,11 @@ def test_infer_java_exports_public_static_field(rule_runner: RuleRunner) -> None
         [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_a))],
     )
 
-    # A should depend on both B (direct import) and C (transitive through B's exported field)
+    # A should depend on B (direct import).
+    # C is NOT inferred as a dependency - it's automatically available on the compilation
+    # classpath as a transitive dependency of B.
     assert target_b.address in inferred.include
-    assert target_c.address in inferred.include
+    assert target_c.address not in inferred.include
 
 
 @maybe_skip_jdk_test
@@ -925,12 +923,14 @@ def test_infer_java_exports_method_return_type(rule_runner: RuleRunner) -> None:
         [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_a))],
     )
 
+    # A should depend on B (direct import).
+    # C is NOT inferred - it's automatically available on the compilation classpath transitively.
     assert target_b.address in inferred.include
-    assert target_c.address in inferred.include
+    assert target_c.address not in inferred.include
 
 
 @maybe_skip_jdk_test
-def test_infer_java_exports_method_parameter_type(rule_runner: RuleRunner) -> None:
+def test_infer_java_exports_method_return_type(rule_runner: RuleRunner) -> None:
     """Test transitive dependency through method parameter type.
 
     A imports B, B has method taking C as parameter.
@@ -984,12 +984,14 @@ def test_infer_java_exports_method_parameter_type(rule_runner: RuleRunner) -> No
         [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_a))],
     )
 
+    # A should depend on B (direct import).
+    # C is NOT inferred - it's automatically available on the compilation classpath transitively.
     assert target_b.address in inferred.include
-    assert target_c.address in inferred.include
+    assert target_c.address not in inferred.include
 
 
 @maybe_skip_jdk_test
-def test_infer_java_exports_superclass(rule_runner: RuleRunner) -> None:
+def test_infer_java_exports_method_parameter_type(rule_runner: RuleRunner) -> None:
     """Test transitive dependency through superclass.
 
     A imports B, B extends C.
@@ -1047,12 +1049,14 @@ def test_infer_java_exports_superclass(rule_runner: RuleRunner) -> None:
         [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_a))],
     )
 
+    # A should depend on B (direct import).
+    # C is NOT inferred - it's automatically available on the compilation classpath transitively.
     assert target_b.address in inferred.include
-    assert target_c.address in inferred.include
+    assert target_c.address not in inferred.include
 
 
 @maybe_skip_jdk_test
-def test_infer_java_exports_interface(rule_runner: RuleRunner) -> None:
+def test_infer_java_exports_superclass(rule_runner: RuleRunner) -> None:
     """Test transitive dependency through implemented interface.
 
     A imports B, B implements C.
@@ -1110,12 +1114,14 @@ def test_infer_java_exports_interface(rule_runner: RuleRunner) -> None:
         [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_a))],
     )
 
+    # A should depend on B (direct import).
+    # C is NOT inferred - it's automatically available on the compilation classpath transitively.
     assert target_b.address in inferred.include
-    assert target_c.address in inferred.include
+    assert target_c.address not in inferred.include
 
 
 @maybe_skip_jdk_test
-def test_infer_java_exports_private_field_not_exported(rule_runner: RuleRunner) -> None:
+def test_infer_java_exports_interface(rule_runner: RuleRunner) -> None:
     """Test that private fields are NOT exported.
 
     B has private field of type C. A imports B but should NOT depend on C.
