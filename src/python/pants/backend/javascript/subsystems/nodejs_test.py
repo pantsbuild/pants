@@ -7,7 +7,7 @@ import asyncio
 import stat
 from pathlib import Path
 from textwrap import dedent
-from typing import Generator, NoReturn
+from typing import NoReturn
 from unittest.mock import MagicMock, Mock
 
 import pytest
