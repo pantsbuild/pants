@@ -56,7 +56,6 @@ class InferJavaSourceDependencies(InferDependenciesRequest):
 @dataclass(frozen=True)
 class JavaInferredDependencies:
     dependencies: FrozenOrderedSet[Address]
-    exports: FrozenOrderedSet[Address]
 
 
 @dataclass(frozen=True)
@@ -72,7 +71,7 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
     symbol_mapping: SymbolMapping,
 ) -> JavaInferredDependencies:
     if not java_infer_subsystem.imports and not java_infer_subsystem.consumed_types:
-        return JavaInferredDependencies(FrozenOrderedSet([]), FrozenOrderedSet([]))
+        return JavaInferredDependencies(FrozenOrderedSet([]))
 
     address = request.source.address
 
@@ -121,7 +120,7 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
             if maybe_disambiguated:
                 dependencies.add(maybe_disambiguated)
 
-    return JavaInferredDependencies(FrozenOrderedSet(dependencies), FrozenOrderedSet())
+    return JavaInferredDependencies(FrozenOrderedSet(dependencies))
 
 
 @rule(desc="Inferring Java dependencies by source analysis")

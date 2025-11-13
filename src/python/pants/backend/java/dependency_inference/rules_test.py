@@ -600,7 +600,7 @@ def test_exports(rule_runner: RuleRunner) -> None:
     target_a = rule_runner.get_target(Address("", target_name="t", relative_file_path="A.java"))
     target_b = rule_runner.get_target(Address("", target_name="t", relative_file_path="B.java"))
 
-    # B should depend on C and D. Exports are no longer tracked.
+    # B should depend on C and D.
     assert rule_runner.request(
         JavaInferredDependencies,
         [JavaInferredDependenciesAndExportsRequest(target_b[JavaSourceField])],
@@ -611,10 +611,9 @@ def test_exports(rule_runner: RuleRunner) -> None:
                 Address("", target_name="t", relative_file_path="D.java"),
             ]
         ),
-        exports=FrozenOrderedSet([]),
     )
 
-    # A should depend on B, but not B's dependencies or export types
+    # A should depend on B, but not B's dependencies
     assert rule_runner.request(
         JavaInferredDependencies,
         [JavaInferredDependenciesAndExportsRequest(target_a[JavaSourceField])],
@@ -624,7 +623,6 @@ def test_exports(rule_runner: RuleRunner) -> None:
                 Address("", target_name="t", relative_file_path="B.java"),
             ]
         ),
-        exports=FrozenOrderedSet([]),
     )
 
 
