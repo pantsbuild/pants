@@ -64,7 +64,7 @@ class PylintRequest(LintTargetsRequest):
 
 
 def generate_argv(field_sets: tuple[PylintFieldSet, ...], pylint: Pylint) -> tuple[str, ...]:
-    args = []
+    args: list[str] = []
     if pylint.config is not None:
         args.append(f"--rcfile={pylint.config}")
     args.append("--jobs={pants_concurrency}")

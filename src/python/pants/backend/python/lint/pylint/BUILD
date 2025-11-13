@@ -5,7 +5,11 @@ resources(name="lockfile", sources=["pylint.lock*"])
 
 resources(
     name="test_lockfiles",
-    sources=["pylint_3rdparty_plugin_test.lock", "pylint_source_plugin_test.lock"],
+    sources=[
+        "pylint_3rdparty_plugin_test.lock",
+        "pylint_source_plugin_test.lock",
+        "pylint_py39.lock",
+    ],
 )
 
 python_sources(
