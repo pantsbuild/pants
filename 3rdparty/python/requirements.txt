@@ -10,13 +10,13 @@ fasteners==0.20.0
 freezegun==1.5.5
 hdrhistogram==0.10.3
 ijson==3.4.0.post0
-libcst==1.8.5
+libcst==1.8.6
 packaging==25.0
 pex==2.69.1
-psutil==5.9.8
+psutil==7.1.3
 # This should be compatible with pytest.py, although it can be looser so that we don't
 # over-constrain pantsbuild.pants.testutil
-pytest>=7,<9,!=7.1.0,!=7.1.1
+pytest>=7,!=7.1.0,!=7.1.1,<10
 python-lsp-jsonrpc==1.1.2
 PyYAML>=6.0,<7.0
 requests[security]==2.32.5
@@ -33,17 +33,17 @@ node-semver==0.9.0
 
 # These dependencies are only for debugging Pants itself (in VSCode/PyCharm respectively),
 # and should never be imported.
-debugpy==1.8.16
-pydevd-pycharm==251.23536.40
+debugpy==1.8.17
+pydevd-pycharm==253.28086.55
 
 # These dependencies must only be used from the explorer backend, and no code outside that backend
 # may import anything from it, so these libraries are not ending up as requirements of Pants itself.
-fastapi==0.120.1
-starlette==0.49.1
-strawberry-graphql[fastapi]==0.284.1
+fastapi==0.121.2
+starlette==0.50.0
+strawberry-graphql[fastapi]==0.285.0
 uvicorn[standard]==0.38.0
 
-beautifulsoup4==4.11.1 # Util for webcrawling for pulling in tool versions
+beautifulsoup4==4.14.2 # Util for webcrawling for pulling in tool versions
 python-gnupg==0.5.5 # For validating signatures
 
 # Only used for release management
