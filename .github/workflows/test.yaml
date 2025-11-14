@@ -33,7 +33,7 @@ jobs:
       with:
         fetch-depth: 10
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -131,7 +131,7 @@ jobs:
           3.13
           3.11
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -229,7 +229,7 @@ jobs:
       with:
         fetch-depth: 10
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -325,7 +325,7 @@ jobs:
           3.13
           3.11
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -444,7 +444,7 @@ jobs:
         echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
         echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -513,16 +513,16 @@ jobs:
         echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
         echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.24.9
     - env:
@@ -569,7 +569,7 @@ jobs:
       with:
         fetch-depth: 10
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -590,16 +590,16 @@ jobs:
         shared-key: engine
         workspaces: src/rust
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.24.9
     - env:
@@ -656,7 +656,7 @@ jobs:
           3.13
           3.11
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -677,16 +677,16 @@ jobs:
         shared-key: engine
         workspaces: src/rust
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.24.9
     - env:
@@ -988,11 +988,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.24.9
     - name: Download native binaries
@@ -1086,11 +1086,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -1202,11 +1202,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -1318,11 +1318,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -1434,11 +1434,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -1550,11 +1550,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -1666,11 +1666,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -1782,11 +1782,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -1898,11 +1898,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -2014,11 +2014,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -2130,11 +2130,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -2223,11 +2223,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.24.9
     - name: Download native binaries
@@ -2297,11 +2297,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.24.9
     - name: Set up Python 3.9, 3.10, 3.12, 3.13, 3.11

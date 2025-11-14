@@ -32,12 +32,12 @@ def action(name: str) -> str:
         "msys2": "msys2/setup-msys2@v2",
         "rust-cache": "Swatinem/rust-cache@v2.8.1",
         # Switch to v6 once https://github.com/actions/setup-go/pull/665 is released
-        "setup-go": "actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25",
+        "setup-go": "actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f",
         "setup-java": "actions/setup-java@v5",
         "setup-node": "actions/setup-node@v6",
-        "setup-protoc": "arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9",
+        "setup-protoc": "arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623",
         "setup-python": "actions/setup-python@v6",
-        "slack-github-action": "slackapi/slack-github-action@v1.24.0",
+        "slack-github-action": "slackapi/slack-github-action@v2.1.1",
         "upload-artifact": "actions/upload-artifact@v5",
     }
     try:
@@ -1392,13 +1392,13 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     ),
                 },
                 {
-                    "name": "Announce to Slack",
+                    "name": "Announce release to Slack",
                     "uses": action("slack-github-action"),
                     "with": {
-                        "channel-id": "C18RRR4JK",
+                        "method": "chat.postMessage",
                         "payload-file-path": "${{ runner.temp }}/slack_announcement.json",
+                        "token": f"{gha_expr('secrets.SLACK_BOT_TOKEN')}",
                     },
-                    "env": {"SLACK_BOT_TOKEN": f"{gha_expr('secrets.SLACK_BOT_TOKEN')}"},
                 },
                 {
                     "name": "Announce to pants-devel",

@@ -52,7 +52,7 @@ jobs:
         echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
         echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -158,16 +158,16 @@ jobs:
         echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
         echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.24.9
     - env:
@@ -266,7 +266,7 @@ jobs:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -287,16 +287,16 @@ jobs:
         shared-key: engine
         workspaces: src/rust
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.24.9
     - env:
@@ -390,7 +390,7 @@ jobs:
           3.13
           3.11
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -411,16 +411,16 @@ jobs:
         shared-key: engine
         workspaces: src/rust
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.24.9
     - env:
@@ -513,7 +513,7 @@ jobs:
           3.13
           3.11
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -552,13 +552,12 @@ jobs:
       name: Generate announcement
       run: |
         ./pants run src/python/pants_release/generate_release_announcement.py                         -- --output-dir=${{ runner.temp }}
-    - env:
-        SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-      name: Announce to Slack
-      uses: slackapi/slack-github-action@v1.24.0
+    - name: Announce release to Slack
+      uses: slackapi/slack-github-action@v2.1.1
       with:
-        channel-id: C18RRR4JK
+        method: chat.postMessage
         payload-file-path: ${{ runner.temp }}/slack_announcement.json
+        token: ${{ secrets.SLACK_BOT_TOKEN }}
     - name: Announce to pants-devel
       uses: dawidd6/action-send-mail@v3.8.0
       with:
