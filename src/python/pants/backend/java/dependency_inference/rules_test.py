@@ -634,82 +634,28 @@ def test_exports(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 def test_infer_same_package_inner_class(rule_runner: RuleRunner) -> None:
-    """Test that inner class references in same package are correctly inferred."""
     rule_runner.write_files(
         {
-            "BUILD": dedent(
+            "BUILD": "java_sources(name='lib')",
+            "B.java": dedent(
                 """\
-                java_sources(
-                    name = 't',
-                )
+                package com.example;
+                public class B {
+                    public static class InnerB {
+                        public void hello() {}
+                    }
+                }
                 """
             ),
             "A.java": dedent(
                 """\
                 package com.example;
-
                 public class A {
-                    // Reference to B.InnerB without importing B (valid in same package)
-                    B.InnerB inner;
-                }
-                """
-            ),
-            "B.java": dedent(
-                """\
-                package com.example;
+                    private B.InnerB inner;
 
-                public class B {
-                    public static class InnerB {}
-                }
-                """
-            ),
-        }
-    )
-
-    target_a = rule_runner.get_target(Address("", target_name="t", relative_file_path="A.java"))
-
-    # A should depend on B because it references B.InnerB
-    assert rule_runner.request(
-        InferredDependencies,
-        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_a))],
-    ) == InferredDependencies(
-        FrozenOrderedSet(
-            [
-                Address("", target_name="t", relative_file_path="B.java"),
-            ]
-        )
-    )
-
-
-@maybe_skip_jdk_test
-def test_infer_same_package_deeply_nested_inner_class(rule_runner: RuleRunner) -> None:
-    """Test that deeply nested inner class references are correctly inferred."""
-    rule_runner.write_files(
-        {
-            "BUILD": dedent(
-                """\
-                java_sources(
-                    name = 't',
-                )
-                """
-            ),
-            "Consumer.java": dedent(
-                """\
-                package com.example;
-
-                public class Consumer {
-                    // Reference to Outer.Middle.Inner without import
-                    Outer.Middle.Inner deeplyNested;
-                }
-                """
-            ),
-            "Outer.java": dedent(
-                """\
-                package com.example;
-
-                public class Outer {
-                    public static class Middle {
-                        public static class Inner {}
+                    public void use() {
+                        inner = new B.InnerB();
+                        inner.hello();
                     }
                 }
                 """
@@ -717,137 +663,144 @@ def test_infer_same_package_deeply_nested_inner_class(rule_runner: RuleRunner) -
         }
     )
 
-    target_consumer = rule_runner.get_target(
-        Address("", target_name="t", relative_file_path="Consumer.java")
+    a = rule_runner.get_target(Address("", target_name="lib", relative_file_path="A.java"))
+    b = rule_runner.get_target(Address("", target_name="lib", relative_file_path="B.java"))
+
+    # A should depend on B due to B.InnerB reference
+    inferred = rule_runner.request(
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(a))],
+    )
+    assert inferred == InferredDependencies([b.address])
+
+
+@maybe_skip_jdk_test
+def test_infer_same_package_deeply_nested_inner_class(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": "java_sources(name='lib')",
+            "Outer.java": dedent(
+                """\
+                package com.example;
+                public class Outer {
+                    public static class Middle {
+                        public static class Inner {
+                            public void hello() {}
+                        }
+                    }
+                }
+                """
+            ),
+            "Consumer.java": dedent(
+                """\
+                package com.example;
+                public class Consumer {
+                    public void use() {
+                        Outer.Middle.Inner obj = new Outer.Middle.Inner();
+                    }
+                }
+                """
+            ),
+        }
     )
 
-    # Consumer should depend on Outer because it references Outer.Middle.Inner
-    assert rule_runner.request(
+    consumer = rule_runner.get_target(Address("", target_name="lib", relative_file_path="Consumer.java"))
+    outer = rule_runner.get_target(Address("", target_name="lib", relative_file_path="Outer.java"))
+
+    inferred = rule_runner.request(
         InferredDependencies,
-        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_consumer))],
-    ) == InferredDependencies(
-        FrozenOrderedSet(
-            [
-                Address("", target_name="t", relative_file_path="Outer.java"),
-            ]
-        )
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(consumer))],
     )
+    assert inferred == InferredDependencies([outer.address])
 
 
 @maybe_skip_jdk_test
 def test_infer_imported_outer_class_inner_ref(rule_runner: RuleRunner) -> None:
-    """Test that inner class refs with imported outer class are correctly inferred."""
     rule_runner.write_files(
         {
-            "pkg1/BUILD": dedent(
-                """\
-                java_sources(
-                    name = 't',
-                )
-                """
-            ),
-            "pkg1/A.java": dedent(
+            "pkg1/BUILD": "java_sources()",
+            "pkg1/B.java": dedent(
                 """\
                 package com.pkg1;
-
-                // Import outer class B
-                import com.pkg2.B;
-
-                public class A {
-                    // Reference to B.InnerB via imported B
-                    B.InnerB inner;
-                }
-                """
-            ),
-            "pkg2/BUILD": dedent(
-                """\
-                java_sources(
-                    name = 't',
-                )
-                """
-            ),
-            "pkg2/B.java": dedent(
-                """\
-                package com.pkg2;
-
                 public class B {
                     public static class InnerB {}
                 }
                 """
             ),
+            "pkg2/BUILD": "java_sources()",
+            "pkg2/A.java": dedent(
+                """\
+                package com.pkg2;
+
+                import com.pkg1.B;
+
+                public class A {
+                    B.InnerB obj;
+                }
+                """
+            ),
         }
     )
 
-    target_a = rule_runner.get_target(
-        Address("pkg1", target_name="t", relative_file_path="A.java")
-    )
+    a = rule_runner.get_target(Address("pkg2", relative_file_path="A.java"))
+    b = rule_runner.get_target(Address("pkg1", relative_file_path="B.java"))
 
-    # A should depend on B because it imports B and references B.InnerB
-    assert rule_runner.request(
+    inferred = rule_runner.request(
         InferredDependencies,
-        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_a))],
-    ) == InferredDependencies(
-        FrozenOrderedSet(
-            [
-                Address("pkg2", target_name="t", relative_file_path="B.java"),
-            ]
-        )
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(a))],
     )
+    assert inferred == InferredDependencies([b.address])
 
 
 @maybe_skip_jdk_test
 def test_infer_third_party_with_same_package_refs(rule_runner: RuleRunner) -> None:
-    """Test that same-package inner classes work alongside third-party imports."""
     rule_runner.write_files(
         {
-            "BUILD": dedent(
+            "3rdparty/jvm/BUILD": dedent(
                 """\
-                java_sources(
-                    name = 't',
+                jvm_artifact(
+                    name="guava",
+                    group="com.google.guava",
+                    artifact="guava",
+                    version="31.0-jre",
+                    packages=["com.google.common.**"],
                 )
                 """
             ),
-            "Mixed.java": dedent(
+            "BUILD": "java_sources(name='lib')",
+            "MyClass.java": dedent(
                 """\
                 package com.example;
 
-                import java.util.List;
-                import java.util.Map;
+                import com.google.common.collect.ImmutableList;
 
-                public class Mixed {
-                    // Third-party refs (should be ignored)
-                    List<String> list;
-                    Map<String, Integer> map;
+                public class MyClass {
+                    private Helper helper;  // Same package, no import
+                    private ImmutableList<String> list;  // Third-party, with import
 
-                    // Same-package inner class ref
-                    Local.Inner inner;
+                    // Inline FQTN reference without import
+                    private com.google.common.collect.ImmutableMap<String, String> map;
                 }
                 """
             ),
-            "Local.java": dedent(
+            "Helper.java": dedent(
                 """\
                 package com.example;
-
-                public class Local {
-                    public static class Inner {}
-                }
+                public class Helper {}
                 """
             ),
         }
     )
 
-    target_mixed = rule_runner.get_target(
-        Address("", target_name="t", relative_file_path="Mixed.java")
+    my_class = rule_runner.get_target(Address("", target_name="lib", relative_file_path="MyClass.java"))
+    helper = rule_runner.get_target(Address("", target_name="lib", relative_file_path="Helper.java"))
+    guava = rule_runner.get_target(Address("3rdparty/jvm", target_name="guava"))
+
+    inferred = rule_runner.request(
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(my_class))],
     )
 
-    # Mixed should depend on Local (not java.util classes)
-    assert rule_runner.request(
-        InferredDependencies,
-        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_mixed))],
-    ) == InferredDependencies(
-        FrozenOrderedSet(
-            [
-                Address("", target_name="t", relative_file_path="Local.java"),
-            ]
-        )
-    )
+    # Should depend on both same-package Helper and third-party Guava
+    assert helper.address in inferred.include
+    assert guava.address in inferred.include

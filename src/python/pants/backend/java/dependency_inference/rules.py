@@ -35,7 +35,7 @@ from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
-# Java standard library prefixes that are always fully qualified
+# Java standard library package prefixes - types starting with these are always fully qualified
 JAVA_STDLIB_PREFIXES = frozenset([
     "java.", "javax.", "jakarta.", "jdk.",
     "com.sun.", "sun.",  # Oracle internal
@@ -162,92 +162,92 @@ async def infer_java_dependencies_via_source_analysis(
 
 
 def qualify_consumed_type(
-    consumed_type: str, package: str | None, imports: frozenset[JavaImport]
+    type_name: str,
+    source_package: str | None,
+    imports: tuple[JavaImport, ...],
 ) -> tuple[str, ...]:
     """
-    Qualify a consumed type name, potentially returning multiple candidates.
+    Qualify a consumed type name, returning possible qualified names to try.
 
-    Handles multiple cases:
-    - Case 1: Unqualified names (no dots) → add package prefix
-    - Case 2: JDK/stdlib types → already fully qualified
-    - Case 3: Type appears in imports → already resolved
-    - Case 4: Outer class is imported → resolve inner class (e.g., B.InnerB when com.pkg.B imported)
-    - Case 5: Ambiguous with dots → try same-package first, then as-is
+    Returns a tuple of candidates in priority order. The symbol map should be checked
+    for each candidate until a match is found.
 
-    Returns tuple of candidate FQTNs in priority order.
+    Args:
+        type_name: The type name as it appears in the source (may be qualified or unqualified)
+        source_package: The package of the source file, or None if unnamed package
+        imports: The imports declared in the source file
+
+    Returns:
+        Tuple of possible fully-qualified type names, in priority order
     """
-    # Case 1: Unqualified name (no dots) - add package prefix if available
-    if "." not in consumed_type:
-        if package:
-            return (f"{package}.{consumed_type}",)
+    # Case 1: No dots → definitely unqualified, needs package prefix
+    if "." not in type_name:
+        if source_package:
+            return (f"{source_package}.{type_name}",)
         else:
-            return (consumed_type,)
+            return (type_name,)  # Unnamed package
 
-    # Case 2: JDK/stdlib types - already fully qualified
-    for prefix in JAVA_STDLIB_PREFIXES:
-        if consumed_type.startswith(prefix):
-            return (consumed_type,)
+    # Case 2: Known JDK/stdlib type → already fully qualified
+    if any(type_name.startswith(prefix) for prefix in JAVA_STDLIB_PREFIXES):
+        return (type_name,)
 
-    # Build a map of imported type names (both simple and full)
-    import_map: dict[str, str] = {}
+    # Case 3: Type fully qualified name appears in imports → already resolved
+    import_names = {imp.name for imp in imports}
+    if type_name in import_names:
+        return (type_name,)
+
+    # Case 4: Outer class is imported → resolve inner class through import
+    # E.g., "B.InnerB" where "com.other.B" is imported → "com.other.B.InnerB"
+    first_part = type_name.split(".")[0]
     for imp in imports:
-        full_name = dependency_name(imp)
-        simple_name = full_name.rsplit(".", maxsplit=1)[-1]
-        import_map[simple_name] = full_name
-        import_map[full_name] = full_name
+        if imp.name.endswith(f".{first_part}"):
+            # Found import for outer class, construct fully qualified inner class name
+            qualified = imp.name + type_name[len(first_part):]
+            return (qualified,)
 
-    # Case 3: Type appears in imports → already resolved
-    if consumed_type in import_map:
-        return (import_map[consumed_type],)
-
-    # Case 4: Outer class is imported → resolve inner class
-    # E.g., consumed_type is "B.InnerB" and "com.pkg.B" is imported
-    first_part = consumed_type.split(".", maxsplit=1)[0]
-    if first_part in import_map:
-        outer_class_fqn = import_map[first_part]
-        # Replace the simple name with the fully qualified name
-        # "B.InnerB" with B→"com.pkg.B" becomes "com.pkg.B.InnerB"
-        inner_part = consumed_type.split(".", maxsplit=1)[1]
-        return (f"{outer_class_fqn}.{inner_part}",)
-
-    # Case 5: Ambiguous with dots - try same-package first, then as-is
-    # The type might be a same-package reference like "OtherClass.InnerClass"
-    # or it might already be fully qualified
-    candidates = []
-    if package:
-        candidates.append(f"{package}.{consumed_type}")
-    candidates.append(consumed_type)
-    return tuple(candidates)
+    # Case 5: Ambiguous - has dots but not stdlib, not imported
+    # Most likely: same-package inner class like "B.InnerB" → "com.example.B.InnerB"
+    # Less likely: third-party FQTN without import
+    if source_package:
+        # Try same-package first (most common), then as-is (fallback for third-party)
+        return (f"{source_package}.{type_name}", type_name)
+    else:
+        return (type_name,)
 
 
 def lookup_type_with_fallback(
-    typ: str, symbol_mapping: SymbolMapping, resolve: str | None
-) -> dict[str, tuple[Address, ...]]:
+    typ: str,
+    symbol_mapping: SymbolMapping,
+    resolve: str
+) -> dict[str, FrozenOrderedSet[Address]]:
     """
-    Search symbol map with inner class fallback.
+    Look up a type in the symbol map, with fallback to parent types for inner classes.
 
-    - Try exact match first
-    - If not found and type has multiple dots, strip inner class parts iteratively
-    - Example: com.example.B.InnerB → try com.example.B → find match
+    Args:
+        typ: Fully qualified type name (e.g., "com.example.B.InnerB")
+        symbol_mapping: The symbol map to search
+        resolve: The JVM resolve to search within
 
-    Returns the same structure as symbol_mapping.addresses_for_symbol().
+    Returns:
+        Dict mapping namespaces to addresses, empty if no match found
     """
     # Try exact match first
-    result = symbol_mapping.addresses_for_symbol(typ, resolve)
-    if result:
-        return result
+    matches = symbol_mapping.addresses_for_symbol(typ, resolve)
+    if matches:
+        return matches
 
-    # If not found and type has multiple dots, try stripping inner class parts
-    if typ.count(".") >= 2:
-        # Iteratively strip the last part until we find a match
-        parts = typ.split(".")
-        for i in range(len(parts) - 1, 1, -1):  # Stop at 2 parts (package.Class)
-            candidate = ".".join(parts[:i])
-            result = symbol_mapping.addresses_for_symbol(candidate, resolve)
-            if result:
-                return result
+    # If not found and typ looks like it might be an inner class (has dots after package)
+    # Try stripping inner class parts one by one
+    # E.g., "com.example.B.InnerB" → try "com.example.B"
+    #       "com.example.Outer.Middle.Inner" → try "com.example.Outer.Middle", then "com.example.Outer"
+    parts = typ.split(".")
+    if len(parts) > 2:  # At least package + outer + inner
+        for i in range(len(parts) - 1, 1, -1):  # Don't try single-part names
+            parent_type = ".".join(parts[:i])
+            matches = symbol_mapping.addresses_for_symbol(parent_type, resolve)
+            if matches:
+                return matches
 
-    # Return empty dict if no match found
     return {}
 
 
