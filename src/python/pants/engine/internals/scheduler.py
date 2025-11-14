@@ -570,30 +570,30 @@ class SchedulerSession:
             )
         with self._goals._execute(product):
             (return_value,) = self.product_request(
-                product, [subject], poll=poll, poll_delay=poll_delay
+                product, subject, poll=poll, poll_delay=poll_delay
             )
         return cast(int, return_value.exit_code)
 
     def product_request(
         self,
         product: type,
-        subjects: Sequence[Any | Params],
+        subject: Any | Params,
         *,
         poll: bool = False,
         poll_delay: float | None = None,
         timeout: float | None = None,
     ) -> list:
-        """Executes a request for a single product for some subjects, and returns the products.
+        """Executes a request for a single product for a subject, and returns the products.
 
         :param product: A product type for the request.
-        :param subjects: A list of subjects or Params instances for the request.
+        :param subject: A subject or Params instance for the request.
         :param poll: See self.execution_request.
         :param poll_delay: See self.execution_request.
         :param timeout: See self.execution_request.
         :returns: A list of the requested products, with length match len(subjects).
         """
         request = self.execution_request(
-            [(product, subject) for subject in subjects],
+            [(product, subject)],
             poll=poll,
             poll_delay=poll_delay,
             timeout=timeout,
@@ -625,7 +625,7 @@ class SchedulerSession:
         each snapshot needs to yield a separate `DigestContents`.
         """
         return tuple(
-            self.product_request(DigestContents, [snapshot.digest])[0] for snapshot in snapshots
+            self.product_request(DigestContents, snapshot.digest)[0] for snapshot in snapshots
         )
 
     def ensure_remote_has_recursive(self, digests: Sequence[Digest | FileDigest]) -> None:

@@ -150,7 +150,7 @@ async def _warn_on_non_local_environments(specified_targets: Iterable[Target], s
 def determine_bootstrap_environment(session: SchedulerSession) -> EnvironmentName:
     local_env = cast(
         ChosenLocalEnvironmentName,
-        session.product_request(ChosenLocalEnvironmentName, [Params()])[0],
+        session.product_request(ChosenLocalEnvironmentName, Params())[0],
     )
     return local_env.val
 
