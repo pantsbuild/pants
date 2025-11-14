@@ -97,7 +97,6 @@ class ExecutionRequest:
     To create an ExecutionRequest, see `SchedulerSession.execution_request`.
     """
 
-    roots: tuple[tuple[type, Any | Params], ...]
     native: PyExecutionRequest
 
 
@@ -447,7 +446,7 @@ class SchedulerSession:
         )
         for product, subject in requests:
             self._scheduler.execution_add_root_select(native_execution_request, subject, product)
-        return ExecutionRequest(tuple(requests), native_execution_request)
+        return ExecutionRequest(native_execution_request)
 
     def invalidate_files(self, direct_filenames: Iterable[str]) -> int:
         """Invalidates the given filenames in an internal product Graph instance."""
@@ -482,7 +481,7 @@ class SchedulerSession:
 
     def _execute(
         self, execution_request: ExecutionRequest
-    ) -> tuple[tuple[tuple[Any, Return], ...], tuple[tuple[Any, Throw], ...]]:
+    ) -> tuple[tuple[Return, ...], tuple[Throw, ...]]:
         start_time = time.time()
         try:
             raw_roots = native_engine.scheduler_execute(
@@ -506,21 +505,19 @@ class SchedulerSession:
             for raw_root in raw_roots
         ]
 
-        roots = list(zip(execution_request.roots, states))
-
         self._maybe_visualize()
         logger.debug(
             "computed %s nodes in %f seconds. there are %s total nodes.",
-            len(roots),
+            len(states),
             time.time() - start_time,
             self._scheduler.graph_len(),
         )
 
-        returns = tuple((root, state) for root, state in roots if isinstance(state, Return))
-        throws = tuple((root, state) for root, state in roots if isinstance(state, Throw))
+        returns = tuple(state for state in states if isinstance(state, Return))
+        throws = tuple(state for state in states if isinstance(state, Throw))
         return returns, throws
 
-    def _raise_on_error(self, throws: list[Throw]) -> NoReturn:
+    def _raise_on_error(self, throws: Sequence[Throw]) -> NoReturn:
         exception_noun = pluralize(len(throws), "Exception")
         others_msg = f"\n(and {len(throws) - 1} more)\n" if len(throws) > 1 else ""
         raise ExecutionError(
@@ -539,11 +536,11 @@ class SchedulerSession:
 
         # Throw handling.
         if throws:
-            self._raise_on_error([t for _, t in throws])
+            self._raise_on_error(throws)
 
         # Everything is a Return: we rely on the fact that roots are ordered to preserve subject
         # order in output lists.
-        return [ret.value for _, ret in returns]
+        return [ret.value for ret in returns]
 
     def run_goal_rule(
         self,
