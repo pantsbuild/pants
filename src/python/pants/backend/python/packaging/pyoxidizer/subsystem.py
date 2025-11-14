@@ -25,9 +25,6 @@ class PyOxidizer(PythonToolBase):
     default_main = ConsoleScript("pyoxidizer")
     default_requirements = ["pyoxidizer>=0.18.0,<1"]
 
-    register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.9,<3.14"]
-
     default_lockfile_resource = ("pants.backend.python.packaging.pyoxidizer", "pyoxidizer.lock")
 
     args = ArgsListOption(example="--release")

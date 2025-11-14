@@ -20,9 +20,6 @@ class Pytype(PythonToolBase):
         """
     )
 
-    register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.9,<3.14"]
-
     default_main = ConsoleScript("pytype")
     default_requirements = ["pytype==2024.9.13"]
     default_version = "pytype@2024.9.13"

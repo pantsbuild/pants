@@ -49,9 +49,6 @@ class Sqlfluff(PythonToolBase):
     default_main = ConsoleScript("sqlfluff")
     default_requirements = ["sqlfluff>=2.3.5,<3"]
 
-    register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.9,<3.14"]
-
     default_lockfile_resource = ("pants.backend.sql.lint.sqlfluff", "sqlfluff.lock")
 
     skip = SkipOption("fmt", "fix", "lint")

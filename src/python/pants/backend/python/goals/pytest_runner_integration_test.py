@@ -189,7 +189,7 @@ def run_pytest_interactive(
 @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
-    all_major_minor_python_versions(["CPython>=3.9,<4"]),
+    all_major_minor_python_versions(["CPython>=3.9,<3.15"]),
 )
 def test_passing(rule_runner: PythonRuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files(
@@ -934,7 +934,7 @@ def test_partition(
 @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
-    all_major_minor_python_versions(["CPython>=3.9,<4"]),
+    all_major_minor_python_versions(["CPython>=3.9,<3.15"]),
 )
 def test_batched_passing(rule_runner: PythonRuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files(
