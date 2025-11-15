@@ -27,7 +27,7 @@ class Pyright(NodeJSToolBase):
 
     _interpreter_constraints = StrListOption(
         advanced=True,
-        default=["CPython>=3.8,<4"],
+        default=["CPython>=3.8,<3.15"],
         help="Python interpreter constraints for Pyright (which is, itself, a NodeJS tool).",
     )
 

@@ -50,7 +50,6 @@ class Sqlfluff(PythonToolBase):
     default_requirements = ["sqlfluff>=2.3.5,<3"]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.9,<4"]
 
     default_lockfile_resource = ("pants.backend.sql.lint.sqlfluff", "sqlfluff.lock")
 

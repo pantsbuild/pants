@@ -595,7 +595,7 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.66.0",
+  "pex_version": "2.69.1",
   "pip_version": "25.3",
   "prefer_older_binary": false,
   "requirements": [
@@ -604,7 +604,7 @@
     "setuptools"
   ],
   "requires_python": [
-    "CPython<4,>=3.9"
+    "CPython<3.15,>=3.9"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",

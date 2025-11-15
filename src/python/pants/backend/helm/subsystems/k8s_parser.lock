@@ -126,37 +126,37 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "09868944b6dde876dfd44e1d47e18484541eaf12f26f29b7af91b26cc892d701",
-              "url": "https://files.pythonhosted.org/packages/96/c5/1e741d26306c42e2bf6ab740b2202872727e0f606033c9dd713f8b93f5a8/cachetools-6.2.1-py3-none-any.whl"
+              "hash": "6c09c98183bf58560c97b2abfcedcbaf6a896a490f534b031b661d3723b45ace",
+              "url": "https://files.pythonhosted.org/packages/e6/46/eb6eca305c77a4489affe1c5d8f4cae82f285d9addd8de4ec084a7184221/cachetools-6.2.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "3f391e4bd8f8bf0931169baf7456cc822705f4e2a31f840d218f445b9a854201",
-              "url": "https://files.pythonhosted.org/packages/cc/7e/b975b5814bd36faf009faebe22c1072a1fa1168db34d285ef0ba071ad78c/cachetools-6.2.1.tar.gz"
+              "hash": "8e6d266b25e539df852251cfd6f990b4bc3a141db73b939058d809ebd2590fc6",
+              "url": "https://files.pythonhosted.org/packages/fb/44/ca1675be2a83aeee1886ab745b28cda92093066590233cc501890eb8417a/cachetools-6.2.2.tar.gz"
             }
           ],
           "project_name": "cachetools",
           "requires_dists": [],
           "requires_python": ">=3.9",
-          "version": "6.2.1"
+          "version": "6.2.2"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "0f212c2744a9bb6de0c56639a6f68afe01ecd92d91f14ae897c4fe7bbeeef0de",
-              "url": "https://files.pythonhosted.org/packages/e4/37/af0d2ef3967ac0d6113837b44a4f0bfe1328c2b9763bd5b1744520e5cfed/certifi-2025.10.5-py3-none-any.whl"
+              "hash": "97de8790030bbd5c2d96b7ec782fc2f7820ef8dba6db909ccf95449f2d062d4b",
+              "url": "https://files.pythonhosted.org/packages/70/7d/9bc192684cea499815ff478dfcdc13835ddf401365057044fb721ec6bddb/certifi-2025.11.12-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "47c09d31ccf2acf0be3f701ea53595ee7e0b8fa08801c6624be771df09ae7b43",
-              "url": "https://files.pythonhosted.org/packages/4c/5b/b6ce21586237c77ce67d01dc5507039d444b630dd76611bbca2d8e5dcd91/certifi-2025.10.5.tar.gz"
+              "hash": "d8ab5478f2ecd78af242878415affce761ca6bc54a22a27e026d7c25357c3316",
+              "url": "https://files.pythonhosted.org/packages/a2/8c/58f469717fa48465e4a50c014a0400602d3c437d7c0c468e17ada824da3a/certifi-2025.11.12.tar.gz"
             }
           ],
           "project_name": "certifi",
           "requires_dists": [],
           "requires_python": ">=3.7",
-          "version": "2025.10.5"
+          "version": "2025.11.12"
         },
         {
           "artifacts": [
@@ -609,13 +609,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "eb73d71c91fc95dbd221a2eb87477c278a355e7367a35c0d84e6b0e5f9b4ad11",
-              "url": "https://files.pythonhosted.org/packages/92/05/adeb6c495aec4f9d93f9e2fc29eeef6e14d452bba11d15bdb874ce1d5b10/google_auth-2.42.1-py2.py3-none-any.whl"
+              "hash": "af628ba6fa493f75c7e9dbe9373d148ca9f4399b5ea29976519e0a3848eddd16",
+              "url": "https://files.pythonhosted.org/packages/6f/d1/385110a9ae86d91cc14c5282c61fe9f4dc41c0b9f7d423c6ad77038c4448/google_auth-2.43.0-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "30178b7a21aa50bffbdc1ffcb34ff770a2f65c712170ecd5446c4bef4dc2b94e",
-              "url": "https://files.pythonhosted.org/packages/25/6b/22a77135757c3a7854c9f008ffed6bf4e8851616d77faf13147e9ab5aae6/google_auth-2.42.1.tar.gz"
+              "hash": "88228eee5fc21b62a1b5fe773ca15e67778cb07dc8363adcb4a8827b52d81483",
+              "url": "https://files.pythonhosted.org/packages/ff/ef/66d14cf0e01b08d2d51ffc3c20410c4e134a1548fc246a6081eae585a4fe/google_auth-2.43.0.tar.gz"
             }
           ],
           "project_name": "google-auth",
@@ -663,7 +663,7 @@
             "urllib3; extra == \"urllib3\""
           ],
           "requires_python": ">=3.7",
-          "version": "2.42.1"
+          "version": "2.43.0"
         },
         {
           "artifacts": [
@@ -1892,7 +1892,7 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.66.0",
+  "pex_version": "2.69.1",
   "pip_version": "25.3",
   "prefer_older_binary": false,
   "requirements": [
@@ -1905,7 +1905,7 @@
     "hikaru>=1.1.0"
   ],
   "requires_python": [
-    "CPython<4,>=3.9"
+    "CPython<3.15,>=3.9"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",

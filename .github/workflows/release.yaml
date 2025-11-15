@@ -53,7 +53,7 @@ jobs:
         echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
         echo "/opt/python/cp314-cp314/bin" >> $GITHUB_PATH
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -160,16 +160,16 @@ jobs:
         echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
         echo "/opt/python/cp314-cp314/bin" >> $GITHUB_PATH
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.24.9
     - env:
@@ -245,122 +245,6 @@ jobs:
             "${{ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)" \
             --data-binary "@$WHL";
     timeout-minutes: 90
-  build_wheels_macos13_x86_64:
-    env:
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: false
-      PANTS_REMOTE_CACHE_READ: 'false'
-      PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: github.repository_owner == 'pantsbuild'
-    name: Build wheels (macOS13-x86_64)
-    needs:
-    - release_info
-    permissions:
-      attestations: write
-      contents: write
-      id-token: write
-    runs-on:
-    - self-hosted
-    - macos-13
-    steps:
-    - name: Check out code
-      uses: actions/checkout@v5
-      with:
-        fetch-depth: 10
-        ref: ${{ needs.release_info.outputs.build-ref }}
-    - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        version: 23.x
-    - name: Set rustup profile
-      run: rustup set profile default
-    - name: Cache Rust toolchain
-      uses: actions/cache@v4
-      with:
-        key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
-        path: |
-          ~/.rustup/toolchains/1.91.0-*
-          ~/.rustup/update-hashes
-          ~/.rustup/settings.toml
-    - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.1
-      with:
-        cache-bin: 'false'
-        shared-key: engine
-        workspaces: src/rust
-    - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        version: 23.x
-    - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
-      with:
-        go-version: 1.25.3
-    - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
-      with:
-        go-version: 1.24.9
-    - env:
-        ARCHFLAGS: -arch x86_64
-        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
-        _PYTHON_HOST_PLATFORM: macosx-13.0-x86_64
-      name: Build wheels
-      run: ./pants run src/python/pants_release/release.py -- build-wheels
-    - env:
-        ARCHFLAGS: -arch x86_64
-        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
-        _PYTHON_HOST_PLATFORM: macosx-13.0-x86_64
-      name: Build Pants PEX
-      run: ./pants package src/python/pants:pants-pex
-    - continue-on-error: true
-      if: always()
-      name: Upload pants.log
-      uses: actions/upload-artifact@v5
-      with:
-        name: logs-wheels-and-pex-macOS13-x86_64
-        overwrite: 'true'
-        path: .pants.d/workdir/*.log
-    - if: needs.release_info.outputs.is-release == 'true'
-      name: Attest the pantsbuild.pants wheel
-      uses: actions/attest-build-provenance@v3
-      with:
-        subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants-*.whl
-    - if: needs.release_info.outputs.is-release == 'true'
-      name: Rename the Pants Pex to its final name for upload
-      run: |
-        PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
-        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')")
-        PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
-        PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
-
-        mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
-        echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
-    - if: needs.release_info.outputs.is-release == 'true'
-      name: Attest the Pants Pex artifact
-      uses: actions/attest-build-provenance@v3
-      with:
-        subject-path: dist/src.python.pants/*.pex
-    - if: needs.release_info.outputs.is-release == 'true'
-      name: Upload Wheel and Pex
-      run: |
-        curl -L --fail \
-            -X POST \
-            -H "Authorization: Bearer ${{ github.token }}" \
-            -H "Content-Type: application/octet-stream" \
-            ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \
-            --data-binary "@dist/src.python.pants/$PEX_FILENAME"
-
-        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild_pants-*.whl")
-        curl -L --fail \
-            -X POST \
-            -H "Authorization: Bearer ${{ github.token }}" \
-            -H "Content-Type: application/octet-stream" \
-            "${{ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)" \
-            --data-binary "@$WHL";
-    timeout-minutes: 90
   build_wheels_macos14_arm64:
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: false
@@ -393,7 +277,7 @@ jobs:
           3.13
           3.14
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -414,16 +298,16 @@ jobs:
         shared-key: engine
         workspaces: src/rust
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.24.9
     - env:
@@ -493,7 +377,6 @@ jobs:
     needs:
     - build_wheels_linux_x86_64
     - build_wheels_linux_arm64
-    - build_wheels_macos13_x86_64
     - build_wheels_macos14_arm64
     - release_info
     runs-on: ubuntu-22.04
@@ -517,7 +400,7 @@ jobs:
           3.13
           3.14
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -556,13 +439,12 @@ jobs:
       name: Generate announcement
       run: |
         ./pants run src/python/pants_release/generate_release_announcement.py                         -- --output-dir=${{ runner.temp }}
-    - env:
-        SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-      name: Announce to Slack
-      uses: slackapi/slack-github-action@v1.24.0
+    - name: Announce release to Slack
+      uses: slackapi/slack-github-action@v2.1.1
       with:
-        channel-id: C18RRR4JK
+        method: chat.postMessage
         payload-file-path: ${{ runner.temp }}/slack_announcement.json
+        token: ${{ secrets.SLACK_BOT_TOKEN }}
     - name: Announce to pants-devel
       uses: dawidd6/action-send-mail@v3.8.0
       with:

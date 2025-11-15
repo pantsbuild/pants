@@ -222,7 +222,7 @@ def mk_scheduler(
 def test_recursive_multi_get(tmp_path: Path) -> None:
     # Tests that a rule that "uses itself" multiple times per invoke works.
     rules = [fib, QueryRule(Fib, (int,))]
-    (fib_10,) = mk_scheduler(tmp_path, rules=rules).product_request(Fib, subjects=[10])
+    (fib_10,) = mk_scheduler(tmp_path, rules=rules).product_request(Fib, subject=10)
     assert 55 == fib_10.val
 
 
@@ -230,28 +230,9 @@ def test_no_include_trace_error_raises_boring_error(tmp_path: Path) -> None:
     rules = [nested_raise, QueryRule(A, (B,))]
     scheduler = mk_scheduler(tmp_path, rules, include_trace_on_error=False)
     with pytest.raises(ExecutionError) as cm:
-        list(scheduler.product_request(A, subjects=[(B())]))
+        list(scheduler.product_request(A, subject=B()))
     assert_equal_with_printing(
         "1 Exception encountered:\n\nException: An exception for B\n", str(cm.value)
-    )
-
-
-def test_no_include_trace_error_multiple_paths_raises_executionerror(tmp_path: Path) -> None:
-    rules = [nested_raise, QueryRule(A, (B,))]
-    scheduler = mk_scheduler(tmp_path, rules, include_trace_on_error=False)
-    with pytest.raises(ExecutionError) as cm:
-        list(scheduler.product_request(A, subjects=[B(), B()]))
-    assert_equal_with_printing(
-        dedent(
-            """
-            2 Exceptions encountered:
-
-            Exception: An exception for B
-
-            (and 1 more)
-            """
-        ).lstrip(),
-        str(cm.value),
     )
 
 
@@ -259,7 +240,7 @@ def test_include_trace_error_raises_error_with_trace(tmp_path: Path) -> None:
     rules = [nested_raise, QueryRule(A, (B,))]
     scheduler = mk_scheduler(tmp_path, rules, include_trace_on_error=True)
     with pytest.raises(ExecutionError) as cm:
-        list(scheduler.product_request(A, subjects=[(B())]))
+        list(scheduler.product_request(A, subject=(B())))
     assert_equal_with_printing(
         dedent(
             """
@@ -300,7 +281,7 @@ def test_missing_query_rule(tmp_path: Path) -> None:
     # for the graph to work when making a synchronous call via `Scheduler.product_request`.
     scheduler = mk_scheduler(tmp_path, rules=[upcast], include_trace_on_error=False)
     with pytest.raises(Exception) as cm:
-        scheduler.product_request(MyFloat, subjects=[MyInt(0)])
+        scheduler.product_request(MyFloat, subject=MyInt(0))
     assert (
         "No installed QueryRules return the type MyFloat. Try registering QueryRule(MyFloat "
         "for MyInt)."
@@ -347,7 +328,7 @@ def test_streaming_workunits_reporting(tmp_path: Path) -> None:
         tmp_path / "start", [fib, QueryRule(Fib, (int,))]
     )
     with handler:
-        scheduler.product_request(Fib, subjects=[0])
+        scheduler.product_request(Fib, subject=0)
     flattened = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
     # The execution of the single named @rule "fib" should be providing this one workunit.
     assert len(flattened) == 1
@@ -356,7 +337,7 @@ def test_streaming_workunits_reporting(tmp_path: Path) -> None:
         tmp_path / "second", [fib, QueryRule(Fib, (int,))]
     )
     with handler:
-        scheduler.product_request(Fib, subjects=[10])
+        scheduler.product_request(Fib, subject=10)
 
     # Requesting a bigger fibonacci number will result in more rule executions and thus
     # more reported workunits. In this case, we expect 11 invocations of the `fib` rule.
@@ -372,7 +353,7 @@ def test_streaming_workunits_parent_id_and_rule_metadata(tmp_path: Path) -> None
     )
     with handler:
         i = Input()
-        scheduler.product_request(Beta, subjects=[i])
+        scheduler.product_request(Beta, subject=i)
     assert tracker.finished
 
     # rule_one should complete well-after the other rules because of the artificial delay in
@@ -424,7 +405,7 @@ def test_streaming_workunit_log_levels(tmp_path: Path) -> None:
     )
     with handler:
         i = Input()
-        scheduler.product_request(Beta, subjects=[i])
+        scheduler.product_request(Beta, subject=i)
 
     assert tracker.finished
     finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
@@ -455,7 +436,7 @@ def test_streaming_workunit_log_level_parent_rewrite(tmp_path: Path) -> None:
     scheduler, tracker, info_level_handler = _fixture_for_rules(tmp_path, rules)
     with info_level_handler:
         i = Input()
-        scheduler.product_request(Alpha, subjects=[i])
+        scheduler.product_request(Alpha, subject=i)
 
     assert tracker.finished
     finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
@@ -475,7 +456,7 @@ def test_streaming_workunit_log_level_parent_rewrite(tmp_path: Path) -> None:
     )
     with debug_level_handler:
         i = Input()
-        scheduler.product_request(Alpha, subjects=[i])
+        scheduler.product_request(Alpha, subject=i)
 
     assert tracker.finished
     finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
@@ -512,7 +493,7 @@ def test_engine_aware_rule(tmp_path: Path) -> None:
         max_workunit_verbosity=LogLevel.TRACE,
     )
     with handler:
-        scheduler.product_request(ModifiedOutput, subjects=[0])
+        scheduler.product_request(ModifiedOutput, 0)
 
     finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
     workunit = next(
@@ -539,7 +520,7 @@ def test_engine_aware_param(tmp_path: Path) -> None:
         max_workunit_verbosity=LogLevel.TRACE,
     )
     with handler:
-        scheduler.product_request(int, subjects=[ModifiedMetadata()])
+        scheduler.product_request(int, subject=ModifiedMetadata())
 
     finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
     workunit = next(
@@ -571,7 +552,7 @@ def test_engine_aware_none_case(tmp_path: Path) -> None:
         max_workunit_verbosity=LogLevel.TRACE,
     )
     with handler:
-        scheduler.product_request(ModifiedOutput, subjects=[0])
+        scheduler.product_request(ModifiedOutput, subject=0)
 
     finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
     workunit = next(
@@ -598,7 +579,7 @@ def test_artifacts_on_engine_aware_type(tmp_path: Path) -> None:
         tmp_path, [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
     )
     with handler:
-        scheduler.product_request(Output, subjects=[0])
+        scheduler.product_request(Output, subject=0)
 
     finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
     workunit = next(
@@ -627,7 +608,7 @@ def test_metadata_on_engine_aware_type(tmp_path: Path) -> None:
         tmp_path, [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
     )
     with handler:
-        scheduler.product_request(Output, subjects=[0])
+        scheduler.product_request(Output, subject=0)
 
     finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
     workunit = next(
@@ -661,7 +642,7 @@ def test_metadata_non_string_key_behavior(tmp_path: Path) -> None:
         tmp_path, [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
     )
     with handler:
-        scheduler.product_request(Output, subjects=[0])
+        scheduler.product_request(Output, subject=0)
 
     finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
     workunit = next(

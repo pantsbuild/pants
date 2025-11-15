@@ -88,13 +88,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "a662f3cacf57ba494dcb0235349c4912ae7f44345b162894ce5949745501c9c7",
-              "url": "https://files.pythonhosted.org/packages/1d/c2/36d747a14dd3834af7e2f4f86daf8d6e21762ffbdb2b177a5bb3be8f0e8f/diff_cover-9.7.1-py3-none-any.whl"
+              "hash": "cd6498620c747c2493a6c83c14362c32868bfd91cd8d0dd093f136070ec4ffc5",
+              "url": "https://files.pythonhosted.org/packages/21/dd/6db45462ffbfe3791c6de81be5db1c9e883e6b664ae39fc8adf947c738a6/diff_cover-9.7.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "a03b78bc64b7dc27dda7f11c46bc6d44f4e121c8fb9a5068d41f20a05d463548",
-              "url": "https://files.pythonhosted.org/packages/eb/b7/3124f2038eb9d2842665c109d4516110e3e5570615243ee1065fdc65ac7d/diff_cover-9.7.1.tar.gz"
+              "hash": "872c820d2ecbf79c61d52c7dc70419015e0ab9289589566c791dd270fc0c6e3b",
+              "url": "https://files.pythonhosted.org/packages/e1/66/c200febf00c8b0115825a99c3fdb2e77798419b8a632b1f8e4c81a75e734/diff_cover-9.7.2.tar.gz"
             }
           ],
           "project_name": "diff-cover",
@@ -106,7 +106,7 @@
             "tomli>=1.2.1; extra == \"toml\""
           ],
           "requires_python": ">=3.9",
-          "version": "9.7.1"
+          "version": "9.7.2"
         },
         {
           "artifacts": [
@@ -1375,19 +1375,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "aacdaffceac6c4ef6818887b15677513f16d75c68384b76b415a935d548dd172",
-              "url": "https://files.pythonhosted.org/packages/31/cc/099fab5a73909a117e9689c7da4c39a248595187f0f30dd879ad1d2c34ce/tblib-3.2.1-py3-none-any.whl"
+              "hash": "26bdccf339bcce6a88b2b5432c988b266ebbe63a4e593f6b578b1d2e723d2b76",
+              "url": "https://files.pythonhosted.org/packages/02/be/5d2d47b1fb58943194fb59dcf222f7c4e35122ec0ffe8c36e18b5d728f0b/tblib-3.2.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "846e274d0aeec822953251a3cbd3d840fd0ee7a5ec844d59ffbde7b056f9cd2b",
-              "url": "https://files.pythonhosted.org/packages/43/b6/920e7557087e245ebfd3236f6424304d1c145236ea0ab16c964aa773371a/tblib-3.2.1.tar.gz"
+              "hash": "e9a652692d91bf4f743d4a15bc174c0b76afc750fe8c7b6d195cc1c1d6d2ccec",
+              "url": "https://files.pythonhosted.org/packages/f4/8a/14c15ae154895cc131174f858c707790d416c444fc69f93918adfd8c4c0b/tblib-3.2.2.tar.gz"
             }
           ],
           "project_name": "tblib",
           "requires_dists": [],
           "requires_python": ">=3.9",
-          "version": "3.2.1"
+          "version": "3.2.2"
         },
         {
           "artifacts": [
@@ -1631,14 +1631,14 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.66.0",
+  "pex_version": "2.69.1",
   "pip_version": "25.3",
   "prefer_older_binary": false,
   "requirements": [
     "sqlfluff<3,>=2.3.5"
   ],
   "requires_python": [
-    "CPython<4,>=3.9"
+    "CPython<3.15,>=3.9"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",

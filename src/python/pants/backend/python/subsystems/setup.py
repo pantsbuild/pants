@@ -104,7 +104,7 @@ class PythonSetup(Subsystem):
             #  We'll probably want to find and modify all those tests to set an explicit IC, but
             #  that will take time.
             if "PYTEST_CURRENT_TEST" in os.environ:
-                return (">=3.9,<4",)
+                return (">=3.9,<3.15",)
             raise OptionsError(
                 softwrap(
                     f"""\

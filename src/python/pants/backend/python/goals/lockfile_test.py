@@ -310,7 +310,7 @@ def test_multiple_resolves() -> None:
         GeneratePythonLockfile(
             requirements=FrozenOrderedSet(["a"]),
             find_links=FrozenOrderedSet([]),
-            interpreter_constraints=InterpreterConstraints(["CPython>=3.9,<4"]),
+            interpreter_constraints=InterpreterConstraints(["CPython>=3.9,<3.15"]),
             resolve_name="a",
             lockfile_dest="a.lock",
             diff=False,

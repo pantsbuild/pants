@@ -46,7 +46,7 @@ class HelpBuiltinGoalBase(BuiltinGoal):
     ) -> ExitCode:
         env_name = determine_bootstrap_environment(graph_session.scheduler_session)
         build_symbols = graph_session.scheduler_session.product_request(
-            BuildFileSymbolsInfo, [Params(env_name)]
+            BuildFileSymbolsInfo, Params(env_name)
         )[0]
         all_help_info = HelpInfoExtracter.get_all_help_info(
             options,
