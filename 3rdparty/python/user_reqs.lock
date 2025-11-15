@@ -505,6 +505,28 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "8df0b4f0deceae9faf37bf5f1ad1b46fa5bc7c1731d016df0bdec2513ec82750",
+              "url": "https://files.pythonhosted.org/packages/02/e6/c142be7a103580b65fab706bebe0626c695f677acacbbbbd8852733659fb/elfdeps-0.2.0-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "d99002612d9e08548e14dda6396c7146071cf4150d674eb98f4ced0ea052968b",
+              "url": "https://files.pythonhosted.org/packages/a4/d8/bc6a3d2a99ee83733bfc825201baf53700fbad7bab026a40377a1de2fa6f/elfdeps-0.2.0.tar.gz"
+            }
+          ],
+          "project_name": "elfdeps",
+          "requires_dists": [
+            "coverage[toml]; extra == \"test\"",
+            "pyelftools",
+            "pytest; extra == \"test\""
+          ],
+          "requires_python": ">=3.10",
+          "version": "0.2.0"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "0e8a2c328e96c117272d8c794d3a97d205f753cc2e69dd7ee387b7488a75601f",
               "url": "https://files.pythonhosted.org/packages/7e/bb/1a74dbe87e9a595bf63052c886dfef965dc5b91d149456a8301eb3d41ce2/fastapi-0.120.1-py3-none-any.whl"
             },
@@ -1158,6 +1180,24 @@
           "requires_dists": [],
           "requires_python": null,
           "version": "251.23536.40"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "013df952a006db5e138b1edf6d8a68ecc50630adbd0d83a2d41e7f846163d738",
+              "url": "https://files.pythonhosted.org/packages/af/43/700932c4f0638c3421177144a2e86448c0d75dbaee2c7936bda3f9fd0878/pyelftools-0.32-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "6de90ee7b8263e740c8715a925382d4099b354f29ac48ea40d840cf7aa14ace5",
+              "url": "https://files.pythonhosted.org/packages/b9/ab/33968940b2deb3d92f5b146bc6d4009a5f95d1d06c148ea2f9ee965071af/pyelftools-0.32.tar.gz"
+            }
+          ],
+          "project_name": "pyelftools",
+          "requires_dists": [],
+          "requires_python": null,
+          "version": "0.32"
         },
         {
           "artifacts": [
@@ -2223,6 +2263,7 @@
     "beautifulsoup4==4.11.1",
     "chevron==0.14.0",
     "debugpy==1.8.16",
+    "elfdeps==0.2.0",
     "fastapi==0.120.1",
     "fasteners==0.20.0",
     "freezegun==1.5.5",
