@@ -55,6 +55,8 @@ class SemgrepSubsystem(PythonToolBase):
         "opentelemetry-instrumentation-requests~=0.55b1",
     ]
 
+    register_interpreter_constraints = True
+
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.tools.semgrep", "semgrep.lock")
 

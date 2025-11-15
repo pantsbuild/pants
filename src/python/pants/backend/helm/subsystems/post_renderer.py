@@ -54,6 +54,8 @@ class HelmPostRendererSubsystem(PythonToolRequirementsBase):
         "ruamel.yaml>=0.15.96,!=0.17.0,!=0.17.1,!=0.17.2,!=0.17.5,<=0.17.21",
     ]
 
+    register_interpreter_constraints = True
+
     default_lockfile_resource = (_HELM_POSTRENDERER_PACKAGE, "post_renderer.lock")
 
 
