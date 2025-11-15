@@ -75,7 +75,7 @@ class ScalaParser(JvmToolBase):
     help = "Internal tool for parsing Scala sources to identify dependencies"
 
     default_artifacts = (
-        f"org.scalameta:scalameta_{_PARSER_SCALA_BINARY_VERSION}:4.8.7",
+        f"org.scalameta:scalameta_{_PARSER_SCALA_BINARY_VERSION}:4.14.1",
         f"io.circe:circe-generic_{_PARSER_SCALA_BINARY_VERSION}:0.14.1",
         _resolve_scala_artifacts_for_version(
             _PARSER_SCALA_VERSION
