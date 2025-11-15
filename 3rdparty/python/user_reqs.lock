@@ -299,13 +299,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "9b9f285302c6e3064f4330c05f05b81945b2a39544279343e6e7c5f27a9baddc",
-              "url": "https://files.pythonhosted.org/packages/db/d3/9dcc0f5797f070ec8edf30fbadfb200e71d9db6b84d211e3b2085a7589a0/click-8.3.0-py3-none-any.whl"
+              "hash": "981153a64e25f12d547d3426c367a4857371575ee7ad18df2a6183ab0545b2a6",
+              "url": "https://files.pythonhosted.org/packages/98/78/01c019cdb5d6498122777c1a43056ebb3ebfeef2076d9d026bfe15583b2b/click-8.3.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e7b8232224eba16f4ebe410c25ced9f7875cb5f3263ffc93cc3e8da705e229c4",
-              "url": "https://files.pythonhosted.org/packages/46/61/de6cd827efad202d7057d93e0fed9294b96952e188f7384832791c7b2254/click-8.3.0.tar.gz"
+              "hash": "12ff4785d337a1bb490bb7e9c2b1ee5da3112e94a8622f26a6c77f5d2fc6842a",
+              "url": "https://files.pythonhosted.org/packages/3d/fa/656b739db8587d7b5dfa22e22ed02566950fbfbcdc20311993483657a5c0/click-8.3.1.tar.gz"
             }
           ],
           "project_name": "click",
@@ -313,7 +313,7 @@
             "colorama; platform_system == \"Windows\""
           ],
           "requires_python": ">=3.10",
-          "version": "8.3.0"
+          "version": "8.3.1"
         },
         {
           "artifacts": [
@@ -953,13 +953,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "e166bd4af957a3b396df3467a68e70648cb384b1f332505e8459b3cee561aaae",
-              "url": "https://files.pythonhosted.org/packages/09/34/eb938923b2902fbe7856e45107dfdf9ed476a061cc22729d97f77d611d74/pex-2.69.1-py2.py3-none-any.whl"
+              "hash": "d47c2438fe1577c1de2f1b8228247904f356d84e688aa328275a21082be23eb0",
+              "url": "https://files.pythonhosted.org/packages/3b/74/51f3ef71b4e47af1136b496fefb760d46658f0f8bd00cf99c89111d8787f/pex-2.69.2-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "602bec81ee73fcec986e09286f5a579f6f8346e3d1b0bb547fd5c76a52a169ca",
-              "url": "https://files.pythonhosted.org/packages/71/69/f22ddf5e437c3e252159bfb61a673a77054a2d9dbce415b3065de157f7c5/pex-2.69.1.tar.gz"
+              "hash": "39d5bf1bbd2e687132d990ae56107a4d229f0b6b0be2fd080a2463b5031b2c9f",
+              "url": "https://files.pythonhosted.org/packages/4f/d6/6e62f2c7bb78d1bff2f84f15939b4318e7534495cc576724e1724f3a052f/pex-2.69.2.tar.gz"
             }
           ],
           "project_name": "pex",
@@ -968,7 +968,7 @@
             "subprocess32>=3.2.7; python_version < \"3\" and extra == \"subprocess\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,<3.16,>=2.7",
-          "version": "2.69.1"
+          "version": "2.69.2"
         },
         {
           "artifacts": [
@@ -2213,7 +2213,7 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.69.1",
+  "pex_version": "2.69.2",
   "pip_version": "25.3",
   "prefer_older_binary": false,
   "requirements": [
@@ -2232,7 +2232,7 @@
     "mypy-typing-asserts==0.1.1",
     "node-semver==0.9.0",
     "packaging==25.0",
-    "pex==2.69.1",
+    "pex==2.69.2",
     "psutil==5.9.8",
     "pydevd-pycharm==251.23536.40",
     "pytest!=7.1.0,!=7.1.1,<9,>=7",
