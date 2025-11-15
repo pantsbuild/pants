@@ -56,7 +56,6 @@ class SemgrepSubsystem(PythonToolBase):
     ]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.9,<3.14"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.tools.semgrep", "semgrep.lock")
