@@ -36,7 +36,6 @@ class JavaSourceDependencyAnalysis:
     imports: Sequence[JavaImport]
     top_level_types: Sequence[str]
     consumed_types: Sequence[str]
-    export_types: Sequence[str]
 
     @classmethod
     def from_json_dict(cls, analysis: dict[str, Any]) -> JavaSourceDependencyAnalysis:
@@ -45,7 +44,6 @@ class JavaSourceDependencyAnalysis:
             imports=tuple(JavaImport.from_json_dict(imp) for imp in analysis["imports"]),
             top_level_types=tuple(analysis["topLevelTypes"]),
             consumed_types=tuple(analysis["consumedTypes"]),
-            export_types=tuple(analysis["exportTypes"]),
         )
 
     def to_debug_json_dict(self) -> dict[str, Any]:
@@ -54,5 +52,4 @@ class JavaSourceDependencyAnalysis:
             "imports": [imp.to_debug_json_dict() for imp in self.imports],
             "top_level_types": self.top_level_types,
             "consumed_types": self.consumed_types,
-            "export_types": self.export_types,
         }
