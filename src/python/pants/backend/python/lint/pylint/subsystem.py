@@ -63,8 +63,8 @@ class Pylint(PythonToolBase):
     default_main = ConsoleScript("pylint")
     default_requirements = ["pylint>=4.0.0,<5"]
 
-    default_interpreter_constraints = ["CPython>=3.10,<4"]
     register_interpreter_constraints = True
+    default_interpreter_constraints = ["CPython>=3.10,<3.15"]
 
     default_lockfile_resource = ("pants.backend.python.lint.pylint", "pylint.lock")
 
