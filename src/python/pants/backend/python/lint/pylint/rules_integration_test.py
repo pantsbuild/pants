@@ -11,7 +11,7 @@ from pants.backend.python import target_types_rules
 from pants.backend.python.lint.pylint import subsystem
 from pants.backend.python.lint.pylint.rules import PartitionMetadata, PylintRequest
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
-from pants.backend.python.lint.pylint.subsystem import PylintFieldSet
+from pants.backend.python.lint.pylint.subsystem import Pylint, PylintFieldSet
 from pants.backend.python.target_types import (
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
@@ -27,7 +27,7 @@ from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
-    skip_unless_all_pythons_present,
+    skip_unless_python39_present,
     skip_unless_python310_and_python311_present,
 )
 from pants.testutil.python_rule_runner import PythonRuleRunner
@@ -63,13 +63,17 @@ def run_pylint(
     rule_runner: PythonRuleRunner,
     targets: list[Target],
     *,
+    python_ics: str | None = Pylint.default_interpreter_constraints[0],
     extra_args: list[str] | None = None,
 ) -> tuple[LintResult, ...]:
+    args = extra_args or []
+    if python_ics:
+        args.extend([f"--python-interpreter-constraints=['{python_ics}']"])
     rule_runner.set_options(
         [
             "--backend-packages=pants.backend.python.lint.pylint",
             "--source-root-patterns=['src/python', 'tests/python']",
-            *(extra_args or ()),
+            *(args),
         ],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
@@ -77,7 +81,7 @@ def run_pylint(
         Partitions[PylintFieldSet, PartitionMetadata],
         [PylintRequest.PartitionRequest(tuple(PylintFieldSet.create(tgt) for tgt in targets))],
     )
-    results = []
+    results: list[LintResult] = []
     for partition in partitions:
         result = rule_runner.request(
             LintResult,
@@ -87,9 +91,7 @@ def run_pylint(
     return tuple(results)
 
 
-def assert_success(
-    rule_runner: PythonRuleRunner, target: Target, *, extra_args: list[str] | None = None
-) -> None:
+def assert_success(rule_runner: PythonRuleRunner, target: Target, *, extra_args: list[str]) -> None:
     result = run_pylint(rule_runner, [target], extra_args=extra_args)
     assert len(result) == 1
     assert "Your code has been rated at 10.00/10" in result[0].stdout
@@ -100,7 +102,7 @@ def assert_success(
 @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
-    all_major_minor_python_versions(["CPython>=3.9,<3.15"]),
+    all_major_minor_python_versions(Pylint.default_interpreter_constraints),
 )
 def test_passing(rule_runner: PythonRuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({f"{PACKAGE}/f.py": GOOD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
@@ -108,7 +110,7 @@ def test_passing(rule_runner: PythonRuleRunner, major_minor_interpreter: str) ->
     assert_success(
         rule_runner,
         tgt,
-        extra_args=[f"--python-interpreter-constraints=['=={major_minor_interpreter}.*']"],
+        extra_args=[f"--pylint-interpreter-constraints=['=={major_minor_interpreter}.*']"],
     )
 
 
@@ -174,7 +176,7 @@ def test_uses_correct_python_version(rule_runner: PythonRuleRunner) -> None:
     py310_tgt = rule_runner.get_target(
         Address(PACKAGE, target_name="py310", relative_file_path="f.py")
     )
-    py310_result = run_pylint(rule_runner, [py310_tgt])
+    py310_result = run_pylint(rule_runner, [py310_tgt], python_ics=None)
     assert len(py310_result) == 1
     assert py310_result[0].exit_code == 2
     assert (
@@ -184,12 +186,12 @@ def test_uses_correct_python_version(rule_runner: PythonRuleRunner) -> None:
     py311_tgt = rule_runner.get_target(
         Address(PACKAGE, target_name="py311", relative_file_path="f.py")
     )
-    py311_result = run_pylint(rule_runner, [py311_tgt])
+    py311_result = run_pylint(rule_runner, [py311_tgt], python_ics=None)
     assert len(py311_result) == 1
     assert py311_result[0].exit_code == 0
     assert "Your code has been rated at 10.00/10" in py311_result[0].stdout.strip()
 
-    combined_result = run_pylint(rule_runner, [py310_tgt, py311_tgt])
+    combined_result = run_pylint(rule_runner, [py310_tgt, py311_tgt], python_ics=None)
     assert len(combined_result) == 2
     batched_py311_result, batched_py310_result = sorted(
         combined_result, key=lambda result: result.exit_code
@@ -480,7 +482,7 @@ def test_source_plugin(rule_runner: PythonRuleRunner) -> None:
     assert result.report == EMPTY_DIGEST
 
 
-@skip_unless_all_pythons_present("3.8", "3.9")
+@skip_unless_python310_and_python311_present
 def test_partition_targets(rule_runner: PythonRuleRunner) -> None:
     def create_folder(folder: str, resolve: str, interpreter: str) -> dict[str, str]:
         return {
@@ -506,10 +508,10 @@ def test_partition_targets(rule_runner: PythonRuleRunner) -> None:
         }
 
     files = {
-        **create_folder("resolveA_py38", "a", "3.8"),
-        **create_folder("resolveA_py39", "a", "3.9"),
-        **create_folder("resolveB_1", "b", "3.9"),
-        **create_folder("resolveB_2", "b", "3.9"),
+        **create_folder("resolveA_py310", "a", "3.10"),
+        **create_folder("resolveA_py311", "a", "3.11"),
+        **create_folder("resolveB_1", "b", "3.11"),
+        **create_folder("resolveB_2", "b", "3.11"),
     }
     rule_runner.write_files(files)
     rule_runner.set_options(
@@ -517,10 +519,10 @@ def test_partition_targets(rule_runner: PythonRuleRunner) -> None:
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
 
-    resolve_a_py38_dep = rule_runner.get_target(Address("resolveA_py38", target_name="dep"))
-    resolve_a_py38_root = rule_runner.get_target(Address("resolveA_py38", target_name="root"))
-    resolve_a_py39_dep = rule_runner.get_target(Address("resolveA_py39", target_name="dep"))
-    resolve_a_py39_root = rule_runner.get_target(Address("resolveA_py39", target_name="root"))
+    resolve_a_py310_dep = rule_runner.get_target(Address("resolveA_py310", target_name="dep"))
+    resolve_a_py310_root = rule_runner.get_target(Address("resolveA_py310", target_name="root"))
+    resolve_a_py311_dep = rule_runner.get_target(Address("resolveA_py311", target_name="dep"))
+    resolve_a_py311_root = rule_runner.get_target(Address("resolveA_py311", target_name="root"))
     resolve_b_dep1 = rule_runner.get_target(Address("resolveB_1", target_name="dep"))
     resolve_b_root1 = rule_runner.get_target(Address("resolveB_1", target_name="root"))
     resolve_b_dep2 = rule_runner.get_target(Address("resolveB_2", target_name="dep"))
@@ -529,8 +531,8 @@ def test_partition_targets(rule_runner: PythonRuleRunner) -> None:
         tuple(
             PylintFieldSet.create(t)
             for t in (
-                resolve_a_py38_root,
-                resolve_a_py39_root,
+                resolve_a_py310_root,
+                resolve_a_py311_root,
                 resolve_b_root1,
                 resolve_b_root2,
             )
@@ -559,12 +561,40 @@ def test_partition_targets(rule_runner: PythonRuleRunner) -> None:
         assert key.interpreter_constraints == InterpreterConstraints(ics)
         assert key.description == f"{resolve}, {ics}"
 
-    assert_partition(partitions[0], [resolve_a_py38_root], [resolve_a_py38_dep], "3.8", "a")
-    assert_partition(partitions[1], [resolve_a_py39_root], [resolve_a_py39_dep], "3.9", "a")
+    assert_partition(partitions[0], [resolve_a_py310_root], [resolve_a_py310_dep], "3.10", "a")
+    assert_partition(partitions[1], [resolve_a_py311_root], [resolve_a_py311_dep], "3.11", "a")
     assert_partition(
         partitions[2],
         [resolve_b_root1, resolve_b_root2],
         [resolve_b_dep1, resolve_b_dep2],
-        "3.9",
+        "3.11",
         "b",
     )
+
+
+@skip_unless_python39_present
+def test_works_on_python39(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/f.py": dedent(
+                """\
+                x = 0
+                if y := x:
+                    print("x is truthy and now assigned to y")
+                """
+            ),
+            f"{PACKAGE}/BUILD": "python_sources(interpreter_constraints=['==3.9.*'])",
+            "pylint.lock": read_sibling_resource(__name__, "pylint_py39.lock"),
+        }
+    )
+    extra_args = [
+        "--python-resolves={'pylint':'pylint.lock'}",
+        "--pylint-install-from-resolve=pylint",
+    ]
+    rule_runner.write_files({f"{PACKAGE}/f.py": GOOD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+    result = run_pylint(rule_runner, [tgt], python_ics="CPython==3.9.*", extra_args=extra_args)
+    assert len(result) == 1
+    assert "Your code has been rated at 10.00/10" in result[0].stdout
+    assert result[0].exit_code == 0
+    assert result[0].report == EMPTY_DIGEST
