@@ -48,7 +48,7 @@ class Black(PythonToolBase):
         'typing-extensions>=3.10.0.0; python_version < "3.10"',
     ]
 
-    register_interpreter_constraints = False
+    register_interpreter_constraints = True
 
     default_lockfile_resource = ("pants.backend.python.lint.black", "black.lock")
 
