@@ -825,3 +825,82 @@ def test_multiple_classified_jars(rule_runner: RuleRunner) -> None:
 
     assert direct_dependency.file_name == "com.google.api_gax-grpc_2.67.0.jar"
     assert dependency.file_name == "com.google.api_gax-grpc_2.67.0.jar"
+
+
+# @pytest.mark.xfail(
+#     reason="Bug: dependencies() doesn't recursively resolve transitive deps (see plans/20251117_jvm_transitive_dep_bug.md)",
+#     strict=True,
+# )
+@maybe_skip_jdk_test
+def test_transitive_dependency_closure_bug(rule_runner: RuleRunner) -> None:
+    """Test that demonstrates the transitive dependency resolution bug.
+
+    When multiple top-level artifacts share dependencies, Coursier optimizes the lockfile
+    by omitting transitive dependencies that are already defined elsewhere. The current
+    dependencies() method only returns immediate dependencies, not the full transitive closure.
+
+    This test uses a 3-level dependency chain:
+    - spring-context depends on spring-core (but NOT directly on spring-jcl)
+    - spring-core depends on spring-jcl
+    - When all three are in the lockfile as top-level artifacts, Coursier optimizes by
+      not listing spring-jcl in spring-context's dependencies field
+    - Bug: dependencies() for spring-context only returns immediate deps, missing spring-jcl
+    """
+    # Configure Coursier to use Clojars in addition to Maven Central
+    rule_runner.set_options(
+        args=[
+            """--coursier-repos=['https://repo1.maven.org/maven2', 'https://repo.clojars.org']"""
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    # Resolve all three as top-level artifacts
+    resolved_lockfile = rule_runner.request(
+        CoursierResolvedLockfile,
+        [
+            ArtifactRequirements.from_coordinates(
+                [
+                    Coordinate(
+                        group="com.taoensso",
+                        artifact="timbre",
+                        version="6.3.1",
+                    ),
+                    Coordinate(
+                        group="com.taoensso",
+                        artifact="encore",
+                        version="3.132.0",
+                    ),
+                ]
+            ),
+        ],
+    )
+
+    # Write the lockfile to disk for inspection
+    lockfile_toml = resolved_lockfile.to_serialized()
+    with open("/tmp/coursier_test.lock", "wb") as f:
+        f.write(lockfile_toml)
+
+    resolve_key = CoursierResolveKey(name="test", path="test", digest=EMPTY_DIGEST)
+
+    spring_context_coord = Coordinate(
+        group="com.taoensso",
+        artifact="timbre",
+        version="6.3.1",
+    )
+
+    # Get spring-context's dependencies
+    _, transitive_entries = resolved_lockfile.dependencies(resolve_key, spring_context_coord)
+
+    # Collect all transitive artifacts
+    transitive_artifacts = {e.coord.artifact for e in transitive_entries}
+
+    # BUG: This assertion will FAIL because spring-jcl is missing from the transitive deps
+    # Dependency chain: spring-context → spring-core → spring-jcl
+    # The lockfile has spring-context.dependencies = [spring-core, ...] (optimized by Coursier)
+    # but spring-jcl is NOT listed even though it's transitively needed through spring-core.
+    #
+    # This causes ClassNotFoundException at runtime when code tries to use spring-jcl classes.
+    assert "truss" in transitive_artifacts, (
+        f"spring-jcl should be in transitive dependencies of spring-context "
+        f"(via spring-core), but got: {transitive_artifacts}"
+    )
