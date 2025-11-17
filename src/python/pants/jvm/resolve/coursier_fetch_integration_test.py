@@ -838,7 +838,7 @@ def test_transitive_dependency_closure_bug(rule_runner: RuleRunner) -> None:
     
     It's unclear why this happens. Perhaps A, B, and C all need to depend on a fourth dependency D?
     In the case of timbre, encore, and truss, D is Clojure? This is just a hypothesis and we need to confirm it."""
-    # Configure Coursier to use Clojars in addition to Maven Central
+    # Add clojars since that's where timbre, encore, and truss reside
     rule_runner.set_options(
         args=[
             """--coursier-repos=['https://repo1.maven.org/maven2', 'https://repo.clojars.org']"""
@@ -846,7 +846,6 @@ def test_transitive_dependency_closure_bug(rule_runner: RuleRunner) -> None:
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
 
-    # Resolve all top-level artifacts
     resolved_lockfile = rule_runner.request(
         CoursierResolvedLockfile,
         [
@@ -867,11 +866,6 @@ def test_transitive_dependency_closure_bug(rule_runner: RuleRunner) -> None:
         ],
     )
 
-    # Write the lockfile to disk for inspection later
-    lockfile_toml = resolved_lockfile.to_serialized()
-    with open("/tmp/coursier_test.lock", "wb") as f:
-        f.write(lockfile_toml)
-
     resolve_key = CoursierResolveKey(name="test", path="test", digest=EMPTY_DIGEST)
 
     timbre_coord = Coordinate(
@@ -880,18 +874,8 @@ def test_transitive_dependency_closure_bug(rule_runner: RuleRunner) -> None:
         version="6.3.1",
     )
 
-    # Get timbre's dependencies
     _, transitive_entries = resolved_lockfile.dependencies(resolve_key, timbre_coord)
-
-    # Collect all transitive artifacts
     transitive_artifacts = {e.coord.artifact for e in transitive_entries}
-
-    # BUG: This assertion will FAIL because truss is missing from the transitive deps
-    # Dependency chain: timbre → encore → truss
-    # The lockfile has timbre.dependencies = [encore, ...] (optimized by Coursier)
-    # but truss is NOT listed even though it's transitively needed through encore.
-    #
-    # This causes ClassNotFoundException at runtime when code tries to use truss classes.
     assert "truss" in transitive_artifacts, (
         f"truss should be in transitive dependencies of timbre "
         f"(via encore), but got: {transitive_artifacts}"
