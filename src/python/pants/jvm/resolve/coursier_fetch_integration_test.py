@@ -827,25 +827,17 @@ def test_multiple_classified_jars(rule_runner: RuleRunner) -> None:
     assert dependency.file_name == "com.google.api_gax-grpc_2.67.0.jar"
 
 
-# @pytest.mark.xfail(
-#     reason="Bug: dependencies() doesn't recursively resolve transitive deps (see plans/20251117_jvm_transitive_dep_bug.md)",
-#     strict=True,
-# )
 @maybe_skip_jdk_test
 def test_transitive_dependency_closure_bug(rule_runner: RuleRunner) -> None:
-    """Test that demonstrates the transitive dependency resolution bug.
-
-    When multiple top-level artifacts share dependencies, Coursier optimizes the lockfile
-    by omitting transitive dependencies that are already defined elsewhere. The current
-    dependencies() method only returns immediate dependencies, not the full transitive closure.
-
-    This test uses a 3-level dependency chain:
-    - timbre depends on encore (but NOT directly on truss)
-    - encore depends on truss
-    - When all three are in the lockfile as top-level artifacts, Coursier optimizes by
-      not listing truss in timbre's dependencies field
-    - Bug: dependencies() for timbre only returns immediate deps, missing truss
-    """
+    """Given three dependencies A, B, and C where A depends on B which depends on C
+    and A only depends on C transitively through B (no explicit dependency), our Coursier locking
+    functionality sometimes will not include C in the dependencies of A.
+    
+    For some combinations of A->B->C such as spring-context->spring-core->spring-jcl, the bug does not exist.
+    But for timbre->encore->truss, the bug exists.
+    
+    It's unclear why this happens. Perhaps A, B, and C all need to depend on a fourth dependency D?
+    In the case of timbre, encore, and truss, D is Clojure? This is just a hypothesis and we need to confirm it."""
     # Configure Coursier to use Clojars in addition to Maven Central
     rule_runner.set_options(
         args=[
@@ -875,7 +867,7 @@ def test_transitive_dependency_closure_bug(rule_runner: RuleRunner) -> None:
         ],
     )
 
-    # Write the lockfile to disk for inspection
+    # Write the lockfile to disk for inspection later
     lockfile_toml = resolved_lockfile.to_serialized()
     with open("/tmp/coursier_test.lock", "wb") as f:
         f.write(lockfile_toml)
