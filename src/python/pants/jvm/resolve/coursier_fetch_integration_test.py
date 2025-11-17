@@ -714,9 +714,10 @@ def test_missing_entry_for_transitive_dependency(rule_runner: RuleRunner) -> Non
     missing = coords_of_dependencies - coords_of_entries
 
     # We expect all the dependencies to have an entry, but right now it's not true
-    # for ("junit", "junit") and ("org.apache.curator", "apache-curator").
+    # for ("org.apache.curator", "apache-curator").
+    # Note: As of Coursier v2.1.24, the ("junit", "junit") issue appears to be fixed.
     # TODO Remove the workaround once the bug is fixed.
-    assert missing == {("junit", "junit"), ("org.apache.curator", "apache-curator")}
+    assert missing == {("org.apache.curator", "apache-curator")}
 
 
 @maybe_skip_jdk_test
