@@ -840,11 +840,11 @@ def test_transitive_dependency_closure_bug(rule_runner: RuleRunner) -> None:
     dependencies() method only returns immediate dependencies, not the full transitive closure.
 
     This test uses a 3-level dependency chain:
-    - spring-context depends on spring-core (but NOT directly on spring-jcl)
-    - spring-core depends on spring-jcl
+    - timbre depends on encore (but NOT directly on truss)
+    - encore depends on truss
     - When all three are in the lockfile as top-level artifacts, Coursier optimizes by
-      not listing spring-jcl in spring-context's dependencies field
-    - Bug: dependencies() for spring-context only returns immediate deps, missing spring-jcl
+      not listing truss in timbre's dependencies field
+    - Bug: dependencies() for timbre only returns immediate deps, missing truss
     """
     # Configure Coursier to use Clojars in addition to Maven Central
     rule_runner.set_options(
@@ -854,7 +854,7 @@ def test_transitive_dependency_closure_bug(rule_runner: RuleRunner) -> None:
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
 
-    # Resolve all three as top-level artifacts
+    # Resolve all top-level artifacts
     resolved_lockfile = rule_runner.request(
         CoursierResolvedLockfile,
         [
@@ -882,25 +882,25 @@ def test_transitive_dependency_closure_bug(rule_runner: RuleRunner) -> None:
 
     resolve_key = CoursierResolveKey(name="test", path="test", digest=EMPTY_DIGEST)
 
-    spring_context_coord = Coordinate(
+    timbre_coord = Coordinate(
         group="com.taoensso",
         artifact="timbre",
         version="6.3.1",
     )
 
-    # Get spring-context's dependencies
-    _, transitive_entries = resolved_lockfile.dependencies(resolve_key, spring_context_coord)
+    # Get timbre's dependencies
+    _, transitive_entries = resolved_lockfile.dependencies(resolve_key, timbre_coord)
 
     # Collect all transitive artifacts
     transitive_artifacts = {e.coord.artifact for e in transitive_entries}
 
-    # BUG: This assertion will FAIL because spring-jcl is missing from the transitive deps
-    # Dependency chain: spring-context → spring-core → spring-jcl
-    # The lockfile has spring-context.dependencies = [spring-core, ...] (optimized by Coursier)
-    # but spring-jcl is NOT listed even though it's transitively needed through spring-core.
+    # BUG: This assertion will FAIL because truss is missing from the transitive deps
+    # Dependency chain: timbre → encore → truss
+    # The lockfile has timbre.dependencies = [encore, ...] (optimized by Coursier)
+    # but truss is NOT listed even though it's transitively needed through encore.
     #
-    # This causes ClassNotFoundException at runtime when code tries to use spring-jcl classes.
+    # This causes ClassNotFoundException at runtime when code tries to use truss classes.
     assert "truss" in transitive_artifacts, (
-        f"spring-jcl should be in transitive dependencies of spring-context "
-        f"(via spring-core), but got: {transitive_artifacts}"
+        f"truss should be in transitive dependencies of timbre "
+        f"(via encore), but got: {transitive_artifacts}"
     )
