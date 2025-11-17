@@ -244,19 +244,38 @@ class CoursierResolvedLockfile:
         if entry is None:
             raise self._coordinate_not_found(key, coord)
 
-        return (
-            entry,
-            tuple(
-                dependency_entry
-                for d in entry.dependencies
+        # Recursively compute the full transitive dependency closure.
+        # Coursier's JSON report may optimize the dependencies list by omitting some transitive
+        # dependencies when they're already declared as top-level requirements. We need to
+        # recursively walk the dependency tree to ensure we get the complete closure.
+        visited = set()
+        transitive_entries = []
+
+        def visit(dep_coord: Coordinate) -> None:
+            key_tuple = (dep_coord.group, dep_coord.artifact, dep_coord.classifier)
+            if key_tuple in visited:
+                return
+            visited.add(key_tuple)
+
+            dep_entry = entries.get(key_tuple)
+            if dep_entry is None:
                 # The dependency might not be present in the entries due to coursier bug:
                 # https://github.com/coursier/coursier/issues/2884
                 # As a workaround, if this happens, we want to skip the dependency.
                 # TODO Drop the check once the bug is fixed.
-                if (dependency_entry := entries.get((d.group, d.artifact, d.classifier)))
-                is not None
-            ),
-        )
+                return
+
+            transitive_entries.append(dep_entry)
+
+            # Recursively visit all dependencies of this dependency
+            for transitive_dep in dep_entry.dependencies:
+                visit(transitive_dep)
+
+        # Visit all direct dependencies to build the full transitive closure
+        for d in entry.dependencies:
+            visit(d)
+
+        return (entry, tuple(transitive_entries))
 
     @classmethod
     def from_toml(cls, lockfile: str | bytes) -> CoursierResolvedLockfile:
