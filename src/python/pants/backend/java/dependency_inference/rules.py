@@ -91,30 +91,17 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
     if java_infer_subsystem.consumed_types:
         package = analysis.declared_package
 
-        # Qualify consumed types, handling both simple types and inner classes
-        import_map = {imp.name.split(".")[-1]: imp.name for imp in analysis.imports}
-
         for consumed_type in analysis.consumed_types:
             if "." not in consumed_type:
                 # Simple unqualified type - add package prefix
                 types.add(f"{package}.{consumed_type}" if package else consumed_type)
             else:
-                # Has dots - could be inner class reference (e.g., Outer.Inner)
-                # The symbol mapper only knows about outer classes, so we need to look up
-                # the outer class part, not the full inner class reference
+                # Has dots and might already be fully qualified
+                types.add(consumed_type)
 
+                # Might be an inner class in the same package as the current class
                 first_part = consumed_type.split(".")[0]
-
-                # Try the outer class as-is (might be fully qualified)
-                types.add(first_part)
-
-                # Try with package prefix (for same-package outer classes)
-                if package:
-                    types.add(f"{package}.{first_part}")
-
-                # If the outer class is imported, use the import
-                if first_part in import_map:
-                    types.add(import_map[first_part])
+                types.add(f"{package}.{first_part}" if package else first_part)
 
     # Resolve the export types into (probable) types:
     # First produce a map of known consumed unqualified types to possible qualified names
