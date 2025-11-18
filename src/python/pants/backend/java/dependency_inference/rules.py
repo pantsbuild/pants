@@ -91,12 +91,30 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
     if java_infer_subsystem.consumed_types:
         package = analysis.declared_package
 
-        # Qualify each consumed type, potentially generating multiple candidates
-        type_candidates: OrderedSet[str] = OrderedSet()
+        # Qualify consumed types, handling both simple types and inner classes
+        import_map = {imp.name.split(".")[-1]: imp.name for imp in analysis.imports}
+
         for consumed_type in analysis.consumed_types:
-            candidates = qualify_consumed_type(consumed_type, package, analysis.imports)
-            type_candidates.update(candidates)
-        types.update(type_candidates)
+            if "." not in consumed_type:
+                # Simple unqualified type - add package prefix
+                types.add(f"{package}.{consumed_type}" if package else consumed_type)
+            else:
+                # Has dots - could be inner class reference (e.g., Outer.Inner)
+                # The symbol mapper only knows about outer classes, so we need to look up
+                # the outer class part, not the full inner class reference
+
+                first_part = consumed_type.split(".")[0]
+
+                # Try the outer class as-is (might be fully qualified)
+                types.add(first_part)
+
+                # Try with package prefix (for same-package outer classes)
+                if package:
+                    types.add(f"{package}.{first_part}")
+
+                # If the outer class is imported, use the import
+                if first_part in import_map:
+                    types.add(import_map[first_part])
 
     # Resolve the export types into (probable) types:
     # First produce a map of known consumed unqualified types to possible qualified names
@@ -152,65 +170,6 @@ async def infer_java_dependencies_via_source_analysis(
         JavaInferredDependenciesAndExportsRequest(request.field_set.source), **implicitly()
     )
     return InferredDependencies(jids.dependencies)
-
-
-def qualify_consumed_type(
-    type_name: str,
-    source_package: str | None,
-    imports: tuple[JavaImport, ...],
-) -> list[str]:
-    """
-    Generate candidate fully-qualified names for a type, using progressive stripping.
-
-    For types without dots: just add package prefix (simple case)
-    For types with dots: iteratively try each prefix level
-
-    Args:
-        type_name: The type name as it appears in the source (may be qualified or unqualified)
-        source_package: The package of the source file, or None if unnamed package
-        imports: The imports declared in the source file
-
-    Returns:
-        List of possible fully-qualified type names, in priority order
-    """
-    # Simple case: no dots means definitely unqualified
-    if "." not in type_name:
-        if source_package:
-            return [f"{source_package}.{type_name}"]
-        else:
-            return [type_name]
-
-    # Complex case: has dots, could be inner class reference
-    # Generate all candidates by progressive stripping
-    candidates = []
-    parts = type_name.split(".")
-
-    # Build import map for quick lookup
-    import_map = {imp.name.split(".")[-1]: imp.name for imp in imports}
-
-    # Try each progressively shorter prefix
-    for i in range(len(parts), 0, -1):
-        prefix = ".".join(parts[:i])
-
-        # Candidate 1: As fully qualified name
-        candidates.append(prefix)
-
-        # Candidate 2: If first part is imported, use import
-        first_part = parts[0]
-        if first_part in import_map and i == len(parts):
-            # Only for the full name, not stripped versions
-            imported_fqn = import_map[first_part]
-            remainder = ".".join(parts[1:]) if len(parts) > 1 else ""
-            if remainder:
-                candidates.append(f"{imported_fqn}.{remainder}")
-            else:
-                candidates.append(imported_fqn)
-
-        # Candidate 3: With current package prefix
-        if source_package:
-            candidates.append(f"{source_package}.{prefix}")
-
-    return candidates
 
 
 def dependency_name(imp: JavaImport):
