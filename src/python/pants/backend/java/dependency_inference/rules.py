@@ -119,7 +119,7 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
     dependencies: OrderedSet[Address] = OrderedSet()
     exports: OrderedSet[Address] = OrderedSet()
     for typ in types:
-        for matches in lookup_type_with_fallback(typ, symbol_mapping, resolve).values():
+        for matches in symbol_mapping.addresses_for_symbol(typ, resolve).values():
             explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
                 matches,
                 address,
@@ -211,42 +211,6 @@ def qualify_consumed_type(
             candidates.append(f"{source_package}.{prefix}")
 
     return candidates
-
-
-def lookup_type_with_fallback(
-    typ: str,
-    symbol_mapping: SymbolMapping,
-    resolve: str
-) -> dict[str, FrozenOrderedSet[Address]]:
-    """
-    Look up a type in the symbol map, with fallback to parent types for inner classes.
-
-    Args:
-        typ: Fully qualified type name (e.g., "com.example.B.InnerB")
-        symbol_mapping: The symbol map to search
-        resolve: The JVM resolve to search within
-
-    Returns:
-        Dict mapping namespaces to addresses, empty if no match found
-    """
-    # Try exact match first
-    matches = symbol_mapping.addresses_for_symbol(typ, resolve)
-    if matches:
-        return matches
-
-    # If not found and typ looks like it might be an inner class (has dots after package)
-    # Try stripping inner class parts one by one
-    # E.g., "com.example.B.InnerB" → try "com.example.B"
-    #       "com.example.Outer.Middle.Inner" → try "com.example.Outer.Middle", then "com.example.Outer"
-    parts = typ.split(".")
-    if len(parts) > 2:  # At least package + outer + inner
-        for i in range(len(parts) - 1, 1, -1):  # Don't try single-part names
-            parent_type = ".".join(parts[:i])
-            matches = symbol_mapping.addresses_for_symbol(parent_type, resolve)
-            if matches:
-                return matches
-
-    return {}
 
 
 def dependency_name(imp: JavaImport):
