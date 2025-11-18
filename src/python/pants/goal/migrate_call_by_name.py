@@ -89,7 +89,7 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
 
         plan_files = {item["filepath"] for item in migration_plan}
 
-        paths: list[Paths] = graph_session.scheduler_session.product_request(Paths, [path_globs])
+        paths: list[Paths] = graph_session.scheduler_session.product_request(Paths, path_globs)
         requested_files = set(paths[0].files)
 
         files_to_migrate = requested_files.intersection(plan_files)

@@ -62,7 +62,7 @@ class RequestState:
     ) -> T:
         result = self.scheduler_session.product_request(
             product,
-            [Params(*subjects, self.env_name)],
+            Params(*subjects, self.env_name),
             poll=poll,
             timeout=timeout,
         )

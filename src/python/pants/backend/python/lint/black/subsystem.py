@@ -47,7 +47,6 @@ class Black(PythonToolBase):
         "black>=22.6.0,<25",
         'typing-extensions>=3.10.0.0; python_version < "3.10"',
     ]
-    default_interpreter_constraints = ["CPython>=3.9,<3.14"]
 
     register_interpreter_constraints = True
 

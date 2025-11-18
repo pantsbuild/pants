@@ -68,7 +68,7 @@ from pants.util.dirutil import touch
 logger = logging.getLogger(__name__)
 
 
-default_python_interpreter_constraints = "CPython>=3.8,<4"
+default_python_interpreter_constraints = "CPython>=3.9,<3.15"
 
 
 ToolBaseT = TypeVar("ToolBaseT")
