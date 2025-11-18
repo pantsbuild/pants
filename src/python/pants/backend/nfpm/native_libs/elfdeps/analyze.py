@@ -1,6 +1,12 @@
 # Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+"""A standalone script that uses elfdeps to analyze ELF binaries/libraries.
+
+Rule code must treat this script as a `resource`, running it as a subprocess in a sandboxed venv.
+Rule code must not import anythin from this script or use it as a `python_source`.
+"""
+
 from __future__ import annotations
 
 import argparse

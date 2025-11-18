@@ -11,6 +11,8 @@ from _pytest.tmpdir import TempPathFactory
 from elfdeps import ELFAnalyzeSettings, ELFInfo, SOInfo
 from pytest import fixture
 
+# The relative import emphasizes that `analyze` is a standalone script that runs
+# from a sandbox root (thus avoiding a dependency on the pants code structure).
 from .analyze import ELFInfoAnalysis, analyze_directory, analyze_wheel, analyze_wheels_repo
 
 WHEELS = {
