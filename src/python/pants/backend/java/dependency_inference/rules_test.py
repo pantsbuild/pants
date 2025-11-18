@@ -704,7 +704,9 @@ def test_infer_same_package_deeply_nested_inner_class(rule_runner: RuleRunner) -
         }
     )
 
-    consumer = rule_runner.get_target(Address("", target_name="lib", relative_file_path="Consumer.java"))
+    consumer = rule_runner.get_target(
+        Address("", target_name="lib", relative_file_path="Consumer.java")
+    )
     outer = rule_runner.get_target(Address("", target_name="lib", relative_file_path="Outer.java"))
 
     inferred = rule_runner.request(
