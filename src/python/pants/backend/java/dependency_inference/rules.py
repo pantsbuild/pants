@@ -35,13 +35,6 @@ from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
-# Java standard library package prefixes - types starting with these are always fully qualified
-JAVA_STDLIB_PREFIXES = frozenset([
-    "java.", "javax.", "jakarta.", "jdk.",
-    "com.sun.", "sun.",  # Oracle internal
-    "org.w3c.", "org.xml.", "org.ietf.", "org.omg.",  # Standards
-])
-
 
 @dataclass(frozen=True)
 class JavaSourceDependenciesInferenceFieldSet(FieldSet):
@@ -165,12 +158,12 @@ def qualify_consumed_type(
     type_name: str,
     source_package: str | None,
     imports: tuple[JavaImport, ...],
-) -> tuple[str, ...]:
+) -> list[str]:
     """
-    Qualify a consumed type name, returning possible qualified names to try.
+    Generate candidate fully-qualified names for a type, using progressive stripping.
 
-    Returns a tuple of candidates in priority order. The symbol map should be checked
-    for each candidate until a match is found.
+    For types without dots: just add package prefix (simple case)
+    For types with dots: iteratively try each prefix level
 
     Args:
         type_name: The type name as it appears in the source (may be qualified or unqualified)
@@ -178,41 +171,46 @@ def qualify_consumed_type(
         imports: The imports declared in the source file
 
     Returns:
-        Tuple of possible fully-qualified type names, in priority order
+        List of possible fully-qualified type names, in priority order
     """
-    # Case 1: No dots → definitely unqualified, needs package prefix
+    # Simple case: no dots means definitely unqualified
     if "." not in type_name:
         if source_package:
-            return (f"{source_package}.{type_name}",)
+            return [f"{source_package}.{type_name}"]
         else:
-            return (type_name,)  # Unnamed package
+            return [type_name]
 
-    # Case 2: Known JDK/stdlib type → already fully qualified
-    if any(type_name.startswith(prefix) for prefix in JAVA_STDLIB_PREFIXES):
-        return (type_name,)
+    # Complex case: has dots, could be inner class reference
+    # Generate all candidates by progressive stripping
+    candidates = []
+    parts = type_name.split(".")
 
-    # Case 3: Type fully qualified name appears in imports → already resolved
-    import_names = {imp.name for imp in imports}
-    if type_name in import_names:
-        return (type_name,)
+    # Build import map for quick lookup
+    import_map = {imp.name.split(".")[-1]: imp.name for imp in imports}
 
-    # Case 4: Outer class is imported → resolve inner class through import
-    # E.g., "B.InnerB" where "com.other.B" is imported → "com.other.B.InnerB"
-    first_part = type_name.split(".")[0]
-    for imp in imports:
-        if imp.name.endswith(f".{first_part}"):
-            # Found import for outer class, construct fully qualified inner class name
-            qualified = imp.name + type_name[len(first_part):]
-            return (qualified,)
+    # Try each progressively shorter prefix
+    for i in range(len(parts), 0, -1):
+        prefix = ".".join(parts[:i])
 
-    # Case 5: Ambiguous - has dots but not stdlib, not imported
-    # Most likely: same-package inner class like "B.InnerB" → "com.example.B.InnerB"
-    # Less likely: third-party FQTN without import
-    if source_package:
-        # Try same-package first (most common), then as-is (fallback for third-party)
-        return (f"{source_package}.{type_name}", type_name)
-    else:
-        return (type_name,)
+        # Candidate 1: As fully qualified name
+        candidates.append(prefix)
+
+        # Candidate 2: If first part is imported, use import
+        first_part = parts[0]
+        if first_part in import_map and i == len(parts):
+            # Only for the full name, not stripped versions
+            imported_fqn = import_map[first_part]
+            remainder = ".".join(parts[1:]) if len(parts) > 1 else ""
+            if remainder:
+                candidates.append(f"{imported_fqn}.{remainder}")
+            else:
+                candidates.append(imported_fqn)
+
+        # Candidate 3: With current package prefix
+        if source_package:
+            candidates.append(f"{source_package}.{prefix}")
+
+    return candidates
 
 
 def lookup_type_with_fallback(
