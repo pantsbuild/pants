@@ -11,6 +11,12 @@ import pytest
 
 from pants.backend.nfpm.dependency_inference import rules as nfpm_dependency_inference_rules
 from pants.backend.nfpm.fields.rpm import NfpmRpmDependsField, NfpmRpmProvidesField
+from pants.backend.nfpm.native_libs.rules import (
+    NativeLibsNfpmPackageFieldsRequest,
+    RpmDependsFromPexRequest,
+    RpmDependsInfo,
+)
+from pants.backend.nfpm.native_libs.rules import rules as native_libs_rules
 from pants.backend.nfpm.rules import rules as nfpm_rules
 from pants.backend.nfpm.subsystem import rules as nfpm_subsystem_rules
 from pants.backend.nfpm.target_types import target_types as nfpm_target_types
@@ -30,9 +36,6 @@ from pants.engine.internals.native_engine import Address
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.frozendict import FrozenDict
-
-from .rules import NativeLibsNfpmPackageFieldsRequest, RpmDependsFromPexRequest, RpmDependsInfo
-from .rules import rules as native_libs_rules
 
 _PY_TAG = "".join(map(str, sys.version_info[:2]))
 _PY_OS = platform.system()  # Linux

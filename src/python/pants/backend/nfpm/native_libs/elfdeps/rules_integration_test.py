@@ -9,6 +9,8 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.nfpm.native_libs.elfdeps.rules import PexELFInfo, RequestPexELFInfo, SOInfo
+from pants.backend.nfpm.native_libs.elfdeps.rules import rules as elfdeps_rules
 from pants.backend.python import target_types_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import (
@@ -22,9 +24,6 @@ from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsReque
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
-
-from .rules import PexELFInfo, RequestPexELFInfo, SOInfo
-from .rules import rules as elfdeps_rules
 
 # The tests build a pex with wheels for the current platform.
 # These vars are used to choose the expected platform-specific test results.

@@ -8,6 +8,8 @@ from dataclasses import dataclass
 
 from pants.backend.nfpm.field_sets import NfpmRpmPackageFieldSet
 from pants.backend.nfpm.fields.rpm import NfpmRpmDependsField, NfpmRpmProvidesField
+from pants.backend.nfpm.native_libs.elfdeps.rules import RequestPexELFInfo, elfdeps_analyze_pex
+from pants.backend.nfpm.native_libs.elfdeps.rules import rules as elfdeps_rules
 from pants.backend.nfpm.util_rules.contents import (
     GetPackageFieldSetsForNfpmContentFileDepsRequest,
     get_package_field_sets_for_nfpm_content_file_deps,
@@ -24,9 +26,6 @@ from pants.engine.internals.selectors import concurrently
 from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.target import Field, Target
 from pants.engine.unions import UnionMembership, UnionRule
-
-from .elfdeps.rules import RequestPexELFInfo, elfdeps_analyze_pex
-from .elfdeps.rules import rules as elfdeps_rules
 
 
 @dataclass(frozen=True)
