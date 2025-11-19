@@ -255,3 +255,54 @@ Setting up pants to run with Python executables provided by [setup-python](https
 ```
 
 One of the workaround to fix this issue is setting up python tool cache files at `/opt/hostedtoolcache` directory. This is the default path which `setup-python` action uses to download relevant files on hosted GitHub actions runner. Overriding tool cache download directory can be achieved by following [setup-python documentation](https://github.com/actions/setup-python/blob/main/docs/advanced-usage.md#linux).
+
+## Shipping a desktop app 
+
+A `pex_binary` will not run on non-dev-mode Windows installations (see [the next issue](##Running PEX on Windows)). 
+At the moment Pants does not export `.exe` files, this is a potential feature addition - see [issue](https://github.com/pantsbuild/pants/issues/22897).
+
+
+## Running PEX on Windows
+```python
+
+ python3 .\main.pex
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "\\wsl.localhost\Ubuntu-24.04\home\username\pants\literate-umbrella\dist\src.python.tui\main.pex\__main__.py", line 244, in <module>
+    result, should_exit, is_globals = boot(
+                                      ~~~~^
+        bootstrap_dir='.bootstrap',
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+        inject_python_args=(),
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "\\wsl.localhost\Ubuntu-24.04\home\username\pants\literate-umbrella\dist\src.python.tui\main.pex\__main__.py", line 224, in boot
+    entry_point = __ensure_pex_installed__(
+        pex=entry_point, pex_root=pex_root, pex_hash=pex_hash, python_args=python_args
+    )
+  File "\\wsl.localhost\Ubuntu-24.04\home\username\pants\literate-umbrella\dist\src.python.tui\main.pex\__main__.py", line 95, in __ensure_pex_installed__
+    installed_location = ensure_installed(pex=pex, pex_root=pex_root, pex_hash=pex_hash)
+  File "\\wsl.localhost\Ubuntu-24.04\home\username\pants\literate-umbrella\dist\src.python.tui\main.pex\.bootstrap\pex\layout.py", line 712, in ensure_installed
+    return _ensure_installed(layout, pex_root, pex_hash)
+  File "\\wsl.localhost\Ubuntu-24.04\home\username\pants\literate-umbrella\dist\src.python.tui\main.pex\.bootstrap\pex\layout.py", line 361, in _ensure_installed
+    safe_symlink(
+    ~~~~~~~~~~~~^
+        os.path.join(os.path.relpath(bootstrap_cache, install_to)),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        os.path.join(chroot.work_dir, BOOTSTRAP_DIR),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+OSError: [WinError 1314] A required privilege is not held by the client: '..\\..\\..\\bootstraps\\0\\665f5cc6c9dbc44f942d0ea8bb0f192ba5292a3d' -> 'C:\\Users\\Username\\.cache\\pex\\unzipped_pexes\\1\\4aa4cb8f93bc3658e4338db4ff92576e6d4bbfca.lck.work\\.bootstrap'
+```
+
+This means that you need to enable SYMLINKS with developer mode. This is lessens the security of your device, you can turn it off later.
+
+```powershell
+
+$env:PEX_NO_SYMLINK=1
+python3 .\pex_binary.pex
+```
