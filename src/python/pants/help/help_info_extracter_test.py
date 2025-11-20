@@ -792,7 +792,7 @@ def test_pretty_print_type_hint() -> None:
 
     # Transform Unions to use `|`
     assert pretty_print_type_hint(Union[int, float]) == "int | float"
-    assert pretty_print_type_hint(Optional[int]) == "int | None"
+    assert pretty_print_type_hint(Optional[int]) == "int | None"  # noqa: UP045
     # NB: `Iterable[List[ExampleCls]]` will use the full module name for `ExampleCls`. We can't
     # easily control that because it comes from the __repr__ implementation for `typing.Iterable`.
     example_cls_repr = (
