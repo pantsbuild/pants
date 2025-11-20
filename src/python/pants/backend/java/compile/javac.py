@@ -7,10 +7,6 @@ import itertools
 import logging
 from itertools import chain
 
-from pants.backend.java.dependency_inference.rules import (
-    JavaInferredDependenciesAndExportsRequest,
-    infer_java_dependencies_and_exports_via_source_analysis,
-)
 from pants.backend.java.dependency_inference.rules import rules as java_dep_inference_rules
 from pants.backend.java.subsystems.javac import JavacSubsystem
 from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField
@@ -83,26 +79,6 @@ async def compile_java_source(
             exit_code=1,
         )
 
-    # Capture just the `ClasspathEntry` objects that are listed as `export` types by source analysis
-    deps_to_classpath_entries = dict(
-        zip(request.component.dependencies, direct_dependency_classpath_entries or ())
-    )
-    # Re-request inferred dependencies to get a list of export dependency addresses
-    inferred_dependencies = await concurrently(
-        infer_java_dependencies_and_exports_via_source_analysis(
-            JavaInferredDependenciesAndExportsRequest(tgt[JavaSourceField]), **implicitly()
-        )
-        for tgt in request.component.members
-        if JavaFieldSet.is_applicable(tgt)
-    )
-    flat_exports = {export for i in inferred_dependencies for export in i.exports}
-
-    export_classpath_entries = [
-        classpath_entry
-        for coarsened_target, classpath_entry in deps_to_classpath_entries.items()
-        if any(m.address in flat_exports for m in coarsened_target.members)
-    ]
-
     # Then collect the component's sources.
     component_members_with_sources = tuple(
         t for t in request.component.members if t.has_field(SourcesField)
@@ -157,8 +133,8 @@ async def compile_java_source(
 
     usercp = "__cp"
     user_classpath = Classpath(direct_dependency_classpath_entries, request.resolve)
-    classpath_arg = ":".join(user_classpath.root_immutable_inputs_args(prefix=usercp))
-    immutable_input_digests = dict(user_classpath.root_immutable_inputs(prefix=usercp))
+    classpath_arg = ":".join(user_classpath.immutable_inputs_args(prefix=usercp))
+    immutable_input_digests = dict(user_classpath.immutable_inputs(prefix=usercp))
 
     # Compile.
     compile_result = await execute_process(
@@ -234,15 +210,6 @@ async def compile_java_source(
     output_classpath = ClasspathEntry(
         jar_output_digest, output_files, direct_dependency_classpath_entries
     )
-
-    if export_classpath_entries:
-        merged_export_digest = await merge_digests(
-            MergeDigests((output_classpath.digest, *(i.digest for i in export_classpath_entries)))
-        )
-        merged_classpath = ClasspathEntry.merge(
-            merged_export_digest, (output_classpath, *export_classpath_entries)
-        )
-        output_classpath = merged_classpath
 
     return FallibleClasspathEntry.from_fallible_process_result(
         str(request.component),
