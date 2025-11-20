@@ -74,4 +74,4 @@ select = ["UP"]
 # UP035: Deprecated import
 # UP036: Outdated version check
 # UP045: PEP604 annotations
-ignore = ["UP006", "UP007", "UP018", "UP034", "UP035", "UP036", "UP045"]
+ignore = ["UP006", "UP007", "UP018", "UP035", "UP036", "UP045"]
