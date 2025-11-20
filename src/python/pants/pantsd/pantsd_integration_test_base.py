@@ -279,9 +279,7 @@ class PantsDaemonIntegrationTestBase(unittest.TestCase):
         self.assertEqual(
             runs_created,
             expected_runs,
-            "Expected {} RunTracker run(s) to be created per pantsd run: was {}".format(
-                expected_runs, runs_created
-            ),
+            f"Expected {expected_runs} RunTracker run(s) to be created per pantsd run: was {runs_created}",
         )
 
         return run

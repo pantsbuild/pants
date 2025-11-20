@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -14,7 +14,7 @@ class Return:
     value: Any
 
 
-_Frame = tuple[str, Optional[str]]
+_Frame = tuple[str, str | None]
 
 
 @dataclass(frozen=True)

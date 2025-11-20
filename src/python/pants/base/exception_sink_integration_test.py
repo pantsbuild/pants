@@ -62,13 +62,13 @@ Exception message:.*
 
 
 def assert_graceful_signal_log_matches(pid: int, signum, signame, contents: str) -> None:
-    regex_str = """\
+    regex_str = f"""\
 timestamp: ([^\n]+)
 process title: ([^\n]+)
 sys\\.argv: ([^\n]+)
 pid: {pid}
 Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
-""".format(pid=pid, signum=signum, signame=signame)
+"""
     assert re.search(regex_str, contents)
 
 

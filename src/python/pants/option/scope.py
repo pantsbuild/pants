@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 from pants.option.option_value_container import OptionValueContainer
 
@@ -48,12 +48,12 @@ class ScopeInfo:
 
     @property
     def deprecated_scope(self) -> str | None:
-        return cast(Optional[str], self._subsystem_cls_attr("deprecated_options_scope"))
+        return cast(str | None, self._subsystem_cls_attr("deprecated_options_scope"))
 
     @property
     def deprecated_scope_removal_version(self) -> str | None:
         return cast(
-            Optional[str],
+            str | None,
             self._subsystem_cls_attr("deprecated_options_scope_removal_version"),
         )
 

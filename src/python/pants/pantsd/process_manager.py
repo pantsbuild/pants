@@ -147,9 +147,7 @@ class ProcessManager:
             now = time.time()
             if now > deadline:
                 raise cls.Timeout(
-                    "exceeded timeout of {} seconds while waiting for {}".format(
-                        timeout, ongoing_msg
-                    )
+                    f"exceeded timeout of {timeout} seconds while waiting for {ongoing_msg}"
                 )
 
             if now > info_deadline:
@@ -429,9 +427,7 @@ class ProcessManager:
                     self._kill(signal_type)
                 except OSError as e:
                     logger.warning(
-                        "caught OSError({e!s}) during attempt to kill -{signal} {pid}!".format(
-                            e=e, signal=signal_type, pid=pid
-                        )
+                        f"caught OSError({e!s}) during attempt to kill -{signal_type} {pid}!"
                     )
 
                 # Wait up to kill_wait seconds to terminate or move onto the next signal.
@@ -451,9 +447,7 @@ class ProcessManager:
 
         if alive:
             raise ProcessManager.NonResponsiveProcess(
-                "failed to kill pid {pid} with signals {chain}".format(
-                    pid=self.pid, chain=signal_chain
-                )
+                f"failed to kill pid {self.pid} with signals {signal_chain}"
             )
 
         if purge:
