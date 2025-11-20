@@ -275,7 +275,8 @@ async def pyright_typecheck_partition(
     # to exceed the max command line length.  See https://github.com/pantsbuild/pants/issues/22779.
     # However Pyright, weirdly, splits stdin on spaces as well as newlines. So we can't pass input
     # file paths via stdin if any of them contain spaces.
-    if any(" " in file for file in input_files):
+    file_with_spaces = next((file for file in root_sources.snapshot.files if " " in file), None)
+    if file_with_spaces:
         # Fall back to passing paths as args and hope we don't exceed the max command line length.
         process = dataclasses.replace(process, argv=(*process.argv[0:-1], *input_files))
     else:
@@ -300,6 +301,14 @@ async def pyright_typecheck_partition(
         )
 
     result = await execute_process(process, **implicitly())
+    if result.exit_code == 249 and file_with_spaces:
+        logger.error(
+            f"Found input files with spaces in their names, including: {file_with_spaces}. "
+            "Due to a bug in Pyright this means that the number of input files Pants can pass to "
+            "Pyright is limited, and exceeding that limit causes it to crash with exit code 249. "
+            "Please reach out to the Pants team if this happens: "
+            "https://www.pantsbuild.org/community/getting-help."
+        )
     return CheckResult.from_fallible_process_result(
         result,
         partition_description=partition.description(),
