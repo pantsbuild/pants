@@ -368,7 +368,7 @@ impl Sandboxer {
                 base.join(&workdir_hash)
             };
             let socket_path = run_dir.join("sandboxer.sock");
-            info!("Trying sandboxer socket path {}", socket_path.display());
+            debug!("Trying sandboxer socket path {}", socket_path.display());
 
             match SocketAddr::from_pathname(&socket_path) {
                 Ok(_) => (),
@@ -384,7 +384,7 @@ impl Sandboxer {
 
             let res = fs::create_dir_all(&run_dir);
             if res.is_err() {
-                warn!(
+                debug!(
                     "Failed to create dir for sandboxer socket at {}",
                     socket_path.display()
                 );
