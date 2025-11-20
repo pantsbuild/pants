@@ -67,6 +67,11 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["UP"]
-# UP006 replaces DefaultDict with collections.defaultdict - lots of churn (which SJ wants to batch after 3.14)
-# UP045: Replaces `int(42)` in tests, breaking call-by-type and implicitly
-ignore = ["UP006", "UP031", "UP032", "UP034", "UP035", "UP045"]
+# UP006/UP035: replaces DefaultDict with collections.defaultdict - lots of churn (which SJ wants to batch after 3.14)
+# UP007: Many buried, non-auto-fixable unions
+# UP018: Replaces `int(42)` in tests, breaking call-by-type and implicitly
+# UP034: Extra parens 
+# UP035: Deprecated import
+# UP036: Outdated version check
+# UP045: PEP604 annotations
+ignore = ["UP006", "UP007", "UP018", "UP034", "UP035", "UP036", "UP045"]
