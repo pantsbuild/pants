@@ -7,7 +7,7 @@ import enum
 import logging
 import os
 from collections.abc import Iterable
-from typing import Optional, TypeVar, cast
+from typing import TypeVar, cast
 
 from packaging.utils import canonicalize_name
 

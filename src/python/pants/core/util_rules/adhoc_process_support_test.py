@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import UTC, datetime, timedelta
 
 from pants.core.util_rules.adhoc_process_support import _path_metadata_to_bytes
 from pants.engine.internals.native_engine import PathMetadata, PathMetadataKind

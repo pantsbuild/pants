@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 from pants.option.option_value_container import OptionValueContainer
 
