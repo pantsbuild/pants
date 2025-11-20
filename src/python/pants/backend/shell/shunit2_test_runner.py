@@ -70,7 +70,7 @@ class Shunit2FieldSet(TestFieldSet):
 
 
 class Shunit2TestRequest(TestRequest):
-    tool_subsystem = Shunit2
+    tool_subsystem = Shunit2  # type: ignore[assignment]
     field_set_type = Shunit2FieldSet
     supports_debug = True
 

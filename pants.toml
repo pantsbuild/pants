@@ -1,5 +1,6 @@
 [GLOBAL]
 print_stacktrace = true
+sandboxer = true
 
 # Enable our custom loose-source plugins.
 pythonpath = ["%(buildroot)s/pants-plugins"]
@@ -11,7 +12,6 @@ backend_packages.add = [
   "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.flake8",
   "pants.backend.python.lint.isort",
-  "pants.backend.python.lint.pyupgrade",
   "pants.backend.python.typecheck.mypy",
   "pants.backend.python.mixed_interpreter_constraints",
   "pants.backend.shell",
@@ -27,6 +27,7 @@ backend_packages.add = [
   "pants.backend.experimental.javascript",
   "pants.backend.experimental.javascript.lint.prettier",
   "pants.backend.experimental.python",
+  "pants.backend.experimental.python.lint.ruff.check",
   "pants.backend.experimental.python.lint.ruff.format",
   "pants.backend.experimental.python.packaging.pyoxidizer",
   "pants.backend.experimental.scala",
@@ -181,8 +182,7 @@ args = ["--external-sources"]
 args = ["-i 2", "-ci", "-sr"]
 
 [pytest]
-# TODO: Add ["-m", "'not call_by_type'"] to args to skip testing Gets.
-args = ["--no-header", "--noskip", "-vv"]
+args = ["--no-header", "--noskip", "-vv", "-m", "'not call_by_type'"]
 execution_slot_var = "TEST_EXECUTION_SLOT"
 install_from_resolve = "pytest"
 requirements = ["//3rdparty/python:pytest"]
@@ -213,10 +213,6 @@ template_by_globs = "@build-support/preambles/config.yaml"
 
 [generate-lockfiles]
 diff = true
-
-[pyupgrade]
-args = ["--keep-runtime-typing", "--py311-plus"]
-
 
 [jvm]
 default_resolve = "jvm_testprojects"

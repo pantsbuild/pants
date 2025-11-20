@@ -178,7 +178,7 @@ class PluginResolver:
         params = Params(request, determine_bootstrap_environment(session))
         return cast(
             ResolvedPluginDistributions,
-            session.product_request(ResolvedPluginDistributions, [params])[0],
+            session.product_request(ResolvedPluginDistributions, params)[0],
         )
 
 

@@ -91,7 +91,7 @@ class JSTestFieldSet(TestFieldSet):
 
 
 class JSTestRequest(TestRequest):
-    tool_subsystem = NodeJSTest
+    tool_subsystem = NodeJSTest  # type: ignore[assignment]
     field_set_type = JSTestFieldSet
 
     partitioner_type = PartitionerType.CUSTOM

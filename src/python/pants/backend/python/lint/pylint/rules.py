@@ -60,7 +60,7 @@ class PartitionMetadata:
 
 class PylintRequest(LintTargetsRequest):
     field_set_type = PylintFieldSet
-    tool_subsystem = Pylint
+    tool_subsystem = Pylint  # type: ignore[assignment]
 
 
 def generate_argv(field_sets: tuple[PylintFieldSet, ...], pylint: Pylint) -> tuple[str, ...]:
@@ -84,7 +84,7 @@ async def partition_pylint(
         return Partitions()
 
     first_party_ics = InterpreterConstraints.create_from_compatibility_fields(
-        first_party_plugins.interpreter_constraints_fields, python_setup
+        first_party_plugins.interpreter_constraints_and_resolve_fields, python_setup
     )
 
     resolve_and_interpreter_constraints_to_field_sets = (

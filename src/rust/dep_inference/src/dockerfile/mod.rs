@@ -116,7 +116,7 @@ impl DockerFileInfoCollector<'_> {
     pub fn collect(&mut self) {
         let mut parser = Parser::new();
         parser
-            .set_language(tree_sitter_dockerfile::language())
+            .set_language(&tree_sitter_dockerfile::LANGUAGE.into())
             .expect("Error loading Dockerfile grammar");
         let parsed = parser.parse(self.code, None);
         let tree = parsed.unwrap();

@@ -1,5 +1,8 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+use itertools::Itertools;
+
 use crate::python::{ImportCollector, get_dependencies};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -24,9 +27,12 @@ fn assert_collected(
 fn assert_imports(code: &str, imports: &[&str]) {
     let mut collector = ImportCollector::new(code);
     collector.collect();
+    let actual: Vec<&String> = collector.import_map.keys().sorted().collect();
+    let expected: Vec<&str> = imports.iter().copied().sorted().collect();
     assert_eq!(
-        HashSet::from_iter(imports.iter().map(|s| s.to_string())),
-        collector.import_map.keys().cloned().collect::<HashSet<_>>()
+        actual, expected,
+        "'{code}' should generate '{:?}', instead received {:?}",
+        expected, actual
     );
 }
 
@@ -824,8 +830,10 @@ fn relative_imports_resolution() {
 }
 
 #[test]
-fn syntax_errors_and_other_fun() {
-    // These tests aren't specifically testing what we parse, so much as we don't "crash and burn".
+fn syntax_errors_shouldnt_crash() {
+    // These are syntax errors and we're parsing them to ensure nothing panics and they return bounded/sane results
+    // If updating tree-sitter causes these to fail, update the imports array with the correct result (from the assertion error) to ensure these pass
+    // Unless the failure is a panic/memory exhaustion/really large array - in which case, something has gone terribly wrong
 
     assert_imports("imprt a", &[]);
     assert_imports("form a import b", &["b"]);
@@ -839,7 +847,7 @@ fn syntax_errors_and_other_fun() {
     assert_imports("from a imp x", &[]);
     assert_imports("from from import a as .as", &[]);
     assert_imports("from a import ......g", &["a.g"]);
-    assert_imports("from a. import b", &[]);
+    assert_imports("from a. import b", &["a.b"]);
     assert_imports("from a as c import b as d", &["a.b"]);
     assert_imports("from a import *, b", &["a"]);
     assert_imports("from a import b, *", &["a.b"]);

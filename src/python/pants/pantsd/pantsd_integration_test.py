@@ -464,20 +464,13 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             final_memory_usage = ctx.checker.current_memory_usage()
             self.assertTrue(
                 initial_memory_usage <= final_memory_usage,
-                "Memory usage inverted unexpectedly: {} > {}".format(
-                    initial_memory_usage, final_memory_usage
-                ),
+                f"Memory usage inverted unexpectedly: {initial_memory_usage} > {final_memory_usage}",
             )
 
             increase_fraction = (float(final_memory_usage) / initial_memory_usage) - 1.0
             self.assertTrue(
                 increase_fraction <= max_memory_increase_fraction,
-                "Memory usage increased more than expected: {} -> {}: {} actual increase (expected < {})".format(
-                    initial_memory_usage,
-                    final_memory_usage,
-                    increase_fraction,
-                    max_memory_increase_fraction,
-                ),
+                f"Memory usage increased more than expected: {initial_memory_usage} -> {final_memory_usage}: {increase_fraction} actual increase (expected < {max_memory_increase_fraction})",
             )
 
     def test_pantsd_max_memory_usage(self):
@@ -665,19 +658,22 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             )
             """
         )
-        with self.pantsd_successful_run_context() as ctx, temporary_dir(".") as directory:
-            safe_file_dump(os.path.join(directory, "A.py"), mode="w")
-            safe_file_dump(os.path.join(directory, "B.py"), mode="w")
 
-            if directory.startswith("./"):
-                directory = directory[2:]
+        with self.pantsd_successful_run_context() as ctx:
+            tmp_path = Path(ctx.workdir).parent
+            relative_target_path = tmp_path.relative_to(tmp_path.parent)
+
+            safe_file_dump(os.path.join(relative_target_path, "A.py"), mode="w")
+            safe_file_dump(os.path.join(relative_target_path, "B.py"), mode="w")
 
             def list_and_verify(a_deps: str, b_deps: str) -> None:
-                Path(directory, "BUILD").write_text(template.format(a_deps=a_deps, b_deps=b_deps))
-                result = ctx.runner(["list", f"{directory}:"])
+                Path(relative_target_path, "BUILD").write_text(
+                    template.format(a_deps=a_deps, b_deps=b_deps)
+                )
+                result = ctx.runner(["list", f"{relative_target_path}:"])
                 ctx.checker.assert_started()
                 result.assert_success()
-                expected_targets = {f"{directory}:{target}" for target in ("A", "B")}
+                expected_targets = {f"{relative_target_path}:{target}" for target in ("A", "B")}
                 assert expected_targets == set(result.stdout.strip().split("\n"))
 
             list_and_verify(a_deps='dependencies = [":B"],', b_deps="")
@@ -702,8 +698,11 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
         This is a regression test for the most glaring case of https://github.com/pantsbuild/pants/issues/7597.
         """
-        with self.pantsd_run_context(success=False) as ctx, temporary_dir(".") as directory:
-            Path(directory, "BUILD").write_text(
+        with self.pantsd_run_context(success=False) as ctx:
+            tmp_path = Path(ctx.workdir).parent
+            relative_target_path = tmp_path.relative_to(tmp_path.parent)
+
+            Path(relative_target_path, "BUILD").write_text(
                 dedent(
                     """\
                     python_requirement(name="badreq", requirements=["badreq==99.99.99"])
@@ -711,7 +710,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                     """
                 )
             )
-            result = ctx.runner(["package", f"{directory}:pex"])
+            result = ctx.runner(["package", f"{relative_target_path}:pex"])
             ctx.checker.assert_running()
             result.assert_failure()
             # Assert that the desired exception has been triggered once.

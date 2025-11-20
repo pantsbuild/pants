@@ -38,7 +38,7 @@ from pants.util.strutil import pluralize
 
 class Flake8Request(LintTargetsRequest):
     field_set_type = Flake8FieldSet
-    tool_subsystem = Flake8
+    tool_subsystem = Flake8  # type: ignore[assignment]
 
 
 def generate_argv(source_files: SourceFiles, flake8: Flake8) -> tuple[str, ...]:
@@ -64,7 +64,10 @@ async def partition_flake8(
     results: dict[InterpreterConstraints, list[Flake8FieldSet]] = defaultdict(list)
     for fs in request.field_sets:
         constraints = InterpreterConstraints.create_from_compatibility_fields(
-            [fs.interpreter_constraints, *first_party_plugins.interpreter_constraints_fields],
+            [
+                (fs.interpreter_constraints, fs.resolve),
+                *first_party_plugins.interpreter_constraints_and_resolve_fields,
+            ],
             python_setup,
         )
         results[constraints].append(fs)

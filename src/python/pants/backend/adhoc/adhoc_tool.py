@@ -80,6 +80,7 @@ async def run_in_sandbox_request(
             execution_dependencies=target.get(AdhocToolExecutionDependenciesField).value or (),
             runnable_dependencies=target.get(AdhocToolRunnableDependenciesField).value or (),
             target=request.protocol_target,
+            runnable_address_field_alias=AdhocToolRunnableField.alias,
             named_caches=FrozenDict(target.get(AdhocToolNamedCachesField).value or {}),
         )
     )

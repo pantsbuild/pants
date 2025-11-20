@@ -478,7 +478,7 @@ async def setup_pytest_for_target(
 
 
 class PyTestRequest(TestRequest):
-    tool_subsystem = PyTest
+    tool_subsystem = PyTest  # type: ignore[assignment]
     field_set_type = PythonTestFieldSet
     partitioner_type = PartitionerType.CUSTOM
     supports_debug = True
@@ -495,8 +495,8 @@ async def partition_python_tests(
 
     for field_set in request.field_sets:
         metadata = TestMetadata(
-            interpreter_constraints=InterpreterConstraints.create_from_compatibility_fields(
-                [field_set.interpreter_constraints], python_setup
+            interpreter_constraints=InterpreterConstraints.create_from_field_sets(
+                [field_set], python_setup
             ),
             extra_env_vars=field_set.extra_env_vars.sorted(),
             xdist_concurrency=field_set.xdist_concurrency.value,
@@ -607,8 +607,8 @@ async def debugpy_python_test(
 ) -> TestDebugAdapterRequest:
     debugpy_pex = await create_pex(
         debugpy.to_pex_request(
-            interpreter_constraints=InterpreterConstraints.create_from_compatibility_fields(
-                [field_set.interpreter_constraints for field_set in batch.elements], python_setup
+            interpreter_constraints=InterpreterConstraints.create_from_field_sets(
+                batch.elements, python_setup
             )
         )
     )

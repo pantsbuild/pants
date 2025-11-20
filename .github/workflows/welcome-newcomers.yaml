@@ -13,7 +13,7 @@ jobs:
   check_for_first_interaction:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/first-interaction@v1
+      - uses: actions/first-interaction@v3
         with:
           repo-token: ${{ secrets.WORKER_PANTS_SAY_HI_PAT }}
           issue-message: |

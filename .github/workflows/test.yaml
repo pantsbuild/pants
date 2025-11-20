@@ -1,6 +1,6 @@
 # GENERATED, DO NOT EDIT!
 # To change, edit `src/python/pants_release/generate_github_workflows.py` and run:
-#   ./pants run src/python/pants_release/generate_github_workflows.py
+#   pants run src/python/pants_release/generate_github_workflows.py
 
 
 concurrency:
@@ -9,6 +9,7 @@ concurrency:
 env:
   HONEYCOMB_API_KEY: --DISABLED--
   PANTS_CONFIG_FILES: +['pants.ci.toml']
+  PANTS_DISABLE_GETS: '1'
   PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: 'False'
   RUST_BACKTRACE: all
 jobs:
@@ -28,11 +29,11 @@ jobs:
     - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -43,7 +44,7 @@ jobs:
       with:
         key: Linux-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.89.0-*
+          ~/.rustup/toolchains/1.91.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
@@ -83,13 +84,13 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: logs-bootstrap-Linux-ARM64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
     - name: Upload native binaries
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
         path: |-
@@ -115,11 +116,11 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -130,7 +131,7 @@ jobs:
           3.13
           3.11
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -141,7 +142,7 @@ jobs:
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.89.0-*
+          ~/.rustup/toolchains/1.91.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
@@ -181,13 +182,13 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: logs-bootstrap-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
     - name: Upload native binaries
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: |-
@@ -211,94 +212,6 @@ jobs:
         ./cargo test --locked --all --tests --benches -- --nocapture
         ./cargo doc
     timeout-minutes: 60
-  bootstrap_pants_macos13_x86_64:
-    env:
-      PANTS_REMOTE_CACHE_READ: 'false'
-      PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
-    name: Bootstrap Pants, test Rust (macOS13-x86_64)
-    needs:
-    - classify_changes
-    runs-on:
-    - self-hosted
-    - macos-13
-    steps:
-    - name: Check out code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 10
-    - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        version: 23.x
-    - name: Set rustup profile
-      run: rustup set profile default
-    - name: Cache Rust toolchain
-      uses: actions/cache@v4
-      with:
-        key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
-        path: |
-          ~/.rustup/toolchains/1.89.0-*
-          ~/.rustup/update-hashes
-          ~/.rustup/settings.toml
-    - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.1
-      with:
-        cache-bin: 'false'
-        shared-key: engine
-        workspaces: src/rust
-    - id: get-engine-hash
-      name: Get native engine hash
-      run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
-      shell: bash
-    - name: Cache native engine
-      uses: actions/cache@v4
-      with:
-        key: macOS13-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
-        path: |-
-          src/python/pants/bin/native_client
-          src/python/pants/bin/sandboxer
-          src/python/pants/engine/internals/native_engine.so
-          src/python/pants/engine/internals/native_engine.so.metadata
-    - env:
-        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
-      name: Bootstrap Pants
-      run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout ]]
-    - env:
-        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
-      name: Run smoke tests
-      run: |
-        ./pants list ::
-        ./pants roots
-        ./pants help goals
-        ./pants help targets
-        ./pants help subsystems
-    - continue-on-error: true
-      if: always()
-      name: Upload pants.log
-      uses: actions/upload-artifact@v4
-      with:
-        name: logs-bootstrap-macOS13-x86_64
-        overwrite: 'true'
-        path: .pants.d/workdir/*.log
-    - name: Upload native binaries
-      uses: actions/upload-artifact@v4
-      with:
-        name: native_binaries.${{ matrix.python-version }}.macOS13-x86_64
-        path: |-
-          src/python/pants/bin/native_client
-          src/python/pants/bin/sandboxer
-          src/python/pants/engine/internals/native_engine.so
-          src/python/pants/engine/internals/native_engine.so.metadata
-    - env:
-        TMPDIR: ${{ runner.temp }}
-      if: needs.classify_changes.outputs.rust == 'true'
-      name: Test Rust
-      run: ./cargo test --locked --tests -- --nocapture
-    timeout-minutes: 60
   bootstrap_pants_macos14_arm64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
@@ -311,11 +224,11 @@ jobs:
     - macos-14
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - name: Set up Python 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.9
@@ -324,7 +237,7 @@ jobs:
           3.13
           3.11
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -335,7 +248,7 @@ jobs:
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.89.0-*
+          ~/.rustup/toolchains/1.91.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
@@ -375,13 +288,13 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: logs-bootstrap-macOS14-ARM64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
     - name: Upload native binaries
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: native_binaries.${{ matrix.python-version }}.macOS14-ARM64
         path: |-
@@ -419,7 +332,7 @@ jobs:
     - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - name: Configure Git
@@ -431,7 +344,7 @@ jobs:
     - name: Install Rust toolchain
       run: |
         # Set the default toolchain. Installs the toolchain if it is not already installed.
-        rustup default 1.89.0
+        rustup default 1.91.0
         cargo version
     - name: Expose Pythons
       run: |
@@ -443,7 +356,7 @@ jobs:
         echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
         echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -462,7 +375,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: logs-wheels-and-pex-Linux-ARM64
         overwrite: 'true'
@@ -488,7 +401,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - name: Configure Git
@@ -500,7 +413,7 @@ jobs:
     - name: Install Rust toolchain
       run: |
         # Set the default toolchain. Installs the toolchain if it is not already installed.
-        rustup default 1.89.0
+        rustup default 1.91.0
         cargo version
     - name: Expose Pythons
       run: |
@@ -512,14 +425,18 @@ jobs:
         echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
         echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      with:
+        go-version: 1.24.9
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
         PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
@@ -535,84 +452,9 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: logs-wheels-and-pex-Linux-x86_64
-        overwrite: 'true'
-        path: .pants.d/workdir/*.log
-    timeout-minutes: 90
-  build_wheels_macos13_x86_64:
-    env:
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: false
-      MODE: debug
-      PANTS_REMOTE_CACHE_READ: 'false'
-      PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true' || needs.classify_changes.outputs.ci_config == 'true')) && (needs.classify_changes.outputs.no_code != 'true')
-    name: Build wheels (macOS13-x86_64)
-    needs:
-    - classify_changes
-    permissions:
-      attestations: write
-      contents: write
-      id-token: write
-    runs-on:
-    - self-hosted
-    - macos-13
-    steps:
-    - name: Check out code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 10
-    - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        version: 23.x
-    - name: Set rustup profile
-      run: rustup set profile default
-    - name: Cache Rust toolchain
-      uses: actions/cache@v4
-      with:
-        key: macOS13-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
-        path: |
-          ~/.rustup/toolchains/1.89.0-*
-          ~/.rustup/update-hashes
-          ~/.rustup/settings.toml
-    - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.1
-      with:
-        cache-bin: 'false'
-        shared-key: engine
-        workspaces: src/rust
-    - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        version: 23.x
-    - name: Install Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: 1.19.5
-    - env:
-        ARCHFLAGS: -arch x86_64
-        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
-        _PYTHON_HOST_PLATFORM: macosx-13.0-x86_64
-      name: Build wheels
-      run: ./pants run src/python/pants_release/release.py -- build-wheels
-    - env:
-        ARCHFLAGS: -arch x86_64
-        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
-        _PYTHON_HOST_PLATFORM: macosx-13.0-x86_64
-      name: Build Pants PEX
-      run: ./pants package src/python/pants:pants-pex
-    - continue-on-error: true
-      if: always()
-      name: Upload pants.log
-      uses: actions/upload-artifact@v4
-      with:
-        name: logs-wheels-and-pex-macOS13-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
@@ -634,11 +476,11 @@ jobs:
     - macos-14
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - name: Set up Python 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.9
@@ -647,7 +489,7 @@ jobs:
           3.13
           3.11
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -658,7 +500,7 @@ jobs:
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.89.0-*
+          ~/.rustup/toolchains/1.91.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
@@ -668,14 +510,18 @@ jobs:
         shared-key: engine
         workspaces: src/rust
     - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      with:
+        go-version: 1.24.9
     - env:
         ARCHFLAGS: -arch arm64
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
@@ -693,7 +539,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: logs-wheels-and-pex-macOS14-ARM64
         overwrite: 'true'
@@ -708,7 +554,7 @@ jobs:
     - windows-2025
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - name: Install MSYS2
@@ -777,7 +623,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - id: classify
@@ -814,7 +660,6 @@ jobs:
     - test_python_linux_x86_64_8
     - test_python_linux_x86_64_9
     - test_python_linux_arm64
-    - test_python_macos13_x86_64
     - test_python_macos14_arm64
     - classify_changes
     runs-on:
@@ -834,7 +679,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - env:
@@ -863,7 +708,7 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -874,7 +719,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v6
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -889,7 +734,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: logs-lint-Linux-x86_64
         overwrite: 'true'
@@ -920,11 +765,9 @@ jobs:
     - check_release_notes
     - bootstrap_pants_linux_arm64
     - bootstrap_pants_linux_x86_64
-    - bootstrap_pants_macos13_x86_64
     - bootstrap_pants_macos14_arm64
     - build_wheels_linux_arm64
     - build_wheels_linux_x86_64
-    - build_wheels_macos13_x86_64
     - build_wheels_macos14_arm64
     - build_windows11_x86_64
     - check_release_notes
@@ -942,7 +785,6 @@ jobs:
     - test_python_linux_x86_64_7
     - test_python_linux_x86_64_8
     - test_python_linux_x86_64_9
-    - test_python_macos13_x86_64
     - test_python_macos14_arm64
     outputs:
       merge_ok: ${{ steps.set_merge_ok.outputs.merge_ok }}
@@ -966,20 +808,24 @@ jobs:
     - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - name: Install AdoptJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      with:
+        go-version: 1.24.9
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v6
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
         path: src/python/pants
@@ -1006,7 +852,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: logs-python-test-Linux-ARM64
         overwrite: 'true'
@@ -1035,7 +881,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - env:
@@ -1064,14 +910,18 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      with:
+        go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
@@ -1080,7 +930,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -1091,7 +941,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v6
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1118,7 +968,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: logs-python-test-0_10-Linux-x86_64
         overwrite: 'true'
@@ -1147,7 +997,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - env:
@@ -1176,14 +1026,18 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      with:
+        go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
@@ -1192,7 +1046,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -1203,7 +1057,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v6
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1230,7 +1084,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: logs-python-test-1_10-Linux-x86_64
         overwrite: 'true'
@@ -1259,7 +1113,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - env:
@@ -1288,14 +1142,18 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      with:
+        go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
@@ -1304,7 +1162,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -1315,7 +1173,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v6
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1342,7 +1200,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: logs-python-test-2_10-Linux-x86_64
         overwrite: 'true'
@@ -1371,7 +1229,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - env:
@@ -1400,14 +1258,18 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      with:
+        go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
@@ -1416,7 +1278,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -1427,7 +1289,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v6
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1454,7 +1316,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: logs-python-test-3_10-Linux-x86_64
         overwrite: 'true'
@@ -1483,7 +1345,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - env:
@@ -1512,14 +1374,18 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      with:
+        go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
@@ -1528,7 +1394,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -1539,7 +1405,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v6
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1566,7 +1432,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: logs-python-test-4_10-Linux-x86_64
         overwrite: 'true'
@@ -1595,7 +1461,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - env:
@@ -1624,14 +1490,18 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      with:
+        go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
@@ -1640,7 +1510,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -1651,7 +1521,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v6
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1678,7 +1548,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: logs-python-test-5_10-Linux-x86_64
         overwrite: 'true'
@@ -1707,7 +1577,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - env:
@@ -1736,14 +1606,18 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      with:
+        go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
@@ -1752,7 +1626,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -1763,7 +1637,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v6
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1790,7 +1664,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: logs-python-test-6_10-Linux-x86_64
         overwrite: 'true'
@@ -1819,7 +1693,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - env:
@@ -1848,14 +1722,18 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      with:
+        go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
@@ -1864,7 +1742,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -1875,7 +1753,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v6
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1902,7 +1780,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: logs-python-test-7_10-Linux-x86_64
         overwrite: 'true'
@@ -1931,7 +1809,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - env:
@@ -1960,14 +1838,18 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      with:
+        go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
@@ -1976,7 +1858,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -1987,7 +1869,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v6
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -2014,7 +1896,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: logs-python-test-8_10-Linux-x86_64
         overwrite: 'true'
@@ -2043,7 +1925,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - env:
@@ -2072,14 +1954,18 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      with:
+        go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: |
@@ -2088,7 +1974,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.7
@@ -2099,7 +1985,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v6
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -2126,7 +2012,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: logs-python-test-9_10-Linux-x86_64
         overwrite: 'true'
@@ -2143,77 +2029,6 @@ jobs:
         format: cobertura
         parallel: true
     timeout-minutes: 90
-  test_python_macos13_x86_64:
-    env:
-      ARCHFLAGS: -arch x86_64
-      _PYTHON_HOST_PLATFORM: macosx-13.0-x86_64
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
-    name: Test Python (macOS13-x86_64)
-    needs:
-    - bootstrap_pants_macos13_x86_64
-    - classify_changes
-    runs-on:
-    - self-hosted
-    - macos-13
-    steps:
-    - name: Check out code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 10
-    - name: Install AdoptJDK
-      uses: actions/setup-java@v4
-      with:
-        distribution: adopt
-        java-version: '11'
-    - name: Install Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: 1.19.5
-    - name: Download native binaries
-      uses: actions/download-artifact@v4
-      with:
-        name: native_binaries.${{ matrix.python-version }}.macOS13-x86_64
-        path: src/python/pants
-    - name: Make native-client runnable
-      run: chmod +x src/python/pants/bin/native_client
-    - env:
-        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
-      name: Run Python tests
-      run: |
-        ./pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
-    - continue-on-error: true
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
-      if: always()
-      name: Upload test reports
-      run: |
-        export S3_DST=s3://logs.pantsbuild.org/test/reports/macOS13-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
-        echo "Uploading test reports to ${S3_DST}"
-        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
-    - continue-on-error: true
-      if: always()
-      name: Upload pants.log
-      uses: actions/upload-artifact@v4
-      with:
-        name: logs-python-test-macOS13-x86_64
-        overwrite: 'true'
-        path: .pants.d/workdir/*.log
-    - continue-on-error: true
-      if: always()
-      name: Report coverage to coveralls.io
-      uses: coverallsapp/github-action@v2
-      with:
-        allow-empty: true
-        fail-on-error: false
-        file: dist/coverage/python/coverage.xml
-        flag-name: test_python_macos13_x86_64
-        format: cobertura
-        parallel: true
-    timeout-minutes: 90
   test_python_macos14_arm64:
     env:
       ARCHFLAGS: -arch arm64
@@ -2227,20 +2042,24 @@ jobs:
     - macos-14
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 10
     - name: Install AdoptJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      with:
+        go-version: 1.24.9
     - name: Set up Python 3.9, 3.10, 3.12, 3.13, 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.9
@@ -2249,7 +2068,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v6
       with:
         name: native_binaries.${{ matrix.python-version }}.macOS14-ARM64
         path: src/python/pants
@@ -2276,7 +2095,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: logs-python-test-macOS14-ARM64
         overwrite: 'true'

@@ -65,7 +65,7 @@ class ScalatestTestFieldSet(TestFieldSet):
 
 
 class ScalatestTestRequest(TestRequest):
-    tool_subsystem = Scalatest
+    tool_subsystem = Scalatest  # type: ignore[assignment]
     field_set_type = ScalatestTestFieldSet
     supports_debug = True
 

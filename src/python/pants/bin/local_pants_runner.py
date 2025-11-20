@@ -207,7 +207,7 @@ class LocalPantsRunner:
             determine_bootstrap_environment(self.graph_session.scheduler_session),
         )
         (workunits_callback_factories,) = self.graph_session.scheduler_session.product_request(
-            WorkunitsCallbackFactories, [params]
+            WorkunitsCallbackFactories, params
         )
         return tuple(filter(bool, (wcf.callback_factory() for wcf in workunits_callback_factories)))
 

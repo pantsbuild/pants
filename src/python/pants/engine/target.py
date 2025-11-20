@@ -1178,7 +1178,7 @@ _TargetGenerator = TypeVar("_TargetGenerator", bound=TargetGenerator)
 @union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class GenerateTargetsRequest(Generic[_TargetGenerator]):
-    generate_from: ClassVar[type[_TargetGenerator]]  # type: ignore[misc]
+    generate_from: ClassVar[type[_TargetGenerator]]
 
     # The TargetGenerator instance to generate targets for.
     generator: _TargetGenerator
@@ -1782,10 +1782,10 @@ class ScalarField(Generic[T], Field):
                 return super().compute_value(raw_value, address=address)
     """
 
-    expected_type: ClassVar[type[T]]  # type: ignore[misc]
+    expected_type: ClassVar[type[T]]
     expected_type_description: ClassVar[str]
     value: T | None
-    default: ClassVar[T | None] = None  # type: ignore[misc]
+    default: ClassVar[T | None] = None
 
     @classmethod
     def compute_value(cls, raw_value: Any | None, address: Address) -> T | None:
@@ -1839,9 +1839,9 @@ class ValidNumbers(Enum):
     all = enum.auto()
 
     def validate(self, num: float | int | None, alias: str, address: Address) -> None:
-        if num is None or self == self.all:  # type: ignore[comparison-overlap]
+        if num is None or self == self.all:
             return
-        if self == self.positive_and_zero:  # type: ignore[comparison-overlap]
+        if self == self.positive_and_zero:
             if num < 0:
                 raise InvalidFieldException(
                     f"The {repr(alias)} field in target {address} must be greater than or equal to "
@@ -1922,7 +1922,7 @@ class SequenceField(Generic[T], Field):
     expected_element_type: ClassVar[type]
     expected_type_description: ClassVar[str]
     value: tuple[T, ...] | None
-    default: ClassVar[tuple[T, ...] | None] = None  # type: ignore[misc]
+    default: ClassVar[tuple[T, ...] | None] = None
 
     @classmethod
     def compute_value(
@@ -1953,7 +1953,7 @@ class TupleSequenceField(Generic[T], Field):
     expected_element_type_description: ClassVar[str]
 
     value: tuple[tuple[T, ...], ...] | None
-    default: ClassVar[tuple[tuple[T, ...], ...] | None] = None  # type: ignore[misc]
+    default: ClassVar[tuple[tuple[T, ...], ...] | None] = None
 
     @classmethod
     def compute_value(
@@ -2868,7 +2868,7 @@ class InferDependenciesRequest(Generic[FS], EngineAwareParameter):
             ]
     """
 
-    infer_from: ClassVar[type[FS]]  # type: ignore[misc]
+    infer_from: ClassVar[type[FS]]
 
     field_set: FS
 
@@ -2900,7 +2900,7 @@ class TransitivelyExcludeDependenciesRequest(Generic[FS], EngineAwareParameter):
     This mirrors the public facing "transitive exclude" dependency feature (i.e. `!!<address>`).
     """
 
-    infer_from: ClassVar[type[FS]]  # type: ignore[misc]
+    infer_from: ClassVar[type[FS]]
 
     field_set: FS
 
@@ -2917,7 +2917,7 @@ class ValidateDependenciesRequest(Generic[FS], ABC):
     An implementing rule should raise an exception if dependencies are invalid.
     """
 
-    field_set_type: ClassVar[type[FS]]  # type: ignore[misc]
+    field_set_type: ClassVar[type[FS]]
 
     field_set: FS
     dependencies: Addresses

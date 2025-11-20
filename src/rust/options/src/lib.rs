@@ -13,7 +13,7 @@ mod build_root;
 #[cfg(test)]
 mod build_root_tests;
 
-mod config;
+pub mod config;
 #[cfg(test)]
 mod config_tests;
 
@@ -21,11 +21,11 @@ mod cli_alias;
 #[cfg(test)]
 mod cli_alias_tests;
 
-mod env;
+pub mod env;
 #[cfg(test)]
 mod env_tests;
 
-mod fromfile;
+pub mod fromfile;
 #[cfg(test)]
 mod fromfile_tests;
 

@@ -10,7 +10,7 @@ from typing import Any
 
 from fastapi import FastAPI
 from pants_explorer.server.browser import BrowserRequest
-from uvicorn import Config, Server  # type: ignore
+from uvicorn import Config, Server
 
 from pants.base.exiter import ExitCode
 from pants.engine.environment import EnvironmentName
@@ -44,7 +44,7 @@ class UvicornServer:
                 app,
                 host=request.address,
                 port=request.port,
-                timeout_notify=0.25,
+                timeout_notify=1,
                 log_config=None,
             ),
             request_state=request.request_state,

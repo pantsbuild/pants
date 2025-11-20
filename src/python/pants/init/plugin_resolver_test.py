@@ -70,7 +70,7 @@ def _create_pex(
     request = PexRequest(
         output_filename="setup-py-runner.pex",
         internal_only=True,
-        requirements=PexRequirements(["setuptools==44.0.0", "wheel==0.34.2"]),
+        requirements=PexRequirements(["setuptools==66.1.0", "wheel==0.37.0"]),
         interpreter_constraints=interpreter_constraints,
     )
     return rule_runner.request(Pex, [request])

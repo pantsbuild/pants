@@ -207,19 +207,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let out_dir = env::var_os("OUT_DIR").expect("OUT_DIR env var not set.");
     let out_dir = Path::new(&out_dir);
     gen_files_for_language(
-        tree_sitter_python::language(),
+        tree_sitter_python::LANGUAGE.into(),
         "python",
         &source_dir,
         out_dir,
     )?;
     gen_files_for_language(
-        tree_sitter_typescript::language_tsx(),
+        tree_sitter_typescript::LANGUAGE_TSX.into(),
         "javascript",
         &source_dir,
         out_dir,
     )?;
     gen_files_for_language(
-        tree_sitter_dockerfile::language(),
+        tree_sitter_dockerfile::LANGUAGE.into(),
         "dockerfile",
         &source_dir,
         out_dir,

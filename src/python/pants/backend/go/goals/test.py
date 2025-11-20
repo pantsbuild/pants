@@ -145,7 +145,7 @@ class GoTestFieldSet(TestFieldSet):
 
 
 class GoTestRequest(TestRequest):
-    tool_subsystem = GoTestSubsystem
+    tool_subsystem = GoTestSubsystem  # type: ignore[assignment]
     field_set_type = GoTestFieldSet
 
 

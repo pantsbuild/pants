@@ -201,16 +201,11 @@ impl MtlsConfig {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub enum CertificateCheck {
+    #[default]
     Enabled,
     DangerouslyDisabled,
-}
-
-impl Default for CertificateCheck {
-    fn default() -> Self {
-        Self::Enabled
-    }
 }
 
 #[derive(Debug)]

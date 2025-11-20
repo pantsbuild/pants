@@ -109,7 +109,7 @@ async def lint(
         ],
         target_partitioners,
         file_partitioners,
-        lint_subsystem,
+        lint_subsystem,  # type: ignore[arg-type]
         specs,
         lambda request_type: partition_targets(
             **implicitly({request_type: LintTargetsRequest.PartitionRequest})
