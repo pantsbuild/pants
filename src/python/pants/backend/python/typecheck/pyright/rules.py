@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 import os
+import shlex
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
 
@@ -44,6 +46,7 @@ from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.core.util_rules import config_files
 from pants.core.util_rules.config_files import ConfigFiles, find_config_file
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
+from pants.core.util_rules.system_binaries import CatBinary, ShBinary
 from pants.engine.collection import Collection
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.graph import resolve_coarsened_targets as coarsened_targets_get
@@ -166,6 +169,8 @@ async def pyright_typecheck_partition(
     pyright: Pyright,
     pex_environment: PexEnvironment,
     nodejs: NodeJS,
+    sh_binary: ShBinary,
+    cat_binary: CatBinary,
 ) -> CheckResult:
     root_sources_get = determine_source_files(
         SourceFilesRequest(fs.sources for fs in partition.field_sets)
@@ -233,6 +238,9 @@ async def pyright_typecheck_partition(
         config_files, requirements_venv_pex.venv_rel_dir, transitive_sources.source_roots
     )
 
+    # Prepare the process with as much information as we currently have. This will give us the
+    # process's cwd, which we need in order to calculate the relative paths to the input files.
+    # We will then manually tweak the argv before actually running.
     input_digest = await merge_digests(
         MergeDigests(
             [
@@ -242,13 +250,12 @@ async def pyright_typecheck_partition(
             ]
         )
     )
-
     process = await prepare_tool_process(
         pyright.request(
             args=(
                 f"--venvpath={complete_pex_env.pex_root}",  # Used with `venv` in config
                 *pyright.args,  # User-added arguments
-                *(os.path.join("{chroot}", file) for file in root_sources.snapshot.files),
+                "-",  # Read input file paths from stdin
             ),
             input_digest=input_digest,
             description=f"Run Pyright on {pluralize(len(root_sources.snapshot.files), 'file')}.",
@@ -256,6 +263,42 @@ async def pyright_typecheck_partition(
         ),
         **implicitly(),
     )
+
+    # We must use relative paths, because we don't know the abspath of the sandbox the process
+    # will run in, and `{chroot}` interpolation only works on argv, not on the contents of
+    # __files.txt (see below). Pyright interprets relpaths as relative to its cwd, so we
+    # prepend the appropriate prefix to each file path.
+    input_path_prefix = os.path.relpath(".", process.working_directory)
+    input_files = [os.path.join(input_path_prefix, file) for file in root_sources.snapshot.files]
+
+    # We prefer to pass the list of input files via stdin, as large numbers of files can cause us
+    # to exceed the max command line length.  See https://github.com/pantsbuild/pants/issues/22779.
+    # However Pyright, weirdly, splits stdin on spaces as well as newlines. So we can't pass input
+    # file paths via stdin if any of them contain spaces.
+    if any(" " in file for file in input_files):
+        # Fall back to passing paths as args and hope we don't exceed the max command line length.
+        process = dataclasses.replace(process, argv=(*process.argv[0:-1], *input_files))
+    else:
+        # Write the input files out to a text file.
+        file_list_path = "__files.txt"
+        file_list_content = "\n".join(input_files).encode()
+        file_list_digest = await create_digest(
+            CreateDigest([FileContent(file_list_path, file_list_content)])
+        )
+        input_digest = await merge_digests(
+            MergeDigests(
+                [
+                    process.input_digest,
+                    file_list_digest,
+                ]
+            )
+        )
+        # Run the underlying process inside a shell script that cats the file list to stdin.
+        shell_script = f"{cat_binary.path} {os.path.join(input_path_prefix, file_list_path)} | {shlex.join(process.argv)}"
+        process = dataclasses.replace(
+            process, argv=(sh_binary.path, "-c", shell_script), input_digest=input_digest
+        )
+
     result = await execute_process(process, **implicitly())
     return CheckResult.from_fallible_process_result(
         result,
