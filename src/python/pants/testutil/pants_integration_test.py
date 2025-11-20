@@ -34,7 +34,7 @@ Command = Union[str, list[str]]
 # cases we pass strict str->str, and we want both to typecheck.
 # TODO: The complexity of this type, and the casting and # type: ignoring we have to do below,
 #  is a code smell. We should use bytes everywhere, and convert lazily as needed.
-Env = Union[Mapping[str, str], Mapping[bytes, bytes], Mapping[Union[str, bytes], Union[str, bytes]]]
+Env = Union[Mapping[str, str], Mapping[bytes, bytes], Mapping[str | bytes, str | bytes]]
 
 
 @dataclass(frozen=True)
@@ -227,11 +227,11 @@ def run_pants_with_workdir_without_waiting(
                 if value is not None:
                     env[h] = value
     else:
-        env = cast(dict[Union[str, bytes], Union[str, bytes]], os.environ.copy())
+        env = cast(dict[str | bytes, str | bytes], os.environ.copy())
 
     env.update(PYTHONPATH=os.pathsep.join(sys.path), NO_SCIE_WARNING="1")
     if extra_env:
-        env.update(cast(dict[Union[str, bytes], Union[str, bytes]], extra_env))
+        env.update(cast(dict[str | bytes, str | bytes], extra_env))
 
     # Pants command that was called from the test shouldn't have a parent.
     if "PANTS_PARENT_BUILD_ID" in env:

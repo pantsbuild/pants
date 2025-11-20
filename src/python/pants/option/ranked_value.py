@@ -48,7 +48,7 @@ class Rank(Enum):
 
 
 Value = Union[str, int, float, None, dict, Enum, list]
-ValueAndDetails = tuple[Optional[Value], Optional[str]]
+ValueAndDetails = tuple[Value | None, str | None]
 
 
 @dataclass(frozen=True)

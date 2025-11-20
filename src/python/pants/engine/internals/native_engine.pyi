@@ -697,7 +697,7 @@ T = TypeVar("T")
 OptionValueDerivation = list[tuple[T, int, str]]
 
 # A tuple (value, rank of value, optional derivation of value).
-OptionValue = tuple[Optional[T], int, Optional[OptionValueDerivation]]
+OptionValue = tuple[T | None, int, OptionValueDerivation | None]
 
 def py_bin_name() -> str: ...
 

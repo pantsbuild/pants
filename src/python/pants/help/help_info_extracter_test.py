@@ -799,6 +799,6 @@ def test_pretty_print_type_hint() -> None:
         f"{__name__}.{test_pretty_print_type_hint.__name__}.<locals>.{ExampleCls.__name__}"
     )
     assert (
-        pretty_print_type_hint(Union[Iterable[list[ExampleCls]], Optional[float], Any])
+        pretty_print_type_hint(Union[Iterable[list[ExampleCls]], float | None, Any])
         == f"Iterable[list[{example_cls_repr}]] | float | None | Any"
     )

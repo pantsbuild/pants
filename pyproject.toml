@@ -68,4 +68,5 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["UP"]
 # UP006 replaces DefaultDict with collections.defaultdict - lots of churn (which SJ wants to batch after 3.14)
+# UP045: Replaces `int(42)` in tests, breaking call-by-type and implicitly
 ignore = ["UP006", "UP031", "UP032", "UP034", "UP035", "UP045"]

@@ -48,12 +48,12 @@ class ScopeInfo:
 
     @property
     def deprecated_scope(self) -> str | None:
-        return cast(Optional[str], self._subsystem_cls_attr("deprecated_options_scope"))
+        return cast(str | None, self._subsystem_cls_attr("deprecated_options_scope"))
 
     @property
     def deprecated_scope_removal_version(self) -> str | None:
         return cast(
-            Optional[str],
+            str | None,
             self._subsystem_cls_attr("deprecated_options_scope_removal_version"),
         )
 

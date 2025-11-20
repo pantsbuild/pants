@@ -14,7 +14,7 @@ class Return:
     value: Any
 
 
-_Frame = tuple[str, Optional[str]]
+_Frame = tuple[str, str | None]
 
 
 @dataclass(frozen=True)
