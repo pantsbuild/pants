@@ -25,6 +25,7 @@ pub use crate::glob_matching::{
 use std::cmp::min;
 use std::io::{self, ErrorKind};
 use std::ops::Deref;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;

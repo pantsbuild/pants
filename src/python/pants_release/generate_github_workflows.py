@@ -863,8 +863,15 @@ def macos14_arm64_test_jobs() -> Jobs:
 
 def windows11_x86_64_test_jobs() -> Jobs:
     ported_crates = [
-        "address", "async_latch", "async_value", "concrete_time", "grpc_util", "hashing",
-        "stdio", "task_executor", "workunit_store",
+        "address",
+        "async_latch",
+        "async_value",
+        "concrete_time",
+        "grpc_util",
+        "hashing",
+        "stdio",
+        "task_executor",
+        "workunit_store",
     ]
     ported_crates_args = " -p " + " -p ".join(ported_crates)
 
@@ -882,7 +889,7 @@ def windows11_x86_64_test_jobs() -> Jobs:
                     "uses": action("msys2"),
                     "with": {
                         "msystem": "UCRT64",
-                        "install": "base-devel mingw-w64-x86_64-toolchain mingw-w64-ucrt-x86_64-nasm mingw-w64-x86_64-cmake mingw-w64-ucrt-x86_64-protobuf",
+                        "install": "base-devel mingw-w64-ucrt-x86_64-toolchain mingw-w64-ucrt-x86_64-nasm mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-protobuf",
                     },
                 },
                 {
@@ -896,7 +903,7 @@ def windows11_x86_64_test_jobs() -> Jobs:
                 },
                 {
                     "name": "Check and Test Rust Code",
-                    "shell": "msys2 {0}",
+                    "shell": "ucrt64 {0}",
                     "run": dedent(
                         f"""\
                         # $GITHUB_PATH affects the regular Windows path, not the MSYS2 path,

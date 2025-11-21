@@ -560,7 +560,7 @@ jobs:
     - name: Install MSYS2
       uses: msys2/setup-msys2@v2
       with:
-        install: base-devel mingw-w64-x86_64-toolchain mingw-w64-ucrt-x86_64-nasm mingw-w64-x86_64-cmake mingw-w64-ucrt-x86_64-protobuf
+        install: base-devel mingw-w64-ucrt-x86_64-toolchain mingw-w64-ucrt-x86_64-nasm mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-protobuf
         msystem: UCRT64
     - name: Set Up Rust Toolchain
       uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -576,7 +576,7 @@ jobs:
         cd src/rust
         cargo check  -p address -p async_latch -p async_value -p concrete_time -p grpc_util -p hashing -p stdio -p task_executor -p workunit_store
         cargo test  -p address -p async_latch -p async_value -p concrete_time -p grpc_util -p hashing -p stdio -p task_executor -p workunit_store
-      shell: msys2 {0}
+      shell: ucrt64 {0}
     timeout-minutes: 60
   check_release_notes:
     if: github.repository_owner == 'pantsbuild'
