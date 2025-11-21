@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+# The relative import emphasizes that `search_for_sonames` is a standalone script that runs
+# from a sandbox root (thus avoiding a dependency on the pants code structure).
 from .search_for_sonames import deb_packages_from_html_response
 
 # simplified for readability and to keep it focused
