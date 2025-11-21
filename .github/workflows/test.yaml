@@ -574,8 +574,8 @@ jobs:
         # so we must modify the MSYS2 PATH directly in each step that needs it.
         export PATH=$PATH:$(cygpath $USERPROFILE)/.cargo/bin
         cd src/rust
-        cargo check -p stdio
-        cargo test -p stdio
+        cargo check  -p address -p async_latch -p async_value -p concrete_time -p grpc_util -p hashing -p stdio -p task_executor -p workunit_store
+        cargo test  -p address -p async_latch -p async_value -p concrete_time -p grpc_util -p hashing -p stdio -p task_executor -p workunit_store
       shell: msys2 {0}
     timeout-minutes: 60
   check_release_notes:

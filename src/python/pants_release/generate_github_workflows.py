@@ -862,6 +862,12 @@ def macos14_arm64_test_jobs() -> Jobs:
 
 
 def windows11_x86_64_test_jobs() -> Jobs:
+    ported_crates = [
+        "address", "async_latch", "async_value", "concrete_time", "grpc_util", "hashing",
+        "stdio", "task_executor", "workunit_store",
+    ]
+    ported_crates_args = " -p " + " -p ".join(ported_crates)
+
     helper = Helper(Platform.WINDOWS11_X86_64)
     jobs = {
         helper.job_name("build"): {
@@ -892,13 +898,13 @@ def windows11_x86_64_test_jobs() -> Jobs:
                     "name": "Check and Test Rust Code",
                     "shell": "msys2 {0}",
                     "run": dedent(
-                        """\
+                        f"""\
                         # $GITHUB_PATH affects the regular Windows path, not the MSYS2 path,
                         # so we must modify the MSYS2 PATH directly in each step that needs it.
                         export PATH=$PATH:$(cygpath $USERPROFILE)/.cargo/bin
                         cd src/rust
-                        cargo check -p stdio
-                        cargo test -p stdio
+                        cargo check {ported_crates_args}
+                        cargo test {ported_crates_args}
                         """
                     ),
                 },
