@@ -576,7 +576,7 @@ jobs:
         cd src/rust
         cargo check  -p address -p async_latch -p async_value -p concrete_time -p grpc_util -p hashing -p stdio -p task_executor -p workunit_store
         cargo test  -p address -p async_latch -p async_value -p concrete_time -p grpc_util -p hashing -p stdio -p task_executor -p workunit_store
-      shell: ucrt64 {0}
+      shell: msys2 -ucrt64 {0}
     timeout-minutes: 60
   check_release_notes:
     if: github.repository_owner == 'pantsbuild'

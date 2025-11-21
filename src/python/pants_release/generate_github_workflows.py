@@ -903,7 +903,7 @@ def windows11_x86_64_test_jobs() -> Jobs:
                 },
                 {
                     "name": "Check and Test Rust Code",
-                    "shell": "ucrt64 {0}",
+                    "shell": "msys2 -ucrt64 {0}",
                     "run": dedent(
                         f"""\
                         # $GITHUB_PATH affects the regular Windows path, not the MSYS2 path,
