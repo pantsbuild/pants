@@ -8,17 +8,12 @@ from typing import Any
 
 import pytest
 
-from pants.backend.nfpm.native_libs.deb.rules import (
-    DebPackagesForSonames,
-    DebSearchForSonamesRequest,
-)
-from pants.backend.nfpm.native_libs.deb.rules import rules as native_libs_deb_rules
 from pants.backend.python.util_rules import pex_from_targets
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
-# The relative import emphasizes that `search_for_sonames` is a standalone script that runs
-# from a sandbox root (thus avoiding a dependency on the pants code structure).
+from .rules import DebPackagesForSonames, DebSearchForSonamesRequest
+from .rules import rules as native_libs_deb_rules
 from .search_for_sonames import deb_search_for_sonames
 
 _libldap_soname = "libldap-2.5.so.0"
