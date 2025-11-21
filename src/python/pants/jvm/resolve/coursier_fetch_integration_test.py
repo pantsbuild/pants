@@ -687,7 +687,7 @@ def test_transitive_group_only_excludes(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
-def test_missing_entry_for_transitive_dependency(rule_runner: RuleRunner) -> None:
+def test_missing_entry_for_transitive_pom_dependency(rule_runner: RuleRunner) -> None:
     requirement = ArtifactRequirement(
         coordinate=Coordinate(
             group="org.apache.hive",
@@ -713,10 +713,8 @@ def test_missing_entry_for_transitive_dependency(rule_runner: RuleRunner) -> Non
     }
     missing = coords_of_dependencies - coords_of_entries
 
-    # We expect all the dependencies to have an entry, but right now it's not true
-    # for ("junit", "junit") and ("org.apache.curator", "apache-curator").
-    # TODO Remove the workaround once the bug is fixed.
-    assert missing == {("junit", "junit"), ("org.apache.curator", "apache-curator")}
+    # We expect all the dependencies to have an entry except for entries with a classifier of type "pom"
+    assert missing == {("org.apache.curator", "apache-curator")}
 
 
 @maybe_skip_jdk_test
