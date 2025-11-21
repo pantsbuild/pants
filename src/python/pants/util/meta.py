@@ -46,10 +46,10 @@ class _ClassPropertyDescriptor:
         if getattr(self.fget.__func__, "__isabstractmethod__", False):
             field_name = self.fget.__func__.fget.__name__  # type: ignore[union-attr]
             raise TypeError(
-                """\
-The classproperty '{func_name}' in type '{type_name}' was an abstractproperty, meaning that type \
-{type_name} must override it by setting it as a variable in the class body or defining a method \
-with an @classproperty decorator.""".format(func_name=field_name, type_name=objtype.__name__)
+                f"""\
+The classproperty '{field_name}' in type '{objtype.__name__}' was an abstractproperty, meaning that type \
+{objtype.__name__} must override it by setting it as a variable in the class body or defining a method \
+with an @classproperty decorator."""
             )
         return callable_field()
 

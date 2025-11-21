@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository_owner == 'pantsbuild'
     permissions:
+      actions: write
       issues: write
     steps:
       - uses: actions/stale@v10
@@ -33,5 +34,5 @@ jobs:
           days-before-pr-stale: -1
           days-before-pr-close: -1
 
-          operations-per-run: 100
+          operations-per-run: 250
           repo-token: ${{ secrets.GITHUB_TOKEN }}

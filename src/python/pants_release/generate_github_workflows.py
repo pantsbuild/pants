@@ -68,13 +68,12 @@ Env = dict[str, str]
 class Platform(Enum):
     LINUX_X86_64 = "Linux-x86_64"
     LINUX_ARM64 = "Linux-ARM64"
-    MACOS13_X86_64 = "macOS13-x86_64"
     MACOS14_ARM64 = "macOS14-ARM64"
     WINDOWS11_X86_64 = "Windows11-x86_64"
 
 
 GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS14_ARM64}
-SELF_HOSTED = {Platform.MACOS13_X86_64, Platform.LINUX_ARM64}
+SELF_HOSTED = {Platform.LINUX_ARM64}
 CARGO_AUDIT_IGNORED_ADVISORY_IDS = (
     "RUSTSEC-2020-0128",  # returns a false positive on the cache crate, which is a local crate not a 3rd party crate
 )
@@ -89,7 +88,6 @@ PYTHON_VERSIONS_PER_PLATFORM = {
     # Python 3.7 or 3.8 aren't supported directly on arm64 macOS
     Platform.MACOS14_ARM64: [v for v in _BASE_PYTHON_VERSIONS if v not in ("3.7", "3.8")],
     # These runners have Python already installed
-    Platform.MACOS13_X86_64: None,
     Platform.LINUX_ARM64: None,
 }
 
@@ -452,9 +450,7 @@ class Helper:
         # any platform-specific labels, so we don't run on future GH-hosted
         # platforms without realizing it.
         ret = ["self-hosted"] if self.platform in SELF_HOSTED else []
-        if self.platform == Platform.MACOS13_X86_64:
-            ret += ["macos-13"]
-        elif self.platform == Platform.MACOS14_ARM64:
+        if self.platform == Platform.MACOS14_ARM64:
             ret += ["macos-14"]
         elif self.platform == Platform.LINUX_X86_64:
             ret += ["ubuntu-22.04"]
@@ -473,19 +469,6 @@ class Helper:
 
     def platform_env(self):
         ret = {}
-        if self.platform in {Platform.MACOS13_X86_64}:
-            # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
-            # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
-            ret["ARCHFLAGS"] = "-arch x86_64"
-            # Be explicit about the platform we've built our native code for: without this, Python
-            # builds and tags wheels based on the interpreter's build.
-            #
-            # At the time of writing, the GitHub-hosted runners' Pythons are built as
-            # macosx-10.9-universal2. Thus, without this env var, we tag our single-platform wheels
-            # as universal2... this is a lie and understandably leads to installing the wrong wheel
-            # and thus things do not work (see #21938 for an example).
-            # A similar issue may occur with the interpreters on self-hosted runners.
-            ret["_PYTHON_HOST_PLATFORM"] = "macosx-13.0-x86_64"
         if self.platform in {Platform.MACOS14_ARM64}:
             ret["ARCHFLAGS"] = "-arch arm64"
             ret["_PYTHON_HOST_PLATFORM"] = "macosx-14.0-arm64"
@@ -859,23 +842,6 @@ def linux_arm64_test_jobs() -> Jobs:
     return jobs
 
 
-def macos13_x86_64_test_jobs() -> Jobs:
-    helper = Helper(Platform.MACOS13_X86_64)
-    jobs = {
-        helper.job_name("bootstrap_pants"): bootstrap_jobs(
-            helper,
-            validate_ci_config=False,
-            rust_testing=RustTesting.SOME,
-        ),
-        # We run these on a dedicated host with ample local cache, so remote caching
-        # just adds cost but little value.
-        helper.job_name(TEST_PYTHON_JOB_PREFIX): test_jobs(
-            helper, shard=None, platform_specific=True, with_remote_caching=False
-        ),
-    }
-    return jobs
-
-
 def macos14_arm64_test_jobs() -> Jobs:
     helper = Helper(Platform.MACOS14_ARM64)
     jobs = {
@@ -1137,7 +1103,6 @@ def build_wheels_jobs(*, for_deploy_ref: str | None = None, needs: list[str] | N
     return {
         **build_wheels_job(Platform.LINUX_X86_64, for_deploy_ref, needs),
         **build_wheels_job(Platform.LINUX_ARM64, for_deploy_ref, needs),
-        **build_wheels_job(Platform.MACOS13_X86_64, for_deploy_ref, needs),
         **build_wheels_job(Platform.MACOS14_ARM64, for_deploy_ref, needs),
     }
 
@@ -1155,7 +1120,6 @@ def test_workflow_jobs() -> Jobs:
     }
     jobs.update(**linux_x86_64_test_jobs())
     jobs.update(**linux_arm64_test_jobs())
-    jobs.update(**macos13_x86_64_test_jobs())
     jobs.update(**macos14_arm64_test_jobs())
     jobs.update(**build_wheels_jobs())
     jobs.update(**windows11_x86_64_test_jobs())

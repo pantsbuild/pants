@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import datetime
 from io import RawIOBase
-from typing import Any, ClassVar, Generic, Optional, Protocol, Self, TextIO, TypeVar, overload
+from typing import Any, ClassVar, Generic, Protocol, Self, TextIO, TypeVar, overload
 
 from pants.engine.fs import (
     CreateDigest,
@@ -697,7 +697,7 @@ T = TypeVar("T")
 OptionValueDerivation = list[tuple[T, int, str]]
 
 # A tuple (value, rank of value, optional derivation of value).
-OptionValue = tuple[Optional[T], int, Optional[OptionValueDerivation]]
+OptionValue = tuple[T | None, int, OptionValueDerivation | None]
 
 def py_bin_name() -> str: ...
 

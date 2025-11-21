@@ -193,8 +193,8 @@ class MultiMatcher:
             path_patterns_used.add(k)
             if not isinstance(v, (tuple, list)):
                 raise ValueError(
-                    "Value for path pattern {} in required_matches must be tuple of "
-                    "content pattern names, but was {}".format(k, v)
+                    f"Value for path pattern {k} in required_matches must be tuple of "
+                    f"content pattern names, but was {v}"
                 )
             content_patterns_used.update(v)
 
