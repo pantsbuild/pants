@@ -247,14 +247,12 @@ class CoursierResolvedLockfile:
         return (
             entry,
             tuple(
-                dependency_entry
+                entries.get((d.group, d.artifact, d.classifier))
                 for d in entry.dependencies
-                # The dependency might not be present in the entries due to coursier bug:
-                # https://github.com/coursier/coursier/issues/2884
-                # As a workaround, if this happens, we want to skip the dependency.
-                # TODO Drop the check once the bug is fixed.
-                if (dependency_entry := entries.get((d.group, d.artifact, d.classifier)))
-                is not None
+                # Coursier will pass "pom" coords through to us. These coords don't have
+                # a coords entry, but all of their relevant dependencies have already been taken into account
+                # and will appear in the dependencies list
+                if d.classifier != "pom"
             ),
         )
 
