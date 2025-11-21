@@ -4,6 +4,7 @@
 pub mod config;
 #[cfg(test)]
 mod config_tests;
+pub mod options;
 pub mod pants_invocation;
 #[cfg(test)]
 mod pants_invocation_tests;

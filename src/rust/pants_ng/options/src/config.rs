@@ -21,8 +21,11 @@ pub struct ConfigFinder {
 }
 
 impl ConfigFinder {
-    pub fn new(buildroot: BuildRoot, seed_values: InterpolationMap) -> Result<Self, String> {
-        let fromfile_expander = FromfileExpander::relative_to(buildroot.clone());
+    pub fn new(
+        buildroot: BuildRoot,
+        fromfile_expander: FromfileExpander,
+        seed_values: InterpolationMap,
+    ) -> Result<Self, String> {
         Ok(Self {
             buildroot,
             seed_values,
@@ -31,7 +34,7 @@ impl ConfigFinder {
         })
     }
 
-    fn get_config(&self, path: &Path) -> Result<Arc<ConfigReader>, String> {
+    pub(crate) fn get_config(&self, path: &Path) -> Result<Arc<ConfigReader>, String> {
         let mut lock = self.parsed_configs.lock();
         if let Some(config) = lock.get(path) {
             return Ok(Arc::clone(config));

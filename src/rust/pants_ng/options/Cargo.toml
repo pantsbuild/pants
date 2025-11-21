@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 fs = { path = "../../fs" }
 glob = { workspace = true }
+maplit = { workspace = true }
 options = { path = "../../options" }
 parking_lot = { workspace = true }
 regex = { workspace = true }

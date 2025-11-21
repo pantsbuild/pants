@@ -6,7 +6,9 @@ use std::iter::Peekable;
 use std::path;
 use std::sync::LazyLock;
 
+use options::Scope;
 use regex::Regex;
+use std::collections::HashMap;
 
 static NAME_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^[A-Za-z][0-9A-Za-z_\-]*$").unwrap());
@@ -216,5 +218,44 @@ impl PantsInvocation {
             specs,
             passthru,
         })
+    }
+
+    pub(crate) fn get_flags(&self) -> HashMap<Scope, HashMap<String, Vec<Option<String>>>> {
+        let mut flags: HashMap<Scope, HashMap<String, Vec<Option<String>>>> = HashMap::new();
+        // Global flags can either refer implicitly to options in the global scope (--global_option),
+        // or prefixed with an explicit scope and a dash (--explicit-scope-flag_in_that_scope).
+        // Multi-word scope names must uses dashes as word separators, while multi-word option
+        // names must use underscores as word separators, so that a flag is never ambiguous.
+        for flag in &self.global_flags {
+            let (scope_name, name) = flag.key.rsplit_once("-").unwrap_or(("", &flag.key));
+            flags
+                .entry(Scope::named(scope_name))
+                .or_default()
+                .entry(name.to_string())
+                .or_default()
+                .push(flag.value.clone());
+        }
+        // Command flags for `command` correspond to options with scopes named `command`.
+        // Subcommand flags correspond to options with scopes named `command.subcommand`.
+        for command in &self.commands {
+            let flags_for_scope = flags.entry(Scope::named(&command.name)).or_default();
+            for flag in &command.flags {
+                flags_for_scope
+                    .entry(flag.key.clone())
+                    .or_default()
+                    .push(flag.value.clone());
+            }
+            if let Some(subcommand) = &command.subcommand {
+                let subcommand_scope = format!("{}.{}", &command.name, &subcommand.name);
+                let flags_for_scope = flags.entry(Scope::named(&subcommand_scope)).or_default();
+                for flag in &subcommand.flags {
+                    flags_for_scope
+                        .entry(flag.key.clone())
+                        .or_default()
+                        .push(flag.value.clone());
+                }
+            }
+        }
+        flags
     }
 }

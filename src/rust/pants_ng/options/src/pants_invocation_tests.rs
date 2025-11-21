@@ -6,6 +6,8 @@ use crate::pants_invocation::Command;
 use crate::pants_invocation::Flag;
 use crate::pants_invocation::PantsInvocation;
 use crate::pants_invocation::SubCommand;
+use maplit::hashmap;
+use options::Scope;
 
 fn mk_flag(key: &str, value: Option<&str>) -> Flag {
     Flag {
@@ -377,5 +379,34 @@ fn test_errors() {
     assert_error(
         "pants cmd subcmd path/to/spec subcmd2",
         "Extraneous argument `subcmd2`",
+    );
+}
+
+#[test]
+fn test_get_flags() {
+    let flags = mk_invocation(
+        "pants --global_flag1 --scope-scoped_flag1=foo --global_flag2=false --scope-scoped_flag1=bar cmd1 --cmd1_flag + cmd2 --cmd2_flag=true subcmd --subcmd_flag=42"
+    ).unwrap().get_flags();
+
+    assert_eq!(
+        flags,
+        hashmap! {
+            Scope::Global => hashmap! {
+                "global_flag1".to_string() => vec![None],
+                "global_flag2".to_string() => vec![Some("false".to_string())],
+            },
+            Scope::named("scope") => hashmap! {
+                "scoped_flag1".to_string() => vec![Some("foo".to_string()), Some("bar".to_string())],
+            },
+            Scope::named("cmd1") => hashmap! {
+                "cmd1_flag".to_string() => vec![None],
+            },
+            Scope::named("cmd2") => hashmap! {
+                "cmd2_flag".to_string() => vec![Some("true".to_string())],
+            },
+            Scope::named("cmd2.subcmd") => hashmap! {
+                "subcmd_flag".to_string() => vec![Some("42".to_string())],
+            },
+        }
     );
 }
