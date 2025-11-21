@@ -6,11 +6,20 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from pants.backend.nfpm.field_sets import NfpmRpmPackageFieldSet
+from pants.backend.nfpm.field_sets import NfpmDebPackageFieldSet, NfpmRpmPackageFieldSet
+from pants.backend.nfpm.fields.all import NfpmArchField
+from pants.backend.nfpm.fields.deb import NfpmDebDependsField
 from pants.backend.nfpm.fields.rpm import NfpmRpmDependsField, NfpmRpmProvidesField
+from pants.backend.nfpm.native_libs.deb.rules import (
+    DebSearchForSonamesRequest,
+    deb_search_for_sonames,
+)
 from pants.backend.nfpm.native_libs.deb.rules import rules as deb_rules
+from pants.backend.nfpm.native_libs.deb.utils import shlibdeps_filter_sonames
 from pants.backend.nfpm.native_libs.elfdeps.rules import RequestPexELFInfo, elfdeps_analyze_pex
 from pants.backend.nfpm.native_libs.elfdeps.rules import rules as elfdeps_rules
+from pants.backend.nfpm.native_libs.target_types import DebDistroCodenameField, DebDistroField
+from pants.backend.nfpm.native_libs.target_types import rules as target_types_rules
 from pants.backend.nfpm.util_rules.contents import (
     GetPackageFieldSetsForNfpmContentFileDepsRequest,
     get_package_field_sets_for_nfpm_content_file_deps,
@@ -27,6 +36,54 @@ from pants.engine.internals.selectors import concurrently
 from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.target import Field, Target
 from pants.engine.unions import UnionMembership, UnionRule
+
+
+@dataclass(frozen=True)
+class DebDependsFromPexRequest:
+    target_pex: Pex
+    distro: str
+    distro_codename: str
+    debian_arch: str
+
+
+@dataclass(frozen=True)
+class DebDependsInfo:
+    requires: tuple[str, ...]
+
+
+@rule
+async def deb_depends_from_pex(request: DebDependsFromPexRequest) -> DebDependsInfo:
+    # This rule partially replaces `dh_shlibdeps` + `dpkg-shlibdeps` in native deb builds.
+    # `dpkg-shlibdeps` calculates deps that replace ${shlibs:<dep field>} vars in debian/control files.
+    #   - By default, `dpkg-shlibdeps` puts the package deps in ${shlibs:Depends}.
+    #   - When building an "Essential" package, it puts the deps in ${shlibs:Pre-Depends} instead.
+    #   - If requested, some deps can also go in ${shlibs:Recommends} or ${shilbs:Suggests}.
+    # This rule only calculates one list of deps (the equivalent of ${shlibs:Depends}).
+    # Consuming rules are responsible for putting these deps in one or more nfpm package dep field(s).
+
+    pex_elf_info = await elfdeps_analyze_pex(RequestPexELFInfo(request.target_pex), **implicitly())
+
+    sonames = shlibdeps_filter_sonames(so_info.soname for so_info in pex_elf_info.requires)
+
+    packages_for_sonames = await deb_search_for_sonames(
+        DebSearchForSonamesRequest(
+            request.distro,
+            request.distro_codename,
+            request.debian_arch,
+            sonames,
+            from_best_so_files=True,
+        )
+    )
+
+    # this blindly grabs all of them, but we really need to select only one so_file per soname and use those packages
+    package_deps = {
+        package
+        for packages_for_soname in packages_for_sonames.packages_for_sonames
+        for packages_per_so_file in packages_for_soname.packages_per_so_files
+        for package in packages_per_so_file.packages
+    }
+    # TODO: Should there be a minimum version constraint for libc.so.6 based on so_info.version?
+    return DebDependsInfo(requires=tuple(sorted(package_deps)))
 
 
 @dataclass(frozen=True)
@@ -78,7 +135,10 @@ class NativeLibsNfpmPackageFieldsRequest(InjectNfpmPackageFieldsRequest):
 
     @classmethod
     def is_applicable(cls, target: Target) -> bool:
-        return NfpmRpmPackageFieldSet.is_applicable(target)
+        return any(
+            field_set_type.is_applicable(target)
+            for field_set_type in (NfpmDebPackageFieldSet, NfpmRpmPackageFieldSet)
+        )
 
 
 @rule
@@ -96,7 +156,25 @@ async def inject_native_libs_dependencies_in_package_fields(
     if not pex_binaries:
         return InjectedNfpmPackageFields(fields, address=address)
 
-    if NfpmRpmPackageFieldSet.is_applicable(request.target):
+    if NfpmDebPackageFieldSet.is_applicable(request.target):
+        # This is like running deb helper shlib-deps.
+        deb_depends_infos = await concurrently(
+            deb_depends_from_pex(
+                DebDependsFromPexRequest(
+                    pex,
+                    request.get_field(DebDistroField).value or "",
+                    request.get_field(DebDistroCodenameField).value or "",
+                    request.get_field(NfpmArchField).value or "",
+                )
+            )
+            for pex in pex_binaries
+        )
+        depends = list(request.get_field(NfpmDebDependsField).value or ())
+        for deb_depends_info in deb_depends_infos:
+            depends.extend(deb_depends_info.requires)
+        fields.append(NfpmDebDependsField(depends, address=address))
+
+    elif NfpmRpmPackageFieldSet.is_applicable(request.target):
         # This is like running rpmdeps -> elfdeps.
         rpm_depends_infos = await concurrently(
             rpm_depends_from_pex(RpmDependsFromPexRequest(pex)) for pex in pex_binaries
@@ -120,6 +198,7 @@ def rules() -> Iterable[Rule | UnionRule]:
     return (
         *deb_rules(),
         *elfdeps_rules(),
+        *target_types_rules(),
         *collect_rules(),
         UnionRule(InjectNfpmPackageFieldsRequest, NativeLibsNfpmPackageFieldsRequest),
     )
