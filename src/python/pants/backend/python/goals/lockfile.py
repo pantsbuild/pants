@@ -61,6 +61,8 @@ class GeneratePythonLockfile(GenerateLockfile):
     requirements: FrozenOrderedSet[str]
     find_links: FrozenOrderedSet[str]
     interpreter_constraints: InterpreterConstraints
+    lock_style: str
+    complete_platforms: tuple[str, ...]
 
     @property
     def requirements_hex_digest(self) -> str:
@@ -113,6 +115,27 @@ async def generate_lockfile(
 
     python = await find_interpreter(req.interpreter_constraints, **implicitly())
 
+    # Add complete platforms if specified, otherwise use default target systems
+    if req.complete_platforms:
+        target_system_args = (
+            f"--complete-platform={platform}" for platform in req.complete_platforms
+        )
+    else:
+        # PEX files currently only run on Linux and Mac machines; so we hard code this
+        # limit on lock universality to avoid issues locking due to irrelevant
+        # Windows-only dependency issues. See this Pex issue that originated from a
+        # Pants user issue presented in Slack:
+        #   https://github.com/pex-tool/pex/issues/1821
+        #
+        # At some point it will probably make sense to expose `--target-system` for
+        # configuration.
+        target_system_args = (
+            "--target-system",
+            "linux",
+            "--target-system",
+            "mac",
+        )
+
     result = await fallible_to_exec_result_or_raise(
         **implicitly(
             PexCliProcess(
@@ -129,18 +152,7 @@ async def generate_lockfile(
                     "pip-2020-resolver",
                     "--preserve-pip-download-log",
                     "pex-pip-download.log",
-                    # PEX files currently only run on Linux and Mac machines; so we hard code this
-                    # limit on lock universality to avoid issues locking due to irrelevant
-                    # Windows-only dependency issues. See this Pex issue that originated from a
-                    # Pants user issue presented in Slack:
-                    #   https://github.com/pex-tool/pex/issues/1821
-                    #
-                    # At some point it will probably make sense to expose `--target-system` for
-                    # configuration.
-                    "--target-system",
-                    "linux",
-                    "--target-system",
-                    "mac",
+                    *target_system_args,
                     # This makes diffs more readable when lockfiles change.
                     "--indent=2",
                     f"--python-path={python.path}",
@@ -192,6 +204,8 @@ async def generate_lockfile(
         excludes=set(pip_args_setup.resolve_config.excludes),
         overrides=set(pip_args_setup.resolve_config.overrides),
         sources=set(pip_args_setup.resolve_config.sources),
+        lock_style=req.lock_style,
+        complete_platforms=req.complete_platforms,
     )
     regenerate_command = (
         generate_lockfiles_subsystem.custom_command
@@ -313,6 +327,10 @@ async def setup_user_lockfile_requests(
                     resolve_name=resolve,
                     lockfile_dest=python_setup.resolves[resolve],
                     diff=False,
+                    lock_style=python_setup.resolves_to_lock_style().get(resolve, "universal"),
+                    complete_platforms=tuple(
+                        python_setup.resolves_to_complete_platforms().get(resolve, [])
+                    ),
                 )
             )
         else:
@@ -334,6 +352,8 @@ async def setup_user_lockfile_requests(
                     resolve_name=resolve,
                     lockfile_dest=DEFAULT_TOOL_LOCKFILE,
                     diff=False,
+                    lock_style="universal",  # Tools always use universal style
+                    complete_platforms=(),  # Tools don't use complete platforms
                 )
             )
 

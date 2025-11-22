@@ -450,6 +450,71 @@ class PythonSetup(Subsystem):
         advanced=True,
     )
 
+    _resolves_to_lock_style = DictOption[str](
+        help=softwrap(
+            f"""
+            The style of lock to generate. The 'strict' style generates a lock file that contains exactly the
+            distributions that would be used in a local PEX build. If an sdist would be used, the sdist is included, but if a
+            wheel would be used, an accompanying sdist will not be included. The 'sources' style includes locks containing both
+            wheels and the associated sdists when available. The 'universal' style generates a universal lock for all possible
+            target interpreters and platforms, although the scope can be constrained via one or more --interpreter-constraint. Of
+            the three lock styles, only 'strict' can give you full confidence in the lock since it includes exactly the artifacts
+            that are included in the local PEX you'll build to test the lock result with before checking in the lock. With the
+            other two styles you lock un-vetted artifacts in addition to the 'strict' ones; so, even though you can be sure to
+            reproducibly resolve those same un-vetted artifacts in the future, they're still un-vetted and could be innocently or
+            maliciously different from the 'strict' artifacts you can locally vet before committing the lock to version control.
+            The effects of the differences could range from failing a resolve using the lock when the un-vetted artifacts have
+            different dependencies from their sibling artifacts, to your application crashing due to different code in the sibling
+            artifacts to being compromised by differing code in the sibling artifacts. So, although the more permissive lock
+            styles will allow the lock to work on a wider range of machines /are apparently more convenient, the convenience comes
+            with a potential price and using these styles should be considered carefully.
+
+            Expects a dictionary of resolve names from `[python].resolves` to style values.
+            For example, `{{'data-science': 'strict', 'web-app': 'universal'}}`.
+            If a resolve is not set in the dictionary, it will default to 'universal'.
+
+            You can use the key `{RESOLVE_OPTION_KEY__DEFAULT}` to set a default value for all
+            resolves.
+
+            See https://docs.pex-tool.org/api/pex.html for more information on lockfile styles.
+            """
+        ),
+        advanced=True,
+    )
+
+    _resolves_to_complete_platforms = DictOption[list[str]](
+        help=softwrap(
+            f"""
+            The complete platform information describing the platform for which to build the PEX. This option can be passed
+            multiple times to create a multi-platform pex. Values should be either JSON object literal strings or paths to files
+            containing them. The JSON object is expected to have two fields with any other fields ignored. The
+            'marker_environment' field should have an object value with string field values corresponding to PEP-508 marker
+            environment entries (See: https://peps.python.org/pep-0508/#environment-markers). It is OK to only have a subset of
+            valid marker environment fields but it is not valid to present entries not defined in PEP-508. The 'compatible_tags'
+            field should have an array of strings value containing the compatible tags in order from most specific first to least
+            specific last as defined in PEP-425 (See: https://peps.python.org/pep-0425). Pex can create complete platform JSON for
+            you by running it on the target platform like so: `pex3 interpreter inspect --markers --tags`. For more options,
+            particularly to select the desired target interpreter see: `pex3 interpreter inspect --help`.
+
+            Complete platforms allow you to create lockfiles for specific target platforms
+            (e.g., different CPU architectures or operating systems) rather than the default
+            universal platforms. This is particularly useful for cross-platform builds or
+            when you need strict platform-specific dependencies.
+
+            Expects a dictionary of resolve names from `[python].resolves` to lists of file paths
+            pointing to complete platform JSON files. For example,
+            `{{'linux-resolve': ['3rdparty/platforms/manylinux_2_28_aarch64.json', '3rdparty/platforms/macosx_26_0_arm64.json']}}`.
+
+            You can use the key `{RESOLVE_OPTION_KEY__DEFAULT}` to set a default value for all
+            resolves.
+
+            Complete platform JSON files can be generated using PEX's interpreter inspect command.
+            See https://docs.pex-tool.org for more information.
+            """
+        ),
+        advanced=True,
+    )
+
     invalid_lockfile_behavior = EnumOption(
         default=InvalidLockfileBehavior.error,
         help=softwrap(
@@ -791,6 +856,20 @@ class PythonSetup(Subsystem):
                 "resolves_to_sources",
             ).items()
         }
+
+    @memoized_method
+    def resolves_to_lock_style(self) -> dict[str, str]:
+        return self._resolves_to_option_helper(
+            self._resolves_to_lock_style,
+            "resolves_to_lock_style",
+        )
+
+    @memoized_method
+    def resolves_to_complete_platforms(self) -> dict[str, list[str]]:
+        return self._resolves_to_option_helper(
+            self._resolves_to_complete_platforms,
+            "resolves_to_complete_platforms",
+        )
 
     @property
     def manylinux(self) -> str | None:
