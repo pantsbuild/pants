@@ -159,6 +159,8 @@ def test_get_lockfile_interpreter_constraints() -> None:
         excludes=set(),
         overrides=set(),
         sources=set(),
+        lock_style="universal",
+        complete_platforms=(),
     )
 
     def assert_ics(

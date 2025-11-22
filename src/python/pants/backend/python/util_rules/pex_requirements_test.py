@@ -185,6 +185,8 @@ def test_validate_lockfiles(
             excludes=FrozenOrderedSet(),
             sources=FrozenOrderedSet(),
             path_mappings=(),
+            lock_style="universal",
+            complete_platforms=(),
         ),
     )
 
@@ -366,6 +368,8 @@ class TestResolvePexConfigPexArgs:
                 overrides=FrozenOrderedSet(),
                 sources=FrozenOrderedSet(),
                 path_mappings=[],
+                lock_style="universal",
+                complete_platforms=(),
             ).pex_args()
         )
 

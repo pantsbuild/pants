@@ -117,7 +117,7 @@ async def generate_lockfile(
 
     # Add complete platforms if specified, otherwise use default target systems
     if req.complete_platforms:
-        target_system_args = (
+        target_system_args = tuple(
             f"--complete-platform={platform}" for platform in req.complete_platforms
         )
     else:
