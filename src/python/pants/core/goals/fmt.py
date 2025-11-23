@@ -7,9 +7,14 @@ import logging
 from collections.abc import Iterable
 
 from pants.base.specs import Specs
-from pants.core.goals.fix import AbstractFixRequest, FixFilesRequest, FixResult, FixTargetsRequest
+from pants.core.goals.fix import (
+    AbstractFixRequest,
+    FixFilesRequest,
+    FixResult,
+    FixTargetsRequest,
+    _do_fix,
+)
 from pants.core.goals.fix import Partitions as Partitions  # re-export
-from pants.core.goals.fix import _do_fix
 from pants.core.goals.multi_tool_goal_helper import BatchSizeOption, OnlyOption
 from pants.engine.console import Console
 from pants.engine.fs import Workspace
