@@ -518,7 +518,8 @@ def test_scie_defaults(rule_runner: PythonRuleRunner) -> None:
                 python_sources(name="lib")
                 pex_binary(
                     entry_point="app.py",
-                    scie="lazy"
+                    scie="lazy",
+                    scie_pbs_release="20251031",  # The last release that includes Python 3.9.
                 )
                 """
             ),
@@ -549,7 +550,8 @@ def test_scie_hash_present(rule_runner: PythonRuleRunner, scie_hash_alg: str) ->
                 pex_binary(
                     entry_point="app.py",
                     scie="lazy",
-                    scie_hash_alg="{scie_hash_alg}"
+                    scie_hash_alg="{scie_hash_alg}",
+                    scie_pbs_release="20251031",  # The last release that includes Python 3.9.
                 )
                 """
             ),
@@ -583,6 +585,7 @@ def test_scie_platform_file_suffix(rule_runner: PythonRuleRunner) -> None:
                     scie="lazy",
                     scie_name_style="platform-file-suffix",
                     scie_platform=["linux-aarch64", "linux-x86_64"],
+                    scie_pbs_release="20251031",  # The last release that includes Python 3.9.
                 )
                 """
             ),
@@ -617,6 +620,7 @@ def test_scie_platform_parent_dir(rule_runner: PythonRuleRunner) -> None:
                     scie="lazy",
                     scie_name_style="platform-parent-dir",
                     scie_platform=["linux-aarch64", "linux-x86_64"],
+                    scie_pbs_release="20251031",  # The last release that includes Python 3.9.
                 )
                 """
             ),
@@ -657,6 +661,7 @@ def test_scie_busybox_moo(rule_runner: PythonRuleRunner, passthrough: str) -> No
                 python_requirement(name="cowsay", requirements=["cowsay==6.1"])
                 pex_binary(
                     scie="lazy",
+                    scie_pbs_release="20251031",  # The last release that includes Python 3.9.
                     dependencies=[":cowsay"],
                     scie_busybox='@',
                     {passthrough}
@@ -795,6 +800,7 @@ def test_scie_pbs_stripped(rule_runner: PythonRuleRunner, stripped: str) -> None
                 python_requirement(name="cowsay", requirements=["cowsay==6.1"])
                 pex_binary(
                     scie="lazy",
+                    scie_pbs_release="20251031",  # The last release that includes Python 3.9.
                     dependencies=[":cowsay"],
                     scie_busybox='@',
                     {stripped}
