@@ -31,9 +31,9 @@ from pants.core.util_rules.adhoc_process_support import (
     AdhocProcessRequest,
     FallibleAdhocProcessResult,
     prepare_adhoc_process,
+    run_prepared_adhoc_process,
 )
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
-from pants.core.util_rules.adhoc_process_support import run_prepared_adhoc_process
 from pants.engine.fs import EMPTY_DIGEST, Snapshot
 from pants.engine.internals.graph import resolve_target
 from pants.engine.intrinsics import digest_to_snapshot
