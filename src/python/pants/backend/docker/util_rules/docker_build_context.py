@@ -364,7 +364,9 @@ async def create_docker_build_context(
                 for artifact in built_package.artifacts:
                     if isinstance(artifact, BuiltDockerImage):
                         stable_content = artifact.image_id.encode()
-                        # Use a stable filename for better debugging
+                        # Add `stable` to the file name to emphasize that it contains only 
+                        # metadata that is stable for given inputs, and not fields, such as tags, 
+                        # that may contain timestamps or otherwise change on each rebuild.
                         stable_filename = "docker-info.stable.json"
                         stable_digest = await create_digest(
                             CreateDigest([FileContent(stable_filename, stable_content)])
