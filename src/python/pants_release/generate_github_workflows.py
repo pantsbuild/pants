@@ -1,5 +1,8 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+#
+# Editing Github Actions directly will fail in CI, instead edit this file and run:
+# `pants run src/python/pants_release/generate_github_workflows.py`
 
 from __future__ import annotations
 
@@ -520,6 +523,7 @@ class Helper:
             },
             {
                 "name": "Cache Rust toolchain",
+                "if": "runner.os != 'macOS'",
                 "uses": action("cache"),
                 "with": {
                     "path": f"~/.rustup/toolchains/{rust_channel()}-*\n~/.rustup/update-hashes\n~/.rustup/settings.toml\n",

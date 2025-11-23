@@ -39,7 +39,8 @@ jobs:
         version: 23.x
     - name: Set rustup profile
       run: rustup set profile default
-    - name: Cache Rust toolchain
+    - if: runner.os != 'macOS'
+      name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
         key: Linux-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
@@ -137,7 +138,8 @@ jobs:
         version: 23.x
     - name: Set rustup profile
       run: rustup set profile default
-    - name: Cache Rust toolchain
+    - if: runner.os != 'macOS'
+      name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
@@ -243,7 +245,8 @@ jobs:
         version: 23.x
     - name: Set rustup profile
       run: rustup set profile default
-    - name: Cache Rust toolchain
+    - if: runner.os != 'macOS'
+      name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
@@ -495,7 +498,8 @@ jobs:
         version: 23.x
     - name: Set rustup profile
       run: rustup set profile default
-    - name: Cache Rust toolchain
+    - if: runner.os != 'macOS'
+      name: Cache Rust toolchain
       uses: actions/cache@v4
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
