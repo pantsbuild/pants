@@ -2719,6 +2719,7 @@ version = "0.0.1"
 dependencies = [
  "fs",
  "glob",
+ "maplit",
  "options",
  "parking_lot 0.12.4",
  "regex",
