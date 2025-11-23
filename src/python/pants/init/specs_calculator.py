@@ -62,9 +62,9 @@ def calculate_specs(
 
     bootstrap_environment = determine_bootstrap_environment(session)
 
-    (git_binary,) = session.product_request(GitBinary, [Params(bootstrap_environment)])
+    (git_binary,) = session.product_request(GitBinary, Params(bootstrap_environment))
     (maybe_git_worktree,) = session.product_request(
-        MaybeGitWorktree, [Params(GitWorktreeRequest(), git_binary, bootstrap_environment)]
+        MaybeGitWorktree, Params(GitWorktreeRequest(), git_binary, bootstrap_environment)
     )
     if not maybe_git_worktree.git_worktree:
         raise InvalidSpecConstraint(
@@ -72,7 +72,7 @@ def calculate_specs(
         )
 
     (files_with_sources_blocks,) = session.product_request(
-        FilesWithSourceBlocks, [Params(bootstrap_environment)]
+        FilesWithSourceBlocks, Params(bootstrap_environment)
     )
     changed_files = tuple(
         file
@@ -104,7 +104,7 @@ def calculate_specs(
     )
     (changed_addresses,) = session.product_request(
         ChangedAddresses,
-        [Params(changed_request, options_bootstrapper, bootstrap_environment)],
+        Params(changed_request, options_bootstrapper, bootstrap_environment),
     )
     logger.debug("changed addresses: %s", changed_addresses)
 

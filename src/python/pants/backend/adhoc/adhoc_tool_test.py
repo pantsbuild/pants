@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from textwrap import dedent
 
@@ -354,7 +355,7 @@ def test_adhoc_tool_workspace_invalidation_sources(rule_runner: PythonRuleRunner
               # Use a random value so we can detect when re-execution occurs.
               args=["-c", "echo $RANDOM > out.log"],
               output_files=["out.log"],
-              workspace_invalidation_sources=['a-file'],
+              workspace_invalidation_sources=["a-file"],
             )
             """
             ),
@@ -370,6 +371,7 @@ def test_adhoc_tool_workspace_invalidation_sources(rule_runner: PythonRuleRunner
 
     # Update the hash-only source file's content. The adhoc_tool should be re-executed now.
     (Path(rule_runner.build_root) / "src" / "a-file").write_text("xyzzy")
+    os.sync()  # Ensure the file is visible in the adhoc tool's subprocess.
     result3 = execute_adhoc_tool(rule_runner, address)
     assert result1.snapshot != result3.snapshot
 

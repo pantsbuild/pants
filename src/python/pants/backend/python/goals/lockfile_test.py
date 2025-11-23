@@ -11,9 +11,9 @@ import pytest
 from pants.backend.python.goals.lockfile import (
     GeneratePythonLockfile,
     RequestedPythonUserResolveNames,
+    setup_user_lockfile_requests,
 )
 from pants.backend.python.goals.lockfile import rules as lockfile_rules
-from pants.backend.python.goals.lockfile import setup_user_lockfile_requests
 from pants.backend.python.subsystems.setup import RESOLVE_OPTION_KEY__DEFAULT, PythonSetup
 from pants.backend.python.target_types import PythonRequirementTarget
 from pants.backend.python.util_rules import pex
@@ -310,7 +310,7 @@ def test_multiple_resolves() -> None:
         GeneratePythonLockfile(
             requirements=FrozenOrderedSet(["a"]),
             find_links=FrozenOrderedSet([]),
-            interpreter_constraints=InterpreterConstraints(["CPython>=3.9,<3.14"]),
+            interpreter_constraints=InterpreterConstraints(["CPython>=3.9,<3.15"]),
             resolve_name="a",
             lockfile_dest="a.lock",
             diff=False,

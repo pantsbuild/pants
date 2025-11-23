@@ -38,10 +38,8 @@ class BuildFileAliases:
     def _validate_alias(cls, category: str, alias: str, obj: Any) -> None:
         if not isinstance(alias, str):
             raise TypeError(
-                "Aliases must be strings, given {category} entry {alias!r} of type {typ} as "
-                "the alias of {obj}".format(
-                    category=category, alias=alias, typ=type(alias).__name__, obj=obj
-                )
+                f"Aliases must be strings, given {category} entry {alias!r} of type {type(alias).__name__} as "
+                f"the alias of {obj}"
             )
 
     @classmethod
@@ -64,9 +62,7 @@ class BuildFileAliases:
             cls._validate_alias("context_aware_object_factories", alias, obj)
             if not callable(obj):
                 raise TypeError(
-                    "The given context aware object factory {alias!r} must be a callable.".format(
-                        alias=alias
-                    )
+                    f"The given context aware object factory {alias!r} must be a callable."
                 )
 
         return FrozenDict(context_aware_object_factories)

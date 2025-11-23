@@ -41,11 +41,6 @@ from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfile,
     LoadedLockfileRequest,
     Lockfile,
-)
-from pants.backend.python.util_rules.pex_requirements import (
-    PexRequirements as PexRequirements,  # Explicit re-export.
-)
-from pants.backend.python.util_rules.pex_requirements import (
     Resolve,
     ResolvePexConfigRequest,
     determine_resolve_pex_config,
@@ -53,12 +48,14 @@ from pants.backend.python.util_rules.pex_requirements import (
     load_lockfile,
     validate_metadata,
 )
+from pants.backend.python.util_rules.pex_requirements import (
+    PexRequirements as PexRequirements,  # Explicit re-export.
+)
 from pants.build_graph.address import Address
 from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.target_types import FileSourceField, ResourceSourceField
-from pants.core.util_rules.stripped_source_files import StrippedFileNameRequest
+from pants.core.util_rules.stripped_source_files import StrippedFileNameRequest, strip_file_name
 from pants.core.util_rules.stripped_source_files import rules as stripped_source_rules
-from pants.core.util_rules.stripped_source_files import strip_file_name
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
@@ -189,11 +186,15 @@ class PexRequest(EngineAwareParameter):
     pex_path: tuple[Pex, ...]
     description: str | None = dataclasses.field(compare=False)
     cache_scope: ProcessCacheScope
+    scie_output_files: Iterable[str] | None = None
+    scie_output_directories: Iterable[str] | None = None
 
     def __init__(
         self,
         *,
         output_filename: str,
+        scie_output_files: Iterable[str] | None = None,
+        scie_output_directories: Iterable[str] | None = None,
         internal_only: bool,
         layout: PexLayout | None = None,
         python: PythonExecutable | None = None,
@@ -247,8 +248,12 @@ class PexRequest(EngineAwareParameter):
         :param description: A human-readable description to render in the dynamic UI when building
             the Pex.
         :param cache_scope: The cache scope for the underlying pex cli invocation process.
+        :param scie_output_files If we are also building native executable scies for the PEX, their filenames
+        :param scie_output_directories If we are also building native executable scies for the PEX, using a directory layout, their dirs.
         """
         object.__setattr__(self, "output_filename", output_filename)
+        object.__setattr__(self, "scie_output_files", scie_output_files)
+        object.__setattr__(self, "scie_output_directories", scie_output_directories)
         object.__setattr__(self, "internal_only", internal_only)
         # Use any explicitly requested layout, or Packed for internal PEXes (which is a much
         # friendlier layout for the CAS than Zipapp.)
@@ -798,12 +803,22 @@ async def build_pex(
     )
 
     argv.extend(["--layout", request.layout.value])
-    output_files: Iterable[str] | None = None
-    output_directories: Iterable[str] | None = None
+
+    pex_output_files: Iterable[str] | None = None
+    pex_output_directories: Iterable[str] | None = None
     if PexLayout.ZIPAPP == request.layout:
-        output_files = [request.output_filename]
+        pex_output_files = [request.output_filename]
     else:
-        output_directories = [request.output_filename]
+        pex_output_directories = [request.output_filename]
+
+    output_files = (
+        *(pex_output_files if pex_output_files else []),
+        *(request.scie_output_files if request.scie_output_files else []),
+    )
+    output_directories = (
+        *(pex_output_directories if pex_output_directories else []),
+        *(request.scie_output_directories if request.scie_output_directories else []),
+    )
 
     result = await fallible_to_exec_result_or_raise(
         **implicitly(
@@ -812,8 +827,8 @@ async def build_pex(
                 extra_args=argv,
                 additional_input_digest=merged_digest,
                 description=_build_pex_description(request, req_strings, python_setup.resolves),
-                output_files=output_files,
-                output_directories=output_directories,
+                output_files=output_files if output_files else None,
+                output_directories=output_directories if output_directories else None,
                 concurrency_available=requirements_setup.concurrency_available,
                 cache_scope=request.cache_scope,
             )

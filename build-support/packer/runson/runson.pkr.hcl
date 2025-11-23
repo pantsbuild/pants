@@ -80,7 +80,7 @@ packer {
 }
 
 source "amazon-ebs" "runson" {
-  ami_name      = "ubuntu22-full-arm64-python3.7-3.13-{{timestamp}}"
+  ami_name      = "ubuntu22-full-arm64-python3.7-3.14-{{timestamp}}"
   instance_type = "t4g.nano"
   region        = "us-east-1"
   source_ami_filter {
@@ -115,7 +115,8 @@ build {
       "python3.10 python3.10-dev python3.10-venv \\",
       "python3.11 python3.11-dev python3.11-venv \\",
       "python3.12 python3.12-dev python3.12-venv \\",
-      "python3.13 python3.13-dev python3.13-venv",
+      "python3.13 python3.13-dev python3.13-venv \\",
+      "python3.14 python3.14-dev python3.14-venv",
     ]
   }
   post-processor "manifest" {

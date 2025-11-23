@@ -374,14 +374,14 @@ def test_file_targets_available_during_typescript_compilation(
             # Override src/BUILD to include dependencies on the file target
             # Only include index.ts to avoid React errors from Button.tsx
             f"{test_project}/src/BUILD": textwrap.dedent(
-                """
+                f"""
             # Single TypeScript source that depends on the file target in parent directory
             typescript_sources(
                 name="ts_sources",
                 sources=["index.ts"],
                 dependencies=["//{test_project}:config_data"],
             )
-        """.format(test_project=test_project)
+        """
             ),
         }
     )

@@ -409,7 +409,7 @@ class RuleRunner:
             else Params(*inputs)
         )
         with self.pushd():
-            result = assert_single_element(self.scheduler.product_request(output_type, [params]))
+            result = assert_single_element(self.scheduler.product_request(output_type, params))
         return cast(_O, result)
 
     def run_goal_rule(

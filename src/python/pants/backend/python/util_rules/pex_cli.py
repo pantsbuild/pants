@@ -37,9 +37,9 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
-_PEX_VERSION = "v2.66.0"
-_PEX_BINARY_HASH = "f471dcbffecfdc7d0f9128b5ec839c60fb9e2567ab5c9506405feb5b2fb153fd"
-_PEX_BINARY_SIZE = 4927719
+_PEX_VERSION = "v2.69.2"
+_PEX_BINARY_HASH = "ba521d8665bf58f759ce7bf0ebb534a1f1e5006044be2e42e7a298ad4fbd2ec5"
+_PEX_BINARY_SIZE = 4937401
 
 
 class PexCli(TemplatedExternalTool):

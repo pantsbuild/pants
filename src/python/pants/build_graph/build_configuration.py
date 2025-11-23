@@ -189,8 +189,8 @@ class BuildConfiguration:
         ):
             if alias in self._exposed_context_aware_object_factory_by_alias:
                 logger.debug(
-                    "This context aware object factory alias {} has already been registered. "
-                    "Overwriting!".format(alias)
+                    f"This context aware object factory alias {alias} has already been registered. "
+                    "Overwriting!"
                 )
 
             self._exposed_context_aware_object_factory_by_alias[alias] = (

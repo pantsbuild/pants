@@ -7,7 +7,7 @@ import enum
 import logging
 import os
 from collections.abc import Iterable
-from typing import Optional, TypeVar, cast
+from typing import TypeVar, cast
 
 from packaging.utils import canonicalize_name
 
@@ -103,7 +103,7 @@ class PythonSetup(Subsystem):
             #  We'll probably want to find and modify all those tests to set an explicit IC, but
             #  that will take time.
             if "PYTEST_CURRENT_TEST" in os.environ:
-                return (">=3.9,<3.14",)
+                return (">=3.9,<3.15",)
             raise OptionsError(
                 softwrap(
                     f"""\
@@ -794,7 +794,7 @@ class PythonSetup(Subsystem):
 
     @property
     def manylinux(self) -> str | None:
-        manylinux = cast(Optional[str], self.resolver_manylinux)
+        manylinux = cast(str | None, self.resolver_manylinux)
         if manylinux is None or manylinux.lower() in ("false", "no", "none"):
             return None
         return manylinux
