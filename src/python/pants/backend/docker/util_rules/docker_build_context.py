@@ -130,6 +130,7 @@ class DockerBuildContext:
         build_env: DockerBuildEnvironment,
         upstream_image_ids: Iterable[str],
         dockerfile_info: DockerfileInfo,
+        should_suggest_renames: bool = True,
     ) -> DockerBuildContext:
         interpolation_context: dict[str, dict[str, str] | InterpolationValue] = {}
 
