@@ -38,7 +38,11 @@ impl Options {
         context: Vec<String>,
         include_derivation: bool,
     ) -> Result<Self, String> {
-        let buildroot = buildroot.unwrap_or(BuildRoot::find()?);
+        let buildroot = if let Some(br) = buildroot {
+            br
+        } else {
+            BuildRoot::find()?
+        };
         let fromfile_expander = FromfileExpander::relative_to(buildroot.clone());
         let config_finder = ConfigFinder::new(buildroot, fromfile_expander.clone(), seed_values)?;
         let context = HashSet::from_iter(context);
