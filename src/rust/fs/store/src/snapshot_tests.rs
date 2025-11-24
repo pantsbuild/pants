@@ -11,8 +11,8 @@ use testutil::make_file;
 
 use crate::{OneOffStoreFileByDigest, RelativePath, Snapshot, SnapshotOps, Store, StoreError};
 use fs::{
-    Dir, DirectoryDigest, FS, FS, File, GitignoreStyleExcludes, GlobExpansionConjunction,
-    GlobMatching, PathGlobs, PathStat, StrictGlobMatching, SymlinkBehavior,
+    Dir, DirectoryDigest, FS, File, GitignoreStyleExcludes, GlobExpansionConjunction, GlobMatching,
+    PathGlobs, PathStat, StrictGlobMatching, SymlinkBehavior,
 };
 
 pub const STR: &str = "European Burmese";
