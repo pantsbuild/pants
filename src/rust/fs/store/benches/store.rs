@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use fs::{
-    DirectoryDigest, FS, FS, File, GitignoreStyleExcludes, GlobExpansionConjunction, PathStat,
+    DirectoryDigest, FS, File, GitignoreStyleExcludes, GlobExpansionConjunction, PathStat,
     Permissions, PreparedPathGlobs, StrictGlobMatching,
 };
 use hashing::EMPTY_DIGEST;
