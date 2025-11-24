@@ -45,12 +45,12 @@ from pants.core.goals.generate_lockfiles import (
 )
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
+from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.intrinsics import create_digest, get_digest_contents, merge_digests
 from pants.engine.process import ProcessCacheScope, fallible_to_exec_result_or_raise
-from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import AllTargets
 from pants.engine.unions import UnionMembership, UnionRule
