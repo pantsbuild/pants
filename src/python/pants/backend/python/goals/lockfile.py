@@ -19,7 +19,11 @@ from pants.backend.python.target_types import (
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_diff import _generate_python_lockfile_diff
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
-from pants.backend.python.util_rules.pex import find_interpreter
+from pants.backend.python.util_rules.pex import (
+    CompletePlatforms,
+    digest_complete_platform_addresses,
+    find_interpreter,
+)
 from pants.backend.python.util_rules.pex_cli import PexCliProcess, maybe_log_pex_stderr
 from pants.backend.python.util_rules.pex_environment import PexSubsystem
 from pants.backend.python.util_rules.pex_requirements import (
@@ -46,6 +50,7 @@ from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, Synth
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.intrinsics import create_digest, get_digest_contents, merge_digests
 from pants.engine.process import ProcessCacheScope, fallible_to_exec_result_or_raise
+from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import AllTargets
 from pants.engine.unions import UnionMembership, UnionRule
@@ -115,26 +120,43 @@ async def generate_lockfile(
 
     python = await find_interpreter(req.interpreter_constraints, **implicitly())
 
-    # Add complete platforms if specified, otherwise use default target systems
+    # Resolve complete platform targets if specified
+    complete_platforms: CompletePlatforms | None = None
     if req.complete_platforms:
-        target_system_args = tuple(
-            f"--complete-platform={platform}" for platform in req.complete_platforms
+        # Resolve target addresses to get platform JSON files
+        complete_platforms = await digest_complete_platform_addresses(
+            UnparsedAddressInputs(
+                req.complete_platforms,
+                owning_address=None,
+                description_of_origin=f"the `[python].resolves_to_complete_platforms` for resolve `{req.resolve_name}`",
+            )
         )
-    else:
+
+    # Add complete platforms if specified, otherwise use default target systems for universal locks
+    if complete_platforms:
+        target_system_args = tuple(
+            f"--complete-platform={platform}" for platform in complete_platforms
+        )
+    elif req.lock_style == "universal":
         # PEX files currently only run on Linux and Mac machines; so we hard code this
         # limit on lock universality to avoid issues locking due to irrelevant
         # Windows-only dependency issues. See this Pex issue that originated from a
         # Pants user issue presented in Slack:
         #   https://github.com/pex-tool/pex/issues/1821
         #
-        # At some point it will probably make sense to expose `--target-system` for
-        # configuration.
+        # Note: --target-system only applies to universal locks. For other lock styles
+        # (strict, sources) without complete platforms, we don't specify platform args
+        # and PEX will lock for the current platform only.
         target_system_args = (
             "--target-system",
             "linux",
             "--target-system",
             "mac",
         )
+    else:
+        # For non-universal lock styles without complete platforms, don't specify
+        # platform arguments - PEX will lock for the current platform only
+        target_system_args = ()
 
     result = await fallible_to_exec_result_or_raise(
         **implicitly(
@@ -142,10 +164,7 @@ async def generate_lockfile(
                 subcommand=("lock", "create"),
                 extra_args=(
                     f"--output={req.lockfile_dest}",
-                    # See https://github.com/pantsbuild/pants/issues/12458. For now, we always
-                    # generate universal locks because they have the best compatibility. We may
-                    # want to let users change this, as `style=strict` is safer.
-                    "--style=universal",
+                    f"--style={req.lock_style}",
                     "--pip-version",
                     python_setup.pip_version,
                     "--resolver-version",
@@ -158,14 +177,29 @@ async def generate_lockfile(
                     f"--python-path={python.path}",
                     *(f"--find-links={link}" for link in req.find_links),
                     *pip_args_setup.args,
-                    *req.interpreter_constraints.generate_pex_arg_list(),
+                    # When complete platforms are specified, don't pass interpreter constraints.
+                    # The complete platforms already define Python versions and platforms.
+                    # Passing both causes PEX to generate duplicate locked_requirements entries
+                    # when the local platform matches a complete platform.
+                    # TODO(#9560): Consider validating that these platforms are valid with the
+                    #  interpreter constraints.
+                    *(
+                        req.interpreter_constraints.generate_pex_arg_list()
+                        if not complete_platforms
+                        else ()
+                    ),
                     *(
                         f"--override={override}"
                         for override in pip_args_setup.resolve_config.overrides
                     ),
                     *req.requirements,
                 ),
-                additional_input_digest=pip_args_setup.digest,
+                additional_input_digest=await merge_digests(
+                    MergeDigests(
+                        [pip_args_setup.digest]
+                        + ([complete_platforms.digest] if complete_platforms else [])
+                    )
+                ),
                 output_files=(req.lockfile_dest,),
                 description=f"Generate lockfile for {req.resolve_name}",
                 # Instead of caching lockfile generation with LMDB, we instead use the invalidation
