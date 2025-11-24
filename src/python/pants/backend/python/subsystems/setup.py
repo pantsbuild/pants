@@ -485,30 +485,29 @@ class PythonSetup(Subsystem):
     _resolves_to_complete_platforms = DictOption[list[str]](
         help=softwrap(
             f"""
-            The complete platform information describing the platform for which to build the PEX. This option can be passed
-            multiple times to create a multi-platform pex. Values should be either JSON object literal strings or paths to files
-            containing them. The JSON object is expected to have two fields with any other fields ignored. The
-            'marker_environment' field should have an object value with string field values corresponding to PEP-508 marker
-            environment entries (See: https://peps.python.org/pep-0508/#environment-markers). It is OK to only have a subset of
-            valid marker environment fields but it is not valid to present entries not defined in PEP-508. The 'compatible_tags'
-            field should have an array of strings value containing the compatible tags in order from most specific first to least
-            specific last as defined in PEP-425 (See: https://peps.python.org/pep-0425). Pex can create complete platform JSON for
-            you by running it on the target platform like so: `pex3 interpreter inspect --markers --tags`. For more options,
-            particularly to select the desired target interpreter see: `pex3 interpreter inspect --help`.
+            The platforms the built PEX should be compatible with when generating lockfiles.
 
             Complete platforms allow you to create lockfiles for specific target platforms
             (e.g., different CPU architectures or operating systems) rather than the default
             universal platforms. This is particularly useful for cross-platform builds or
             when you need strict platform-specific dependencies.
 
-            Expects a dictionary of resolve names from `[python].resolves` to lists of file paths
-            pointing to complete platform JSON files. For example,
-            `{{'linux-resolve': ['3rdparty/platforms/manylinux_2_28_aarch64.json', '3rdparty/platforms/macosx_26_0_arm64.json']}}`.
+            You can give a list of multiple complete platforms to create a multiplatform lockfile,
+            meaning that the lockfile will include wheels for all of the supported environments.
+
+            Expects a dictionary of resolve names from `[python].resolves` to lists of addresses of
+            `file` or `resource` targets that point to files containing complete platform JSON as
+            described by Pex (https://pex.readthedocs.io/en/latest/buildingpex.html#complete-platform).
+
+            For example:
+            `{{'python-default': ['3rdparty/platforms:linux_aarch64', '3rdparty/platforms:macos_arm64']}}`.
 
             You can use the key `{RESOLVE_OPTION_KEY__DEFAULT}` to set a default value for all
             resolves.
 
-            Complete platform JSON files can be generated using PEX's interpreter inspect command.
+            Complete platform JSON files can be generated using PEX's interpreter inspect command on
+            the target platform: `pex3 interpreter inspect --markers --tags > platform.json`
+
             See https://docs.pex-tool.org for more information.
             """
         ),
