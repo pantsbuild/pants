@@ -523,7 +523,6 @@ class Helper:
             },
             {
                 "name": "Cache Rust toolchain",
-                "if": "runner.os != 'macOS'",
                 "uses": action("cache"),
                 "with": {
                     "path": f"~/.rustup/toolchains/{rust_channel()}-*\n~/.rustup/update-hashes\n~/.rustup/settings.toml\n",
