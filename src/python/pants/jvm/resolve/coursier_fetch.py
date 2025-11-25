@@ -247,12 +247,13 @@ class CoursierResolvedLockfile:
         return (
             entry,
             tuple(
-                entries.get((d.group, d.artifact, d.classifier))
+                dep_entry
                 for d in entry.dependencies
                 # Coursier will pass "pom" coords through to us. These coords don't have
                 # a coords entry, but all of their relevant dependencies have already been taken into account
                 # and will appear in the dependencies list
                 if d.classifier != "pom"
+                and (dep_entry := entries.get((d.group, d.artifact, d.classifier))) is not None
             ),
         )
 
