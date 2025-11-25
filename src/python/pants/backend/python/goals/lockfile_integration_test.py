@@ -228,14 +228,18 @@ def test_lock_with_complete_platforms() -> None:
             lockfile = f.read()
 
         # Verify the metadata contains complete_platforms
-        assert "complete_platforms" in lockfile, "Lockfile should contain complete_platforms metadata"
+        assert "complete_platforms" in lockfile, (
+            "Lockfile should contain complete_platforms metadata"
+        )
 
         # The lockfile should contain references to the platform files
         assert "linux_x86_64" in lockfile, "Lockfile should reference linux_x86_64 platform"
         assert "macos_x86_64" in lockfile, "Lockfile should reference macos_x86_64 platform"
 
         # Verify the lockfile has the correct lock_style in metadata
-        assert '"lock_style": "strict"' in lockfile, "Lockfile metadata should specify strict lock_style"
+        assert '"lock_style": "strict"' in lockfile, (
+            "Lockfile metadata should specify strict lock_style"
+        )
 
         # Verify cowsay was resolved successfully
         assert "cowsay" in lockfile.lower(), "Lockfile should contain cowsay package"
@@ -305,9 +309,9 @@ def test_lock_with_lock_style() -> None:
         lockfile_strict_json = json.loads("\n".join(lockfile_lines))
 
         # Strict style should have exactly one resolve for the current platform
-        assert (
-            len(lockfile_strict_json["locked_resolves"]) == 1
-        ), f"Expected 1 locked_resolve for strict style, got {len(lockfile_strict_json['locked_resolves'])}"
+        assert len(lockfile_strict_json["locked_resolves"]) == 1, (
+            f"Expected 1 locked_resolve for strict style, got {len(lockfile_strict_json['locked_resolves'])}"
+        )
 
         # Verify cowsay was resolved successfully
         assert "cowsay" in lockfile_strict.lower(), "Strict lockfile should contain cowsay package"
@@ -327,10 +331,14 @@ def test_lock_with_lock_style() -> None:
             lockfile_universal = f.read()
 
         # Verify the metadata contains lock_style
-        assert '"lock_style": "universal"' in lockfile_universal, "Universal lockfile metadata should specify universal lock_style"
+        assert '"lock_style": "universal"' in lockfile_universal, (
+            "Universal lockfile metadata should specify universal lock_style"
+        )
 
         # Verify cowsay was resolved successfully
-        assert "cowsay" in lockfile_universal.lower(), "Universal lockfile should contain cowsay package"
+        assert "cowsay" in lockfile_universal.lower(), (
+            "Universal lockfile should contain cowsay package"
+        )
 
         # Parse and verify universal lockfile
         lockfile_lines = lockfile_universal.splitlines()
@@ -340,6 +348,6 @@ def test_lock_with_lock_style() -> None:
 
         # Universal style should generate locks that work across multiple platforms
         # Verify we have at least one locked_resolve
-        assert (
-            len(lockfile_universal_json["locked_resolves"]) >= 1
-        ), "Universal lockfile should have at least one locked_resolve"
+        assert len(lockfile_universal_json["locked_resolves"]) >= 1, (
+            "Universal lockfile should have at least one locked_resolve"
+        )
