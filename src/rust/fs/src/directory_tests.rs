@@ -2,11 +2,12 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+
+use hashing::EMPTY_DIGEST;
 
 use crate::MAX_LINK_DEPTH;
 use crate::directory::{DigestTrie, Entry, Name, TypedPath};
-use hashing::EMPTY_DIGEST;
-use std::path::{Path, PathBuf};
 
 fn make_tree(path_stats: Vec<TypedPath>) -> DigestTrie {
     let mut file_digests = HashMap::new();

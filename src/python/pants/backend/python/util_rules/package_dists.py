@@ -52,9 +52,9 @@ from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
     prepare_python_sources,
+    strip_python_sources,
 )
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
-from pants.backend.python.util_rules.python_sources import strip_python_sources
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.core.target_types import FileSourceField, ResourceSourceField

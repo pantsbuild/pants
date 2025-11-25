@@ -10,9 +10,13 @@ from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.internals.graph import resolve_targets, resolve_unexpanded_targets
 from pants.engine.internals.graph import transitive_targets as transitive_targets_get
 from pants.engine.rules import collect_rules, concurrently, goal_rule, implicitly
-from pants.engine.target import AlwaysTraverseDeps
+from pants.engine.target import (
+    AlwaysTraverseDeps,
+    DependenciesRequest,
+    Targets,
+    TransitiveTargetsRequest,
+)
 from pants.engine.target import Dependencies as DependenciesField
-from pants.engine.target import DependenciesRequest, Targets, TransitiveTargetsRequest
 from pants.option.option_types import BoolOption, EnumOption
 
 

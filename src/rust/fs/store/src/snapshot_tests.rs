@@ -11,19 +11,14 @@ use testutil::make_file;
 
 use crate::{OneOffStoreFileByDigest, RelativePath, Snapshot, SnapshotOps, Store, StoreError};
 use fs::{
-    Dir, DirectoryDigest, File, GitignoreStyleExcludes, GlobExpansionConjunction, GlobMatching,
-    PathGlobs, PathStat, PosixFS, StrictGlobMatching, SymlinkBehavior,
+    Dir, DirectoryDigest, FS, File, GitignoreStyleExcludes, GlobExpansionConjunction, GlobMatching,
+    PathGlobs, PathStat, StrictGlobMatching, SymlinkBehavior,
 };
 
 pub const STR: &str = "European Burmese";
 pub const STR2: &str = "asdf";
 
-pub fn setup() -> (
-    Store,
-    tempfile::TempDir,
-    Arc<PosixFS>,
-    OneOffStoreFileByDigest,
-) {
+pub fn setup() -> (Store, tempfile::TempDir, Arc<FS>, OneOffStoreFileByDigest) {
     let executor = task_executor::Executor::new();
     // TODO: Pass a remote CAS address through.
     let store = Store::local_only(
@@ -36,19 +31,19 @@ pub fn setup() -> (
     .unwrap();
     let dir = tempfile::Builder::new().prefix("root").tempdir().unwrap();
     let ignorer = GitignoreStyleExcludes::create(vec![]).unwrap();
-    let posix_fs = Arc::new(PosixFS::new(dir.path(), ignorer, executor).unwrap());
-    let file_saver = OneOffStoreFileByDigest::new(store.clone(), posix_fs.clone(), true);
-    (store, dir, posix_fs, file_saver)
+    let fs = Arc::new(FS::new(dir.path(), ignorer, executor).unwrap());
+    let file_saver = OneOffStoreFileByDigest::new(store.clone(), fs.clone(), true);
+    (store, dir, fs, file_saver)
 }
 
 #[tokio::test]
 async fn snapshot_one_file() {
-    let (_, dir, posix_fs, digester) = setup();
+    let (_, dir, fs, digester) = setup();
 
     let file_name = PathBuf::from("roland");
     make_file(&dir.path().join(&file_name), STR.as_bytes(), 0o600);
 
-    let path_stats = expand_all_sorted(posix_fs).await;
+    let path_stats = expand_all_sorted(fs).await;
     let snapshot = Snapshot::from_path_stats(digester, path_stats)
         .await
         .unwrap();
@@ -68,14 +63,14 @@ async fn snapshot_one_file() {
 
 #[tokio::test]
 async fn snapshot_recursive_directories() {
-    let (_, dir, posix_fs, digester) = setup();
+    let (_, dir, fs, digester) = setup();
 
     let cats = PathBuf::from("cats");
     let roland = cats.join("roland");
     std::fs::create_dir_all(dir.path().join(cats)).unwrap();
     make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
-    let path_stats = expand_all_sorted(posix_fs).await;
+    let path_stats = expand_all_sorted(fs).await;
     let snapshot = Snapshot::from_path_stats(digester, path_stats)
         .await
         .unwrap();
@@ -95,14 +90,14 @@ async fn snapshot_recursive_directories() {
 
 #[tokio::test]
 async fn snapshot_from_digest() {
-    let (store, dir, posix_fs, digester) = setup();
+    let (store, dir, fs, digester) = setup();
 
     let cats = PathBuf::from("cats");
     let roland = cats.join("roland");
     std::fs::create_dir_all(dir.path().join(cats)).unwrap();
     make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
-    let path_stats = expand_all_sorted(posix_fs).await;
+    let path_stats = expand_all_sorted(fs).await;
     let expected_snapshot = Snapshot::from_path_stats(digester, path_stats)
         .await
         .unwrap();
@@ -136,7 +131,7 @@ async fn snapshot_from_digest() {
 
 #[tokio::test]
 async fn snapshot_recursive_directories_including_empty() {
-    let (_, dir, posix_fs, digester) = setup();
+    let (_, dir, fs, digester) = setup();
 
     let cats = PathBuf::from("cats");
     let roland = cats.join("roland");
@@ -147,7 +142,7 @@ async fn snapshot_recursive_directories_including_empty() {
     std::fs::create_dir_all(dir.path().join(&llamas)).unwrap();
     make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
-    let sorted_path_stats = expand_all_sorted(posix_fs).await;
+    let sorted_path_stats = expand_all_sorted(fs).await;
     let mut unsorted_path_stats = sorted_path_stats.clone();
     unsorted_path_stats.reverse();
     let snapshot = Snapshot::from_path_stats(digester, unsorted_path_stats)
@@ -353,18 +348,18 @@ async fn snapshot_merge_same_file() {
 
 #[tokio::test]
 async fn snapshot_merge_colliding() {
-    let (store, tempdir, posix_fs, digester) = setup();
+    let (store, tempdir, fs, digester) = setup();
 
     make_file(&tempdir.path().join("roland"), STR.as_bytes(), 0o600);
-    let path_stats1 = expand_all_sorted(posix_fs).await;
+    let path_stats1 = expand_all_sorted(fs).await;
     let snapshot1 = Snapshot::from_path_stats(digester.clone(), path_stats1)
         .await
         .unwrap();
 
     // When the file is *not* the same, error out.
-    let (_store2, tempdir2, posix_fs2, digester2) = setup();
+    let (_store2, tempdir2, fs2, digester2) = setup();
     make_file(&tempdir2.path().join("roland"), STR2.as_bytes(), 0o600);
-    let path_stats2 = expand_all_sorted(posix_fs2).await;
+    let path_stats2 = expand_all_sorted(fs2).await;
     let snapshot2 = Snapshot::from_path_stats(digester2, path_stats2)
         .await
         .unwrap();
@@ -538,7 +533,7 @@ fn make_file_stat(root: &Path, relpath: &Path, contents: &[u8], is_executable: b
     )
 }
 
-pub async fn expand_all_sorted(posix_fs: Arc<PosixFS>) -> Vec<PathStat> {
+pub async fn expand_all_sorted(fs: Arc<FS>) -> Vec<PathStat> {
     let path_globs = PathGlobs::new(
         vec!["**".to_owned()],
         // Don't error or warn if there are no paths matched -- that is a valid state.
@@ -547,7 +542,7 @@ pub async fn expand_all_sorted(posix_fs: Arc<PosixFS>) -> Vec<PathStat> {
     )
     .parse()
     .unwrap();
-    let mut v = posix_fs
+    let mut v = fs
         .expand_globs(path_globs, SymlinkBehavior::Aware, None)
         .await
         .unwrap();

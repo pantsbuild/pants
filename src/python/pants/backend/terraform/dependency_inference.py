@@ -8,9 +8,13 @@ from pathlib import PurePath
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
-from pants.backend.python.util_rules.pex import VenvPex, VenvPexProcess, create_venv_pex
+from pants.backend.python.util_rules.pex import (
+    VenvPex,
+    VenvPexProcess,
+    create_venv_pex,
+    setup_venv_pex_process,
+)
 from pants.backend.python.util_rules.pex import rules as pex_rules
-from pants.backend.python.util_rules.pex import setup_venv_pex_process
 from pants.backend.terraform.target_types import (
     TerraformBackendTarget,
     TerraformDependenciesField,
