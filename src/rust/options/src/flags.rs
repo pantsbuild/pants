@@ -215,7 +215,10 @@ impl OptionsSource for FlagsReader {
                 return self
                     .fromfile_expander
                     .expand(flag.value.clone().ok_or_else(|| {
-                        format!("Expected list option {} to have a value.", self.display(id))
+                        format!(
+                            "Expected string option {} to have a value.",
+                            self.display(id)
+                        )
                     })?)
                     .map_err(|e| e.render(&flag.key));
             };

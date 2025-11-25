@@ -5,11 +5,11 @@ use std::sync::Arc;
 
 use hashing::EMPTY_DIGEST;
 
+use crate::posixfs::PosixFS;
 use crate::testutil::make_file;
 use crate::{
     DigestTrie, Dir, DirectoryListing, File, GitignoreStyleExcludes, GlobExpansionConjunction,
-    GlobMatching, Link, PathGlobs, PathStat, PosixFS, Stat, StrictGlobMatching, SymlinkBehavior,
-    TypedPath,
+    GlobMatching, Link, PathGlobs, PathStat, Stat, StrictGlobMatching, SymlinkBehavior, TypedPath,
 };
 
 #[tokio::test]

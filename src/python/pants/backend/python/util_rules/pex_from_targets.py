@@ -42,9 +42,9 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
     prepare_python_sources,
+    strip_python_sources,
 )
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
-from pants.backend.python.util_rules.python_sources import strip_python_sources
 from pants.core.goals.generate_lockfiles import NoCompatibleResolveException
 from pants.core.goals.package import TraverseIfNotPackageTarget
 from pants.core.target_types import FileSourceField

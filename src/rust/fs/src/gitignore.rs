@@ -2,8 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 
@@ -125,12 +124,12 @@ mod tests {
     use std::sync::Arc;
 
     use crate::testutil::make_file;
-    use crate::{GitignoreStyleExcludes, PosixFS, Stat};
+    use crate::{FS, GitignoreStyleExcludes, Stat};
 
-    async fn read_mock_files(input: Vec<PathBuf>, posix_fs: &Arc<PosixFS>) -> Vec<Stat> {
+    async fn read_mock_files(input: Vec<PathBuf>, fs: &Arc<FS>) -> Vec<Stat> {
         input
             .iter()
-            .map(|p| posix_fs.stat_sync(p).unwrap().unwrap())
+            .map(|p| fs.stat_sync(p).unwrap().unwrap())
             .collect()
     }
 
@@ -154,14 +153,14 @@ mod tests {
         fs::create_dir_all(git_info_exclude_path.parent().unwrap()).unwrap();
         make_file(&git_info_exclude_path, b"unimportant.x", 0o700);
 
-        let create_posix_fx = |patterns, gitignore_paths| {
+        let create_fs = |patterns, gitignore_paths| {
             let ignorer =
                 GitignoreStyleExcludes::create_with_gitignore_files(patterns, gitignore_paths)
                     .unwrap();
-            Arc::new(PosixFS::new(root.as_ref(), ignorer, task_executor::Executor::new()).unwrap())
+            Arc::new(FS::new(root.as_ref(), ignorer, task_executor::Executor::new()).unwrap())
         };
 
-        let posix_fs = create_posix_fx(vec![], vec![gitignore_path.clone()]);
+        let fs = create_fs(vec![], vec![gitignore_path.clone()]);
 
         let stats = read_mock_files(
             vec![
@@ -170,48 +169,48 @@ mod tests {
                 PathBuf::from("important.x"),
                 PathBuf::from("unimportant.x"),
             ],
-            &posix_fs,
+            &fs,
         )
         .await;
 
-        assert!(posix_fs.is_ignored(&stats[1]));
+        assert!(fs.is_ignored(&stats[1]));
         for fp in [&stats[0], &stats[2], &stats[3]] {
-            assert!(!posix_fs.is_ignored(fp));
+            assert!(!fs.is_ignored(fp));
         }
 
         // Test that .gitignore files work in tandem with explicit ignores.
         //
         // Patterns override file paths: note how the gitignore says `!*.x` but that gets
         // overridden here.
-        let posix_fs2 = create_posix_fx(
+        let fs2 = create_fs(
             vec!["unimportant.x".to_owned()],
             vec![gitignore_path.clone()],
         );
         for fp in [&stats[1], &stats[3]] {
-            assert!(posix_fs2.is_ignored(fp));
+            assert!(fs2.is_ignored(fp));
         }
         for fp in [&stats[0], &stats[2]] {
-            assert!(!posix_fs2.is_ignored(fp));
+            assert!(!fs2.is_ignored(fp));
         }
 
         // Test that later gitignore files override earlier ones.
-        let posix_fs3 = create_posix_fx(
+        let fs3 = create_fs(
             vec![],
             vec![gitignore_path.clone(), git_info_exclude_path.clone()],
         );
         for fp in [&stats[1], &stats[3]] {
-            assert!(posix_fs3.is_ignored(fp));
+            assert!(fs3.is_ignored(fp));
         }
         for fp in [&stats[0], &stats[2]] {
-            assert!(!posix_fs3.is_ignored(fp));
+            assert!(!fs3.is_ignored(fp));
         }
-        let posix_fs4 = create_posix_fx(
+        let fs4 = create_fs(
             vec![],
             vec![git_info_exclude_path.clone(), gitignore_path.clone()],
         );
-        assert!(posix_fs4.is_ignored(&stats[1]));
+        assert!(fs4.is_ignored(&stats[1]));
         for fp in [&stats[0], &stats[2], &stats[3]] {
-            assert!(!posix_fs4.is_ignored(fp));
+            assert!(!fs4.is_ignored(fp));
         }
     }
 

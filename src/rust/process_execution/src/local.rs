@@ -88,7 +88,7 @@ impl CommandRunner {
 
     pub(crate) async fn construct_output_snapshot(
         store: Store,
-        posix_fs: Arc<fs::PosixFS>,
+        fs: Arc<fs::FS>,
         output_file_paths: BTreeSet<RelativePath>,
         output_dir_paths: BTreeSet<RelativePath>,
     ) -> Result<Snapshot, String> {
@@ -125,15 +125,11 @@ impl CommandRunner {
         )
         .parse()?;
 
-        let path_stats = posix_fs
+        let path_stats = fs
             .expand_globs(output_globs, SymlinkBehavior::Aware, None)
             .map_err(|err| format!("Error expanding output globs: {err}"))
             .await?;
-        Snapshot::from_path_stats(
-            OneOffStoreFileByDigest::new(store, posix_fs, true),
-            path_stats,
-        )
-        .await
+        Snapshot::from_path_stats(OneOffStoreFileByDigest::new(store, fs, true), path_stats).await
     }
 
     pub fn named_caches(&self) -> &NamedCaches {
@@ -460,16 +456,18 @@ pub trait CapturedWorkdir {
                 _ => workdir_path.clone(),
             };
             // Use no ignore patterns, because we are looking for explicitly listed paths.
-            let posix_fs = Arc::new(
-                fs::PosixFS::new(root, fs::GitignoreStyleExcludes::empty(), executor.clone()).map_err(
+            let fs = Arc::new(
+                fs::FS::new(root, fs::GitignoreStyleExcludes::empty(), executor.clone()).map_err(
                     |err| {
-                        format!("Error making posix_fs to fetch local process execution output files: {err}")
+                        format!(
+                            "Error making fs to fetch local process execution output files: {err}"
+                        )
                     },
                 )?,
             );
             CommandRunner::construct_output_snapshot(
                 store.clone(),
-                posix_fs,
+                fs,
                 req.output_files,
                 req.output_directories,
             )

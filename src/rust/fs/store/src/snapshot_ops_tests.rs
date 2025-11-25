@@ -5,9 +5,7 @@ use std::os::unix::fs::symlink;
 use std::path::Path;
 use std::sync::Arc;
 
-use fs::{
-    DirectoryDigest, GlobExpansionConjunction, PosixFS, PreparedPathGlobs, StrictGlobMatching,
-};
+use fs::{DirectoryDigest, FS, GlobExpansionConjunction, PreparedPathGlobs, StrictGlobMatching};
 use testutil::make_file;
 
 use crate::{
@@ -18,25 +16,25 @@ use crate::{
 async fn get_duplicate_rolands<T: SnapshotOps>(
     store_wrapper: T,
     base_path: &Path,
-    posix_fs: Arc<PosixFS>,
+    fs: Arc<FS>,
     digester: OneOffStoreFileByDigest,
 ) -> (DirectoryDigest, Snapshot, Snapshot) {
     create_dir_all(base_path.join("subdir")).unwrap();
 
     make_file(&base_path.join("subdir/roland1"), STR.as_bytes(), 0o600);
-    let path_stats1 = expand_all_sorted(posix_fs).await;
+    let path_stats1 = expand_all_sorted(fs).await;
     let snapshot1 = Snapshot::from_path_stats(digester.clone(), path_stats1)
         .await
         .unwrap();
 
-    let (_store2, tempdir2, posix_fs2, digester2) = setup();
+    let (_store2, tempdir2, fs2, digester2) = setup();
     create_dir_all(tempdir2.path().join("subdir")).unwrap();
     make_file(
         &tempdir2.path().join("subdir/roland2"),
         STR2.as_bytes(),
         0o600,
     );
-    let path_stats2 = expand_all_sorted(posix_fs2).await;
+    let path_stats2 = expand_all_sorted(fs2).await;
     let snapshot2 = Snapshot::from_path_stats(digester2, path_stats2)
         .await
         .unwrap();
@@ -61,10 +59,10 @@ fn make_subset_params(globs: &[&str]) -> SubsetParams {
 
 #[tokio::test]
 async fn subset_single_files() {
-    let (store, tempdir, posix_fs, digester) = setup();
+    let (store, tempdir, fs, digester) = setup();
 
     let (merged_digest, snapshot1, snapshot2) =
-        get_duplicate_rolands(store.clone(), tempdir.path(), posix_fs.clone(), digester).await;
+        get_duplicate_rolands(store.clone(), tempdir.path(), fs.clone(), digester).await;
 
     let subset_params1 = make_subset_params(&["subdir/roland1"]);
     let subset_roland1 = store
@@ -86,7 +84,7 @@ async fn subset_single_files() {
 #[tokio::test]
 async fn subset_symlink() {
     // Make the first snapshot with a file
-    let (store, tempdir1, posix_fs1, digester1) = setup();
+    let (store, tempdir1, fs1, digester1) = setup();
     create_dir_all(tempdir1.path().join("subdir")).unwrap();
     make_file(
         &tempdir1.path().join("subdir/roland1"),
@@ -94,18 +92,17 @@ async fn subset_symlink() {
         0o600,
     );
     let snapshot_with_real_file =
-        Snapshot::from_path_stats(digester1.clone(), expand_all_sorted(posix_fs1).await)
+        Snapshot::from_path_stats(digester1.clone(), expand_all_sorted(fs1).await)
             .await
             .unwrap();
 
     // Make the second snapshot with a symlink pointing to the file in the first snapshot.
-    let (_store2, tempdir2, posix_fs2, digester2) = setup();
+    let (_store2, tempdir2, fs2, digester2) = setup();
     create_dir_all(tempdir2.path().join("subdir")).unwrap();
     symlink("./roland1", tempdir2.path().join("subdir/roland2")).unwrap();
-    let snapshot_with_symlink =
-        Snapshot::from_path_stats(digester2, expand_all_sorted(posix_fs2).await)
-            .await
-            .unwrap();
+    let snapshot_with_symlink = Snapshot::from_path_stats(digester2, expand_all_sorted(fs2).await)
+        .await
+        .unwrap();
 
     let merged_digest = store
         .merge(vec![
@@ -127,10 +124,10 @@ async fn subset_symlink() {
 
 #[tokio::test]
 async fn subset_recursive_wildcard() {
-    let (store, tempdir, posix_fs, digester) = setup();
+    let (store, tempdir, fs, digester) = setup();
 
     let (merged_digest, snapshot1, _) =
-        get_duplicate_rolands(store.clone(), tempdir.path(), posix_fs.clone(), digester).await;
+        get_duplicate_rolands(store.clone(), tempdir.path(), fs.clone(), digester).await;
 
     let subset_params1 = make_subset_params(&["subdir/**"]);
     let subset_roland1 = store

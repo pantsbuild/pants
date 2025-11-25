@@ -13,8 +13,8 @@ use futures::FutureExt;
 use futures::future;
 
 use fs::{
-    DigestTrie, Dir, DirectoryDigest, EMPTY_DIGEST_TREE, Entry, File, GitignoreStyleExcludes,
-    GlobMatching, PathStat, PosixFS, PreparedPathGlobs, SymlinkBehavior,
+    DigestTrie, Dir, DirectoryDigest, EMPTY_DIGEST_TREE, Entry, FS, File, GitignoreStyleExcludes,
+    GlobMatching, PathStat, PreparedPathGlobs, SymlinkBehavior,
 };
 use hashing::{Digest, EMPTY_DIGEST};
 
@@ -159,22 +159,19 @@ impl Snapshot {
         if let Ok(snapshot) = snapshot_result {
             Ok(snapshot)
         } else {
-            let posix_fs = Arc::new(PosixFS::new_with_symlink_behavior(
+            let fs = Arc::new(FS::new_with_symlink_behavior(
                 root_path,
                 GitignoreStyleExcludes::create(vec![])?,
                 executor,
                 SymlinkBehavior::Oblivious,
             )?);
 
-            let path_stats = posix_fs
+            let path_stats = fs
                 .expand_globs(path_globs, SymlinkBehavior::Oblivious, None)
                 .await
                 .map_err(|err| format!("Error expanding globs: {err}"))?;
-            Snapshot::from_path_stats(
-                OneOffStoreFileByDigest::new(store, posix_fs, true),
-                path_stats,
-            )
-            .await
+            Snapshot::from_path_stats(OneOffStoreFileByDigest::new(store, fs, true), path_stats)
+                .await
         }
     }
 
@@ -243,21 +240,21 @@ pub trait StoreFileByDigest<Error> {
 }
 
 ///
-/// A StoreFileByDigest which reads immutable files with a PosixFS and writes to a Store, with no
+/// A StoreFileByDigest which reads immutable files with a FS and writes to a Store, with no
 /// caching.
 ///
 #[derive(Clone)]
 pub struct OneOffStoreFileByDigest {
     store: Store,
-    posix_fs: Arc<PosixFS>,
+    fs: Arc<FS>,
     immutable: bool,
 }
 
 impl OneOffStoreFileByDigest {
-    pub fn new(store: Store, posix_fs: Arc<PosixFS>, immutable: bool) -> OneOffStoreFileByDigest {
+    pub fn new(store: Store, fs: Arc<FS>, immutable: bool) -> OneOffStoreFileByDigest {
         OneOffStoreFileByDigest {
             store,
-            posix_fs,
+            fs,
             immutable,
         }
     }
@@ -266,10 +263,10 @@ impl OneOffStoreFileByDigest {
 impl StoreFileByDigest<String> for OneOffStoreFileByDigest {
     fn store_by_digest(&self, file: File) -> future::BoxFuture<'static, Result<Digest, String>> {
         let store = self.store.clone();
-        let posix_fs = self.posix_fs.clone();
+        let fs = self.fs.clone();
         let immutable = self.immutable;
         let res = async move {
-            let path = posix_fs.file_path(&file);
+            let path = fs.file_path(&file);
             store.store_file(true, immutable, path).await
         };
         res.boxed()

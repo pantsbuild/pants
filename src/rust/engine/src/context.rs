@@ -11,15 +11,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::nodes::{ExecuteProcess, NodeKey, NodeOutput, NodeResult, SubjectPath};
-use crate::python::{Failure, throw};
-use crate::session::{Session, Sessions};
-use crate::tasks::{Rule, Tasks};
-use crate::types::Types;
-
 use cache::PersistentCache;
 use docker::docker;
-use fs::{GitignoreStyleExcludes, PosixFS};
+use fs::{FS, GitignoreStyleExcludes};
 use futures::FutureExt;
 use graph::{Graph, InvalidationResult};
 use hashing::Digest;
@@ -40,6 +34,12 @@ use task_executor::Executor;
 use tokio::sync::RwLock;
 use watch::{Invalidatable, InvalidateCaller, InvalidationWatcher};
 use workunit_store::{Metric, RunningWorkunit};
+
+use crate::nodes::{ExecuteProcess, NodeKey, NodeOutput, NodeResult, SubjectPath};
+use crate::python::{Failure, throw};
+use crate::session::{Session, Sessions};
+use crate::tasks::{Rule, Tasks};
+use crate::types::Types;
 
 // The reqwest crate has no support for ingesting multiple certificates in a single file,
 // and requires single PEM blocks. There is a crate (https://crates.io/crates/pem) that can decode
@@ -78,8 +78,8 @@ pub struct Core {
     pub command_runners: Vec<Arc<dyn CommandRunner>>,
     pub http_client: reqwest::Client,
     pub local_cache: PersistentCache,
-    pub vfs: PosixFS,
-    pub vfs_system: PosixFS,
+    pub vfs: FS,
+    pub vfs_system: FS,
     pub watcher: Option<Arc<InvalidationWatcher>>,
     pub build_root: PathBuf,
     pub local_parallelism: usize,
@@ -749,9 +749,9 @@ impl Core {
             command_runners,
             http_client,
             local_cache,
-            vfs: PosixFS::new(&build_root, ignorer, executor.clone())
+            vfs: FS::new(&build_root, ignorer, executor.clone())
                 .map_err(|e| format!("Could not initialize Vfs: {e:?}"))?,
-            vfs_system: PosixFS::new(Path::new("/"), GitignoreStyleExcludes::empty(), executor)
+            vfs_system: FS::new(Path::new("/"), GitignoreStyleExcludes::empty(), executor)
                 .map_err(|e| format!("Could not initialize Vfs for local system: {e:?}"))?,
             build_root,
             watcher,

@@ -91,15 +91,17 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
     if java_infer_subsystem.consumed_types:
         package = analysis.declared_package
 
-        # 13545: `analysis.consumed_types` may be unqualified (package-local or imported) or qualified
-        # (prefixed by package name). Heuristic for now is that if there's a `.` in the type name, it's
-        # probably fully qualified. This is probably fine for now.
-        maybe_qualify_types = (
-            f"{package}.{consumed_type}" if package and "." not in consumed_type else consumed_type
-            for consumed_type in analysis.consumed_types
-        )
+        for consumed_type in analysis.consumed_types:
+            if "." not in consumed_type:
+                # Simple unqualified type - add package prefix
+                types.add(f"{package}.{consumed_type}" if package else consumed_type)
+            else:
+                # Has dots and might already be fully qualified
+                types.add(consumed_type)
 
-        types.update(maybe_qualify_types)
+                # Might be an inner class in the same package as the current class
+                first_part = consumed_type.split(".")[0]
+                types.add(f"{package}.{first_part}" if package else first_part)
 
     # Resolve the export types into (probable) types:
     # First produce a map of known consumed unqualified types to possible qualified names
