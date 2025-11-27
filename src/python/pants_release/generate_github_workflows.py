@@ -399,7 +399,7 @@ def install_go() -> list[Step]:
 def install_python_headers_in_manylinux_container() -> Step:
     return {
         "name": "Install Python headers",
-        "run": "yum install -y python3.14-devel",
+        "run": "echo 'no-op'",
     }
 
 
