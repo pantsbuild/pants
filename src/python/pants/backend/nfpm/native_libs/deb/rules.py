@@ -68,11 +68,9 @@ class DebPackagesPerSoFile:
 
 _TYPICAL_LD_PATH_PATTERNS = (
     # platform specific system libs (like libc) get selected first
-    # "/usr/local/lib/*-linux-*/",
     "/lib/*-linux-*/",
     "/usr/lib/*-linux-*/",
     # Then look for a generic system libs
-    # "/usr/local/lib/",
     "/lib/",
     "/usr/lib/",
     # Anything else has to be added manually to dependencies.
