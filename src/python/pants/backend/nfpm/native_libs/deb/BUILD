@@ -7,5 +7,11 @@ python_sources(
 
 python_tests(
     name="tests",
+    sources=["*_test.py"],
     overrides={"search_for_sonames_integration_test.py": dict(timeout=150)},
+)
+
+python_test_utils(
+    name="test_utils",
+    sources=["test_utils.py"],
 )
