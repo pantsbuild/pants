@@ -845,6 +845,7 @@ def test_applied_types_to_terms(rule_runner: RuleRunner) -> None:
         "foo.bar",
     ]
 
+
 def test_new_given_syntax_sip64(rule_runner: RuleRunner) -> None:
     # https://docs.scala-lang.org/sips/sips/typeclasses-syntax.html#7-cleanup-of-given-syntax
     rule_runner.set_options(
@@ -870,9 +871,9 @@ def test_new_given_syntax_sip64(rule_runner: RuleRunner) -> None:
     )
 
     assert sorted(analysis.fully_qualified_consumed_symbols()) == [
-        'foo.Int',
-        'foo.Int',
-        'foo.Ord',
-        'foo.T',
-        'foo.intOrd',
+        "foo.Int",
+        "foo.Int",
+        "foo.Ord",
+        "foo.T",
+        "foo.intOrd",
     ]
