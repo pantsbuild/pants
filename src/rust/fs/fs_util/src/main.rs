@@ -461,7 +461,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
                 ("save", args) => {
                     let path = PathBuf::from(args.get_one::<String>("path").unwrap());
                     // Canonicalize path to guarantee that a relative path has a parent.
-                    let posix_fs = make_posix_fs(
+                    let fs = make_fs(
                         runtime.clone(),
                         path.canonicalize()
                             .map_err(|e| format!("Error canonicalizing path {path:?}: {e:?}"))?
@@ -470,7 +470,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
                                 format!("File being saved must have parent but {path:?} did not")
                             })?,
                     );
-                    let file = posix_fs
+                    let file = fs
                         .stat_sync(Path::new(path.file_name().unwrap()))
                         .unwrap()
                         .ok_or_else(|| {
@@ -480,7 +480,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
                         fs::Stat::File(f) => {
                             let digest = store::OneOffStoreFileByDigest::new(
                                 store.clone(),
-                                Arc::new(posix_fs),
+                                Arc::new(fs),
                                 false,
                             )
                             .store_by_digest(f)
@@ -559,7 +559,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
                     .await?)
             }
             ("save", args) => {
-                let posix_fs = Arc::new(make_posix_fs(
+                let fs = Arc::new(make_fs(
                     runtime.clone(),
                     args.get_one::<String>("root").unwrap(),
                 ));
@@ -575,13 +575,13 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
                     fs::GlobExpansionConjunction::AllMatch,
                 )
                 .parse()?;
-                let paths = posix_fs
+                let paths = fs
                     .expand_globs(path_globs, SymlinkBehavior::Oblivious, None)
                     .await
                     .map_err(|e| format!("Error expanding globs: {e:?}"))?;
 
                 let snapshot = Snapshot::from_path_stats(
-                    store::OneOffStoreFileByDigest::new(store_copy, posix_fs, false),
+                    store::OneOffStoreFileByDigest::new(store_copy, fs, false),
                     paths,
                 )
                 .await?;
@@ -774,9 +774,9 @@ fn expand_files_helper(
     .boxed()
 }
 
-fn make_posix_fs<P: AsRef<Path>>(executor: task_executor::Executor, root: P) -> fs::PosixFS {
+fn make_fs<P: AsRef<Path>>(executor: task_executor::Executor, root: P) -> fs::FS {
     // Unwrapping the output of creating the git ignorer with no patterns is infallible.
-    fs::PosixFS::new(
+    fs::FS::new(
         &root,
         fs::GitignoreStyleExcludes::create(vec![]).unwrap(),
         executor,

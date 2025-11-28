@@ -30,9 +30,9 @@ from pants.engine.internals.graph import (
     _DependencyMappingRequest,
     _TargetParametrizations,
     hydrate_sources,
+    warn_deprecated_field_type,
 )
 from pants.engine.internals.graph import transitive_targets as transitive_targets_get
-from pants.engine.internals.graph import warn_deprecated_field_type
 from pants.engine.internals.native_engine import AddressParseException
 from pants.engine.internals.parametrize import Parametrize, _TargetParametrizationsRequest
 from pants.engine.internals.scheduler import ExecutionError

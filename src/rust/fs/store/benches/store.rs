@@ -11,8 +11,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use fs::{
-    DirectoryDigest, File, GitignoreStyleExcludes, GlobExpansionConjunction, PathStat, Permissions,
-    PosixFS, PreparedPathGlobs, StrictGlobMatching,
+    DirectoryDigest, FS, File, GitignoreStyleExcludes, GlobExpansionConjunction, PathStat,
+    Permissions, PreparedPathGlobs, StrictGlobMatching,
 };
 use hashing::EMPTY_DIGEST;
 use protos::pb::build::bazel::remote::execution::v2 as remexec;
@@ -88,8 +88,8 @@ pub fn criterion_benchmark_snapshot_capture(c: &mut Criterion) {
         let storedir = TempDir::new().unwrap();
         let store = Store::local_only(executor.clone(), storedir.path()).unwrap();
         let (tempdir, path_stats) = tempdir_containing(count, size);
-        let posix_fs = Arc::new(
-            PosixFS::new(
+        let fs = Arc::new(
+            FS::new(
                 tempdir.path(),
                 GitignoreStyleExcludes::empty(),
                 executor.clone(),
@@ -104,11 +104,7 @@ pub fn criterion_benchmark_snapshot_capture(c: &mut Criterion) {
                     for _ in 0..captures {
                         let _ = executor
                             .block_on(Snapshot::from_path_stats(
-                                OneOffStoreFileByDigest::new(
-                                    store.clone(),
-                                    posix_fs.clone(),
-                                    immutable,
-                                ),
+                                OneOffStoreFileByDigest::new(store.clone(), fs.clone(), immutable),
                                 path_stats.clone(),
                             ))
                             .unwrap();
@@ -339,14 +335,14 @@ fn snapshot(
     let store2 = store.clone();
     let digest = executor
         .block_on(async move {
-            let posix_fs = PosixFS::new(
+            let fs = FS::new(
                 tempdir.path(),
                 GitignoreStyleExcludes::empty(),
                 executor.clone(),
             )
             .unwrap();
             Snapshot::from_path_stats(
-                OneOffStoreFileByDigest::new(store2, Arc::new(posix_fs), true),
+                OneOffStoreFileByDigest::new(store2, Arc::new(fs), true),
                 path_stats,
             )
             .await

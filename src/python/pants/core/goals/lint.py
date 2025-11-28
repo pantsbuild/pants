@@ -17,13 +17,15 @@ from pants.core.goals.multi_tool_goal_helper import (
     SkippableSubsystem,
     determine_specified_tool_ids,
 )
-from pants.core.util_rules.partitions import PartitionElementT, PartitionerType, PartitionMetadataT
-from pants.core.util_rules.partitions import Partitions as Partitions  # re-export
 from pants.core.util_rules.partitions import (
+    PartitionElementT,
+    PartitionerType,
+    PartitionMetadataT,
     _BatchBase,
     _PartitionFieldSetsRequestBase,
     _PartitionFilesRequestBase,
 )
+from pants.core.util_rules.partitions import Partitions as Partitions  # re-export
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, Digest

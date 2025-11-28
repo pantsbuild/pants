@@ -464,20 +464,13 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             final_memory_usage = ctx.checker.current_memory_usage()
             self.assertTrue(
                 initial_memory_usage <= final_memory_usage,
-                "Memory usage inverted unexpectedly: {} > {}".format(
-                    initial_memory_usage, final_memory_usage
-                ),
+                f"Memory usage inverted unexpectedly: {initial_memory_usage} > {final_memory_usage}",
             )
 
             increase_fraction = (float(final_memory_usage) / initial_memory_usage) - 1.0
             self.assertTrue(
                 increase_fraction <= max_memory_increase_fraction,
-                "Memory usage increased more than expected: {} -> {}: {} actual increase (expected < {})".format(
-                    initial_memory_usage,
-                    final_memory_usage,
-                    increase_fraction,
-                    max_memory_increase_fraction,
-                ),
+                f"Memory usage increased more than expected: {initial_memory_usage} -> {final_memory_usage}: {increase_fraction} actual increase (expected < {max_memory_increase_fraction})",
             )
 
     def test_pantsd_max_memory_usage(self):

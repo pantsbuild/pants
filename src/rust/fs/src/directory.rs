@@ -7,20 +7,18 @@ use std::fmt::{self, Debug, Display};
 use std::hash::{self, Hash};
 use std::ops::Deref;
 use std::path::{Component, Path, PathBuf};
-use std::sync::Arc;
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 
 use deepsize::{DeepSizeOf, known_deep_size};
-use internment::Intern;
-use itertools::Itertools;
-use log::warn;
-use serde::Serialize;
-
 // TODO: Extract protobuf-specific pieces to a new crate.
 use grpc_util::prost::MessageExt;
 use hashing::{Digest, EMPTY_DIGEST};
+use internment::Intern;
+use itertools::Itertools;
+use log::warn;
 use protos::pb::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
+use serde::Serialize;
 
 use crate::{LinkDepth, MAX_LINK_DEPTH, PathStat, RelativePath};
 

@@ -125,9 +125,7 @@ class _ServiceState:
             while self._state != self._PAUSED:
                 if self._state != self._PAUSING:
                     raise AssertionError(
-                        "Cannot wait for {} to reach `{}` while it is in `{}`.".format(
-                            self, self._PAUSED, self._state
-                        )
+                        f"Cannot wait for {self} to reach `{self._PAUSED}` while it is in `{self._state}`."
                     )
                 timeout = deadline - time.time() if deadline else None
                 if timeout and timeout <= 0:

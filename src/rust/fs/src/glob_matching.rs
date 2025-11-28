@@ -6,13 +6,11 @@ use std::ffi::OsStr;
 use std::fmt::Display;
 use std::iter::Iterator;
 use std::path::{Component, Path, PathBuf};
-use std::sync::Arc;
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 
 use async_trait::async_trait;
 use futures::future::{self, TryFutureExt};
 use glob::{MatchOptions, Pattern};
-
 use log::warn;
 use parking_lot::Mutex;
 

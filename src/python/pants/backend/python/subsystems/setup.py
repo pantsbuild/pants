@@ -7,7 +7,7 @@ import enum
 import logging
 import os
 from collections.abc import Iterable
-from typing import Optional, TypeVar, cast
+from typing import TypeVar, cast
 
 from packaging.utils import canonicalize_name
 
@@ -795,7 +795,7 @@ class PythonSetup(Subsystem):
 
     @property
     def manylinux(self) -> str | None:
-        manylinux = cast(Optional[str], self.resolver_manylinux)
+        manylinux = cast(str | None, self.resolver_manylinux)
         if manylinux is None or manylinux.lower() in ("false", "no", "none"):
             return None
         return manylinux

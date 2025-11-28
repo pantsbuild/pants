@@ -215,7 +215,7 @@ async def create_tsc_wrapper_script(
     package_dirs_str = " ".join(f'"{d}"' for d in package_dirs)
     output_dirs_str = " ".join(f'"{d}"' for d in package_output_dirs)
 
-    script_content = """#!/bin/sh
+    script_content = f"""#!/bin/sh
 # TypeScript incremental compilation cache wrapper
 
 # All source files in sandbox have mtime as at sandbox creation (e.g. when the process started).
@@ -226,10 +226,10 @@ async def create_tsc_wrapper_script(
 
 set -e
 
-CP_BIN="{cp_binary_path}"
-MKDIR_BIN="{mkdir_binary_path}"
-FIND_BIN="{find_binary_path}"
-TOUCH_BIN="{touch_binary_path}"
+CP_BIN="{cp_binary.path}"
+MKDIR_BIN="{mkdir_binary.path}"
+FIND_BIN="{find_binary.path}"
+TOUCH_BIN="{touch_binary.path}"
 
 PROJECT_CACHE_SUBDIR="{project_cache_subdir}"
 
@@ -266,15 +266,7 @@ for output_dir in {output_dirs_str}; do
         "$CP_BIN" -r "$output_dir" "$PROJECT_CACHE_SUBDIR/$output_parent/"
     fi
 done
-""".format(
-        cp_binary_path=cp_binary.path,
-        mkdir_binary_path=mkdir_binary.path,
-        find_binary_path=find_binary.path,
-        touch_binary_path=touch_binary.path,
-        project_cache_subdir=project_cache_subdir,
-        package_dirs_str=package_dirs_str,
-        output_dirs_str=output_dirs_str,
-    )
+"""
 
     script_digest = await create_digest(
         CreateDigest(

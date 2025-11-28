@@ -23,9 +23,11 @@ from pants.core.goals.package import (
     OutputPathField,
     PackageFieldSet,
 )
-from pants.core.util_rules.adhoc_process_support import AdhocProcessRequest
+from pants.core.util_rules.adhoc_process_support import (
+    AdhocProcessRequest,
+    run_prepared_adhoc_process,
+)
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
-from pants.core.util_rules.adhoc_process_support import run_prepared_adhoc_process
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest
 from pants.engine.internals.graph import resolve_target
 from pants.engine.intrinsics import add_prefix, get_digest_entries
