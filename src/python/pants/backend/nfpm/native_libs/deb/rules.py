@@ -17,8 +17,8 @@ from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import UnionRule
 from pants.engine.internals.selectors import concurrently
-from pants.engine.intrinsics import create_digest, execute_process
-from pants.engine.process import FallibleProcessResult
+from pants.engine.intrinsics import create_digest
+from pants.engine.process import ProcessResult, execute_process_or_raise
 from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.init.import_util import find_matching_distributions
 from pants.util.logging import LogLevel
@@ -185,7 +185,8 @@ async def deb_search_for_sonames(
         ),
     )
 
-    result: FallibleProcessResult = await execute_process(
+    # Raising an error means we gave up retrying because the server is unavailable.
+    result: ProcessResult = await execute_process_or_raise(
         **implicitly(
             VenvPexProcess(
                 venv_pex,
@@ -204,14 +205,9 @@ async def deb_search_for_sonames(
         )
     )
 
-    if result.exit_code == 0:
-        packages = json.loads(result.stdout)
-    else:
-        # The search API returns 200 even if no results were found.
-        # A 4xx or 5xx error means we gave up retrying because the server is unavailable.
-        # TODO: Should this raise an error instead of just a warning?
+    packages = json.loads(result.stdout)
+    if result.stderr:
         logger.warning(result.stderr.decode("utf-8"))
-        packages = {}
 
     deb_packages_for_sonames = DebPackagesForSonames.from_dict(packages)
     if request.from_best_so_files:

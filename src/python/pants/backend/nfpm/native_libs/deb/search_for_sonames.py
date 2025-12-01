@@ -192,13 +192,16 @@ def main() -> int:
     )
 
     if not packages:
+        # The search API returns 200 even if no results were found (which is not an error).
+        # If the service is unavailable, an error should be raised before getting here.
         print("{}")
         print(
             f"No {options.distro} {options.distro_codename} ({options.arch}) packages"
             f" found for sonames: {options.sonames}",
             file=sys.stderr,
         )
-        return 1
+        # If needed, add a flag to this script to say "fail if no results found".
+        return 0
 
     print(json.dumps(packages, indent=None, separators=(",", ":")))
 
