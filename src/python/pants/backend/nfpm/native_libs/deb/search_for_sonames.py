@@ -6,7 +6,7 @@
 Rule code should run this script as a subprocess in a sandboxed venv. Generally, that venv should
 be a subset of the pants venv (using the version of packages that pants depends on).
 
-WARNING: This script relies on aiohttp and asyncio, so their are probably incompatibilities
+WARNING: This script relies on aiohttp and asyncio, so there are probably incompatibilities
 with rule code in the pants engine. So, avoid importing this script in rule code.
 """
 
