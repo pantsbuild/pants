@@ -127,6 +127,10 @@ def deb_packages_from_html_response(
 
     soup = BeautifulSoup(html_doc, "html.parser")
 
+    # Fail if the API is requesting javascript-based validation
+    if soup.title.get_text() == "Client Challenge":
+        raise ValueError("API service is blocking the request")
+
     # .table means 'search for a <table> tag'. The response should only have one.
     # In xmlpath, descending would look like one of these:
     #   /html/body/div[1]/div[3]/div[2]/table
