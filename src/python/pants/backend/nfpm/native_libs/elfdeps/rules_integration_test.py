@@ -61,13 +61,11 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-# This has SO versions for the setproctitle==1.3.6 NEEDS libc.so.6 by architecture.
+# This has SO versions for the setproctitle==1.3.7 NEEDS libc.so.6 by architecture.
 _SETPROCTITLE_LIBC6_SO_VERSIONS = {
     "x86_64": ("", "GLIBC_2.2.5"),
     "aarch64": ("", "GLIBC_2.17"),
     "powerpc64le": ("", "GLIBC_2.17"),
-    "i686": ("", "GLIBC_2.0", "GLIBC_2.1.3"),
-    "i386": ("", "GLIBC_2.0", "GLIBC_2.1.3"),
 }
 
 
@@ -77,7 +75,7 @@ _SETPROCTITLE_LIBC6_SO_VERSIONS = {
     (
         pytest.param(["cowsay==4.0"], "cowsay", (), (), id="cowsay"),
         pytest.param(
-            ["setproctitle==1.3.6"],
+            ["setproctitle==1.3.7"],
             None,
             (
                 SOInfo(
@@ -125,7 +123,12 @@ def test_elfdeps_analyze_pex_wheels(
             "BUILD": dedent(
                 f"""
                 python_requirement(name="req", requirements={pex_reqs!r})
-                pex_binary(name="pex", script={pex_script!r}, dependencies=[":req"])
+                pex_binary(
+                    name="pex",
+                    script={pex_script!r},
+                    extra_build_args=["--no-build"],  # no sdists
+                    dependencies=[":req"],
+                )
                 """
             )
         }
