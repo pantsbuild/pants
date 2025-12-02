@@ -32,7 +32,7 @@ DISTRO_PACKAGE_SEARCH_URL = {
 
 
 async def deb_search_for_sonames(
-    distro: str,
+    search_url: str,
     distro_codename: str,
     debian_arch: str,
     sonames: Iterable[str],
@@ -44,7 +44,6 @@ async def deb_search_for_sonames(
     version. This code, however, should be able to run on any host even non-debian and non-ubuntu
     hosts. So, it uses an API call instead of local tooling.
     """
-    search_url = DISTRO_PACKAGE_SEARCH_URL[distro]
 
     # tasks are IO bound
     async with (
@@ -168,9 +167,8 @@ def deb_packages_from_html_response(
 def main() -> int:
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("--user-agent-suffix")
-    arg_parser.add_argument(
-        "--distro", default="ubuntu", choices=tuple(DISTRO_PACKAGE_SEARCH_URL.keys())
-    )
+    arg_parser.add_argument("--search-url", default="https://packages.debian.org/search")
+    arg_parser.add_argument("--distro", default="debian")
     arg_parser.add_argument("--distro-codename", required=True)
     arg_parser.add_argument("--arch", default="amd64")
     arg_parser.add_argument("sonames", nargs="+")
@@ -183,7 +181,7 @@ def main() -> int:
 
     packages = asyncio.get_event_loop().run_until_complete(
         deb_search_for_sonames(
-            distro=options.distro,
+            search_url=options.search_url,
             distro_codename=options.distro_codename,
             debian_arch=options.arch,
             sonames=tuple(options.sonames),

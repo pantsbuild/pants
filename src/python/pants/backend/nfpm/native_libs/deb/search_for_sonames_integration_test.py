@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 
+from pants.backend.nfpm.native_libs.deb._constants import DEFAULT_DEB_DISTRO_PACKAGE_SEARCH_URLS
 from pants.backend.nfpm.native_libs.deb.test_utils import TEST_CASES
 
 # The relative import emphasizes that `search_for_sonames` is a standalone script that runs
@@ -21,7 +22,8 @@ async def test_deb_search_for_sonames(
     debian_arch: str,
     sonames: tuple[str, ...],
     expected: dict[str, dict[str, list[str]]],
-    _: Any,  # unused. This is for the next test.
+    _: Any,  # unused. This is for the rule integration test.
 ):
-    result = await deb_search_for_sonames(distro, distro_codename, debian_arch, sonames)
+    search_url = DEFAULT_DEB_DISTRO_PACKAGE_SEARCH_URLS[distro]
+    result = await deb_search_for_sonames(search_url, distro_codename, debian_arch, sonames)
     assert result == expected

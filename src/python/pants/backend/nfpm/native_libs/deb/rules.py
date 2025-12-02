@@ -11,6 +11,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import PurePath
 
+from pants.backend.nfpm.native_libs.deb.subsystem import DebSubsystem
 from pants.backend.python.util_rules.pex import PexRequest, VenvPexProcess, create_venv_pex
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
@@ -142,6 +143,7 @@ class DebPackagesForSonames:
 @rule
 async def deb_search_for_sonames(
     request: DebSearchForSonamesRequest,
+    deb_subsystem: DebSubsystem,
 ) -> DebPackagesForSonames:
     script = read_resource(_NATIVE_LIBS_DEB_PACKAGE, _SEARCH_FOR_SONAMES_SCRIPT)
     if not script:
@@ -185,6 +187,8 @@ async def deb_search_for_sonames(
         ),
     )
 
+    distro_package_search_url = deb_subsystem.options.distro_package_search_urls[request.distro]
+
     # Raising an error means we gave up retrying because the server is unavailable.
     result: ProcessResult = await execute_process_or_raise(
         **implicitly(
@@ -193,6 +197,7 @@ async def deb_search_for_sonames(
                 argv=(
                     script_content.path,
                     f"--user-agent-suffix=pants/{VERSION}",
+                    f"--search-url={distro_package_search_url}",
                     f"--distro={request.distro}",
                     f"--distro-codename={request.distro_codename}",
                     f"--arch={request.debian_arch}",
@@ -216,4 +221,7 @@ async def deb_search_for_sonames(
 
 
 def rules() -> Iterable[Rule | UnionRule]:
-    return collect_rules()
+    return (
+        *DebSubsystem.rules(),
+        *collect_rules(),
+    )
