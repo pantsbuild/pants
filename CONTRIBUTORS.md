@@ -336,6 +336,7 @@ Created as part of the release process.
 + Srikanth Kotagiri
 + Stefan Sauer
 + Stephan Erb
++ Stephen Hopper
 + Stu Hood
 + Subin Kim
 + Suresh Joshi
