@@ -10,8 +10,11 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.nfpm.dependency_inference import rules as nfpm_dependency_inference_rules
+from pants.backend.nfpm.fields.deb import NfpmDebDependsField
 from pants.backend.nfpm.fields.rpm import NfpmRpmDependsField, NfpmRpmProvidesField
 from pants.backend.nfpm.native_libs.rules import (
+    DebDependsFromPexRequest,
+    DebDependsInfo,
     NativeLibsNfpmPackageFieldsRequest,
     RpmDependsFromPexRequest,
     RpmDependsInfo,
@@ -32,10 +35,13 @@ from pants.backend.python.target_types import PexBinary, PythonRequirementTarget
 from pants.backend.python.util_rules import pex_cli, pex_from_targets
 from pants.backend.python.util_rules.pex import Pex
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.core.target_types import FileTarget
+from pants.core.target_types import rules as core_target_type_rules
 from pants.engine.internals.native_engine import Address
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.frozendict import FrozenDict
+from pants.util.resources import read_resource
 
 _PY_TAG = "".join(map(str, sys.version_info[:2]))
 _PY_OS = platform.system()  # Linux
@@ -64,11 +70,13 @@ skip_unless_linux_x86_64 = _skip_unless(os="Linux", arch="x86_64")
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         target_types=[
+            FileTarget,
             PexBinary,
             PythonRequirementTarget,
             *nfpm_target_types(),
         ],
         rules=[
+            *core_target_type_rules(),
             *package_pex_binary.rules(),
             *pex_from_targets.rules(),
             *target_types_rules.rules(),
@@ -80,6 +88,7 @@ def rule_runner() -> RuleRunner:
             *native_libs_rules(),
             QueryRule(PexFromTargetsRequestForBuiltPackage, (PexBinaryFieldSet,)),
             QueryRule(Pex, (PexFromTargetsRequest,)),
+            QueryRule(DebDependsInfo, (DebDependsFromPexRequest,)),
             QueryRule(RpmDependsInfo, (RpmDependsFromPexRequest,)),
             QueryRule(InjectedNfpmPackageFields, (NativeLibsNfpmPackageFieldsRequest,)),
         ],
@@ -105,6 +114,139 @@ def _get_pex_binary(rule_runner: RuleRunner, address: Address) -> Pex:
     )
     pex_binary = rule_runner.request(Pex, [build_pex_request.request])
     return pex_binary
+
+
+@pytest.mark.parametrize(
+    "pex_reqs,pex_script,distro,distro_codename,debian_arch,expected_packages",
+    (
+        pytest.param(
+            ["cowsay==4.0"],
+            "cowsay",
+            "ubuntu",
+            "jammy",
+            "amd64",
+            (),
+            id="cowsay-ubuntu-jammy-arm64",
+        ),
+        pytest.param(
+            ["cowsay==4.0"],
+            "cowsay",
+            "ubuntu",
+            "jammy",
+            "arm64",
+            (),
+            id="cowsay-ubuntu-jammy-arm64",
+        ),
+        pytest.param(
+            ["setproctitle==1.3.6"],
+            None,
+            "ubuntu",
+            "jammy",
+            "amd64",
+            ("libc6",),
+            id="setproctitle-ubuntu-jammy-amd64",
+        ),
+        pytest.param(
+            ["setproctitle==1.3.6"],
+            None,
+            "ubuntu",
+            "jammy",
+            "arm64",
+            ("libc6",),
+            id="setproctitle-ubuntu-jammy-arm64",
+        ),
+    ),
+)
+def test_deb_depends_from_pex_rule(
+    pex_reqs: list[str],
+    pex_script: str | None,
+    distro: str,
+    distro_codename: str,
+    debian_arch: str,
+    expected_packages: tuple[str, ...],
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                f"""
+                python_requirement(name="req", requirements={pex_reqs!r})
+                pex_binary(name="pex", script={pex_script!r}, dependencies=[":req"])
+                """
+            )
+        }
+    )
+
+    target_pex = _get_pex_binary(rule_runner, Address("", target_name="pex"))
+    result = rule_runner.request(
+        DebDependsInfo, [DebDependsFromPexRequest(target_pex, distro, distro_codename, debian_arch)]
+    )
+    assert result.requires == expected_packages
+
+
+@pytest.mark.parametrize(
+    "whl_dist,whl_resource,whl_py_tag,distro,distro_codename,debian_arch,expected_packages",
+    (
+        pytest.param(
+            "python-ldap",
+            "python_ldap-3.4.4-cp311-cp311-linux_x86_64.whl",
+            "cp311",
+            "ubuntu",
+            "jammy",
+            "amd64",
+            ("libc6", "libldap-2.5-0"),
+            marks=_skip_unless(
+                os="Linux",
+                arch="x86_64",
+                extra_reason="(python-ldap wheel not included for other platforms)",
+            ),
+            id="ldap-ubuntu-jammy-amd64",
+        ),
+    ),
+)
+def test_deb_depends_from_pex_rule_with_whl_resource(
+    whl_dist: str,
+    whl_resource: str,
+    whl_py_tag: str,
+    distro: str,
+    distro_codename: str,
+    debian_arch: str,
+    expected_packages: tuple[str, ...],
+    rule_runner: RuleRunner,
+) -> None:
+    assert whl_resource.endswith(".whl")
+    whl_contents = read_resource(__name__, whl_resource)
+    assert whl_contents is not None
+
+    # NOTE: Renaming the wheel in this test is a hack for forwards compatibility.
+    # The test only needs a whl with an ELF .so that can be statically analyzed to look up packages.
+    # The other details (os, distro, distro_codename, arch) are hard-coded for this test,
+    # except for python version (the only variable that is likely to change over time).
+    # So, this replaces the python tag, pretending the wheel is for the current python version.
+    whl = whl_resource.replace(whl_py_tag, f"cp{_PY_TAG}")
+
+    rule_runner.write_files(
+        {
+            whl: whl_contents,
+            "BUILD": dedent(
+                f"""
+                file(name="whl", source={whl!r})
+                python_requirement(
+                    name="req",
+                    dependencies=[":whl"],
+                    requirements=["{whl_dist} @ file://{rule_runner.build_root}/{whl}"],
+                )
+                pex_binary(name="pex", dependencies=[":req"])
+                """
+            ),
+        }
+    )
+
+    target_pex = _get_pex_binary(rule_runner, Address("", target_name="pex"))
+    result = rule_runner.request(
+        DebDependsInfo, [DebDependsFromPexRequest(target_pex, distro, distro_codename, debian_arch)]
+    )
+    assert result.requires == expected_packages
 
 
 @pytest.mark.parametrize(
@@ -163,11 +305,35 @@ def test_rpm_depends_from_pex_rule(
 
 
 @pytest.mark.parametrize(
-    "packager,pex_reqs,pex_script,nfpm_arch,expected_provides,expected_depends",
+    "packager,pex_reqs,pex_script,deb_distro,deb_distro_codename,nfpm_arch,expected_provides,expected_depends",
     (
+        pytest.param(
+            "deb",
+            ["setproctitle==1.3.6"],
+            None,
+            "ubuntu",
+            "jammy",
+            "amd64",
+            (),
+            ("libc6",),
+            id="deb-setproctitle-ubuntu-jammy-amd64",
+        ),
+        pytest.param(
+            "deb",
+            ["setproctitle==1.3.6"],
+            None,
+            "ubuntu",
+            "jammy",
+            "arm64",
+            (),
+            ("libc6",),
+            id="deb-setproctitle-ubuntu-jammy-arm64",
+        ),
         pytest.param(
             "rpm",
             ["setproctitle==1.3.6"],
+            None,
+            None,
             None,
             "amd64",
             (f"_setproctitle.cpython-{_PY_TAG}-x86_64-linux-gnu.so()(64bit)",),
@@ -183,6 +349,8 @@ def test_rpm_depends_from_pex_rule(
         pytest.param(
             "rpm",
             ["setproctitle==1.3.6"],
+            None,
+            None,
             None,
             "arm64",
             (f"_setproctitle.cpython-{_PY_TAG}-aarch64-linux-gnu.so()(64bit)",),
@@ -201,6 +369,8 @@ def test_inject_native_libs_dependencies_in_package_fields_rule(
     packager: str,
     pex_reqs: list[str],
     pex_script: str | None,
+    deb_distro: str | None,
+    deb_distro_codename: str | None,
     nfpm_arch: str,
     expected_provides: tuple[str, ...],
     expected_depends: tuple[str, ...],
@@ -225,11 +395,20 @@ def test_inject_native_libs_dependencies_in_package_fields_rule(
             description="A {packager} package",
             package_name="{_PKG_NAME}",
             version="1.2.3",
+            {"" if packager != "deb" else 'maintainer="Foo Bar <deb@example.com>",'}
             dependencies=[":contents"],
             arch="{nfpm_arch}",
-        )
         """
     )
+    if packager == "deb":
+        build_contents += "\n    "
+        build_contents += "\n    ".join(
+            [
+                f"distro={deb_distro!r},",
+                f"distro_codename={deb_distro_codename!r},",
+            ]
+        )
+    build_contents += "\n)"
 
     rule_runner.write_files(
         {
@@ -242,6 +421,9 @@ def test_inject_native_libs_dependencies_in_package_fields_rule(
         InjectedNfpmPackageFields, [NativeLibsNfpmPackageFieldsRequest(target, FrozenDict())]
     )
     field_values = result.field_values
+    if packager == "deb":
+        assert len(field_values) == 1
+        assert field_values[NfpmDebDependsField].value == expected_depends
     if packager == "rpm":
         assert len(field_values) == 2
         assert field_values[NfpmRpmProvidesField].value == expected_provides
