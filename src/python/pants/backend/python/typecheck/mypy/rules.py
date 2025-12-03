@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import itertools
 from collections.abc import Iterable
 from dataclasses import dataclass
 from hashlib import sha256
@@ -335,9 +336,13 @@ async def mypy_typecheck_partition(
         )
     )
 
+    all_used_source_roots = sorted(
+        set(itertools.chain(first_party_plugins.source_roots, closure_sources.source_roots))
+    )
+
     env = {
-        "PEX_EXTRA_SYS_PATH": ":".join(first_party_plugins.source_roots),
-        "MYPYPATH": ":".join(closure_sources.source_roots),
+        "PEX_EXTRA_SYS_PATH": ":".join(all_used_source_roots),
+        "MYPYPATH": ":".join(all_used_source_roots),
         # Always emit colors to improve cache hit rates, the results are post-processed to match the
         # global setting
         "MYPY_FORCE_COLOR": "1",
