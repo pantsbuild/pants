@@ -164,6 +164,7 @@ class CodeQualityTool:
     file_glob_include: tuple[str, ...]
     file_glob_exclude: tuple[str, ...]
     target: Target
+    runnable_address_field_alias: str
 
 
 @rule
@@ -195,6 +196,7 @@ async def find_code_quality_tool(request: CodeQualityToolAddressString) -> CodeQ
         file_glob_include=target[CodeQualityToolFileGlobIncludeField].value or (),
         file_glob_exclude=target[CodeQualityToolFileGlobExcludeField].value or (),
         target=target,
+        runnable_address_field_alias=CodeQualityToolRunnableField.alias,
     )
 
 
@@ -244,6 +246,7 @@ async def runner_request_for_code_quality_tool(
         execution_dependencies=cqt.execution_dependencies,
         runnable_dependencies=cqt.runnable_dependencies,
         target=cqt.target,
+        runnable_address_field_alias=cqt.runnable_address_field_alias,
     )
 
 
