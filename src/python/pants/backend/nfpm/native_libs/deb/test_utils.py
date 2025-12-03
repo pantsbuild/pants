@@ -94,24 +94,25 @@ _libc6_cross_pkgs = {
 }
 
 TEST_CASES = (
-    pytest.param(
-        "debian",
-        "bookworm",
-        "amd64",
-        (_libldap_soname,),
-        {_libldap_soname: {_libldap_so_file.format("x86_64"): [_libldap_pkg]}},
-        None,  # from_best_so_files is the same result
-        id="debian-amd64-libldap",
-    ),
-    pytest.param(
-        "debian",
-        "bookworm",
-        "arm64",
-        (_libldap_soname,),
-        {_libldap_soname: {_libldap_so_file.format("aarch64"): [_libldap_pkg]}},
-        None,  # from_best_so_files is the same result
-        id="debian-arm64-libldap",
-    ),
+    # debian is blocking non-javascript-enabled search requests
+    # pytest.param(
+    #    "debian",
+    #    "bookworm",
+    #    "amd64",
+    #    (_libldap_soname,),
+    #    {_libldap_soname: {_libldap_so_file.format("x86_64"): [_libldap_pkg]}},
+    #    None,  # from_best_so_files is the same result
+    #    id="debian-amd64-libldap",
+    # ),
+    # pytest.param(
+    #    "debian",
+    #    "bookworm",
+    #    "arm64",
+    #    (_libldap_soname,),
+    #    {_libldap_soname: {_libldap_so_file.format("aarch64"): [_libldap_pkg]}},
+    #    None,  # from_best_so_files is the same result
+    #    id="debian-arm64-libldap",
+    # ),
     pytest.param(
         "ubuntu",
         "jammy",

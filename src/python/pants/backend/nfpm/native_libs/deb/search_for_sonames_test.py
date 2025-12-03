@@ -11,7 +11,10 @@ from .search_for_sonames import deb_packages_from_html_response
 SAMPLE_HTML_RESPONSE = """
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <html lang="en">
-    <head><!-- ... --></head>
+    <head>
+        <title>Debian -- Package Contents Search Results -- libldap-2.5.so.0</title>
+        <!-- ... -->
+    </head>
     <body>
         <div>...</div>
         <table>
