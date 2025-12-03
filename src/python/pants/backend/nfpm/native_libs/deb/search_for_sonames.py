@@ -25,11 +25,6 @@ from aiohttp.http import SERVER_SOFTWARE as DEFAULT_USER_AGENT
 from aiohttp_retry.types import ClientType
 from bs4 import BeautifulSoup
 
-DISTRO_PACKAGE_SEARCH_URL = {
-    "debian": "https://packages.debian.org/search",
-    "ubuntu": "https://packages.ubuntu.com/search",
-}
-
 
 async def deb_search_for_sonames(
     search_url: str,
