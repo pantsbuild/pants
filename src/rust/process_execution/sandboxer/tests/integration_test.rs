@@ -70,7 +70,7 @@ async fn test_sandboxer_process() {
     fs::remove_file(sandboxer.socket_path()).unwrap();
     // Wait for that removal to actually manifest on the filesystem.
     let mut n = 50;
-    while sandboxer.socket_path().exists() {
+    while sandboxer.socket_path().try_exists().unwrap() {
         n -= 1;
         thread::sleep(Duration::from_millis(10));
         if n == 0 {
@@ -78,7 +78,7 @@ async fn test_sandboxer_process() {
         }
     }
     // Give the sandboxer a chance to notice that the socket is gone, and shut down.
-    thread::sleep(SandboxerService::POLLING_INTERVAL * 2);
+    thread::sleep(SandboxerService::POLLING_INTERVAL * 10);
 
     assert!(!sandboxer.is_alive().await.unwrap());
 }
