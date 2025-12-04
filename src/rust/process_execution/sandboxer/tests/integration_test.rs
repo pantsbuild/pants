@@ -8,6 +8,7 @@ use std::env;
 use std::fs;
 use std::path::Path;
 use std::thread;
+use std::time::Duration;
 use tempfile::TempDir;
 
 use sandboxer::Sandboxer;
@@ -63,9 +64,21 @@ async fn test_sandboxer_process() {
         fs::read_to_string(sandbox_path.join("subdir").join("greeting.txt")).unwrap();
     assert_eq!("Hello, world!", materialized_content);
 
-    // Assert that removing the socket file causes the sandboxer process to shut down.
+    // Assert that removing the socket file causes the sandboxer process to shut down:
+
+    // Remove the file.
     fs::remove_file(sandboxer.socket_path()).unwrap();
-    thread::sleep(SandboxerService::POLLING_INTERVAL * 5);
+    // Wait for that removal to actually manifest on the filesystem.
+    let mut n = 50;
+    while sandboxer.socket_path().try_exists().unwrap() {
+        n -= 1;
+        thread::sleep(Duration::from_millis(10));
+        if n == 0 {
+            panic!("Waited too long for socket path deletion to take effect.");
+        }
+    }
+    // Give the sandboxer a chance to notice that the socket is gone, and shut down.
+    thread::sleep(SandboxerService::POLLING_INTERVAL * 10);
 
     assert!(!sandboxer.is_alive().await.unwrap());
 }
