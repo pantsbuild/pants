@@ -146,7 +146,7 @@ emit_warnings = true
 # + src/python/pants/testutil:testutil_wheel
 # And update the PythonBuildStandalone version/URL:
 # + src/python/pants/core/subsystems/python_bootstrap.py
-interpreter_constraints = ["==3.11.*"]
+interpreter_constraints = ["==3.14.*"]
 macos_big_sur_compatibility = true
 enable_resolves = true
 pip_version = "latest"
@@ -166,6 +166,8 @@ unowned_dependency_behavior = "error"
 
 [docformatter]
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
+# Does not work on 3.14 https://github.com/PyCQA/docformatter/issues/327
+skip = true
 
 [flake8]
 config = "build-support/flake8/.flake8"
@@ -205,7 +207,7 @@ requirements = ["//3rdparty/python:mypy"]
 
 
 [coverage-py]
-interpreter_constraints = ["==3.11.*"]
+interpreter_constraints = ["==3.14.*"]
 
 [preamble]
 template_by_globs = "@build-support/preambles/config.yaml"
