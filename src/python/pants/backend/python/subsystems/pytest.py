@@ -126,6 +126,24 @@ class PyTest(PythonToolBase):
             """
         ),
     )
+    install_from_target_resolve = BoolOption(
+        default=False,
+        advanced=True,
+        help=softwrap(
+            """
+            If true, Pants will install pytest and its dependencies from the target's resolve
+            instead of using a separate pytest resolve or the default lockfile.
+
+            When enabled, pytest and its plugins (pytest-cov, pytest-xdist, etc.) must be
+            included in the target's resolve lockfile. This avoids creating a separate pytest_pex
+            and uses the target's requirements_pex directly, which can improve cache efficiency
+            when the target resolve already contains pytest.
+
+            This option takes precedence over `install_from_resolve`. If both are set, this
+            option will be used instead.
+            """
+        ),
+    )
 
     skip = SkipOption("test")
 
