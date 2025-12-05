@@ -29,7 +29,7 @@ jobs:
     - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
     - name: Install Protoc
@@ -48,7 +48,7 @@ jobs:
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.1
+      uses: Swatinem/rust-cache@v2.8.2
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -116,7 +116,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
@@ -146,7 +146,7 @@ jobs:
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.1
+      uses: Swatinem/rust-cache@v2.8.2
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -224,7 +224,7 @@ jobs:
     - macos-14
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
     - name: Set up Python 3.9, 3.10, 3.12, 3.13, 3.11
@@ -252,7 +252,7 @@ jobs:
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.1
+      uses: Swatinem/rust-cache@v2.8.2
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -332,7 +332,7 @@ jobs:
     - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
     - name: Configure Git
@@ -401,7 +401,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
     - name: Configure Git
@@ -430,11 +430,11 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.24.9
     - env:
@@ -476,7 +476,7 @@ jobs:
     - macos-14
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
     - name: Set up Python 3.9, 3.10, 3.12, 3.13, 3.11
@@ -504,7 +504,7 @@ jobs:
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.1
+      uses: Swatinem/rust-cache@v2.8.2
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -515,11 +515,11 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.24.9
     - env:
@@ -554,7 +554,7 @@ jobs:
     - windows-2025
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
     - name: Install MSYS2
@@ -591,7 +591,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       if: github.event_name == 'pull_request' && !needs.classify_changes.outputs.notes
       name: Ensure appropriate label
-      uses: mheap/github-action-required-labels@v4.0.0
+      uses: mheap/github-action-required-labels@v5.5.1
       with:
         count: 1
         labels: release-notes:not-required, category:internal
@@ -624,7 +624,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
     - id: classify
@@ -680,7 +680,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
     - env:
@@ -809,7 +809,7 @@ jobs:
     - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
     - name: Install AdoptJDK
@@ -818,11 +818,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.24.9
     - name: Download native binaries
@@ -882,7 +882,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
     - env:
@@ -916,11 +916,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -998,7 +998,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
     - env:
@@ -1032,11 +1032,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -1114,7 +1114,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
     - env:
@@ -1148,11 +1148,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -1230,7 +1230,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
     - env:
@@ -1264,11 +1264,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -1346,7 +1346,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
     - env:
@@ -1380,11 +1380,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -1462,7 +1462,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
     - env:
@@ -1496,11 +1496,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -1578,7 +1578,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
     - env:
@@ -1612,11 +1612,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -1694,7 +1694,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
     - env:
@@ -1728,11 +1728,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -1810,7 +1810,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
     - env:
@@ -1844,11 +1844,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -1926,7 +1926,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
     - env:
@@ -1960,11 +1960,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -2043,7 +2043,7 @@ jobs:
     - macos-14
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
     - name: Install AdoptJDK
@@ -2052,11 +2052,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.24.9
     - name: Set up Python 3.9, 3.10, 3.12, 3.13, 3.11

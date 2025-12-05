@@ -27,7 +27,7 @@ jobs:
     - run-id=${{ github.run_id }}
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
@@ -133,7 +133,7 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
@@ -163,11 +163,11 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.24.9
     - env:
@@ -260,7 +260,7 @@ jobs:
     - macos-14
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
@@ -289,7 +289,7 @@ jobs:
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.1
+      uses: Swatinem/rust-cache@v2.8.2
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -300,11 +300,11 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.24.9
     - env:
@@ -379,7 +379,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Checkout Pants at Release Tag
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: '0'
         fetch-tags: true
@@ -411,7 +411,7 @@ jobs:
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.1
+      uses: Swatinem/rust-cache@v2.8.2
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -442,7 +442,7 @@ jobs:
         payload-file-path: ${{ runner.temp }}/slack_announcement.json
         token: ${{ secrets.SLACK_BOT_TOKEN }}
     - name: Announce to pants-devel
-      uses: dawidd6/action-send-mail@v3.8.0
+      uses: dawidd6/action-send-mail@v3.12.0
       with:
         body: file://${{ runner.temp }}/email_announcement_body.md
         connection_url: ${{ secrets.EMAIL_CONNECTION_URL }}
