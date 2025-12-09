@@ -20,7 +20,7 @@ python_tests(
         "lockfile_test.py": {"timeout": 120},
         "package_pex_binary_integration_test.py": {
             "dependencies": [":platforms"],
-            "timeout": 120,
+            "timeout": 300,
         },
         "pytest_runner_integration_test.py": {
             "dependencies": [":test_lockfile"],

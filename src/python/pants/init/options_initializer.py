@@ -30,6 +30,9 @@ from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.requirements import parse_requirements_file
 
+# import pkg_resources
+
+
 logger = logging.getLogger(__name__)
 
 
