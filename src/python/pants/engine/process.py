@@ -441,6 +441,7 @@ class InteractiveProcess(SideEffecting):
         append_only_caches: Mapping[str, str] | None = None,
         immutable_input_digests: Mapping[str, Digest] | None = None,
         keep_sandboxes: KeepSandboxes = KeepSandboxes.never,
+        working_directory: str | None = None,
     ) -> None:
         """Request to run a subprocess in the foreground, similar to subprocess.run().
 
@@ -463,6 +464,7 @@ class InteractiveProcess(SideEffecting):
                 input_digest=input_digest,
                 append_only_caches=append_only_caches,
                 immutable_input_digests=immutable_input_digests,
+                working_directory=working_directory,
             ),
         )
         object.__setattr__(self, "run_in_workspace", run_in_workspace)
@@ -489,6 +491,7 @@ class InteractiveProcess(SideEffecting):
             append_only_caches=process.append_only_caches,
             immutable_input_digests=process.immutable_input_digests,
             keep_sandboxes=keep_sandboxes,
+            working_directory=process.working_directory,
         )
 
 
