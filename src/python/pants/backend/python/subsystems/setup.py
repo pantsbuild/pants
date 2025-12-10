@@ -453,11 +453,14 @@ class PythonSetup(Subsystem):
     _resolves_to_lock_style = DictOption[str](
         help=softwrap(
             f"""
-            The style of lock to generate. The 'strict' style generates a lock file that contains exactly the
+            The style of lock to generate. Valid values are 'strict', 'sources', or 'universal'
+            (additional styles may be supported in future PEX versions).
+
+            The 'strict' style generates a lock file that contains exactly the
             distributions that would be used in a local PEX build. If an sdist would be used, the sdist is included, but if a
             wheel would be used, an accompanying sdist will not be included. The 'sources' style includes locks containing both
             wheels and the associated sdists when available. The 'universal' style generates a universal lock for all possible
-            target interpreters and platforms, although the scope can be constrained via one or more --interpreter-constraint. Of
+            target interpreters and platforms, although the scope can be constrained via `[python].resolves_to_interpreter_constraints`. Of
             the three lock styles, only 'strict' can give you full confidence in the lock since it includes exactly the artifacts
             that are included in the local PEX you'll build to test the lock result with before checking in the lock. With the
             other two styles you lock un-vetted artifacts in addition to the 'strict' ones; so, even though you can be sure to
@@ -470,8 +473,11 @@ class PythonSetup(Subsystem):
             with a potential price and using these styles should be considered carefully.
 
             Expects a dictionary of resolve names from `[python].resolves` to style values.
-            For example, `{{'data-science': 'strict', 'web-app': 'universal'}}`.
             If a resolve is not set in the dictionary, it will default to 'universal'.
+
+            Examples:
+            - `{{'data-science': 'strict', 'web-app': 'universal'}}` - use strict style for data-science resolve, universal for web-app
+            - `{{'python-default': 'sources'}}` - use sources style for the default resolve
 
             You can use the key `{RESOLVE_OPTION_KEY__DEFAULT}` to set a default value for all
             resolves.
