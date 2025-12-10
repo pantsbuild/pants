@@ -54,8 +54,10 @@ _PRESERVED_ENV_VARS = [
     # Environment variables needed to support downloading tools in a restricted internet environment
     "HTTP_PROXY",
     "HTTPS_PROXY",
+    "NO_PROXY",
     "http_proxy", # for historical reasons, in some environments, *_proxy variables must be lowercase
     "https_proxy",
+    "no_proxy",
 ]
 
 
