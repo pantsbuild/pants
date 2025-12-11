@@ -517,6 +517,8 @@ def test_local_requirements_and_path_mappings(
                     resolve_name="test",
                     lockfile_dest="test.lock",
                     diff=False,
+                    lock_style="universal",
+                    complete_platforms=(),
                 )
             ],
         )
@@ -733,6 +735,8 @@ def test_setup_pex_requirements() -> None:
                     excludes=FrozenOrderedSet(),
                     overrides=FrozenOrderedSet(),
                     sources=FrozenOrderedSet(),
+                    lock_style="universal",
+                    complete_platforms=(),
                 ),
                 "pants.backend.python.util_rules.pex.get_req_strings": lambda _: PexRequirementsInfo(
                     (
@@ -897,6 +901,8 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
         excludes=set(),
         overrides=set(),
         sources=set(),
+        lock_style="universal",
+        complete_platforms=(),
     ).add_header_to_lockfile(b"", regenerate_command="regen", delimeter="#")
     rule_runner.write_files({"lock.txt": lock_content.decode()})
 
