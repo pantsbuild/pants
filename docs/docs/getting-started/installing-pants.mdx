@@ -70,7 +70,7 @@ RUN uv tool install \
   https://github.com/pantsbuild/pants/releases/download/release_2.30.0/pantsbuild_pants-2.30.0-cp311-cp311-manylinux2014_x86_64.whl \
   --python 3.11
 ```
-You can avoid hardcoding wheel wheel URLs and satisfy firewall constraints by uploading these pants wheels on your private [package indexes](https://docs.astral.sh/uv/concepts/indexes/) and only use this via `uv tool`'s documentation (i.e. using `uv tool --index-url`).
+You can avoid hardcoding wheel wheel URLs and satisfy firewall constraints by uploading these pants wheels on your private [package indexes](https://docs.astral.sh/uv/concepts/indexes/) and use these as per `uv tool`'s documentation (i.e. using `uv tool --index-url`).
 
 ## The `pants` binary's implementation
 
