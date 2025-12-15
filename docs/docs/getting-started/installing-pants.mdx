@@ -66,7 +66,7 @@ For container environments where a static or airtight installation is often impo
 FROM debian:bookworm-slim
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/
 ENV NO_SCIE_WARNING=True
-RUN uv tool install \
+RUN UV_TOOL_BIN_DIR=/usr/local/bin UV_TOOL_DIR=/usr/local/share uv tool install \
   https://github.com/pantsbuild/pants/releases/download/release_2.30.0/pantsbuild_pants-2.30.0-cp311-cp311-manylinux2014_x86_64.whl \
   --python 3.11
 ```
