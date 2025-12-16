@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from pants.backend.nfpm.field_sets import NfpmRpmPackageFieldSet
 from pants.backend.nfpm.fields.rpm import NfpmRpmDependsField, NfpmRpmProvidesField
+from pants.backend.nfpm.native_libs.deb.rules import rules as deb_rules
 from pants.backend.nfpm.native_libs.elfdeps.rules import RequestPexELFInfo, elfdeps_analyze_pex
 from pants.backend.nfpm.native_libs.elfdeps.rules import rules as elfdeps_rules
 from pants.backend.nfpm.util_rules.contents import (
@@ -117,6 +118,7 @@ async def inject_native_libs_dependencies_in_package_fields(
 
 def rules() -> Iterable[Rule | UnionRule]:
     return (
+        *deb_rules(),
         *elfdeps_rules(),
         *collect_rules(),
         UnionRule(InjectNfpmPackageFieldsRequest, NativeLibsNfpmPackageFieldsRequest),
