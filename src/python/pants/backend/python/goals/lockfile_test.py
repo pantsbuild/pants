@@ -434,6 +434,70 @@ def test_define_source_from_different_index(rule_runner: PythonRuleRunner) -> No
     assert sdist_cowsay in artifacts
 
 
+def test_uv_lockfile_resolver_rejects_universal_lock_style(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.set_options(["--python-lockfile-resolver=uv"], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    with pytest.raises(ExecutionError) as excinfo:
+        rule_runner.request(
+            GenerateLockfileResult,
+            [
+                GeneratePythonLockfile(
+                    requirements=FrozenOrderedSet(["ansicolors==1.1.8"]),
+                    find_links=FrozenOrderedSet([]),
+                    interpreter_constraints=InterpreterConstraints(),
+                    resolve_name="test",
+                    lockfile_dest="test.lock",
+                    diff=False,
+                    lock_style="universal",
+                    complete_platforms=(),
+                )
+            ],
+        )
+    assert "does not yet support `lock_style=\"universal\"`" in str(excinfo.value)
+
+
+def test_uv_lockfile_resolver_requires_interpreter_constraints(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.set_options(["--python-lockfile-resolver=uv"], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    with pytest.raises(ExecutionError) as excinfo:
+        rule_runner.request(
+            GenerateLockfileResult,
+            [
+                GeneratePythonLockfile(
+                    requirements=FrozenOrderedSet(["ansicolors==1.1.8"]),
+                    find_links=FrozenOrderedSet([]),
+                    interpreter_constraints=InterpreterConstraints(),
+                    resolve_name="test",
+                    lockfile_dest="test.lock",
+                    diff=False,
+                    lock_style="strict",
+                    complete_platforms=(),
+                )
+            ],
+        )
+    assert "requires interpreter constraints to be set" in str(excinfo.value)
+
+
+def test_uv_lockfile_resolver_requires_single_python_minor(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.set_options(["--python-lockfile-resolver=uv"], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    with pytest.raises(ExecutionError) as excinfo:
+        rule_runner.request(
+            GenerateLockfileResult,
+            [
+                GeneratePythonLockfile(
+                    requirements=FrozenOrderedSet(["ansicolors==1.1.8"]),
+                    find_links=FrozenOrderedSet([]),
+                    interpreter_constraints=InterpreterConstraints(["CPython>=3.10,<3.12"]),
+                    resolve_name="test",
+                    lockfile_dest="test.lock",
+                    diff=False,
+                    lock_style="strict",
+                    complete_platforms=(),
+                )
+            ],
+        )
+    assert "requires interpreter constraints" in str(excinfo.value)
+    assert "select exactly one Python major/minor version" in str(excinfo.value)
+
+
 def test_override_version(rule_runner: PythonRuleRunner) -> None:
     args = [
         "--python-resolves={'test': 'test.lock'}",
