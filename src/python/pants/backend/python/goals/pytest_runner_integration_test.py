@@ -982,3 +982,34 @@ def test_batched_failing(rule_runner: PythonRuleRunner) -> None:
     stdout_text = result.stdout_simplified_str
     assert f"{PACKAGE}/test_1.py ." in stdout_text
     assert f"{PACKAGE}/test_2.py F" in stdout_text
+
+
+def test_no_tests_collected_fails_by_default(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/tests.py": GOOD_TEST,
+            f"{PACKAGE}/BUILD": "python_tests()",
+        }
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
+    result = run_pytest_noninteractive(
+        rule_runner, tgt, extra_args=["--pytest-args='-k nonexistent_test'"]
+    )
+    assert result.exit_code == 5
+    assert b"deselected" in result.stdout_bytes
+
+
+def test_no_tests_collected_succeeds_when_allowed(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/tests.py": GOOD_TEST,
+            f"{PACKAGE}/BUILD": "python_tests()",
+        }
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
+    result = run_pytest_noninteractive(
+        rule_runner,
+        tgt,
+        extra_args=["--pytest-args='-k nonexistent_test'", "--pytest-allow-empty-test-collection"],
+    )
+    assert result.exit_code is None
