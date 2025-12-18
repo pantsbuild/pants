@@ -5,6 +5,7 @@ import logging
 import os
 import sys
 import time
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from threading import Lock
 
@@ -43,7 +44,7 @@ class DaemonPantsRunner:
     @contextmanager
     def _one_run_at_a_time(
         self, stderr_fileno: int, cancellation_latch: PySessionCancellationLatch, timeout: float
-    ):
+    ) -> Generator[Callable[[], None], None, None]:
         """Acquires exclusive access within the daemon.
 
         Periodically prints a message on the given stderr_fileno while exclusive access cannot be
@@ -73,14 +74,19 @@ class DaemonPantsRunner:
                 "If you don't want to wait for the first run to finish, please press Ctrl-C and run "
                 "this command with PANTS_CONCURRENT=True in the environment.\n",
             )
+
+        def release_daemon_concurrency_lock():
+            if self._run_lock.locked:
+                self._run_lock.release()
+
         while True:
             now = time.time()
             if acquired:
                 try:
-                    yield
+                    yield release_daemon_concurrency_lock
                     break
                 finally:
-                    self._run_lock.release()
+                    release_daemon_concurrency_lock()
             elif should_keep_polling(now):
                 if now > render_deadline:
                     self._send_stderr(
@@ -100,6 +106,8 @@ class DaemonPantsRunner:
         env: dict[str, str],
         working_dir: str,
         cancellation_latch: PySessionCancellationLatch,
+        *,
+        release_daemon_concurrency_lock: Callable[[], None],
     ) -> ExitCode:
         """Run a single daemonized run of Pants.
 
@@ -137,6 +145,7 @@ class DaemonPantsRunner:
                 scheduler=scheduler,
                 options_initializer=options_initializer,
                 cancellation_latch=cancellation_latch,
+                release_daemon_concurrency_lock=release_daemon_concurrency_lock,
             )
             return runner.run(start_time)
         except Exception as e:
@@ -163,7 +172,7 @@ class DaemonPantsRunner:
             stderr_fileno,
             cancellation_latch=cancellation_latch,
             timeout=request_timeout,
-        ):
+        ) as release_daemon_concurrency_lock:
             # NB: `single_daemonized_run` implements exception handling, so only the most primitive
             # errors will escape this function, where they will be logged by the server.
             logger.info(f"handling request: `{' '.join(args)}`")
@@ -174,7 +183,11 @@ class DaemonPantsRunner:
                     stderr_fileno=stderr_fileno,
                 ):
                     return self.single_daemonized_run(
-                        ((command,) + args), env, working_dir, cancellation_latch
+                        ((command,) + args),
+                        env,
+                        working_dir,
+                        cancellation_latch,
+                        release_daemon_concurrency_lock=release_daemon_concurrency_lock,
                     )
             finally:
                 logger.info(f"request completed: `{' '.join(args)}`")
