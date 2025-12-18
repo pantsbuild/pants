@@ -965,6 +965,7 @@ def build_wheels_job(
 
     if container:
         initial_steps = [
+            free_disk_space_step(),
             *checkout(containerized=True, ref=for_deploy_ref),
             *install_rustup(),
             {

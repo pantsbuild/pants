@@ -26,6 +26,16 @@ jobs:
     - image=ubuntu22-full-arm64-python3.7-3.13
     - run-id=${{ github.run_id }}
     steps:
+    - name: Free up disk space
+      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+      with:
+        android: true
+        docker-images: false
+        dotnet: true
+        haskell: true
+        large-packages: false
+        swap-storage: false
+        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v5
       with:
@@ -132,6 +142,16 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
+    - name: Free up disk space
+      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+      with:
+        android: true
+        docker-images: false
+        dotnet: true
+        haskell: true
+        large-packages: false
+        swap-storage: false
+        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v5
       with:
