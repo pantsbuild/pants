@@ -11,7 +11,7 @@ runs:
 
         # Disable these because not as huge an impact or for `large-packages` it would take time to remove packages
         # since `apt-get` must be invoked.
-        large-packges: false
+        large-packages: false
         docker-images: false
         tool-cache: false
         swap-storage: false
