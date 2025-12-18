@@ -28,6 +28,7 @@ jobs:
     - image=ubuntu22-full-arm64-python3.7-3.13
     - run-id=${{ github.run_id }}
     steps:
+    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
@@ -115,6 +116,7 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
+    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
@@ -222,6 +224,7 @@ jobs:
     runs-on:
     - macos-14
     steps:
+    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
@@ -807,6 +810,7 @@ jobs:
     - image=ubuntu22-full-arm64-python3.7-3.13
     - run-id=${{ github.run_id }}
     steps:
+    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
@@ -880,6 +884,7 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
+    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
@@ -996,6 +1001,7 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
+    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
@@ -1112,6 +1118,7 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
+    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
@@ -1228,6 +1235,7 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
+    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
@@ -1344,6 +1352,7 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
+    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
@@ -1460,6 +1469,7 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
+    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
@@ -1576,6 +1586,7 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
+    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
@@ -1692,6 +1703,7 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
+    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
@@ -1808,6 +1820,7 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
+    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
@@ -1924,6 +1937,7 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
+    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
@@ -2041,6 +2055,7 @@ jobs:
     runs-on:
     - macos-14
     steps:
+    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
