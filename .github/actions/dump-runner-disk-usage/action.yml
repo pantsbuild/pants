@@ -3,15 +3,18 @@ description: "Scan the runner's installed software and show sizes."
 runs:
   using: composite
   steps:
-  - name: Existing free space
+  - name: Existing free space (all mount points)
     run: "df -h"
     shell: bash
-  - name: Show existing software sizes
+  - name: Existing free space (current directory)
+    run: "df -h ."
+    shell: bash
+  - name: Show sizes of various existing software
     shell: bash
     run: |
       check_path() {
         local title="$1"
-        shiff
+        shift
 
         echo "::group::${title}"
         for path in "$@" ; do
