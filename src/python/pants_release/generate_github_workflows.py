@@ -984,6 +984,7 @@ def build_wheels_job(
         ]
     else:
         initial_steps = [
+            free_disk_space_step(),
             *checkout(ref=for_deploy_ref),
             *helper.setup_pythons(),
             # NB: We only cache Rust, but not `native_engine.so` and the Pants
