@@ -579,6 +579,10 @@ class Helper:
     def bootstrap_pants(self) -> Sequence[Step]:
         return [
             *checkout(),
+            {
+                "name": "Check disk space usage.",
+                "uses": "./.github/actions/dump-runner-disk-usage",
+            },
             *self.setup_pythons(),
             *self.bootstrap_caches(),
             {
@@ -717,10 +721,6 @@ def bootstrap_jobs(
         "if": IS_PANTS_OWNER,
         "steps": [
             *helper.bootstrap_pants(),
-            {
-                "name": "Check disk space usage.",
-                "uses": "./.github/actions/dump-runner-disk-usage",
-            },
             *(
                 [
                     {

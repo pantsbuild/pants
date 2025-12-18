@@ -32,6 +32,8 @@ jobs:
       uses: actions/checkout@v5
       with:
         fetch-depth: 10
+    - name: Check disk space usage.
+      uses: ./.github/actions/dump-runner-disk-usage
     - name: Install Protoc
       uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
@@ -98,8 +100,6 @@ jobs:
           src/python/pants/bin/sandboxer
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
-    - name: Check disk space usage.
-      uses: ./.github/actions/dump-runner-disk-usage
     - env:
         TMPDIR: ${{ runner.temp }}
       if: needs.classify_changes.outputs.rust == 'true'
@@ -121,6 +121,8 @@ jobs:
       uses: actions/checkout@v5
       with:
         fetch-depth: 10
+    - name: Check disk space usage.
+      uses: ./.github/actions/dump-runner-disk-usage
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
       uses: actions/setup-python@v6
       with:
@@ -198,8 +200,6 @@ jobs:
           src/python/pants/bin/sandboxer
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
-    - name: Check disk space usage.
-      uses: ./.github/actions/dump-runner-disk-usage
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
@@ -230,6 +230,8 @@ jobs:
       uses: actions/checkout@v5
       with:
         fetch-depth: 10
+    - name: Check disk space usage.
+      uses: ./.github/actions/dump-runner-disk-usage
     - name: Set up Python 3.9, 3.10, 3.12, 3.13, 3.11
       uses: actions/setup-python@v6
       with:
@@ -305,8 +307,6 @@ jobs:
           src/python/pants/bin/sandboxer
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
-    - name: Check disk space usage.
-      uses: ./.github/actions/dump-runner-disk-usage
     - env:
         TMPDIR: ${{ runner.temp }}
       if: needs.classify_changes.outputs.rust == 'true'

@@ -5,7 +5,9 @@ runs:
   steps:
   - name: Existing free space
     run: "df -h"
+    shell: bash
   - name: Show existing software sizes
+    shell: bash
     run: |
       check_path() {
         local title="$1"
