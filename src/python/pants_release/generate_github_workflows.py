@@ -716,6 +716,9 @@ def bootstrap_jobs(
         "timeout-minutes": 60,
         "if": IS_PANTS_OWNER,
         "steps": [
+            {
+                "uses": "./.github/actions/free-disk-space",
+            },
             *helper.bootstrap_pants(),
             *(
                 [
@@ -779,6 +782,9 @@ def test_jobs(
         "timeout-minutes": 90,
         "if": IS_PANTS_OWNER,
         "steps": [
+            {
+                "uses": "./.github/actions/free-disk-space",
+            },
             *checkout(),
             *(launch_bazel_remote() if with_remote_caching else []),
             install_jdk(),
