@@ -31,6 +31,7 @@ def action(name: str) -> str:
         "checkout": "actions/checkout@v5",
         "coverallsapp": "coverallsapp/github-action@v2",
         "download-artifact": "actions/download-artifact@v6",
+        "free-disk-space": "jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be",
         "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
         "msys2": "msys2/setup-msys2@v2",
         "rust-cache": "Swatinem/rust-cache@v2.8.1",
@@ -578,10 +579,8 @@ class Helper:
 
     def bootstrap_pants(self) -> Sequence[Step]:
         return [
+            free_disk_space_step(),
             *checkout(),
-            {
-                "uses": "./.github/actions/free-disk-space",
-            },
             *self.setup_pythons(),
             *self.bootstrap_caches(),
             {
@@ -668,6 +667,25 @@ class Helper:
                 "fail-on-error": False,
             },
         }
+
+
+def free_disk_space_step() -> Step:
+    return {
+        "name": "Free up disk space",
+        "uses": action("free-disk-space"),
+        "with": {
+            "android": True,  # ~9GB
+            "dotnet": True,  # ~4GB
+            "haskell": True,  # ~6GB
+            # Keep the tool cache since we use other actions which install to the tool cache.
+            "tool-cache": False,
+            # Disable these because not as huge an impact or for `large-packages` it would take time to remove packages
+            # since `apt-get` must be invoked.
+            "large-packages": False,
+            "docker-images": False,
+            "swap-storage": False,
+        },
+    }
 
 
 class RustTesting(Enum):
@@ -782,10 +800,8 @@ def test_jobs(
         "timeout-minutes": 90,
         "if": IS_PANTS_OWNER,
         "steps": [
+            free_disk_space_step(),
             *checkout(),
-            {
-                "uses": "./.github/actions/free-disk-space",
-            },
             *(launch_bazel_remote() if with_remote_caching else []),
             install_jdk(),
             *install_go(),
