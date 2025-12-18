@@ -28,11 +28,11 @@ jobs:
     - image=ubuntu22-full-arm64-python3.7-3.13
     - run-id=${{ github.run_id }}
     steps:
-    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
         fetch-depth: 10
+    - uses: ./.github/actions/free-disk-space
     - name: Install Protoc
       uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
@@ -116,11 +116,11 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
-    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
         fetch-depth: 10
+    - uses: ./.github/actions/free-disk-space
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
       uses: actions/setup-python@v6
       with:
@@ -224,11 +224,11 @@ jobs:
     runs-on:
     - macos-14
     steps:
-    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
         fetch-depth: 10
+    - uses: ./.github/actions/free-disk-space
     - name: Set up Python 3.9, 3.10, 3.12, 3.13, 3.11
       uses: actions/setup-python@v6
       with:
@@ -810,11 +810,11 @@ jobs:
     - image=ubuntu22-full-arm64-python3.7-3.13
     - run-id=${{ github.run_id }}
     steps:
-    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
         fetch-depth: 10
+    - uses: ./.github/actions/free-disk-space
     - name: Install AdoptJDK
       uses: actions/setup-java@v5
       with:
@@ -884,11 +884,11 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
-    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
         fetch-depth: 10
+    - uses: ./.github/actions/free-disk-space
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -1001,11 +1001,11 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
-    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
         fetch-depth: 10
+    - uses: ./.github/actions/free-disk-space
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -1118,11 +1118,11 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
-    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
         fetch-depth: 10
+    - uses: ./.github/actions/free-disk-space
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -1235,11 +1235,11 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
-    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
         fetch-depth: 10
+    - uses: ./.github/actions/free-disk-space
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -1352,11 +1352,11 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
-    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
         fetch-depth: 10
+    - uses: ./.github/actions/free-disk-space
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -1469,11 +1469,11 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
-    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
         fetch-depth: 10
+    - uses: ./.github/actions/free-disk-space
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -1586,11 +1586,11 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
-    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
         fetch-depth: 10
+    - uses: ./.github/actions/free-disk-space
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -1703,11 +1703,11 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
-    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
         fetch-depth: 10
+    - uses: ./.github/actions/free-disk-space
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -1820,11 +1820,11 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
-    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
         fetch-depth: 10
+    - uses: ./.github/actions/free-disk-space
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -1937,11 +1937,11 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
-    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
         fetch-depth: 10
+    - uses: ./.github/actions/free-disk-space
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -2055,11 +2055,11 @@ jobs:
     runs-on:
     - macos-14
     steps:
-    - uses: ./.github/actions/free-disk-space
     - name: Check out code
       uses: actions/checkout@v5
       with:
         fetch-depth: 10
+    - uses: ./.github/actions/free-disk-space
     - name: Install AdoptJDK
       uses: actions/setup-java@v5
       with:
