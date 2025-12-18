@@ -99,7 +99,11 @@ def _strip_named_repo(value: str) -> str:
     named so they can be referenced by `--source` in Pex. `uv` does not understand this syntax.
     """
     maybe_name, maybe_url = value.split("=", 1) if "=" in value else ("", value)
-    if maybe_name and "://" not in maybe_name and ("://" in maybe_url or maybe_url.startswith("file:")):
+    if (
+        maybe_name
+        and "://" not in maybe_name
+        and ("://" in maybe_url or maybe_url.startswith("file:"))
+    ):
         return maybe_url
     return value
 
@@ -279,10 +283,8 @@ async def generate_lockfile(
 
         uv_find_links_args = list(
             itertools.chain.from_iterable(
-                (
-                    ["--find-links", _strip_named_repo(link)]
-                    for link in (*resolve_config.find_links, *req.find_links)
-                )
+                ["--find-links", _strip_named_repo(link)]
+                for link in (*resolve_config.find_links, *req.find_links)
             )
         )
 
