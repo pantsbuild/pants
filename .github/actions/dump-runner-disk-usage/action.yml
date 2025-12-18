@@ -20,7 +20,6 @@ runs:
         for path in "$@" ; do
           if [ -d "$path" ]; then
             du -sh "$path"
-            du -sh "${path}/*"
           else
             echo "WARNING: Path '${path}' does not exist or is not a directory."
           fi
