@@ -717,6 +717,10 @@ def bootstrap_jobs(
         "if": IS_PANTS_OWNER,
         "steps": [
             *helper.bootstrap_pants(),
+            {
+                "name": "Check disk space usage.",
+                "uses": "./.github/actions/dump-runner-disk-usage",
+            },
             *(
                 [
                     {

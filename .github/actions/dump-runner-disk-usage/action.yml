@@ -1,0 +1,29 @@
+name: "Dump Runner Disk Usage"
+description: "Scan the runner's installed software and show sizes."
+runs:
+  using: composite
+  steps:
+  - name: Existing free space
+    run: "df -h"
+  - name: Show existing software sizes
+    run: |
+      check_path() {
+        local title="$1"
+        shiff
+
+        echo "::group::${title}"
+        for path in "$@" ; do
+          if [ -d "$path" ]; then
+            du -sh "$path"
+            du -sh "${path}/*"
+          else
+            echo "WARNING: Path '${path}' does not exist or is not a directory."
+          fi
+        done
+        echo "::endgroup::"
+      }
+
+      check_path DotNet /usr/share/dotnet
+      check_path Android /usr/local/lib/android
+      check_path Haskell /opt/ghc /usr/local/.ghcup
+      check_path CodeQL /opt/hostedtoolcache/CodeQL

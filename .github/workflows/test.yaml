@@ -98,6 +98,8 @@ jobs:
           src/python/pants/bin/sandboxer
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
+    - name: Check disk space usage.
+      uses: ./.github/actions/dump-runner-disk-usage
     - env:
         TMPDIR: ${{ runner.temp }}
       if: needs.classify_changes.outputs.rust == 'true'
@@ -196,6 +198,8 @@ jobs:
           src/python/pants/bin/sandboxer
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
+    - name: Check disk space usage.
+      uses: ./.github/actions/dump-runner-disk-usage
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
         PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
@@ -301,6 +305,8 @@ jobs:
           src/python/pants/bin/sandboxer
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
+    - name: Check disk space usage.
+      uses: ./.github/actions/dump-runner-disk-usage
     - env:
         TMPDIR: ${{ runner.temp }}
       if: needs.classify_changes.outputs.rust == 'true'
