@@ -452,10 +452,12 @@ def test_uv_lockfile_resolver_rejects_universal_lock_style(rule_runner: PythonRu
                 )
             ],
         )
-    assert "does not yet support `lock_style=\"universal\"`" in str(excinfo.value)
+    assert 'does not yet support `lock_style="universal"`' in str(excinfo.value)
 
 
-def test_uv_lockfile_resolver_requires_interpreter_constraints(rule_runner: PythonRuleRunner) -> None:
+def test_uv_lockfile_resolver_requires_interpreter_constraints(
+    rule_runner: PythonRuleRunner,
+) -> None:
     rule_runner.set_options(["--python-lockfile-resolver=uv"], env_inherit=PYTHON_BOOTSTRAP_ENV)
     with pytest.raises(ExecutionError) as excinfo:
         rule_runner.request(
