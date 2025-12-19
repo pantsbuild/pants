@@ -126,6 +126,21 @@ class PyTest(PythonToolBase):
             """
         ),
     )
+    allow_empty_test_collection = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            If true, treat pytest exit code 5 ("No tests were collected") as success.
+
+            Pytest returns exit code 5 when no tests are collected, e.g., when all tests
+            in a file are skipped via markers or deselected via `-k`. By default, Pants
+            treats this as a test failure. Enable this option to instead treat it as
+            "no tests found", which will be skipped in the test summary.
+
+            See https://docs.pytest.org/en/stable/reference/exit-codes.html
+            """
+        ),
+    )
 
     skip = SkipOption("test")
 

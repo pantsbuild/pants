@@ -521,6 +521,7 @@ async def partition_python_tests(
 @rule(desc="Run Pytest", level=LogLevel.DEBUG)
 async def run_python_tests(
     batch: PyTestRequest.Batch[PythonTestFieldSet, TestMetadata],
+    pytest: PyTest,
     test_subsystem: TestSubsystem,
     global_options: GlobalOptions,
 ) -> TestResult:
@@ -572,6 +573,9 @@ async def run_python_tests(
     extra_output_snapshot = await digest_to_snapshot(
         **implicitly(RemovePrefix(extra_output_snapshot.digest, _EXTRA_OUTPUT_DIR))
     )
+
+    if last_result.exit_code == 5 and pytest.allow_empty_test_collection:
+        return TestResult.no_tests_found_in_batch(batch, test_subsystem.output)
 
     return TestResult.from_batched_fallible_process_result(
         results.results,
