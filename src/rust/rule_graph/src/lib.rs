@@ -496,7 +496,6 @@ impl<R: Rule> RuleGraph<R> {
                         root_str,
                         dep_entries
                             .iter()
-                            .cloned()
                             .map(|d| format!("\"{}\"", d.entry_str))
                             .collect::<Vec<String>>()
                             .join(" ")
@@ -532,7 +531,6 @@ impl<R: Rule> RuleGraph<R> {
                         k.fmt_for_graph(display_args),
                         dep_entries
                             .iter()
-                            .cloned()
                             .map(|d| format!("\"{}\"", d.entry_str))
                             .collect::<Vec<String>>()
                             .join(" "),

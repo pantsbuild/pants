@@ -776,7 +776,10 @@ def bootstrap_jobs(
                         # We pass --tests to skip doc tests because our generated protos contain
                         # invalid doc tests in their comments.
                         "run": step_cmd,
-                        "env": {"TMPDIR": f"{gha_expr('runner.temp')}"},
+                        "env": {
+                            "CARGO_BUILD_JOBS": "1",
+                            "TMPDIR": f"{gha_expr('runner.temp')}",
+                        },
                         "if": DONT_SKIP_RUST,
                     }
                 ]

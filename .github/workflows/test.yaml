@@ -54,7 +54,7 @@ jobs:
       with:
         key: Linux-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.91.0-*
+          ~/.rustup/toolchains/1.92.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
@@ -109,6 +109,7 @@ jobs:
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
+        CARGO_BUILD_JOBS: '1'
         TMPDIR: ${{ runner.temp }}
       if: needs.classify_changes.outputs.rust == 'true'
       name: Test Rust
@@ -162,7 +163,7 @@ jobs:
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.91.0-*
+          ~/.rustup/toolchains/1.92.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
@@ -223,6 +224,7 @@ jobs:
       run: |
         ./pants run src/python/pants_release/generate_github_workflows.py -- --check
     - env:
+        CARGO_BUILD_JOBS: '1'
         TMPDIR: ${{ runner.temp }}
       if: needs.classify_changes.outputs.rust == 'true'
       name: Test and lint Rust
@@ -277,7 +279,7 @@ jobs:
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.91.0-*
+          ~/.rustup/toolchains/1.92.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
@@ -332,6 +334,7 @@ jobs:
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
+        CARGO_BUILD_JOBS: '1'
         TMPDIR: ${{ runner.temp }}
       if: needs.classify_changes.outputs.rust == 'true'
       name: Test Rust
@@ -381,7 +384,7 @@ jobs:
     - name: Install Rust toolchain
       run: |
         # Set the default toolchain. Installs the toolchain if it is not already installed.
-        rustup default 1.91.0
+        rustup default 1.92.0
         cargo version
     - name: Expose Pythons
       run: |
@@ -460,7 +463,7 @@ jobs:
     - name: Install Rust toolchain
       run: |
         # Set the default toolchain. Installs the toolchain if it is not already installed.
-        rustup default 1.91.0
+        rustup default 1.92.0
         cargo version
     - name: Expose Pythons
       run: |
@@ -557,7 +560,7 @@ jobs:
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.91.0-*
+          ~/.rustup/toolchains/1.92.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
