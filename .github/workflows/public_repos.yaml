@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: AlexTereshenkov/cheeseshop-query
@@ -94,7 +94,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: Ars-Linguistica/mlconjug3
@@ -145,7 +145,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: OpenSaMD/OpenSaMD
@@ -226,7 +226,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: StackStorm/st2
@@ -315,7 +315,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: fucina/treb
@@ -386,7 +386,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: ghandic/jsf
@@ -447,7 +447,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: komprenilo/liga
@@ -498,7 +498,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: lablup/backend.ai
@@ -581,7 +581,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: mitodl/ol-django
@@ -634,7 +634,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: mitodl/ol-infrastructure
@@ -685,7 +685,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: naccdata/flywheel-gear-extensions
@@ -746,7 +746,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: pantsbuild/example-adhoc
@@ -811,7 +811,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: pantsbuild/example-codegen
@@ -899,7 +899,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: pantsbuild/example-django
@@ -981,7 +981,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: pantsbuild/example-docker
@@ -1062,7 +1062,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: pantsbuild/example-golang
@@ -1071,11 +1071,11 @@ jobs:
       with:
         python-version: '3.10'
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.24.9
     - name: Pants on
@@ -1151,7 +1151,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: pantsbuild/example-jvm
@@ -1232,7 +1232,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: pantsbuild/example-kotlin
@@ -1313,7 +1313,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: pantsbuild/example-python
@@ -1394,7 +1394,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: pantsbuild/example-visibility
@@ -1465,7 +1465,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: pantsbuild/scie-pants

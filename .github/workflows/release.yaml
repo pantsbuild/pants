@@ -35,7 +35,7 @@ jobs:
         rm -rf /mnt/host-root/usr/local/.ghcup || true
         df -h
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
@@ -79,7 +79,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: logs-wheels-and-pex-Linux-ARM64
         overwrite: 'true'
@@ -151,7 +151,7 @@ jobs:
         rm -rf /mnt/host-root/usr/local/.ghcup || true
         df -h
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
@@ -181,11 +181,11 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.24.9
     - env:
@@ -203,7 +203,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: logs-wheels-and-pex-Linux-x86_64
         overwrite: 'true'
@@ -288,7 +288,7 @@ jobs:
         swap-storage: false
         tool-cache: false
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
@@ -309,7 +309,7 @@ jobs:
     - name: Set rustup profile
       run: rustup set profile default
     - name: Cache Rust toolchain
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
@@ -317,7 +317,7 @@ jobs:
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.1
+      uses: Swatinem/rust-cache@v2.8.2
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -328,11 +328,11 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.24.9
     - env:
@@ -352,7 +352,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: logs-wheels-and-pex-macOS14-ARM64
         overwrite: 'true'
@@ -407,7 +407,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Checkout Pants at Release Tag
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: '0'
         fetch-tags: true
@@ -431,7 +431,7 @@ jobs:
     - name: Set rustup profile
       run: rustup set profile default
     - name: Cache Rust toolchain
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
@@ -439,7 +439,7 @@ jobs:
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.1
+      uses: Swatinem/rust-cache@v2.8.2
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -449,7 +449,7 @@ jobs:
       run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
       shell: bash
     - name: Cache native engine
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         key: Linux-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
         path: |-
@@ -470,7 +470,7 @@ jobs:
         payload-file-path: ${{ runner.temp }}/slack_announcement.json
         token: ${{ secrets.SLACK_BOT_TOKEN }}
     - name: Announce to pants-devel
-      uses: dawidd6/action-send-mail@v3.8.0
+      uses: dawidd6/action-send-mail@v3.12.0
       with:
         body: file://${{ runner.temp }}/email_announcement_body.md
         connection_url: ${{ secrets.EMAIL_CONNECTION_URL }}
