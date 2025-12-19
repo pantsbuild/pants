@@ -9,6 +9,7 @@ Created as part of the release process.
 + Aditya Raj Verma
 + Alan Paulin
 + Alan Velasco
++ Aleksandr Artemenkov
 + Alex Bancroft
 + Alex Schmitt
 + Alexander Heldt
