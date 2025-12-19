@@ -976,7 +976,7 @@ def build_wheels_job(
     if platform == Platform.LINUX_X86_64:
         container = {
             "image": "quay.io/pypa/manylinux_2_28_x86_64:latest",
-            "volumes": [{"/": "/mnt/host-root"}],
+            "volumes": ["/:/mnt/host-root"],
         }
     elif platform == Platform.LINUX_ARM64:
         container = {"image": "quay.io/pypa/manylinux_2_28_aarch64:latest"}

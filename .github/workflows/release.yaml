@@ -126,7 +126,7 @@ jobs:
     container:
       image: quay.io/pypa/manylinux_2_28_x86_64:latest
       volumes:
-      - /: /mnt/host-root
+      - /:/mnt/host-root
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
       PANTS_REMOTE_CACHE_READ: 'false'
