@@ -688,6 +688,22 @@ def free_disk_space_step() -> Step:
     }
 
 
+def free_disk_space_in_container(host_root_mount: str) -> Step:
+    return {
+        "name": "Free up disk space",
+        "run": "\n".join(
+            [
+                "df -h",
+                f"rm -rf {host_root_mount}/usr/share/dotnet || true",
+                f"rm -rf {host_root_mount}/usr/local/lib/android || true",
+                f"rm -rf {host_root_mount}/opt/ghc || true",
+                f"rm -rf {host_root_mount}/usr/local/.ghcup || true",
+                "df -h",
+            ]
+        ),
+    }
+
+
 class RustTesting(Enum):
     NONE = "NONE"
     SOME = "SOME"  # Most tests.
@@ -957,7 +973,10 @@ def build_wheels_job(
     # the code, install rustup and expose Pythons.
     # TODO: Apply rust caching here.
     if platform == Platform.LINUX_X86_64:
-        container = {"image": "quay.io/pypa/manylinux_2_28_x86_64:latest"}
+        container = {
+            "image": "quay.io/pypa/manylinux_2_28_x86_64:latest",
+            "volumes": [{"/": "/mnt/host-root"}],
+        }
     elif platform == Platform.LINUX_ARM64:
         container = {"image": "quay.io/pypa/manylinux_2_28_aarch64:latest"}
     else:
@@ -965,7 +984,7 @@ def build_wheels_job(
 
     if container:
         initial_steps = [
-            free_disk_space_step(),
+            free_disk_space_in_container("/mnt/host-root"),
             *checkout(containerized=True, ref=for_deploy_ref),
             *install_rustup(),
             {

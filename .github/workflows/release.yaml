@@ -27,15 +27,13 @@ jobs:
     - run-id=${{ github.run_id }}
     steps:
     - name: Free up disk space
-      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
-      with:
-        android: true
-        docker-images: false
-        dotnet: true
-        haskell: true
-        large-packages: false
-        swap-storage: false
-        tool-cache: false
+      run: |-
+        df -h
+        rm -rf /mnt/host-root/usr/share/dotnet || true
+        rm -rf /mnt/host-root/usr/local/lib/android || true
+        rm -rf /mnt/host-root/opt/ghc || true
+        rm -rf /mnt/host-root/usr/local/.ghcup || true
+        df -h
     - name: Check out code
       uses: actions/checkout@v5
       with:
@@ -127,6 +125,8 @@ jobs:
   build_wheels_linux_x86_64:
     container:
       image: quay.io/pypa/manylinux_2_28_x86_64:latest
+      volumes:
+      - /: /mnt/host-root
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
       PANTS_REMOTE_CACHE_READ: 'false'
@@ -143,15 +143,13 @@ jobs:
     - ubuntu-22.04
     steps:
     - name: Free up disk space
-      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
-      with:
-        android: true
-        docker-images: false
-        dotnet: true
-        haskell: true
-        large-packages: false
-        swap-storage: false
-        tool-cache: false
+      run: |-
+        df -h
+        rm -rf /mnt/host-root/usr/share/dotnet || true
+        rm -rf /mnt/host-root/usr/local/lib/android || true
+        rm -rf /mnt/host-root/opt/ghc || true
+        rm -rf /mnt/host-root/usr/local/.ghcup || true
+        df -h
     - name: Check out code
       uses: actions/checkout@v5
       with:
