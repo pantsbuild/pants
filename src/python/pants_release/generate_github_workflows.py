@@ -688,6 +688,7 @@ def free_disk_space_step() -> Step:
     }
 
 
+# A greatly simplified limited version for use when running in a container
 def free_disk_space_in_container(host_root_mount: str) -> Step:
     return {
         "name": "Free up disk space",
