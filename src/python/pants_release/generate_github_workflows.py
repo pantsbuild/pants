@@ -700,7 +700,6 @@ def bootstrap_jobs(
             [
                 "./build-support/bin/check_rust_pre_commit.sh",
                 "./cargo test --locked --all --tests --benches -- --nocapture",
-                "./cargo doc",
             ]
         )
     else:

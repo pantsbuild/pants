@@ -380,6 +380,8 @@ class ResolvePexConfig:
     overrides: FrozenOrderedSet[str]
     sources: FrozenOrderedSet[str]
     path_mappings: tuple[str, ...]
+    lock_style: str
+    complete_platforms: tuple[str, ...]
 
     def pex_args(self) -> Iterator[str]:
         """Arguments for Pex for indexes/--find-links, manylinux, and path mappings.
@@ -465,6 +467,8 @@ async def determine_resolve_pex_config(
             overrides=FrozenOrderedSet(),
             sources=FrozenOrderedSet(),
             path_mappings=python_repos.path_mappings,
+            lock_style="universal",  # Default to universal when no resolve name
+            complete_platforms=(),  # No complete platforms by default
         )
 
     no_binary = python_setup.resolves_to_no_binary().get(request.resolve_name) or []
@@ -472,6 +476,10 @@ async def determine_resolve_pex_config(
     excludes = python_setup.resolves_to_excludes().get(request.resolve_name) or []
     overrides = python_setup.resolves_to_overrides().get(request.resolve_name) or []
     sources = python_setup.resolves_to_sources().get(request.resolve_name) or []
+    lock_style = python_setup.resolves_to_lock_style().get(request.resolve_name) or "universal"
+    complete_platforms = tuple(
+        python_setup.resolves_to_complete_platforms().get(request.resolve_name) or []
+    )
 
     constraints_file: ResolvePexConstraintsFile | None = None
     _constraints_file_path = python_setup.resolves_to_constraints_file().get(request.resolve_name)
@@ -523,6 +531,8 @@ async def determine_resolve_pex_config(
         overrides=FrozenOrderedSet(overrides),
         sources=FrozenOrderedSet(sources),
         path_mappings=python_repos.path_mappings,
+        lock_style=lock_style,
+        complete_platforms=complete_platforms,
     )
 
 
@@ -555,6 +565,8 @@ def validate_metadata(
         excludes=resolve_config.excludes,
         overrides=resolve_config.overrides,
         sources=resolve_config.sources,
+        lock_style=resolve_config.lock_style,
+        complete_platforms=resolve_config.complete_platforms,
     )
     if validation:
         return

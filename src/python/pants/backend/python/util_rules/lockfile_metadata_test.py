@@ -42,6 +42,8 @@ def test_metadata_json_round_trip() -> None:
         excludes=set(),
         overrides=set(),
         sources=set(),
+        lock_style="universal",
+        complete_platforms=(),
     )
     output_metadata = PythonLockfileMetadata.from_json_dict(
         json.loads(input_metadata.to_json()), "", ""
@@ -62,6 +64,8 @@ def test_metadata_header_round_trip() -> None:
         excludes=set(),
         overrides=set(),
         sources=set(),
+        lock_style="universal",
+        complete_platforms=(),
     )
     serialized_lockfile = input_metadata.add_header_to_lockfile(
         b"req1==1.0", regenerate_command="./pants lock", delimeter="#"
@@ -356,6 +360,8 @@ def test_is_valid_for_v1(user_digest, expected_digest, user_ic, expected_ic, mat
                 excludes=set(),
                 overrides=set(),
                 sources=set(),
+                lock_style=None,
+                complete_platforms=(),
             )
         )
         == matches
@@ -433,6 +439,8 @@ def test_is_valid_for_interpreter_constraints_and_requirements(
             excludes=set(),
             overrides=set(),
             sources=set(),
+            lock_style=None,
+            complete_platforms=(),
         )
         assert result.failure_reasons == set(expected)
 
@@ -458,6 +466,8 @@ def test_is_valid_for_v3_metadata() -> None:
         excludes=set(),
         overrides=set(),
         sources=set(),
+        lock_style=None,
+        complete_platforms=(),
     )
     assert result.failure_reasons == {
         InvalidPythonLockfileReason.CONSTRAINTS_FILE_MISMATCH,
@@ -490,6 +500,8 @@ def test_is_valid_for_v4_metadata() -> None:
         excludes=set(),
         overrides={"deadbeef<=0"},
         sources=set(),
+        lock_style=None,
+        complete_platforms=(),
     )
     assert result.failure_reasons == {
         InvalidPythonLockfileReason.EXCLUDES_MISMATCH,
@@ -521,6 +533,8 @@ def test_is_valid_for_v5_metadata() -> None:
         excludes=set(),
         overrides={"cowsay==1.0.0"},
         sources=set(),
+        lock_style=None,
+        complete_platforms=(),
     )
     assert result.failure_reasons == {
         InvalidPythonLockfileReason.SOURCES_MISMATCH,
