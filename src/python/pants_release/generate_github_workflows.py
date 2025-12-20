@@ -777,7 +777,6 @@ def bootstrap_jobs(
                         # invalid doc tests in their comments.
                         "run": step_cmd,
                         "env": {
-                            "CARGO_BUILD_JOBS": "1",
                             "TMPDIR": f"{gha_expr('runner.temp')}",
                         },
                         "if": DONT_SKIP_RUST,
