@@ -33,7 +33,6 @@ from pants.init.plugin_resolver import PluginResolver
 from pants.init.plugin_resolver import rules as plugin_resolver_rules
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.python_interpreter_selection import (
-    PY_38,
     PY_39,
     PY_311,
     skip_unless_python38_and_python39_present,
@@ -354,7 +353,7 @@ def test_exact_requirements(rule_runner: RuleRunner, sdist: bool, use_uv: bool) 
             use_uv=use_uv,
             chroot=chroot,
             plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
-            use_pypi=sdist
+            use_pypi=sdist,
         ) as results2:
             plugin_paths2, _, _, _ = results2
             assert plugin_paths1 == plugin_paths2
@@ -397,13 +396,13 @@ def test_exact_requirements_interpreter_change(
         print(f"chdoot: {chroot}")
         print(f"repo_dir: {repo_dir}")
         safe_rmtree(repo_dir)
-        
+
         # plugins_venv = os.path.join(chroot, ".pants.d", "plugins", "venv", "lib", "python3.11", "site-packages", "jane")
         # print(f"chroot files: {os.listdir(chroot)}")
         # print(f"repo_dir files: {os.listdir(repo_dir)}")
         # # print(f"site-packages: {os.listdir(os.path.dirname(plugins_venv))}")
         # safe_rmtree(plugins_venv)
-        
+
         with pytest.raises(ExecutionError):
             with plugin_resolution(
                 rule_runner,

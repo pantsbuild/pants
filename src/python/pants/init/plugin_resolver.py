@@ -18,7 +18,7 @@ from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPexProcess, create_venv_pex
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
-from pants.backend.python.util_rules.pex_requirements import PexRequirements<<<<<<< HEAD
+from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.core.subsystems.uv import UvTool
 from pants.core.subsystems.uv import rules as uv_rules
 from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
@@ -36,9 +36,8 @@ from pants.engine.process import (
     Process,
     ProcessCacheScope,
     ProcessExecutionEnvironment,
-    ProcessResult,
+    execute_process_or_raise,
 )
-from pants.engine.process import ProcessCacheScope, execute_process_or_raise
 from pants.engine.rules import QueryRule, collect_rules, implicitly, rule
 from pants.init.bootstrap_scheduler import BootstrapScheduler
 from pants.init.import_util import find_matching_distributions

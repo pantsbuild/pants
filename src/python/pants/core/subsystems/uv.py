@@ -4,11 +4,11 @@
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
-    ExternalToolRequest,
     TemplatedExternalTool,
+    download_external_tool,
 )
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import collect_rules, rule
 
 
 class UvSubsystem(TemplatedExternalTool):
@@ -44,9 +44,7 @@ class UvTool(DownloadedExternalTool):
 
 @rule
 async def download_uv_tool(uv_subsystem: UvSubsystem, platform: Platform) -> UvTool:
-    pex_pex = await Get(
-        DownloadedExternalTool, ExternalToolRequest, uv_subsystem.get_request(platform)
-    )
+    pex_pex = await download_external_tool(uv_subsystem.get_request(platform))
     return UvTool(digest=pex_pex.digest, exe=pex_pex.exe)
 
 
