@@ -13,6 +13,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from textwrap import dedent
+from typing import cast
 
 import pytest
 from packaging.requirements import Requirement
@@ -67,7 +68,7 @@ def rule_runner() -> RuleRunner:
 
 @pytest.fixture(params=[False, True], ids=["pex", "uv"])
 def use_uv(request) -> bool:
-    return request.param
+    return cast(bool, request.param)
 
 
 def _create_pex(

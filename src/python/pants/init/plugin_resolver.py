@@ -16,21 +16,26 @@ from packaging.requirements import Requirement
 
 from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import PexRequest, VenvPexProcess, create_venv_pex
+from pants.backend.python.util_rules.pex import (
+    PexRequest,
+    VenvPexProcess,
+    create_venv_pex,
+)
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
+from pants.core.environments.rules import determine_bootstrap_environment
 from pants.core.subsystems.uv import UvTool
 from pants.core.subsystems.uv import rules as uv_rules
 from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.adhoc_binaries import rules as adhoc_binaries_rules
-from pants.core.environments.rules import determine_bootstrap_environment
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.engine.collection import DeduplicatedCollection
-from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVarsRequest
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import SessionValues
-from pants.engine.intrinsics import execute_process
+from pants.engine.intrinsics import create_digest, execute_process, merge_digests
 from pants.engine.platform import Platform
 from pants.engine.process import (
     Process,
@@ -64,9 +69,18 @@ class ResolvedPluginDistributions(DeduplicatedCollection[str]):
     sort_input = True
 
 
+class ResolvedPluginDistributionsPEX(ResolvedPluginDistributions):
+    pass
+
+
+class ResolvedPluginDistributionsUV(ResolvedPluginDistributions):
+    pass
+
+
+@rule
 async def resolve_plugins_via_pex(
     request: PluginsRequest, global_options: GlobalOptions
-) -> ResolvedPluginDistributions:
+) -> ResolvedPluginDistributionsPEX:
     """This rule resolves plugins using a VenvPex, and exposes the absolute paths of their dists.
 
     NB: This relies on the fact that PEX constructs venvs in a stable location (within the
@@ -83,7 +97,7 @@ async def resolve_plugins_via_pex(
         description_of_origin="configured Pants plugins",
     )
     if not requirements:
-        return ResolvedPluginDistributions()
+        return ResolvedPluginDistributionsPEX()
 
     python: PythonExecutable | None = None
     if not request.interpreter_constraints:
@@ -123,7 +137,9 @@ async def resolve_plugins_via_pex(
             )
         )
     )
-    return ResolvedPluginDistributions(plugins_process_result.stdout.decode().strip().split("\n"))
+    return ResolvedPluginDistributionsPEX(
+        plugins_process_result.stdout.decode().strip().split("\n")
+    )
 
 
 @dataclass(frozen=True)
@@ -169,8 +185,7 @@ run(["./.venv/bin/python", "-c", "import os, site; print(os.linesep.join(site.ge
 
 @rule
 async def _setup_uv_plugin_resolve_script() -> _UvPluginResolveScript:
-    digest = await Get(
-        Digest,
+    digest = await create_digest(
         CreateDigest(
             [FileContent(content=_UV_PLUGIN_RESOLVE_SCRIPT.encode(), path="uv_plugin_resolve.py")]
         ),
@@ -225,14 +240,19 @@ def _generate_pyproject_toml(
     )
 
 
+@rule
 async def resolve_plugins_via_uv(
-    request: PluginsRequest, global_options: GlobalOptions
-) -> ResolvedPluginDistributions:
+    request: PluginsRequest,
+    global_options: GlobalOptions,
+    python_repos: PythonRepos,
+    uv_tool: UvTool,
+    uv_plugin_resolve_script: _UvPluginResolveScript,
+    platform: Platform,
+    python_binary: PythonBuildStandaloneBinary,
+) -> ResolvedPluginDistributionsUV:
     req_strings = sorted(global_options.plugins + request.requirements)
     if not req_strings:
-        return ResolvedPluginDistributions()
-
-    python_repos = await Get(PythonRepos)
+        return ResolvedPluginDistributionsUV()
 
     pyproject_content = _generate_pyproject_toml(
         requirements=req_strings,
@@ -241,19 +261,13 @@ async def resolve_plugins_via_uv(
         python_find_links=python_repos.find_links,
     )
 
-    uv_tool, uv_plugin_resolve_script, platform, python_binary, data_digest = await MultiGet(
-        Get(UvTool),
-        Get(_UvPluginResolveScript),
-        Get(Platform),
-        Get(PythonBuildStandaloneBinary),
-        Get(
-            Digest,
-            CreateDigest(
-                [
-                    FileContent(content=pyproject_content.encode(), path="pyproject.toml"),
-                ]
-            ),
+    data_digest = await create_digest(
+        CreateDigest(
+            [
+                FileContent(content=pyproject_content.encode(), path="pyproject.toml"),
+            ]
         ),
+        **implicitly(),
     )
 
     cache_scope = (
@@ -262,12 +276,13 @@ async def resolve_plugins_via_uv(
         else ProcessCacheScope.PER_RESTART_SUCCESSFUL
     )
 
-    input_digest = await Get(
-        Digest, MergeDigests([uv_plugin_resolve_script.digest, uv_tool.digest, data_digest])
+    input_digest = await merge_digests(
+        MergeDigests([uv_plugin_resolve_script.digest, uv_tool.digest, data_digest]),
+        **implicitly(),
     )
 
-    env = await Get(
-        EnvironmentVars, EnvironmentVarsRequest(["PATH", "HOME"], allowed=["PATH", "HOME"])
+    env = await environment_vars_subset(
+        EnvironmentVarsRequest(["PATH", "HOME"], allowed=["PATH", "HOME"]), **implicitly()
     )
 
     process = Process(
@@ -301,7 +316,7 @@ async def resolve_plugins_via_uv(
     if result.exit_code != 0:
         raise ValueError(f"Plugin resolution failed: stderr={result.stderr.decode()}")
 
-    return ResolvedPluginDistributions(result.stdout.decode().strip().split("\n"))
+    return ResolvedPluginDistributionsUV(result.stdout.decode().strip().split("\n"))
 
 
 @rule
@@ -309,9 +324,11 @@ async def resolve_plugins(
     request: PluginsRequest, global_options: GlobalOptions
 ) -> ResolvedPluginDistributions:
     if global_options.experimental_use_uv_for_plugin_resolution:
-        return await resolve_plugins_via_uv(request=request, global_options=global_options)
+        plugins_from_uv = await resolve_plugins_via_uv(request, **implicitly())
+        return ResolvedPluginDistributions(plugins_from_uv)
     else:
-        return await resolve_plugins_via_pex(request=request, global_options=global_options)
+        plugins_from_pex = await resolve_plugins_via_pex(request, **implicitly())
+        return ResolvedPluginDistributions(plugins_from_pex)
 
 
 class PluginResolver:
