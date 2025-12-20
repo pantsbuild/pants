@@ -41,13 +41,13 @@ class UnparsedAddressInputs:
 
     You can convert these into fully normalized `Addresses` and `Targets` like this:
 
-        await Get(Addresses, UnparsedAddressInputs(["//:tgt1", "//:tgt2"], owning_address=None)
-        await Get(Targets, UnparsedAddressInputs([...], owning_address=Address("original"))
+        await resolve_unparsed_address_inputs(UnparsedAddressInputs(["//:tgt1", "//:tgt2"], owning_address=None), **implicitly())
+        await resolve_targets(**implicitly(UnparsedAddressInputs([...], owning_address=Address("original")))
 
     This is intended for contexts where the user specifies addresses outside of the `dependencies`
     field, such as through an option or a special field on a target that is not normal
     `dependencies`. You should not use this to resolve the `dependencies` field; use
-    `await Get(Addresses, DependenciesRequest)` for that.
+    `await resolve_dependencies(DependenciesRequest(..), **implicitly())` for that.
 
     If the addresses are coming from a target's fields, set `owning_address` so that relative
     references like `:sibling` work properly.

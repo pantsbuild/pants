@@ -14,12 +14,13 @@ from pants.backend.python.target_types import (
     Executable,
     InterpreterConstraintsField,
     PexEntryPointField,
+    PythonResolveField,
     PythonRunGoalUseSandboxField,
     PythonSourceField,
 )
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import Pex, PexRequest
+from pants.backend.python.util_rules.pex import create_pex
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import rules as pex_from_targets_rules
 from pants.core.goals.run import (
@@ -30,7 +31,6 @@ from pants.core.goals.run import (
     RunRequest,
 )
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
-from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.util.logging import LogLevel
 
@@ -43,6 +43,7 @@ class PythonSourceFieldSet(RunFieldSet):
 
     source: PythonSourceField
     interpreter_constraints: InterpreterConstraintsField
+    resolve: PythonResolveField
     _run_goal_use_sandbox: PythonRunGoalUseSandboxField
 
     def should_use_sandbox(self, python_setup: PythonSetup) -> bool:
@@ -100,17 +101,12 @@ async def create_python_source_debug_adapter_request(
     pex_env: PexEnvironment,
     python_setup: PythonSetup,
 ) -> RunDebugAdapterRequest:
-    debugpy_pex = await Get(
-        # NB: We fold the debugpy PEX into the normally constructed VenvPex so that debugpy is in the
-        # venv, but isn't the main entrypoint. Then we use PEX_* env vars to dynamically have debugpy
-        # be invoked in that VenvPex. Hence, a vanilla Pex.
-        Pex,
-        PexRequest,
+    debugpy_pex = await create_pex(
         debugpy.to_pex_request(
-            interpreter_constraints=InterpreterConstraints.create_from_compatibility_fields(
-                [field_set.interpreter_constraints], python_setup
+            interpreter_constraints=InterpreterConstraints.create_from_field_sets(
+                [field_set], python_setup
             )
-        ),
+        )
     )
 
     run_in_sandbox = field_set.should_use_sandbox(python_setup)

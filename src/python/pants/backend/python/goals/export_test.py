@@ -24,11 +24,11 @@ from pants.backend.python.util_rules import local_dists_pep660, pex_from_targets
 from pants.base.specs import RawSpecs
 from pants.core.goals.export import ExportResults
 from pants.core.util_rules import distdir
-from pants.engine.fs import CreateDigest, DigestContents
-from pants.engine.internals.native_engine import Digest, Snapshot
+from pants.engine.fs import CreateDigest
+from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.parametrize import Parametrize
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import QueryRule, rule
+from pants.engine.intrinsics import digest_to_snapshot, get_digest_contents
+from pants.engine.rules import QueryRule, implicitly, rule
 from pants.engine.target import (
     GeneratedSources,
     GenerateSourcesRequest,
@@ -206,12 +206,14 @@ def test_export_codegen_outputs():
     @rule
     async def do_codegen(request: CodegenGenerateSourcesRequest) -> GeneratedSources:
         # Generate a Python file with the same contents as each input file.
-        input_files = await Get(DigestContents, Digest, request.protocol_sources.digest)
+        input_files = await get_digest_contents(request.protocol_sources.digest)
         generated_files = [
             dataclasses.replace(input_file, path=input_file.path + ".py")
             for input_file in input_files
         ]
-        result = await Get(Snapshot, CreateDigest(generated_files))
+        result = await digest_to_snapshot(
+            **implicitly({CreateDigest(generated_files): CreateDigest})
+        )
         return GeneratedSources(result)
 
     rule_runner = RuleRunner(

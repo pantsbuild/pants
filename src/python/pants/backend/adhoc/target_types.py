@@ -7,8 +7,8 @@ from enum import Enum
 from typing import ClassVar
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.util_rules.adhoc_process_support import PathEnvModifyMode
-from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP
 from pants.engine.fs import GlobExpansionConjunction
 from pants.engine.process import ProcessCacheScope
@@ -57,7 +57,7 @@ class AdhocToolOutputFilesField(StringSequenceField):
         `{AdhocToolWorkdirField.alias}`.
 
         For directories, use `{AdhocToolOutputDirectoriesField.alias}`. At least one of
-        `{AdhocToolOutputFilesField.alias}` and`{AdhocToolOutputDirectoriesField.alias}` must be
+        `{AdhocToolOutputFilesField.alias}` and `{AdhocToolOutputDirectoriesField.alias}` must be
         specified.
 
         Relative paths (including `..`) may be used, as long as the path does not ascend further
@@ -76,7 +76,7 @@ class AdhocToolOutputDirectoriesField(StringSequenceField):
         to the value of `{AdhocToolWorkdirField.alias}`.
 
         For individual files, use `{AdhocToolOutputFilesField.alias}`. At least one of
-        `{AdhocToolOutputFilesField.alias}` and`{AdhocToolOutputDirectoriesField.alias}` must be
+        `{AdhocToolOutputFilesField.alias}` and `{AdhocToolOutputDirectoriesField.alias}` must be
         specified.
 
         Relative paths (including `..`) may be used, as long as the path does not ascend further
@@ -285,13 +285,16 @@ class AdhocToolPathEnvModifyModeField(StringField):
     default = PathEnvModifyMode.PREPEND.value
     help = help_text(
         """
-        When executing the command of an `adhoc_tool` or `shell_command` target, Pants may augment the `PATH`
-        environment variable with the location of any binary shims created for `tools` and for
-        any runnable dependencies.
+        When executing the command of an `adhoc_tool`, `shell_command`, or `test_shell_command` target,
+        Pants may augment the `PATH` environment variable with the location of any binary shims created for
+        `tools` and any runnable dependencies.
 
         Modification of the `PATH` environment variable can be configured as follows:
+
         - `prepend`: Prepend the extra path components to any existing `PATH` value.
+
         - `append`: Append the extra path componenets to any existing `PATH` value.
+
         - `off`: Do not modify the existing `PATH` value.
         """
     )

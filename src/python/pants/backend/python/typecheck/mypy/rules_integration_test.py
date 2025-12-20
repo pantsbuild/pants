@@ -236,6 +236,7 @@ def test_thirdparty_plugin(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "mypy.lock": read_sibling_resource(__name__, "mypy_with_django_stubs.lock"),
+            f"{PACKAGE}/__init__.py": "",
             f"{PACKAGE}/settings.py": dedent(
                 """\
                 from django.urls import URLPattern
@@ -256,7 +257,7 @@ def test_thirdparty_plugin(rule_runner: PythonRuleRunner) -> None:
             ),
             f"{PACKAGE}/BUILD": dedent(
                 """\
-                python_sources()
+                python_sources(interpreter_constraints=['>=3.11'])
 
                 python_requirement(
                     name="reqs", requirements=["django==3.2.19", "django-stubs==1.8.0"]
@@ -282,6 +283,7 @@ def test_thirdparty_plugin(rule_runner: PythonRuleRunner) -> None:
             rule_runner.get_target(Address(PACKAGE, relative_file_path="settings.py")),
         ],
         extra_args=[
+            "--source-root-patterns=['src/py']",
             "--python-resolves={'mypy':'mypy.lock'}",
             "--mypy-install-from-resolve=mypy",
         ],
@@ -345,10 +347,15 @@ def test_works_with_python38(rule_runner: PythonRuleRunner) -> None:
                 """
             ),
             f"{PACKAGE}/BUILD": "python_sources(interpreter_constraints=['>=3.8'])",
+            "mypy.lock": read_sibling_resource(__name__, "mypy_py38.lock"),
         }
     )
+    extra_args = [
+        "--python-resolves={'mypy':'mypy.lock'}",
+        "--mypy-install-from-resolve=mypy",
+    ]
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
-    assert_success(rule_runner, tgt)
+    assert_success(rule_runner, tgt, extra_args=extra_args)
 
 
 @skip_unless_python39_present
@@ -431,9 +438,9 @@ def test_mypy_shadows_requirements(rule_runner: PythonRuleRunner) -> None:
     """
     rule_runner.write_files(
         {
-            "mypy.lock": read_sibling_resource(__name__, "mypy_shadowing_typed_ast.lock"),
-            "BUILD": "python_requirement(name='ta', requirements=['typed-ast==1.4.1'])",
-            f"{PACKAGE}/f.py": "import typed_ast",
+            "mypy.lock": read_sibling_resource(__name__, "mypy_shadowing_tomli.lock"),
+            "BUILD": "python_requirement(name='ta', requirements=['tomli==2.1.0'])",
+            f"{PACKAGE}/f.py": "import tomli",
             f"{PACKAGE}/BUILD": "python_sources()",
         }
     )
@@ -557,7 +564,8 @@ def test_source_plugin(rule_runner: PythonRuleRunner) -> None:
     assert "Success: no issues found in 1 source file" in result.stdout
 
 
-def test_protobuf_mypy(rule_runner: PythonRuleRunner) -> None:
+@pytest.mark.parametrize("protoc_type_stubs", (False, True), ids=("mypy_plugin", "protoc_direct"))
+def test_protobuf_mypy(rule_runner: PythonRuleRunner, protoc_type_stubs: bool) -> None:
     rule_runner = PythonRuleRunner(
         rules=[*rule_runner.rules, *protobuf_rules(), *protobuf_subsystem_rules()],
         target_types=[*rule_runner.target_types, ProtobufSourceTarget],
@@ -597,7 +605,11 @@ def test_protobuf_mypy(rule_runner: PythonRuleRunner) -> None:
     result = run_mypy(
         rule_runner,
         [tgt],
-        extra_args=["--python-protobuf-mypy-plugin"],
+        extra_args=[
+            "--python-protobuf-generate-type-stubs"
+            if protoc_type_stubs
+            else "--python-protobuf-mypy-plugin"
+        ],
     )
     assert len(result) == 1
     assert 'Argument "name" to "Person" has incompatible type "int"' in result[0].stdout

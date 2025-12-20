@@ -16,7 +16,7 @@ def run_pants_with_sources(sources: dict[str, str], *args: str) -> PantsResult:
         return run_pants(
             [
                 "--backend-packages=['pants.backend.docker']",
-                "--python-interpreter-constraints=['>=3.8,<4']",
+                "--python-interpreter-constraints=['>=3.9,<3.15']",
                 "--pants-ignore=__pycache__",
             ]
             + [arg.format(tmpdir=tmpdir) for arg in args]

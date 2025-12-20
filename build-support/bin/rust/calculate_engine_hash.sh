@@ -10,7 +10,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 # shellcheck source=build-support/common.sh
 source "${REPO_ROOT}/build-support/common.sh"
 
-readonly NATIVE_ROOT="${REPO_ROOT}/src/rust/engine"
+readonly NATIVE_ROOT="${REPO_ROOT}/src/rust"
 
 # N.B. Set $MODE to "debug" for faster builds.
 readonly MODE="${MODE:-release}"

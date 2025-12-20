@@ -248,6 +248,42 @@ def test_bad_python_source_root(rule_runner: RuleRunner) -> None:
     "major_minor_interpreter",
     all_major_minor_python_versions(PythonProtobufMypyPlugin.default_interpreter_constraints),
 )
+def test_generate_type_stubs(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
+    rule_runner.write_files(
+        {
+            "src/protobuf/dir1/f.proto": dedent(
+                """\
+                syntax = "proto3";
+
+                package dir1;
+
+                message Person {
+                  string name = 1;
+                  int32 id = 2;
+                  string email = 3;
+                }
+                """
+            ),
+            "src/protobuf/dir1/BUILD": "protobuf_sources()",
+        }
+    )
+    assert_files_generated(
+        rule_runner,
+        Address("src/protobuf/dir1", relative_file_path="f.proto"),
+        source_roots=["src/protobuf"],
+        extra_args=[
+            "--python-protobuf-generate-type-stubs",
+            f"--mypy-protobuf-interpreter-constraints=['=={major_minor_interpreter}.*']",
+        ],
+        expected_files=["src/protobuf/dir1/f_pb2.py", "src/protobuf/dir1/f_pb2.pyi"],
+    )
+
+
+@pytest.mark.platform_specific_behavior
+@pytest.mark.parametrize(
+    "major_minor_interpreter",
+    all_major_minor_python_versions(PythonProtobufMypyPlugin.default_interpreter_constraints),
+)
 def test_mypy_plugin(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files(
         {

@@ -19,29 +19,21 @@ from pants.build_graph.address import Address
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.console import Console
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import (
-    CreateDigest,
-    Digest,
-    DigestContents,
-    FileContent,
-    PathGlobs,
-    Paths,
-    SpecsPaths,
-    Workspace,
-)
+from pants.engine.fs import CreateDigest, Digest, FileContent, PathGlobs, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.build_files import BuildFileOptions
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, goal_rule, rule
+from pants.engine.internals.graph import resolve_source_paths, resolve_unexpanded_targets
+from pants.engine.internals.selectors import concurrently
+from pants.engine.internals.specs_rules import resolve_specs_paths
+from pants.engine.intrinsics import create_digest, get_digest_contents, path_globs_to_paths
+from pants.engine.rules import collect_rules, goal_rule, implicitly, rule
 from pants.engine.target import (
     AllUnexpandedTargets,
     MultipleSourcesField,
     OptionalSingleSourceField,
     SourcesField,
-    SourcesPaths,
     SourcesPathsRequest,
     Target,
-    UnexpandedTargets,
 )
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import BoolOption, DictOption, StrListOption, StrOption
@@ -269,6 +261,13 @@ class PutativeTargets(DeduplicatedCollection[PutativeTarget]):
         return cls(all_tgts)
 
 
+@rule(polymorphic=True)
+async def generate_putative_targets(
+    req: PutativeTargetsRequest, env_name: EnvironmentName
+) -> PutativeTargets:
+    raise NotImplementedError()
+
+
 class TailorSubsystem(GoalSubsystem):
     name = "tailor"
     help = help_text(
@@ -425,8 +424,9 @@ class AllOwnedSources(DeduplicatedCollection[str]):
 
 @rule(desc="Determine all files already owned by targets", level=LogLevel.DEBUG)
 async def determine_all_owned_sources(all_tgts: AllUnexpandedTargets) -> AllOwnedSources:
-    all_sources_paths = await MultiGet(
-        Get(SourcesPaths, SourcesPathsRequest(tgt.get(SourcesField))) for tgt in all_tgts
+    all_sources_paths = await concurrently(
+        resolve_source_paths(SourcesPathsRequest(tgt.get(SourcesField)), **implicitly())
+        for tgt in all_tgts
     )
     return AllOwnedSources(
         itertools.chain.from_iterable(sources_paths.files for sources_paths in all_sources_paths)
@@ -472,23 +472,24 @@ class DisjointSourcePutativeTarget:
 
 @rule
 async def restrict_conflicting_sources(ptgt: PutativeTarget) -> DisjointSourcePutativeTarget:
-    source_paths = await Get(
-        Paths,
+    source_paths = await path_globs_to_paths(
         PathGlobs(
             SourcesField.prefix_glob_with_dirpath(ptgt.path, glob) for glob in ptgt.owned_sources
-        ),
+        )
     )
     source_path_set = set(source_paths.files)
     source_dirs = {os.path.dirname(path) for path in source_path_set}
-    possible_owners = await Get(
-        UnexpandedTargets,
-        RawSpecs(
-            ancestor_globs=tuple(AncestorGlobSpec(d) for d in source_dirs),
-            description_of_origin="the `tailor` goal",
-        ),
+    possible_owners = await resolve_unexpanded_targets(
+        **implicitly(
+            RawSpecs(
+                ancestor_globs=tuple(AncestorGlobSpec(d) for d in source_dirs),
+                description_of_origin="the `tailor` goal",
+            )
+        )
     )
-    possible_owners_sources = await MultiGet(
-        Get(SourcesPaths, SourcesPathsRequest(t.get(SourcesField))) for t in possible_owners
+    possible_owners_sources = await concurrently(
+        resolve_source_paths(SourcesPathsRequest(t.get(SourcesField)), **implicitly())
+        for t in possible_owners
     )
     conflicting_targets = []
     for tgt, sources in zip(possible_owners, possible_owners_sources):
@@ -540,14 +541,16 @@ async def edit_build_files(
     # There may be an existing *directory* whose name collides with that of a BUILD file
     # we want to create. This is more likely on a system with case-insensitive paths,
     # such as MacOS. We detect such cases and use an alt BUILD file name to fix.
-    existing_paths = await Get(Paths, PathGlobs(ptgts_by_build_file.keys()))
+    existing_paths = await path_globs_to_paths(PathGlobs(ptgts_by_build_file.keys()))
     existing_dirs = set(existing_paths.dirs)
     # Technically there could be a dir named "BUILD.pants" as well, but that's pretty unlikely.
     ptgts_by_build_file = {
         (f"{bf}.pants" if bf in existing_dirs else bf): pts
         for bf, pts in ptgts_by_build_file.items()
     }
-    existing_build_files_contents = await Get(DigestContents, PathGlobs(ptgts_by_build_file.keys()))
+    existing_build_files_contents = await get_digest_contents(
+        **implicitly(PathGlobs(ptgts_by_build_file.keys()))
+    )
     existing_build_files_contents_by_path = {
         ebfc.path: ebfc.content for ebfc in existing_build_files_contents
     }
@@ -564,8 +567,7 @@ async def edit_build_files(
         ).encode()
         return FileContent(bf_path, new_content_bytes)
 
-    new_digest = await Get(
-        Digest,
+    new_digest = await create_digest(
         CreateDigest([make_content(path, ptgts) for path, ptgts in ptgts_by_build_file.items()]),
     )
 
@@ -622,6 +624,7 @@ async def tailor(
     console: Console,
     workspace: Workspace,
     union_membership: UnionMembership,
+    env_name: EnvironmentName,
     specs: Specs,
     build_file_options: BuildFileOptions,
 ) -> TailorGoal:
@@ -648,21 +651,24 @@ async def tailor(
             )
         return TailorGoal(exit_code=0)
 
-    specs_paths = await Get(SpecsPaths, Specs, specs)
+    specs_paths = await resolve_specs_paths(specs)
     dir_search_paths = tuple(sorted({os.path.dirname(f) for f in specs_paths.files}))
 
-    putative_targets_results = await MultiGet(
-        Get(PutativeTargets, PutativeTargetsRequest, req_type(dir_search_paths))
+    putative_targets_results = await concurrently(
+        generate_putative_targets(
+            **implicitly(
+                {req_type(dir_search_paths): PutativeTargetsRequest, env_name: EnvironmentName}
+            )
+        )
         for req_type in union_membership[PutativeTargetsRequest]
     )
     putative_targets = PutativeTargets.merge(putative_targets_results)
     putative_targets = PutativeTargets(
         pt.realias(tailor_subsystem.alias_for(pt.type_alias)) for pt in putative_targets
     )
-    fixed_names_ptgts = await Get(UniquelyNamedPutativeTargets, PutativeTargets, putative_targets)
-    fixed_sources_ptgts = await MultiGet(
-        Get(DisjointSourcePutativeTarget, PutativeTarget, ptgt)
-        for ptgt in fixed_names_ptgts.putative_targets
+    fixed_names_ptgts = await rename_conflicting_targets(putative_targets, **implicitly())
+    fixed_sources_ptgts = await concurrently(
+        restrict_conflicting_sources(ptgt) for ptgt in fixed_names_ptgts.putative_targets
     )
 
     valid_putative_targets = list(
@@ -674,8 +680,8 @@ async def tailor(
     if not valid_putative_targets:
         return TailorGoal(exit_code=0)
 
-    edited_build_files = await Get(
-        EditedBuildFiles, EditBuildFilesRequest(PutativeTargets(valid_putative_targets))
+    edited_build_files = await edit_build_files(
+        EditBuildFilesRequest(PutativeTargets(valid_putative_targets)), **implicitly()
     )
     if not tailor_subsystem.check:
         workspace.write_digest(edited_build_files.digest)

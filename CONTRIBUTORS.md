@@ -9,6 +9,7 @@ Created as part of the release process.
 + Aditya Raj Verma
 + Alan Paulin
 + Alan Velasco
++ Aleksandr Artemenkov
 + Alex Bancroft
 + Alex Schmitt
 + Alexander Heldt
@@ -30,6 +31,7 @@ Created as part of the release process.
 + Bardur Arantsson
 + Bastian Wegge
 + Ben Limmer
++ Ben Wilen
 + Benjamin Dabelow
 + Benjy Weinberger
 + Berkay Öztürk
@@ -48,6 +50,7 @@ Created as part of the release process.
 + Caleb Lloyd
 + Carina C. Zona
 + Caspar Krieger
++ Chiara
 + Chris Aniszczyk
 + Chris Borckholder
 + Chris Burroughs
@@ -73,6 +76,7 @@ Created as part of the release process.
 + Dan Fabulich
 + Dan Harrison
 + Daniel Anderson
++ Daniel Beck
 + Daniel Bentley
 + Daniel Cavazos
 + Daniel Goldman
@@ -112,6 +116,7 @@ Created as part of the release process.
 + Facetoe
 + Fatin H
 + Fedor Korotkov
++ Felix Scherz
 + Filip Nikolovski
 + Fiona Condone
 + Flo
@@ -124,6 +129,7 @@ Created as part of the release process.
 + Gautham Nair
 + Gerald Spencer
 + Gordon Cassie
++ Greg Fast
 + Greg Niemann
 + Greg Shuflin
 + Gregory Borodin
@@ -196,6 +202,7 @@ Created as part of the release process.
 + Julio Batista Silva
 + Justin Trobec
 + Kacper
++ Kacper Krylowicz
 + KadenAgrey
 + Karin Lundberg
 + Kaushik Srenevasan
@@ -243,6 +250,7 @@ Created as part of the release process.
 + Mateo Rodriguez
 + Mathew Jennings
 + Mathieu Sabourin
++ Matt Alexander
 + Matt Dee
 + Matt Landis
 + Matt Olsen
@@ -270,6 +278,7 @@ Created as part of the release process.
 + Neil Sanchala
 + Nicholas Gustafson
 + Nicholas Santos
++ Nick Dell'Osa
 + Nick Dellosa
 + Nik Shkrob
 + Nimrod Shlagman
@@ -318,6 +327,7 @@ Created as part of the release process.
 + SergeKireev
 + Sergey Serebryakov
 + Seve Martinez
++ Shaked Kaplan
 + Shane Delmore
 + Shantanu Kumar
 + Shuo Li
@@ -327,6 +337,7 @@ Created as part of the release process.
 + Srikanth Kotagiri
 + Stefan Sauer
 + Stephan Erb
++ Stephen Hopper
 + Stu Hood
 + Subin Kim
 + Suresh Joshi
@@ -342,6 +353,7 @@ Created as part of the release process.
 + Tim Gates
 + Tim Nielens
 + Tim Treptow
++ Tim Werner
 + Timur Abishev
 + Tina Huang
 + Tobias Nilsson
@@ -362,6 +374,7 @@ Created as part of the release process.
 + Ulugbek Adilbekov
 + Viktor Kleen
 + Vincent Tavernier
++ Vito Laurenza
 + Walter Scheper
 + Wei An
 + Wilhelmina Drengwitz
@@ -375,6 +388,7 @@ Created as part of the release process.
 + Yoav Alon
 + Yuhan GUO
 + Yujie Chen
++ Yusuf Jabri
 + achrafmam2
 + andreaimprovised
 + azban
@@ -388,14 +402,17 @@ Created as part of the release process.
 + hephex
 + jgartdele/del
 + lukevmorris
++ nikhila-dwarakanath-zocdoc
 + offsetcyan
 + okcleary
 + olivercoleman-switchdin
++ peter-woyzbun
 + philipp-sontag-by
 + purajit
 + ravi2024sk
 + sww
 + twunderlich-grapl
++ vladislav doster
 + wimax-grapl
 + yjabri
 + Éric Jacob

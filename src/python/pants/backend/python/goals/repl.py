@@ -10,23 +10,25 @@ from pants.backend.python.subsystems import ipython
 from pants.backend.python.subsystems.ipython import IPython
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonResolveField
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
-from pants.backend.python.util_rules.pex import Pex, PexRequest
+from pants.backend.python.util_rules.local_dists import LocalDistsPexRequest, build_local_dists
+from pants.backend.python.util_rules.pex import create_pex
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import (
     InterpreterConstraintsRequest,
     RequirementsPexRequest,
+    interpreter_constraints_for_targets,
 )
 from pants.backend.python.util_rules.python_sources import (
-    PythonSourceFiles,
     PythonSourceFilesRequest,
+    prepare_python_sources,
 )
 from pants.core.goals.generate_lockfiles import NoCompatibleResolveException
 from pants.core.goals.repl import ReplImplementation, ReplRequest
-from pants.engine.fs import Digest, MergeDigests
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Target, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.fs import MergeDigests
+from pants.engine.internals.graph import transitive_targets as transitive_targets_get
+from pants.engine.intrinsics import merge_digests
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
+from pants.engine.target import Target, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
@@ -80,32 +82,32 @@ async def create_python_repl_request(
 ) -> ReplRequest:
     validate_compatible_resolve(request.targets, python_setup)
 
-    interpreter_constraints, transitive_targets = await MultiGet(
-        Get(InterpreterConstraints, InterpreterConstraintsRequest(request.addresses)),
-        Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses)),
+    interpreter_constraints, transitive_targets = await concurrently(
+        interpreter_constraints_for_targets(
+            InterpreterConstraintsRequest(request.addresses), **implicitly()
+        ),
+        transitive_targets_get(TransitiveTargetsRequest(request.addresses), **implicitly()),
     )
 
-    requirements_request = Get(Pex, RequirementsPexRequest(request.addresses))
-    local_dists_request = Get(
-        LocalDistsPex,
+    requirements_request = create_pex(**implicitly(RequirementsPexRequest(request.addresses)))
+    local_dists_request = build_local_dists(
         LocalDistsPexRequest(
             request.addresses,
             interpreter_constraints=interpreter_constraints,
-        ),
+        )
     )
 
-    sources_request = Get(
-        PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure, include_files=True)
+    sources_request = prepare_python_sources(
+        PythonSourceFilesRequest(transitive_targets.closure, include_files=True), **implicitly()
     )
 
-    requirements_pex, local_dists, sources = await MultiGet(
+    requirements_pex, local_dists, sources = await concurrently(
         requirements_request, local_dists_request, sources_request
     )
-    merged_digest = await Get(
-        Digest,
+    merged_digest = await merge_digests(
         MergeDigests(
             (requirements_pex.digest, local_dists.pex.digest, sources.source_files.snapshot.digest)
-        ),
+        )
     )
 
     complete_pex_env = pex_env.in_workspace()
@@ -133,35 +135,35 @@ async def create_ipython_repl_request(
 ) -> ReplRequest:
     validate_compatible_resolve(request.targets, python_setup)
 
-    interpreter_constraints, transitive_targets = await MultiGet(
-        Get(InterpreterConstraints, InterpreterConstraintsRequest(request.addresses)),
-        Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses)),
+    interpreter_constraints, transitive_targets = await concurrently(
+        interpreter_constraints_for_targets(
+            InterpreterConstraintsRequest(request.addresses), **implicitly()
+        ),
+        transitive_targets_get(TransitiveTargetsRequest(request.addresses), **implicitly()),
     )
 
-    requirements_request = Get(Pex, RequirementsPexRequest(request.addresses))
-    sources_request = Get(
-        PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure, include_files=True)
+    requirements_request = create_pex(**implicitly(RequirementsPexRequest(request.addresses)))
+    sources_request = prepare_python_sources(
+        PythonSourceFilesRequest(transitive_targets.closure, include_files=True), **implicitly()
     )
 
-    ipython_request = Get(
-        Pex, PexRequest, ipython.to_pex_request(interpreter_constraints=interpreter_constraints)
+    ipython_request = create_pex(
+        ipython.to_pex_request(interpreter_constraints=interpreter_constraints)
     )
 
-    requirements_pex, sources, ipython_pex = await MultiGet(
+    requirements_pex, sources, ipython_pex = await concurrently(
         requirements_request, sources_request, ipython_request
     )
 
-    local_dists = await Get(
-        LocalDistsPex,
+    local_dists = await build_local_dists(
         LocalDistsPexRequest(
             request.addresses,
             interpreter_constraints=interpreter_constraints,
             sources=sources,
-        ),
+        )
     )
 
-    merged_digest = await Get(
-        Digest,
+    merged_digest = await merge_digests(
         MergeDigests(
             (
                 requirements_pex.digest,
@@ -169,7 +171,7 @@ async def create_ipython_repl_request(
                 local_dists.remaining_sources.source_files.snapshot.digest,
                 ipython_pex.digest,
             )
-        ),
+        )
     )
 
     complete_pex_env = pex_env.in_workspace()

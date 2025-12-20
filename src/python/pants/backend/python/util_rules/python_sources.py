@@ -8,16 +8,22 @@ from dataclasses import dataclass
 
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import ancestor_files
-from pants.backend.python.util_rules.ancestor_files import AncestorFiles, AncestorFilesRequest
+from pants.backend.python.util_rules.ancestor_files import AncestorFilesRequest, find_ancestor_files
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules import source_files, stripped_source_files
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
-from pants.engine.fs import EMPTY_SNAPSHOT, MergeDigests, Snapshot
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, Target
+from pants.core.util_rules.source_files import (
+    SourceFiles,
+    SourceFilesRequest,
+    determine_source_files,
+)
+from pants.core.util_rules.stripped_source_files import StrippedSourceFiles, strip_source_roots
+from pants.engine.fs import EMPTY_SNAPSHOT, MergeDigests
+from pants.engine.internals.graph import hydrate_sources
+from pants.engine.intrinsics import digest_to_snapshot
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
+from pants.engine.target import HydrateSourcesRequest, SourcesField, Target
 from pants.engine.unions import UnionMembership
-from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.source.source_root import SourceRootRequest, get_source_root
 from pants.util.logging import LogLevel
 
 
@@ -91,23 +97,21 @@ class PythonSourceFilesRequest:
 async def prepare_python_sources(
     request: PythonSourceFilesRequest, union_membership: UnionMembership
 ) -> PythonSourceFiles:
-    sources = await Get(
-        SourceFiles,
+    sources = await determine_source_files(
         SourceFilesRequest(
             (tgt.get(SourcesField) for tgt in request.targets),
             for_sources_types=request.valid_sources_types,
             enable_codegen=True,
-        ),
+        )
     )
 
-    missing_init_files = await Get(
-        AncestorFiles,
+    missing_init_files = await find_ancestor_files(
         AncestorFilesRequest(
             input_files=sources.snapshot.files, requested=("__init__.py", "__init__.pyi")
-        ),
+        )
     )
-    init_injected = await Get(
-        Snapshot, MergeDigests((sources.snapshot.digest, missing_init_files.snapshot.digest))
+    init_injected = await digest_to_snapshot(
+        **implicitly(MergeDigests((sources.snapshot.digest, missing_init_files.snapshot.digest)))
     )
 
     # Codegen is able to generate code in any arbitrary location, unlike sources normally being
@@ -123,14 +127,14 @@ async def prepare_python_sources(
             SourcesField
         ).can_generate(ResourceSourceField, union_membership):
             codegen_targets.append(tgt)
-    codegen_sources = await MultiGet(
-        Get(
-            HydratedSources,
+    codegen_sources = await concurrently(
+        hydrate_sources(
             HydrateSourcesRequest(
                 tgt.get(SourcesField),
                 for_sources_types=request.valid_sources_types,
                 enable_codegen=True,
             ),
+            **implicitly(),
         )
         for tgt in codegen_targets
     )
@@ -143,9 +147,7 @@ async def prepare_python_sources(
         ),
     ]
 
-    source_root_objs = await MultiGet(
-        Get(SourceRoot, SourceRootRequest, req) for req in source_root_requests
-    )
+    source_root_objs = await concurrently(get_source_root(req) for req in source_root_requests)
     source_root_paths = {source_root_obj.path for source_root_obj in source_root_objs}
     return PythonSourceFiles(
         SourceFiles(init_injected, sources.unrooted_files), tuple(sorted(source_root_paths))
@@ -154,7 +156,7 @@ async def prepare_python_sources(
 
 @rule(level=LogLevel.DEBUG)
 async def strip_python_sources(python_sources: PythonSourceFiles) -> StrippedPythonSourceFiles:
-    stripped = await Get(StrippedSourceFiles, SourceFiles, python_sources.source_files)
+    stripped = await strip_source_roots(python_sources.source_files)
     return StrippedPythonSourceFiles(stripped)
 
 

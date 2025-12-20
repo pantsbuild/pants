@@ -8,7 +8,7 @@ import logging
 from pants.base.exiter import ExitCode
 from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.core.util_rules.environments import determine_bootstrap_environment
+from pants.core.environments.rules import determine_bootstrap_environment
 from pants.engine.explorer import ExplorerServer, ExplorerServerRequest, RequestState
 from pants.engine.internals.parser import BuildFileSymbolsInfo
 from pants.engine.internals.selectors import Params
@@ -56,7 +56,7 @@ class ExplorerBuiltinGoal(BuiltinGoal):
 
         env_name = determine_bootstrap_environment(graph_session.scheduler_session)
         build_symbols = graph_session.scheduler_session.product_request(
-            BuildFileSymbolsInfo, [Params(env_name)]
+            BuildFileSymbolsInfo, Params(env_name)
         )[0]
         all_help_info = HelpInfoExtracter.get_all_help_info(
             options,

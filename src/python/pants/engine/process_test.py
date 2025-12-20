@@ -3,12 +3,13 @@
 
 from __future__ import annotations
 
+import os
 import textwrap
 from pathlib import Path
 
 import pytest
 
-from pants.core.util_rules.environments import LocalWorkspaceEnvironmentTarget
+from pants.core.environments.target_types import LocalWorkspaceEnvironmentTarget
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -309,6 +310,55 @@ def test_interactive_process_inputs(rule_runner: RuleRunner, run_in_workspace: b
             "prefix1",
             "prefix2",
         }
+
+
+@pytest.mark.parametrize("working_directory", [None, "foo", "foo/bar"])
+@pytest.mark.parametrize("run_in_workspace", [True, False])
+def test_interactive_process_working_directory(
+    rule_runner: RuleRunner,
+    working_directory: str,
+    run_in_workspace: bool,
+) -> None:
+    # Test that interactive processes can run in a working directory, and that the
+    # working directory is correctly resolved relative to the sandbox root or workspace root.
+    rule_runner.write_files(
+        {
+            "test.txt": "workspace test.txt",
+            "foo/test.txt": "workspace foo/test.txt",
+            "foo/bar/test.txt": "workspace foo/bar/test.txt",
+        }
+    )
+    input_digest = rule_runner.make_snapshot(
+        {
+            "test.txt": "chroot test.txt",
+            "foo/test.txt": "chroot foo/test.txt",
+            "foo/bar/test.txt": "chroot foo/bar/test.txt",
+        }
+    ).digest
+
+    process = InteractiveProcess(
+        argv=["/bin/bash", "-c", "pwd && cat test.txt"],
+        input_digest=input_digest,
+        working_directory=working_directory,
+        run_in_workspace=run_in_workspace,
+    )
+
+    with mock_console(rule_runner.options_bootstrapper) as (_, stdio_reader):
+        result = rule_runner.run_interactive_process(process)
+        stdout = stdio_reader.get_stdout()
+        stderr = stdio_reader.get_stderr()
+        assert result.exit_code == 0, (
+            f"Process failed with exit code {result.exit_code}.\nstdout: {stdout}\nstderr: {stderr}"
+        )
+
+        lines = stdout.splitlines()
+        assert len(lines) == 2
+        if working_directory is not None:
+            assert lines[0].endswith(working_directory)
+
+        expected_prefix = "workspace" if run_in_workspace else "chroot"
+        expected_path = os.path.join(*(s for s in (working_directory, "test.txt") if s))
+        assert f"{expected_prefix} {expected_path}" in stdout
 
 
 def test_workspace_execution_support() -> None:

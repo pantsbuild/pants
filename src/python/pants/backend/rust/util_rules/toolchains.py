@@ -8,6 +8,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from pants.backend.rust.subsystems.rust import RustSubsystem
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.system_binaries import (
     BinaryPath,
     BinaryPathRequest,
@@ -16,7 +17,6 @@ from pants.core.util_rules.system_binaries import (
 )
 from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.internals.native_engine import Digest
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope, execute_process_or_raise
 from pants.engine.rules import Rule, collect_rules, implicitly, rule

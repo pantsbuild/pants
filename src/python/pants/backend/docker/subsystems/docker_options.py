@@ -269,6 +269,17 @@ class DockerOptions(Subsystem):
         advanced=True,
     )
 
+    suggest_renames = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            When true and, the `docker_image` build fails, enrich the logs with suggestions
+            for renaming source file COPY instructions where possible.
+            """
+        ),
+        advanced=True,
+    )
+
     @property
     def build_args(self) -> tuple[str, ...]:
         return tuple(sorted(set(self._build_args)))

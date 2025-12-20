@@ -59,12 +59,28 @@ class PythonProtobufSubsystem(Subsystem):
         ),
     )
 
+    generate_type_stubs = BoolOption(
+        default=False,
+        mutually_exclusive_group="typestubs",
+        help=softwrap(
+            """
+            If True, then configure `protoc` to also generate `.pyi` type stubs for each generated
+            Python file. This option will work wih any recent version of `protoc` and should
+            be preferred over the `--python-protobuf-mypy-plugin` option.
+            """
+        ),
+    )
+
     mypy_plugin = BoolOption(
         default=False,
+        mutually_exclusive_group="typestubs",
         help=softwrap(
             """
             Use the `mypy-protobuf` plugin (https://github.com/dropbox/mypy-protobuf) to also
             generate `.pyi` type stubs.
+
+            Please prefer the `--python-protobuf-generate-type-stubs` option over this option
+            since recent versions of `protoc` have the ability to directly generate type stubs.
             """
         ),
     )

@@ -11,7 +11,8 @@ import pytest
 
 from pants.base.exceptions import IncorrectProductError
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import Get, MultiGet, implicitly, rule
+from pants.engine.internals.selectors import Get
+from pants.engine.rules import concurrently, implicitly, rule
 from pants.engine.unions import UnionRule, union
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
@@ -31,11 +32,11 @@ class B:
 
 
 @rule
-def consumes_a_and_b(a: A, b: B) -> str:
+async def consumes_a_and_b(a: A, b: B) -> str:
     return str(f"{a} and {b}")
 
 
-def test_use_params() -> None:
+async def test_use_params() -> None:
     rule_runner = RuleRunner(
         rules=[consumes_a_and_b, QueryRule(str, [A, B])],
         inherent_environment=None,
@@ -44,11 +45,11 @@ def test_use_params() -> None:
     # Confirm that we can pass in Params in order to provide multiple inputs to an execution.
     a, b = A(), B()
     result_str = rule_runner.request(str, [a, b])
-    assert result_str == consumes_a_and_b.rule.func(a, b)  # type: ignore[attr-defined]
+    assert result_str == await consumes_a_and_b.rule.func(a, b)  # type: ignore[attr-defined]
 
     # And confirm that a superset of Params is also accepted.
     result_str = rule_runner.request(str, [a, b, b"bytes aren't used by any rules"])
-    assert result_str == consumes_a_and_b.rule.func(a, b)  # type: ignore[attr-defined]
+    assert result_str == await consumes_a_and_b.rule.func(a, b)  # type: ignore[attr-defined]
 
     # But not a subset.
     expected_msg = "No installed QueryRules can compute str given input Params(A), but"
@@ -62,7 +63,7 @@ class C:
 
 
 @rule
-def transitive_b_c(c: C) -> B:
+async def transitive_b_c(c: C) -> B:
     return B()
 
 
@@ -73,7 +74,7 @@ class D:
 
 @rule
 async def transitive_coroutine_rule(c: C) -> D:
-    b = await Get(B, C, c)
+    b = await transitive_b_c(c)
     return D(b)
 
 
@@ -98,7 +99,7 @@ def test_transitive_params(transitive_params_rule_runner: RuleRunner) -> None:
     a, c = A(), C()
     assert transitive_params_rule_runner.request(str, [a, c])
 
-    # Test that an inner Get in transitive_coroutine_rule() is able to resolve B from C due to
+    # Test that an inner rule call in transitive_coroutine_rule() is able to resolve B from C due to
     # the existence of transitive_b_c().
     transitive_params_rule_runner.request(D, [c])
 
@@ -110,7 +111,7 @@ def test_consumed_types(transitive_params_rule_runner: RuleRunner) -> None:
 
 
 @rule
-def boolean_and_int(i: int, b: bool) -> A:
+async def boolean_and_int(i: int, b: bool) -> A:
     return A()
 
 
@@ -134,7 +135,7 @@ async def b(i: int) -> B:
 
 
 @rule
-def c() -> C:
+async def c() -> C:
     return C()
 
 
@@ -142,10 +143,10 @@ def c() -> C:
 async def a() -> A:
     _ = await b(**implicitly(int(1)))
     _ = await c()
-    b1, c1, b2 = await MultiGet(
+    b1, c1, b2 = await concurrently(
         b(1),
         c(),
-        Get(B, int(1)),
+        b(int(1)),
     )
     return A()
 
@@ -190,12 +191,12 @@ class Motorcycle(Vehicle):
 
 
 @rule
-def car_num_wheels(car: Car, _: Fuel) -> int:
+async def car_num_wheels(car: Car, _: Fuel) -> int:
     return car.num_wheels()
 
 
 @rule
-def motorcycle_num_wheels(motorcycle: Motorcycle) -> int:
+async def motorcycle_num_wheels(motorcycle: Motorcycle) -> int:
     return motorcycle.num_wheels()
 
 
@@ -204,9 +205,32 @@ class WrappedVehicle:
     vehicle: Vehicle
 
 
+@dataclass(frozen=True)
+class WrappedVehiclesByName:
+    vehicles: tuple[Vehicle, ...]
+
+
+@rule(polymorphic=True)
+async def num_wheels(vehicle: Vehicle, _: Fuel) -> int:
+    raise NotImplementedError()
+
+
 @rule
 async def generic_num_wheels(wrapped_vehicle: WrappedVehicle) -> int:
-    return await Get(int, Vehicle, wrapped_vehicle.vehicle)
+    return await num_wheels(**implicitly({wrapped_vehicle.vehicle: Vehicle}))
+
+
+@rule
+async def wrapped_num_wheels(wrapped_vehicles: WrappedVehiclesByName) -> int:
+    all_wheels = await concurrently(
+        num_wheels(**implicitly({vehicle: Vehicle})) for vehicle in wrapped_vehicles.vehicles
+    )
+    return sum(all_wheels)
+
+
+@rule
+async def fuel_singleton() -> Fuel:
+    return Fuel()
 
 
 def test_union_rules_in_scope_via_query() -> None:
@@ -216,6 +240,7 @@ def test_union_rules_in_scope_via_query() -> None:
             motorcycle_num_wheels,
             UnionRule(Vehicle, Car),
             UnionRule(Vehicle, Motorcycle),
+            num_wheels,
             generic_num_wheels,
             QueryRule(int, [WrappedVehicle, Fuel]),
         ],
@@ -227,23 +252,20 @@ def test_union_rules_in_scope_via_query() -> None:
     with pytest.raises(ExecutionError) as exc:
         rule_runner.request(int, [WrappedVehicle("not a vehicle"), Fuel()])  # type: ignore[arg-type]
     assert (
-        "Invalid Get. Because an input type for `Get(int, Vehicle, not a vehicle)` was "
-        "annotated with `@union`, the value for that type should be a member of that union. Did you "
-        "intend to register a `UnionRule`?"
+        "Call(pants.engine.internals.scheduler_test.num_wheels, int, Vehicle, not a vehicle) "
+        "was not detected in your @rule body at rule compile time. Make sure the callee is defined "
+        "before the @rule body."
     ) in str(exc.value.args[0])
 
 
 def test_union_rules_in_scope_computed() -> None:
-    @rule
-    def fuel_singleton() -> Fuel:
-        return Fuel()
-
     rule_runner = RuleRunner(
         rules=[
             car_num_wheels,
             motorcycle_num_wheels,
             UnionRule(Vehicle, Car),
             UnionRule(Vehicle, Motorcycle),
+            num_wheels,
             generic_num_wheels,
             fuel_singleton,
             QueryRule(int, [WrappedVehicle]),
@@ -253,21 +275,40 @@ def test_union_rules_in_scope_computed() -> None:
     assert rule_runner.request(int, [WrappedVehicle(Motorcycle())]) == 2
 
 
+def test_polymorphic_call_by_name() -> None:
+    @rule
+    async def fuel_singleton() -> Fuel:
+        return Fuel()
+
+    rule_runner = RuleRunner(
+        rules=[
+            car_num_wheels,
+            motorcycle_num_wheels,
+            UnionRule(Vehicle, Car),
+            UnionRule(Vehicle, Motorcycle),
+            num_wheels,
+            wrapped_num_wheels,
+            fuel_singleton,
+            QueryRule(int, [WrappedVehiclesByName]),
+        ],
+    )
+    assert rule_runner.request(int, [WrappedVehiclesByName((Car(), Motorcycle()))]) == 6
+
+
 # -----------------------------------------------------------------------------------------------
 # Test invalid Gets
 # -----------------------------------------------------------------------------------------------
 
 
-def create_outlined_get() -> Get[int]:
-    return Get(int, str, "hello")
-
-
-@rule
-async def uses_outlined_get() -> int:
-    return await create_outlined_get()
-
-
+@pytest.mark.call_by_type
 def test_outlined_get() -> None:
+    def create_outlined_get() -> Get[int]:
+        return Get(int, str, "hello")
+
+    @rule
+    async def uses_outlined_get() -> int:
+        return await create_outlined_get()
+
     rule_runner = RuleRunner(
         rules=[
             uses_outlined_get,
@@ -275,30 +316,6 @@ def test_outlined_get() -> None:
         ],
     )
     # Fails because the creation of the `Get` was out-of-lined into a separate function.
-    with pytest.raises(ExecutionError) as exc:
-        rule_runner.request(int, [])
-    assert (
-        "Get(int, str, hello) was not detected in your @rule body at rule compile time."
-    ) in str(exc.value.args[0])
-
-
-@rule
-async def uses_rule_helper_before_definition() -> int:
-    return await get_after_rule()
-
-
-async def get_after_rule() -> int:
-    return await Get(int, str, "hello")
-
-
-def test_rule_helper_after_rule_definition_fails() -> None:
-    rule_runner = RuleRunner(
-        rules=[
-            uses_rule_helper_before_definition,
-            QueryRule(int, []),
-        ],
-    )
-
     with pytest.raises(ExecutionError) as exc:
         rule_runner.request(int, [])
     assert (
@@ -317,7 +334,7 @@ class SomeOutput:
 
 
 @rule
-def raise_an_exception(some_input: SomeInput) -> SomeOutput:
+async def raise_an_exception(some_input: SomeInput) -> SomeOutput:
     raise Exception(some_input.s)
 
 
@@ -329,7 +346,7 @@ class OuterInput:
 @rule
 async def catch_an_exception(outer_input: OuterInput) -> SomeOutput:
     try:
-        return await Get(SomeOutput, SomeInput(outer_input.s))
+        return await raise_an_exception(SomeInput(outer_input.s))
     except Exception as e:
         return SomeOutput(str(e))
 
@@ -339,7 +356,7 @@ async def catch_and_reraise(outer_input: OuterInput) -> SomeOutput:
     """This rule is used in a dedicated test only, so does not conflict with
     `catch_an_exception`."""
     try:
-        return await Get(SomeOutput, SomeInput(outer_input.s))
+        return await raise_an_exception(SomeInput(outer_input.s))
     except Exception as e:
         raise Exception("nested exception!") from e
 
@@ -352,21 +369,21 @@ GLOBAL_FLAG: bool = True
 
 
 @rule
-def raise_an_exception_upon_global_state(input_with_nothing: InputWithNothing) -> SomeOutput:
+async def raise_an_exception_upon_global_state(input_with_nothing: InputWithNothing) -> SomeOutput:
     if GLOBAL_FLAG:
         raise Exception("global flag is set!")
     return SomeOutput("asdf")
 
 
 @rule
-def return_a_wrong_product_type(input_with_nothing: InputWithNothing) -> A:
+async def return_a_wrong_product_type(input_with_nothing: InputWithNothing) -> A:
     return B()  # type: ignore[return-value]
 
 
 @rule
 async def catch_a_wrong_product_type(input_with_nothing: InputWithNothing) -> B:
     try:
-        _ = await Get(A, InputWithNothing, input_with_nothing)
+        _ = await return_a_wrong_product_type(input_with_nothing)
     except IncorrectProductError as e:
         raise Exception(f"caught product type error: {e}")
     return B()
@@ -425,7 +442,7 @@ def fn_raises():
 
 
 @rule(desc="Nested raise")
-def nested_raise() -> A:
+async def nested_raise() -> A:
     fn_raises()
     return A()
 
@@ -478,8 +495,11 @@ def test_trace_includes_nested_exception_traceback() -> None:
 
         Traceback (most recent call last):
           File LOCATION-INFO, in catch_and_reraise
-            return await Get(SomeOutput, SomeInput(outer_input.s))
-                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            return await raise_an_exception(SomeInput(outer_input.s))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          File LOCATION-INFO, in wrapper
+            return await call
+                   ^^^^^^^^^^
           File LOCATION-INFO, in __await__
             result = yield self
                      ^^^^^^^^^^
@@ -524,7 +544,7 @@ async def unhashable(_: MaybeHashableWrapper) -> B:
 
 @rule
 async def call_unhashable_with_invalid_input() -> C:
-    _ = await Get(B, MaybeHashableWrapper([1, 2]))
+    _ = await unhashable(MaybeHashableWrapper([1, 2]))
     return C()
 
 
@@ -545,6 +565,6 @@ def test_unhashable_types_failure() -> None:
     with pytest.raises(TypeError, match="unhashable type: 'list'"):
         rule_runner.request(B, [MaybeHashableWrapper([1, 2])])
 
-    # Fail if the `input` in a `Get` is not hashable.
+    # Fail if the `input` to a rule call is not hashable.
     with pytest.raises(ExecutionError, match="unhashable type: 'list'"):
         rule_runner.request(C, [])

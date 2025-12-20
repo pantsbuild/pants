@@ -11,10 +11,10 @@ from pants.backend.helm.goals.tailor import _SNAPSHOT_FOLDER_NAME, _TESTS_FOLDER
 from pants.backend.helm.target_types import AllHelmChartTargets, HelmUnitTestDependenciesField
 from pants.core.target_types import AllAssetTargetsByPath
 from pants.engine.addresses import Address
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.internals.graph import determine_explicitly_provided_dependencies
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
     DependenciesRequest,
-    ExplicitlyProvidedDependencies,
     FieldSet,
     InferDependenciesRequest,
     InferredDependencies,
@@ -66,8 +66,8 @@ async def infer_chart_dependency_into_unittests(
     if unittest_target_dir != _TESTS_FOLDER_NAME:
         raise InvalidUnitTestTestFolder(unittest_target_addr, unittest_target_addr.spec_path)
 
-    explicitly_provided_deps = await Get(
-        ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)
+    explicitly_provided_deps = await determine_explicitly_provided_dependencies(
+        **implicitly(DependenciesRequest(request.field_set.dependencies))
     )
 
     def is_snapshot_resource(path: PurePath) -> bool:

@@ -25,14 +25,15 @@ from pants.backend.python.dependency_inference.rules import (
     _exec_parse_deps,
     _find_other_owners_for_unowned_imports,
     import_rules,
+    resolve_parsed_dependencies,
 )
 from pants.backend.python.goals.run_python_source import PythonSourceFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.build_graph.address import Address
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, goal_rule, rule
+from pants.engine.internals.selectors import concurrently
+from pants.engine.rules import collect_rules, goal_rule, implicitly, rule
 from pants.engine.target import Targets
 from pants.option.option_types import EnumOption
 from pants.util.strutil import softwrap
@@ -89,9 +90,8 @@ async def dump_python_source_analysis_single(
 
     resolve = fs.resolve.normalized_value(python_setup)
 
-    resolved_dependencies = await Get(
-        ResolvedParsedPythonDependencies,
-        ResolvedParsedPythonDependenciesRequest(fs, parsed_dependencies, resolve),
+    resolved_dependencies = await resolve_parsed_dependencies(
+        ResolvedParsedPythonDependenciesRequest(fs, parsed_dependencies, resolve), **implicitly()
     )
 
     import_deps, unowned_imports = _collect_imports_info(resolved_dependencies.resolve_results)
@@ -171,13 +171,8 @@ async def dump_python_source_analysis(
         if PythonSourceFieldSet.is_applicable(tgt)
     ]
 
-    source_analysis = await MultiGet(
-        Get(
-            PythonSourceAnalysis,
-            PythonImportDependenciesInferenceFieldSet,
-            fs,
-        )
-        for fs in source_field_sets
+    source_analysis = await concurrently(
+        dump_python_source_analysis_single(fs, **implicitly()) for fs in source_field_sets
     )
 
     output: Any

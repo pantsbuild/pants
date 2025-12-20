@@ -15,7 +15,6 @@ from pants.engine.fs import EMPTY_DIGEST, Digest, FileDigest
 from pants.engine.internals.native_engine import (  # noqa: F401
     ProcessExecutionEnvironment as ProcessExecutionEnvironment,
 )
-from pants.engine.internals.selectors import Get
 from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
 from pants.engine.rules import collect_rules, rule
@@ -155,23 +154,23 @@ class Process:
 
         Usually, you will want to provide input files/directories via the parameter `input_digest`.
         The process will then be able to access these paths through relative paths. If you want to
-        give multiple input digests, first merge them with `await Get(Digest, MergeDigests)`. Files
-        larger than 512KB will be read-only unless they are globbed as part of either `output_files`
-        or `output_directories`.
+        give multiple input digests, first merge them with `merge_digests()`. Files larger than
+        512KB will be read-only unless they are globbed as part of either `output_files` or
+        `output_directories`.
 
         Often, you will want to capture the files/directories created in the process. To do this,
         you can either set `output_files` or `output_directories`. The specified paths should be
         specified relative to the `working_directory`, if any, and will then be used to populate
         `output_digest` on the `ProcessResult`. If you want to split up this output digest into
-        multiple digests, use `await Get(Digest, DigestSubset)` on the `output_digest`.
+        multiple digests, use `digest_subset_to_digest()` on the `output_digest`.
 
-        To actually run the process, use `await Get(ProcessResult, Process)` or
-        `await Get(FallibleProcessResult, Process)`.
+        To actually run the process, use or `await execute_process(Process(...), **implicitly())`
+        or `await execute_process_or_raise(**implicitly(Process(...)))`.
 
         Example:
 
-            result = await Get(
-                ProcessResult, Process(["/bin/echo", "hello world"], description="demo")
+            result = await execute_process_or_raise(
+                **implicitly(Process(["/bin/echo", "hello world"], description="demo")
             )
             assert result.stdout == b"hello world"
         """
@@ -367,12 +366,12 @@ class ProcessExecutionFailure(Exception):
 
 
 @rule
-def get_multi_platform_request_description(req: Process) -> ProductDescription:
+async def get_multi_platform_request_description(req: Process) -> ProductDescription:
     return ProductDescription(req.description)
 
 
 @rule
-def fallible_to_exec_result_or_raise(
+async def fallible_to_exec_result_or_raise(
     fallible_result: FallibleProcessResult,
     description: ProductDescription,
     keep_sandboxes: KeepSandboxes,
@@ -414,20 +413,6 @@ def fallible_to_exec_result_or_raise(
 execute_process_or_raise = fallible_to_exec_result_or_raise
 
 
-@rule
-async def execute_process_with_retry(req: ProcessWithRetries) -> ProcessResultWithRetries:
-    results: list[FallibleProcessResult] = []
-    for attempt in range(0, req.attempts):
-        proc = dataclasses.replace(req.proc, attempt=attempt)
-        result = await Get(  # noqa: PNT30: We only know that we need to rerun the test after we run it
-            FallibleProcessResult, Process, proc
-        )
-        results.append(result)
-        if result.exit_code == 0:
-            break
-    return ProcessResultWithRetries(tuple(results))
-
-
 @dataclass(frozen=True)
 class InteractiveProcessResult:
     exit_code: int
@@ -456,12 +441,13 @@ class InteractiveProcess(SideEffecting):
         append_only_caches: Mapping[str, str] | None = None,
         immutable_input_digests: Mapping[str, Digest] | None = None,
         keep_sandboxes: KeepSandboxes = KeepSandboxes.never,
+        working_directory: str | None = None,
     ) -> None:
         """Request to run a subprocess in the foreground, similar to subprocess.run().
 
         Unlike `Process`, the result will not be cached.
 
-        To run the process, use `await Effect(InteractiveProcessResult, InteractiveProcess(..))`
+        To run the process, use `await run_interactive_process(InteractiveProcess(..))`
         in a `@goal_rule`.
 
         `forward_signals_to_process` controls whether pants will allow a SIGINT signal
@@ -478,6 +464,7 @@ class InteractiveProcess(SideEffecting):
                 input_digest=input_digest,
                 append_only_caches=append_only_caches,
                 immutable_input_digests=immutable_input_digests,
+                working_directory=working_directory,
             ),
         )
         object.__setattr__(self, "run_in_workspace", run_in_workspace)
@@ -504,6 +491,7 @@ class InteractiveProcess(SideEffecting):
             append_only_caches=process.append_only_caches,
             immutable_input_digests=process.immutable_input_digests,
             keep_sandboxes=keep_sandboxes,
+            working_directory=process.working_directory,
         )
 
 

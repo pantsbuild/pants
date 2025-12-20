@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import importlib.metadata
 import logging
 import site
 import sys
@@ -11,19 +12,18 @@ from dataclasses import dataclass
 from io import StringIO
 from typing import cast
 
-from pkg_resources import Requirement, WorkingSet
-from pkg_resources import working_set as global_working_set
+from packaging.requirements import Requirement
 
 from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import PexRequest, VenvPexProcess, create_venv_pex
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
-from pants.backend.python.util_rules.pex_requirements import PexRequirements
+from pants.backend.python.util_rules.pex_requirements import PexRequirements<<<<<<< HEAD
 from pants.core.subsystems.uv import UvTool
 from pants.core.subsystems.uv import rules as uv_rules
 from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.adhoc_binaries import rules as adhoc_binaries_rules
-from pants.core.util_rules.environments import determine_bootstrap_environment
+from pants.core.environments.rules import determine_bootstrap_environment
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.environment import EnvironmentName
@@ -38,8 +38,10 @@ from pants.engine.process import (
     ProcessExecutionEnvironment,
     ProcessResult,
 )
-from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
+from pants.engine.process import ProcessCacheScope, execute_process_or_raise
+from pants.engine.rules import QueryRule, collect_rules, implicitly, rule
 from pants.init.bootstrap_scheduler import BootstrapScheduler
+from pants.init.import_util import find_matching_distributions
 from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.logging import LogLevel
@@ -90,16 +92,17 @@ async def resolve_plugins_via_pex(
             sys.executable, ".".join(map(str, sys.version_info[:3])).encode("utf8")
         )
 
-    plugins_pex = await Get(
-        VenvPex,
-        PexRequest(
-            output_filename="pants_plugins.pex",
-            internal_only=True,
-            python=python,
-            requirements=requirements,
-            interpreter_constraints=request.interpreter_constraints or InterpreterConstraints(),
-            description=f"Resolving plugins: {', '.join(req_strings)}",
-        ),
+    plugins_pex = await create_venv_pex(
+        **implicitly(
+            PexRequest(
+                output_filename="pants_plugins.pex",
+                internal_only=True,
+                python=python,
+                requirements=requirements,
+                interpreter_constraints=request.interpreter_constraints or InterpreterConstraints(),
+                description=f"Resolving plugins: {', '.join(req_strings)}",
+            )
+        )
     )
 
     # NB: We run this Process per-restart because it (intentionally) leaks named cache
@@ -110,15 +113,16 @@ async def resolve_plugins_via_pex(
         else ProcessCacheScope.PER_RESTART_SUCCESSFUL
     )
 
-    plugins_process_result = await Get(
-        ProcessResult,
-        VenvPexProcess(
-            plugins_pex,
-            argv=("-c", "import os, site; print(os.linesep.join(site.getsitepackages()))"),
-            description="Extracting plugin locations",
-            level=LogLevel.DEBUG,
-            cache_scope=cache_scope,
-        ),
+    plugins_process_result = await execute_process_or_raise(
+        **implicitly(
+            VenvPexProcess(
+                plugins_pex,
+                argv=("-c", "import os, site; print(os.linesep.join(site.getsitepackages()))"),
+                description="Extracting plugin locations",
+                level=LogLevel.DEBUG,
+                cache_scope=cache_scope,
+            )
+        )
     )
     return ResolvedPluginDistributions(plugins_process_result.stdout.decode().strip().split("\n"))
 
@@ -312,42 +316,52 @@ async def resolve_plugins(
 
 
 class PluginResolver:
-    """Encapsulates the state of plugin loading for the given WorkingSet.
+    """Encapsulates the state of plugin loading.
 
-    Plugin loading is inherently stateful, and so this class captures the state of the WorkingSet at
-    creation time, even though it will be mutated by each call to `PluginResolver.resolve`. This
-    makes the inputs to each `resolve(..)` call idempotent, even if the output is not.
+    Plugin loading is inherently stateful, and so the system enviroment on `sys.path` will be
+    mutated by each call to `PluginResolver.resolve`.
     """
 
     def __init__(
         self,
         scheduler: BootstrapScheduler,
         interpreter_constraints: InterpreterConstraints | None = None,
-        working_set: WorkingSet | None = None,
+        inherit_existing_constraints: bool = True,
     ) -> None:
         self._scheduler = scheduler
-        self._working_set = working_set or global_working_set
         self._interpreter_constraints = interpreter_constraints
+        self._inherit_existing_constraints = inherit_existing_constraints
 
     def resolve(
         self,
         options_bootstrapper: OptionsBootstrapper,
         env: CompleteEnvironmentVars,
         requirements: Iterable[str] = (),
-    ) -> WorkingSet:
-        """Resolves any configured plugins and adds them to the working_set."""
+    ) -> list[str]:
+        """Resolves any configured plugins and adds them to the sys.path as a side effect."""
+
+        def to_requirement(d):
+            return f"{d.name}=={d.version}"
+
+        distributions: list[importlib.metadata.Distribution] = []
+        if self._inherit_existing_constraints:
+            distributions = list(find_matching_distributions(None))
+
         request = PluginsRequest(
             self._interpreter_constraints,
-            tuple(dist.as_requirement() for dist in self._working_set),
+            tuple(to_requirement(dist) for dist in distributions),
             tuple(requirements),
         )
 
+        result = []
         for resolved_plugin_location in self._resolve_plugins(options_bootstrapper, env, request):
-            site.addsitedir(
-                resolved_plugin_location
-            )  # Activate any .pth files plugin wheels may have.
-            self._working_set.add_entry(resolved_plugin_location)
-        return self._working_set
+            # Activate any .pth files plugin wheels may have.
+            orig_sys_path_len = len(sys.path)
+            site.addsitedir(resolved_plugin_location)
+            if len(sys.path) > orig_sys_path_len:
+                result.append(resolved_plugin_location)
+
+        return result
 
     def _resolve_plugins(
         self,
@@ -367,7 +381,7 @@ class PluginResolver:
         params = Params(request, determine_bootstrap_environment(session))
         return cast(
             ResolvedPluginDistributions,
-            session.product_request(ResolvedPluginDistributions, [params])[0],
+            session.product_request(ResolvedPluginDistributions, params)[0],
         )
 
 

@@ -32,10 +32,10 @@ from pants.backend.python.target_types import (
     PythonResolveField,
     PythonSourceField,
 )
-from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
+from pants.core.util_rules.stripped_source_files import StrippedFileNameRequest, strip_file_name
 from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import AllTargets, Target
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.frozendict import FrozenDict
@@ -86,7 +86,7 @@ class AllPythonTargets:
 
 
 @rule(desc="Find all Python targets in project", level=LogLevel.DEBUG)
-def find_all_python_projects(all_targets: AllTargets) -> AllPythonTargets:
+async def find_all_python_projects(all_targets: AllTargets) -> AllPythonTargets:
     first_party = []
     third_party = []
     for tgt in all_targets:
@@ -139,6 +139,13 @@ class FirstPartyPythonMappingImplMarker:
     All implementations will be merged together. Any modules that show up in multiple
     implementations will be marked ambiguous.
     """
+
+
+@rule(polymorphic=True)
+async def get_first_party_python_mapping_impl(
+    marker: FirstPartyPythonMappingImplMarker, env_name: EnvironmentName
+) -> FirstPartyPythonMappingImpl:
+    raise NotImplementedError()
 
 
 @dataclass(frozen=True)
@@ -202,11 +209,9 @@ class FirstPartyPythonModuleMapping:
 async def merge_first_party_module_mappings(
     union_membership: UnionMembership,
 ) -> FirstPartyPythonModuleMapping:
-    all_mappings = await MultiGet(
-        Get(
-            FirstPartyPythonMappingImpl,
-            FirstPartyPythonMappingImplMarker,
-            marker_cls(),
+    all_mappings = await concurrently(
+        get_first_party_python_mapping_impl(
+            **implicitly({marker_cls(): FirstPartyPythonMappingImplMarker})
         )
         for marker_cls in union_membership.get(FirstPartyPythonMappingImplMarker)
     )
@@ -245,8 +250,8 @@ async def map_first_party_python_targets_to_modules(
     all_python_targets: AllPythonTargets,
     python_setup: PythonSetup,
 ) -> FirstPartyPythonMappingImpl:
-    stripped_file_per_target = await MultiGet(
-        Get(StrippedFileName, StrippedFileNameRequest(tgt[PythonSourceField].file_path))
+    stripped_file_per_target = await concurrently(
+        strip_file_name(StrippedFileNameRequest(tgt[PythonSourceField].file_path))
         for tgt in all_python_targets.first_party
     )
 

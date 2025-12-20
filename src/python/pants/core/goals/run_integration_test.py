@@ -72,7 +72,7 @@ def test_non_restartable(use_pantsd: bool) -> None:
 
     files = {
         dirname / "script.py": dedent(
-            """\
+            f"""\
             import os
             import time
 
@@ -82,7 +82,7 @@ def test_non_restartable(use_pantsd: bool) -> None:
                 fp.write("")
             time.sleep(5)
             print("Not restarted")
-            """.format(dirname=dirname)
+            """
         ),
         dirname / "BUILD": dedent(
             """\

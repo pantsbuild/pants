@@ -8,14 +8,18 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from pants.backend.go.util_rules.build_opts import GoBuildOptions
-from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest, BuiltGoPackage
+from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest, required_built_go_package
 from pants.backend.go.util_rules.goroot import GoRoot
-from pants.backend.go.util_rules.import_analysis import GoStdLibPackages, GoStdLibPackagesRequest
-from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
+from pants.backend.go.util_rules.import_analysis import (
+    GoStdLibPackagesRequest,
+    analyze_go_stdlib_packages,
+)
+from pants.backend.go.util_rules.link import LinkGoBinaryRequest, link_go_binary
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.native_engine import EMPTY_DIGEST
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.intrinsics import create_digest
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.util.resources import read_resource
 
 
@@ -46,19 +50,18 @@ async def naive_build_go_package_request_for_stdlib(
     request: NaiveBuildGoPackageRequestForStdlibPackageRequest,
     goroot: GoRoot,
 ) -> BuildGoPackageRequest:
-    stdlib_packages = await Get(
-        GoStdLibPackages,
-        GoStdLibPackagesRequest(with_race_detector=False, cgo_enabled=False),
+    stdlib_packages = await analyze_go_stdlib_packages(
+        GoStdLibPackagesRequest(with_race_detector=False, cgo_enabled=False)
     )
 
     pkg_info = stdlib_packages[request.import_path]
 
-    dep_build_requests = await MultiGet(
-        Get(
-            BuildGoPackageRequest,
+    dep_build_requests = await concurrently(
+        naive_build_go_package_request_for_stdlib(
             NaiveBuildGoPackageRequestForStdlibPackageRequest(
                 import_path=dep_import_path,
             ),
+            goroot,
         )
         for dep_import_path in pkg_info.imports
         if dep_import_path not in ("C", "unsafe", "builtin")
@@ -112,35 +115,34 @@ async def setup_go_binary(request: LoadedGoBinaryRequest, goroot: GoRoot) -> Loa
 
     build_opts = GoBuildOptions(cgo_enabled=False)
 
-    source_digest = await Get(Digest, CreateDigest(file_contents))
+    source_digest = await create_digest(CreateDigest(file_contents))
 
-    dep_build_requests = await MultiGet(
-        Get(
-            BuildGoPackageRequest,
-            NaiveBuildGoPackageRequestForStdlibPackageRequest(dep_import_path),
+    dep_build_requests = await concurrently(
+        naive_build_go_package_request_for_stdlib(
+            NaiveBuildGoPackageRequestForStdlibPackageRequest(dep_import_path), goroot
         )
         for dep_import_path in sorted(imports)
     )
 
-    built_pkg = await Get(
-        BuiltGoPackage,
-        BuildGoPackageRequest(
-            import_path="main",
-            pkg_name="main",
-            dir_path=".",
-            build_opts=build_opts,
-            digest=source_digest,
-            go_files=tuple(fc.path for fc in file_contents),
-            s_files=(),
-            direct_dependencies=dep_build_requests,
-            minimum_go_version=goroot.version,
+    built_pkg = await required_built_go_package(
+        **implicitly(
+            BuildGoPackageRequest(
+                import_path="main",
+                pkg_name="main",
+                dir_path=".",
+                build_opts=build_opts,
+                digest=source_digest,
+                go_files=tuple(fc.path for fc in file_contents),
+                s_files=(),
+                direct_dependencies=dep_build_requests,
+                minimum_go_version=goroot.version,
+            ),
         ),
     )
 
     main_pkg_a_file_path = built_pkg.import_paths_to_pkg_a_files["main"]
 
-    binary = await Get(
-        LinkedGoBinary,
+    binary = await link_go_binary(
         LinkGoBinaryRequest(
             input_digest=built_pkg.digest,
             archives=(main_pkg_a_file_path,),
@@ -149,6 +151,7 @@ async def setup_go_binary(request: LoadedGoBinaryRequest, goroot: GoRoot) -> Loa
             output_filename=request.output_name,
             description=f"Link internal Go binary `{request.output_name}`",
         ),
+        **implicitly(),
     )
     return LoadedGoBinary(binary.digest)
 

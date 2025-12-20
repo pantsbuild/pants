@@ -18,34 +18,35 @@ from pants.backend.codegen.protobuf.target_types import (
 from pants.backend.experimental.java.register import rules as java_backend_rules
 from pants.backend.java.target_types import JavaSourceField
 from pants.core.goals.resolves import ExportableTool
-from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
+from pants.core.util_rules.external_tool import download_external_tool
 from pants.core.util_rules.source_files import SourceFilesRequest
-from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
+from pants.core.util_rules.stripped_source_files import strip_source_roots
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
     Digest,
-    DigestEntries,
     Directory,
     FileEntry,
     MergeDigests,
     RemovePrefix,
-    Snapshot,
+)
+from pants.engine.internals.graph import transitive_targets
+from pants.engine.intrinsics import (
+    create_digest,
+    digest_to_snapshot,
+    get_digest_entries,
+    merge_digests,
+    remove_prefix,
 )
 from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import (
-    GeneratedSources,
-    GenerateSourcesRequest,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-)
+from pants.engine.process import Process, fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
+from pants.engine.target import GeneratedSources, GenerateSourcesRequest, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
-from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.coursier_fetch import ToolClasspathRequest, materialize_classpath_for_tool
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.target_types import PrefixedJvmJdkField, PrefixedJvmResolveField
-from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.source.source_root import SourceRootRequest, get_source_root
 from pants.util.logging import LogLevel
 
 
@@ -66,9 +67,8 @@ async def resolve_protobuf_java_grpc_plugin(
     tool: JavaProtobufGrpcSubsystem,
 ) -> ProtobufJavaGrpcPlugin:
     lockfile_request = GenerateJvmLockfileFromTool.create(tool)
-    classpath = await Get(
-        ToolClasspath,
-        ToolClasspathRequest(lockfile=lockfile_request),
+    classpath = await materialize_classpath_for_tool(
+        ToolClasspathRequest(lockfile=lockfile_request)
     )
 
     # TODO: Improve `ToolClasspath` API so that the filenames corresponding to a coordinate are identified by a
@@ -81,7 +81,7 @@ async def resolve_protobuf_java_grpc_plugin(
         Platform.linux_x86_64: "exe_linux-x86_64",
     }[platform]
 
-    classpath_entries = await Get(DigestEntries, Digest, classpath.digest)
+    classpath_entries = await get_digest_entries(classpath.digest)
     candidate_plugin_entries = []
     for classpath_entry in classpath_entries:
         if isinstance(classpath_entry, FileEntry):
@@ -91,8 +91,7 @@ async def resolve_protobuf_java_grpc_plugin(
 
     assert len(candidate_plugin_entries) == 1
 
-    plugin_digest = await Get(
-        Digest,
+    plugin_digest = await create_digest(
         CreateDigest(
             [
                 FileEntry(
@@ -101,7 +100,7 @@ async def resolve_protobuf_java_grpc_plugin(
                     is_executable=True,
                 )
             ]
-        ),
+        )
     )
 
     return ProtobufJavaGrpcPlugin(digest=plugin_digest, path="protoc-gen-grpc-java")
@@ -114,32 +113,31 @@ async def generate_java_from_protobuf(
     grpc_plugin: ProtobufJavaGrpcPlugin,  # TODO: Don't access grpc plugin unless gRPC codegen is enabled.
     platform: Platform,
 ) -> GeneratedSources:
-    download_protoc_request = Get(
-        DownloadedExternalTool, ExternalToolRequest, protoc.get_request(platform)
-    )
+    download_protoc_request = download_external_tool(protoc.get_request(platform))
 
     output_dir = "_generated_files"
-    create_output_dir_request = Get(Digest, CreateDigest([Directory(output_dir)]))
+    create_output_dir_request = create_digest(CreateDigest([Directory(output_dir)]))
 
     # Protoc needs all transitive dependencies on `protobuf_source` to work properly. It won't
     # actually generate those dependencies; it only needs to look at their .proto files to work
     # with imports.
-    transitive_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequest([request.protocol_target.address])
+    transitive_targets_for_protobuf_source = await transitive_targets(
+        TransitiveTargetsRequest([request.protocol_target.address]), **implicitly()
     )
 
     # NB: By stripping the source roots, we avoid having to set the value `--proto_path`
     # for Protobuf imports to be discoverable.
-    all_stripped_sources_request = Get(
-        StrippedSourceFiles,
-        SourceFilesRequest(
-            tgt[ProtobufSourceField]
-            for tgt in transitive_targets.closure
-            if tgt.has_field(ProtobufSourceField)
-        ),
+    all_stripped_sources_request = strip_source_roots(
+        **implicitly(
+            SourceFilesRequest(
+                tgt[ProtobufSourceField]
+                for tgt in transitive_targets_for_protobuf_source.closure
+                if tgt.has_field(ProtobufSourceField)
+            )
+        )
     )
-    target_stripped_sources_request = Get(
-        StrippedSourceFiles, SourceFilesRequest([request.protocol_target[ProtobufSourceField]])
+    target_stripped_sources_request = strip_source_roots(
+        **implicitly(SourceFilesRequest([request.protocol_target[ProtobufSourceField]]))
     )
 
     (
@@ -147,7 +145,7 @@ async def generate_java_from_protobuf(
         empty_output_dir,
         all_sources_stripped,
         target_sources_stripped,
-    ) = await MultiGet(
+    ) = await concurrently(
         download_protoc_request,
         create_output_dir_request,
         all_stripped_sources_request,
@@ -159,7 +157,7 @@ async def generate_java_from_protobuf(
         downloaded_protoc_binary.digest,
         empty_output_dir,
     ]
-    input_digest = await Get(Digest, MergeDigests(unmerged_digests))
+    input_digest = await merge_digests(MergeDigests(unmerged_digests))
 
     immutable_input_digests = {}
     if request.protocol_target.get(ProtobufGrpcToggleField).value:
@@ -175,27 +173,28 @@ async def generate_java_from_protobuf(
         )
 
     argv.extend(target_sources_stripped.snapshot.files)
-    result = await Get(
-        ProcessResult,
-        Process(
-            argv,
-            input_digest=input_digest,
-            immutable_input_digests=immutable_input_digests,
-            description=f"Generating Java sources from {request.protocol_target.address}.",
-            level=LogLevel.DEBUG,
-            output_directories=(output_dir,),
-        ),
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            Process(
+                argv,
+                input_digest=input_digest,
+                immutable_input_digests=immutable_input_digests,
+                description=f"Generating Java sources from {request.protocol_target.address}.",
+                level=LogLevel.DEBUG,
+                output_directories=(output_dir,),
+            )
+        )
     )
 
-    normalized_digest, source_root = await MultiGet(
-        Get(Digest, RemovePrefix(result.output_digest, output_dir)),
-        Get(SourceRoot, SourceRootRequest, SourceRootRequest.for_target(request.protocol_target)),
+    normalized_digest, source_root = await concurrently(
+        remove_prefix(RemovePrefix(result.output_digest, output_dir)),
+        get_source_root(SourceRootRequest.for_target(request.protocol_target)),
     )
 
     source_root_restored = (
-        await Get(Snapshot, AddPrefix(normalized_digest, source_root.path))
+        await digest_to_snapshot(**implicitly(AddPrefix(normalized_digest, source_root.path)))
         if source_root.path != "."
-        else await Get(Snapshot, Digest, normalized_digest)
+        else await digest_to_snapshot(normalized_digest)
     )
     return GeneratedSources(source_root_restored)
 

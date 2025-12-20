@@ -16,14 +16,15 @@ from pants.core.util_rules import external_tool
 from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
-    ExternalToolRequest,
     TemplatedExternalTool,
+    download_external_tool,
 )
 from pants.core.util_rules.system_binaries import BashBinary, MkdirBinary
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
+from pants.engine.intrinsics import create_digest, merge_digests
 from pants.engine.platform import Platform
 from pants.engine.process import Process
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import collect_rules, concurrently, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import StrListOption, StrOption
 from pants.util.frozendict import FrozenDict
@@ -111,8 +112,12 @@ class CoursierSubsystem(TemplatedExternalTool):
     name = "coursier"
     help = "A dependency resolver for the Maven ecosystem. (https://get-coursier.io/)"
 
-    default_version = "v2.1.6"
+    default_version = "v2.1.24"
     default_known_versions = [
+        "v2.1.24|macos_arm64 |8f47594eb62dea25af913c8932d1f1d86a3a9c8e1262925b63852635390a3f43|21541383|https://github.com/VirtusLab/coursier-m1/releases/download/v2.1.24/cs-aarch64-apple-darwin.gz",
+        "v2.1.24|linux_arm64 |96b4c7580d253b6999a40e94413ca6c4a9bd2339ecce4754ac31a26d1a12fcbf|21534519|https://github.com/VirtusLab/coursier-m1/releases/download/v2.1.24/cs-aarch64-pc-linux.gz",
+        "v2.1.24|linux_x86_64|d2c0572a17fb6146ea65349b59dd216b38beff60ae22bce6e549867c6ed2eda6|23366878",
+        "v2.1.24|macos_x86_64|33913cd6b61658035d9e6fe971e919cb0ef1f659aa7bff7deeded963a2d36385|22442034",
         "v2.1.6|macos_arm64 |746b3e346fa2c0107fdbc8a627890d495cb09dee4f8dcc87146bdb45941088cf|20829782|https://github.com/VirtusLab/coursier-m1/releases/download/v2.1.6/cs-aarch64-apple-darwin.gz",
         "v2.1.6|linux_arm64 |33330ca433781c9db9458e15d2d32e5d795de3437771647e26835e8b1391af82|20899290|https://github.com/VirtusLab/coursier-m1/releases/download/v2.1.6/cs-aarch64-pc-linux.gz",
         "v2.1.6|linux_x86_64|af7234f8802107f5e1130307ef8a5cc90262d392f16ddff7dce27a4ed0ddd292|20681688",
@@ -289,13 +294,8 @@ async def setup_coursier(
 
     post_process_stderr = POST_PROCESS_COURSIER_STDERR_SCRIPT.format(python_path=python.path)
 
-    downloaded_coursier_get = Get(
-        DownloadedExternalTool,
-        ExternalToolRequest,
-        coursier_subsystem.get_request(platform),
-    )
-    wrapper_scripts_digest_get = Get(
-        Digest,
+    downloaded_coursier_get = download_external_tool(coursier_subsystem.get_request(platform))
+    wrapper_scripts_digest_get = create_digest(
         CreateDigest(
             [
                 FileContent(
@@ -314,23 +314,22 @@ async def setup_coursier(
                     is_executable=True,
                 ),
             ]
-        ),
+        )
     )
 
-    downloaded_coursier, wrapper_scripts_digest = await MultiGet(
+    downloaded_coursier, wrapper_scripts_digest = await concurrently(
         downloaded_coursier_get, wrapper_scripts_digest_get
     )
 
     return Coursier(
         coursier=downloaded_coursier,
-        _digest=await Get(
-            Digest,
+        _digest=await merge_digests(
             MergeDigests(
                 [
                     downloaded_coursier.digest,
                     wrapper_scripts_digest,
                 ]
-            ),
+            )
         ),
         repos=FrozenOrderedSet(coursier_subsystem.repos),
         jvm_index=coursier_subsystem.jvm_index,

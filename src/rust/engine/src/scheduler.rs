@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 
 use deepsize::DeepSizeOf;
 use futures::{FutureExt, future};
-use log::debug;
+use log::trace;
 use tokio::time;
 
 use crate::context::{Context, Core};
@@ -156,7 +156,7 @@ impl Scheduler {
         // TODO: Creation of a Context is exposed in https://github.com/Aeledfyr/deepsize/pull/31.
         let mut deep_context = deepsize::Context::new();
         self.core.graph.visit_live(&context, |k, v| {
-            if let NodeKey::Task(ref t) = k {
+            if let NodeKey::Task(t) = k {
                 items.extend(t.params.keys().map(|k| k.to_value()));
                 items.push(v.clone().try_into().unwrap());
             }
@@ -278,7 +278,7 @@ impl Scheduler {
         request: &ExecutionRequest,
         session: &Session,
     ) -> Result<Vec<Result<Value, Failure>>, ExecutionTermination> {
-        debug!(
+        trace!(
             "Launching {} roots (poll={}).",
             request.roots.len(),
             request.poll

@@ -167,14 +167,18 @@ def workspace_files(package_manager: str) -> dict[str, str]:
         }
     if package_manager == "pnpm":
         return {
-            "src/js/pnpm-workspace.yaml": "",
+            "src/js/pnpm-workspace.yaml": json.dumps(
+                {
+                    "packages": ["a"],
+                }
+            ),
             "src/js/pnpm-lock.yaml": json.dumps(
                 {
                     "importers": {
                         ".": {},
                         "a": {},
                     },
-                    "lockfileVersion": "6.0",
+                    "lockfileVersion": "9.0",
                 }
             ),
         }

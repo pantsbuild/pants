@@ -7,7 +7,15 @@ These are always activated and cannot be disabled.
 """
 
 from pants.backend.codegen import export_codegen_goal
+from pants.build_graph import build_configuration
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.environments import rules as environments_rules
+from pants.core.environments.target_types import (
+    DockerEnvironmentTarget,
+    LocalEnvironmentTarget,
+    LocalWorkspaceEnvironmentTarget,
+    RemoteEnvironmentTarget,
+)
 from pants.core.goals import (
     check,
     deploy,
@@ -17,6 +25,7 @@ from pants.core.goals import (
     generate_lockfiles,
     generate_snapshots,
     lint,
+    lint_goal,
     package,
     publish,
     repl,
@@ -44,20 +53,16 @@ from pants.core.util_rules import (
     adhoc_binaries,
     archive,
     config_files,
-    environments,
+    env_vars,
     external_tool,
+    misc,
     source_files,
     stripped_source_files,
     subprocess_environment,
     system_binaries,
 )
-from pants.core.util_rules.environments import (
-    DockerEnvironmentTarget,
-    LocalEnvironmentTarget,
-    LocalWorkspaceEnvironmentTarget,
-    RemoteEnvironmentTarget,
-)
 from pants.core.util_rules.wrap_source import wrap_source_rule_and_target
+from pants.engine.internals import options_parsing
 from pants.engine.internals.parametrize import Parametrize
 from pants.goal import anonymous_telemetry, stats_aggregator
 from pants.source import source_root
@@ -79,6 +84,7 @@ def rules():
         *generate_lockfiles.rules(),
         *generate_snapshots.rules(),
         *lint.rules(),
+        *lint_goal.rules(),
         *update_build_files.rules(),
         *package.rules(),
         *publish.rules(),
@@ -90,10 +96,14 @@ def rules():
         *adhoc_binaries.rules(),
         *anonymous_telemetry.rules(),
         *archive.rules(),
+        *build_configuration.rules(),
         *config_files.rules(),
-        *environments.rules(),
+        *env_vars.rules(),
+        *environments_rules.rules(),
         *external_tool.rules(),
         *git.rules(),
+        *misc.rules(),
+        *options_parsing.rules(),
         *source_files.rules(),
         *source_root.rules(),
         *stats_aggregator.rules(),

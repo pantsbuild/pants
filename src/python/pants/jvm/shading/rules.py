@@ -19,10 +19,11 @@ from pants.engine.fs import (
     MergeDigests,
     RemovePrefix,
 )
-from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.intrinsics import add_prefix, create_digest, merge_digests, remove_prefix
+from pants.engine.process import execute_process_or_raise
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
-from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.coursier_fetch import ToolClasspathRequest, materialize_classpath_for_tool
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.shading import jarjar
 from pants.jvm.shading.jarjar import JarJar, MisplacedClassStrategy
@@ -89,9 +90,8 @@ async def shade_jar(request: ShadeJarRequest, jdk: InternalJdk, jarjar: JarJar) 
     rule_config_content = "\n".join([rule.encode() for rule in request.rules]) + "\n"
     logger.debug(f"Using JarJar rule file with following contents:\n{rule_config_content}")
 
-    conf_digest, output_digest = await MultiGet(
-        Get(
-            Digest,
+    conf_digest, output_digest = await concurrently(
+        create_digest(
             CreateDigest(
                 [
                     FileContent(
@@ -99,16 +99,16 @@ async def shade_jar(request: ShadeJarRequest, jdk: InternalJdk, jarjar: JarJar) 
                         content=rule_config_content.encode("utf-8"),
                     ),
                 ]
-            ),
+            )
         ),
-        Get(Digest, CreateDigest([Directory(output_prefix)])),
+        create_digest(CreateDigest([Directory(output_prefix)])),
     )
 
-    tool_classpath, input_digest = await MultiGet(
-        Get(
-            ToolClasspath, ToolClasspathRequest(lockfile=GenerateJvmLockfileFromTool.create(jarjar))
+    tool_classpath, input_digest = await concurrently(
+        materialize_classpath_for_tool(
+            ToolClasspathRequest(lockfile=GenerateJvmLockfileFromTool.create(jarjar))
         ),
-        Get(Digest, MergeDigests([request.digest, output_digest])),
+        merge_digests(MergeDigests([request.digest, output_digest])),
     )
 
     toolcp_prefix = "__toolcp"
@@ -131,36 +131,35 @@ async def shade_jar(request: ShadeJarRequest, jdk: InternalJdk, jarjar: JarJar) 
     if misplaced_class_strategy:
         system_properties["misplacedClassStrategy"] = misplaced_class_strategy.value
 
-    result = await Get(
-        ProcessResult,
-        JvmProcess(
-            jdk=jdk,
-            argv=[
-                _JARJAR_MAIN_CLASS,
-                "process",
-                os.path.join(conf_prefix, _JARJAR_RULE_CONFIG_FILENAME),
-                str(request.path),
-                output_filename,
-            ],
-            classpath_entries=tool_classpath.classpath_entries(toolcp_prefix),
-            input_digest=input_digest,
-            extra_immutable_input_digests=immutable_input_digests,
-            extra_jvm_options=[
-                *jarjar.jvm_options,
-                *[f"-D{prop}={value}" for prop, value in system_properties.items()],
-            ],
-            description=f"Shading JAR {request.path}",
-            output_directories=(output_prefix,),
-            level=LogLevel.DEBUG,
-        ),
+    result = await execute_process_or_raise(
+        **implicitly(
+            JvmProcess(
+                jdk=jdk,
+                argv=[
+                    _JARJAR_MAIN_CLASS,
+                    "process",
+                    os.path.join(conf_prefix, _JARJAR_RULE_CONFIG_FILENAME),
+                    str(request.path),
+                    output_filename,
+                ],
+                classpath_entries=tool_classpath.classpath_entries(toolcp_prefix),
+                input_digest=input_digest,
+                extra_immutable_input_digests=immutable_input_digests,
+                extra_jvm_options=[
+                    *jarjar.jvm_options,
+                    *[f"-D{prop}={value}" for prop, value in system_properties.items()],
+                ],
+                description=f"Shading JAR {request.path}",
+                output_directories=(output_prefix,),
+                level=LogLevel.DEBUG,
+            )
+        )
     )
 
-    shaded_jar_digest = await Get(Digest, RemovePrefix(result.output_digest, output_prefix))
+    shaded_jar_digest = await remove_prefix(RemovePrefix(result.output_digest, output_prefix))
     if request.path.parents:
         # Restore the folder structure of the original path in the output digest
-        shaded_jar_digest = await Get(
-            Digest, AddPrefix(shaded_jar_digest, str(request.path.parent))
-        )
+        shaded_jar_digest = await add_prefix(AddPrefix(shaded_jar_digest, str(request.path.parent)))
 
     return ShadedJar(path=str(request.path), digest=shaded_jar_digest)
 

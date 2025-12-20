@@ -46,3 +46,20 @@ def test_each_distinct_backend_loads(backend) -> None:
     else:
         backend = [backend]
     assert_backends_load(backend)
+
+
+def test_plugin_with_dependencies() -> None:
+    testproject_backend_pkg_name = "test_pants_plugin"
+
+    pants_run = run_pants(
+        [
+            "--no-pantsd",
+            f"--backend-packages=['{testproject_backend_pkg_name}']",
+            "help",
+        ],
+        config={"GLOBAL": {"pythonpath": ["%(buildroot)s/testprojects/pants-plugins/src/python"]}},
+        extra_env={
+            "_IMPORT_REQUIREMENT": "True",
+        },
+    )
+    pants_run.assert_success()

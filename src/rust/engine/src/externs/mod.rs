@@ -6,18 +6,18 @@
 
 use futures::FutureExt;
 use futures::future::{BoxFuture, Future};
+use parking_lot::{MappedRwLockReadGuard, Mutex, RwLock, RwLockReadGuard};
 use pyo3::FromPyObject;
 use pyo3::exceptions::{PyAssertionError, PyException, PyStopIteration, PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::sync::GILProtected;
+use pyo3::sync::{MutexExt, RwLockExt};
 use pyo3::types::{PyBool, PyBytes, PyDict, PySequence, PyString, PyTuple, PyType};
 use pyo3::{create_exception, import_exception, intern};
 use smallvec::{SmallVec, smallvec};
-use std::cell::{Ref, RefCell};
 use std::collections::BTreeMap;
 use std::convert::TryInto;
-use std::fmt;
 use std::sync::LazyLock;
+use std::{env, fmt};
 
 use logging::PythonLogLevel;
 use rule_graph::RuleId;
@@ -40,6 +40,7 @@ pub mod scheduler;
 mod stdio;
 mod target;
 pub mod testutil;
+mod unions;
 pub mod workunits;
 
 pub fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -87,7 +88,7 @@ pub fn equals(h1: &Bound<'_, PyAny>, h2: &Bound<'_, PyAny>) -> bool {
     // between non-equal types to avoid legacy behavior like `assert True == 1`, which is very
     // surprising in interning, and would likely be surprising anywhere else in the engine where we
     // compare things.
-    if !h1.get_type().is(&h2.get_type()) {
+    if !h1.get_type().is(h2.get_type()) {
         return false;
     }
     h1.eq(h2).unwrap()
@@ -108,7 +109,7 @@ pub fn is_union(py: Python, v: &Bound<'_, PyType>) -> PyResult<bool> {
 
 /// If the given type is a @union, return its in-scope types.
 ///
-/// This function is also implemented in Python as `pants.engine.union.union_in_scope_types`.
+/// This function is also implemented in Python as `pants.engine.unions.union_in_scope_types`.
 pub fn union_in_scope_types<'py>(
     py: Python<'py>,
     v: &Bound<'py, PyType>,
@@ -169,7 +170,8 @@ pub fn store_bool(py: Python, val: bool) -> Value {
 ///
 pub fn getattr<'py, T>(value: &Bound<'py, PyAny>, field: &str) -> Result<T, String>
 where
-    T: FromPyObject<'py>,
+    T: for<'a> FromPyObject<'a, 'py>,
+    for<'a> <T as FromPyObject<'a, 'py>>::Error: std::fmt::Debug,
 {
     value
         .getattr(field)
@@ -186,7 +188,7 @@ where
 }
 
 ///
-/// Collect the Values contained within an outer Python Iterable PyObject.
+/// Collect the Values contained within an outer Python Iterable Py<PyAny>.
 ///
 pub fn collect_iterable<'py>(value: &Bound<'py, PyAny>) -> Result<Vec<Bound<'py, PyAny>>, String> {
     match value.try_iter() {
@@ -212,17 +214,18 @@ pub fn collect_iterable<'py>(value: &Bound<'py, PyAny>) -> Result<Vec<Bound<'py,
 }
 
 /// Read a `FrozenDict[str, T]`.
-pub fn getattr_from_str_frozendict<'py, T: FromPyObject<'py>>(
+pub fn getattr_from_str_frozendict<'py, T: for<'a> FromPyObject<'a, 'py>>(
     value: &Bound<'py, PyAny>,
     field: &str,
 ) -> BTreeMap<String, T> {
     let frozendict: Bound<PyAny> = getattr(value, field).unwrap();
     let pydict: Bound<PyDict> = getattr(&frozendict, "_data").unwrap();
-    pydict
+    let result: BTreeMap<String, T> = pydict
         .items()
         .into_iter()
-        .map(|kv_pair| kv_pair.extract().unwrap())
-        .collect()
+        .map(|kv_pair| kv_pair.extract::<(String, T)>().unwrap())
+        .collect();
+    result
 }
 
 pub fn getattr_as_optional_string(
@@ -304,7 +307,8 @@ pub(crate) fn generator_send(
                 let throw = err
                     .value(py)
                     .getattr(intern!(py, "failure"))?
-                    .extract::<PyRef<PyFailure>>()?
+                    .extract::<PyRef<PyFailure>>()
+                    .map_err(PyErr::from)?
                     .get_error(py);
                 let response = throw_method.call1((&throw,));
                 (response, Some((throw, err)))
@@ -351,7 +355,7 @@ pub(crate) fn generator_send(
         Ok(GeneratorResponse::Get(get.take(py)?))
     } else if let Ok(call) = response.extract::<PyRef<PyGeneratorResponseNativeCall>>() {
         Ok(GeneratorResponse::NativeCall(call.take(py)?))
-    } else if let Ok(get_multi) = response.downcast::<PySequence>() {
+    } else if let Ok(get_multi) = response.cast::<PySequence>() {
         // Was an `All` or `MultiGet`.
         let gogs = get_multi
             .try_iter()?
@@ -423,13 +427,13 @@ fn interpret_get_inputs(
             a constructor call, rather than a type, but given {input_arg0}."
                 )));
             }
-            if let Ok(d) = input_arg0.downcast::<PyDict>() {
+            if let Ok(d) = input_arg0.cast::<PyDict>() {
                 let mut input_types = SmallVec::new();
                 let mut inputs = SmallVec::new();
                 for (value, declared_type) in d.iter() {
                     input_types.push(TypeId::new(
                         &declared_type
-                            .downcast::<PyType>()
+                            .cast::<PyType>()
                             .map_err(|_| {
                                 PyTypeError::new_err(
                 "Invalid Get. Because the second argument was a dict, we expected the keys of the \
@@ -450,7 +454,7 @@ fn interpret_get_inputs(
             }
         }
         (Some(input_arg0), Some(input_arg1)) => {
-            let declared_type = input_arg0.downcast::<PyType>().map_err(|_| {
+            let declared_type = input_arg0.cast::<PyType>().map_err(|_| {
                 let input_arg0_type = input_arg0.get_type();
                 PyTypeError::new_err(format!(
           "Invalid Get. Because you are using the longhand form Get(OutputType, InputType, \
@@ -484,19 +488,16 @@ fn interpret_get_inputs(
 }
 
 #[pyclass]
-pub struct PyGeneratorResponseNativeCall(GILProtected<RefCell<Option<NativeCall>>>);
+pub struct PyGeneratorResponseNativeCall(Mutex<Option<NativeCall>>);
 
 impl PyGeneratorResponseNativeCall {
     pub fn new(call: impl Future<Output = Result<Value, Failure>> + 'static + Send) -> Self {
-        Self(GILProtected::new(RefCell::new(Some(NativeCall {
-            call: call.boxed(),
-        }))))
+        Self(Mutex::new(Some(NativeCall { call: call.boxed() })))
     }
 
     fn take(&self, py: Python<'_>) -> Result<NativeCall, String> {
         self.0
-            .get(py)
-            .borrow_mut()
+            .lock_py_attached(py)
             .take()
             .ok_or_else(|| "A `NativeCall` may only be consumed once.".to_owned())
     }
@@ -516,24 +517,26 @@ impl PyGeneratorResponseNativeCall {
         Some(self_)
     }
 
-    fn send(&self, py: Python<'_>, value: PyObject) -> PyResult<()> {
+    fn send(&self, py: Python<'_>, value: Py<PyAny>) -> PyResult<()> {
         let args = PyTuple::new(py, [value])?.into_pyobject(py)?.unbind();
         Err(PyStopIteration::new_err(args))
     }
 }
 
 #[pyclass(subclass)]
-pub struct PyGeneratorResponseCall(GILProtected<RefCell<Option<Call>>>);
+pub struct PyGeneratorResponseCall(RwLock<Option<Call>>);
 
 impl PyGeneratorResponseCall {
-    fn borrow_inner<'py>(&'py self, py: Python<'py>) -> PyResult<Ref<'py, Call>> {
-        let inner: Ref<'py, _> = self.0.get(py).borrow();
+    fn borrow_inner<'py>(&'py self, py: Python<'py>) -> PyResult<MappedRwLockReadGuard<'py, Call>> {
+        let read_guard = self.0.read_py_attached(py);
 
-        Ref::filter_map(inner, |o: &Option<Call>| o.as_ref()).map_err(|_| {
-            PyException::new_err(
+        if read_guard.is_some() {
+            Ok(RwLockReadGuard::map(read_guard, |g| g.as_ref().unwrap()))
+        } else {
+            Err(PyException::new_err(
                 "A `Call` may not be consumed after being provided to the @rule engine.",
-            )
-        })
+            ))
+        }
     }
 }
 
@@ -562,14 +565,22 @@ impl PyGeneratorResponseCall {
         };
         let (input_types, inputs) = interpret_get_inputs(py, input_arg0, input_arg1)?;
 
-        Ok(Self(GILProtected::new(RefCell::new(Some(Call {
+        Ok(Self(RwLock::new(Some(Call {
             rule_id: RuleId::from_string(rule_id),
             output_type,
             args,
             args_arity,
             input_types,
             inputs,
-        })))))
+        }))))
+    }
+
+    #[getter]
+    fn rule_id(&self, py: Python) -> PyResult<String> {
+        // TODO: Currently this is only called in test infrastructure (specifically, by
+        // rule_runner.py). But if this ends up being used in a performance sensitive
+        // code path, consider denormalizing the rule_id to avoid this copy.
+        Ok(self.borrow_inner(py)?.rule_id.as_str().to_owned())
     }
 
     #[getter]
@@ -588,9 +599,9 @@ impl PyGeneratorResponseCall {
     }
 
     #[getter]
-    fn inputs(&self, py: Python<'_>) -> PyResult<Vec<PyObject>> {
+    fn inputs(&self, py: Python<'_>) -> PyResult<Vec<Py<PyAny>>> {
         let inner = self.borrow_inner(py)?;
-        let args: Vec<PyObject> = inner.args.as_ref().map_or_else(
+        let args: Vec<Py<PyAny>> = inner.args.as_ref().map_or_else(
             || Ok(Vec::default()),
             |args| args.to_py_object().extract(py),
         )?;
@@ -604,8 +615,7 @@ impl PyGeneratorResponseCall {
 impl PyGeneratorResponseCall {
     fn take(&self, py: Python<'_>) -> Result<Call, String> {
         self.0
-            .get(py)
-            .borrow_mut()
+            .write_py_attached(py)
             .take()
             .ok_or_else(|| "A `Call` may only be consumed once.".to_owned())
     }
@@ -613,13 +623,12 @@ impl PyGeneratorResponseCall {
 
 // Contains a `RefCell<Option<Get>>` in order to allow us to `take` the content without cloning.
 #[pyclass(subclass)]
-pub struct PyGeneratorResponseGet(GILProtected<RefCell<Option<Get>>>);
+pub struct PyGeneratorResponseGet(Mutex<Option<Get>>);
 
 impl PyGeneratorResponseGet {
     fn take(&self, py: Python<'_>) -> Result<Get, String> {
         self.0
-            .get(py)
-            .borrow_mut()
+            .lock_py_attached(py)
             .take()
             .ok_or_else(|| "A `Get` may only be consumed once.".to_owned())
     }
@@ -635,7 +644,15 @@ impl PyGeneratorResponseGet {
         input_arg0: Option<Bound<'_, PyAny>>,
         input_arg1: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
-        let product = product.downcast::<PyType>().map_err(|_| {
+        if ["1", "t", "true"].contains(
+            &env::var("PANTS_DISABLE_GETS")
+                .map(|s| s.to_lowercase())
+                .unwrap_or("".to_string())
+                .as_str(),
+        ) {
+            panic!("Get() is disabled!");
+        }
+        let product = product.cast::<PyType>().map_err(|_| {
             let actual_type = product.get_type();
             PyTypeError::new_err(format!(
                 "Invalid Get. The first argument (the output type) must be a type, but given \
@@ -646,19 +663,18 @@ impl PyGeneratorResponseGet {
 
         let (input_types, inputs) = interpret_get_inputs(py, input_arg0, input_arg1)?;
 
-        Ok(Self(GILProtected::new(RefCell::new(Some(Get {
+        Ok(Self(Mutex::new(Some(Get {
             output,
             input_types,
             inputs,
-        })))))
+        }))))
     }
 
     #[getter]
     fn output_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyType>> {
         Ok(self
             .0
-            .get(py)
-            .borrow()
+            .lock_py_attached(py)
             .as_ref()
             .ok_or_else(|| {
                 PyException::new_err(
@@ -673,8 +689,7 @@ impl PyGeneratorResponseGet {
     fn input_types<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyType>>> {
         Ok(self
             .0
-            .get(py)
-            .borrow()
+            .lock_py_attached(py)
             .as_ref()
             .ok_or_else(|| {
                 PyException::new_err(
@@ -688,11 +703,10 @@ impl PyGeneratorResponseGet {
     }
 
     #[getter]
-    fn inputs(&self, py: Python<'_>) -> PyResult<Vec<PyObject>> {
+    fn inputs(&self, py: Python<'_>) -> PyResult<Vec<Py<PyAny>>> {
         Ok(self
             .0
-            .get(py)
-            .borrow()
+            .lock_py_attached(py)
             .as_ref()
             .ok_or_else(|| {
                 PyException::new_err(
@@ -708,7 +722,7 @@ impl PyGeneratorResponseGet {
     fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
         Ok(format!(
             "{}",
-            self.0.get(py).borrow().as_ref().ok_or_else(|| {
+            self.0.lock_py_attached(py).as_ref().ok_or_else(|| {
                 PyException::new_err(
                     "A `Get` may not be consumed after being provided to the @rule engine.",
                 )

@@ -1,0 +1,16 @@
+[package]
+version = "0.0.1"
+edition = "2024"
+name = "async_value"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[dependencies]
+futures = { workspace = true }
+tokio = { workspace = true, features = ["macros", "sync"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "sync", "time"] }
+
+[lints]
+workspace = true

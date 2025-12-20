@@ -10,21 +10,21 @@ from pants.bsp.spec.log import LogMessageParams, MessageType
 from pants.bsp.spec.task import TaskProgressParams
 from pants.bsp.util_rules.targets import BSPCompileRequest, BSPCompileResult
 from pants.engine.addresses import Addresses
-from pants.engine.fs import AddPrefix, Digest, MergeDigests
+from pants.engine.fs import AddPrefix, MergeDigests
+from pants.engine.internals.graph import resolve_coarsened_targets
 from pants.engine.internals.native_engine import EMPTY_DIGEST
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import CoarsenedTargets
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import add_prefix, merge_digests
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.jvm import classpath
-from pants.jvm.classpath import LooseClassfiles
 from pants.jvm.compile import (
-    ClasspathEntry,
     ClasspathEntryRequest,
     ClasspathEntryRequestFactory,
     CompileResult,
     FallibleClasspathEntry,
+    get_fallible_classpath_entry,
 )
-from pants.jvm.resolve.key import CoursierResolveKey
+from pants.jvm.resolve.coursier_fetch import select_coursier_resolve_for_targets
 from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.util.strutil import path_safe
 
@@ -50,7 +50,9 @@ async def notify_for_classpath_entry(
     request: BSPClasspathEntryRequest,
     context: BSPContext,
 ) -> FallibleClasspathEntry:
-    entry = await Get(FallibleClasspathEntry, ClasspathEntryRequest, request.request)
+    entry = await get_fallible_classpath_entry(
+        **implicitly({request.request: ClasspathEntryRequest})
+    )
     context.notify_client(
         TaskProgressParams(
             task_id=request.task_id,
@@ -80,10 +82,10 @@ async def _jvm_bsp_compile(
     @unions, and we can't forward the implementation of a @union to another the way we might with
     an abstract class.
     """
-    coarsened_targets = await Get(
-        CoarsenedTargets, Addresses([fs.address for fs in request.field_sets])
+    coarsened_targets = await resolve_coarsened_targets(
+        **implicitly(Addresses([fs.address for fs in request.field_sets]))
     )
-    resolve = await Get(CoursierResolveKey, CoarsenedTargets, coarsened_targets)
+    resolve = await select_coursier_resolve_for_targets(coarsened_targets, **implicitly())
 
     # TODO: We include the (non-3rdparty) transitive dependencies here, because each project
     # currently only has a single BuildTarget. This has the effect of including `resources` targets,
@@ -92,13 +94,13 @@ async def _jvm_bsp_compile(
     #
     # To resolve #15051, this will no longer be transitive, and so `resources` will need to be
     # attached-to/referenced-by nearby BuildTarget(s) instead (most likely: direct dependent(s)).
-    results = await MultiGet(
-        Get(
-            FallibleClasspathEntry,
+    results = await concurrently(
+        notify_for_classpath_entry(
             BSPClasspathEntryRequest(
                 classpath_entry_request.for_targets(component=coarsened_target, resolve=resolve),
                 task_id=request.task_id,
             ),
+            **implicitly(),
         )
         for coarsened_target in coarsened_targets.coarsened_closure()
         if not any(JvmArtifactFieldSet.is_applicable(t) for t in coarsened_target.members)
@@ -111,12 +113,11 @@ async def _jvm_bsp_compile(
             output_digest=EMPTY_DIGEST,
         )
 
-    loose_classfiles = await MultiGet(
-        Get(LooseClassfiles, ClasspathEntry, entry) for entry in entries
+    loose_clsfiles = await concurrently(
+        classpath.loose_classfiles(entry, **implicitly()) for entry in entries
     )
-    merged_loose_classfiles = await Get(Digest, MergeDigests(lc.digest for lc in loose_classfiles))
-    output_digest = await Get(
-        Digest,
+    merged_loose_classfiles = await merge_digests(MergeDigests(lc.digest for lc in loose_clsfiles))
+    output_digest = await add_prefix(
         AddPrefix(merged_loose_classfiles, jvm_classes_directory(request.bsp_target.bsp_target_id)),
     )
 

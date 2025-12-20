@@ -12,23 +12,32 @@ from pants.backend.python.target_types import (
     ConsoleScript,
     Executable,
     PexEntryPointField,
-    ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
 )
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexRequest
-from pants.backend.python.util_rules.pex_environment import PexEnvironment, PythonExecutable
-from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.target_types_rules import resolve_pex_entry_point
+from pants.backend.python.util_rules.pex import (
+    Pex,
+    VenvPexRequest,
+    create_venv_pex,
+    find_interpreter,
+)
+from pants.backend.python.util_rules.pex_environment import PexEnvironment
+from pants.backend.python.util_rules.pex_from_targets import (
+    PexFromTargetsRequest,
+    create_pex_from_targets,
+)
 from pants.backend.python.util_rules.python_sources import (
-    PythonSourceFiles,
     PythonSourceFilesRequest,
+    prepare_python_sources,
 )
 from pants.core.goals.run import RunDebugAdapterRequest, RunRequest
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.rules import Get, MultiGet
-from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.fs import CreateDigest, FileContent, MergeDigests
+from pants.engine.internals.graph import transitive_targets as transitive_targets_get
+from pants.engine.intrinsics import create_digest, merge_digests
+from pants.engine.rules import concurrently, implicitly
+from pants.engine.target import TransitiveTargetsRequest
 from pants.util.frozendict import FrozenDict
 
 
@@ -47,21 +56,17 @@ async def _create_python_source_run_request(
     executable: Executable | None = None,
 ) -> RunRequest:
     addresses = [address]
-    entry_point, transitive_targets = await MultiGet(
-        Get(
-            ResolvedPexEntryPoint,
-            ResolvePexEntryPointRequest(entry_point_field),
-        ),
-        Get(TransitiveTargets, TransitiveTargetsRequest(addresses)),
+    entry_point, transitive_targets = await concurrently(
+        resolve_pex_entry_point(ResolvePexEntryPointRequest(entry_point_field)),
+        transitive_targets_get(TransitiveTargetsRequest(addresses), **implicitly()),
     )
 
     pex_filename = (
         address.generated_name.replace(".", "_") if address.generated_name else address.target_name
     )
 
-    pex_request, sources = await MultiGet(
-        Get(
-            PexRequest,
+    pex_request, sources = await concurrently(
+        create_pex_from_targets(
             PexFromTargetsRequest(
                 addresses,
                 output_filename=f"{pex_filename}.pex",
@@ -77,10 +82,10 @@ async def _create_python_source_run_request(
                     "--no-strip-pex-env",
                 ),
             ),
+            **implicitly(),
         ),
-        Get(
-            PythonSourceFiles,
-            PythonSourceFilesRequest(transitive_targets.closure, include_files=True),
+        prepare_python_sources(
+            PythonSourceFilesRequest(transitive_targets.closure, include_files=True), **implicitly()
         ),
     )
 
@@ -92,9 +97,9 @@ async def _create_python_source_run_request(
         complete_pex_environment = pex_env.in_sandbox(working_directory=None)
     else:
         complete_pex_environment = pex_env.in_workspace()
-    venv_pex, python = await MultiGet(
-        Get(VenvPex, VenvPexRequest(pex_request, complete_pex_environment)),
-        Get(PythonExecutable, InterpreterConstraints, pex_request.interpreter_constraints),
+    venv_pex, python = await concurrently(
+        create_venv_pex(VenvPexRequest(pex_request, complete_pex_environment), **implicitly()),
+        find_interpreter(pex_request.interpreter_constraints, **implicitly()),
     )
     input_digests = [
         venv_pex.digest,
@@ -106,7 +111,7 @@ async def _create_python_source_run_request(
         # sources will take precedence and their copies in the chroot will be ignored.
         sources.source_files.snapshot.digest,
     ]
-    merged_digest = await Get(Digest, MergeDigests(input_digests))
+    merged_digest = await merge_digests(MergeDigests(input_digests))
 
     chrooted_source_roots = [_in_chroot(sr) for sr in sources.source_roots]
     # The order here is important: we want the in-repo sources to take precedence over their
@@ -141,8 +146,7 @@ async def _create_python_source_run_dap_request(
     debug_adapter: DebugAdapterSubsystem,
     run_in_sandbox: bool,
 ) -> RunDebugAdapterRequest:
-    launcher_digest = await Get(
-        Digest,
+    launcher_digest = await create_digest(
         CreateDigest(
             [
                 FileContent(
@@ -174,15 +178,7 @@ async def _create_python_source_run_dap_request(
         ),
     )
 
-    merged_digest = await Get(
-        Digest,
-        MergeDigests(
-            [
-                regular_run_request.digest,
-                launcher_digest,
-            ]
-        ),
-    )
+    merged_digest = await merge_digests(MergeDigests([regular_run_request.digest, launcher_digest]))
     extra_env = dict(regular_run_request.extra_env)
     extra_env["PEX_INTERPRETER"] = "1"
     # See https://github.com/pantsbuild/pants/issues/17540

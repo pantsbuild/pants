@@ -64,7 +64,7 @@ class MakeselfArchiveFieldSet(PackageFieldSet, RunFieldSet):
 
 @dataclass(frozen=True)
 class CreateMakeselfArchive:
-    """Create Makeself archive with `await Get(ProcessResult, CreateMakeselfArchive(...))`.
+    """Await create_makeself_archive() to get a Process to invoke.
 
     See docs for the options [here](https://github.com/megastep/makeself/tree/release-2.5.0#usage).
     """

@@ -68,8 +68,10 @@ from dataclasses import dataclass
 
 from pants.core.goals.repl import ReplRequest
 from pants.core.target_types import FileSourceField, ResourceSourceField
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.rules import Get, rule
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
+from pants.core.util_rules.system_binaries import BinaryPathRequest, find_binary
+from pants.engine.internals.graph import TransitiveTargetsRequest, transitive_targets
+from pants.engine.rules import implicitly, rule
 from pants.engine.target import SourcesField
 from pants.util.logging import LogLevel
 
@@ -78,25 +80,25 @@ from pants.util.logging import LogLevel
 @rule(level=LogLevel.DEBUG)
 async def create_bash_repl_request(repl: BashRepl) -> ReplRequest:
     # First, we find the `bash` program.
-    bash_program_paths =  await Get(
-        BinaryPaths, BinaryPathRequest(binary_name="bash", search_path=("/bin", "/usr/bin")),
+    bash_program_paths =  await find_binary(
+         BinaryPathRequest(binary_name="bash", search_path=("/bin", "/usr/bin")),
     )
     if not bash_program_paths.first_path:
         raise EnvironmentError("Could not find the `bash` program on /bin or /usr/bin.")
     bash_program = bash_program_paths.first_path
 
-    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses))
-    sources = await Get(
-        SourceFiles,
+    transitive_tgts = await transitive_targets(
+        TransitiveTargetsRequest(repl.addresses), **implicitly()
+    )
+    sources = await determine_source_files(
         SourceFilesRequest(
-            (tgt.get(SourcesField) for tgt in transitive_targets.closure),
-            for_sources_types=(BashSourceField, FileSourceField, ResourceSourceField),
+            (tgt.get(SourcesField) for tgt in transitive_tgts.closure),
+            for_sources_types=(FileSourceField, ResourceSourceField),
         ),
     )
     return ReplRequest(
         digest=sources.snapshot.digest, args=(bash_program.exe,)
     )
-
 ```
 
 If you use any relative paths in `args` or `extra_env`, you should call `repl.in_chroot("./example_relative_path")` on the values. This ensures that you run on the correct file in the temporary directory created by Pants.

@@ -1,0 +1,18 @@
+[package]
+version = "0.0.1"
+edition = "2024"
+name = "protos"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[dependencies]
+bytes = { workspace = true }
+hashing = { path = "../hashing" }
+prost = { workspace = true }
+prost-build = { workspace = true }
+prost-types = { workspace = true }
+tonic = { workspace = true, features = ["transport", "codegen", "tls", "tls-roots"] }
+
+[build-dependencies]
+prost-build = { workspace = true }
+tonic-build = { workspace = true, features = ["prost"] }

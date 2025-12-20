@@ -9,12 +9,12 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from pants.core.target_types import FileSourceField
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.fs import DigestSubset, PathGlobs
-from pants.engine.internals.native_engine import Digest, Snapshot
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import Rule, collect_rules, rule
+from pants.engine.internals.graph import resolve_targets
+from pants.engine.intrinsics import digest_subset_to_digest, digest_to_snapshot
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     GeneratedSources,
@@ -24,7 +24,6 @@ from pants.engine.target import (
     SpecialCasedDependencies,
     StringSequenceField,
     Target,
-    Targets,
 )
 from pants.engine.unions import UnionRule
 from pants.util.strutil import help_text
@@ -67,14 +66,13 @@ async def _wrap_source(wrapper: GenerateSourcesRequest) -> GeneratedSources:
     request = wrapper.protocol_target
     default_extensions = {i for i in (wrapper.output.expected_file_extensions or ()) if i}
 
-    inputs = await Get(
-        Targets,
-        UnparsedAddressInputs,
-        request.get(WrapSourceInputsField).to_unparsed_address_inputs(),
+    inputs = await resolve_targets(
+        **implicitly(
+            {request.get(WrapSourceInputsField).to_unparsed_address_inputs(): UnparsedAddressInputs}
+        )
     )
 
-    sources = await Get(
-        SourceFiles,
+    sources = await determine_source_files(
         SourceFilesRequest(
             sources_fields=[tgt.get(SourcesField) for tgt in inputs],
             for_sources_types=(SourcesField, FileSourceField),
@@ -90,11 +88,11 @@ async def _wrap_source(wrapper: GenerateSourcesRequest) -> GeneratedSources:
     else:
         outputs_value = sources.files
 
-    filter_digest = await Get(
-        Digest, DigestSubset(sources.snapshot.digest, PathGlobs(outputs_value))
+    filter_digest = await digest_subset_to_digest(
+        DigestSubset(sources.snapshot.digest, PathGlobs(outputs_value))
     )
 
-    snapshot = await Get(Snapshot, Digest, filter_digest)
+    snapshot = await digest_to_snapshot(filter_digest)
     return GeneratedSources(snapshot)
 
 

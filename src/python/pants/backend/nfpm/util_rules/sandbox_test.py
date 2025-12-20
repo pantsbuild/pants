@@ -44,11 +44,11 @@ from pants.core.target_types import (
 )
 from pants.core.target_types import rules as core_target_type_rules
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, DigestContents, DigestEntries
-from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, Snapshot
+from pants.engine.fs import CreateDigest, DigestEntries
+from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import QueryRule, rule
+from pants.engine.intrinsics import digest_to_snapshot, get_digest_contents
+from pants.engine.rules import QueryRule, implicitly, rule
 from pants.engine.target import GeneratedSources, GenerateSourcesRequest, SingleSourceField, Target
 from pants.engine.unions import UnionRule
 from pants.testutil.pytest_util import no_exception
@@ -186,12 +186,12 @@ class MockCodegenGenerateSourcesRequest(GenerateSourcesRequest):
 @rule
 async def do_codegen(request: MockCodegenGenerateSourcesRequest) -> GeneratedSources:
     # Generate a file with the same contents as each input file.
-    input_files = await Get(DigestContents, Digest, request.protocol_sources.digest)
+    input_files = await get_digest_contents(request.protocol_sources.digest)
     generated_files = [
         dataclasses.replace(input_file, path=input_file.path + ".generated")
         for input_file in input_files
     ]
-    result = await Get(Snapshot, CreateDigest(generated_files))
+    result = await digest_to_snapshot(**implicitly(CreateDigest(generated_files)))
     return GeneratedSources(result)
 
 

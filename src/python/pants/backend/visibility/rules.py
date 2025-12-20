@@ -36,7 +36,7 @@ class VisibilityValidateDependenciesRequest(ValidateDependenciesRequest):
 
 
 @rule
-def build_file_visibility_implementation(
+async def build_file_visibility_implementation(
     _: BuildFileVisibilityImplementationRequest,
 ) -> BuildFileDependencyRulesImplementation:
     return BuildFileDependencyRulesImplementation(BuildFileVisibilityRules)

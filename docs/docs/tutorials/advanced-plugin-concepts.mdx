@@ -1,6 +1,6 @@
 ---
     title: Advanced plugin concepts
-    sidebar_position: 2
+    sidebar_position: 1
 ---
 
 Learning advanced concepts for writing plugins.
@@ -9,7 +9,7 @@ Learning advanced concepts for writing plugins.
 
 ## Introduction
 
-In this tutorial, we continue from where we've left in the [previous tutorial](./create-a-new-goal.mdx). Having now a complete goal with a custom target, we are ready to make certain improvements and learn more advanced concepts that you would likely find useful when working on your own plugins.
+In this tutorial, we continue from where we've left in the [previous tutorial](./create-a-new-goal.mdx). Now that we have a complete goal with a custom target, we are ready to make certain improvements and learn more advanced concepts that you would likely find useful when working on your own plugins.
 
 ### Adding a custom `source` field
 
@@ -111,6 +111,7 @@ Now, let's raise an exception if it isn't possible to construct an instance of t
 ```python
 from packaging.version import Version, InvalidVersion
 from project_version.target_types import ProjectVersionTarget, ProjectVersionSourceField
+from pants.engine.rules import concurrently, goal_rule
 
 class InvalidProjectVersionString(ValueError):
     pass
@@ -118,8 +119,8 @@ class InvalidProjectVersionString(ValueError):
 @goal_rule
 async def goal_show_project_version(targets: Targets) -> ProjectVersionGoal:
     targets = [tgt for tgt in targets if tgt.has_field(ProjectVersionSourceField)]
-    results = await MultiGet(
-        Get(ProjectVersionFileView, ProjectVersionTarget, target) for target in targets
+    results = await concurrently(
+        get_project_version_file_view(target) for target in targets
     )
     for result in results:
         try:
@@ -201,9 +202,9 @@ $ pants project-version --as-json myapp: | jq
 
 ### Automating generation of `project_version` targets
 
-Pants provides a way to automate generation of standard targets using the [`tailor`](../../reference/goals/tailor.mdx) goal. If a monorepository has many projects, each containing a `VERSION` file, it might be useful to generate `version_file` targets in every directory where the relevant files are found. This is what Pants does, for instance, when Docker backend is enabled, and you have `Dockerfile` files in the codebase. To make this work for our use case, however, we need to introduce the `tailor` goal to the `VERSION` files.
+Pants provides a way to automate generation of standard targets using the [`tailor`](../../reference/goals/tailor.mdx) goal. If a repo has many projects, each containing a `VERSION` file, it might be useful to generate `version_file` targets in every directory where the relevant files are found. This is what Pants does, for instance, when the Docker backend is enabled, and you have `Dockerfile` files in the codebase. To make this work for our use case, however, we need to introduce the `tailor` goal to the `VERSION` files.
 
-We've reached the moment when the documentation won't be of help: there are no instructions on how to extend the `tailor` goal. In a situation like this, it may be worth exploring the Pants codebase to see how this was done in other plugins that are part of Pants. Once you find a piece of code that looks like it does what you want, you can copy it and tweak it to better suit your needs. For our use case, the code used in [generation of C++ source targets](https://github.com/pantsbuild/pants/blob/672ca1d662c76f2567e432347deee8949c14d35d/src/python/pants/backend/cc/goals/tailor.py) may get handy. After making a few changes, we have a new rule we can place in a new file:
+There is currently no website documentation on how to extend the `tailor` goal. In a situation like this, it may be worth exploring the Pants codebase to see how this was done in other plugins that are part of Pants. Once you find a piece of code that looks like it does what you want, you can copy it and tweak it to better suit your needs. For our use case, the code used in [generation of C++ source targets](https://github.com/pantsbuild/pants/blob/672ca1d662c76f2567e432347deee8949c14d35d/src/python/pants/backend/cc/goals/tailor.py) may be handy. After making a few changes, we have a new rule we can place in a new file:
 
 ```python title="pants-plugins/project_version/tailor.py"
 from __future__ import annotations
@@ -218,7 +219,7 @@ from pants.core.goals.tailor import (
 )
 from pants.util.dirutil import group_by_dir
 from pants.engine.fs import PathGlobs, Paths
-from pants.engine.internals.selectors import Get
+from pants.engine.intrinsics import path_globs_to_paths
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from project_version.target_types import ProjectVersionTarget
@@ -234,25 +235,21 @@ async def find_putative_targets(
     req: PutativeProjectVersionTargetsRequest,
     all_owned_sources: AllOwnedSources,
 ) -> PutativeTargets:
-    all_project_version_files = await Get(Paths, PathGlobs, req.path_globs("VERSION"))
+    all_project_version_files = await path_globs_to_paths(req.path_globs("VERSION"))
     unowned_project_version_files = set(all_project_version_files.files) - set(
         all_owned_sources
     )
-    classified_unowned_project_version_files = {
-        ProjectVersionTarget: unowned_project_version_files
-    }
 
     putative_targets = []
-    for tgt_type, paths in classified_unowned_project_version_files.items():
-        for dirname, filenames in group_by_dir(paths).items():
-            putative_targets.append(
-                PutativeTarget.for_target_type(
-                    ProjectVersionTarget,
-                    path=dirname,
-                    name="project-version-file",
-                    triggering_sources=sorted(filenames),
-                )
+    for dirname, filenames in group_by_dir(unowned_project_version_files).items():
+        putative_targets.append(
+            PutativeTarget.for_target_type(
+                ProjectVersionTarget,
+                path=dirname,
+                name="project-version-file",
+                triggering_sources=sorted(filenames),
             )
+        )
 
     return PutativeTargets(putative_targets)
 
@@ -274,7 +271,7 @@ def rules():
     ]
 ```
 
-When the `tailor` goal is run, the build graph is analyzed to see when `PutativeTargetsRequest` is needed, i.e. to find out if there are any files (yet unknown to Pants) that look like they could potentially be made targets. For instance, if there is a `requirements.txt` file, a `python_requirement` target is created and when there is a Python `test_` module, a `python_test` target is created. To be able to customize the `tailor` goal (to allow generation of custom targets), we need to "extend" the build graph. That is, we ask Pants to also run our rule when searching for files that maybe should have a target created.
+When the `tailor` goal is run, the build graph is analyzed to see when `PutativeTargetsRequest` is needed, i.e. to find out if there are any files (yet unknown to Pants) that look like they could potentially be wrapped in targets. For instance, if there is a `requirements.txt` file, a `python_requirement` target is created and when there is a Python `test_*` module, a `python_test` target is created. To be able to customize the `tailor` goal (to allow generation of custom targets), we need to "extend" the build graph. That is, we ask Pants to also run our rule when searching for files that maybe should have a target created.
 
 We also have to make sure that the new rule is collected:
 
@@ -309,27 +306,31 @@ Pants lets you [run system applications](../writing-plugins/the-rules-api/instal
 We can create a new rule:
 
 ```python
+from pants.base.build_root import BuildRoot
+from pants.core.util_rules.system_binaries import BinaryPathRequest, find_binary
+from pants.engine.process import Process, execute_process_or_raise
+from pants.engine.rules import implicitly, rule
+
 class GitTagVersion(str):
     pass
 
 @rule
 async def get_git_repo_version(buildroot: BuildRoot) -> GitTagVersion:
-    git_paths = await Get(
-        BinaryPaths,
+    git_paths = await find_binary(
         BinaryPathRequest(
             binary_name="git",
             search_path=["/usr/bin", "/bin"],
         ),
+        **implicitly(),
     )
     git_bin = git_paths.first_path
     if git_bin is None:
         raise OSError("Could not find 'git'.")
-    git_describe = await Get(
-        ProcessResult,
-        Process(
+    git_describe = await execute_process_or_raise(
+        **implicitly(Process(
             argv=[git_bin.path, "-C", buildroot.path, "describe", "--tags"],
             description="git describe --tags",
-        ),
+        )),
     )
     return GitTagVersion(git_describe.stdout.decode().strip())
 ```
@@ -343,7 +344,7 @@ class ProjectVersionGitTagMismatch(ValueError):
 @goal_rule
 async def goal_show_project_version(...) -> ProjectVersionGoal:
     ...
-    git_repo_version = await Get(GitTagVersion)
+    git_repo_version = await get_git_repo_version(**implicitly())
     ...
     if git_repo_version != result.version:
         raise ProjectVersionGitTagMismatch(
@@ -396,20 +397,19 @@ $ pants project-version --as-json myapp:
   ProjectVersionGitTagMismatch: Project version string '0.0.3' from 'myapp/VERSION' doesn't match latest Git tag '0.0.1'
 ```
 
-This happens because of how the Pants cache works. Modifying our repository tags doesn't qualify for the changes that should invalidate the cache. It is not safe to [cache the `Process` runs](../writing-plugins/the-rules-api/processes.mdx) and since we know that Git will access the repository (that is outside the sandbox), we should change its cacheability using the `ProcessCacheScope` parameter so that our Git call would run once per run of Pants.
+This happens because Git state is external to Pants, and so modifying our repository tags doesn't invalidate the Pants cache. Therefore it is not safe to [cache the `Process` runs](../writing-plugins/the-rules-api/processes.mdx) in this case. We can change the cacheability using the `cache_scope` parameter so that our Git call is forced to run on every Pants invocation.
 
 ```python
-git_describe = await Get(
-    ProcessResult,
-    Process(
+git_describe = await execute_process_or_raise(
+    **implicitly(Process(
         argv=[git_bin.path, "-C", buildroot.path, "describe", "--tags"],
         description="git describe --tags",
         cache_scope=ProcessCacheScope.PER_SESSION,
-    ),
+    ))
 )
 ```
 
-Let's add another option so that we can control whether Git tag should be retrieved:
+Let's add another option so that we can control whether the Git tag should be retrieved:
 
 ```python
 class ProjectVersionSubsystem(GoalSubsystem):
@@ -419,13 +419,13 @@ class ProjectVersionSubsystem(GoalSubsystem):
     ...
     match_git = BoolOption(
         default=False,
-        help="Check Git tag of the repository matches the project version.",
+        help="Check that a current Git tag of the repository matches the project version.",
     )
 ```
 
 Keep in mind that once you've declared [custom options in the plugin's subsystem](../using-pants/key-concepts/options.mdx#setting-options), they can be set in the `pants.toml` file just like any standard Pants options.
 
-If you know that your Git tag may be different from the project version stored in the `VERSION` file and that you would always want the output to be in the JSON format, you can set these options in the `pants.toml` file for visibility (and to avoid setting them via command line flags):
+If you know that your Git tag may be different from the project version stored in the `VERSION` file and that you would always want the output to be in JSON format, you can set these options in the `pants.toml` file for visibility (and to avoid setting them via command line flags):
 
 ```toml
 [project-version]
@@ -470,16 +470,14 @@ from dataclasses import dataclass
 
 from packaging.version import InvalidVersion, Version
 from pants.base.build_root import BuildRoot
-from pants.core.util_rules.system_binaries import BinaryPathRequest, BinaryPaths
+from pants.core.util_rules.system_binaries import BinaryPathRequest, find_binary
 from pants.engine.console import Console
-from pants.engine.fs import DigestContents
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.native_engine import Digest
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import Process, ProcessCacheScope, ProcessResult
-from pants.engine.rules import collect_rules, goal_rule, rule
+from pants.engine.internals.graph import hydrate_sources
+from pants.engine.intrinsics import get_digest_contents
+from pants.engine.process import Process, ProcessCacheScope, execute_process_or_raise
+from pants.engine.rules import collect_rules, concurrently, implicitly, goal_rule, rule
 from pants.engine.target import (
-    HydratedSources,
     HydrateSourcesRequest,
     SourcesField,
     Targets,
@@ -498,8 +496,8 @@ class ProjectVersionFileView:
 async def get_project_version_file_view(
     target: ProjectVersionTarget,
 ) -> ProjectVersionFileView:
-    sources = await Get(HydratedSources, HydrateSourcesRequest(target[SourcesField]))
-    digest_contents = await Get(DigestContents, Digest, sources.snapshot.digest)
+    sources = await hydrate_sources(HydrateSourcesRequest(target[SourcesField]))
+    digest_contents = await get_digest_contents(sources.snapshot.digest)
     file_content = digest_contents[0]
     return ProjectVersionFileView(
         path=file_content.path, version=file_content.content.decode("utf-8").strip()
@@ -544,11 +542,12 @@ async def goal_show_project_version(
     project_version_subsystem: ProjectVersionSubsystem,
 ) -> ProjectVersionGoal:
     targets = [tgt for tgt in targets if tgt.has_field(ProjectVersionSourceField)]
-    results = await MultiGet(
-        Get(ProjectVersionFileView, ProjectVersionTarget, target) for target in targets
+    results = await concurrently(
+        get_project_version_file_view(ProjectVersionTarget, target)
+        for target in targets
     )
     if project_version_subsystem.match_git:
-        git_repo_version = await Get(GitTagVersion)
+        git_repo_version = await get_git_repo_version()
 
     for result in results:
         try:
@@ -573,9 +572,8 @@ async def goal_show_project_version(
 
 
 @rule
-async def get_git_repo_version() -> GitTagVersion:
-    git_paths = await Get(
-        BinaryPaths,
+async def get_git_repo_version(buildroot: BuildRoot) -> GitTagVersion:
+    git_paths = await find_binary(
         BinaryPathRequest(
             binary_name="git",
             search_path=["/usr/bin", "/bin"],
@@ -584,13 +582,12 @@ async def get_git_repo_version() -> GitTagVersion:
     git_bin = git_paths.first_path
     if git_bin is None:
         raise OSError("Could not find 'git'.")
-    git_describe = await Get(
-        ProcessResult,
-        Process(
+    git_describe = await execute_process_or_raise(
+        **implicitly(Process(
             argv=[git_bin.path, "-C", buildroot.path, "describe", "--tags"],
             description="git describe --tags",
             cache_scope=ProcessCacheScope.PER_SESSION,
-        ),
+        ))
     )
     return GitTagVersion(git_describe.stdout.decode().strip())
 
@@ -600,8 +597,6 @@ def rules():
 ```
 
 ```python tab={"label":"pants-plugins/project_version/tailor.py"}
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 from pants.core.goals.tailor import (
@@ -611,7 +606,7 @@ from pants.core.goals.tailor import (
     PutativeTargetsRequest,
 )
 from pants.engine.fs import PathGlobs, Paths
-from pants.engine.internals.selectors import Get
+from pants.engine.intrinsics import path_globs_to_paths
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.dirutil import group_by_dir
@@ -628,25 +623,23 @@ async def find_putative_targets(
     req: PutativeProjectVersionTargetsRequest,
     all_owned_sources: AllOwnedSources,
 ) -> PutativeTargets:
-    all_project_version_files = await Get(Paths, PathGlobs, req.path_globs("VERSION"))
-    unowned_project_version_files = set(all_project_version_files.files) - set(
-        all_owned_sources
+    all_project_version_files = await path_globs_to_paths(
+        Paths, PathGlobs, req.path_globs("VERSION")
     )
-    classified_unowned_project_version_files = {
-        ProjectVersionTarget: unowned_project_version_files
-    }
+    unowned_project_version_files = (
+        set(all_project_version_files.files) - set(all_owned_sources)
+    )
 
     putative_targets = []
-    for tgt_type, paths in classified_unowned_project_version_files.items():
-        for dirname, filenames in group_by_dir(paths).items():
-            putative_targets.append(
-                PutativeTarget.for_target_type(
-                    ProjectVersionTarget,
-                    path=dirname,
-                    name="project-version-file",
-                    triggering_sources=sorted(filenames),
-                )
+    for dirname, filenames in group_by_dir(unowned_project_version_files).items():
+        putative_targets.append(
+            PutativeTarget.for_target_type(
+                ProjectVersionTarget,
+                path=dirname,
+                name="project-version-file",
+                triggering_sources=sorted(filenames),
             )
+        )
 
     return PutativeTargets(putative_targets)
 
@@ -675,4 +668,4 @@ class ProjectVersionTarget(Target):
     help = "A project version target representing the VERSION file."
 ```
 
-There are a few more things left to do, for example, we haven't written any tests yet. This is what we'll do in the next tutorial!
+In the [next tutorial](./testing-plugins.mdx) we'll see how to write tests for our plugin!

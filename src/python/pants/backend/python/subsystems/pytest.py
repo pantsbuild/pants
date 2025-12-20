@@ -19,10 +19,10 @@ from pants.backend.python.target_types import (
     PythonTestsXdistConcurrencyField,
     SkipPythonTestsField,
 )
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.resolves import ExportableTool
 from pants.core.goals.test import RuntimePackageDependenciesField, TestFieldSet
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.rules import collect_rules
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
@@ -54,14 +54,10 @@ class PyTest(PythonToolBase):
     name = "Pytest"
     help_short = "The pytest Python test framework (https://docs.pytest.org/)."
 
-    # Pytest 7.1.0 introduced a significant bug that is apparently not fixed as of 7.1.1 (the most
-    # recent release at the time of writing). see https://github.com/pantsbuild/pants/issues/14990.
-    # TODO: Once this issue is fixed, loosen this to allow the version to float above the bad ones.
-    #  E.g., as default_version = "pytest>=7,<8,!=7.1.0,!=7.1.1"
     default_requirements = [
-        "pytest==7.0.1",
-        "pytest-cov>=2.12,!=2.12.1,<3.1",
-        "pytest-xdist>=2.5,<3",
+        "pytest>=7,<9,!=7.1.0,!=7.1.1",
+        "pytest-cov>=5,<7",
+        "pytest-xdist>=3.6.1,<4",
     ]
 
     default_main = ConsoleScript("pytest")
@@ -127,6 +123,21 @@ class PyTest(PythonToolBase):
             NOTE: Enabling `pytest-xdist` can cause high-level scoped fixtures (for example `session`)
             to execute more than once. See the `pytest-xdist` docs for more info:
             https://pypi.org/project/pytest-xdist/#making-session-scoped-fixtures-execute-only-once
+            """
+        ),
+    )
+    allow_empty_test_collection = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            If true, treat pytest exit code 5 ("No tests were collected") as success.
+
+            Pytest returns exit code 5 when no tests are collected, e.g., when all tests
+            in a file are skipped via markers or deselected via `-k`. By default, Pants
+            treats this as a test failure. Enable this option to instead treat it as
+            "no tests found", which will be skipped in the test summary.
+
+            See https://docs.pytest.org/en/stable/reference/exit-codes.html
             """
         ),
     )

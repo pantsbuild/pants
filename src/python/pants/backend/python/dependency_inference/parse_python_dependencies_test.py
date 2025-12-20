@@ -10,12 +10,10 @@ import pytest
 from pants.backend.python.dependency_inference import parse_python_dependencies
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
     ParsedPythonDependencies,
+    ParsePythonDependenciesRequest,
 )
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
     ParsedPythonImportInfo as ImpInfo,
-)
-from pants.backend.python.dependency_inference.parse_python_dependencies import (
-    ParsePythonDependenciesRequest,
 )
 from pants.backend.python.target_types import PythonSourceField, PythonSourceTarget
 from pants.backend.python.util_rules import pex

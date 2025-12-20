@@ -146,7 +146,7 @@ impl Session {
         ui_use_prodash: bool,
         mut max_workunit_level: log::Level,
         build_id: String,
-        session_values: PyObject,
+        session_values: Py<PyAny>,
         cancelled: AsyncLatch,
     ) -> Result<Session, String> {
         // We record workunits with the maximum level of:
@@ -317,7 +317,7 @@ impl Session {
             }
         };
         if let Err(e) = result {
-            warn!("{}", e);
+            warn!("{e}");
         }
     }
 
@@ -366,7 +366,7 @@ impl Session {
                                 .into_iter()
                                 .map(|(duration, desc)| format!(
                                     "{}\t{}",
-                                    format_workunit_duration_ms!(duration.as_millis()),
+                                    format_workunit_duration_ms(duration),
                                     desc
                                 ))
                                 .collect::<Vec<_>>()
@@ -469,14 +469,14 @@ impl Sessions {
                     let cancelled = handle.cancelled.clone();
                     let cancellation_triggered = async move {
                         cancelled.triggered().await;
-                        log::info!("Shutdown completed: {:?}", build_id)
+                        log::info!("Shutdown completed: {build_id:?}")
                     };
                     (handle.build_id.clone(), cancellation_triggered)
                 })
                 .unzip();
 
             if !build_ids.is_empty() {
-                log::info!("Waiting for shutdown of: {:?}", build_ids);
+                log::info!("Waiting for shutdown of: {build_ids:?}");
                 tokio::time::timeout(timeout, future::join_all(cancellation_latches))
                     .await
                     .map_err(|_| format!("Some Sessions did not shutdown within {timeout:?}."))?;

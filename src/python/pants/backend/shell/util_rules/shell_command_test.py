@@ -23,6 +23,7 @@ from pants.backend.shell.util_rules.shell_command import (
     ShellCommandProcessFromTargetRequest,
 )
 from pants.backend.shell.util_rules.shell_command import rules as shell_command_rules
+from pants.core.environments.target_types import LocalWorkspaceEnvironmentTarget
 from pants.core.goals.run import RunRequest
 from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget, FileSourceField
 from pants.core.target_types import rules as core_target_type_rules
@@ -31,7 +32,6 @@ from pants.core.util_rules.adhoc_process_support import (
     AdhocProcessRequest,
     PreparedAdhocProcessRequest,
 )
-from pants.core.util_rules.environments import LocalWorkspaceEnvironmentTarget
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName

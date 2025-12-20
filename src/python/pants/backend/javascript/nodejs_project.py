@@ -19,10 +19,9 @@ from pants.backend.javascript.package_manager import PackageManager
 from pants.backend.javascript.subsystems import nodejs
 from pants.backend.javascript.subsystems.nodejs import NodeJS, UserChosenNodeJSResolveAliases
 from pants.core.util_rules import stripped_source_files
-from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
+from pants.core.util_rules.stripped_source_files import StrippedFileNameRequest, strip_file_name
 from pants.engine.collection import Collection
 from pants.engine.internals.native_engine import MergeDigests
-from pants.engine.internals.selectors import Get
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.ordered_set import FrozenOrderedSet
@@ -179,7 +178,7 @@ class ProjectPaths:
 
 
 async def _get_default_resolve_name(path: str) -> str:
-    stripped = await Get(StrippedFileName, StrippedFileNameRequest(path))
+    stripped = await strip_file_name(StrippedFileNameRequest(path))
     return stripped.value.replace(os.path.sep, ".")
 
 

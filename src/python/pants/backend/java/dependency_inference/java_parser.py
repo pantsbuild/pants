@@ -12,13 +12,26 @@ from dataclasses import dataclass
 from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.source_files import SourceFiles
-from pants.engine.fs import AddPrefix, CreateDigest, Digest, DigestContents, Directory, FileContent
+from pants.engine.fs import AddPrefix, CreateDigest, Digest, Directory, FileContent
 from pants.engine.internals.native_engine import MergeDigests, RemovePrefix
-from pants.engine.process import FallibleProcessResult, ProcessResult, ProductDescription
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.intrinsics import (
+    add_prefix,
+    create_digest,
+    execute_process,
+    get_digest_contents,
+    merge_digests,
+    remove_prefix,
+)
+from pants.engine.process import (
+    FallibleProcessResult,
+    ProductDescription,
+    execute_process_or_raise,
+    fallible_to_exec_result_or_raise,
+)
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
-from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.coursier_fetch import ToolClasspathRequest, materialize_classpath_for_tool
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, JvmToolBase
 from pants.util.logging import LogLevel
 
@@ -63,11 +76,12 @@ async def resolve_fallible_result_to_analysis(
     fallible_result: FallibleJavaSourceDependencyAnalysisResult,
 ) -> JavaSourceDependencyAnalysis:
     desc = ProductDescription("Java source dependency analysis failed.")
-    result = await Get(
-        ProcessResult,
-        {fallible_result.process_result: FallibleProcessResult, desc: ProductDescription},
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            {fallible_result.process_result: FallibleProcessResult, desc: ProductDescription}
+        )
     )
-    analysis_contents = await Get(DigestContents, Digest, result.output_digest)
+    analysis_contents = await get_digest_contents(result.output_digest)
     analysis = json.loads(analysis_contents[0].content)
     return JavaSourceDependencyAnalysis.from_json_dict(analysis)
 
@@ -100,12 +114,11 @@ async def analyze_java_source_dependencies(
     processorcp_relpath = "__processorcp"
     toolcp_relpath = "__toolcp"
 
-    tool_classpath, prefixed_source_files_digest = await MultiGet(
-        Get(
-            ToolClasspath,
-            ToolClasspathRequest(lockfile=(GenerateJvmLockfileFromTool.create(tool))),
+    tool_classpath, prefixed_source_files_digest = await concurrently(
+        materialize_classpath_for_tool(
+            ToolClasspathRequest(lockfile=(GenerateJvmLockfileFromTool.create(tool)))
         ),
-        Get(Digest, AddPrefix(source_files.snapshot.digest, source_prefix)),
+        add_prefix(AddPrefix(source_files.snapshot.digest, source_prefix)),
     )
 
     extra_immutable_input_digests = {
@@ -115,26 +128,27 @@ async def analyze_java_source_dependencies(
 
     analysis_output_path = "__source_analysis.json"
 
-    process_result = await Get(
-        FallibleProcessResult,
-        JvmProcess(
-            jdk=jdk,
-            classpath_entries=[
-                *tool_classpath.classpath_entries(toolcp_relpath),
-                processorcp_relpath,
-            ],
-            argv=[
-                "org.pantsbuild.javaparser.PantsJavaParserLauncher",
-                analysis_output_path,
-                source_path,
-            ],
-            input_digest=prefixed_source_files_digest,
-            extra_immutable_input_digests=extra_immutable_input_digests,
-            output_files=(analysis_output_path,),
-            extra_nailgun_keys=extra_immutable_input_digests,
-            description=f"Analyzing {source_files.files[0]}",
-            level=LogLevel.DEBUG,
-        ),
+    process_result = await execute_process(
+        **implicitly(
+            JvmProcess(
+                jdk=jdk,
+                classpath_entries=[
+                    *tool_classpath.classpath_entries(toolcp_relpath),
+                    processorcp_relpath,
+                ],
+                argv=[
+                    "org.pantsbuild.javaparser.PantsJavaParserLauncher",
+                    analysis_output_path,
+                    source_path,
+                ],
+                input_digest=prefixed_source_files_digest,
+                extra_immutable_input_digests=extra_immutable_input_digests,
+                output_files=(analysis_output_path,),
+                extra_nailgun_keys=extra_immutable_input_digests,
+                description=f"Analyzing {source_files.files[0]}",
+                level=LogLevel.DEBUG,
+            )
+        )
     )
 
     return FallibleJavaSourceDependencyAnalysisResult(process_result=process_result)
@@ -149,15 +163,13 @@ def _load_javaparser_launcher_source() -> bytes:
 @rule
 async def build_processors(jdk: InternalJdk, tool: JavaParser) -> JavaParserCompiledClassfiles:
     dest_dir = "classfiles"
-    materialized_classpath, source_digest = await MultiGet(
-        Get(
-            ToolClasspath,
+    materialized_classpath, source_digest = await concurrently(
+        materialize_classpath_for_tool(
             ToolClasspathRequest(
                 prefix="__toolcp", lockfile=GenerateJvmLockfileFromTool.create(tool)
-            ),
+            )
         ),
-        Get(
-            Digest,
+        create_digest(
             CreateDigest(
                 [
                     FileContent(
@@ -166,43 +178,43 @@ async def build_processors(jdk: InternalJdk, tool: JavaParser) -> JavaParserComp
                     ),
                     Directory(dest_dir),
                 ]
-            ),
+            )
         ),
     )
 
-    merged_digest = await Get(
-        Digest,
+    merged_digest = await merge_digests(
         MergeDigests(
             (
                 materialized_classpath.digest,
                 source_digest,
             )
-        ),
+        )
     )
 
-    process_result = await Get(
-        ProcessResult,
-        JvmProcess(
-            jdk=jdk,
-            classpath_entries=[f"{jdk.java_home}/lib/tools.jar"],
-            argv=[
-                "com.sun.tools.javac.Main",
-                "-cp",
-                ":".join(materialized_classpath.classpath_entries()),
-                "-d",
-                dest_dir,
-                _LAUNCHER_BASENAME,
-            ],
-            input_digest=merged_digest,
-            output_directories=(dest_dir,),
-            description=f"Compile {_LAUNCHER_BASENAME} import processors with javac",
-            level=LogLevel.DEBUG,
-            # NB: We do not use nailgun for this process, since it is launched exactly once.
-            use_nailgun=False,
-        ),
+    process_result = await execute_process_or_raise(
+        **implicitly(
+            JvmProcess(
+                jdk=jdk,
+                classpath_entries=[f"{jdk.java_home}/lib/tools.jar"],
+                argv=[
+                    "com.sun.tools.javac.Main",
+                    "-cp",
+                    ":".join(materialized_classpath.classpath_entries()),
+                    "-d",
+                    dest_dir,
+                    _LAUNCHER_BASENAME,
+                ],
+                input_digest=merged_digest,
+                output_directories=(dest_dir,),
+                description=f"Compile {_LAUNCHER_BASENAME} import processors with javac",
+                level=LogLevel.DEBUG,
+                # NB: We do not use nailgun for this process, since it is launched exactly once.
+                use_nailgun=False,
+            )
+        )
     )
-    stripped_classfiles_digest = await Get(
-        Digest, RemovePrefix(process_result.output_digest, dest_dir)
+    stripped_classfiles_digest = await remove_prefix(
+        RemovePrefix(process_result.output_digest, dest_dir)
     )
     return JavaParserCompiledClassfiles(digest=stripped_classfiles_digest)
 

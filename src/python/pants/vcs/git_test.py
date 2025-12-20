@@ -15,7 +15,7 @@ from typing import Any
 import pytest
 
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException, MaybeGitBinary
-from pants.engine.rules import Get, rule
+from pants.engine.rules import implicitly, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.contextutil import environment_as, pushd
 from pants.util.dirutil import touch
@@ -456,7 +456,7 @@ def test_worktree_invalidation(origin: Path) -> None:
 
         @rule
         async def worktree_id_string() -> str:
-            worktree = await Get(MaybeGitWorktree, GitWorktreeRequest())
+            worktree = await get_git_worktree(GitWorktreeRequest(), **implicitly())
             return str(id(worktree))
 
         rule_runner = RuleRunner(

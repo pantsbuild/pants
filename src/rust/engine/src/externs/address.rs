@@ -249,8 +249,17 @@ impl AddressInput {
     }
 
     #[getter]
-    fn path_component(&self) -> &Path {
-        &self.path_component
+    fn path_component(&self) -> PyResult<String> {
+        self.path_component
+            .as_os_str()
+            .to_str()
+            .map(|s| s.to_string())
+            .ok_or_else(|| {
+                PyException::new_err(format!(
+                    "Could not convert AddressInput.path_component `{}` to UTF8.",
+                    self.path_component.display()
+                ))
+            })
     }
 
     #[getter]
@@ -418,11 +427,11 @@ fn split_on_longest_dir_prefix<'a, 'b>(
     let mut longest_match = 0;
     let mut matched = None;
     for prefix in prefixes {
-        if prefix.len() > longest_match {
-            if let Ok(stripped) = Path::new(path).strip_prefix(prefix) {
-                longest_match = prefix.len();
-                matched = Some((*prefix, stripped.to_str().unwrap()));
-            }
+        if prefix.len() > longest_match
+            && let Ok(stripped) = Path::new(path).strip_prefix(prefix)
+        {
+            longest_match = prefix.len();
+            matched = Some((*prefix, stripped.to_str().unwrap()));
         }
     }
     matched
@@ -514,23 +523,32 @@ impl Address {
             relative_file_path,
         };
 
-        if let Some(file_name) = address.spec_path.file_name().and_then(|n| n.to_str()) {
-            if file_name.starts_with("BUILD") {
-                return Err(InvalidSpecPathError::new_err(format!(
-                    "The address {address} has {} as the last part of its \
+        if let Some(file_name) = address.spec_path.file_name().and_then(|n| n.to_str())
+            && file_name.starts_with("BUILD")
+        {
+            return Err(InvalidSpecPathError::new_err(format!(
+                "The address {address} has {} as the last part of its \
            path, but BUILD is a reserved name. Please make sure that you did not name any \
            directories BUILD.",
-                    Path::new(file_name).display(),
-                )));
-            }
+                Path::new(file_name).display(),
+            )));
         }
 
         Ok(address)
     }
 
     #[getter]
-    fn spec_path(&self) -> &Path {
-        &self.spec_path
+    fn spec_path(&self) -> PyResult<String> {
+        self.spec_path
+            .as_os_str()
+            .to_str()
+            .map(|s| s.to_string())
+            .ok_or_else(|| {
+                PyException::new_err(format!(
+                    "Could not convert Address.spec_path `{}` to UTF8.",
+                    self.spec_path.display()
+                ))
+            })
     }
 
     #[getter]
@@ -539,8 +557,21 @@ impl Address {
     }
 
     #[getter]
-    fn relative_file_path(&self) -> Option<&Path> {
-        self.relative_file_path.as_deref()
+    fn relative_file_path(&self) -> PyResult<Option<String>> {
+        match &self.relative_file_path {
+            Some(p) => Ok(Some(
+                p.as_os_str()
+                    .to_str()
+                    .map(|s| s.to_string())
+                    .ok_or_else(|| {
+                        PyException::new_err(format!(
+                            "Could not convert Address.relative_file_path `{}` to UTF8.",
+                            self.relative_file_path.as_ref().unwrap().display()
+                        ))
+                    })?,
+            )),
+            None => Ok(None),
+        }
     }
 
     #[getter]
@@ -573,9 +604,19 @@ impl Address {
     }
 
     #[getter]
-    fn filename(&self) -> PyResult<PathBuf> {
+    fn filename(&self) -> PyResult<String> {
         if let Some(relative_file_path) = self.relative_file_path.as_ref() {
-            Ok(self.spec_path.join(relative_file_path))
+            let full_path = self.spec_path.join(relative_file_path);
+            full_path
+                .as_os_str()
+                .to_str()
+                .map(|s| s.to_string())
+                .ok_or_else(|| {
+                    PyException::new_err(format!(
+                        "Could not convert Address.path_component `{}` to UTF8.",
+                        full_path.display()
+                    ))
+                })
         } else {
             Err(PyException::new_err(format!(
                 "Only a file Address (`self.is_file_target`) has a filename: {self}",
@@ -600,7 +641,7 @@ impl Address {
     }
 
     #[getter]
-    fn parameters_repr(&self) -> Cow<str> {
+    fn parameters_repr(&self) -> Cow<'_, str> {
         if self.parameters.is_empty() {
             return Cow::from("");
         }
@@ -727,7 +768,7 @@ impl Address {
         }
     }
 
-    fn maybe_convert_to_target_generator(self_: PyRef<Self>, py: Python) -> PyResult<PyObject> {
+    fn maybe_convert_to_target_generator(self_: PyRef<Self>, py: Python) -> PyResult<Py<PyAny>> {
         if !self_.is_generated_target() && !self_.is_parametrized() {
             return Ok(self_.into_pyobject(py)?.into_any().unbind());
         }
@@ -837,7 +878,7 @@ type ParsedSpec<'a> = (ParsedAddress<'a>, Option<&'a str>);
 
 /// Parses an "address spec" from the CLI.
 #[pyfunction]
-fn address_spec_parse(spec_str: &str) -> PyResult<ParsedSpec> {
+fn address_spec_parse(spec_str: &str) -> PyResult<ParsedSpec<'_>> {
     let spec = address::parse_address_spec(spec_str).map_err(AddressParseException::new_err)?;
     Ok((
         (

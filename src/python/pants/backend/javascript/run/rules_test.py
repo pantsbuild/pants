@@ -8,7 +8,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.javascript import package_json
-from pants.backend.javascript.run.rules import RunNodeBuildScriptFieldSet
+from pants.backend.javascript.run.rules import RunNodeBuildScriptFieldSet, RunNodeScriptFieldSet
 from pants.backend.javascript.run.rules import rules as run_rules
 from pants.backend.javascript.target_types import JSSourcesGeneratorTarget, JSSourceTarget
 from pants.build_graph.address import Address
@@ -23,6 +23,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *run_rules(),
             QueryRule(RunRequest, (RunNodeBuildScriptFieldSet,)),
+            QueryRule(RunRequest, (RunNodeScriptFieldSet,)),
         ],
         target_types=[
             *package_json.target_types(),
@@ -162,3 +163,39 @@ def test_extra_envs(rule_runner: RuleRunner) -> None:
     assert result.extra_env.get("FOO") == "BAR"
     assert result.extra_env.get("FROM_SUBSYSTEM") == "FIZZ"
     assert result.extra_env.get("FROM_PACKAGE_JSON") == "BUZZ"
+
+
+def test_run_node_script(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": dedent(
+                """\
+                package_json(
+                    scripts=[
+                        node_run_script(entry_point="start", extra_env_vars=["PORT=3000"])
+                    ]
+                )
+                """
+            ),
+            "src/js/package.json": json.dumps(
+                {
+                    "name": "ham",
+                    "version": "0.0.1",
+                    "browser": "lib/index.mjs",
+                    "scripts": {"start": "node server.js"},
+                }
+            ),
+            "src/js/package-lock.json": json.dumps({}),
+            "src/js/lib/BUILD": dedent(
+                """\
+                javascript_sources()
+                """
+            ),
+            "src/js/lib/index.mjs": "",
+        }
+    )
+    target = rule_runner.get_target(Address("src/js", generated_name="start"))
+    run_request = rule_runner.request(RunRequest, [RunNodeScriptFieldSet.create(target)])
+    assert "run" in run_request.args
+    assert "start" in run_request.args
+    assert run_request.extra_env.get("PORT") == "3000"

@@ -19,6 +19,7 @@ from typing import DefaultDict, cast
 from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
     PythonModuleOwnersRequest,
+    map_module_to_address,
 )
 from pants.backend.python.dependency_inference.rules import import_rules
 from pants.backend.python.dependency_inference.subsystem import (
@@ -45,18 +46,21 @@ from pants.backend.python.target_types import (
     ResolvePexEntryPointRequest,
     ResolvePythonDistributionEntryPointsRequest,
 )
-from pants.backend.python.util_rules.entry_points import (
-    get_python_distribution_entry_point_unambiguous_module_owners,
-)
 from pants.backend.python.util_rules.interpreter_constraints import interpreter_constraints_contains
-from pants.backend.python.util_rules.package_dists import InvalidEntryPoint
 from pants.core.util_rules.unowned_dependency_behavior import (
     UnownedDependencyError,
     UnownedDependencyUsage,
 )
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
-from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs
+from pants.engine.internals.graph import (
+    determine_explicitly_provided_dependencies,
+    resolve_target,
+    resolve_targets,
+    resolve_unparsed_address_inputs,
+)
+from pants.engine.intrinsics import path_globs_to_paths
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
@@ -70,14 +74,12 @@ from pants.engine.target import (
     InvalidFieldException,
     TargetFilesGeneratorSettings,
     TargetFilesGeneratorSettingsRequest,
-    Targets,
     ValidatedDependencies,
     ValidateDependenciesRequest,
-    WrappedTarget,
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.source.source_root import SourceRootRequest, get_source_root
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import OrderedSet
@@ -86,8 +88,17 @@ from pants.util.strutil import bullet_list, softwrap
 logger = logging.getLogger(__name__)
 
 
+class SetupPyError(Exception):
+    def __init__(self, msg: str):
+        super().__init__(f"{msg} See {doc_url('docs/python/overview/building-distributions')}.")
+
+
+class InvalidEntryPoint(SetupPyError, InvalidFieldException):
+    """Indicates that a specified binary entry point was invalid."""
+
+
 @rule
-def python_files_generator_settings(
+async def python_files_generator_settings(
     _: PythonFilesGeneratorSettingsRequest,
     python_infer: PythonInferSubsystem,
 ) -> TargetFilesGeneratorSettings:
@@ -174,14 +185,14 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
 
     # Use the engine to validate that the file exists and that it resolves to only one file.
     full_glob = os.path.join(address.spec_path, ep_val.module)
-    entry_point_paths = await Get(
-        Paths,
+    entry_point_paths = await path_globs_to_paths(
         PathGlobs(
             [full_glob],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             description_of_origin=f"{address}'s `{request.entry_point_field.alias}` field",
-        ),
+        )
     )
+
     # We will have already raised if the glob did not match, i.e. if there were no files. But
     # we need to check if they used a file glob (`*` or `**`) that resolved to >1 file.
     if len(entry_point_paths.files) != 1:
@@ -197,11 +208,7 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
             )
         )
     entry_point_path = entry_point_paths.files[0]
-    source_root = await Get(
-        SourceRoot,
-        SourceRootRequest,
-        SourceRootRequest.for_file(entry_point_path),
-    )
+    source_root = await get_source_root(SourceRootRequest.for_file(entry_point_path))
     stripped_source_path = os.path.relpath(entry_point_path, source_root.path)
     module_base, _ = os.path.splitext(stripped_source_path)
     normalized_path = module_base.replace(os.path.sep, ".")
@@ -236,9 +243,11 @@ async def infer_pex_binary_entry_point_dependency(
     if entry_point_field.value is None:
         return InferredDependencies([])
 
-    explicitly_provided_deps, entry_point = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
-        Get(ResolvedPexEntryPoint, ResolvePexEntryPointRequest(entry_point_field)),
+    explicitly_provided_deps, entry_point = await concurrently(
+        determine_explicitly_provided_dependencies(
+            **implicitly(DependenciesRequest(request.field_set.dependencies))
+        ),
+        resolve_pex_entry_point(ResolvePexEntryPointRequest(entry_point_field)),
     )
     if entry_point.val is None:
         return InferredDependencies([])
@@ -248,18 +257,18 @@ async def infer_pex_binary_entry_point_dependency(
     # misses than using the full spec_path.
     locality = None
     if python_infer_subsystem.ambiguity_resolution == AmbiguityResolution.by_source_root:
-        source_root = await Get(
-            SourceRoot, SourceRootRequest, SourceRootRequest.for_address(request.field_set.address)
+        source_root = await get_source_root(
+            SourceRootRequest.for_address(request.field_set.address)
         )
         locality = source_root.path
 
-    owners = await Get(
-        PythonModuleOwners,
+    owners = await map_module_to_address(
         PythonModuleOwnersRequest(
             entry_point.val.module,
             resolve=request.field_set.resolve.normalized_value(python_setup),
             locality=locality,
         ),
+        **implicitly(),
     )
     address = request.field_set.address
     explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
@@ -396,7 +405,7 @@ async def resolve_python_distribution_entry_points(
 
     classified_entry_points = list(_classify_entry_points(all_entry_points))
 
-    # Pick out all target addresses up front, so we can use MultiGet later.
+    # Pick out all target addresses up front, so we can use concurrently later.
     #
     # This calls for a bit of trickery however (using the "y_by_x" mapping dicts), so we keep track
     # of which address belongs to which entry point. I.e. the `address_by_ref` and
@@ -406,18 +415,18 @@ async def resolve_python_distribution_entry_points(
         entry_point_str for is_target, _, _, entry_point_str in classified_entry_points if is_target
     ]
 
-    # Intermediate step, as Get(Targets) returns a deduplicated set which breaks in case of
-    # multiple input refs that maps to the same target.
-    target_addresses = await Get(
-        Addresses,
+    # Intermediate step, as resolve_targets() returns a deduplicated set which breaks in case of
+    # multiple input refs that map to the same target.
+    target_addresses = await resolve_unparsed_address_inputs(
         UnparsedAddressInputs(
             target_refs,
             owning_address=address,
             description_of_origin=description_of_origin,
         ),
+        **implicitly(),
     )
     address_by_ref = dict(zip(target_refs, target_addresses))
-    targets = await Get(Targets, Addresses, target_addresses)
+    targets = await resolve_targets(**implicitly(target_addresses))
 
     # Check that we only have targets with a pex entry_point field.
     for target in targets:
@@ -435,11 +444,8 @@ async def resolve_python_distribution_entry_points(
                 )
             )
 
-    binary_entry_points = await MultiGet(
-        Get(
-            ResolvedPexEntryPoint,
-            ResolvePexEntryPointRequest(target[PexEntryPointField]),
-        )
+    binary_entry_points = await concurrently(
+        resolve_pex_entry_point(ResolvePexEntryPointRequest(target[PexEntryPointField]))
         for target in targets
     )
     binary_entry_point_by_address = {
@@ -506,6 +512,34 @@ class InferPythonDistributionDependencies(InferDependenciesRequest):
     infer_from = PythonDistributionDependenciesInferenceFieldSet
 
 
+def get_python_distribution_entry_point_unambiguous_module_owners(
+    address: Address,
+    entry_point_group: str,  # group is the pypa term; aka category or namespace
+    entry_point_name: str,
+    entry_point: EntryPoint,
+    explicitly_provided_deps: ExplicitlyProvidedDependencies,
+    owners: PythonModuleOwners,
+) -> tuple[Address, ...]:
+    field_str = repr({entry_point_group: {entry_point_name: entry_point.spec}})
+    explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
+        owners.ambiguous,
+        address,
+        import_reference="module",
+        context=softwrap(
+            f"""
+            The python_distribution target {address} has the field
+            `entry_points={field_str}`, which maps to the Python module
+            `{entry_point.module}`
+            """
+        ),
+    )
+    maybe_disambiguated = explicitly_provided_deps.disambiguated(owners.ambiguous)
+    unambiguous_owners = owners.unambiguous or (
+        (maybe_disambiguated,) if maybe_disambiguated else ()
+    )
+    return unambiguous_owners
+
+
 @rule
 async def infer_python_distribution_dependencies(
     request: InferPythonDistributionDependencies, python_infer_subsystem: PythonInferSubsystem
@@ -514,17 +548,17 @@ async def infer_python_distribution_dependencies(
     if not python_infer_subsystem.entry_points:
         return InferredDependencies([])
 
-    explicitly_provided_deps, distribution_entry_points, provides_entry_points = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
-        Get(
-            ResolvedPythonDistributionEntryPoints,
+    explicitly_provided_deps, distribution_entry_points, provides_entry_points = await concurrently(
+        determine_explicitly_provided_dependencies(
+            **implicitly(DependenciesRequest(request.field_set.dependencies))
+        ),
+        resolve_python_distribution_entry_points(
             ResolvePythonDistributionEntryPointsRequest(
                 entry_points_field=request.field_set.entry_points
-            ),
+            )
         ),
-        Get(
-            ResolvedPythonDistributionEntryPoints,
-            ResolvePythonDistributionEntryPointsRequest(provides_field=request.field_set.provides),
+        resolve_python_distribution_entry_points(
+            ResolvePythonDistributionEntryPointsRequest(provides_field=request.field_set.provides)
         ),
     )
 
@@ -538,8 +572,10 @@ async def infer_python_distribution_dependencies(
         for name, entry_point in entry_points.items()
     ]
     all_module_owners = iter(
-        await MultiGet(
-            Get(PythonModuleOwners, PythonModuleOwnersRequest(entry_point.module, resolve=None))
+        await concurrently(
+            map_module_to_address(
+                PythonModuleOwnersRequest(entry_point.module, resolve=None), **implicitly()
+            )
             for _, _, entry_point in all_module_entry_points
         )
     )
@@ -568,7 +604,7 @@ class PythonResolveFieldDefaultFactoryRequest(FieldDefaultFactoryRequest):
 
 
 @rule
-def python_resolve_field_default_factory(
+async def python_resolve_field_default_factory(
     request: PythonResolveFieldDefaultFactoryRequest,
     python_setup: PythonSetup,
 ) -> FieldDefaultFactoryResult:
@@ -585,6 +621,7 @@ class DependencyValidationFieldSet(FieldSet):
     required_fields = (InterpreterConstraintsField,)
 
     interpreter_constraints: InterpreterConstraintsField
+    resolve: PythonResolveField | None = None
 
 
 class PythonValidateDependenciesRequest(ValidateDependenciesRequest):
@@ -596,23 +633,28 @@ async def validate_python_dependencies(
     request: PythonValidateDependenciesRequest,
     python_setup: PythonSetup,
 ) -> ValidatedDependencies:
-    dependencies = await MultiGet(
-        Get(
-            WrappedTarget,
+    dependencies = await concurrently(
+        resolve_target(
             WrappedTargetRequest(
                 d, description_of_origin=f"the dependencies of {request.field_set.address}"
             ),
+            **implicitly(),
         )
         for d in request.dependencies
     )
 
     # Validate that the ICs for dependencies are all compatible with our own.
-    target_ics = request.field_set.interpreter_constraints.value_or_global_default(python_setup)
+    target_ics = request.field_set.interpreter_constraints.value_or_configured_default(
+        python_setup, request.field_set.resolve
+    )
     non_subset_items = []
     for dep in dependencies:
         if not dep.target.has_field(InterpreterConstraintsField):
             continue
-        dep_ics = dep.target[InterpreterConstraintsField].value_or_global_default(python_setup)
+        dep_ics = dep.target[InterpreterConstraintsField].value_or_configured_default(
+            python_setup,
+            dep.target[PythonResolveField] if dep.target.has_field(PythonResolveField) else None,
+        )
         if not interpreter_constraints_contains(
             dep_ics, target_ics, python_setup.interpreter_versions_universe
         ):

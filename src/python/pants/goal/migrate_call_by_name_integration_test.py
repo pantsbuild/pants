@@ -6,7 +6,12 @@ from __future__ import annotations
 from pathlib import Path
 from textwrap import dedent
 
+import pytest
+
 from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
+
+pytestmark = pytest.mark.call_by_type
+
 
 REGISTER_FILE = dedent(
     """\

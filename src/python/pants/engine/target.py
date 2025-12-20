@@ -51,8 +51,9 @@ from pants.engine.internals.dep_rules import (
 from pants.engine.internals.native_engine import NO_VALUE as NO_VALUE  # noqa: F401
 from pants.engine.internals.native_engine import Field as Field
 from pants.engine.internals.target_adaptor import SourceBlock, SourceBlocks  # noqa: F401
+from pants.engine.rules import rule
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
-from pants.option.global_options import UnmatchedBuildFileGlobs
+from pants.option.bootstrap_options import UnmatchedBuildFileGlobs
 from pants.source.filespec import Filespec, FilespecMatcher
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.dirutil import fast_relpath
@@ -108,17 +109,18 @@ class AsyncFieldMixin(Field):
 
 
         @rule
-        def hydrate_sources(request: HydrateSourcesRequest) -> HydratedSources:
-            result = await Get(Snapshot, PathGlobs(request.field.value))
+        async def hydrate_sources(request: HydrateSourcesRequest) -> HydratedSources:
+            digest = await path_globs_to_digest(PathGlobs(request.field.value))
+            result = await digest_to_snapshot(digest)
             request.field.validate_resolved_files(result.files)
             ...
             return HydratedSources(result)
 
-    Then, call sites can `await Get` if they need to hydrate the field, even if they subclassed
+    Then, call sites can `await` if they need to hydrate the field, even if they subclassed
     the original async field to have custom behavior:
 
-        sources1 = await Get(HydratedSources, HydrateSourcesRequest(my_tgt.get(Sources)))
-        sources2 = await Get(HydratedSources, HydrateSourcesRequest(custom_tgt.get(CustomSources)))
+        sources1 = hydrate_sources(HydrateSourcesRequest(my_tgt.get(Sources)))
+        sources2 = hydrate_sources(HydrateSourcesRequest(custom_tgt.get(CustomSources)))
     """
 
     address: Address
@@ -968,11 +970,7 @@ class TransitiveTargets:
 
 @dataclass(frozen=True)
 class TransitiveTargetsRequest:
-    """A request to get the transitive dependencies of the input roots.
-
-    Resolve the transitive targets with `await Get(TransitiveTargets,
-    TransitiveTargetsRequest([addr1, addr2]))`.
-    """
+    """A request to get the transitive dependencies of the input roots."""
 
     roots: tuple[Address, ...]
     should_traverse_deps_predicate: ShouldTraverseDepsPredicate
@@ -1045,7 +1043,7 @@ class TargetGenerator(Target):
     # types being generated manually. The applicable defaults are available on the `AddressFamily`
     # which you can get using:
     #
-    #    family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
+    #    family = await ensure_address_family(**implicitly(AddressFamilyDir(address.spec_path)))
     #    target_defaults = family.defaults.get(MyTarget.alias, {})
     generated_target_cls: ClassVar[type[Target]]
 
@@ -1180,7 +1178,7 @@ _TargetGenerator = TypeVar("_TargetGenerator", bound=TargetGenerator)
 @union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class GenerateTargetsRequest(Generic[_TargetGenerator]):
-    generate_from: ClassVar[type[_TargetGenerator]]  # type: ignore[misc]
+    generate_from: ClassVar[type[_TargetGenerator]]
 
     # The TargetGenerator instance to generate targets for.
     generator: _TargetGenerator
@@ -1245,6 +1243,11 @@ class GeneratedTargets(FrozenDict[Address, Target]):
                 )
             mapping[tgt.address] = tgt
         super().__init__(mapping)
+
+
+@rule(polymorphic=True)
+async def generate_targets(req: GenerateTargetsRequest) -> GeneratedTargets:
+    raise NotImplementedError()
 
 
 class TargetTypesToGenerateTargetsRequests(
@@ -1779,10 +1782,10 @@ class ScalarField(Generic[T], Field):
                 return super().compute_value(raw_value, address=address)
     """
 
-    expected_type: ClassVar[type[T]]  # type: ignore[misc]
+    expected_type: ClassVar[type[T]]
     expected_type_description: ClassVar[str]
     value: T | None
-    default: ClassVar[T | None] = None  # type: ignore[misc]
+    default: ClassVar[T | None] = None
 
     @classmethod
     def compute_value(cls, raw_value: Any | None, address: Address) -> T | None:
@@ -1836,10 +1839,10 @@ class ValidNumbers(Enum):
     all = enum.auto()
 
     def validate(self, num: float | int | None, alias: str, address: Address) -> None:
-        if num is None or self == self.all:  # type: ignore[comparison-overlap]
+        if num is None or self == self.all:
             return
-        if self == self.positive_and_zero:  # type: ignore[comparison-overlap]
-            if num < 0:  # type: ignore[unreachable]
+        if self == self.positive_and_zero:
+            if num < 0:
                 raise InvalidFieldException(
                     f"The {repr(alias)} field in target {address} must be greater than or equal to "
                     f"zero, but was set to `{num}`."
@@ -1919,7 +1922,7 @@ class SequenceField(Generic[T], Field):
     expected_element_type: ClassVar[type]
     expected_type_description: ClassVar[str]
     value: tuple[T, ...] | None
-    default: ClassVar[tuple[T, ...] | None] = None  # type: ignore[misc]
+    default: ClassVar[tuple[T, ...] | None] = None
 
     @classmethod
     def compute_value(
@@ -1950,7 +1953,7 @@ class TupleSequenceField(Generic[T], Field):
     expected_element_type_description: ClassVar[str]
 
     value: tuple[tuple[T, ...], ...] | None
-    default: ClassVar[tuple[tuple[T, ...], ...] | None] = None  # type: ignore[misc]
+    default: ClassVar[tuple[tuple[T, ...], ...] | None] = None
 
     @classmethod
     def compute_value(
@@ -2257,13 +2260,13 @@ class SourcesField(AsyncFieldMixin, Field):
         and the engine will generate the sources if possible or will return an instance of
         HydratedSources with an empty snapshot if not possible:
 
-            await Get(
-                HydratedSources,
+            await hydrate_sources(
                 HydrateSourcesRequest(
                     sources_field,
                     for_sources_types=[FortranSources],
                     enable_codegen=True,
-                )
+                ),
+                **implicitly(),
             )
 
         This method is useful when you need to filter targets before hydrating them, such as how
@@ -2569,7 +2572,7 @@ class GenerateSourcesRequest:
             output = FortranSources
 
         @rule
-        def generate_fortran_from_avro(request: GenerateFortranFromAvroRequest) -> GeneratedSources:
+        async def generate_fortran_from_avro(request: GenerateFortranFromAvroRequest) -> GeneratedSources:
             ...
 
         def rules():
@@ -2593,6 +2596,13 @@ class GeneratedSources:
     snapshot: Snapshot
 
 
+@rule(polymorphic=True)
+async def generate_sources(
+    req: GenerateSourcesRequest, env_name: EnvironmentName
+) -> GeneratedSources:
+    raise NotImplementedError()
+
+
 class SourcesPaths(Paths):
     """The resolved file names of the `source`/`sources` field.
 
@@ -2604,9 +2614,9 @@ class SourcesPaths(Paths):
 class SourcesPathsRequest(EngineAwareParameter):
     """A request to resolve the file names of the `source`/`sources` field.
 
-    Use via `Get(SourcesPaths, SourcesPathRequest(tgt.get(SourcesField))`.
+    Use via `await resolve_source_paths(SourcesPathRequest(tgt.get(SourcesField))`.
 
-    This is faster than `Get(HydratedSources, HydrateSourcesRequest)` because it does not snapshot
+    This is faster than `await hydrate_sources(HydrateSourcesRequest)` because it does not snapshot
     the files and it only resolves the file names.
 
     This does not consider codegen, and only captures the files from the field. Use
@@ -2645,9 +2655,9 @@ def targets_with_sources_types(
 class Dependencies(StringSequenceField, AsyncFieldMixin):
     """The dependencies field.
 
-    To resolve all dependencies—including the results of dependency inference—use either `await
-    Get(Addresses, DependenciesRequest(tgt[Dependencies])` or `await Get(Targets,
-    DependenciesRequest(tgt[Dependencies])`.
+    To resolve all dependencies—including the results of dependency inference—use either
+    `await resolve_dependencies(DependenciesRequest(tgt[Dependencies])` or
+    `await resolve_targets(**implicitly(DependenciesRequest(tgt[Dependencies]))`.
     """
 
     alias = "dependencies"
@@ -2712,12 +2722,13 @@ class ExplicitlyProvidedDependenciesRequest(EngineAwareParameter):
 class ExplicitlyProvidedDependencies:
     """The literal addresses from a BUILD file `dependencies` field.
 
-    Almost always, you should use `await Get(Addresses, DependenciesRequest)` instead, which will
-    consider dependency inference and apply ignores. However, this type can be
+    Almost always, you should use `await resolve_dependencies(DependenciesRequest, **implicitly())`
+    instead, which will consider dependency inference and apply ignores. However, this type can be
     useful particularly within inference rules to see if a user already explicitly
     provided a dependency.
 
-    Resolve using `await Get(ExplicitlyProvidedDependencies, DependenciesRequest)`.
+    Resolve using
+    `await determine_explicitly_provided_dependencies(**implicitly(DependenciesRequest))`.
 
     Note that the `includes` are not filtered based on the `ignores`: this type preserves exactly
     what was in the BUILD file.
@@ -2845,8 +2856,8 @@ class InferDependenciesRequest(Generic[FS], EngineAwareParameter):
             infer_from = FortranDependenciesInferenceFieldSet
 
         @rule
-        def infer_fortran_dependencies(request: InferFortranDependencies) -> InferredDependencies:
-            hydrated_sources = await Get(HydratedSources, HydrateSources(request.field_set.sources))
+        async def infer_fortran_dependencies(request: InferFortranDependencies) -> InferredDependencies:
+            hydrated_sources = await hydrate_sources(HydrateSources(request.field_set.sources))
             ...
             return InferredDependencies(...)
 
@@ -2857,7 +2868,7 @@ class InferDependenciesRequest(Generic[FS], EngineAwareParameter):
             ]
     """
 
-    infer_from: ClassVar[type[FS]]  # type: ignore[misc]
+    infer_from: ClassVar[type[FS]]
 
     field_set: FS
 
@@ -2889,7 +2900,7 @@ class TransitivelyExcludeDependenciesRequest(Generic[FS], EngineAwareParameter):
     This mirrors the public facing "transitive exclude" dependency feature (i.e. `!!<address>`).
     """
 
-    infer_from: ClassVar[type[FS]]  # type: ignore[misc]
+    infer_from: ClassVar[type[FS]]
 
     field_set: FS
 
@@ -2906,7 +2917,7 @@ class ValidateDependenciesRequest(Generic[FS], ABC):
     An implementing rule should raise an exception if dependencies are invalid.
     """
 
-    field_set_type: ClassVar[type[FS]]  # type: ignore[misc]
+    field_set_type: ClassVar[type[FS]]
 
     field_set: FS
     dependencies: Addresses
@@ -2978,11 +2989,12 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
     dedicated field.
 
     This type will ensure that the dependencies show up in project introspection,
-    like `dependencies` and `dependents`, but not show up when you call `Get(TransitiveTargets,
-    TransitiveTargetsRequest)` and `Get(Addresses, DependenciesRequest)`.
+    like `dependencies` and `dependents`, but not show up when you
+    `await transitive_targets(TransitiveTargetsRequest(...), **implicitly())` and
+    `await resolve_dependencies(DependenciesRequest(...), **implicitly())`.
 
-    To hydrate this field's dependencies, use `await Get(Addresses, UnparsedAddressInputs,
-    tgt.get(MyField).to_unparsed_address_inputs())`.
+    To hydrate this field's dependencies, use
+    `await resolve_unparsed_address_inputs(tgt.get(MyField).to_unparsed_address_inputs(), **implicitly())`.
     """
 
     def to_unparsed_address_inputs(self) -> UnparsedAddressInputs:

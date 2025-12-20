@@ -2,20 +2,21 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from dataclasses import dataclass
 
-from pants.backend.terraform.dependencies import TerraformInitRequest, prepare_terraform_invocation
+from pants.backend.terraform.dependencies import (
+    prepare_terraform_invocation,
+    terraform_fieldset_to_init_request,
+)
 from pants.backend.terraform.target_types import (
-    TerraformDeploymentFieldSet,
     TerraformDeploymentTarget,
     TerraformFieldSet,
     TerraformModuleTarget,
-    TerraformRootModuleField,
 )
 from pants.backend.terraform.tool import TerraformCommand, TerraformProcess
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
-from pants.engine.internals.native_engine import Digest, MergeDigests
-from pants.engine.internals.selectors import Get, MultiGet, concurrently
-from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.internals.native_engine import MergeDigests
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import execute_process, merge_digests
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import BoolField, Target
 from pants.engine.unions import UnionRule
 from pants.option.option_types import SkipOption
@@ -49,20 +50,6 @@ class TerraformCheckRequest(CheckRequest):
     tool_name = TerraformValidateSubsystem.options_scope
 
 
-def terraform_fieldset_to_init_request(
-    terraform_fieldset: TerraformDeploymentFieldSet | TerraformFieldSet,
-) -> TerraformInitRequest:
-    if isinstance(terraform_fieldset, TerraformDeploymentFieldSet):
-        deployment = terraform_fieldset
-        return TerraformInitRequest(deployment.root_module, deployment.dependencies)
-    if isinstance(terraform_fieldset, TerraformFieldSet):
-        module = terraform_fieldset
-        return TerraformInitRequest(
-            TerraformRootModuleField(module.address.spec, module.address),
-            module.dependencies,
-        )
-
-
 @rule
 async def terraform_check(
     request: TerraformCheckRequest, subsystem: TerraformValidateSubsystem
@@ -75,32 +62,32 @@ async def terraform_check(
         for deployment in request.field_sets
     )
 
-    all_sources_and_deps = await MultiGet(
-        Get(
-            Digest,
+    all_sources_and_deps = await concurrently(
+        merge_digests(
             MergeDigests(
                 [
                     deployment.terraform_sources.snapshot.digest,
                     deployment.dependencies_files.snapshot.digest,
                 ]
-            ),
+            )
         )
         for deployment in terraform_deployments
     )
 
-    results = await MultiGet(
-        Get(
-            FallibleProcessResult,
-            TerraformProcess(
-                cmds=(
-                    deployment.init_cmd.to_args(),
-                    TerraformCommand(("validate",)),
-                ),
-                input_digest=sources_and_deps,
-                output_files=tuple(deployment.terraform_sources.files),
-                description=f"Run `terraform validate` on module {deployment.chdir} with {pluralize(len(deployment.terraform_sources.files), 'file')}.",
-                chdir=deployment.chdir,
-            ),
+    results = await concurrently(
+        execute_process(
+            **implicitly(
+                TerraformProcess(
+                    cmds=(
+                        deployment.init_cmd.to_args(),
+                        TerraformCommand(("validate",)),
+                    ),
+                    input_digest=sources_and_deps,
+                    output_files=tuple(deployment.terraform_sources.files),
+                    description=f"Run `terraform validate` on module {deployment.chdir} with {pluralize(len(deployment.terraform_sources.files), 'file')}.",
+                    chdir=deployment.chdir,
+                )
+            )
         )
         for deployment, sources_and_deps in zip(terraform_deployments, all_sources_and_deps)
     )

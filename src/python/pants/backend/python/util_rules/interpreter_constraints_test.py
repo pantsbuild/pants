@@ -10,7 +10,7 @@ import pytest
 from packaging.requirements import InvalidRequirement, Requirement
 
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import InterpreterConstraintsField
+from pants.backend.python.target_types import InterpreterConstraintsField, PythonResolveField
 from pants.backend.python.util_rules.interpreter_constraints import (
     _PATCH_VERSION_UPPER_BOUND,
     InterpreterConstraints,
@@ -27,14 +27,18 @@ from pants.util.strutil import softwrap
 @dataclass(frozen=True)
 class MockFieldSet(FieldSet):
     interpreter_constraints: InterpreterConstraintsField
+    resolve: PythonResolveField
 
     @classmethod
-    def create_for_test(cls, address: Address, compat: str | None) -> MockFieldSet:
+    def create_for_test(
+        cls, address: Address, compat: str | None, resolve: str = "python-default"
+    ) -> MockFieldSet:
         return cls(
             address=address,
             interpreter_constraints=InterpreterConstraintsField(
                 [compat] if compat else None, address=address
             ),
+            resolve=PythonResolveField(resolve, address=address),
         )
 
 
@@ -300,7 +304,10 @@ def test_group_field_sets_by_constraints() -> None:
     assert InterpreterConstraints.group_field_sets_by_constraints(
         [py2_fs, *py3_fs],
         python_setup=create_subsystem(
-            PythonSetup, interpreter_constraints=[], warn_on_python2_usage=False
+            PythonSetup,
+            interpreter_constraints=[],
+            warn_on_python2_usage=False,
+            enable_resolves=False,
         ),
     ) == FrozenDict(
         {
@@ -328,7 +335,10 @@ def test_group_field_sets_by_constraints_with_unsorted_inputs() -> None:
     output = InterpreterConstraints.group_field_sets_by_constraints(
         py3_fs,
         python_setup=create_subsystem(
-            PythonSetup, interpreter_constraints=[], warn_on_python2_usage=False
+            PythonSetup,
+            interpreter_constraints=[],
+            warn_on_python2_usage=False,
+            enable_resolves=False,
         ),
     )
 
@@ -560,3 +570,30 @@ def test_parse_python_interpreter_constraint_when_invalid(
 ) -> None:
     with pytest.raises(InvalidRequirement, match=expected_error):
         parse_constraint(input_ic)
+
+
+@pytest.mark.parametrize(
+    argnames=("compat", "enable_resolves", "expected"),
+    argvalues=[
+        ("==3.11.*", False, InterpreterConstraints.for_fixed_python_version("3.11.*")),
+        (None, False, InterpreterConstraints.for_fixed_python_version("3.10.*")),
+        (None, True, InterpreterConstraints.for_fixed_python_version("3.12.*")),
+    ],
+)
+def test_default_to_resolve_interpreter_constraints(
+    compat: str | None, enable_resolves: bool, expected: InterpreterConstraints
+) -> None:
+    field_set = MockFieldSet.create_for_test(
+        Address("src/python/path.py", target_name="test"), compat
+    )
+    subsystem = create_subsystem(
+        PythonSetup,
+        enable_resolves=enable_resolves,
+        interpreter_constraints=["==3.10.*"],
+        default_resolve="python-default",
+        resolves={"python-default": "default.lock"},
+        default_to_resolve_interpreter_constraints=True,
+        resolves_to_interpreter_constraints={"python-default": ["==3.12.*"]},
+        warn_on_python2_usage=False,
+    )
+    assert InterpreterConstraints.create_from_field_sets([field_set], subsystem) == expected

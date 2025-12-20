@@ -1,0 +1,81 @@
+---
+    title: Migrating from Get
+    sidebar_position: 11
+---
+
+Migrating away from the old call-by-type Rules API.
+
+---
+
+## `Get` and `MultiGet`
+
+As [we've seen](./concepts.mdx), rules invoke other rules directly by name:
+
+```python
+from pants.engine.fs import NativeDownloadFile
+from pants.engine.intrinsics import download_file
+from pants.engine.rules import rule
+...
+
+@rule
+async def my_rule() -> MyResult:
+    downloaded_file = await download_file(
+        NativeDownloadFile("https://www.google.com/robots.txt")
+    )
+    ...
+```
+
+However, a previous version of the Rules API had a different idiom, call-by-type. This was achieved using a construct called `Get`:
+
+```python
+from pants.engine.fs import Digest, NativeDownloadFile
+from pants.engine.rules import Get, rule
+...
+
+@rule
+async def my_rule() -> MyResult:
+    downloaded_file = await Get(Digest, NativeDownloadFile("https://www.google.com/robots.txt"))
+    ...
+```
+
+A `Get(OutputType, InputType, input)` or `Get(OutputType, InputType(...))` invoked the engine's "fill in the blanks" mechanism to find a rule or a cascade of rules that could produce a value of OutputType from the given input type (plus any contextual parameters).
+
+To achieve concurrency you could `await MultiGet(<iterable of Gets>)`.
+
+## `Get` and `MultiGet` are deprecated
+
+`Get` and `MultiGet` are now deprecated, and will be removed entirely soon. Pants itself no longer uses them internally, but external plugins still might. Plugin authors must migrate from `Get`/`MultiGet` to call-by-name syntax as soon as possible.
+
+## Migrating to call-by-name
+
+Migrating to call-by-name is fairly straightforward:
+
+First, replace all `MultiGet`s with `concurrently`, imported from from `pants.engine.rules`. `MultiGet` is now just an alias for `concurrently`, so this is trivial to do with a find/replace.
+
+Then, replace `await Get(OutputType, InputType, input)` with `await rule_name(...)` where `rule_name` is the rule that returns a value `OutputType`.
+
+- If the rule has exactly one parameter, of type `InputType`, then this as simple as:
+
+```python
+val = await rule_name(input)
+```
+
+- If the rule has other parameters that should be passed implicitly, then add an empty `**implicitly()`:
+
+```python
+val = await rule_name(input, **implicitly())
+```
+
+- If the rule that returns `OutputType` does not take `InputType` directly, but rather some `IntermediateType`, then we need to tell the Pants engine to fill in the blanks, just as the `Get` would have:
+
+```python
+val = await rule_name(**implicitly({input: InputType}))
+```
+
+There may be various corner cases that require slightly more refactoring. We encourage you to ask for help on [Slack](/community/getting-help) with those.
+
+For examples of migrations, you can review [pull requests](https://github.com/pantsbuild/pants/pulls?q=is%3Apr+%22call-by-name%22+is%3Aclosed) made to the Pants repository. Additionally, there are some simplified examples in the form of [Pants integration tests](https://github.com/pantsbuild/pants/blob/main/src/python/pants/goal/migrate_call_by_name_integration_test.py).
+
+## Migrating union `Get`s to call-by-name
+
+If you're relying on polymorphic dispatch via a [union](./union-rules-advanced.mdx), then you must make sure that your implementation rule has the same signature as the "base" rule (the `@rule(polymorphic=True)` rule) - the same type annotations for parameters and return value - except with your subtype in place of the union type. If things aren't working and the base rule is a standard Pants rule, you can examine its signature in the Pants source code.

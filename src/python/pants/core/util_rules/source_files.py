@@ -6,8 +6,10 @@ from dataclasses import dataclass
 from pathlib import PurePath
 
 from pants.engine.fs import MergeDigests, Snapshot
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, Target
+from pants.engine.internals.graph import hydrate_sources
+from pants.engine.intrinsics import digest_to_snapshot
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
+from pants.engine.target import HydrateSourcesRequest, SourcesField, Target
 
 
 @dataclass(frozen=True)
@@ -47,14 +49,14 @@ class SourceFilesRequest:
 async def determine_source_files(request: SourceFilesRequest) -> SourceFiles:
     """Merge all `SourceBaseField`s into one Snapshot."""
     unrooted_files: set[str] = set()
-    all_hydrated_sources = await MultiGet(
-        Get(
-            HydratedSources,
+    all_hydrated_sources = await concurrently(
+        hydrate_sources(
             HydrateSourcesRequest(
                 sources_field,
                 for_sources_types=request.for_sources_types,
                 enable_codegen=request.enable_codegen,
             ),
+            **implicitly(),
         )
         for sources_field in request.sources_fields
     )
@@ -66,7 +68,7 @@ async def determine_source_files(request: SourceFilesRequest) -> SourceFiles:
     digests_to_merge = tuple(
         hydrated_sources.snapshot.digest for hydrated_sources in all_hydrated_sources
     )
-    result = await Get(Snapshot, MergeDigests(digests_to_merge))
+    result = await digest_to_snapshot(**implicitly(MergeDigests(digests_to_merge)))
     return SourceFiles(result, tuple(sorted(unrooted_files)))
 
 

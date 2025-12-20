@@ -20,7 +20,8 @@ from pants.engine.internals.native_engine import PyExecutor, PyNailgunServer
 from pants.init.engine_initializer import GraphScheduler
 from pants.init.logging import initialize_stdio, pants_log_path
 from pants.init.util import init_workdir
-from pants.option.global_options import GlobalOptions, LocalStoreOptions
+from pants.option.bootstrap_options import LocalStoreOptions
+from pants.option.global_options import GlobalOptions
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -36,6 +37,8 @@ from pants.version import VERSION
 _SHUTDOWN_TIMEOUT_SECS = 3
 
 _PRESERVED_ENV_VARS = [
+    # Provides location of sandboxer binary.
+    "PANTS_SANDBOXER_BINARY_PATH",
     # Controls backtrace behavior for rust code.
     "RUST_BACKTRACE",
     # The environment variables consumed by the `bollard` crate as of
@@ -48,6 +51,13 @@ _PRESERVED_ENV_VARS = [
     "HOME",
     "PATH",
     "USER",
+    # Environment variables needed to support downloading tools in a restricted internet environment
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "NO_PROXY",
+    "http_proxy",  # for historical reasons, in some environments, *_proxy variables must be lowercase
+    "https_proxy",
+    "no_proxy",
 ]
 
 

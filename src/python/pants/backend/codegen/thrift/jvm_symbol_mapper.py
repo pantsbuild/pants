@@ -8,9 +8,9 @@ from dataclasses import dataclass
 from typing import DefaultDict
 
 from pants.backend.codegen.thrift.target_types import AllThriftTargets, ThriftSourceField
-from pants.backend.codegen.thrift.thrift_parser import ParsedThrift, ParsedThriftRequest
+from pants.backend.codegen.thrift.thrift_parser import ParsedThriftRequest, parse_thrift_file
 from pants.engine.addresses import Address
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import collect_rules, concurrently, rule
 from pants.jvm.dependency_inference.artifact_mapper import MutableTrieNode
 from pants.jvm.dependency_inference.symbol_mapper import SymbolMap
 from pants.jvm.subsystems import JvmSubsystem
@@ -32,13 +32,12 @@ async def map_first_party_thrift_targets_to_jvm_symbols(
 ) -> SymbolMap:
     jvm_thrift_targets = [tgt for tgt in thrift_targets if tgt.has_field(JvmResolveField)]
 
-    parsed_thrift_sources = await MultiGet(
-        Get(
-            ParsedThrift,
+    parsed_thrift_sources = await concurrently(
+        parse_thrift_file(
             ParsedThriftRequest(
                 sources_field=tgt[ThriftSourceField],
                 extra_namespace_directives=request.extra_namespace_directives,
-            ),
+            )
         )
         for tgt in jvm_thrift_targets
     )

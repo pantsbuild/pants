@@ -9,7 +9,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import InterpreterConstraintsField
+from pants.backend.python.target_types import InterpreterConstraintsField, PythonResolveField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import find_interpreter
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
@@ -104,7 +104,9 @@ async def detect_django_apps(python_setup: PythonSetup) -> DjangoApps:
     ics_to_tgts: dict[InterpreterConstraints, list[Target]] = defaultdict(list)
     for tgt in targets:
         ics = InterpreterConstraints(
-            tgt[InterpreterConstraintsField].value_or_global_default(python_setup)
+            tgt[InterpreterConstraintsField].value_or_configured_default(
+                python_setup, tgt[PythonResolveField] if tgt.has_field(PythonResolveField) else None
+            )
         )
         ics_to_tgts[ics].append(tgt)
 

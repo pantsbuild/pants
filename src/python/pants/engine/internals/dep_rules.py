@@ -10,7 +10,7 @@ from typing import Protocol
 
 from pants.engine.addresses import Address
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionMembership, union
 
 logger = logging.getLogger(__name__)
@@ -141,6 +141,13 @@ class BuildFileDependencyRulesImplementation:
     build_file_dependency_rules_class: type[BuildFileDependencyRules]
 
 
+@rule(polymorphic=True)
+async def _get_build_file_dependency_rules_implementation(
+    req: BuildFileDependencyRulesImplementationRequest,
+) -> BuildFileDependencyRulesImplementation:
+    raise NotImplementedError()
+
+
 @dataclass(frozen=True)
 class MaybeBuildFileDependencyRulesImplementation:
     build_file_dependency_rules_class: type[BuildFileDependencyRules] | None
@@ -156,11 +163,10 @@ async def get_build_file_dependency_rules_implementation(
         raise AssertionError(
             f"There must be at most one BUILD file dependency rules implementation, got: {impls}"
         )
-    for request_type in request_types:
-        impl = await Get(  # noqa: PNT30: this for loop will never process more than a single iteration.
-            BuildFileDependencyRulesImplementation,
-            BuildFileDependencyRulesImplementationRequest,
-            request_type(),
+    if len(request_types) == 1:
+        request_type = next(iter(request_types))
+        impl = await _get_build_file_dependency_rules_implementation(
+            **implicitly({request_type(): BuildFileDependencyRulesImplementationRequest})
         )
         return MaybeBuildFileDependencyRulesImplementation(impl.build_file_dependency_rules_class)
     return MaybeBuildFileDependencyRulesImplementation(None)

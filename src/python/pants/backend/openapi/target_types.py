@@ -78,7 +78,7 @@ class AllOpenApiDocumentTargets(Targets):
 
 
 @rule(desc="Find all OpenAPI Document targets in project", level=LogLevel.DEBUG)
-def find_all_openapi_document_targets(all_targets: AllTargets) -> AllOpenApiDocumentTargets:
+async def find_all_openapi_document_targets(all_targets: AllTargets) -> AllOpenApiDocumentTargets:
     return AllOpenApiDocumentTargets(
         tgt for tgt in all_targets if tgt.has_field(OpenApiDocumentField)
     )
@@ -129,7 +129,7 @@ class AllOpenApiSourceTargets(Targets):
 
 
 @rule(desc="Find all OpenAPI source targets in project", level=LogLevel.DEBUG)
-def find_all_openapi_source_targets(all_targets: AllTargets) -> AllOpenApiSourceTargets:
+async def find_all_openapi_source_targets(all_targets: AllTargets) -> AllOpenApiSourceTargets:
     return AllOpenApiSourceTargets(tgt for tgt in all_targets if tgt.has_field(OpenApiSourceField))
 
 

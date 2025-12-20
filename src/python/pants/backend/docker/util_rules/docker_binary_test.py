@@ -22,7 +22,7 @@ from pants.engine.fs import EMPTY_DIGEST, Digest, DigestEntries
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import QueryRule
 from pants.testutil.option_util import create_subsystem
-from pants.testutil.rule_runner import MockGet, RuleRunner, run_rule_with_mocks
+from pants.testutil.rule_runner import RuleRunner, run_rule_with_mocks
 
 
 @pytest.fixture
@@ -125,7 +125,7 @@ def test_get_docker(rule_runner: RuleRunner, podman_enabled: bool, podman_found:
     )
     docker_options_env_aware = mock.MagicMock(spec=DockerOptions.EnvironmentAware)
 
-    def mock_get_binary_path(request: BinaryPathRequest) -> BinaryPaths:
+    def mock_find_binary(request: BinaryPathRequest) -> BinaryPaths:
         if request.binary_name == "podman" and podman_found:
             return BinaryPaths("podman", paths=[BinaryPath("/bin/podman")])
 
@@ -135,22 +135,16 @@ def test_get_docker(rule_runner: RuleRunner, podman_enabled: bool, podman_found:
         else:
             return BinaryPaths(request.binary_name, ())
 
-    def mock_get_binary_shims(request: BinaryShimsRequest) -> BinaryShims:
+    def mock_create_binary_shims(request: BinaryShimsRequest) -> BinaryShims:
         return BinaryShims(EMPTY_DIGEST, "cache_name")
 
     result = run_rule_with_mocks(
         get_docker,
         rule_args=[docker_options, docker_options_env_aware],
-        mock_gets=[
-            MockGet(
-                output_type=BinaryPaths, input_types=(BinaryPathRequest,), mock=mock_get_binary_path
-            ),
-            MockGet(
-                output_type=BinaryShims,
-                input_types=(BinaryShimsRequest,),
-                mock=mock_get_binary_shims,
-            ),
-        ],
+        mock_calls={
+            "pants.core.util_rules.system_binaries.find_binary": mock_find_binary,
+            "pants.core.util_rules.system_binaries.create_binary_shims": mock_create_binary_shims,
+        },
     )
 
     if podman_enabled and podman_found:
@@ -162,7 +156,7 @@ def test_get_docker(rule_runner: RuleRunner, podman_enabled: bool, podman_found:
 
 
 def test_get_docker_with_tools(rule_runner: RuleRunner) -> None:
-    def mock_get_binary_path(request: BinaryPathRequest) -> BinaryPaths:
+    def mock_find_binary(request: BinaryPathRequest) -> BinaryPaths:
         if request.binary_name == "docker":
             return BinaryPaths("docker", paths=[BinaryPath("/bin/docker")])
         elif request.binary_name == "real-tool":
@@ -170,7 +164,7 @@ def test_get_docker_with_tools(rule_runner: RuleRunner) -> None:
         else:
             return BinaryPaths(request.binary_name, ())
 
-    def mock_get_binary_shims(request: BinaryShimsRequest) -> BinaryShims:
+    def mock_create_binary_shims(request: BinaryShimsRequest) -> BinaryShims:
         return BinaryShims(EMPTY_DIGEST, "cache_name")
 
     def run(tools: list[str], optional_tools: list[str]) -> None:
@@ -182,24 +176,16 @@ def test_get_docker_with_tools(rule_runner: RuleRunner) -> None:
         )
         docker_options_env_aware = mock.MagicMock(spec=DockerOptions.EnvironmentAware)
 
-        nonlocal mock_get_binary_path
-        nonlocal mock_get_binary_shims
+        nonlocal mock_find_binary
+        nonlocal mock_create_binary_shims
 
         run_rule_with_mocks(
             get_docker,
             rule_args=[docker_options, docker_options_env_aware],
-            mock_gets=[
-                MockGet(
-                    output_type=BinaryPaths,
-                    input_types=(BinaryPathRequest,),
-                    mock=mock_get_binary_path,
-                ),
-                MockGet(
-                    output_type=BinaryShims,
-                    input_types=(BinaryShimsRequest,),
-                    mock=mock_get_binary_shims,
-                ),
-            ],
+            mock_calls={
+                "pants.core.util_rules.system_binaries.find_binary": mock_find_binary,
+                "pants.core.util_rules.system_binaries.create_binary_shims": mock_create_binary_shims,
+            },
         )
 
     run(tools=["real-tool"], optional_tools=[])

@@ -9,7 +9,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from pants.backend.helm.resolve import artifacts
-from pants.backend.helm.resolve.artifacts import HelmArtifact, ResolvedHelmArtifact
+from pants.backend.helm.resolve.artifacts import (
+    HelmArtifact,
+    ResolvedHelmArtifact,
+    resolved_helm_artifact,
+)
 from pants.backend.helm.target_types import HelmArtifactFieldSet, HelmArtifactTarget
 from pants.backend.helm.util_rules import tool
 from pants.backend.helm.util_rules.tool import HelmProcess
@@ -17,7 +21,6 @@ from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import (
     CreateDigest,
-    Digest,
     DigestSubset,
     Directory,
     FileDigest,
@@ -25,8 +28,14 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
-from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.intrinsics import (
+    create_digest,
+    digest_subset_to_digest,
+    digest_to_snapshot,
+    remove_prefix,
+)
+from pants.engine.process import execute_process_or_raise
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import Target
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
@@ -113,41 +122,43 @@ def assemble_pull_target(resolved_artifact: ResolvedHelmArtifact) -> list[str]:
 async def fetch_helm_artifact(request: FetchHelmArtifactRequest) -> FetchedHelmArtifact:
     download_prefix = "__downloads"
 
-    empty_download_digest, resolved_artifact = await MultiGet(
-        Get(Digest, CreateDigest([Directory(download_prefix)])),
-        Get(ResolvedHelmArtifact, HelmArtifact, HelmArtifact.from_field_set(request.field_set)),
-    )
-
-    download_result = await Get(
-        ProcessResult,
-        HelmProcess(
-            argv=[
-                "pull",
-                *assemble_pull_target(resolved_artifact),
-                "--version",
-                resolved_artifact.version,
-                "--destination",
-                download_prefix,
-                "--untar",
-            ],
-            input_digest=empty_download_digest,
-            description=f"Pulling Helm Chart '{resolved_artifact.name}' with version {resolved_artifact.version}.",
-            output_directories=(download_prefix,),
-            level=LogLevel.DEBUG,
+    empty_download_digest, resolved_artifact = await concurrently(
+        create_digest(CreateDigest([Directory(download_prefix)])),
+        resolved_helm_artifact(
+            **implicitly({HelmArtifact.from_field_set(request.field_set): HelmArtifact})
         ),
     )
 
-    raw_output_digest = await Get(
-        Digest, RemovePrefix(download_result.output_digest, download_prefix)
+    download_result = await execute_process_or_raise(
+        **implicitly(
+            HelmProcess(
+                argv=[
+                    "pull",
+                    *assemble_pull_target(resolved_artifact),
+                    "--version",
+                    resolved_artifact.version,
+                    "--destination",
+                    download_prefix,
+                    "--untar",
+                ],
+                input_digest=empty_download_digest,
+                description=f"Pulling Helm Chart '{resolved_artifact.name}' with version {resolved_artifact.version}.",
+                output_directories=(download_prefix,),
+                level=LogLevel.DEBUG,
+            )
+        )
+    )
+
+    raw_output_digest = await remove_prefix(
+        RemovePrefix(download_result.output_digest, download_prefix)
     )
 
     # The download result will come with a tarball alongside the unzipped sources, pick the chart sources only.
-    artifact_sources_digest = await Get(
-        Digest,
-        DigestSubset(raw_output_digest, PathGlobs([os.path.join(resolved_artifact.name, "**")])),
+    artifact_sources_digest = await digest_subset_to_digest(
+        DigestSubset(raw_output_digest, PathGlobs([os.path.join(resolved_artifact.name, "**")]))
     )
-    artifact_snapshot = await Get(
-        Snapshot, RemovePrefix(artifact_sources_digest, resolved_artifact.name)
+    artifact_snapshot = await digest_to_snapshot(
+        **implicitly(RemovePrefix(artifact_sources_digest, resolved_artifact.name))
     )
 
     return FetchedHelmArtifact(artifact=resolved_artifact, snapshot=artifact_snapshot)

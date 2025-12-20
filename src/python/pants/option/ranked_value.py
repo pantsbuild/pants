@@ -7,10 +7,10 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from enum import Enum
 from functools import total_ordering
-from typing import Any, Optional, Union
+from typing import Any, Union
 
 
-# NB: Must mirror the Rank enum in src/rust/engine/options/src/lib.rs.
+# NB: Must mirror the Rank enum in src/rust/options/src/lib.rs.
 @total_ordering
 class Rank(Enum):
     # The ranked value sources. Higher ranks override lower ones.
@@ -48,7 +48,7 @@ class Rank(Enum):
 
 
 Value = Union[str, int, float, None, dict, Enum, list]
-ValueAndDetails = tuple[Optional[Value], Optional[str]]
+ValueAndDetails = tuple[Value | None, str | None]
 
 
 @dataclass(frozen=True)

@@ -46,7 +46,7 @@ class AllShellTargets(Targets):
 
 
 @rule(desc="Find all Shell targets in project", level=LogLevel.DEBUG)
-def find_all_shell_targets(all_tgts: AllTargets) -> AllShellTargets:
+async def find_all_shell_targets(all_tgts: AllTargets) -> AllShellTargets:
     return AllShellTargets(tgt for tgt in all_tgts if tgt.has_field(ShellSourceField))
 
 
@@ -59,7 +59,7 @@ class ShellMapping:
 
 
 @rule(desc="Creating map of Shell file names to Shell targets", level=LogLevel.DEBUG)
-def map_shell_files(tgts: AllShellTargets) -> ShellMapping:
+async def map_shell_files(tgts: AllShellTargets) -> ShellMapping:
     files_to_addresses: dict[str, Address] = {}
     files_with_multiple_owners: DefaultDict[str, set[Address]] = defaultdict(set)
     for tgt in tgts:

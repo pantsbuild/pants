@@ -45,11 +45,7 @@ class Paths:
 
 @dataclass(frozen=True)
 class FileContent:
-    """The content of a file.
-
-    This can be used to create a new Digest with `Get(Digest, CreateDigest)`. You can also get back
-    a list of `FileContent` objects by using `Get(DigestContents, Digest)`.
-    """
+    """The content of a file."""
 
     path: str
     content: bytes
@@ -70,11 +66,7 @@ class FileContent:
 
 @dataclass(frozen=True)
 class FileEntry:
-    """An indirect reference to the content of a file by digest.
-
-    This can be used to create a new Digest with `Get(Digest, CreateDigest)`. You can also get back
-    a list of `FileEntry` objects by using `Get(DigestEntries, Digest)`.
-    """
+    """An indirect reference to the content of a file by digest."""
 
     path: str
     file_digest: FileDigest
@@ -101,10 +93,7 @@ class SymlinkEntry:
 
 @dataclass(frozen=True)
 class Directory:
-    """The path to a directory.
-
-    This can be used to create empty directories with `Get(Digest, CreateDigest)`.
-    """
+    """The path to a directory."""
 
     path: str
 
@@ -230,12 +219,8 @@ class DigestSubset:
     """A request to get a subset of a digest.
 
     The digest will be traversed symlink-oblivious to match the provided globs. If you require a
-    symlink-aware subset, you can access the digest's entries `Get(DigestEntries, Digest, digest)`,
-    filter them out, and create a new digest: `Get(Digest, CreateDigest(...))`.
-
-    Example:
-
-        result = await Get(Digest, DigestSubset(original_digest, PathGlobs(["subdir1", "f.txt"]))
+    symlink-aware subset, you can access the digest's DigestEntries, filter them out, and create a
+    new digest.
     """
 
     digest: Digest
@@ -309,8 +294,8 @@ class Workspace(SideEffecting):
     ) -> None:
         """Write a digest to disk, relative to the build root.
 
-        You should not use this in a `for` loop due to slow performance. Instead, call `await
-        Get(Digest, MergeDigests)` beforehand.
+        You should not use this in a `for` loop due to slow performance. Instead, first merge
+        digests and then write the single merged digest.
 
         As an advanced use-case, if the digest is known to be written to a temporary or idempotent
         location, side_effecting=False may be passed to avoid tracking this write as a side effect.
