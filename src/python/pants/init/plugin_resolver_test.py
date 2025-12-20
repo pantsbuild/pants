@@ -242,7 +242,7 @@ def plugin_resolution(
                 )
 
         env.update(
-            PANTS_PYTHON_REPOS_FIND_LINKS=f"['file://{repo_dir}']",
+            PANTS_PYTHON_REPOS_FIND_LINKS=f"['file://{repo_dir}/']",
             PANTS_PYTHON_RESOLVER_CACHE_TTL="1",
             PANTS_EXPERIMENTAL_USE_UV_FOR_PLUGIN_RESOLUTION="True" if use_uv else "False",
         )
@@ -281,23 +281,11 @@ def plugin_resolution(
         bootstrap_scheduler = create_bootstrap_scheduler(options_bootstrapper, EXECUTOR)
         cache_dir = options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
 
-        input_working_set = WorkingSet(entries=[])
-        for dist in working_set_entries:
-            input_working_set.add(dist)
-        plugin_resolver = PluginResolver(
-            bootstrap_scheduler, interpreter_constraints, input_working_set
-        )
-        working_set = plugin_resolver.resolve(options_bootstrapper, complete_env, requirements)
-        print(f"working_set: {working_set}")
-        # import pdb ; pdb.set_trace()
-        for dist in working_set:
-            if use_uv:
-                assert ".pants.d/plugins" in os.path.realpath(dist.location)
-            else:
-                assert (
-                    Path(os.path.realpath(cache_dir))
-                    in Path(os.path.realpath(dist.location)).parents
-                )
+        site_packages_path = Path(root_dir, "site-packages")
+        expected_distribution_names: set[str] = set()
+        for dist in existing_distributions:
+            dist.create(site_packages_path)
+            expected_distribution_names.add(dist.name)
 
         plugin_resolver = PluginResolver(
             bootstrap_scheduler, interpreter_constraints, inherit_existing_constraints=False
@@ -315,8 +303,9 @@ def plugin_resolution(
 
 
 def test_no_plugins(rule_runner: RuleRunner, use_uv: bool) -> None:
-    with plugin_resolution(rule_runner, use_uv=use_uv) as (working_set, _, _):
-        assert [] == list(working_set)
+    with plugin_resolution(rule_runner, use_uv=use_uv) as (plugin_paths, _, _, saved_sys_path):
+        assert len(plugin_paths) == 0
+        assert saved_sys_path == sys.path
 
 
 @pytest.mark.parametrize("sdist", (True, False), ids=("sdist", "bdist"))
@@ -404,16 +393,16 @@ def test_exact_requirements_interpreter_change(
         plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
         sdist=sdist,
     ) as results:
-        working_set, chroot, repo_dir = results
+        plugin_paths_1, chroot, repo_dir, saved_sys_path = results
         print(f"chdoot: {chroot}")
         print(f"repo_dir: {repo_dir}")
         safe_rmtree(repo_dir)
         
-        plugins_venv = os.path.join(chroot, ".pants.d", "plugins", "venv", "lib", "python3.11", "site-packages", "jane")
-        print(f"chroot files: {os.listdir(chroot)}")
-        print(f"repo_dir files: {os.listdir(repo_dir)}")
-        # print(f"site-packages: {os.listdir(os.path.dirname(plugins_venv))}")
-        safe_rmtree(plugins_venv)
+        # plugins_venv = os.path.join(chroot, ".pants.d", "plugins", "venv", "lib", "python3.11", "site-packages", "jane")
+        # print(f"chroot files: {os.listdir(chroot)}")
+        # print(f"repo_dir files: {os.listdir(repo_dir)}")
+        # # print(f"site-packages: {os.listdir(os.path.dirname(plugins_venv))}")
+        # safe_rmtree(plugins_venv)
         
         with pytest.raises(ExecutionError):
             with plugin_resolution(
