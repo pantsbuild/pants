@@ -424,3 +424,111 @@ def test_all_plugins(rule_runner: RuleRunner) -> None:
             "src/protobuf/dir1/f_grpc.py",
         ],
     )
+
+
+def test_code_generation_with_multiple_resolves(rule_runner: RuleRunner) -> None:
+    """End-to-end test that code is generated correctly for different resolves."""
+    rule_runner.write_files(
+        {
+            "src/protobuf/prod/service.proto": dedent(
+                """\
+                syntax = "proto3";
+
+                package prod;
+
+                message Request {
+                  string name = 1;
+                }
+                """
+            ),
+            "src/protobuf/prod/BUILD": "protobuf_sources(python_resolve='prod')",
+            "src/protobuf/dev/service.proto": dedent(
+                """\
+                syntax = "proto3";
+
+                package dev;
+
+                message Request {
+                  string name = 1;
+                }
+                """
+            ),
+            "src/protobuf/dev/BUILD": "protobuf_sources(python_resolve='dev')",
+        }
+    )
+
+    # Test code generation for prod resolve
+    assert_files_generated(
+        rule_runner,
+        Address("src/protobuf/prod", relative_file_path="service.proto"),
+        source_roots=["src/protobuf"],
+        extra_args=[
+            "--python-enable-resolves",
+            "--python-resolves={'prod': '', 'dev': ''}",
+        ],
+        expected_files=["src/protobuf/prod/service_pb2.py"],
+    )
+
+    # Test code generation for dev resolve
+    assert_files_generated(
+        rule_runner,
+        Address("src/protobuf/dev", relative_file_path="service.proto"),
+        source_roots=["src/protobuf"],
+        extra_args=[
+            "--python-enable-resolves",
+            "--python-resolves={'prod': '', 'dev': ''}",
+        ],
+        expected_files=["src/protobuf/dev/service_pb2.py"],
+    )
+
+
+def test_transitive_dependencies_within_resolve(rule_runner: RuleRunner) -> None:
+    """Test transitive proto imports within a resolve."""
+    rule_runner.write_files(
+        {
+            "src/protobuf/a.proto": dedent(
+                """\
+                syntax = "proto3";
+
+                import "b.proto";
+
+                message A {
+                  B b = 1;
+                }
+                """
+            ),
+            "src/protobuf/b.proto": dedent(
+                """\
+                syntax = "proto3";
+
+                import "c.proto";
+
+                message B {
+                  C c = 1;
+                }
+                """
+            ),
+            "src/protobuf/c.proto": dedent(
+                """\
+                syntax = "proto3";
+
+                message C {
+                  string value = 1;
+                }
+                """
+            ),
+            "src/protobuf/BUILD": "protobuf_sources(python_resolve='my-resolve')",
+        }
+    )
+
+    # Test that code generation succeeds with transitive dependencies resolved
+    assert_files_generated(
+        rule_runner,
+        Address("src/protobuf", relative_file_path="a.proto"),
+        source_roots=["src/protobuf"],
+        extra_args=[
+            "--python-enable-resolves",
+            "--python-resolves={'my-resolve': ''}",
+        ],
+        expected_files=["src/protobuf/a_pb2.py"],
+    )
