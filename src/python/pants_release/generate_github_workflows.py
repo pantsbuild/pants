@@ -27,8 +27,8 @@ def action(name: str) -> str:
         "action-send-mail": "dawidd6/action-send-mail@v3.8.0",
         "actions-rust-lang": "actions-rust-lang/setup-rust-toolchain@v1",
         "attest-build-provenance": "actions/attest-build-provenance@v3",
-        "cache": "actions/cache@v4",
-        "checkout": "actions/checkout@v5",
+        "cache": "actions/cache@v5",
+        "checkout": "actions/checkout@v6",
         "coverallsapp": "coverallsapp/github-action@v2",
         "download-artifact": "actions/download-artifact@v6",
         "free-disk-space": "jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be",
@@ -42,7 +42,7 @@ def action(name: str) -> str:
         "setup-protoc": "arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623",
         "setup-python": "actions/setup-python@v6",
         "slack-github-action": "slackapi/slack-github-action@v2.1.1",
-        "upload-artifact": "actions/upload-artifact@v5",
+        "upload-artifact": "actions/upload-artifact@v6",
     }
     try:
         return version_map[name]
