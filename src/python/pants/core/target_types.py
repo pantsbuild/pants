@@ -24,8 +24,8 @@ from pants.core.goals.package import (
 from pants.core.util_rules.archive import ArchiveFormat, CreateArchive, create_archive
 from pants.core.util_rules.archive import rules as archive_rules
 from pants.engine.addresses import Address, UnparsedAddressInputs
-from pants.engine.environment import EnvironmentName
 from pants.engine.download_file import download_file
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -933,6 +933,11 @@ class ResolveLikeFieldToValueRequest:
 @dataclass(frozen=True)
 class ResolveLikeFieldToValueResult:
     value: str
+
+
+@rule(polymorphic=True)
+async def get_resolve_from_resolve_like_field_request(request: ResolveLikeFieldToValueRequest) -> ResolveLikeFieldToValueResult:
+    raise NotImplementedError()
 
 
 class ResolveLikeField:

@@ -48,7 +48,6 @@ from pants.backend.python.target_types import (
     ResolvePythonDistributionEntryPointsRequest,
 )
 from pants.backend.python.util_rules.interpreter_constraints import interpreter_constraints_contains
-from pants.backend.python.util_rules.package_dists import InvalidEntryPoint
 from pants.core.target_types import ResolveLikeFieldToValueRequest, ResolveLikeFieldToValueResult
 from pants.core.util_rules.unowned_dependency_behavior import (
     UnownedDependencyError,

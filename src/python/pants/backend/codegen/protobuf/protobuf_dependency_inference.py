@@ -19,23 +19,29 @@ from pants.backend.codegen.protobuf.target_types import (
 from pants.core.target_types import (
     ResolveLikeField,
     ResolveLikeFieldToValueRequest,
-    ResolveLikeFieldToValueResult,
+    get_resolve_from_resolve_like_field_request,
 )
-from pants.core.util_rules.stripped_source_files import StrippedFileNameRequest, strip_file_name
+from pants.core.util_rules.stripped_source_files import (
+    StrippedFileName,
+    StrippedFileNameRequest,
+    strip_file_name,
+)
 from pants.engine.addresses import Address
-from pants.engine.internals.graph import determine_explicitly_provided_dependencies, hydrate_sources
+from pants.engine.internals.graph import (
+    determine_explicitly_provided_dependencies,
+    hydrate_sources,
+    resolve_target,
+)
 from pants.engine.intrinsics import get_digest_contents
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     DependenciesRequest,
-    ExplicitlyProvidedDependencies,
     Field,
     FieldSet,
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
     Target,
-    WrappedTarget,
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionMembership, UnionRule
@@ -65,8 +71,7 @@ class ProtobufMapping:
     ambiguous_modules: FrozenDict[ProtobufMappingResolveKey, FrozenDict[str, tuple[Address, ...]]]
 
 
-@rule(desc="Creating map of Protobuf file names to Protobuf targets", level=LogLevel.DEBUG)
-async def map_protobuf_files(protobuf_targets: AllProtobufTargets) -> ProtobufMapping:
+async def _map_single_pseudo_resolve(protobuf_targets: AllProtobufTargets) -> ProtobufMapping:
     stripped_file_per_target = await concurrently(
         strip_file_name(StrippedFileNameRequest(tgt[ProtobufSourceField].file_path))
         for tgt in protobuf_targets
@@ -136,8 +141,10 @@ async def map_protobuf_files(
             raise ValueError(f"Did not find a resolve field on target at address `{tgt.address}`.")
 
     # Obtain the resolves for each target and then partition.
-    resolve_results = await MultiGet(
-        Get(ResolveLikeFieldToValueResult, ResolveLikeFieldToValueRequest, resolve_request)
+    resolve_results = await concurrently(
+        get_resolve_from_resolve_like_field_request(
+            **implicitly({resolve_request: ResolveLikeFieldToValueRequest})
+        )
         for resolve_request in resolve_requests
     )
     targets_partitioned_by_resolve: dict[ProtobufMappingResolveKey, list[Target]] = defaultdict(
@@ -149,10 +156,11 @@ async def map_protobuf_files(
         resolve_key = ProtobufMappingResolveKey(field_type=field_type, resolve=resolve_result.value)
         targets_partitioned_by_resolve[resolve_key].append(target)
 
-    stripped_file_per_target = await MultiGet(
-        Get(StrippedFileName, StrippedFileNameRequest(tgt[ProtobufSourceField].file_path))
+    stripped_file_per_target = await concurrently(
+        strip_file_name(StrippedFileNameRequest(tgt[ProtobufSourceField].file_path))
         for tgt in protobuf_targets
     )
+
     target_to_stripped_file: dict[Target, StrippedFileName] = dict(
         zip(protobuf_targets, stripped_file_per_target)
     )
@@ -227,8 +235,8 @@ class InferProtobufDependencies(InferDependenciesRequest):
 
 
 async def get_resolve_key_from_target(address: Address) -> ProtobufMappingResolveKey:
-    wrapped_target = await Get(
-        WrappedTarget, WrappedTargetRequest(address=address, description_of_origin="protobuf")
+    wrapped_target = await resolve_target(
+        WrappedTargetRequest(address=address, description_of_origin="protobuf"), **implicitly()
     )
     resolve_field_type: type[Field] | None = None
     for field_type in wrapped_target.target.field_types:
@@ -245,8 +253,8 @@ async def get_resolve_key_from_target(address: Address) -> ProtobufMappingResolv
         ResolveLikeField, wrapped_target.target[resolve_field_type]
     ).get_resolve_like_field_to_value_request()
     resolve_request = resolve_request_type(target=wrapped_target.target)
-    resolve_result = await Get(
-        ResolveLikeFieldToValueResult, ResolveLikeFieldToValueRequest, resolve_request
+    resolve_result = await get_resolve_from_resolve_like_field_request(
+        **implicitly({resolve_request: ResolveLikeFieldToValueRequest})
     )
 
     return ProtobufMappingResolveKey(

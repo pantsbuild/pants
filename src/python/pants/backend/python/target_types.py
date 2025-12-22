@@ -27,7 +27,6 @@ from pants.core.goals.test import (
     TestSubsystem,
 )
 from pants.core.target_types import ResolveLikeField, ResolveLikeFieldToValueRequest
-from pants.core.environments.target_types import EnvironmentField
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
