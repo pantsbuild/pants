@@ -366,7 +366,7 @@ def test_dependency_inference_no_cross_resolve(rule_runner_with_python_resolves:
     )
 
     def run_dep_inference(address: Address) -> InferredDependencies:
-        tgt = rule_runner.rule_runner_with_python_resolves(address)
+        tgt = rule_runner_with_python_resolves.get_target(address)
         return rule_runner_with_python_resolves.request(
             InferredDependencies,
             [InferProtobufDependencies(ProtobufDependencyInferenceFieldSet.create(tgt))],
@@ -467,9 +467,9 @@ def test_ambiguous_imports_across_resolves_ok(rule_runner_with_python_resolves: 
     assert "ambiguous" not in caplog.text.lower()
 
 
-def test_default_resolve_behavior(rule_runner: RuleRunner) -> None:
+def test_default_resolve_behavior(rule_runner_with_python_resolves: RuleRunner) -> None:
     """Verify that targets without an explicit resolve get the default resolve."""
-    rule_runner.set_options(
+    rule_runner_with_python_resolves.set_options(
         [
             "--source-root-patterns=['protos']",
             "--python-enable-resolves",
@@ -477,7 +477,7 @@ def test_default_resolve_behavior(rule_runner: RuleRunner) -> None:
             "--python-default-resolve=python-default",
         ]
     )
-    rule_runner.write_files(
+    rule_runner_with_python_resolves.write_files(
         {
             "protos/a.proto": "import 'b.proto';",
             "protos/b.proto": "",
@@ -485,7 +485,7 @@ def test_default_resolve_behavior(rule_runner: RuleRunner) -> None:
         }
     )
 
-    result = rule_runner.request(ProtobufMapping, [])
+    result = rule_runner_with_python_resolves.request(ProtobufMapping, [])
 
     # Assert targets are in python-default resolve
     default_key = [key for key in result.mapping.keys() if key.resolve == "python-default"][0]
@@ -494,8 +494,8 @@ def test_default_resolve_behavior(rule_runner: RuleRunner) -> None:
 
     # Test that dependency inference works
     def run_dep_inference(address: Address) -> InferredDependencies:
-        tgt = rule_runner.get_target(address)
-        return rule_runner.request(
+        tgt = rule_runner_with_python_resolves.get_target(address)
+        return rule_runner_with_python_resolves.request(
             InferredDependencies,
             [InferProtobufDependencies(ProtobufDependencyInferenceFieldSet.create(tgt))],
         )
@@ -537,23 +537,23 @@ def test_no_resolve_fields_fallback(rule_runner: RuleRunner) -> None:
 # Error handling and edge case tests
 
 
-def test_empty_proto_file(rule_runner: RuleRunner) -> None:
+def test_empty_proto_file(rule_runner_with_python_resolves: RuleRunner) -> None:
     """Handle empty proto files in multi-resolve scenarios."""
-    rule_runner.set_options(
+    rule_runner_with_python_resolves.set_options(
         [
             "--source-root-patterns=['protos']",
             "--python-enable-resolves",
             "--python-resolves={'prod': ''}",
         ]
     )
-    rule_runner.write_files(
+    rule_runner_with_python_resolves.write_files(
         {
             "protos/empty.proto": "",
             "protos/BUILD": "protobuf_sources(python_resolve='prod')",
         }
     )
 
-    result = rule_runner.request(ProtobufMapping, [])
+    result = rule_runner_with_python_resolves.request(ProtobufMapping, [])
 
     # Assert empty file is mapped correctly
     prod_key = [key for key in result.mapping.keys() if key.resolve == "prod"][0]
@@ -612,11 +612,11 @@ def test_multiple_resolves_with_same_import_structure(rule_runner_with_python_re
     rule_runner_with_python_resolves.write_files(
         {
             # Prod resolve
-            "protos/prod/main.proto": "import 'common.proto';",
+            "protos/prod/main.proto": "import 'prod/common.proto';",
             "protos/prod/common.proto": "",
             "protos/prod/BUILD": "protobuf_sources(python_resolve='prod')",
             # Dev resolve - identical structure
-            "protos/dev/main.proto": "import 'common.proto';",
+            "protos/dev/main.proto": "import 'dev/common.proto';",
             "protos/dev/common.proto": "",
             "protos/dev/BUILD": "protobuf_sources(python_resolve='dev')",
         }

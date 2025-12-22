@@ -267,6 +267,10 @@ async def get_resolve_key_from_target(address: Address) -> ProtobufMappingResolv
         **implicitly({resolve_request: ResolveLikeFieldToValueRequest})
     )
 
+    # When resolves are disabled, return the sentinel key
+    if resolve_result.value is None:
+        return _NO_RESOLVE_LIKE_FIELDS_DEFINED
+
     return ProtobufMappingResolveKey(
         field_type=resolve_field_type,
         resolve=resolve_result.value,
@@ -287,7 +291,6 @@ async def infer_protobuf_dependencies(
         resolve_key = _NO_RESOLVE_LIKE_FIELDS_DEFINED
     else:
         resolve_key = await get_resolve_key_from_target(address)
-    print(f"protobuf_mapping={protobuf_mapping}; resolve_key={resolve_key}")
 
     explicitly_provided_deps, hydrated_sources = await concurrently(
         determine_explicitly_provided_dependencies(
