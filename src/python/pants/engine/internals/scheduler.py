@@ -6,10 +6,12 @@ from __future__ import annotations
 import logging
 import os
 import time
+from collections import defaultdict
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import PurePath
 from types import CoroutineType
-from typing import Any, Callable, Dict, Iterable, NoReturn, Sequence, cast
+from typing import Any, NoReturn, cast
 
 from typing_extensions import TypedDict
 
@@ -68,7 +70,7 @@ from pants.engine.process import (
 )
 from pants.engine.rules import Rule, RuleIndex, TaskRule
 from pants.engine.unions import UnionMembership, is_union, union_in_scope_types
-from pants.option.global_options import (
+from pants.option.bootstrap_options import (
     LOCAL_STORE_LEASE_TIME_SECS,
     ExecutionOptions,
     LocalStoreOptions,
@@ -80,7 +82,7 @@ from pants.util.strutil import pluralize
 logger = logging.getLogger(__name__)
 
 
-Workunit = Dict[str, Any]
+Workunit = dict[str, Any]
 
 
 class PolledWorkunits(TypedDict):
@@ -95,7 +97,6 @@ class ExecutionRequest:
     To create an ExecutionRequest, see `SchedulerSession.execution_request`.
     """
 
-    roots: tuple[tuple[type, Any | Params], ...]
     native: PyExecutionRequest
 
 
@@ -116,6 +117,7 @@ class Scheduler:
         ignore_patterns: list[str],
         use_gitignore: bool,
         build_root: str,
+        pants_workdir: str,
         local_execution_root_dir: str,
         named_caches_dir: str,
         ca_certs_path: str | None,
@@ -133,6 +135,7 @@ class Scheduler:
         :param ignore_patterns: A list of gitignore-style file patterns for pants to ignore.
         :param use_gitignore: If set, pay attention to .gitignore files.
         :param build_root: The build root as a string.
+        :param pants_workdir: The pants workdir as a string.
         :param local_execution_root_dir: The directory to use for local execution sandboxes.
         :param named_caches_dir: The directory to use as the root for named mutable caches.
         :param ca_certs_path: Path to pem file for custom CA, if needed.
@@ -194,6 +197,7 @@ class Scheduler:
             store_rpc_concurrency=execution_options.remote_store_rpc_concurrency,
             store_rpc_timeout_millis=execution_options.remote_store_rpc_timeout_millis,
             store_batch_api_size_limit=execution_options.remote_store_batch_api_size_limit,
+            store_batch_load_enabled=execution_options.remote_store_batch_load_enabled,
             cache_warnings_behavior=execution_options.remote_cache_warnings.value,
             cache_content_behavior=execution_options.cache_content_behavior.value,
             cache_rpc_concurrency=execution_options.remote_cache_rpc_concurrency,
@@ -222,7 +226,7 @@ class Scheduler:
             local_cache=execution_options.local_cache,
             remote_cache_read=execution_options.remote_cache_read,
             remote_cache_write=execution_options.remote_cache_write,
-            local_keep_sandboxes=execution_options.keep_sandboxes.value,
+            use_sandboxer=execution_options.use_sandboxer,
             local_parallelism=execution_options.process_execution_local_parallelism,
             local_enable_nailgun=execution_options.process_execution_local_enable_nailgun,
             remote_parallelism=execution_options.process_execution_remote_parallelism,
@@ -237,6 +241,7 @@ class Scheduler:
             tasks,
             types,
             build_root,
+            pants_workdir,
             local_execution_root_dir,
             named_caches_dir,
             ignore_patterns,
@@ -441,7 +446,7 @@ class SchedulerSession:
         )
         for product, subject in requests:
             self._scheduler.execution_add_root_select(native_execution_request, subject, product)
-        return ExecutionRequest(tuple(requests), native_execution_request)
+        return ExecutionRequest(native_execution_request)
 
     def invalidate_files(self, direct_filenames: Iterable[str]) -> int:
         """Invalidates the given filenames in an internal product Graph instance."""
@@ -476,7 +481,7 @@ class SchedulerSession:
 
     def _execute(
         self, execution_request: ExecutionRequest
-    ) -> tuple[tuple[tuple[Any, Return], ...], tuple[tuple[Any, Throw], ...]]:
+    ) -> tuple[tuple[Return, ...], tuple[Throw, ...]]:
         start_time = time.time()
         try:
             raw_roots = native_engine.scheduler_execute(
@@ -500,21 +505,19 @@ class SchedulerSession:
             for raw_root in raw_roots
         ]
 
-        roots = list(zip(execution_request.roots, states))
-
         self._maybe_visualize()
         logger.debug(
             "computed %s nodes in %f seconds. there are %s total nodes.",
-            len(roots),
+            len(states),
             time.time() - start_time,
             self._scheduler.graph_len(),
         )
 
-        returns = tuple((root, state) for root, state in roots if isinstance(state, Return))
-        throws = tuple((root, state) for root, state in roots if isinstance(state, Throw))
+        returns = tuple(state for state in states if isinstance(state, Return))
+        throws = tuple(state for state in states if isinstance(state, Throw))
         return returns, throws
 
-    def _raise_on_error(self, throws: list[Throw]) -> NoReturn:
+    def _raise_on_error(self, throws: Sequence[Throw]) -> NoReturn:
         exception_noun = pluralize(len(throws), "Exception")
         others_msg = f"\n(and {len(throws) - 1} more)\n" if len(throws) > 1 else ""
         raise ExecutionError(
@@ -533,11 +536,11 @@ class SchedulerSession:
 
         # Throw handling.
         if throws:
-            self._raise_on_error([t for _, t in throws])
+            self._raise_on_error(throws)
 
         # Everything is a Return: we rely on the fact that roots are ordered to preserve subject
         # order in output lists.
-        return [ret.value for _, ret in returns]
+        return [ret.value for ret in returns]
 
     def run_goal_rule(
         self,
@@ -564,30 +567,30 @@ class SchedulerSession:
             )
         with self._goals._execute(product):
             (return_value,) = self.product_request(
-                product, [subject], poll=poll, poll_delay=poll_delay
+                product, subject, poll=poll, poll_delay=poll_delay
             )
         return cast(int, return_value.exit_code)
 
     def product_request(
         self,
         product: type,
-        subjects: Sequence[Any | Params],
+        subject: Any | Params,
         *,
         poll: bool = False,
         poll_delay: float | None = None,
         timeout: float | None = None,
     ) -> list:
-        """Executes a request for a single product for some subjects, and returns the products.
+        """Executes a request for a single product for a subject, and returns the products.
 
         :param product: A product type for the request.
-        :param subjects: A list of subjects or Params instances for the request.
+        :param subject: A subject or Params instance for the request.
         :param poll: See self.execution_request.
         :param poll_delay: See self.execution_request.
         :param timeout: See self.execution_request.
         :returns: A list of the requested products, with length match len(subjects).
         """
         request = self.execution_request(
-            [(product, subject) for subject in subjects],
+            [(product, subject)],
             poll=poll,
             poll_delay=poll_delay,
             timeout=timeout,
@@ -619,7 +622,7 @@ class SchedulerSession:
         each snapshot needs to yield a separate `DigestContents`.
         """
         return tuple(
-            self.product_request(DigestContents, [snapshot.digest])[0] for snapshot in snapshots
+            self.product_request(DigestContents, snapshot.digest)[0] for snapshot in snapshots
         )
 
     def ensure_remote_has_recursive(self, digests: Sequence[Digest | FileDigest]) -> None:
@@ -671,6 +674,24 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
     """Create a native Tasks object loaded with given RuleIndex."""
     tasks = PyTasks()
 
+    # Compute a reverse index of union membership.
+    member_type_to_base_types = defaultdict(list)
+    for base_type, member_types in union_membership.items():
+        for member_type in member_types:
+            member_type_to_base_types[member_type].append(base_type)
+
+    # Compute map from union base type to rules that have one of its member types as a param.
+    # The value is a list of pairs (rule, member type in that rule's params).
+    base_type_to_member_rule_type_pairs: dict[type, list[tuple[TaskRule, type[Any]]]] = defaultdict(
+        list
+    )
+    rule_id_to_rule: dict[str, TaskRule] = {}
+    for task_rule in rule_index.rules:
+        rule_id_to_rule[task_rule.canonical_name] = task_rule
+        for param_type in task_rule.parameters.values():
+            for base_type in member_type_to_base_types.get(param_type, tuple()):
+                base_type_to_member_rule_type_pairs[base_type].append((task_rule, param_type))
+
     def register_task(rule: TaskRule) -> None:
         native_engine.tasks_task_begin(
             tasks,
@@ -689,29 +710,56 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
         for awaitable in rule.awaitables:
             unions = [t for t in awaitable.input_types if is_union(t)]
             if len(unions) == 1:
-                # Register the union by recording a copy of the Get for each union member.
                 union = unions[0]
-                in_scope_types = union_in_scope_types(union)
-                assert in_scope_types is not None
-                for union_member in union_membership.get(union):
-                    native_engine.tasks_add_get_union(
-                        tasks,
-                        awaitable.output_type,
-                        tuple(union_member if t == union else t for t in awaitable.input_types),
-                        in_scope_types,
-                    )
+                if awaitable.rule_id:
+                    if rule_id_to_rule[awaitable.rule_id].polymorphic:
+                        # This is a polymorphic call-by-name. Compute its vtable data, i.e., a list
+                        # of pairs (union member type, id of implementation rule for that type).
+                        member_rule_type_pairs = base_type_to_member_rule_type_pairs.get(union)
+                        vtable_entries: list[tuple[type[Any], str]] = []
+                        for member_rule, member_type in member_rule_type_pairs or []:
+                            # If a rule has a union member as a param, and returns the relevant
+                            # output type, then we take it to be the implementation of the
+                            # polymorphic rule for the union member.
+                            if member_rule.output_type == awaitable.output_type:
+                                vtable_entries.append((member_type, member_rule.canonical_name))
+                        in_scope_types = union_in_scope_types(union)
+                        assert in_scope_types is not None
+                        native_engine.tasks_add_call(
+                            tasks,
+                            awaitable.output_type,
+                            awaitable.input_types,
+                            awaitable.rule_id,
+                            awaitable.explicit_args_arity,
+                            vtable_entries,
+                            in_scope_types,
+                        )
+                else:
+                    # This is a union Get.
+                    # Register the union by recording a copy of the Get for each union member.
+                    in_scope_types = union_in_scope_types(union)
+                    assert in_scope_types is not None
+                    for union_member in union_membership.get(union):
+                        native_engine.tasks_add_get_union(
+                            tasks,
+                            awaitable.output_type,
+                            tuple(union_member if t == union else t for t in awaitable.input_types),
+                            in_scope_types,
+                        )
             elif len(unions) > 1:
                 raise TypeError(
-                    "Only one @union may be used in a Get, but {awaitable} used: {unions}."
+                    f"Only one @union may be used in a call or Get, but {awaitable} used: {unions}."
                 )
             elif awaitable.rule_id is not None:
-                # Is a call to a known rule.
+                # Is a non-polymorphic call to a known rule.
                 native_engine.tasks_add_call(
                     tasks,
                     awaitable.output_type,
                     awaitable.input_types,
                     awaitable.rule_id,
                     awaitable.explicit_args_arity,
+                    vtable_entries=None,
+                    in_scope_types=None,
                 )
             else:
                 # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.

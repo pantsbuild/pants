@@ -9,16 +9,16 @@ from dataclasses import dataclass
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.util_rules import go_bootstrap
 from pants.backend.go.util_rules.go_bootstrap import GoBootstrap, compatible_go_version
-from pants.core.util_rules.environments import EnvironmentTarget
+from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.util_rules.system_binaries import (
     BinaryNotFoundError,
     BinaryPathRequest,
-    BinaryPaths,
     BinaryPathTest,
+    find_binary,
 )
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.internals.selectors import concurrently
+from pants.engine.process import Process, fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import bullet_list, softwrap
@@ -62,13 +62,13 @@ async def setup_goroot(
     golang_subsystem: GolangSubsystem, go_bootstrap: GoBootstrap, env_target: EnvironmentTarget
 ) -> GoRoot:
     search_paths = go_bootstrap.go_search_paths
-    all_go_binary_paths = await Get(
-        BinaryPaths,
+    all_go_binary_paths = await find_binary(
         BinaryPathRequest(
             search_path=search_paths,
             binary_name="go",
             test=BinaryPathTest(["version"]),
         ),
+        **implicitly(),
     )
     if not all_go_binary_paths.paths:
         raise BinaryNotFoundError(
@@ -87,15 +87,16 @@ async def setup_goroot(
 
     # `go env GOVERSION` does not work in earlier Go versions (like 1.15), so we must run
     # `go version` and `go env GOROOT` to calculate both the version and GOROOT.
-    version_results = await MultiGet(
-        Get(
-            ProcessResult,
-            Process(
-                (binary_path.path, "version"),
-                description=f"Determine Go version for {binary_path.path}",
-                level=LogLevel.DEBUG,
-                cache_scope=env_target.executable_search_path_cache_scope(),
-            ),
+    version_results = await concurrently(
+        fallible_to_exec_result_or_raise(
+            **implicitly(
+                Process(
+                    (binary_path.path, "version"),
+                    description=f"Determine Go version for {binary_path.path}",
+                    level=LogLevel.DEBUG,
+                    cache_scope=env_target.executable_search_path_cache_scope(),
+                )
+            )
         )
         for binary_path in all_go_binary_paths.paths
     )
@@ -119,15 +120,16 @@ async def setup_goroot(
         if compatible_go_version(
             compiler_version=version, target_version=golang_subsystem.minimum_expected_version
         ):
-            env_result = await Get(  # noqa: PNT30: requires triage
-                ProcessResult,
-                Process(
-                    (binary_path.path, "env", "-json"),
-                    description=f"Determine Go SDK metadata for {binary_path.path}",
-                    level=LogLevel.DEBUG,
-                    cache_scope=env_target.executable_search_path_cache_scope(),
-                    env={"GOPATH": "/does/not/matter"},
-                ),
+            env_result = await fallible_to_exec_result_or_raise(  # noqa: PNT30: requires triage
+                **implicitly(
+                    Process(
+                        (binary_path.path, "env", "-json"),
+                        description=f"Determine Go SDK metadata for {binary_path.path}",
+                        level=LogLevel.DEBUG,
+                        cache_scope=env_target.executable_search_path_cache_scope(),
+                        env={"GOPATH": "/does/not/matter"},
+                    )
+                )
             )
             sdk_metadata = json.loads(env_result.stdout.decode())
             return GoRoot(

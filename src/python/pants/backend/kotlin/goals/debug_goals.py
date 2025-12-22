@@ -4,13 +4,15 @@
 import json
 
 from pants.backend.experimental.kotlin.register import rules as kotlin_rules
-from pants.backend.kotlin.dependency_inference.kotlin_parser import KotlinSourceDependencyAnalysis
+from pants.backend.kotlin.dependency_inference.kotlin_parser import (
+    resolve_fallible_result_to_analysis as analyze_kotlin_source_deps,
+)
 from pants.backend.kotlin.target_types import KotlinFieldSet
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, goal_rule
+from pants.engine.internals.selectors import concurrently
+from pants.engine.rules import collect_rules, goal_rule, implicitly
 from pants.engine.target import Targets
 from pants.jvm.goals import debug_goals
 
@@ -32,8 +34,8 @@ async def dump_kotlin_source_analysis(
     kotlin_source_field_sets = [
         KotlinFieldSet.create(tgt) for tgt in targets if KotlinFieldSet.is_applicable(tgt)
     ]
-    kotlin_source_analysis = await MultiGet(
-        Get(KotlinSourceDependencyAnalysis, SourceFilesRequest([fs.sources]))
+    kotlin_source_analysis = await concurrently(
+        analyze_kotlin_source_deps(**implicitly(SourceFilesRequest([fs.sources])))
         for fs in kotlin_source_field_sets
     )
     kotlin_source_analysis_json = [

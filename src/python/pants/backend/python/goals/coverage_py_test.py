@@ -21,7 +21,7 @@ from pants.engine.fs import (
     FileContent,
 )
 from pants.testutil.option_util import create_subsystem
-from pants.testutil.rule_runner import MockGet, RuleRunner, run_rule_with_mocks
+from pants.testutil.rule_runner import RuleRunner, run_rule_with_mocks
 
 
 def resolve_config(path: str | None, content: str | None) -> str:
@@ -50,20 +50,16 @@ def resolve_config(path: str | None, content: str | None) -> str:
         resolved_config.append(request[0].content.decode())
         return EMPTY_DIGEST
 
-    mock_gets = [
-        MockGet(
-            output_type=ConfigFiles,
-            input_types=(ConfigFilesRequest,),
-            mock=mock_find_existing_config,
-        ),
-        MockGet(output_type=DigestContents, input_types=(Digest,), mock=mock_read_existing_config),
-        MockGet(output_type=Digest, input_types=(CreateDigest,), mock=mock_create_final_config),
-    ]
+    mock_calls = {
+        "pants.core.util_rules.config_files.find_config_file": mock_find_existing_config,
+        "pants.engine.intrinsics.get_digest_contents": mock_read_existing_config,
+        "pants.engine.intrinsics.create_digest": mock_create_final_config,
+    }
 
     result = run_rule_with_mocks(
         create_or_update_coverage_config,
         rule_args=[coverage_subsystem],
-        mock_gets=mock_gets,  # type: ignore[arg-type]
+        mock_calls=mock_calls,  # type: ignore[arg-type]
     )
     assert result.digest == EMPTY_DIGEST
     assert len(resolved_config) == 1
@@ -83,21 +79,19 @@ def test_no_config() -> None:
 
 
 def test_no_run_section() -> None:
-    assert (
-        resolve_config(
-            "pyproject.toml",
-            dedent(
-                """\
+    assert resolve_config(
+        "pyproject.toml",
+        dedent(
+            """\
                 [tool.coverage.report]
                 ignore_errors = true
 
                 [tool.isort]
                 foo = "bar"
                 """
-            ),
-        )
-        == dedent(
-            """\
+        ),
+    ) == dedent(
+        """\
             [tool.isort]
             foo = "bar"
 
@@ -108,20 +102,17 @@ def test_no_run_section() -> None:
             relative_files = true
             omit = [ "pytest.pex/*",]
             """
-        )
     )
-    assert (
-        resolve_config(
-            ".coveragerc",
-            dedent(
-                """\
+    assert resolve_config(
+        ".coveragerc",
+        dedent(
+            """\
                 [report]
                 ignore_errors: True
                 """
-            ),
-        )
-        == dedent(
-            """\
+        ),
+    ) == dedent(
+        """\
             [report]
             ignore_errors = True
 
@@ -131,20 +122,17 @@ def test_no_run_section() -> None:
             \tpytest.pex/*
 
             """  # noqa: W291
-        )
     )
-    assert (
-        resolve_config(
-            "setup.cfg",
-            dedent(
-                """\
+    assert resolve_config(
+        "setup.cfg",
+        dedent(
+            """\
                 [coverage:report]
                 ignore_errors: True
                 """
-            ),
-        )
-        == dedent(
-            """\
+        ),
+    ) == dedent(
+        """\
             [coverage:report]
             ignore_errors = True
 
@@ -154,47 +142,41 @@ def test_no_run_section() -> None:
             \tpytest.pex/*
 
             """  # noqa: W291
-        )
     )
 
 
 def test_update_run_section() -> None:
-    assert (
-        resolve_config(
-            "pyproject.toml",
-            dedent(
-                """\
+    assert resolve_config(
+        "pyproject.toml",
+        dedent(
+            """\
                 [tool.coverage.run]
                 relative_files = false
                 omit = ["e1"]
                 foo = "bar"
                 """
-            ),
-        )
-        == dedent(
-            """\
+        ),
+    ) == dedent(
+        """\
             [tool.coverage.run]
             relative_files = true
             omit = [ "e1", "pytest.pex/*",]
             foo = "bar"
             """
-        )
     )
-    assert (
-        resolve_config(
-            ".coveragerc",
-            dedent(
-                """\
+    assert resolve_config(
+        ".coveragerc",
+        dedent(
+            """\
                 [run]
                 relative_files: False
                 omit:
                   e1
                 foo: bar
                 """
-            ),
-        )
-        == dedent(
-            """\
+        ),
+    ) == dedent(
+        """\
             [run]
             relative_files = True
             omit = 
@@ -203,23 +185,20 @@ def test_update_run_section() -> None:
             foo = bar
 
             """  # noqa: W291
-        )
     )
-    assert (
-        resolve_config(
-            "setup.cfg",
-            dedent(
-                """\
+    assert resolve_config(
+        "setup.cfg",
+        dedent(
+            """\
                 [coverage:run]
                 relative_files: False
                 omit:
                   e1
                 foo: bar
                 """
-            ),
-        )
-        == dedent(
-            """\
+        ),
+    ) == dedent(
+        """\
             [coverage:run]
             relative_files = True
             omit = 
@@ -228,7 +207,6 @@ def test_update_run_section() -> None:
             foo = bar
 
             """  # noqa: W291
-        )
     )
 
 

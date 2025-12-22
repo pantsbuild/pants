@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from pants.backend.swift.goals import tailor
 from pants.backend.swift.target_types import SwiftSourcesGeneratorTarget, SwiftSourceTarget

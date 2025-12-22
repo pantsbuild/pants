@@ -27,6 +27,7 @@ from pants.backend.nfpm.util_rules.generate_config import (
     NfpmPackageConfigRequest,
 )
 from pants.backend.nfpm.util_rules.generate_config import rules as nfpm_generate_config_rules
+from pants.backend.nfpm.util_rules.inject_config import rules as nfpm_inject_config_rules
 from pants.core.target_types import FilesGeneratorTarget, FileTarget
 from pants.core.target_types import rules as core_target_type_rules
 from pants.engine.fs import CreateDigest, DigestContents, FileContent
@@ -54,6 +55,7 @@ def rule_runner() -> RuleRunner:
             *nfpm_target_types_rules(),
             *nfpm_dependency_inference_rules(),
             *nfpm_generate_config_rules(),
+            *nfpm_inject_config_rules(),
             *(
                 UnionRule(NfpmContentFieldSet, field_set_type)
                 for field_set_type in NFPM_CONTENT_FIELD_SET_TYPES
@@ -459,7 +461,7 @@ def test_generate_nfpm_yaml(
                     description="{description}",
                     package_name="{_PKG_NAME}",
                     version="{_PKG_VERSION}",
-                    {'' if packager != 'deb' else 'maintainer="Foo Bar <deb@example.com>",'}
+                    {"" if packager != "deb" else 'maintainer="Foo Bar <deb@example.com>",'}
                     dependencies={repr(dependencies)},
                     scripts={repr(scripts)},
                     **{extra_metadata},

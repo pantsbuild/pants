@@ -1,7 +1,8 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from typing import Iterable, Union
+from collections.abc import Iterable
 
+from pants.backend.javascript.subsystems import nodejs_tool
 from pants.backend.tsx.goals import tailor as tsx_tailor
 from pants.backend.tsx.target_types import (
     TSXSourcesGeneratorTarget,
@@ -9,8 +10,7 @@ from pants.backend.tsx.target_types import (
     TSXTestsGeneratorTarget,
     TSXTestTarget,
 )
-from pants.backend.typescript.dependency_inference import rules as dependency_inference_rules
-from pants.backend.typescript.goals import tailor
+from pants.backend.typescript.goals import check, tailor
 from pants.backend.typescript.target_types import (
     TypeScriptSourcesGeneratorTarget,
     TypeScriptSourceTarget,
@@ -35,9 +35,10 @@ def target_types() -> Iterable[type[Target]]:
     )
 
 
-def rules() -> Iterable[Union[Rule, UnionRule]]:
+def rules() -> Iterable[Rule | UnionRule]:
     return (
-        *dependency_inference_rules.rules(),
         *tailor.rules(),
         *tsx_tailor.rules(),
+        *nodejs_tool.rules(),
+        *check.rules(),
     )

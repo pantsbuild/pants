@@ -5,16 +5,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.go.util_rules import cgo_binaries
-from pants.backend.go.util_rules.cgo_binaries import CGoBinaryPathRequest
+from pants.backend.go.util_rules.cgo_binaries import CGoBinaryPathRequest, find_cgo_binary_path
 from pants.backend.go.util_rules.cgo_security import (
     check_compiler_flags,
     check_linker_flags,
     safe_arg,
 )
-from pants.core.util_rules.system_binaries import BinaryPath, BinaryPathTest
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.core.util_rules.system_binaries import BinaryPathTest
+from pants.engine.internals.selectors import concurrently
+from pants.engine.process import Process, fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 
 # Adapted from the Go toolchain
 #
@@ -106,28 +106,30 @@ async def resolve_cgo_pkg_config_args(request: CGoPkgConfigFlagsRequest) -> CGoP
         if not safe_arg(pkg):
             raise ValueError(f"invalid pkg-config package name: {pkg}")
 
-    pkg_config_path = await Get(
-        BinaryPath,
+    pkg_config_path = await find_cgo_binary_path(
         CGoBinaryPathRequest(
             binary_name="pkg-config",
             binary_path_test=BinaryPathTest(["--version"]),
         ),
+        **implicitly(),
     )
 
-    cflags_result, ldflags_result = await MultiGet(
-        Get(
-            ProcessResult,
-            Process(
-                argv=[pkg_config_path.path, "--cflags", *pkg_config_flags, "--", *pkgs],
-                description=f"Run pkg-config for CFLAGS for packages: {pkgs}",
-            ),
+    cflags_result, ldflags_result = await concurrently(
+        fallible_to_exec_result_or_raise(
+            **implicitly(
+                Process(
+                    argv=[pkg_config_path.path, "--cflags", *pkg_config_flags, "--", *pkgs],
+                    description=f"Run pkg-config for CFLAGS for packages: {pkgs}",
+                )
+            )
         ),
-        Get(
-            ProcessResult,
-            Process(
-                argv=[pkg_config_path.path, "--libs", *pkg_config_flags, "--", *pkgs],
-                description=f"Run pkg-config for LDFLAGS for packages: {pkgs}",
-            ),
+        fallible_to_exec_result_or_raise(
+            **implicitly(
+                Process(
+                    argv=[pkg_config_path.path, "--libs", *pkg_config_flags, "--", *pkgs],
+                    description=f"Run pkg-config for LDFLAGS for packages: {pkgs}",
+                )
+            )
         ),
     )
 

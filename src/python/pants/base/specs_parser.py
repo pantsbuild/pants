@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import os.path
+from collections.abc import Iterable
 from pathlib import Path, PurePath
-from typing import Iterable
 
 from pants.base.build_environment import get_buildroot
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior

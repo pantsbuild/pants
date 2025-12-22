@@ -4,8 +4,9 @@
 from __future__ import annotations
 
 import os.path
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Iterable, Mapping, TypeVar
+from typing import TypeVar
 
 from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.base.exceptions import MappingError

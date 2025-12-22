@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from textwrap import dedent
-from typing import Iterable
 
 import pytest
 
@@ -365,15 +365,12 @@ def test_requirements_field() -> None:
     # Give a nice error message if the requirement can't be parsed.
     with pytest.raises(InvalidFieldException) as exc:
         PythonRequirementsField(["not valid! === 3.1"], Address("demo"))
-    assert (
-        softwrap(
-            f"""
+    assert softwrap(
+        f"""
             Invalid requirement 'not valid! === 3.1' in the '{PythonRequirementsField.alias}'
             field for the target demo:
             """
-        )
-        in str(exc.value)
-    )
+    ) in str(exc.value)
 
 
 def test_resolve_python_distribution_entry_points_required_fields() -> None:
@@ -533,15 +530,12 @@ def test_unrecognized_resolve_names_error(
         raise UnrecognizedResolveNamesError(
             unrecognized, ["valid1", "valid2", "valid3"], description_of_origin="foo"
         )
-    assert (
-        softwrap(
-            f"""
+    assert softwrap(
+        f"""
             Unrecognized resolve {name_str} from foo:
             {bad_entry_str}\n\nAll valid resolve names: ['valid1', 'valid2', 'valid3']
             """
-        )
-        in str(exc.value)
-    )
+    ) in str(exc.value)
 
 
 @pytest.mark.parametrize(

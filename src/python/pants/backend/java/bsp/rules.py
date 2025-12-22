@@ -18,8 +18,8 @@ from pants.bsp.util_rules.targets import (
     BSPResourcesRequest,
     BSPResourcesResult,
 )
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
+from pants.engine.internals.selectors import concurrently
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
 from pants.jvm.bsp.compile import _jvm_bsp_compile, jvm_classes_directory
@@ -106,8 +106,9 @@ async def handle_bsp_java_options_request(
 
 @rule
 async def bsp_javac_options_request(request: JavacOptionsParams) -> JavacOptionsResult:
-    results = await MultiGet(
-        Get(HandleJavacOptionsResult, HandleJavacOptionsRequest(btgt)) for btgt in request.targets
+    results = await concurrently(
+        handle_bsp_java_options_request(HandleJavacOptionsRequest(btgt), **implicitly())
+        for btgt in request.targets
     )
     return JavacOptionsResult(items=tuple(result.item for result in results))
 

@@ -11,18 +11,20 @@ from pants.backend.python.providers.pyenv.custom_install.target_types import (
 from pants.backend.python.providers.pyenv.rules import (
     PyenvInstallInfoRequest,
     PyenvPythonProviderSubsystem,
+    get_pyenv_install_info,
 )
 from pants.backend.python.providers.pyenv.rules import rules as pyenv_rules
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
-from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
+from pants.core.util_rules.external_tool import download_external_tool
 from pants.core.util_rules.external_tool import rules as external_tools_rules
 from pants.engine.fs import CreateDigest, FileContent
-from pants.engine.internals.native_engine import Digest, MergeDigests
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.native_engine import MergeDigests
+from pants.engine.internals.selectors import concurrently
 from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
 from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.engine.intrinsics import create_digest, merge_digests
 from pants.engine.platform import Platform
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 
@@ -65,13 +67,12 @@ async def run_pyenv_install(
     platform: Platform,
     pyenv_subsystem: PyenvPythonProviderSubsystem,
 ) -> RunRequest:
-    run_request, pyenv = await MultiGet(
-        Get(RunRequest, PyenvInstallInfoRequest()),
-        Get(DownloadedExternalTool, ExternalToolRequest, pyenv_subsystem.get_request(platform)),
+    run_request, pyenv = await concurrently(
+        get_pyenv_install_info(PyenvInstallInfoRequest(), **implicitly()),
+        download_external_tool(pyenv_subsystem.get_request(platform)),
     )
 
-    wrapper_script_digest = await Get(
-        Digest,
+    wrapper_script_digest = await create_digest(
         CreateDigest(
             [
                 FileContent(
@@ -88,9 +89,9 @@ async def run_pyenv_install(
                     is_executable=True,
                 )
             ]
-        ),
+        )
     )
-    digest = await Get(Digest, MergeDigests([run_request.digest, wrapper_script_digest]))
+    digest = await merge_digests(MergeDigests([run_request.digest, wrapper_script_digest]))
     return dataclasses.replace(
         run_request,
         args=("{chroot}/run_install_python_shim.sh",),

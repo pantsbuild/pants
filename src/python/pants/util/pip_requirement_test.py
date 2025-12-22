@@ -1,14 +1,15 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import pytest
+from packaging.specifiers import SpecifierSet
 
 from pants.util.pip_requirement import PipRequirement
 
 
 def test_parse_simple() -> None:
     req = PipRequirement.parse("Foo.bar==1.2.3")
-    assert req.project_name == "Foo.bar"
-    assert req.specs == [("==", "1.2.3")]
+    assert req.name == "Foo.bar"
+    assert req.specifier_set == SpecifierSet("==1.2.3")
     assert req.url is None
 
 
@@ -22,15 +23,15 @@ def test_parse_simple() -> None:
 )
 def test_parse_old_style_vcs(url: str, expected_project: str, expected_url: str) -> None:
     req = PipRequirement.parse(url)
-    assert req.project_name == expected_project
-    assert req.specs == []
+    assert req.name == expected_project
+    assert req.specifier_set == SpecifierSet()
     assert req.url == expected_url or url
 
 
 def test_parse_pep440_vcs() -> None:
     req = PipRequirement.parse("Django@ git+https://github.com/django/django.git@stable/2.1.x")
-    assert req.project_name == "Django"
-    assert req.specs == []
+    assert req.name == "Django"
+    assert req.specifier_set == SpecifierSet()
     assert req.url == "git+https://github.com/django/django.git@stable/2.1.x"
 
 

@@ -59,7 +59,7 @@ impl PyNailgunClient {
             .map(|kv_pair| kv_pair.extract::<(String, String)>())
             .collect::<Result<Vec<_>, _>>()?;
 
-        py.allow_threads(|| {
+        py.detach(|| {
             self.executor
                 .block_on(nailgun::client_execute(self.port, command, args, env_list))
                 .map_err(|e| match e {

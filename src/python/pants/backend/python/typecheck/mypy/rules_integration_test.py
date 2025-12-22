@@ -3,7 +3,10 @@
 
 from __future__ import annotations
 
+import os.path
 import re
+from hashlib import sha256
+from pathlib import Path
 from textwrap import dedent
 
 import pytest
@@ -233,6 +236,7 @@ def test_thirdparty_plugin(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "mypy.lock": read_sibling_resource(__name__, "mypy_with_django_stubs.lock"),
+            f"{PACKAGE}/__init__.py": "",
             f"{PACKAGE}/settings.py": dedent(
                 """\
                 from django.urls import URLPattern
@@ -253,7 +257,7 @@ def test_thirdparty_plugin(rule_runner: PythonRuleRunner) -> None:
             ),
             f"{PACKAGE}/BUILD": dedent(
                 """\
-                python_sources()
+                python_sources(interpreter_constraints=['>=3.11'])
 
                 python_requirement(
                     name="reqs", requirements=["django==3.2.19", "django-stubs==1.8.0"]
@@ -279,6 +283,7 @@ def test_thirdparty_plugin(rule_runner: PythonRuleRunner) -> None:
             rule_runner.get_target(Address(PACKAGE, relative_file_path="settings.py")),
         ],
         extra_args=[
+            "--source-root-patterns=['src/py']",
             "--python-resolves={'mypy':'mypy.lock'}",
             "--mypy-install-from-resolve=mypy",
         ],
@@ -342,10 +347,15 @@ def test_works_with_python38(rule_runner: PythonRuleRunner) -> None:
                 """
             ),
             f"{PACKAGE}/BUILD": "python_sources(interpreter_constraints=['>=3.8'])",
+            "mypy.lock": read_sibling_resource(__name__, "mypy_py38.lock"),
         }
     )
+    extra_args = [
+        "--python-resolves={'mypy':'mypy.lock'}",
+        "--mypy-install-from-resolve=mypy",
+    ]
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
-    assert_success(rule_runner, tgt)
+    assert_success(rule_runner, tgt, extra_args=extra_args)
 
 
 @skip_unless_python39_present
@@ -428,9 +438,9 @@ def test_mypy_shadows_requirements(rule_runner: PythonRuleRunner) -> None:
     """
     rule_runner.write_files(
         {
-            "mypy.lock": read_sibling_resource(__name__, "mypy_shadowing_typed_ast.lock"),
-            "BUILD": "python_requirement(name='ta', requirements=['typed-ast==1.4.1'])",
-            f"{PACKAGE}/f.py": "import typed_ast",
+            "mypy.lock": read_sibling_resource(__name__, "mypy_shadowing_tomli.lock"),
+            "BUILD": "python_requirement(name='ta', requirements=['tomli==2.1.0'])",
+            f"{PACKAGE}/f.py": "import tomli",
             f"{PACKAGE}/BUILD": "python_sources()",
         }
     )
@@ -554,7 +564,8 @@ def test_source_plugin(rule_runner: PythonRuleRunner) -> None:
     assert "Success: no issues found in 1 source file" in result.stdout
 
 
-def test_protobuf_mypy(rule_runner: PythonRuleRunner) -> None:
+@pytest.mark.parametrize("protoc_type_stubs", (False, True), ids=("mypy_plugin", "protoc_direct"))
+def test_protobuf_mypy(rule_runner: PythonRuleRunner, protoc_type_stubs: bool) -> None:
     rule_runner = PythonRuleRunner(
         rules=[*rule_runner.rules, *protobuf_rules(), *protobuf_subsystem_rules()],
         target_types=[*rule_runner.target_types, ProtobufSourceTarget],
@@ -594,12 +605,59 @@ def test_protobuf_mypy(rule_runner: PythonRuleRunner) -> None:
     result = run_mypy(
         rule_runner,
         [tgt],
-        extra_args=["--python-protobuf-mypy-plugin"],
+        extra_args=[
+            "--python-protobuf-generate-type-stubs"
+            if protoc_type_stubs
+            else "--python-protobuf-mypy-plugin"
+        ],
     )
     assert len(result) == 1
     assert 'Argument "name" to "Person" has incompatible type "int"' in result[0].stdout
     assert 'Argument "id" to "Person" has incompatible type "str"' in result[0].stdout
     assert result[0].exit_code == 1
+
+
+def test_cache_directory_per_resolve(rule_runner: PythonRuleRunner) -> None:
+    build_multiple_resolves = dedent(
+        """\
+        python_source(
+            name='f_from_a',
+            source='f.py',
+            resolve='a',
+        )
+        python_source(
+           name='f_from_b',
+           source='f.py',
+           resolve='b',
+        )
+        """
+    )
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/f.py": GOOD_FILE,
+            f"{PACKAGE}/BUILD": build_multiple_resolves,
+            "mypy.lock": read_sibling_resource(__name__, "mypy_with_django_stubs.lock"),
+        }
+    )
+    target_a = rule_runner.get_target(Address(PACKAGE, target_name="f_from_a"))
+    target_b = rule_runner.get_target(Address(PACKAGE, target_name="f_from_b"))
+
+    runner_options = [
+        "--python-resolves={'a': 'mypy.lock', 'b': 'mypy.lock'}",
+        "--python-enable-resolves",
+    ]
+    run_mypy(rule_runner, [target_a, target_b], extra_args=runner_options)
+
+    with rule_runner.pushd():
+        Path("BUILDROOT").touch()
+        bootstrap_options = rule_runner.options_bootstrapper.bootstrap_options.for_global_scope()
+    named_cache_dir = bootstrap_options.named_caches_dir
+    mypy_cache_dir = (
+        f"{named_cache_dir}/mypy_cache/{sha256(rule_runner.build_root.encode()).hexdigest()}"
+    )
+    for resolve in ["a", "b"]:
+        expected_cache_dir = f"{mypy_cache_dir}/{resolve}"
+        assert os.path.exists(expected_cache_dir)
 
 
 @skip_unless_all_pythons_present("3.8", "3.9")

@@ -14,9 +14,9 @@ def assert_logged(
         return
 
     if exclusively:
-        assert len(caplog.records) == len(
-            expect_logged
-        ), f"Expected {len(expect_logged)} records, but got {len(caplog.records)}."
+        assert len(caplog.records) == len(expect_logged), (
+            f"Expected {len(expect_logged)} records, but got {len(caplog.records)}."
+        )
 
     for idx, (lvl, msg) in enumerate(expect_logged):
         if not exclusively:
@@ -26,12 +26,12 @@ def assert_logged(
             assert log_record is not None, f"Expected log message {msg!r} was not found."
         else:
             log_record = caplog.records[idx]
-        assert (
-            msg in log_record.message
-        ), f"The text {msg!r} was not found in {log_record.message!r}."
-        assert (
-            lvl == log_record.levelno
-        ), f"Expected level {lvl}, but got level {log_record.levelno}."
+        assert msg in log_record.message, (
+            f"The text {msg!r} was not found in {log_record.message!r}."
+        )
+        assert lvl == log_record.levelno, (
+            f"Expected level {lvl}, but got level {log_record.levelno}."
+        )
 
 
 @contextmanager

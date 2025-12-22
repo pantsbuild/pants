@@ -11,24 +11,22 @@ from pants.backend.codegen.thrift.target_types import (
     ThriftSourceTarget,
 )
 from pants.core.goals.resolves import ExportableTool
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import ProcessResult
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import (
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-    WrappedTarget,
-    WrappedTargetRequest,
-)
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
+from pants.engine.fs import CreateDigest, Directory, MergeDigests, RemovePrefix, Snapshot
+from pants.engine.internals.graph import resolve_target
+from pants.engine.internals.graph import transitive_targets as transitive_targets_get
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import create_digest, digest_to_snapshot, merge_digests
+from pants.engine.process import execute_process_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.target import TransitiveTargetsRequest, WrappedTargetRequest
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
-from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.coursier_fetch import ToolClasspathRequest, materialize_classpath_for_tool
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.target_types import PrefixedJvmJdkField, PrefixedJvmResolveField
-from pants.source.source_root import SourceRootsRequest, SourceRootsResult
+from pants.source.source_root import SourceRootsRequest, get_source_roots
 from pants.util.logging import LogLevel
 
 
@@ -54,46 +52,49 @@ async def generate_scrooge_thrift_sources(
     toolcp_relpath = "__toolcp"
 
     lockfile_request = GenerateJvmLockfileFromTool.create(scrooge)
-    tool_classpath, transitive_targets, empty_output_dir_digest, wrapped_target = await MultiGet(
-        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
-        Get(TransitiveTargets, TransitiveTargetsRequest([request.thrift_source_field.address])),
-        Get(Digest, CreateDigest([Directory(output_dir)])),
-        Get(
-            WrappedTarget,
+    (
+        tool_classpath,
+        transitive_targets,
+        empty_output_dir_digest,
+        wrapped_target,
+    ) = await concurrently(
+        materialize_classpath_for_tool(ToolClasspathRequest(lockfile=lockfile_request)),
+        transitive_targets_get(
+            TransitiveTargetsRequest([request.thrift_source_field.address]), **implicitly()
+        ),
+        create_digest(CreateDigest([Directory(output_dir)])),
+        resolve_target(
             WrappedTargetRequest(
                 request.thrift_source_field.address, description_of_origin="<infallible>"
             ),
+            **implicitly(),
         ),
     )
 
-    transitive_sources, target_sources = await MultiGet(
-        Get(
-            SourceFiles,
+    transitive_sources, target_sources = await concurrently(
+        determine_source_files(
             SourceFilesRequest(
                 tgt[ThriftSourceField]
                 for tgt in transitive_targets.closure
                 if tgt.has_field(ThriftSourceField)
-            ),
+            )
         ),
-        Get(SourceFiles, SourceFilesRequest([request.thrift_source_field])),
+        determine_source_files(SourceFilesRequest([request.thrift_source_field])),
     )
 
-    sources_roots = await Get(
-        SourceRootsResult,
-        SourceRootsRequest,
-        SourceRootsRequest.for_files(transitive_sources.snapshot.files),
+    sources_roots = await get_source_roots(
+        SourceRootsRequest.for_files(transitive_sources.snapshot.files)
     )
     deduped_source_root_paths = sorted({sr.path for sr in sources_roots.path_to_root.values()})
 
-    input_digest = await Get(
-        Digest,
+    input_digest = await merge_digests(
         MergeDigests(
             [
                 transitive_sources.snapshot.digest,
                 target_sources.snapshot.digest,
                 empty_output_dir_digest,
             ]
-        ),
+        )
     )
 
     maybe_include_paths = []
@@ -108,32 +109,35 @@ async def generate_scrooge_thrift_sources(
         toolcp_relpath: tool_classpath.digest,
     }
 
-    result = await Get(
-        ProcessResult,
-        JvmProcess(
-            jdk=jdk,
-            classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
-            argv=[
-                "com.twitter.scrooge.Main",
-                *maybe_include_paths,
-                "--dest",
-                output_dir,
-                "--language",
-                request.lang_id,
-                *maybe_finagle_option,
-                *target_sources.snapshot.files,
-            ],
-            input_digest=input_digest,
-            extra_jvm_options=scrooge.jvm_options,
-            extra_immutable_input_digests=extra_immutable_input_digests,
-            extra_nailgun_keys=extra_immutable_input_digests,
-            description=f"Generating {request.lang_name} sources from {request.thrift_source_field.address}.",
-            level=LogLevel.DEBUG,
-            output_directories=(output_dir,),
-        ),
+    result = await execute_process_or_raise(
+        **implicitly(
+            JvmProcess(
+                jdk=jdk,
+                classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
+                argv=[
+                    "com.twitter.scrooge.Main",
+                    *maybe_include_paths,
+                    "--dest",
+                    output_dir,
+                    "--language",
+                    request.lang_id,
+                    *maybe_finagle_option,
+                    *target_sources.snapshot.files,
+                ],
+                input_digest=input_digest,
+                extra_jvm_options=scrooge.jvm_options,
+                extra_immutable_input_digests=extra_immutable_input_digests,
+                extra_nailgun_keys=extra_immutable_input_digests,
+                description=f"Generating {request.lang_name} sources from {request.thrift_source_field.address}.",
+                level=LogLevel.DEBUG,
+                output_directories=(output_dir,),
+            )
+        )
     )
 
-    output_snapshot = await Get(Snapshot, RemovePrefix(result.output_digest, output_dir))
+    output_snapshot = await digest_to_snapshot(
+        **implicitly(RemovePrefix(result.output_digest, output_dir))
+    )
     return GeneratedScroogeThriftSources(output_snapshot)
 
 

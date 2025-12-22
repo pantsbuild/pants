@@ -21,8 +21,8 @@ from pants.backend.python.dependency_inference.module_mapper import (
 )
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonResolveField
-from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.core.util_rules.stripped_source_files import StrippedFileNameRequest, strip_file_name
+from pants.engine.rules import collect_rules, concurrently, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
@@ -49,8 +49,8 @@ async def map_protobuf_to_python_modules(
     if python_protobuf_subsystem.grpclib_plugin:
         grpc_suffixes.append("_grpc")
 
-    stripped_file_per_target = await MultiGet(
-        Get(StrippedFileName, StrippedFileNameRequest(tgt[ProtobufSourceField].file_path))
+    stripped_file_per_target = await concurrently(
+        strip_file_name(StrippedFileNameRequest(tgt[ProtobufSourceField].file_path))
         for tgt in protobuf_targets
     )
 

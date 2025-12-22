@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import inspect
 import logging
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
 
 from packaging.version import InvalidVersion, Version
 
@@ -83,8 +84,7 @@ def validate_deprecation_semver(version_string: str, version_description: str) -
         v = Version(version_string)
     except InvalidVersion as e:
         raise BadSemanticVersionError(
-            f"The given {version_description} {version_string} is not a valid version: "
-            f"{repr(e)}"
+            f"The given {version_description} {version_string} is not a valid version: {repr(e)}"
         )
 
     # NB: packaging.Version will see versions like 1.a.0 as 1a0 and as "valid".

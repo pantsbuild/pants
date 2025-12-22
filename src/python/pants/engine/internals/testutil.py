@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import RawSpecs, RawSpecsWithoutFileOwners, Spec

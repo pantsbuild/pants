@@ -4,8 +4,9 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable, Iterator
 from itertools import chain
-from typing import Any, Callable, Iterator
+from typing import Any
 
 import toml
 

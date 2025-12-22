@@ -4,7 +4,8 @@
 from __future__ import annotations
 
 import itertools
-from typing import Iterable
+import json
+from collections.abc import Iterable
 
 import pytest
 
@@ -15,6 +16,8 @@ from pants.backend.python.util_rules.lockfile_metadata import (
     PythonLockfileMetadataV1,
     PythonLockfileMetadataV2,
     PythonLockfileMetadataV3,
+    PythonLockfileMetadataV4,
+    PythonLockfileMetadataV5,
 )
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
 from pants.util.pip_requirement import PipRequirement
@@ -24,6 +27,28 @@ INTERPRETER_UNIVERSE = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
 
 def reqset(*a) -> set[PipRequirement]:
     return {PipRequirement.parse(i) for i in a}
+
+
+def test_metadata_json_round_trip() -> None:
+    input_metadata = PythonLockfileMetadata.new(
+        valid_for_interpreter_constraints=InterpreterConstraints(
+            ["CPython==2.7.*", "PyPy", "CPython>=3.6,<4,!=3.7.*"]
+        ),
+        requirements=reqset("ansicolors==0.1.0"),
+        manylinux="manylinux2014",
+        requirement_constraints={PipRequirement.parse("constraint")},
+        only_binary={"bdist"},
+        no_binary={"sdist"},
+        excludes=set(),
+        overrides=set(),
+        sources=set(),
+        lock_style="universal",
+        complete_platforms=(),
+    )
+    output_metadata = PythonLockfileMetadata.from_json_dict(
+        json.loads(input_metadata.to_json()), "", ""
+    )
+    assert input_metadata == output_metadata
 
 
 def test_metadata_header_round_trip() -> None:
@@ -36,6 +61,11 @@ def test_metadata_header_round_trip() -> None:
         requirement_constraints={PipRequirement.parse("constraint")},
         only_binary={"bdist"},
         no_binary={"sdist"},
+        excludes=set(),
+        overrides=set(),
+        sources=set(),
+        lock_style="universal",
+        complete_platforms=(),
     )
     serialized_lockfile = input_metadata.add_header_to_lockfile(
         b"req1==1.0", regenerate_command="./pants lock", delimeter="#"
@@ -46,7 +76,11 @@ def test_metadata_header_round_trip() -> None:
     assert input_metadata == output_metadata
 
 
-def test_add_header_to_lockfile() -> None:
+def line_by_line(b: bytes) -> list[bytes]:
+    return [i for i in (j.strip() for j in b.splitlines()) if i]
+
+
+def test_add_header_to_lockfile_v3() -> None:
     input_lockfile = b"""dave==3.1.4 \\
     --hash=sha256:cab0c0c0c0c0dadacafec0c0c0c0cafedadabeefc0c0c0c0feedbeeffeedbeef \\
     """
@@ -81,16 +115,163 @@ dave==3.1.4 \\
     --hash=sha256:cab0c0c0c0c0dadacafec0c0c0c0cafedadabeefc0c0c0c0feedbeeffeedbeef \\
     """
 
-    def line_by_line(b: bytes) -> list[bytes]:
-        return [i for i in (j.strip() for j in b.splitlines()) if i]
-
-    metadata = PythonLockfileMetadata.new(
+    metadata = PythonLockfileMetadataV3(
         valid_for_interpreter_constraints=InterpreterConstraints([">=3.7"]),
         requirements=reqset("ansicolors==0.1.0"),
         manylinux=None,
         requirement_constraints={PipRequirement.parse("constraint")},
         only_binary={"bdist"},
         no_binary={"sdist"},
+    )
+    result = metadata.add_header_to_lockfile(
+        input_lockfile, regenerate_command="./pants lock", delimeter="#"
+    )
+    assert line_by_line(result) == line_by_line(expected)
+
+
+def test_to_json_v4() -> None:
+    metadata = PythonLockfileMetadataV4(
+        valid_for_interpreter_constraints=InterpreterConstraints([">=3.11"]),
+        requirements=reqset("cowsay==1.0"),
+        manylinux=None,
+        requirement_constraints=set(),
+        only_binary=set(),
+        no_binary=set(),
+        excludes={"hungry-wolves"},
+        overrides=set(),
+    )
+    expected = {
+        "version": 4,
+        "valid_for_interpreter_constraints": ["CPython>=3.11"],
+        "generated_with_requirements": ["cowsay==1.0"],
+        "manylinux": None,
+        "requirement_constraints": [],
+        "only_binary": [],
+        "no_binary": [],
+        "excludes": ["hungry-wolves"],
+        "overrides": [],
+    }
+    assert json.loads(metadata.to_json()) == expected
+
+
+def test_to_json_v5() -> None:
+    metadata = PythonLockfileMetadataV5(
+        valid_for_interpreter_constraints=InterpreterConstraints([">=3.11"]),
+        requirements=reqset("cowsay==1.0"),
+        manylinux=None,
+        requirement_constraints=set(),
+        only_binary=set(),
+        no_binary=set(),
+        excludes={"hungry-wolves"},
+        overrides=set(),
+        sources={"pytorch=torch; sys_platform != 'darwin'"},
+    )
+    expected = {
+        "version": 5,
+        "valid_for_interpreter_constraints": ["CPython>=3.11"],
+        "generated_with_requirements": ["cowsay==1.0"],
+        "manylinux": None,
+        "requirement_constraints": [],
+        "only_binary": [],
+        "no_binary": [],
+        "excludes": ["hungry-wolves"],
+        "overrides": [],
+        "sources": ["pytorch=torch; sys_platform != 'darwin'"],
+    }
+    assert json.loads(metadata.to_json()) == expected
+
+
+def test_add_header_to_lockfile_v4() -> None:
+    input_lockfile = b"""cowsay==1.0 \\
+    """
+
+    expected = b"""
+# This lockfile was autogenerated by Pants. To regenerate, run:
+#
+#    ./pants lock
+#
+# --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
+# {
+#   "version": 4,
+#   "valid_for_interpreter_constraints": [
+#     "CPython>=3.11"
+#   ],
+#   "generated_with_requirements": [
+#     "cowsay==1.0"
+#   ],
+#   "manylinux": null,
+#   "requirement_constraints": [],
+#   "only_binary": [],
+#   "no_binary": [],
+#   "excludes": [
+#     "hungry-wolves"
+#   ],
+#   "overrides": []
+# }
+# --- END PANTS LOCKFILE METADATA ---
+cowsay==1.0 \\
+    """
+
+    metadata = PythonLockfileMetadataV4(
+        valid_for_interpreter_constraints=InterpreterConstraints([">=3.11"]),
+        requirements=reqset("cowsay==1.0"),
+        manylinux=None,
+        requirement_constraints=set(),
+        only_binary=set(),
+        no_binary=set(),
+        excludes={"hungry-wolves"},
+        overrides=set(),
+    )
+    result = metadata.add_header_to_lockfile(
+        input_lockfile, regenerate_command="./pants lock", delimeter="#"
+    )
+    assert line_by_line(result) == line_by_line(expected)
+
+
+def test_add_header_to_lockfile_v5() -> None:
+    input_lockfile = b"""cowsay==1.0 \\
+    """
+
+    expected = b"""
+# This lockfile was autogenerated by Pants. To regenerate, run:
+#
+#    ./pants lock
+#
+# --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
+# {
+#   "version": 5,
+#   "valid_for_interpreter_constraints": [
+#     "CPython>=3.11"
+#   ],
+#   "generated_with_requirements": [
+#     "cowsay==1.0"
+#   ],
+#   "manylinux": null,
+#   "requirement_constraints": [],
+#   "only_binary": [],
+#   "no_binary": [],
+#   "excludes": [
+#     "hungry-wolves"
+#   ],
+#   "overrides": [],
+#   "sources": [
+#     "pytorch=torch; sys_platform != 'darwin'"
+#   ]
+# }
+# --- END PANTS LOCKFILE METADATA ---
+cowsay==1.0 \\
+    """
+
+    metadata = PythonLockfileMetadataV5(
+        valid_for_interpreter_constraints=InterpreterConstraints([">=3.11"]),
+        requirements=reqset("cowsay==1.0"),
+        manylinux=None,
+        requirement_constraints=set(),
+        only_binary=set(),
+        no_binary=set(),
+        excludes={"hungry-wolves"},
+        overrides=set(),
+        sources={"pytorch=torch; sys_platform != 'darwin'"},
     )
     result = metadata.add_header_to_lockfile(
         input_lockfile, regenerate_command="./pants lock", delimeter="#"
@@ -176,6 +357,11 @@ def test_is_valid_for_v1(user_digest, expected_digest, user_ic, expected_ic, mat
                 requirement_constraints=set(),
                 only_binary=set(),
                 no_binary=set(),
+                excludes=set(),
+                overrides=set(),
+                sources=set(),
+                lock_style=None,
+                complete_platforms=(),
             )
         )
         == matches
@@ -250,6 +436,11 @@ def test_is_valid_for_interpreter_constraints_and_requirements(
             requirement_constraints=set(),
             only_binary=set(),
             no_binary=set(),
+            excludes=set(),
+            overrides=set(),
+            sources=set(),
+            lock_style=None,
+            complete_platforms=(),
         )
         assert result.failure_reasons == set(expected)
 
@@ -272,10 +463,79 @@ def test_is_valid_for_v3_metadata() -> None:
         requirement_constraints={PipRequirement.parse("c2")},
         only_binary={"not-bdist"},
         no_binary={"not-sdist"},
+        excludes=set(),
+        overrides=set(),
+        sources=set(),
+        lock_style=None,
+        complete_platforms=(),
     )
     assert result.failure_reasons == {
         InvalidPythonLockfileReason.CONSTRAINTS_FILE_MISMATCH,
         InvalidPythonLockfileReason.ONLY_BINARY_MISMATCH,
         InvalidPythonLockfileReason.NO_BINARY_MISMATCH,
         InvalidPythonLockfileReason.MANYLINUX_MISMATCH,
+    }
+
+
+def test_is_valid_for_v4_metadata() -> None:
+    result = PythonLockfileMetadataV4(
+        InterpreterConstraints([]),
+        reqset(),
+        manylinux="manylinux2014",
+        requirement_constraints={PipRequirement.parse("c1")},
+        only_binary={"bdist"},
+        no_binary={"sdist"},
+        # Everything below is new to v4
+        excludes={"terrible-horrible-no-good-very-bad-pkg"},
+        overrides={"cowsay==1.0.0"},
+    ).is_valid_for(
+        expected_invalidation_digest="",
+        user_interpreter_constraints=InterpreterConstraints([]),
+        interpreter_universe=INTERPRETER_UNIVERSE,
+        user_requirements=reqset(),
+        manylinux="manylinux2014",
+        requirement_constraints={PipRequirement.parse("c1")},
+        only_binary={"bdist"},
+        no_binary={"sdist"},
+        excludes=set(),
+        overrides={"deadbeef<=0"},
+        sources=set(),
+        lock_style=None,
+        complete_platforms=(),
+    )
+    assert result.failure_reasons == {
+        InvalidPythonLockfileReason.EXCLUDES_MISMATCH,
+        InvalidPythonLockfileReason.OVERRIDES_MISMATCH,
+    }
+
+
+def test_is_valid_for_v5_metadata() -> None:
+    result = PythonLockfileMetadataV5(
+        InterpreterConstraints([]),
+        reqset(),
+        manylinux="manylinux2014",
+        requirement_constraints={PipRequirement.parse("c1")},
+        only_binary={"bdist"},
+        no_binary={"sdist"},
+        excludes=set(),
+        overrides={"cowsay==1.0.0"},
+        # new to v5
+        sources={"pytorch=torch; sys_platform != 'darwin'"},
+    ).is_valid_for(
+        expected_invalidation_digest="",
+        user_interpreter_constraints=InterpreterConstraints([]),
+        interpreter_universe=INTERPRETER_UNIVERSE,
+        user_requirements=reqset(),
+        manylinux="manylinux2014",
+        requirement_constraints={PipRequirement.parse("c1")},
+        only_binary={"bdist"},
+        no_binary={"sdist"},
+        excludes=set(),
+        overrides={"cowsay==1.0.0"},
+        sources=set(),
+        lock_style=None,
+        complete_platforms=(),
+    )
+    assert result.failure_reasons == {
+        InvalidPythonLockfileReason.SOURCES_MISMATCH,
     }

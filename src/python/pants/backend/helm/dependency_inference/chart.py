@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.helm.resolve import artifacts
 from pants.backend.helm.resolve.artifacts import ThirdPartyHelmArtifactMapping
@@ -20,13 +20,16 @@ from pants.backend.helm.target_types import (
 )
 from pants.backend.helm.target_types import rules as helm_target_types_rules
 from pants.backend.helm.util_rules import chart_metadata
-from pants.backend.helm.util_rules.chart_metadata import HelmChartDependency, HelmChartMetadata
+from pants.backend.helm.util_rules.chart_metadata import (
+    HelmChartDependency,
+    parse_chart_metadata_from_field,
+)
 from pants.engine.addresses import Address
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
+from pants.engine.internals.graph import determine_explicitly_provided_dependencies
+from pants.engine.internals.selectors import concurrently
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
     DependenciesRequest,
-    ExplicitlyProvidedDependencies,
     FieldSet,
     InferDependenciesRequest,
     InferredDependencies,
@@ -64,8 +67,8 @@ class FirstPartyHelmChartMapping(FrozenDict[str, Address]):
 async def first_party_helm_chart_mapping(
     all_helm_chart_tgts: AllHelmChartTargets,
 ) -> FirstPartyHelmChartMapping:
-    charts_metadata = await MultiGet(
-        Get(HelmChartMetadata, HelmChartMetaSourceField, tgt[HelmChartMetaSourceField])
+    charts_metadata = await concurrently(
+        parse_chart_metadata_from_field(tgt[HelmChartMetaSourceField])
         for tgt in all_helm_chart_tgts
     )
 
@@ -118,9 +121,11 @@ async def infer_chart_dependencies_via_metadata(
     address = request.field_set.address
 
     # Parse Chart.yaml for explicitly set dependencies.
-    explicitly_provided_deps, metadata = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
-        Get(HelmChartMetadata, HelmChartMetaSourceField, request.field_set.source),
+    explicitly_provided_deps, metadata = await concurrently(
+        determine_explicitly_provided_dependencies(
+            **implicitly(DependenciesRequest(request.field_set.dependencies))
+        ),
+        parse_chart_metadata_from_field(request.field_set.source),
     )
 
     remotes = subsystem.remotes()

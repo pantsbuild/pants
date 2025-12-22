@@ -6,46 +6,52 @@ from __future__ import annotations
 import itertools
 import logging
 import os.path
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from itertools import groupby
-from typing import ClassVar, Collection, Iterable, Mapping, Sequence
+from typing import ClassVar
 
 from nodesemver import min_satisfying
 
+from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.util_rules import asdf, search_paths, system_binaries
 from pants.core.util_rules.asdf import AsdfPathString, AsdfToolPathsResult
-from pants.core.util_rules.environments import EnvironmentTarget
+from pants.core.util_rules.env_vars import environment_vars_subset
+from pants.core.util_rules.env_vars import environment_vars_subset as environment_vars_subset_get
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalToolRequest,
     ExternalToolVersion,
     TemplatedExternalToolOptionsMixin,
+    download_external_tool,
 )
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.core.util_rules.search_paths import (
     ExecutableSearchPathsOptionMixin,
-    ValidatedSearchPaths,
     ValidateSearchPathsRequest,
-    VersionManagerSearchPaths,
     VersionManagerSearchPathsRequest,
+    get_un_cachable_version_manager_paths,
+    validate_search_paths,
 )
 from pants.core.util_rules.system_binaries import (
     BinaryNotFoundError,
     BinaryPath,
     BinaryPathRequest,
-    BinaryPaths,
     BinaryPathTest,
     BinaryShims,
     BinaryShimsRequest,
+    create_binary_shims,
+    find_binary,
 )
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest, PathEnvironmentVariable
+from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, DownloadFile
 from pants.engine.internals.native_engine import FileDigest, MergeDigests
-from pants.engine.internals.platform_rules import environment_vars_subset
-from pants.engine.internals.selectors import MultiGet
+from pants.engine.internals.platform_rules import environment_path_variable
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import create_digest, merge_digests
 from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, Rule, collect_rules, implicitly, rule
+from pants.engine.process import Process, fallible_to_exec_result_or_raise
+from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import DictOption, ShellStrListOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
@@ -62,12 +68,12 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
     options_scope = "nodejs"
     help = "The Node.js Javascript runtime (including Corepack)."
 
-    default_version = "v22.6.0"
+    default_version = "v24.10.0"
     default_known_versions = [
-        "v22.6.0|macos_arm64|9ea60766807cd3c3a3ad6ad419f98918d634a60fe8dea5b9c07507ed0f176d4c|47583427",
-        "v22.6.0|macos_x86_64|8766c5968ca22d20fc6237c54c7c5d12ef12e15940d6119a79144ccb163ea737|49688634",
-        "v22.6.0|linux_arm64|0053ee0426c4daaa65c44f2cef87be45135001c3145cfb840aa1d0e6f2619610|28097296",
-        "v22.6.0|linux_x86_64|acbbe539edc33209bb3e1b25f7545b5ca5d70e6256ed8318e1ec1e41e7b35703|29240984",
+        "v24.10.0|macos_arm64|fbc3d6e1e1d962450d058e918214373872cc4c46e08673f31c35932afac4a8c5|51169103",
+        "v24.10.0|macos_x86_64|627b884f66db0dd35f4b46fb9e994774ce560a7fb60798ba1ab81e867a73687d|52347633",
+        "v24.10.0|linux_arm64|07f0558316ebb8977dd6fb29b4de8d369a639d3d8cef544293852a6f5eea6af8|31020300",
+        "v24.10.0|linux_x86_64|2642f4428869aca32443660fd71b3918e2be1277a899bdcaeb64c93b54b5af17|32102040",
     ]
 
     default_url_template = "https://nodejs.org/dist/{version}/node-{version}-{platform}.tar"
@@ -119,7 +125,7 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
         exe = self.generate_exe(known_version.version, platform)
         url = self.generate_url(known_version.version, platform)
         download_file = DownloadFile(url, FileDigest(known_version.sha256, known_version.filesize))
-        return await Get(DownloadedExternalTool, ExternalToolRequest(download_file, exe))
+        return await download_external_tool(ExternalToolRequest(download_file, exe))
 
     package_manager = StrOption(
         default="npm",
@@ -138,7 +144,7 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
     )
 
     package_managers = DictOption[str](
-        default={"npm": "10.8.2", "yarn": "1.22.22", "pnpm": "9.5.0"},
+        default={"npm": "11.6.2", "yarn": "1.22.22", "pnpm": "10.19.0"},
         help=help_text(
             """
             A mapping of package manager versions to semver releases.
@@ -151,6 +157,17 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
             the `--activate` flag.
             """
         ),
+    )
+
+    extra_env_vars = StrListOption(
+        help=softwrap(
+            f"""
+            Environment variables to set during package manager operations.
+
+            {EXTRA_ENV_VARS_USAGE_HELP}
+            """
+        ),
+        advanced=True,
     )
 
     @property
@@ -354,30 +371,39 @@ class NodeJSProcessEnvironment:
 async def add_corepack_shims_to_digest(
     binaries: NodeJSBinaries, tool_shims: BinaryShims, corepack_env_vars: EnvironmentVars
 ) -> Digest:
-    directory_digest = await Get(Digest, CreateDigest([Directory("._corepack")]))
+    directory_digest = await create_digest(CreateDigest([Directory("._corepack")]))
     binary_digest = binaries.digest if binaries.digest else EMPTY_DIGEST
-    input_digest = await Get(Digest, MergeDigests((directory_digest, binary_digest)))
+    input_digest = await merge_digests(MergeDigests((directory_digest, binary_digest)))
 
     none_immutable_binary_path = binaries.binary_dir.replace(
         f"/{NodeJSProcessEnvironment.base_bin_dir}", ""
     )
-    enable_corepack_result = await Get(
-        ProcessResult,
-        Process(
-            argv=("corepack", "enable", "npm", "pnpm", "yarn", "--install-directory", "._corepack"),
-            input_digest=input_digest,
-            immutable_input_digests={**tool_shims.immutable_input_digests},
-            output_directories=["._corepack"],
-            description="Enabling corepack shims",
-            level=LogLevel.DEBUG,
-            env={
-                "PATH": f"{tool_shims.path_component}:{none_immutable_binary_path}",
-                "COREPACK_HOME": "._corepack_home",
-                **corepack_env_vars,
-            },
-        ),
+    enable_corepack_result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            Process(
+                argv=(
+                    "corepack",
+                    "enable",
+                    "npm",
+                    "pnpm",
+                    "yarn",
+                    "--install-directory",
+                    "._corepack",
+                ),
+                input_digest=input_digest,
+                immutable_input_digests={**tool_shims.immutable_input_digests},
+                output_directories=["._corepack"],
+                description="Enabling corepack shims",
+                level=LogLevel.DEBUG,
+                env={
+                    "PATH": f"{tool_shims.path_component}:{none_immutable_binary_path}",
+                    "COREPACK_HOME": "._corepack_home",
+                    **corepack_env_vars,
+                },
+            )
+        )
     )
-    return await Get(Digest, MergeDigests((binary_digest, enable_corepack_result.output_digest)))
+    return await merge_digests(MergeDigests((binary_digest, enable_corepack_result.output_digest)))
 
 
 async def get_nodejs_process_tools_shims(
@@ -391,7 +417,7 @@ async def get_nodejs_process_tools_shims(
         BinaryPathRequest(binary_name=binary_name, search_path=search_path)
         for binary_name in (*tools, *optional_tools)
     ]
-    paths = await MultiGet(Get(BinaryPaths, BinaryPathRequest, request) for request in requests)
+    paths = await concurrently(find_binary(request, **implicitly()) for request in requests)
     required_tools_paths = [
         path.first_path_or_raise(request, rationale=rationale)
         for request, path in zip(requests, paths)
@@ -403,14 +429,13 @@ async def get_nodejs_process_tools_shims(
         if request.binary_name in optional_tools and path.first_path
     ]
 
-    tools_shims = await Get(
-        BinaryShims,
-        BinaryShimsRequest,
+    tools_shims = await create_binary_shims(
         BinaryShimsRequest.for_paths(
             *required_tools_paths,
             *optional_tools_paths,
             rationale=rationale,
         ),
+        **implicitly(),
     )
 
     return tools_shims
@@ -424,7 +449,7 @@ async def node_process_environment(
 ) -> NodeJSProcessEnvironment:
     default_required_tools = ["sh", "bash"]
     tools_used_by_setup_scripts = ["mkdir", "rm", "touch", "which"]
-    pnpm_shim_tools = ["sed", "dirname"]
+    pnpm_shim_tools = ["sed", "dirname", "uname"]
 
     binary_shims = await get_nodejs_process_tools_shims(
         tools=[
@@ -437,8 +462,8 @@ async def node_process_environment(
         search_path=nodejs_environment.executable_search_path,
         rationale="execute a nodejs process",
     )
-    corepack_env_vars = await Get(
-        EnvironmentVars, EnvironmentVarsRequest(nodejs_environment.corepack_env_vars)
+    corepack_env_vars = await environment_vars_subset_get(
+        EnvironmentVarsRequest(nodejs_environment.corepack_env_vars), **implicitly()
     )
     binary_digest_with_shims = await add_corepack_shims_to_digest(
         binaries, binary_shims, corepack_env_vars
@@ -466,9 +491,7 @@ async def _get_nvm_root() -> str | None:
     """See https://github.com/nvm-sh/nvm#installing-and-updating."""
 
     env = await environment_vars_subset(
-        **implicitly(
-            {EnvironmentVarsRequest(("NVM_DIR", "XDG_CONFIG_HOME", "HOME")): EnvironmentVarsRequest}
-        )
+        EnvironmentVarsRequest(("NVM_DIR", "XDG_CONFIG_HOME", "HOME")), **implicitly()
     )
     nvm_dir = env.get("NVM_DIR")
     default_dir = env.get("XDG_CONFIG_HOME", env.get("HOME"))
@@ -497,9 +520,8 @@ async def _nodejs_search_paths(
     }
     nvm_dir = await _get_nvm_root()
     expanded: list[str] = []
-    nvm_path_results = await MultiGet(
-        Get(
-            VersionManagerSearchPaths,
+    nvm_path_results = await concurrently(
+        get_un_cachable_version_manager_paths(
             VersionManagerSearchPathsRequest(
                 env_tgt,
                 nvm_dir,
@@ -516,7 +538,7 @@ async def _nodejs_search_paths(
         expanded.append(nvm_path)
     for s in paths:
         if s == "<PATH>":
-            expanded.extend(await Get(PathEnvironmentVariable))  # noqa: PNT30: Linear search
+            expanded.extend(await environment_path_variable(**implicitly()))  # noqa: PNT30: Linear search
         elif s in special_strings:
             expanded.extend(special_strings[s])
         elif s == "<NVM>" or s == "<NVM_LOCAL>":
@@ -528,8 +550,7 @@ async def _nodejs_search_paths(
 
 @rule
 async def nodejs_bootstrap(nodejs_env_aware: NodeJS.EnvironmentAware) -> NodeJSBootstrap:
-    search_paths = await Get(
-        ValidatedSearchPaths,
+    search_paths = await validate_search_paths(
         ValidateSearchPathsRequest(
             env_tgt=nodejs_env_aware.env_tgt,
             search_paths=tuple(nodejs_env_aware.search_path),
@@ -539,7 +560,7 @@ async def nodejs_bootstrap(nodejs_env_aware: NodeJS.EnvironmentAware) -> NodeJSB
             local_only=FrozenOrderedSet(
                 (AsdfPathString.STANDARD, AsdfPathString.LOCAL, "<NVM>", "<NVM_LOCAL>")
             ),
-        ),
+        )
     )
 
     expanded_paths = await _nodejs_search_paths(nodejs_env_aware.env_tgt, search_paths)
@@ -553,8 +574,7 @@ class _BinaryPathsPerVersion(FrozenDict[str, Sequence[BinaryPath]]):
 
 @rule(level=LogLevel.DEBUG, desc="Testing for Node.js binaries.")
 async def get_valid_nodejs_paths_by_version(bootstrap: NodeJSBootstrap) -> _BinaryPathsPerVersion:
-    paths = await Get(
-        BinaryPaths,
+    paths = await find_binary(
         BinaryPathRequest(
             search_path=bootstrap.nodejs_search_paths,
             binary_name="node",
@@ -562,6 +582,7 @@ async def get_valid_nodejs_paths_by_version(bootstrap: NodeJSBootstrap) -> _Bina
                 ["--version"], fingerprint_stdout=False
             ),  # Hack to retain version info
         ),
+        **implicitly(),
     )
 
     group_by_version = groupby((path for path in paths.paths), key=lambda path: path.fingerprint)
@@ -631,19 +652,20 @@ async def prepare_corepack_tool(
     version = request.version or nodejs.package_managers.get(request.tool)
     tool_spec = f"{request.tool}@{version}" if version else request.tool
     tool_description = tool_spec if version else f"default {tool_spec} version"
-    result = await Get(
-        ProcessResult,
-        Process(
-            argv=filter(
-                None, ("corepack", "prepare", tool_spec if version else "--all", "--activate")
-            ),
-            description=f"Preparing configured {tool_description}.",
-            immutable_input_digests=environment.immutable_digest(),
-            level=LogLevel.DEBUG,
-            env=environment.to_env_dict(),
-            append_only_caches={**environment.append_only_caches},
-            output_directories=[environment.corepack_home],
-        ),
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            Process(
+                argv=filter(
+                    None, ("corepack", "prepare", tool_spec if version else "--all", "--activate")
+                ),
+                description=f"Preparing configured {tool_description}.",
+                immutable_input_digests=environment.immutable_digest(),
+                level=LogLevel.DEBUG,
+                env=environment.to_env_dict(),
+                append_only_caches={**environment.append_only_caches},
+                output_directories=[environment.corepack_home],
+            )
+        )
     )
     return CorepackToolDigest(result.output_digest)
 
@@ -654,11 +676,12 @@ async def setup_node_tool_process(
 ) -> Process:
     if request.tool in ("npm", "npx", "pnpm", "yarn"):
         tool_name = request.tool.replace("npx", "npm")
-        corepack_tool = await Get(
-            CorepackToolDigest,
-            CorepackToolRequest(tool_name, request.tool_version),
+        corepack_tool = await prepare_corepack_tool(
+            CorepackToolRequest(tool_name, request.tool_version), **implicitly()
         )
-        input_digest = await Get(Digest, MergeDigests([request.input_digest, corepack_tool.digest]))
+        input_digest = await merge_digests(
+            MergeDigests([request.input_digest, corepack_tool.digest])
+        )
     else:
         input_digest = request.input_digest
     return Process(

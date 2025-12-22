@@ -1,0 +1,12 @@
+[package]
+version = "0.0.1"
+edition = "2024"
+name = "tryfuture"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[dependencies]
+futures = { workspace = true }
+
+[lints]
+workspace = true

@@ -6,8 +6,10 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from pants.backend.go.dependency_inference import GoModuleImportPathsMapping
-from pants.backend.go.target_type_rules import GoImportPathMappingRequest
+from pants.backend.go.target_type_rules import (
+    GoImportPathMappingRequest,
+    map_import_paths_to_packages,
+)
 from pants.backend.go.target_types import (
     GoImportPathField,
     GoModTarget,
@@ -15,18 +17,24 @@ from pants.backend.go.target_types import (
     GoThirdPartyPackageDependenciesField,
 )
 from pants.backend.go.util_rules import first_party_pkg, third_party_pkg
-from pants.backend.go.util_rules.build_opts import GoBuildOptions, GoBuildOptionsFromTargetRequest
-from pants.backend.go.util_rules.build_pkg import FallibleBuildGoPackageRequest
-from pants.backend.go.util_rules.build_pkg_target import BuildGoPackageTargetRequest
-from pants.backend.go.util_rules.cgo import CGoCompileRequest, CGoCompileResult, CGoCompilerFlags
-from pants.backend.go.util_rules.first_party_pkg import (
-    FallibleFirstPartyPkgAnalysis,
-    FirstPartyPkgAnalysisRequest,
+from pants.backend.go.util_rules.build_opts import (
+    GoBuildOptions,
+    GoBuildOptionsFromTargetRequest,
+    go_extract_build_options_from_target,
 )
-from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
+from pants.backend.go.util_rules.build_pkg_target import (
+    BuildGoPackageTargetRequest,
+    setup_build_go_package_target_request,
+)
+from pants.backend.go.util_rules.cgo import CGoCompileRequest, CGoCompilerFlags, cgo_compile_request
+from pants.backend.go.util_rules.first_party_pkg import (
+    FirstPartyPkgAnalysisRequest,
+    analyze_first_party_package,
+)
+from pants.backend.go.util_rules.go_mod import GoModInfoRequest, determine_go_mod_info
 from pants.backend.go.util_rules.third_party_pkg import (
-    ThirdPartyPkgAnalysis,
     ThirdPartyPkgAnalysisRequest,
+    extract_package_info,
 )
 from pants.build_graph.address import Address
 from pants.core.util_rules.distdir import DistDir
@@ -34,8 +42,9 @@ from pants.engine.console import Console
 from pants.engine.fs import Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, RemovePrefix
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, goal_rule, rule
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import remove_prefix
+from pants.engine.rules import collect_rules, goal_rule, implicitly, rule
 from pants.engine.target import Targets, UnexpandedTargets
 
 logger = logging.getLogger(__name__)
@@ -56,39 +65,39 @@ async def go_show_package_analysis(targets: Targets, console: Console) -> ShowGo
     first_party_analysis_gets = []
     third_party_analysis_gets = []
 
-    build_opts_by_target = await MultiGet(
-        Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(tgt.address)) for tgt in targets
+    build_opts_by_target = await concurrently(
+        go_extract_build_options_from_target(
+            GoBuildOptionsFromTargetRequest(tgt.address), **implicitly()
+        )
+        for tgt in targets
     )
 
     for target, build_opts in zip(targets, build_opts_by_target):
         if target.has_field(GoPackageSourcesField):
             first_party_analysis_gets.append(
-                Get(
-                    FallibleFirstPartyPkgAnalysis,
+                analyze_first_party_package(
                     FirstPartyPkgAnalysisRequest(target.address, build_opts=build_opts),
+                    **implicitly(),
                 )
             )
         elif target.has_field(GoThirdPartyPackageDependenciesField):
             import_path = target[GoImportPathField].value
             go_mod_address = target.address.maybe_convert_to_target_generator()
-            go_mod_info = await Get(  # noqa: PNT30: requires triage
-                GoModInfo, GoModInfoRequest(go_mod_address)
-            )
+            go_mod_info = await determine_go_mod_info(GoModInfoRequest(go_mod_address))  # noqa: PNT30: requires triage
             third_party_analysis_gets.append(
-                Get(
-                    ThirdPartyPkgAnalysis,
+                extract_package_info(
                     ThirdPartyPkgAnalysisRequest(
                         import_path,
                         go_mod_address,
                         go_mod_info.digest,
                         go_mod_info.mod_path,
                         build_opts=build_opts,
-                    ),
+                    )
                 )
             )
 
-    first_party_analysis_results = await MultiGet(first_party_analysis_gets)
-    third_party_analysis_results = await MultiGet(third_party_analysis_gets)
+    first_party_analysis_results = await concurrently(first_party_analysis_gets)
+    third_party_analysis_results = await concurrently(third_party_analysis_gets)
 
     for first_party_analysis_result in first_party_analysis_results:
         if first_party_analysis_result.analysis:
@@ -128,8 +137,8 @@ async def dump_go_import_paths_for_module(
             continue
 
         console.write_stdout(f"{tgt.address}:\n")
-        package_mapping = await Get(  # noqa: PNT30: requires triage
-            GoModuleImportPathsMapping, GoImportPathMappingRequest(tgt.address)
+        package_mapping = await map_import_paths_to_packages(  # noqa: PNT30: requires triage
+            GoImportPathMappingRequest(tgt.address), **implicitly()
         )
         for import_path, address_set in package_mapping.mapping.items():
             maybe_infer_all = " (infer all)" if address_set.infer_all else ""
@@ -166,12 +175,12 @@ class ExportCgoPackageResult:
 @rule
 async def export_cgo_package(request: ExportCgoPackageRequest) -> ExportCgoPackageResult:
     # Analyze the package and ensure it is actually contains cgo code.
-    fallible_build_req = await Get(
-        FallibleBuildGoPackageRequest,
+    fallible_build_req = await setup_build_go_package_target_request(
         BuildGoPackageTargetRequest(
             address=request.address,
             build_opts=request.build_opts,
         ),
+        **implicitly(),
     )
 
     build_req = fallible_build_req.request
@@ -188,8 +197,7 @@ async def export_cgo_package(request: ExportCgoPackageRequest) -> ExportCgoPacka
         return ExportCgoPackageResult(skip=True)
 
     # Perform CGo compilation.
-    result = await Get(
-        CGoCompileResult,
+    result = await cgo_compile_request(
         CGoCompileRequest(
             import_path=build_req.import_path,
             pkg_name=build_req.pkg_name,
@@ -199,9 +207,10 @@ async def export_cgo_package(request: ExportCgoPackageRequest) -> ExportCgoPacka
             cgo_files=build_req.cgo_files,
             cgo_flags=build_req.cgo_flags or CGoCompilerFlags.empty(),
         ),
+        **implicitly(),
     )
 
-    output_digest = await Get(Digest, RemovePrefix(result.digest, build_req.dir_path))
+    output_digest = await remove_prefix(RemovePrefix(result.digest, build_req.dir_path))
     return ExportCgoPackageResult(digest=output_digest)
 
 
@@ -218,8 +227,11 @@ async def go_export_cgo_codegen(
         or tgt.has_field(GoThirdPartyPackageDependenciesField)
     ]
 
-    build_opts_by_target = await MultiGet(
-        Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(tgt.address)) for tgt in package_targets
+    build_opts_by_target = await concurrently(
+        go_extract_build_options_from_target(
+            GoBuildOptionsFromTargetRequest(tgt.address), **implicitly()
+        )
+        for tgt in package_targets
     )
 
     targets_to_process = []
@@ -229,8 +241,8 @@ async def go_export_cgo_codegen(
             continue
         targets_to_process.append((tgt, build_opts))
 
-    cgo_results = await MultiGet(
-        Get(ExportCgoPackageResult, ExportCgoPackageRequest(tgt.address, build_opts=build_opts))
+    cgo_results = await concurrently(
+        export_cgo_package(ExportCgoPackageRequest(tgt.address, build_opts=build_opts))
         for tgt, build_opts in targets_to_process
     )
 

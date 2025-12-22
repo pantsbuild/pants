@@ -1,6 +1,6 @@
 # GENERATED, DO NOT EDIT!
 # To change, edit `src/python/pants_release/generate_github_workflows.py` and run:
-#   ./pants run src/python/pants_release/generate_github_workflows.py
+#   pants run src/python/pants_release/generate_github_workflows.py
 
 
 jobs:
@@ -13,26 +13,25 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: AlexTereshenkov/cheeseshop-query
     - name: Set up Python 3.9
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.9'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -41,8 +40,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -70,10 +68,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -98,26 +94,25 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: Ars-Linguistica/mlconjug3
     - name: Set up Python 3.10
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.10'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -150,26 +145,25 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: OpenSaMD/OpenSaMD
     - name: Set up Python 3.9.15
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: 3.9.15
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -178,8 +172,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -207,10 +200,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -235,38 +226,32 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: StackStorm/st2
         submodules: recursive
     - name: Set up Python 3.8
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.8'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - name: Run set-up
-      run: '
+      run: |2
 
-        sudo apt-get install gcc git make screen libffi-dev libssl-dev python3.8-dev
-        libldap2-dev libsasl2-dev
-
+        sudo apt-get install gcc git make screen libffi-dev libssl-dev python3.8-dev libldap2-dev libsasl2-dev
         # sudo apt-get install mongodb mongodb-server
-
         sudo apt-get install rabbitmq-server
-
-        '
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -275,8 +260,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -304,10 +288,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -333,26 +315,25 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: fucina/treb
     - name: Set up Python 3.10
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.10'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -405,26 +386,25 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: ghandic/jsf
     - name: Set up Python 3.10
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.10'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -467,26 +447,25 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: komprenilo/liga
     - name: Set up Python 3.9
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.9'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -519,26 +498,25 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: lablup/backend.ai
     - name: Set up Python 3.11.4
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: 3.11.4
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - name: Run set-up
       run: mkdir .tmp
     - env:
@@ -549,8 +527,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -560,8 +537,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: 'Run `test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis_helper::`
-        with repo-default version (baseline)'
+      name: 'Run `test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis_helper::` with repo-default version (baseline)'
       run: ' pants test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis_helper::'
     - env:
         PANTS_VERSION: ''
@@ -579,10 +555,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -591,10 +565,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: 'Run `test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis_helper::`
-        with ${{ github.event.inputs.pants_version }}'
-      run: '${{ github.event.inputs.extra_env }} pants test :: -tests/agent/docker::
-        -tests/client/integration:: -tests/common/redis_helper::'
+      name: 'Run `test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis_helper::` with ${{ github.event.inputs.pants_version }}'
+      run: '${{ github.event.inputs.extra_env }} pants test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis_helper::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -609,26 +581,25 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: mitodl/ol-django
     - name: Set up Python 3.10
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.10'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - name: Run set-up
       run: sudo apt-get install pkg-config libxml2-dev libxmlsec1-dev libxmlsec1-openssl
     - env:
@@ -663,26 +634,25 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: mitodl/ol-infrastructure
     - name: Set up Python 3.10
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.10'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -715,26 +685,25 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: naccdata/flywheel-gear-extensions
     - name: Set up Python 3.10
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.10'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -766,8 +735,7 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: 'Run `package :: -directory_pull::` with ${{ github.event.inputs.pants_version
-        }}'
+      name: 'Run `package :: -directory_pull::` with ${{ github.event.inputs.pants_version }}'
       run: '${{ github.event.inputs.extra_env }} pants package :: -directory_pull::'
   pantsbuild_example-adhoc:
     env:
@@ -778,30 +746,29 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: pantsbuild/example-adhoc
     - name: Set up Python 3.10
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.10'
     - name: Set up Node 20
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v6
       with:
         node-version: '20'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -844,38 +811,32 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: pantsbuild/example-codegen
     - name: Set up Python 3.10
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.10'
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
-      run: 'mkdir -p "${HOME}/.thrift"
-
-        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift
-        -o "${HOME}/.thrift/thrift"
-
+      run: |
+        mkdir -p "${HOME}/.thrift"
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
         chmod +x "${HOME}/.thrift/thrift"
-
         echo "${HOME}/.thrift" >> $GITHUB_PATH
-
-        '
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -884,8 +845,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -913,10 +873,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -941,26 +899,25 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: pantsbuild/example-django
     - name: Set up Python 3.9
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.9'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -969,8 +926,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -998,10 +954,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -1027,26 +981,25 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: pantsbuild/example-docker
     - name: Set up Python 3.8
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.8'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -1055,8 +1008,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -1084,10 +1036,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -1112,30 +1062,33 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: pantsbuild/example-golang
     - name: Set up Python 3.10
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.10'
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
-        go-version: 1.19.5
+        go-version: 1.25.3
+    - name: Install Go
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      with:
+        go-version: 1.24.9
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -1144,8 +1097,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -1173,10 +1125,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -1201,26 +1151,25 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: pantsbuild/example-jvm
     - name: Set up Python 3.10
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.10'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -1229,8 +1178,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -1258,10 +1206,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -1286,26 +1232,25 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: pantsbuild/example-kotlin
     - name: Set up Python 3.10
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.10'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -1314,8 +1259,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -1343,10 +1287,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -1371,26 +1313,25 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: pantsbuild/example-python
     - name: Set up Python 3.9
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.9'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -1399,8 +1340,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -1428,10 +1368,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -1456,26 +1394,25 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: pantsbuild/example-visibility
     - name: Set up Python 3.9
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.9'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -1484,8 +1421,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -1508,10 +1444,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -1531,26 +1465,25 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 10
         repository: pantsbuild/scie-pants
     - name: Set up Python 3.9
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.9'
     - name: Pants on
-      run: '
+      run: |2
 
-        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
-        | bash -
-
+        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
         echo "$HOME/bin" | tee -a $GITHUB_PATH
-
-        '
     - name: Check for pants.ci.toml
-      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
-        \ | tee -a $GITHUB_ENV\nfi\n"
+      run: |2
+
+        if [[ -f pants.ci.toml ]]; then
+            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+        fi
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -1559,8 +1492,7 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-        (baseline)
+      name: Run `tailor --check update-build-files --check ::` with repo-default version (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
@@ -1588,10 +1520,8 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
-        --check ::'
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -1620,5 +1550,4 @@ name: Public repos tests
         description: Pants version (for example, `2.16.0`, `2.18.0.dev1`)
         required: true
         type: string
-run-name: 'Public repos test: version ${{ github.event.inputs.pants_version }} ${{
-  github.event.inputs.extra_env }}'
+run-name: 'Public repos test: version ${{ github.event.inputs.pants_version }} ${{ github.event.inputs.extra_env }}'

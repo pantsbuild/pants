@@ -7,11 +7,9 @@ import dataclasses
 import importlib
 import logging
 import sys
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, List
-
-import pkg_resources
 
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.env_vars import CompleteEnvironmentVars
@@ -26,8 +24,8 @@ from pants.init.extension_loader import (
 )
 from pants.init.plugin_resolver import PluginResolver
 from pants.init.plugin_resolver import rules as plugin_resolver_rules
+from pants.option.bootstrap_options import DynamicRemoteOptions
 from pants.option.errors import UnknownFlagsError
-from pants.option.global_options import DynamicRemoteOptions
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.requirements import parse_requirements_file
@@ -53,20 +51,20 @@ def _initialize_build_configuration(
     for path in bootstrap_options.pythonpath:
         if path not in sys.path:
             sys.path.append(path)
-            pkg_resources.fixup_namespace_packages(path)
 
+    # Resolve the actual Python code for any plugins. `sys.path` is modified as a side effect if
+    # plugins were configured.
     backends_requirements = _collect_backends_requirements(bootstrap_options.backend_packages)
-    working_set = plugin_resolver.resolve(options_bootstrapper, env, backends_requirements)
+    plugin_resolver.resolve(options_bootstrapper, env, backends_requirements)
 
     # Load plugins and backends.
     return load_backends_and_plugins(
         bootstrap_options.plugins,
-        working_set,
         bootstrap_options.backend_packages,
     )
 
 
-def _collect_backends_requirements(backends: List[str]) -> List[str]:
+def _collect_backends_requirements(backends: list[str]) -> list[str]:
     """Collects backend package dependencies, in case those are declared in an adjacent
     requirements.txt. Ignores any loading errors, assuming those will be later on handled by the
     backends loader.
@@ -163,7 +161,9 @@ class OptionsInitializer:
         raise_: bool,
     ) -> Options:
         with self.handle_unknown_flags(options_bootstrapper, env, raise_=raise_):
-            return options_bootstrapper.full_options(build_config, union_membership)
+            return options_bootstrapper.full_options(
+                build_config.known_scope_infos, union_membership, build_config.allow_unknown_options
+            )
 
     @contextmanager
     def handle_unknown_flags(
@@ -186,8 +186,8 @@ class OptionsInitializer:
                 options_bootstrapper, args=("dummy_first_arg",)
             )
             options = no_arg_bootstrapper.full_options(
-                build_config,
-                union_membership=UnionMembership({}),
+                build_config.known_scope_infos,
+                union_membership=UnionMembership.empty(),
             )
             FlagErrorHelpPrinter(options).handle_unknown_flags(err)
             if raise_:

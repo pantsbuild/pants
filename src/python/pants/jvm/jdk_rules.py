@@ -9,20 +9,21 @@ import os
 import re
 import shlex
 import textwrap
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import Enum
-from typing import ClassVar, Iterable, Mapping
+from typing import ClassVar
 
-from pants.core.util_rules.environments import EnvironmentTarget
+from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.util_rules.system_binaries import BashBinary, LnBinary
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileDigest, MergeDigests
-from pants.engine.internals.selectors import Get
-from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
-from pants.engine.rules import collect_rules, rule
+from pants.engine.intrinsics import create_digest, execute_process, merge_digests
+from pants.engine.process import Process, ProcessCacheScope
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import CoarsenedTarget
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.resolve.coordinate import Coordinate, Coordinates
-from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
+from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, coursier_fetch_one_coord
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmJdkField
@@ -164,8 +165,7 @@ def parse_jre_major_version(version_lines: str) -> int | None:
 
 @rule
 async def fetch_nailgun() -> Nailgun:
-    nailgun = await Get(
-        ClasspathEntry,
+    nailgun = await coursier_fetch_one_coord(
         CoursierLockfileEntry(
             coord=Coordinate.from_coord_str("com.martiansoftware:nailgun-server:0.9.1"),
             file_name="com.martiansoftware_nailgun-server_0.9.1.jar",
@@ -175,23 +175,10 @@ async def fetch_nailgun() -> Nailgun:
                 fingerprint="4518faa6bf4bd26fccdc4d85e1625dc679381a08d56872d8ad12151dda9cef25",
                 serialized_bytes_length=32927,
             ),
-        ),
+        )
     )
 
     return Nailgun(nailgun)
-
-
-@rule
-async def internal_jdk(jvm: JvmSubsystem) -> InternalJdk:
-    """Creates a `JdkEnvironment` object based on the JVM subsystem options.
-
-    This is used for providing a predictable JDK version for Pants' internal usage rather than for
-    matching compatibility with source files (e.g. compilation/testing).
-    """
-
-    request = JdkRequest(jvm.tool_jdk) if jvm.tool_jdk is not None else JdkRequest.SYSTEM
-    env = await Get(JdkEnvironment, JdkRequest, request)
-    return InternalJdk.from_jdk_environment(env)
 
 
 @rule
@@ -242,8 +229,7 @@ async def prepare_jdk_environment(
         **coursier.env,
     }
 
-    java_version_result = await Get(
-        FallibleProcessResult,
+    java_version_result = await execute_process(
         Process(
             argv=(
                 bash.path,
@@ -257,6 +243,7 @@ async def prepare_jdk_environment(
             cache_scope=env_target.executable_search_path_cache_scope(),
             level=LogLevel.DEBUG,
         ),
+        **implicitly(),
     )
 
     if java_version_result.exit_code != 0:
@@ -288,8 +275,7 @@ async def prepare_jdk_environment(
         exec "$@"
         """
     )
-    jdk_preparation_script_digest = await Get(
-        Digest,
+    jdk_preparation_script_digest = await create_digest(
         CreateDigest(
             [
                 FileContent(
@@ -302,8 +288,7 @@ async def prepare_jdk_environment(
     )
 
     return JdkEnvironment(
-        _digest=await Get(
-            Digest,
+        _digest=await merge_digests(
             MergeDigests(
                 [
                     jdk_preparation_script_digest,
@@ -317,6 +302,19 @@ async def prepare_jdk_environment(
         jre_major_version=jre_major_version,
         java_home_command=java_home_command,
     )
+
+
+@rule
+async def internal_jdk(jvm: JvmSubsystem) -> InternalJdk:
+    """Creates a `JdkEnvironment` object based on the JVM subsystem options.
+
+    This is used for providing a predictable JDK version for Pants' internal usage rather than for
+    matching compatibility with source files (e.g. compilation/testing).
+    """
+
+    request = JdkRequest(jvm.tool_jdk) if jvm.tool_jdk is not None else JdkRequest.SYSTEM
+    env = await prepare_jdk_environment(**implicitly({request: JdkRequest}))
+    return InternalJdk.from_jdk_environment(env)
 
 
 @dataclass(frozen=True)

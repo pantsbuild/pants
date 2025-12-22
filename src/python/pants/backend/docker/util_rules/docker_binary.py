@@ -5,23 +5,25 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Mapping, Sequence, cast
+from typing import cast
 
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
 from pants.core.util_rules.system_binaries import (
     BinaryPath,
     BinaryPathRequest,
-    BinaryPaths,
     BinaryPathTest,
     BinaryShims,
     BinaryShimsRequest,
+    create_binary_shims,
+    find_binary,
 )
 from pants.engine.fs import Digest
-from pants.engine.internals.selectors import MultiGet
+from pants.engine.internals.selectors import concurrently
 from pants.engine.process import Process, ProcessCacheScope
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -95,7 +97,7 @@ class DockerBinary(BinaryPath):
             argv=tuple(args),
             description=(
                 f"Building docker image {tags[0]}"
-                + (f" +{pluralize(len(tags)-1, 'additional tag')}." if len(tags) > 1 else "")
+                + (f" +{pluralize(len(tags) - 1, 'additional tag')}." if len(tags) > 1 else "")
             ),
             env=self._get_process_environment(env),
             input_digest=digest,
@@ -146,8 +148,8 @@ async def _get_docker_tools_shims(
             for binary_name in tools
         ]
 
-        tools_paths = await MultiGet(
-            Get(BinaryPaths, BinaryPathRequest, tools_request) for tools_request in tools_requests
+        tools_paths = await concurrently(
+            find_binary(tools_request, **implicitly()) for tools_request in tools_requests
         )
 
         all_binary_first_paths.extend(
@@ -163,8 +165,8 @@ async def _get_docker_tools_shims(
             for binary_name in optional_tools
         ]
 
-        optional_tools_paths = await MultiGet(
-            Get(BinaryPaths, BinaryPathRequest, optional_tools_request)
+        optional_tools_paths = await concurrently(
+            find_binary(optional_tools_request, **implicitly())
             for optional_tools_request in optional_tools_requests
         )
 
@@ -176,13 +178,12 @@ async def _get_docker_tools_shims(
             ]
         )
 
-    tools_shims = await Get(
-        BinaryShims,
-        BinaryShimsRequest,
+    tools_shims = await create_binary_shims(
         BinaryShimsRequest.for_paths(
             *all_binary_first_paths,
             rationale=rationale,
         ),
+        **implicitly(),
     )
 
     return tools_shims
@@ -204,7 +205,7 @@ async def get_docker(
             search_path=search_path,
             test=BinaryPathTest(args=["-v"]),
         )
-        paths = await Get(BinaryPaths, BinaryPathRequest, request)
+        paths = await find_binary(request, **implicitly())
         first_path = paths.first_path
         if first_path:
             is_podman = True
@@ -216,7 +217,7 @@ async def get_docker(
             search_path=search_path,
             test=BinaryPathTest(args=["-v"]),
         )
-        paths = await Get(BinaryPaths, BinaryPathRequest, request)
+        paths = await find_binary(request, **implicitly())
         first_path = paths.first_path_or_raise(request, rationale="interact with the docker daemon")
 
     if not docker_options.tools and not docker_options.optional_tools:

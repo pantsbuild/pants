@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from pants.backend.codegen.thrift.apache.java import subsystem, symbol_mapper
 from pants.backend.codegen.thrift.apache.java.subsystem import ApacheThriftJavaSubsystem
 from pants.backend.codegen.thrift.apache.rules import (
-    GeneratedThriftSources,
     GenerateThriftSourcesRequest,
+    generate_apache_thrift_sources,
 )
 from pants.backend.codegen.thrift.target_types import (
     ThriftDependenciesField,
@@ -18,9 +18,9 @@ from pants.backend.codegen.thrift.target_types import (
 )
 from pants.backend.java.target_types import JavaSourceField
 from pants.build_graph.address import Address
-from pants.engine.fs import AddPrefix, Digest, Snapshot
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import collect_rules, rule
+from pants.engine.fs import AddPrefix
+from pants.engine.intrinsics import digest_to_snapshot
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
     FieldSet,
     GeneratedSources,
@@ -37,7 +37,7 @@ from pants.jvm.dependency_inference.artifact_mapper import (
 )
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField, PrefixedJvmJdkField, PrefixedJvmResolveField
-from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.source.source_root import SourceRootRequest, get_source_root
 from pants.util.logging import LogLevel
 
 
@@ -51,24 +51,22 @@ async def generate_java_from_thrift(
     request: GenerateJavaFromThriftRequest,
     thrift_java: ApacheThriftJavaSubsystem,
 ) -> GeneratedSources:
-    result = await Get(
-        GeneratedThriftSources,
+    result = await generate_apache_thrift_sources(
         GenerateThriftSourcesRequest(
             thrift_source_field=request.protocol_target[ThriftSourceField],
             lang_id="java",
             lang_options=thrift_java.gen_options,
             lang_name="Java",
         ),
+        **implicitly(),
     )
 
-    source_root = await Get(
-        SourceRoot, SourceRootRequest, SourceRootRequest.for_target(request.protocol_target)
-    )
+    source_root = await get_source_root(SourceRootRequest.for_target(request.protocol_target))
 
     source_root_restored = (
-        await Get(Snapshot, AddPrefix(result.snapshot.digest, source_root.path))
+        await digest_to_snapshot(**implicitly(AddPrefix(result.snapshot.digest, source_root.path)))
         if source_root.path != "."
-        else await Get(Snapshot, Digest, result.snapshot.digest)
+        else await digest_to_snapshot(result.snapshot.digest)
     )
     return GeneratedSources(source_root_restored)
 
@@ -127,8 +125,8 @@ async def infer_apache_thrift_java_dependencies(
 ) -> InferredDependencies:
     resolve = request.field_set.resolve.normalized_value(jvm)
 
-    dependencies_info = await Get(
-        ApacheThriftJavaRuntimeForResolve, ApacheThriftJavaRuntimeForResolveRequest(resolve)
+    dependencies_info = await resolve_apache_thrift_java_runtime_for_resolve(
+        ApacheThriftJavaRuntimeForResolveRequest(resolve), **implicitly()
     )
     return InferredDependencies(dependencies_info.addresses)
 

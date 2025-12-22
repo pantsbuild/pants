@@ -1,12 +1,13 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 """Disallow 'await' in a loop."""
+
 from __future__ import annotations
 
 import ast
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import PurePath
-from typing import Iterator, Sequence
 
 
 def check_for_await_in_loop(tree: ast.AST, filename: str) -> Iterator[tuple[int, int, str, None]]:

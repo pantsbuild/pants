@@ -1,7 +1,6 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from dataclasses import dataclass
-from typing import Optional
 
 from pants.engine.collection import Collection
 
@@ -49,5 +48,5 @@ class Hunk:
     In the special case when file is deleted right = None.
     """
 
-    left: Optional[TextBlock]
-    right: Optional[TextBlock]
+    left: TextBlock | None
+    right: TextBlock | None

@@ -9,21 +9,21 @@ use deepsize::DeepSizeOf;
 use fs::RelativePath;
 use graph::CompoundNode;
 use process_execution::{
-    self, CacheName, InputDigests, Process, ProcessCacheScope, ProcessExecutionStrategy,
-    ProcessResultSource,
+    self, CacheName, InputDigests, Process, ProcessCacheScope, ProcessConcurrency,
+    ProcessExecutionStrategy, ProcessResultSource,
 };
+use pyo3::Bound;
 use pyo3::prelude::{PyAny, Python};
 use pyo3::pybacked::PyBackedStr;
-use pyo3::Bound;
 use store::{self, Store, StoreError};
 use workunit_store::{
     Metric, ObservationMetric, RunningWorkunit, UserMetadataItem, WorkunitMetadata,
 };
 
-use super::{lift_directory_digest, NodeKey, NodeOutput, NodeResult};
+use super::{NodeKey, NodeOutput, NodeResult, lift_directory_digest};
 use crate::context::Context;
 use crate::externs;
-use crate::python::{throw, Value};
+use crate::python::{Value, throw};
 
 /// A Node that represents a process to execute.
 ///
@@ -37,7 +37,7 @@ impl ExecuteProcess {
         store: &Store,
         value: &Value,
     ) -> Result<InputDigests, StoreError> {
-        let input_digests_fut: Result<_, String> = Python::with_gil(|py| {
+        let input_digests_fut: Result<_, String> = Python::attach(|py| {
             let value = value.bind(py);
             let input_files = {
                 let input_files_py_value: Bound<'_, PyAny> =
@@ -125,6 +125,29 @@ impl ExecuteProcess {
 
         let concurrency_available: usize = externs::getattr(value, "concurrency_available")?;
 
+        let concurrency_value: Option<Bound<'_, PyAny>> = externs::getattr(value, "concurrency")?;
+        let concurrency: Option<ProcessConcurrency> = match concurrency_value {
+            None => Ok(None),
+            Some(conc) => {
+                let kind_opt = externs::getattr_as_optional_string(&conc, "kind")
+                    .map_err(|e| format!("Failed to get `kind` from field: {e}"))?;
+
+                match kind_opt {
+                    Some(kind) if kind == "exactly" => {
+                        let count: usize = externs::getattr(&conc, "min")?;
+                        Ok(Some(ProcessConcurrency::Exactly { count }))
+                    }
+                    Some(kind) if kind == "range" => {
+                        let min: Option<usize> = externs::getattr(&conc, "min")?;
+                        let max: Option<usize> = externs::getattr(&conc, "max")?;
+                        Ok(Some(ProcessConcurrency::Range { min, max }))
+                    }
+                    Some(kind) if kind == "exclusive" => Ok(Some(ProcessConcurrency::Exclusive)),
+                    _ => Err(format!("Unknown ProcessConcurrency kind: {kind_opt:?}")),
+                }
+            }
+        }?;
+
         let cache_scope: ProcessCacheScope = {
             let cache_scope_enum: Bound<'_, PyAny> = externs::getattr(value, "cache_scope")?;
             externs::getattr::<String>(&cache_scope_enum, "name")?.try_into()?
@@ -135,10 +158,10 @@ impl ExecuteProcess {
                 .map_err(|e| format!("Failed to get `name` for field: {e}"))? as u64,
         );
 
-        let attempt = externs::getattr(value, "attempt").unwrap_or(0);
+        let attempt = externs::getattr::<usize>(value, "attempt").unwrap_or(0);
 
         Ok(Process {
-            argv: externs::getattr(value, "argv").unwrap(),
+            argv: externs::getattr(value, "argv")?,
             env,
             working_directory,
             input_digests,
@@ -151,6 +174,7 @@ impl ExecuteProcess {
             jdk_home,
             execution_slot_variable,
             concurrency_available,
+            concurrency,
             cache_scope,
             execution_environment: process_config.environment,
             remote_cache_speculation_delay,
@@ -164,7 +188,7 @@ impl ExecuteProcess {
         process_config: externs::process::PyProcessExecutionEnvironment,
     ) -> Result<Self, StoreError> {
         let input_digests = Self::lift_process_input_digests(store, &value).await?;
-        let process = Python::with_gil(|py| {
+        let process = Python::attach(|py| {
             Self::lift_process_fields(value.bind(py), input_digests, process_config)
         })?;
         Ok(Self { process })

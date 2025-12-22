@@ -4,9 +4,10 @@
 from __future__ import annotations
 
 import inspect
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Generic, Iterator, TypeVar, Union, cast, overload
+from typing import Any, Generic, TypeVar, Union, cast, overload
 
 from pants.option import custom_types
 from pants.util.docutil import bin_name

@@ -5,9 +5,9 @@ from __future__ import annotations
 import itertools
 import logging
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable
 
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import VenvPexProcess, create_venv_pex
@@ -41,7 +41,7 @@ _DEFAULT_SEMGREP_CONFIG_DIR = ".semgrep"
 
 class SemgrepLintRequest(LintTargetsRequest):
     field_set_type = SemgrepFieldSet
-    tool_subsystem = SemgrepSubsystem
+    tool_subsystem = SemgrepSubsystem  # type: ignore[assignment]
 
 
 @dataclass(frozen=True)

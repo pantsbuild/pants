@@ -466,7 +466,7 @@ You can also set the key `__default__` to apply the same constraints file to eve
 
 ### `only_binary` and `no_binary`
 
-You can use `[python].resolves_to_only_binary` to avoid using sdists (source distributions) for certain requirements, and `[python].resolve_to_no_binary` to avoid using bdists (wheel files) for certain requirements.
+You can use `[python].resolves_to_only_binary` to avoid using sdists (source distributions) for certain requirements, and `[python].resolves_to_no_binary` to avoid using bdists (wheel files) for certain requirements.
 
 `only_binary` and `no_binary` are configured per-resolve, meaning that the resolves for your user code from `[python].resolves` and each Python tool, such as Black and Pytest, can have different configuration. Use the options `[python].resolves_to_only_binary` and `[python].resolves_to_no_binary` to map resolve names to list of Python requirement names.
 

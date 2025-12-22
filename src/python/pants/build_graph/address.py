@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.base.exceptions import MappingError
 from pants.engine.engine_aware import EngineAwareParameter
@@ -88,9 +88,6 @@ class ResolveError(MappingError):
 @dataclass(frozen=True)
 class MaybeAddress:
     """A target address, or an error if it could not be created.
-
-    Use `Get(MaybeAddress, AddressInput)`, rather than the fallible variant
-    `Get(Address, AddressInput)`.
 
     Note that this does not validate the address's target actually exists. It only validates that
     the address is well-formed and that its spec_path exists.

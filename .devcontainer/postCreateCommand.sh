@@ -8,6 +8,9 @@ echo "Installing local git hooks..."
 # See: https://www.pantsbuild.org/stable/docs/contributions/development/setting-up-pants#step-3-set-up-a-pre-push-git-hook
 build-support/bin/setup.sh
 
+echo "Upgrading pip..."
+pip install --upgrade pip
+
 echo "Installing py-sy and memray for CPU and Memory profiling..."
 # See: https://www.pantsbuild.org/stable/docs/contributions/development/debugging-and-benchmarking
 pip install py-spy memray

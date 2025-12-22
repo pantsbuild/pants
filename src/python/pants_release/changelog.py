@@ -120,7 +120,7 @@ def format_notes_by_category(entries: list[Entry]) -> str:
 def format_notes(entries: list[Entry]) -> str:
     if not entries:
         return ""
-    return "\n\n".join([entry.text for entry in entries if entry.category != Category.Internal])
+    return "\n\n".join(entry.text for entry in entries)
 
 
 def main() -> None:

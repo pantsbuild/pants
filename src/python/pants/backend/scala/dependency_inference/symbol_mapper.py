@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Mapping
+from collections.abc import Mapping
 
-from pants.backend.scala.dependency_inference.scala_parser import ScalaSourceDependencyAnalysis
+from pants.backend.scala.dependency_inference.scala_parser import (
+    resolve_fallible_result_to_analysis,
+)
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
+from pants.engine.internals.selectors import concurrently
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import AllTargets, Targets
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import symbol_mapper
@@ -36,7 +38,7 @@ class FirstPartyScalaTargetsMappingRequest(FirstPartyMappingRequest):
 
 
 @rule(desc="Find all Scala targets in project", level=LogLevel.DEBUG)
-def find_all_scala_targets(targets: AllTargets) -> AllScalaTargets:
+async def find_all_scala_targets(targets: AllTargets) -> AllScalaTargets:
     return AllScalaTargets(tgt for tgt in targets if tgt.has_field(ScalaSourceField))
 
 
@@ -60,8 +62,10 @@ async def map_first_party_scala_targets_to_symbols(
     scala_targets: AllScalaTargets,
     jvm: JvmSubsystem,
 ) -> SymbolMap:
-    source_analysis = await MultiGet(
-        Get(ScalaSourceDependencyAnalysis, SourceFilesRequest([target[ScalaSourceField]]))
+    source_analysis = await concurrently(
+        resolve_fallible_result_to_analysis(
+            **implicitly(SourceFilesRequest([target[ScalaSourceField]]))
+        )
         for target in scala_targets
     )
     address_and_analysis = zip(

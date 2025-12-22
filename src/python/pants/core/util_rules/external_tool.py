@@ -11,7 +11,7 @@ from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 
-from pkg_resources import Requirement
+from packaging.requirements import Requirement
 
 from pants.core.goals.export import (
     ExportedBinary,
@@ -22,12 +22,14 @@ from pants.core.goals.export import (
 )
 from pants.core.goals.resolves import ExportableTool, ExportMode
 from pants.core.util_rules import archive
-from pants.core.util_rules.archive import ExtractedArchive
+from pants.core.util_rules.archive import maybe_extract_archive
+from pants.engine.download_file import download_file
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import CreateDigest, Digest, DigestEntries, DownloadFile, FileDigest, FileEntry
-from pants.engine.internals.selectors import MultiGet
+from pants.engine.fs import CreateDigest, Digest, DownloadFile, FileDigest, FileEntry
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import create_digest, get_digest_entries
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.option_types import DictOption, EnumOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem, _construct_subsystem
@@ -144,7 +146,7 @@ class ExternalToolOptionsMixin:
         `version|platform|sha256|length|url_override`, where:
 
           - `version` is the version string
-          - `platform` is one of `[{','.join(Platform.__members__.keys())}]`
+          - `platform` is one of `[{",".join(Platform.__members__.keys())}]`
           - `sha256` is the 64-character hex representation of the expected sha256
             digest of the download file, as emitted by `shasum -a 256`
           - `length` is the expected length of the download file in bytes, as emitted by
@@ -188,12 +190,8 @@ class ExternalTool(Subsystem, ExportableTool, ExternalToolOptionsMixin, metaclas
             return "./path-to/binary
 
     @rule
-    def my_rule(my_external_tool: MyExternalTool, platform: Platform) -> Foo:
-        downloaded_tool = await Get(
-            DownloadedExternalTool,
-            ExternalToolRequest,
-            my_external_tool.get_request(platform)
-        )
+    async def my_rule(my_external_tool: MyExternalTool, platform: Platform) -> Foo:
+        downloaded_tool = await download_external_tool(my_external_tool.get_request(platform))
         ...
     """
 
@@ -293,9 +291,9 @@ class ExternalTool(Subsystem, ExportableTool, ExternalToolOptionsMixin, metaclas
         if not self.version_constraints:
             return None
         # Note that this is not a Python requirement. We're just hackily piggybacking off
-        # pkg_resource.Requirement's ability to check version constraints.
-        constraints = Requirement.parse(f"{self.name}{self.version_constraints}")
-        if constraints.specifier.contains(self.version):  # type: ignore[attr-defined]
+        # packaging.requirements.Requirement's ability to check version constraints.
+        constraints = Requirement(f"{self.name}{self.version_constraints}")
+        if constraints.specifier.contains(self.version):
             # all ok
             return None
 
@@ -343,7 +341,7 @@ class TemplatedExternalToolOptionsMixin(ExternalToolOptionsMixin):
             (e.g. zip file). You can change this to point to your own hosted file, e.g. to
             work with proxies or for access via the filesystem through a `file:$abspath` URL (e.g.
             `file:/this/is/absolute`, possibly by
-            [templating the buildroot in a config file]({doc_url('docs/using-pants/key-concepts/options#config-file-entries')})).
+            [templating the buildroot in a config file]({doc_url("docs/using-pants/key-concepts/options#config-file-entries")})).
 
             Use `{{version}}` to have the value from `--version` substituted, and `{{platform}}` to
             have a value from `--url-platform-mapping` substituted in, depending on the
@@ -396,22 +394,22 @@ class TemplatedExternalTool(ExternalTool, TemplatedExternalToolOptionsMixin):
 @rule(level=LogLevel.DEBUG)
 async def download_external_tool(request: ExternalToolRequest) -> DownloadedExternalTool:
     # Download and extract.
-    maybe_archive_digest = await Get(Digest, DownloadFile, request.download_file_request)
-    extracted_archive = await Get(ExtractedArchive, Digest, maybe_archive_digest)
+    maybe_archive_digest = await download_file(request.download_file_request, **implicitly())
+    extracted_archive = await maybe_extract_archive(**implicitly(maybe_archive_digest))
 
     # Confirm executable.
     exe_path = request.exe.lstrip("./")
     digest = extracted_archive.digest
     is_not_executable = False
     digest_entries = []
-    for entry in await Get(DigestEntries, Digest, digest):
+    for entry in await get_digest_entries(digest):
         if isinstance(entry, FileEntry) and entry.path == exe_path and not entry.is_executable:
             # We should recreate the digest with the executable bit set.
             is_not_executable = True
             entry = dataclasses.replace(entry, is_executable=True)
         digest_entries.append(entry)
     if is_not_executable:
-        digest = await Get(Digest, CreateDigest(digest_entries))
+        digest = await create_digest(CreateDigest(digest_entries))
 
     return DownloadedExternalTool(digest, request.exe)
 
@@ -452,9 +450,7 @@ async def export_external_tool(
         return MaybeExportResult(None)
 
     tool = await _construct_subsystem(maybe_exportable)
-    downloaded_tool = await Get(
-        DownloadedExternalTool, ExternalToolRequest, tool.get_request(platform)
-    )
+    downloaded_tool = await download_external_tool(tool.get_request(platform))
 
     dest = os.path.join("bins", tool.name)
 
@@ -474,8 +470,8 @@ async def export_external_tool(
 async def export_external_tools(
     request: ExportExternalToolRequest, export: ExportSubsystem
 ) -> ExportResults:
-    maybe_tools = await MultiGet(
-        Get(MaybeExportResult, _ExportExternalToolForResolveRequest(resolve))
+    maybe_tools = await concurrently(
+        export_external_tool(_ExportExternalToolForResolveRequest(resolve), **implicitly())
         for resolve in export.binaries
     )
     return ExportResults(tool.result for tool in maybe_tools if tool.result is not None)

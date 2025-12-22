@@ -6,10 +6,11 @@ from __future__ import annotations
 import importlib.util
 import json
 import logging
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path, PurePath
-from typing import Callable, Iterable, TypedDict
+from typing import TypedDict
 
 import libcst as cst
 import libcst.helpers as h
@@ -88,13 +89,13 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
 
         plan_files = {item["filepath"] for item in migration_plan}
 
-        paths: list[Paths] = graph_session.scheduler_session.product_request(Paths, [path_globs])
+        paths: list[Paths] = graph_session.scheduler_session.product_request(Paths, path_globs)
         requested_files = set(paths[0].files)
 
         files_to_migrate = requested_files.intersection(plan_files)
         if not files_to_migrate:
             logger.info(
-                f"None of the {len(requested_files)} requested files are part of the {len(plan_files)} files in the migration plan"
+                f"None of the {len(requested_files)} requested files are part of the {len(plan_files)} files in the migration plan. Please ensure the backend containing these files is activated in pants.toml."
             )
             return PANTS_SUCCEEDED_EXIT_CODE
 
@@ -131,10 +132,17 @@ class MigrateCallByNameBuiltinGoal(BuiltinGoal):
 
             assert (spec := importlib.util.find_spec(rule.__module__)) is not None
             assert spec.origin is not None
-            spec_origin = PurePath(spec.origin)
+
+            try:
+                spec_origin = str(PurePath(spec.origin).relative_to(build_root))
+            except ValueError:
+                logger.debug(
+                    f"Ignoring migration plan item located outside of build_root ({build_root}) - file was located at {spec.origin}"
+                )
+                continue
 
             item: RuleGraphGet = {
-                "filepath": str(spec_origin.relative_to(build_root)),
+                "filepath": spec_origin,
                 "module": rule.__module__,
                 "function": rule.__name__,
                 "gets": [],

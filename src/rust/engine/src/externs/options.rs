@@ -3,12 +3,12 @@
 
 use pyo3::exceptions::PyException;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
-use pyo3::{prelude::*, BoundObject};
+use pyo3::{BoundObject, prelude::*};
 
 use options::{
-    apply_dict_edits, apply_list_edits, bin_name, Args, ConfigSource, DictEdit, DictEditAction,
-    Env, GoalInfo, ListEdit, ListEditAction, ListOptionValue, OptionId, OptionParser,
-    OptionalOptionValue, PantsCommand, Scope, Source, Val,
+    Args, ConfigSource, DictEdit, DictEditAction, Env, GoalInfo, ListEdit, ListEditAction,
+    ListOptionValue, OptionId, OptionParser, OptionalOptionValue, PantsCommand, Scope, Source, Val,
+    apply_dict_edits, apply_list_edits, bin_name,
 };
 
 use itertools::Itertools;
@@ -33,7 +33,7 @@ pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
 // The (nested) values of a dict-valued option are represented by Val.
 // This function converts them to equivalent Python types.
-fn val_to_py_object(py: Python, val: &Val) -> PyResult<PyObject> {
+fn val_to_py_object(py: Python, val: &Val) -> PyResult<Py<PyAny>> {
     let res = match val {
         Val::Bool(b) => b.into_pyobject(py)?.into_any().unbind(),
         Val::Int(i) => i.into_pyobject(py)?.into_any().unbind(),
@@ -64,7 +64,7 @@ fn dict_into_py(py: Python, vals: HashMap<String, Val>) -> PyResult<PyDictVal> {
             Ok(pyobj) => Ok((k, pyobj)),
             Err(err) => Err(err),
         })
-        .collect::<PyResult<HashMap<String, PyObject>>>()
+        .collect::<PyResult<HashMap<String, Py<PyAny>>>>()
 }
 
 // Converts a Python object into a Val, which is necessary for receiving
@@ -92,7 +92,7 @@ pub(crate) fn py_object_to_val(obj: &Bound<'_, PyAny>) -> Result<Val, PyErr> {
         Ok(Val::Float(obj.extract()?))
     } else if obj.is_instance_of::<PyDict>() {
         Ok(Val::Dict(
-            obj.downcast::<PyDict>()?
+            obj.cast::<PyDict>()?
                 .iter()
                 .map(|(k, v)| {
                     Ok::<(String, Val), PyErr>((k.extract::<String>()?, py_object_to_val(&v)?))
@@ -101,14 +101,14 @@ pub(crate) fn py_object_to_val(obj: &Bound<'_, PyAny>) -> Result<Val, PyErr> {
         ))
     } else if obj.is_instance_of::<PyList>() {
         Ok(Val::List(
-            obj.downcast::<PyList>()?
+            obj.cast::<PyList>()?
                 .iter()
                 .map(|v| py_object_to_val(&v))
                 .collect::<Result<Vec<_>, _>>()?,
         ))
     } else if obj.is_instance_of::<PyTuple>() {
         Ok(Val::List(
-            obj.downcast::<PyTuple>()?
+            obj.cast::<PyTuple>()?
                 .iter()
                 .map(|v| py_object_to_val(&v))
                 .collect::<Result<Vec<_>, _>>()?,
@@ -164,9 +164,8 @@ impl PyOptionId {
             None => None,
             Some(s) => {
                 return Err(ParseError::new_err(format!(
-                    "Switch value should contain a single character, but was: {}",
-                    s
-                )))
+                    "Switch value should contain a single character, but was: {s}"
+                )));
             }
         };
         let option_id =
@@ -196,7 +195,7 @@ impl PyPantsCommand {
         &self.0.specs
     }
 
-    fn passthru(&self) -> &Vec<String> {
+    fn passthru(&self) -> &Option<Vec<String>> {
         &self.0.passthru
     }
 }
@@ -219,7 +218,7 @@ impl PyConfigSource {
 struct PyOptionParser(OptionParser);
 
 // The pythonic value of a dict-typed option.
-type PyDictVal = HashMap<String, PyObject>;
+type PyDictVal = HashMap<String, Py<PyAny>>;
 
 // The derivation of the option value, as a vec of (value, rank, details string) tuples.
 type OptionValueDerivation<'py, T> = Vec<(T, isize, Option<Bound<'py, PyString>>)>;
@@ -581,7 +580,7 @@ impl PyOptionParser {
     fn validate_config(
         &self,
         py: Python<'_>,
-        py_valid_keys: HashMap<String, PyObject>,
+        py_valid_keys: HashMap<String, Py<PyAny>>,
     ) -> PyResult<Vec<String>> {
         let mut valid_keys = HashMap::new();
 

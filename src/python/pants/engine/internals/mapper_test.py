@@ -37,7 +37,7 @@ def parse_address_map(build_file: str, *, ignore_unrecognized_symbols: bool = Fa
     parser = Parser(
         build_root="",
         registered_target_types=RegisteredTargetTypes({"thing": GenericTarget}),
-        union_membership=UnionMembership({}),
+        union_membership=UnionMembership.empty(),
         object_aliases=BuildFileAliases(),
         ignore_unrecognized_symbols=ignore_unrecognized_symbols,
     )
@@ -49,7 +49,7 @@ def parse_address_map(build_file: str, *, ignore_unrecognized_symbols: bool = Fa
         EnvironmentVars({}),
         False,
         BuildFileDefaultsParserState.create(
-            "", BuildFileDefaults({}), RegisteredTargetTypes({}), UnionMembership({})
+            "", BuildFileDefaults({}), RegisteredTargetTypes({}), UnionMembership.empty()
         ),
         dependents_rules=None,
         dependencies_rules=None,

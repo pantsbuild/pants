@@ -6,12 +6,13 @@ from __future__ import annotations
 import json
 import shlex
 import unittest.mock
+from collections.abc import Callable
 from contextlib import contextmanager
 from enum import Enum
 from functools import partial
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Callable, Dict, List, cast
+from typing import Any, cast
 
 import pytest
 import toml
@@ -79,7 +80,10 @@ def create_options(
         args=["pants", *(args or ())],
         env=env or {},
         config_sources=[FileContent("pants.toml", toml.dumps(config or {}).encode())],
-        known_scope_infos=[*(ScopeInfo(scope) for scope in scopes), *(extra_scope_infos or ())],
+        known_scope_infos=[
+            *(ScopeInfo(scope, is_goal=scope != GLOBAL_SCOPE) for scope in scopes),
+            *(extra_scope_infos or ()),
+        ],
     )
     register_fn(options)
     return options
@@ -449,7 +453,7 @@ def test_scope_deprecation(caplog) -> None:
 def _create_config(
     config: dict[str, dict[str, str]] | None = None,
     config2: dict[str, dict[str, str]] | None = None,
-) -> List[FileContent]:
+) -> list[FileContent]:
     return [
         FileContent("test_config.toml", toml.dumps(config or {}).encode()),
         FileContent("test_config2.toml", toml.dumps(config2 or {}).encode()),
@@ -478,26 +482,28 @@ def _parse(
 
 
 _known_scope_infos = [
-    ScopeInfo(scope)
-    for scope in (
-        GLOBAL_SCOPE,
-        "anotherscope",
-        "compile",
-        "compile.java",
-        "stale",
-        "test",
-        "test.junit",
-        "passconsumer",
-        "simple",
-        "simple-dashed",
-        "scoped.a.bit",
-        "scoped.and-dashed",
-        "fromfile",
-        "fingerprinting",
-        "enum-opt",
-        "separate-enum-opt-scope",
-        "other-enum-scope",
-    )
+    ScopeInfo(GLOBAL_SCOPE),
+    *[
+        ScopeInfo(scope, is_goal=True)
+        for scope in (
+            "anotherscope",
+            "compile",
+            "compile.java",
+            "stale",
+            "test",
+            "test.junit",
+            "passconsumer",
+            "simple",
+            "simple-dashed",
+            "scoped.a.bit",
+            "scoped.and-dashed",
+            "fromfile",
+            "fingerprinting",
+            "enum-opt",
+            "separate-enum-opt-scope",
+            "other-enum-scope",
+        )
+    ],
 ]
 
 
@@ -1478,7 +1484,7 @@ def test_pants_global_with_default() -> None:
     # This cast shouldn't be necessary - likely a bug in MyPy. Once this gets fixed, MyPy will
     # tell us that we can remove the cast.
     config = cast(
-        Dict[str, Dict[str, Any]],
+        dict[str, dict[str, Any]],
         {"DEFAULT": {"num": "99"}, "GLOBAL": {"store_true_flag": True}},
     )
     global_options = _parse(config=config).for_global_scope()

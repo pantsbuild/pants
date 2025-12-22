@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 from pants.backend.cue import subsystem
 from pants.backend.cue.rules import _run_cue
@@ -19,7 +20,7 @@ from pants.util.logging import LogLevel
 
 class CueLintRequest(LintTargetsRequest):
     field_set_type = CueFieldSet
-    tool_subsystem = Cue
+    tool_subsystem = Cue  # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

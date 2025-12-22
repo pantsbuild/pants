@@ -4,8 +4,9 @@
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Sequence
 from textwrap import dedent
-from typing import Sequence, cast
+from typing import cast
 
 import pytest
 

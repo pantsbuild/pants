@@ -4,7 +4,10 @@
 from __future__ import annotations
 
 import re
-from typing import Callable
+from collections.abc import Callable
+from dataclasses import dataclass, field
+
+from pants.engine.streaming_workunit_handler import WorkunitsCallback
 
 
 def assert_equal_with_printing(
@@ -29,3 +32,29 @@ def remove_locations_from_traceback(trace: str) -> str:
     new_trace = location_pattern.sub("LOCATION-INFO", trace)
     new_trace = address_pattern.sub("0xEEEEEEEEE", new_trace)
     return new_trace
+
+
+@dataclass
+class WorkunitTracker(WorkunitsCallback):
+    """This class records every non-empty batch of started and completed workunits received from the
+    engine."""
+
+    finished_workunit_chunks: list[list[dict]] = field(default_factory=list)
+    started_workunit_chunks: list[list[dict]] = field(default_factory=list)
+    finished: bool = False
+
+    @property
+    def can_finish_async(self) -> bool:
+        return False
+
+    def __call__(self, **kwargs) -> None:
+        if kwargs["finished"] is True:
+            self.finished = True
+
+        started_workunits = kwargs.get("started_workunits")
+        if started_workunits:
+            self.started_workunit_chunks.append(started_workunits)
+
+        completed_workunits = kwargs.get("completed_workunits")
+        if completed_workunits:
+            self.finished_workunit_chunks.append(completed_workunits)

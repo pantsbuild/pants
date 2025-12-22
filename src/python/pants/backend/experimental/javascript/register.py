@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from pants.backend.javascript import package_json
 from pants.backend.javascript.goals import export, lockfile, tailor, test

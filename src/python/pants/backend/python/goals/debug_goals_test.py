@@ -128,9 +128,9 @@ def test_debug_goals(imports_rule_runner: PythonRuleRunner):
 
     assert result
     assert len(result.identified.imports) == 6
-    assert (
-        len([i for i in result.identified.imports.values() if i.weak]) == 1
-    ), "did not find the weak import"
+    assert len([i for i in result.identified.imports.values() if i.weak]) == 1, (
+        "did not find the weak import"
+    )
     assert len(result.identified.assets) == 1
     assert (
         result.resolved.assets[str(Path(filedir, "config.json"))].status

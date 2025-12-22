@@ -1,17 +1,14 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from pants.core.goals.resolves import ExportableTool
-from pants.core.util_rules.external_tool import (
-    DownloadedExternalTool,
-    ExternalToolRequest,
-    TemplatedExternalTool,
-)
+from pants.core.util_rules.external_tool import TemplatedExternalTool, download_external_tool
 from pants.engine.console import Console
-from pants.engine.fs import Digest, MergeDigests, PathGlobs, SpecsPaths
+from pants.engine.fs import MergeDigests, PathGlobs, SpecsPaths
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.intrinsics import merge_digests, path_globs_to_digest
 from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
+from pants.engine.process import Process, execute_process_or_raise
+from pants.engine.rules import collect_rules, concurrently, goal_rule, implicitly
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption
 from pants.util.logging import LogLevel
@@ -70,23 +67,20 @@ async def count_loc(
     if not specs_paths.files:
         return CountLinesOfCode(exit_code=0)
 
-    specs_digest, scc_program = await MultiGet(
-        Get(Digest, PathGlobs(globs=specs_paths.files)),
-        Get(
-            DownloadedExternalTool,
-            ExternalToolRequest,
-            succinct_code_counter.get_request(platform),
-        ),
+    specs_digest, scc_program = await concurrently(
+        path_globs_to_digest(PathGlobs(globs=specs_paths.files)),
+        download_external_tool(succinct_code_counter.get_request(platform)),
     )
-    input_digest = await Get(Digest, MergeDigests((scc_program.digest, specs_digest)))
-    result = await Get(
-        ProcessResult,
-        Process(
-            argv=(scc_program.exe, *succinct_code_counter.args),
-            input_digest=input_digest,
-            description=f"Count lines of code for {pluralize(len(specs_paths.files), 'file')}",
-            level=LogLevel.DEBUG,
-        ),
+    input_digest = await merge_digests(MergeDigests((scc_program.digest, specs_digest)))
+    result = await execute_process_or_raise(
+        **implicitly(
+            Process(
+                argv=(scc_program.exe, *succinct_code_counter.args),
+                input_digest=input_digest,
+                description=f"Count lines of code for {pluralize(len(specs_paths.files), 'file')}",
+                level=LogLevel.DEBUG,
+            )
+        )
     )
     console.print_stdout(result.stdout.decode())
     return CountLinesOfCode(exit_code=0)

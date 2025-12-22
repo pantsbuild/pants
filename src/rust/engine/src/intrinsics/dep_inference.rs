@@ -12,20 +12,21 @@ use dep_inference::{dockerfile, javascript, python};
 use fs::{DirectoryDigest, Entry, SymlinkBehavior};
 use grpc_util::prost::MessageExt;
 use hashing::Digest;
-use protos::gen::pants::cache::{
-    dependency_inference_request, CacheKey, CacheKeyType, DependencyInferenceRequest,
+use protos::pb::pants::cache::{
+    CacheKey, CacheKeyType, DependencyInferenceRequest, dependency_inference_request,
 };
-use pyo3::prelude::{pyfunction, wrap_pyfunction, PyModule, PyResult, Python};
+use pyo3::exceptions::PyException;
+use pyo3::prelude::{PyModule, PyResult, Python, pyfunction, wrap_pyfunction};
 use pyo3::types::{PyAnyMethods, PyModuleMethods};
 use pyo3::{Bound, IntoPyObject, PyErr};
 use store::Store;
-use workunit_store::{in_workunit, Level};
+use workunit_store::{Level, in_workunit};
 
 use crate::externs::dep_inference::PyNativeDependenciesRequest;
-use crate::externs::{store_dict, PyGeneratorResponseNativeCall};
-use crate::nodes::{task_get_context, NodeResult};
+use crate::externs::{PyGeneratorResponseNativeCall, store_dict};
+use crate::nodes::{NodeResult, task_get_context};
 use crate::python::{Failure, Value};
-use crate::{externs, Core};
+use crate::{Core, externs};
 
 pub fn register(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_dockerfile_info, m)?)?;
@@ -54,7 +55,7 @@ impl PreparedInferenceRequest {
         let PyNativeDependenciesRequest {
             directory_digest,
             metadata,
-        } = Python::with_gil(|py| deps_request.bind(py).extract())?;
+        } = Python::attach(|py| deps_request.bind(py).extract().map_err(PyErr::from))?;
 
         let (path, digest) = Self::find_one_file(directory_digest, store, backend).await?;
         let str_path = path.display().to_string();
@@ -145,12 +146,25 @@ fn parse_dockerfile_info(deps_request: Value) -> PyGeneratorResponseNativeCall {
                 )
                 .await?;
 
-                let result = Python::with_gil(|py| -> Result<_, PyErr> {
+                let result = Python::attach(|py| -> Result<_, PyErr> {
                     Ok(externs::unsafe_call(
                         py,
                         core.types.parsed_dockerfile_info_result,
                         &[
-                            result.path.into_pyobject(py)?.into_any().into(),
+                            result
+                                .path
+                                .as_os_str()
+                                .to_str()
+                                .map(|s| s.to_string())
+                                .ok_or_else(|| {
+                                    PyException::new_err(format!(
+                                        "Could not convert ParsedDockerfileInfo.path `{}` to UTF8.",
+                                        result.path.display()
+                                    ))
+                                })?
+                                .into_pyobject(py)?
+                                .into_any()
+                                .into(),
                             result.build_args.into_pyobject(py)?.into_any().into(),
                             result
                                 .copy_source_paths
@@ -166,7 +180,10 @@ fn parse_dockerfile_info(deps_request: Value) -> PyGeneratorResponseNativeCall {
                             result
                                 .version_tags
                                 .into_iter()
-                                .map(|(stage, tag)| format!("{stage} {tag}"))
+                                .map(|(stage, tag)| match tag {
+                                    Some(tag) => format!("{stage} {tag}"),
+                                    None => stage.to_string(),
+                                })
                                 .collect::<Vec<_>>()
                                 .into_pyobject(py)?
                                 .into_any()
@@ -210,7 +227,7 @@ fn parse_python_deps(deps_request: Value) -> PyGeneratorResponseNativeCall {
                 )
                 .await?;
 
-                let result = Python::with_gil(|py| -> Result<_, PyErr> {
+                let result = Python::attach(|py| -> Result<_, PyErr> {
                     Ok(externs::unsafe_call(
                         py,
                         core.types.parsed_python_deps_result,
@@ -278,7 +295,7 @@ fn parse_javascript_deps(deps_request: Value) -> PyGeneratorResponseNativeCall {
                 )
                 .await?;
 
-                Python::with_gil(|py| -> Result<_, Failure> {
+                Python::attach(|py| -> Result<_, Failure> {
                     let import_items = result
                         .imports
                         .into_iter()

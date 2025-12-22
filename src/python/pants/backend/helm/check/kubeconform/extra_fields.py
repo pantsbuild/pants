@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import Type
 
 from pants.backend.helm.target_types import HelmChartTarget, HelmDeploymentTarget
 from pants.engine.target import (
@@ -77,8 +76,8 @@ class KubeconformFieldSet(FieldSet, metaclass=ABCMeta):
         return target[KubeconformSkipField].value
 
 
-_HELM_TARGET_TYPES: list[Type[Target]] = [HelmChartTarget, HelmDeploymentTarget]
-_KUBECONFORM_COMMON_FIELD_TYPES: list[Type[Field]] = [
+_HELM_TARGET_TYPES: list[type[Target]] = [HelmChartTarget, HelmDeploymentTarget]
+_KUBECONFORM_COMMON_FIELD_TYPES: list[type[Field]] = [
     KubeconformSkipField,
     KubeconformIgnoreSourcesField,
     KubeconformIgnoreMissingSchemasField,

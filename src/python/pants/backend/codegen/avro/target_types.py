@@ -29,7 +29,7 @@ class AllAvroTargets(Targets):
 
 
 @rule(desc="Find all Avro targets in project", level=LogLevel.DEBUG)
-def find_all_avro_targets(targets: AllTargets) -> AllAvroTargets:
+async def find_all_avro_targets(targets: AllTargets) -> AllAvroTargets:
     return AllAvroTargets(tgt for tgt in targets if tgt.has_field(AvroSourceField))
 
 
@@ -53,7 +53,7 @@ class AvroSourceTarget(Target):
         f"""
         A single Avro file used to generate various languages.
 
-        See {doc_url('avro')}.
+        See {doc_url("avro")}.
         """
     )
 

@@ -37,6 +37,7 @@ gh pr create \
   --base "$MILESTONE" \
   --title "$TITLE (Cherry-pick of #$PR_NUM)" \
   --label "$CATEGORY_LABEL" \
+  --label "release-notes:not-required" \
   --milestone "$MILESTONE" \
   --body-file "$BODY_FILE" \
   --reviewer "$REVIEWERS" \

@@ -1,8 +1,9 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from collections.abc import Iterable
 from enum import Enum
-from typing import Any, Iterable, List, Optional, Tuple, Union
+from typing import Any, Optional, Union
 
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.build_configuration import BuildConfiguration
@@ -13,7 +14,8 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import IntField, RegisteredTargetTypes, StringField, Target
 from pants.engine.unions import UnionMembership
 from pants.help.help_info_extracter import HelpInfoExtracter, pretty_print_type_hint, to_help_str
-from pants.option.global_options import GlobalOptions, LogLevelOption
+from pants.option.bootstrap_options import LogLevelOption
+from pants.option.global_options import GlobalOptions
 from pants.option.native_options import NativeOptionParser
 from pants.option.option_types import BoolOption, IntListOption, OptionInfo, StrListOption
 from pants.option.options import Options
@@ -62,8 +64,7 @@ def test_global_scope():
         ["--foo"],
         {"type": list, "member_type": dict},
         [
-            "--foo=\"[{'key1': val1, 'key2': val2, ...}, "
-            "{'key1': val1, 'key2': val2, ...}, ...]\"",
+            "--foo=\"[{'key1': val1, 'key2': val2, ...}, {'key1': val1, 'key2': val2, ...}, ...]\"",
         ],
         ["--foo"],
     )
@@ -134,7 +135,7 @@ def test_default() -> None:
 
 
 def test_compute_default():
-    def do_test(expected_default: Optional[Any], **kwargs):
+    def do_test(expected_default: Any | None, **kwargs):
         assert expected_default == HelpInfoExtracter.compute_default(**kwargs)
 
     do_test(False, type=bool, default=False)
@@ -277,16 +278,16 @@ def test_get_all_help_info(tmp_path) -> None:
         known_scope_infos=[Global.get_scope_info(), Foo.get_scope_info(), Bar.get_scope_info()],
         include_derivation=True,
     )
-    Global.register_options_on_scope(options, UnionMembership({}))
-    Foo.register_options_on_scope(options, UnionMembership({}))
-    Bar.register_options_on_scope(options, UnionMembership({}))
+    Global.register_options_on_scope(options, UnionMembership.empty())
+    Foo.register_options_on_scope(options, UnionMembership.empty())
+    Bar.register_options_on_scope(options, UnionMembership.empty())
 
     @rule
-    def rule_info_test(foo: Foo) -> Target:  # type: ignore[empty-body]
+    async def rule_info_test(foo: Foo) -> Target:  # type: ignore[empty-body]
         """This rule is for testing info extraction only."""
         ...
 
-    def fake_consumed_scopes_mapper(scope: str) -> Tuple[str, ...]:
+    def fake_consumed_scopes_mapper(scope: str) -> tuple[str, ...]:
         return ("somescope", f"used_by_{scope or 'GLOBAL_SCOPE'}")
 
     bc_builder = BuildConfiguration.Builder()
@@ -296,7 +297,7 @@ def test_get_all_help_info(tmp_path) -> None:
 
     all_help_info = HelpInfoExtracter.get_all_help_info(
         options,
-        UnionMembership({}),
+        UnionMembership.empty(),
         fake_consumed_scopes_mapper,
         RegisteredTargetTypes({BazLibrary.alias: BazLibrary}),
         BuildFileSymbolsInfo.from_info(
@@ -539,7 +540,9 @@ def test_get_all_help_info(tmp_path) -> None:
             "construct_scope_foo": {
                 "description": None,
                 "documentation": "A foo.",
-                "awaitables": ("Get(ScopedOptions, Scope, ..)",),
+                "awaitables": (
+                    "pants.engine.internals.options_parsing.scope_options() -> ScopedOptions",
+                ),
                 "input_types": (),
                 "name": "construct_scope_foo",
                 "output_type": "Foo",
@@ -556,20 +559,6 @@ def test_get_all_help_info(tmp_path) -> None:
             },
         },
         "name_to_api_type_info": {
-            "pants.option.scope.Scope": {
-                "consumed_by_rules": (),
-                "dependents": (),
-                "dependencies": (),
-                "documentation": "An options scope.",
-                "is_union": False,
-                "module": "pants.option.scope",
-                "name": "Scope",
-                "provider": ("pants.option.scope",),
-                "returned_by_rules": (),
-                "union_members": (),
-                "union_type": None,
-                "used_in_rules": ("construct_scope_foo",),
-            },
             "pants.engine.target.Target": {
                 "consumed_by_rules": (),
                 "dependents": (),
@@ -803,13 +792,13 @@ def test_pretty_print_type_hint() -> None:
 
     # Transform Unions to use `|`
     assert pretty_print_type_hint(Union[int, float]) == "int | float"
-    assert pretty_print_type_hint(Optional[int]) == "int | None"
+    assert pretty_print_type_hint(Optional[int]) == "int | None"  # noqa: UP045
     # NB: `Iterable[List[ExampleCls]]` will use the full module name for `ExampleCls`. We can't
     # easily control that because it comes from the __repr__ implementation for `typing.Iterable`.
     example_cls_repr = (
         f"{__name__}.{test_pretty_print_type_hint.__name__}.<locals>.{ExampleCls.__name__}"
     )
     assert (
-        pretty_print_type_hint(Union[Iterable[List[ExampleCls]], Optional[float], Any])
-        == f"Iterable[List[{example_cls_repr}]] | float | None | Any"
+        pretty_print_type_hint(Union[Iterable[list[ExampleCls]], float | None, Any])
+        == f"Iterable[list[{example_cls_repr}]] | float | None | Any"
     )

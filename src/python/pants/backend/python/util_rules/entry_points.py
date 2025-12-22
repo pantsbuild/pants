@@ -1,12 +1,12 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from collections import defaultdict
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import Callable, Iterable
 
 from pants.backend.python.dependency_inference.module_mapper import (
-    PythonModuleOwners,
     PythonModuleOwnersRequest,
+    map_module_to_address,
 )
 from pants.backend.python.goals.pytest_runner import PytestPluginSetup, PytestPluginSetupRequest
 from pants.backend.python.target_types import (
@@ -22,11 +22,17 @@ from pants.backend.python.target_types import (
     ResolvedPythonDistributionEntryPoints,
     ResolvePythonDistributionEntryPointsRequest,
 )
+from pants.backend.python.target_types_rules import (
+    get_python_distribution_entry_point_unambiguous_module_owners,
+    resolve_python_distribution_entry_points,
+)
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import CreateDigest, FileContent, PathGlobs, Paths
+from pants.engine.internals.graph import determine_explicitly_provided_dependencies, resolve_targets
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Address, Digest
-from pants.engine.internals.selectors import MultiGet
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import create_digest, path_globs_to_paths
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
@@ -40,38 +46,9 @@ from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
-from pants.util.strutil import softwrap
 
 PythonDistributionEntryPointGroupPredicate = Callable[[Target, str], bool]
 PythonDistributionEntryPointPredicate = Callable[[Target, str, str], bool]
-
-
-def get_python_distribution_entry_point_unambiguous_module_owners(
-    address: Address,
-    entry_point_group: str,  # group is the pypa term; aka category or namespace
-    entry_point_name: str,
-    entry_point: EntryPoint,
-    explicitly_provided_deps: ExplicitlyProvidedDependencies,
-    owners: PythonModuleOwners,
-) -> tuple[Address, ...]:
-    field_str = repr({entry_point_group: {entry_point_name: entry_point.spec}})
-    explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
-        owners.ambiguous,
-        address,
-        import_reference="module",
-        context=softwrap(
-            f"""
-            The python_distribution target {address} has the field
-            `entry_points={field_str}`, which maps to the Python module
-            `{entry_point.module}`
-            """
-        ),
-    )
-    maybe_disambiguated = explicitly_provided_deps.disambiguated(owners.ambiguous)
-    unambiguous_owners = owners.unambiguous or (
-        (maybe_disambiguated,) if maybe_disambiguated else ()
-    )
-    return unambiguous_owners
 
 
 @dataclass(frozen=True)
@@ -95,17 +72,16 @@ async def get_filtered_entry_point_dependencies(
 ) -> EntryPointDependencies:
     # This is based on pants.backend.python.target_type_rules.infer_python_distribution_dependencies,
     # but handles multiple targets and filters the entry_points to just get the requested deps.
-    all_explicit_dependencies = await MultiGet(
-        Get(
-            ExplicitlyProvidedDependencies,
-            DependenciesRequest(tgt[PythonDistributionDependenciesField]),
+    all_explicit_dependencies = await concurrently(
+        determine_explicitly_provided_dependencies(
+            **implicitly(DependenciesRequest(tgt[PythonDistributionDependenciesField]))
         )
         for tgt in request.targets
     )
-    resolved_entry_points = await MultiGet(
-        Get(
-            ResolvedPythonDistributionEntryPoints,
-            ResolvePythonDistributionEntryPointsRequest(tgt[PythonDistributionEntryPointsField]),
+    # TODO: This is a circular import on call-by-name
+    resolved_entry_points = await concurrently(
+        resolve_python_distribution_entry_points(
+            ResolvePythonDistributionEntryPointsRequest(tgt[PythonDistributionEntryPointsField])
         )
         for tgt in request.targets
     )
@@ -138,8 +114,10 @@ async def get_filtered_entry_point_dependencies(
                             explicitly_provided_deps,
                         )
                     )
-    filtered_module_owners = await MultiGet(
-        Get(PythonModuleOwners, PythonModuleOwnersRequest(entry_point.module, resolve=None))
+    filtered_module_owners = await concurrently(
+        map_module_to_address(
+            PythonModuleOwnersRequest(entry_point.module, resolve=None), **implicitly()
+        )
         for _, _, _, entry_point, _ in filtered_entry_point_modules
     )
 
@@ -168,13 +146,14 @@ async def _get_entry_point_deps_targets_and_predicates(
             "Please file an issue if you see this error. This rule helper must not "
             "be called with an empty entry_point_dependencies field."
         )
-    targets = await Get(
-        Targets,
-        UnparsedAddressInputs(
-            entry_point_deps.value.keys(),
-            owning_address=owning_address,
-            description_of_origin=f"{PythonTestsEntryPointDependenciesField.alias} from {owning_address}",
-        ),
+    targets = await resolve_targets(
+        **implicitly(
+            UnparsedAddressInputs(
+                entry_point_deps.value.keys(),
+                owning_address=owning_address,
+                description_of_origin=f"{PythonTestsEntryPointDependenciesField.alias} from {owning_address}",
+            )
+        )
     )
 
     requested_entry_points: dict[Target, set[str]] = {}
@@ -243,9 +222,8 @@ async def infer_entry_point_dependencies(
         request.field_set.address, entry_point_deps
     )
 
-    entry_point_dependencies = await Get(
-        EntryPointDependencies,
-        GetEntryPointDependenciesRequest(dist_targets, group_predicate, predicate),
+    entry_point_dependencies = await get_filtered_entry_point_dependencies(
+        GetEntryPointDependenciesRequest(dist_targets, group_predicate, predicate)
     )
     return InferredDependencies(entry_point_dependencies.addresses)
 
@@ -267,10 +245,9 @@ async def generate_entry_points_txt(request: GenerateEntryPointsTxtRequest) -> E
     if not request.targets:
         return EntryPointsTxt(EMPTY_DIGEST)
 
-    all_resolved_entry_points = await MultiGet(
-        Get(
-            ResolvedPythonDistributionEntryPoints,
-            ResolvePythonDistributionEntryPointsRequest(tgt[PythonDistributionEntryPointsField]),
+    all_resolved_entry_points = await concurrently(
+        resolve_python_distribution_entry_points(
+            ResolvePythonDistributionEntryPointsRequest(tgt[PythonDistributionEntryPointsField])
         )
         for tgt in request.targets
     )
@@ -283,8 +260,9 @@ async def generate_entry_points_txt(request: GenerateEntryPointsTxtRequest) -> E
         }
         for tgt, resolved_eps in zip(request.targets, all_resolved_entry_points)
     ]
-    resolved_paths = await MultiGet(
-        Get(Paths, PathGlobs(module_candidate_paths)) for module_candidate_paths in possible_paths
+    resolved_paths = await concurrently(
+        path_globs_to_paths(PathGlobs(module_candidate_paths))
+        for module_candidate_paths in possible_paths
     )
 
     entry_points_by_path: dict[str, list[tuple[Target, ResolvedPythonDistributionEntryPoints]]] = (
@@ -339,7 +317,7 @@ async def generate_entry_points_txt(request: GenerateEntryPointsTxtRequest) -> E
     if not entry_points_txt_files:
         digest = EMPTY_DIGEST
     else:
-        digest = await Get(Digest, CreateDigest(entry_points_txt_files))
+        digest = await create_digest(CreateDigest(entry_points_txt_files))
     return EntryPointsTxt(digest)
 
 
@@ -368,9 +346,8 @@ async def generate_entry_points_txt_from_entry_point_dependencies(
         request.target.address, entry_point_deps
     )
 
-    entry_points_txt = await Get(
-        EntryPointsTxt,
-        GenerateEntryPointsTxtRequest(dist_targets, group_predicate, predicate),
+    entry_points_txt = await generate_entry_points_txt(
+        GenerateEntryPointsTxtRequest(dist_targets, group_predicate, predicate)
     )
     return PytestPluginSetup(entry_points_txt.digest)
 

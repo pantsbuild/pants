@@ -21,8 +21,9 @@ from pants.core.goals.tailor import (
     PutativeTargetsRequest,
 )
 from pants.core.target_types import ResourcesGeneratorTarget
-from pants.engine.fs import PathGlobs, Paths
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.fs import PathGlobs
+from pants.engine.intrinsics import path_globs_to_paths
+from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.source.filespec import FilespecMatcher
 from pants.util.dirutil import group_by_dir
@@ -51,8 +52,8 @@ async def find_putative_helm_targets(
     putative_targets = []
 
     if helm_subsystem.tailor_charts:
-        all_chart_files = await Get(
-            Paths, PathGlobs, request.path_globs(*HELM_CHART_METADATA_FILENAMES)
+        all_chart_files = await path_globs_to_paths(
+            request.path_globs(*HELM_CHART_METADATA_FILENAMES)
         )
         unowned_chart_files = set(all_chart_files.files) - set(all_owned_sources)
 
@@ -71,15 +72,14 @@ async def find_putative_helm_targets(
             chart_folders = {os.path.dirname(path) for path in all_chart_files.files}
             # Helm charts have a rigid folder structure and we rely on it
             # to successfully identify unit tests without false positives.
-            all_unittest_files = await Get(
-                Paths,
+            all_unittest_files = await path_globs_to_paths(
                 PathGlobs(
                     [
                         os.path.join(chart_root, _TESTS_FOLDER_NAME, glob)
                         for glob in HelmUnitTestGeneratingSourcesField.default
                         for chart_root in chart_folders
                     ]
-                ),
+                )
             )
             unonwned_unittest_files = set(all_unittest_files.files) - set(all_owned_sources)
             unittest_filespec_matcher = FilespecMatcher(
@@ -98,15 +98,14 @@ async def find_putative_helm_targets(
             grouped_unittest_files = group_by_dir(unittest_files)
 
             # To prevent false positives, we look for snapshot files relative to the unit test sources
-            all_snapshot_files = await Get(
-                Paths,
+            all_snapshot_files = await path_globs_to_paths(
                 PathGlobs(
                     [
                         os.path.join(dirname, _SNAPSHOT_FOLDER_NAME, glob)
                         for glob in _SNAPSHOT_FILE_GLOBS
                         for dirname in grouped_unittest_files.keys()
                     ]
-                ),
+                )
             )
             unowned_snapshot_files = set(all_snapshot_files.files) - set(all_owned_sources)
             grouped_snapshot_files = group_by_dir(unowned_snapshot_files)

@@ -3,21 +3,21 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Generator
 
 import pytest
 
 from pants.build_graph.address import Address
-from pants.core.util_rules import search_paths
-from pants.core.util_rules.asdf import AsdfPathString
-from pants.core.util_rules.environments import (
+from pants.core.environments.target_types import (
     DockerEnvironmentTarget,
     DockerImageField,
     EnvironmentTarget,
     LocalEnvironmentTarget,
     RemoteEnvironmentTarget,
 )
+from pants.core.util_rules import search_paths
+from pants.core.util_rules.asdf import AsdfPathString
 from pants.core.util_rules.search_paths import (
     ValidateSearchPathsRequest,
     VersionManagerSearchPaths,

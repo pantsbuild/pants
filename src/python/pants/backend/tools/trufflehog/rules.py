@@ -1,10 +1,10 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-""""Generates trufflehog rules."""
+"""Generates trufflehog rules."""
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from pants.backend.tools.trufflehog.subsystem import Trufflehog
 from pants.core.goals.lint import LintFilesRequest, LintResult
@@ -28,7 +28,7 @@ from pants.util.strutil import pluralize
 
 
 class TrufflehogRequest(LintFilesRequest):
-    tool_subsystem = Trufflehog
+    tool_subsystem = Trufflehog  # type: ignore[assignment]
 
 
 @rule

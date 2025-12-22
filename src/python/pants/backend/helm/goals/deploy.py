@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pants.backend.docker.goals.package_image import DockerPackageFieldSet
 from pants.backend.helm.dependency_inference import deployment
 from pants.backend.helm.subsystems.helm import HelmSubsystem
-from pants.backend.helm.subsystems.post_renderer import HelmPostRenderer
+from pants.backend.helm.subsystems.post_renderer import setup_post_renderer_launcher
 from pants.backend.helm.target_types import (
     HelmDeploymentFieldSet,
     HelmDeploymentTarget,
@@ -17,11 +17,15 @@ from pants.backend.helm.target_types import (
 )
 from pants.backend.helm.util_rules import post_renderer
 from pants.backend.helm.util_rules.post_renderer import HelmDeploymentPostRendererRequest
-from pants.backend.helm.util_rules.renderer import HelmDeploymentCmd, HelmDeploymentRequest
+from pants.backend.helm.util_rules.renderer import (
+    HelmDeploymentCmd,
+    HelmDeploymentRequest,
+    materialize_deployment_process_wrapper_into_interactive_process,
+)
 from pants.core.goals.deploy import DeployFieldSet, DeployProcess, DeploySubsystem
-from pants.engine.process import InteractiveProcess
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import DependenciesRequest, Targets
+from pants.engine.internals.graph import resolve_targets
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
+from pants.engine.target import DependenciesRequest
 from pants.engine.unions import UnionRule
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
@@ -55,29 +59,34 @@ async def run_helm_deploy(
         )
     )
 
-    target_dependencies, post_renderer = await MultiGet(
-        Get(Targets, DependenciesRequest(field_set.dependencies)),
-        Get(HelmPostRenderer, HelmDeploymentPostRendererRequest(field_set)),
+    target_dependencies, post_renderer = await concurrently(
+        resolve_targets(**implicitly(DependenciesRequest(field_set.dependencies))),
+        setup_post_renderer_launcher(**implicitly(HelmDeploymentPostRendererRequest(field_set))),
     )
 
     publish_targets = [
         tgt for tgt in target_dependencies if DockerPackageFieldSet.is_applicable(tgt)
     ]
 
-    interactive_process = await Get(
-        InteractiveProcess,
-        HelmDeploymentRequest(
-            cmd=HelmDeploymentCmd.UPGRADE,
-            field_set=field_set,
-            extra_argv=[
-                "--install",
-                *(("--timeout", f"{field_set.timeout.value}s") if field_set.timeout.value else ()),
-                *passthrough_args,
-                *dry_run_args,
-            ],
-            post_renderer=post_renderer,
-            description=f"Running Helm deployment: {field_set.address}",
-        ),
+    interactive_process = await materialize_deployment_process_wrapper_into_interactive_process(
+        **implicitly(
+            HelmDeploymentRequest(
+                cmd=HelmDeploymentCmd.UPGRADE,
+                field_set=field_set,
+                extra_argv=[
+                    "--install",
+                    *(
+                        ("--timeout", f"{field_set.timeout.value}s")
+                        if field_set.timeout.value
+                        else ()
+                    ),
+                    *passthrough_args,
+                    *dry_run_args,
+                ],
+                post_renderer=post_renderer,
+                description=f"Running Helm deployment: {field_set.address}",
+            )
+        )
     )
 
     return DeployProcess(

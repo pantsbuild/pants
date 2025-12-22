@@ -6,9 +6,9 @@ from __future__ import annotations
 import json
 import re
 import sys
+from collections.abc import Iterator
 from dataclasses import asdict, dataclass
 from itertools import chain
-from typing import Iterator
 
 #
 # Note: This file is used as a pex entry point in the execution sandbox.
@@ -201,10 +201,9 @@ def main(*dockerfile_names: str) -> Iterator[ParsedDockerfileInfo]:
                 return None
 
             return tuple(
-                f"{stage} {tag}"
+                f"{stage} {tag}" if tag else stage
                 for stage, name_parts in self.from_baseimages()
                 for tag in [_get_tag(name_parts[-1])]
-                if tag
             )
 
         def build_args(self) -> tuple[str, ...]:

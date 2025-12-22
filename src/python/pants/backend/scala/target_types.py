@@ -36,6 +36,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.jvm import target_types as jvm_target_types
+from pants.jvm.run import jvm_run_rules
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
     JunitTestExtraEnvVarsField,
@@ -66,7 +67,7 @@ class ScalaSettingsRequest(TargetFilesGeneratorSettingsRequest):
 
 
 @rule
-def scala_settings_request(
+async def scala_settings_request(
     scala_infer_subsystem: ScalaInferSubsystem, _: ScalaSettingsRequest
 ) -> TargetFilesGeneratorSettings:
     return TargetFilesGeneratorSettings(
@@ -448,7 +449,7 @@ class ScalaArtifactExclusion(JvmArtifactExclusion):
                     f"""
                     Invalid `crossversion` value '{self.crossversion}' in in list of
                     exclusions at target: {address}. Valid values are:
-                    {', '.join(valid_crossversions)}
+                    {", ".join(valid_crossversions)}
                     """
                 )
             )
@@ -587,7 +588,7 @@ def rules():
     return (
         *collect_rules(),
         *jvm_target_types.rules(),
-        *ScalaFieldSet.jvm_rules(),
+        *jvm_run_rules(ScalaFieldSet),
         UnionRule(TargetFilesGeneratorSettingsRequest, ScalaSettingsRequest),
         UnionRule(GenerateTargetsRequest, GenerateJvmArtifactForScalaTargets),
     )

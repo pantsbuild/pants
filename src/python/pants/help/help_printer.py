@@ -6,9 +6,10 @@ import json
 import re
 import textwrap
 from abc import ABC
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from itertools import cycle
-from typing import Callable, Dict, Iterable, List, Literal, Optional, Set, Tuple, cast
+from typing import Literal, cast
 
 from pants.base.build_environment import pants_version
 from pants.help.help_formatter import HelpFormatter
@@ -119,7 +120,7 @@ class HelpPrinter(MaybeColor):
         title = self.maybe_green(f"{title_text}\n{'-' * len(title_text)}")
         print(f"\n{title}\n")
 
-    def _print_table(self, table: Dict[str, Optional[str]]) -> None:
+    def _print_table(self, table: dict[str, str | None]) -> None:
         longest_key = max(len(key) for key, value in table.items() if value is not None)
         for key, value in table.items():
             if value is None:
@@ -127,16 +128,16 @@ class HelpPrinter(MaybeColor):
             print(
                 self.maybe_cyan(f"{key:{longest_key}}:"),
                 self.maybe_magenta(
-                    f"\n{' ':{longest_key+2}}".join(
+                    f"\n{' ':{longest_key + 2}}".join(
                         hard_wrap(value, width=self._width - longest_key - 2)
                     )
                 ),
             )
 
-    def _get_thing_help_table(self) -> Dict[str, Callable[[str, bool], None]]:
+    def _get_thing_help_table(self) -> dict[str, Callable[[str, bool], None]]:
         def _help_table(
             things: Iterable[str], help_printer: Callable[[str, bool], None]
-        ) -> Dict[str, Callable[[str, bool], None]]:
+        ) -> dict[str, Callable[[str, bool], None]]:
             return dict(zip(things, cycle((help_printer,))))
 
         top_level_help_items = _help_table(self._reserved_names, self._print_top_level_help)
@@ -159,11 +160,11 @@ class HelpPrinter(MaybeColor):
     @staticmethod
     def _disambiguate_things(
         things: Iterable[str], all_things: Iterable[str]
-    ) -> Tuple[Set[str], Set[str]]:
+    ) -> tuple[set[str], set[str]]:
         """Returns two sets of strings, one with disambiguated things and the second with
         unresolvable things."""
-        disambiguated: Set[str] = set()
-        unknown: Set[str] = set()
+        disambiguated: set[str] = set()
+        unknown: set[str] = set()
 
         for thing in things:
             # Look for typos and close matches first.
@@ -173,7 +174,7 @@ class HelpPrinter(MaybeColor):
                 continue
 
             # For api types and rules, see if we get a match, by ignoring the leading module path.
-            found_things: List[str] = []
+            found_things: list[str] = []
             suffix = f".{thing}"
             for known_thing in all_things:
                 if known_thing.endswith(suffix):
@@ -259,7 +260,7 @@ class HelpPrinter(MaybeColor):
             self._print_all_symbols(show_advanced)
 
     def _print_all_goals(self) -> None:
-        goal_descriptions: Dict[str, str] = {}
+        goal_descriptions: dict[str, str] = {}
 
         for goal_info in self._all_help_info.name_to_goal_info.values():
             if goal_info.is_implemented:
@@ -291,7 +292,7 @@ class HelpPrinter(MaybeColor):
     def _print_all_subsystems(self) -> None:
         self._print_title("Subsystems")
 
-        subsystem_description: Dict[str, str] = {}
+        subsystem_description: dict[str, str] = {}
         for help_info in self._all_help_info.non_deprecated_option_scope_help_infos():
             if not help_info.is_goal and help_info.scope:
                 subsystem_description[help_info.scope] = first_paragraph(help_info.description)
@@ -305,8 +306,7 @@ class HelpPrinter(MaybeColor):
 
         specific_help_cmd = f"{bin_name()} help $subsystem"
         print(
-            f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a "
-            f"specific subsystem.\n"
+            f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a specific subsystem.\n"
         )
 
     def _print_all_targets(self) -> None:
@@ -328,8 +328,7 @@ class HelpPrinter(MaybeColor):
             print(f"{alias_str}{summary}\n")
         specific_help_cmd = f"{bin_name()} help $target_type"
         print(
-            f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a specific "
-            f"target type.\n"
+            f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a specific target type.\n"
         )
 
     def _print_all_tools(self) -> None:
@@ -340,7 +339,7 @@ class HelpPrinter(MaybeColor):
 
     def _print_all_api_types(self) -> None:
         self._print_title("Plugin API Types")
-        api_type_descriptions: Dict[str, Tuple[str, str]] = {}
+        api_type_descriptions: dict[str, tuple[str, str]] = {}
         indent_api_summary = 0
         for api_info in self._all_help_info.name_to_api_type_info.values():
             name = api_info.name

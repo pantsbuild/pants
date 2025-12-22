@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Iterable, Set, cast
+from typing import Any, cast
 
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.util_rules.lockfile_metadata import (
@@ -28,6 +29,11 @@ class InvalidPythonLockfileReason(Enum):
     CONSTRAINTS_FILE_MISMATCH = "constraints_file_mismatch"
     ONLY_BINARY_MISMATCH = "only_binary_mismatch"
     NO_BINARY_MISMATCH = "no_binary_mismatch"
+    EXCLUDES_MISMATCH = "excludes_mismatch"
+    OVERRIDES_MISMATCH = "overrides_mismatch"
+    SOURCES_MISMATCH = "sources_mismatch"
+    LOCK_STYLE_MISMATCH = "lock_style_mismatch"
+    COMPLETE_PLATFORMS_MISMATCH = "complete_platforms_mismatch"
 
 
 @dataclass(frozen=True)
@@ -45,6 +51,11 @@ class PythonLockfileMetadata(LockfileMetadata):
         requirement_constraints: set[PipRequirement],
         only_binary: set[str],
         no_binary: set[str],
+        excludes: set[str],
+        overrides: set[str],
+        sources: set[str],
+        lock_style: str,
+        complete_platforms: tuple[str, ...],
     ) -> PythonLockfileMetadata:
         """Call the most recent version of the `LockfileMetadata` class to construct a concrete
         instance.
@@ -54,14 +65,23 @@ class PythonLockfileMetadata(LockfileMetadata):
         writing, while still allowing us to support _reading_ older, deprecated metadata versions.
         """
 
-        return PythonLockfileMetadataV3(
+        return PythonLockfileMetadataV6(
             valid_for_interpreter_constraints,
             requirements,
             manylinux=manylinux,
             requirement_constraints=requirement_constraints,
             only_binary=only_binary,
             no_binary=no_binary,
+            excludes=excludes,
+            overrides=overrides,
+            sources=sources,
+            lock_style=lock_style,
+            complete_platforms=complete_platforms,
         )
+
+    @staticmethod
+    def metadata_location_for_lockfile(lockfile_location: str) -> str:
+        return f"{lockfile_location}.metadata"
 
     @classmethod
     def additional_header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
@@ -83,6 +103,11 @@ class PythonLockfileMetadata(LockfileMetadata):
         requirement_constraints: Iterable[PipRequirement],
         only_binary: Iterable[str],
         no_binary: Iterable[str],
+        excludes: Iterable[str],
+        overrides: Iterable[str],
+        sources: Iterable[str],
+        lock_style: str | None,
+        complete_platforms: Iterable[str],
     ) -> LockfileMetadataValidation:
         """Returns Truthy if this `PythonLockfileMetadata` can be used in the current execution
         context."""
@@ -128,6 +153,11 @@ class PythonLockfileMetadataV1(PythonLockfileMetadata):
         requirement_constraints: Iterable[PipRequirement],
         only_binary: Iterable[str],
         no_binary: Iterable[str],
+        excludes: Iterable[str],
+        overrides: Iterable[str],
+        sources: Iterable[str],
+        lock_style: str | None,
+        complete_platforms: Iterable[str],
     ) -> LockfileMetadataValidation:
         failure_reasons: set[InvalidPythonLockfileReason] = set()
 
@@ -167,7 +197,7 @@ class PythonLockfileMetadataV2(PythonLockfileMetadata):
 
         requirements = metadata(
             "generated_with_requirements",
-            Set[PipRequirement],
+            set[PipRequirement],
             lambda l: {
                 PipRequirement.parse(i, description_of_origin=lockfile_description) for i in l
             },
@@ -197,6 +227,11 @@ class PythonLockfileMetadataV2(PythonLockfileMetadata):
         requirement_constraints: Iterable[PipRequirement],
         only_binary: Iterable[str],
         no_binary: Iterable[str],
+        excludes: Iterable[str],
+        overrides: Iterable[str],
+        sources: Iterable[str],
+        lock_style: str | None,
+        complete_platforms: Iterable[str],
     ) -> LockfileMetadataValidation:
         failure_reasons = set()
         if not set(user_requirements).issubset(self.requirements):
@@ -232,13 +267,13 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
         manylinux = metadata("manylinux", str, lambda l: l)
         requirement_constraints = metadata(
             "requirement_constraints",
-            Set[PipRequirement],
+            set[PipRequirement],
             lambda l: {
                 PipRequirement.parse(i, description_of_origin=lockfile_description) for i in l
             },
         )
-        only_binary = metadata("only_binary", Set[str], lambda l: set(l))
-        no_binary = metadata("no_binary", Set[str], lambda l: set(l))
+        only_binary = metadata("only_binary", set[str], lambda l: set(l))
+        no_binary = metadata("no_binary", set[str], lambda l: set(l))
 
         return PythonLockfileMetadataV3(
             valid_for_interpreter_constraints=v2_metadata.valid_for_interpreter_constraints,
@@ -270,6 +305,12 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
         requirement_constraints: Iterable[PipRequirement],
         only_binary: Iterable[str],
         no_binary: Iterable[str],
+        # not used for V3
+        excludes: Iterable[str],
+        overrides: Iterable[str],
+        sources: Iterable[str],
+        lock_style: str | None,
+        complete_platforms: Iterable[str],
     ) -> LockfileMetadataValidation:
         failure_reasons = (
             super()
@@ -282,6 +323,11 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
                 requirement_constraints=requirement_constraints,
                 only_binary=only_binary,
                 no_binary=no_binary,
+                excludes=excludes,
+                overrides=overrides,
+                sources=sources,
+                lock_style=lock_style,
+                complete_platforms=complete_platforms,
             )
             .failure_reasons
         )
@@ -294,4 +340,264 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
             failure_reasons.add(InvalidPythonLockfileReason.ONLY_BINARY_MISMATCH)
         if self.no_binary != set(no_binary):
             failure_reasons.add(InvalidPythonLockfileReason.NO_BINARY_MISMATCH)
+
+        return LockfileMetadataValidation(failure_reasons)
+
+
+@_python_lockfile_metadata(4)
+@dataclass(frozen=True)
+class PythonLockfileMetadataV4(PythonLockfileMetadataV3):
+    """Lockfile version with excludes/overrides."""
+
+    excludes: set[str]
+    overrides: set[str]
+
+    @classmethod
+    def _from_json_dict(
+        cls: type[PythonLockfileMetadataV4],
+        json_dict: dict[Any, Any],
+        lockfile_description: str,
+        error_suffix: str,
+    ) -> PythonLockfileMetadataV4:
+        v3_metadata = super()._from_json_dict(json_dict, lockfile_description, error_suffix)
+        metadata = _get_metadata(json_dict, lockfile_description, error_suffix)
+
+        excludes = metadata("excludes", set[str], lambda l: set(l))
+        overrides = metadata("overrides", set[str], lambda l: set(l))
+
+        return PythonLockfileMetadataV4(
+            valid_for_interpreter_constraints=v3_metadata.valid_for_interpreter_constraints,
+            requirements=v3_metadata.requirements,
+            manylinux=v3_metadata.manylinux,
+            requirement_constraints=v3_metadata.requirement_constraints,
+            only_binary=v3_metadata.only_binary,
+            no_binary=v3_metadata.no_binary,
+            excludes=excludes,
+            overrides=overrides,
+        )
+
+    @classmethod
+    def additional_header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
+        instance = cast(PythonLockfileMetadataV4, instance)
+        return {
+            "excludes": sorted(instance.excludes),
+            "overrides": sorted(instance.overrides),
+        }
+
+    def is_valid_for(
+        self,
+        *,
+        expected_invalidation_digest: str | None,
+        user_interpreter_constraints: InterpreterConstraints,
+        interpreter_universe: Iterable[str],
+        user_requirements: Iterable[PipRequirement],
+        manylinux: str | None,
+        requirement_constraints: Iterable[PipRequirement],
+        only_binary: Iterable[str],
+        no_binary: Iterable[str],
+        excludes: Iterable[str],
+        overrides: Iterable[str],
+        # not used for V4
+        sources: Iterable[str],
+        lock_style: str | None,
+        complete_platforms: Iterable[str],
+    ) -> LockfileMetadataValidation:
+        failure_reasons = (
+            super()
+            .is_valid_for(
+                expected_invalidation_digest=expected_invalidation_digest,
+                user_interpreter_constraints=user_interpreter_constraints,
+                interpreter_universe=interpreter_universe,
+                user_requirements=user_requirements,
+                manylinux=manylinux,
+                requirement_constraints=requirement_constraints,
+                only_binary=only_binary,
+                no_binary=no_binary,
+                excludes=excludes,
+                overrides=overrides,
+                sources=sources,
+                lock_style=lock_style,
+                complete_platforms=complete_platforms,
+            )
+            .failure_reasons
+        )
+
+        if self.excludes != set(excludes):
+            failure_reasons.add(InvalidPythonLockfileReason.EXCLUDES_MISMATCH)
+        if self.overrides != set(overrides):
+            failure_reasons.add(InvalidPythonLockfileReason.OVERRIDES_MISMATCH)
+
+        return LockfileMetadataValidation(failure_reasons)
+
+
+@_python_lockfile_metadata(5)
+@dataclass(frozen=True)
+class PythonLockfileMetadataV5(PythonLockfileMetadataV4):
+    """Lockfile version with sources."""
+
+    sources: set[str]
+
+    @classmethod
+    def _from_json_dict(
+        cls: type[PythonLockfileMetadataV5],
+        json_dict: dict[Any, Any],
+        lockfile_description: str,
+        error_suffix: str,
+    ) -> PythonLockfileMetadataV5:
+        v4_metadata = PythonLockfileMetadataV4._from_json_dict(
+            json_dict, lockfile_description, error_suffix
+        )
+        metadata = _get_metadata(json_dict, lockfile_description, error_suffix)
+
+        sources = metadata("sources", set[str], lambda l: set(l))
+
+        return PythonLockfileMetadataV5(
+            valid_for_interpreter_constraints=v4_metadata.valid_for_interpreter_constraints,
+            requirements=v4_metadata.requirements,
+            manylinux=v4_metadata.manylinux,
+            requirement_constraints=v4_metadata.requirement_constraints,
+            only_binary=v4_metadata.only_binary,
+            no_binary=v4_metadata.no_binary,
+            excludes=v4_metadata.excludes,
+            overrides=v4_metadata.overrides,
+            sources=sources,
+        )
+
+    @classmethod
+    def additional_header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
+        instance = cast(PythonLockfileMetadataV5, instance)
+        return {
+            "sources": sorted(instance.sources),
+        }
+
+    def is_valid_for(
+        self,
+        *,
+        expected_invalidation_digest: str | None,
+        user_interpreter_constraints: InterpreterConstraints,
+        interpreter_universe: Iterable[str],
+        user_requirements: Iterable[PipRequirement],
+        manylinux: str | None,
+        requirement_constraints: Iterable[PipRequirement],
+        only_binary: Iterable[str],
+        no_binary: Iterable[str],
+        excludes: Iterable[str],
+        overrides: Iterable[str],
+        sources: Iterable[str],
+        lock_style: str | None,
+        complete_platforms: Iterable[str],
+    ) -> LockfileMetadataValidation:
+        failure_reasons = (
+            super()
+            .is_valid_for(
+                expected_invalidation_digest=expected_invalidation_digest,
+                user_interpreter_constraints=user_interpreter_constraints,
+                interpreter_universe=interpreter_universe,
+                user_requirements=user_requirements,
+                manylinux=manylinux,
+                requirement_constraints=requirement_constraints,
+                only_binary=only_binary,
+                no_binary=no_binary,
+                excludes=excludes,
+                overrides=overrides,
+                sources=sources,
+                lock_style=lock_style,
+                complete_platforms=complete_platforms,
+            )
+            .failure_reasons
+        )
+
+        if self.sources != set(sources):
+            failure_reasons.add(InvalidPythonLockfileReason.SOURCES_MISMATCH)
+
+        return LockfileMetadataValidation(failure_reasons)
+
+
+@_python_lockfile_metadata(6)
+@dataclass(frozen=True)
+class PythonLockfileMetadataV6(PythonLockfileMetadataV5):
+    """Lockfile version with lock_style and complete_platforms."""
+
+    lock_style: str | None
+    complete_platforms: Iterable[str]
+
+    @classmethod
+    def _from_json_dict(
+        cls: type[PythonLockfileMetadataV6],
+        json_dict: dict[Any, Any],
+        lockfile_description: str,
+        error_suffix: str,
+    ) -> PythonLockfileMetadataV6:
+        v5_metadata = PythonLockfileMetadataV5._from_json_dict(
+            json_dict, lockfile_description, error_suffix
+        )
+        metadata = _get_metadata(json_dict, lockfile_description, error_suffix)
+
+        lock_style = metadata("lock_style", str, lambda l: l)
+        complete_platforms = metadata("complete_platforms", tuple[str, ...], lambda l: tuple(l))
+
+        return PythonLockfileMetadataV6(
+            valid_for_interpreter_constraints=v5_metadata.valid_for_interpreter_constraints,
+            requirements=v5_metadata.requirements,
+            manylinux=v5_metadata.manylinux,
+            requirement_constraints=v5_metadata.requirement_constraints,
+            only_binary=v5_metadata.only_binary,
+            no_binary=v5_metadata.no_binary,
+            excludes=v5_metadata.excludes,
+            overrides=v5_metadata.overrides,
+            sources=v5_metadata.sources,
+            lock_style=lock_style,
+            complete_platforms=complete_platforms,
+        )
+
+    @classmethod
+    def additional_header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
+        instance = cast(PythonLockfileMetadataV6, instance)
+        return {
+            "lock_style": instance.lock_style,
+            "complete_platforms": sorted(instance.complete_platforms),
+        }
+
+    def is_valid_for(
+        self,
+        *,
+        expected_invalidation_digest: str | None,
+        user_interpreter_constraints: InterpreterConstraints,
+        interpreter_universe: Iterable[str],
+        user_requirements: Iterable[PipRequirement],
+        manylinux: str | None,
+        requirement_constraints: Iterable[PipRequirement],
+        only_binary: Iterable[str],
+        no_binary: Iterable[str],
+        excludes: Iterable[str],
+        overrides: Iterable[str],
+        sources: Iterable[str],
+        lock_style: str | None,
+        complete_platforms: Iterable[str],
+    ) -> LockfileMetadataValidation:
+        failure_reasons = (
+            super()
+            .is_valid_for(
+                expected_invalidation_digest=expected_invalidation_digest,
+                user_interpreter_constraints=user_interpreter_constraints,
+                interpreter_universe=interpreter_universe,
+                user_requirements=user_requirements,
+                manylinux=manylinux,
+                requirement_constraints=requirement_constraints,
+                only_binary=only_binary,
+                no_binary=no_binary,
+                excludes=excludes,
+                overrides=overrides,
+                sources=sources,
+                lock_style=lock_style,
+                complete_platforms=complete_platforms,
+            )
+            .failure_reasons
+        )
+
+        if self.lock_style != lock_style:
+            failure_reasons.add(InvalidPythonLockfileReason.LOCK_STYLE_MISMATCH)
+        if self.complete_platforms != complete_platforms:
+            failure_reasons.add(InvalidPythonLockfileReason.COMPLETE_PLATFORMS_MISMATCH)
+
         return LockfileMetadataValidation(failure_reasons)

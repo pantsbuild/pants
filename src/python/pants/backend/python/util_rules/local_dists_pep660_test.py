@@ -148,8 +148,7 @@ def test_build_editable_local_dists(rule_runner: PythonRuleRunner) -> None:
     foo = PurePath("foo")
     rule_runner.write_files(
         {
-            foo
-            / "BUILD": dedent(
+            foo / "BUILD": dedent(
                 """
             python_sources()
 
@@ -163,8 +162,7 @@ def test_build_editable_local_dists(rule_runner: PythonRuleRunner) -> None:
             """
             ),
             foo / "bar.py": "BAR = 42",
-            foo
-            / "setup.py": dedent(
+            foo / "setup.py": dedent(
                 """
                 from setuptools import setup
 
@@ -216,8 +214,7 @@ def test_build_editable_local_dists_special_files(rule_runner: PythonRuleRunner)
                 root / pkg / "BUILD": "python_sources()\n",
                 root / pkg / "__init__.py": "",
                 root / pkg / "bar.py": "BAR = 42" if pkg == "a" else "from a.bar import BAR",
-                root
-                / "BUILD": dedent(
+                root / "BUILD": dedent(
                     f"""
                     python_sources()
 
@@ -230,8 +227,7 @@ def test_build_editable_local_dists_special_files(rule_runner: PythonRuleRunner)
                     )
                     """
                 ),
-                root
-                / "setup.py": dedent(
+                root / "setup.py": dedent(
                     f"""
                     from setuptools import setup
 

@@ -3,15 +3,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 import pytest
-from packaging.requirements import InvalidRequirement
-from pkg_resources import Requirement
+from packaging.requirements import InvalidRequirement, Requirement
 
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import InterpreterConstraintsField
+from pants.backend.python.target_types import InterpreterConstraintsField, PythonResolveField
 from pants.backend.python.util_rules.interpreter_constraints import (
     _PATCH_VERSION_UPPER_BOUND,
     InterpreterConstraints,
@@ -28,14 +27,18 @@ from pants.util.strutil import softwrap
 @dataclass(frozen=True)
 class MockFieldSet(FieldSet):
     interpreter_constraints: InterpreterConstraintsField
+    resolve: PythonResolveField
 
     @classmethod
-    def create_for_test(cls, address: Address, compat: str | None) -> MockFieldSet:
+    def create_for_test(
+        cls, address: Address, compat: str | None, resolve: str = "python-default"
+    ) -> MockFieldSet:
         return cls(
             address=address,
             interpreter_constraints=InterpreterConstraintsField(
                 [compat] if compat else None, address=address
             ),
+            resolve=PythonResolveField(resolve, address=address),
         )
 
 
@@ -44,7 +47,7 @@ def test_merge_interpreter_constraints() -> None:
         result = sorted(str(req) for req in InterpreterConstraints.merge_constraint_sets(inp))
         # Requirement.parse() sorts specs differently than we'd like, so we convert each str to a
         # Requirement.
-        normalized_expected = sorted(str(Requirement.parse(v)) for v in expected)
+        normalized_expected = sorted(str(Requirement(v)) for v in expected)
         assert result == normalized_expected
 
     # Multiple constraint sets get merged so that they are ANDed.
@@ -301,7 +304,10 @@ def test_group_field_sets_by_constraints() -> None:
     assert InterpreterConstraints.group_field_sets_by_constraints(
         [py2_fs, *py3_fs],
         python_setup=create_subsystem(
-            PythonSetup, interpreter_constraints=[], warn_on_python2_usage=False
+            PythonSetup,
+            interpreter_constraints=[],
+            warn_on_python2_usage=False,
+            enable_resolves=False,
         ),
     ) == FrozenDict(
         {
@@ -324,12 +330,15 @@ def test_group_field_sets_by_constraints_with_unsorted_inputs() -> None:
         ),
     ]
 
-    ic_36 = InterpreterConstraints([Requirement.parse("CPython==3.6.*")])
+    ic_36 = InterpreterConstraints([Requirement("CPython==3.6.*")])
 
     output = InterpreterConstraints.group_field_sets_by_constraints(
         py3_fs,
         python_setup=create_subsystem(
-            PythonSetup, interpreter_constraints=[], warn_on_python2_usage=False
+            PythonSetup,
+            interpreter_constraints=[],
+            warn_on_python2_usage=False,
+            enable_resolves=False,
         ),
     )
 
@@ -490,7 +499,6 @@ def test_partition_into_major_minor_versions(constraints: list[str], expected: l
         (["==3.0.*"], (3, 0)),
         (["==3.45.*"], (3, 45)),
         ([">=3.45,<3.46"], (3, 45)),
-        ([">=3.45.*,<3.46.*"], (3, 45)),
         (["CPython>=3.45,<3.46"], (3, 45)),
         (["<3.46,>=3.45"], (3, 45)),
         # Invalid/too hard
@@ -514,7 +522,6 @@ def test_partition_into_major_minor_versions(constraints: list[str], expected: l
         ([">3.45,<=3.46"], None),
         ([">3.45,<3.47"], None),
         (["===3.45"], None),
-        ([">=3.45,<=3.45.*"], None),
         # wrong number of elements
         ([], None),
         (["==3.45.*", "==3.46.*"], None),
@@ -548,7 +555,7 @@ def test_major_minor_version_when_single_and_entire(
     ],
 )
 def test_parse_python_interpreter_constraint_when_valid(input_ic: str, expected: str) -> None:
-    assert parse_constraint(input_ic) == Requirement.parse(expected)
+    assert parse_constraint(input_ic) == Requirement(expected)
 
 
 @pytest.mark.parametrize(
@@ -563,3 +570,30 @@ def test_parse_python_interpreter_constraint_when_invalid(
 ) -> None:
     with pytest.raises(InvalidRequirement, match=expected_error):
         parse_constraint(input_ic)
+
+
+@pytest.mark.parametrize(
+    argnames=("compat", "enable_resolves", "expected"),
+    argvalues=[
+        ("==3.11.*", False, InterpreterConstraints.for_fixed_python_version("3.11.*")),
+        (None, False, InterpreterConstraints.for_fixed_python_version("3.10.*")),
+        (None, True, InterpreterConstraints.for_fixed_python_version("3.12.*")),
+    ],
+)
+def test_default_to_resolve_interpreter_constraints(
+    compat: str | None, enable_resolves: bool, expected: InterpreterConstraints
+) -> None:
+    field_set = MockFieldSet.create_for_test(
+        Address("src/python/path.py", target_name="test"), compat
+    )
+    subsystem = create_subsystem(
+        PythonSetup,
+        enable_resolves=enable_resolves,
+        interpreter_constraints=["==3.10.*"],
+        default_resolve="python-default",
+        resolves={"python-default": "default.lock"},
+        default_to_resolve_interpreter_constraints=True,
+        resolves_to_interpreter_constraints={"python-default": ["==3.12.*"]},
+        warn_on_python2_usage=False,
+    )
+    assert InterpreterConstraints.create_from_field_sets([field_set], subsystem) == expected

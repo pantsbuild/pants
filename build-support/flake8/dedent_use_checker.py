@@ -5,8 +5,8 @@
 from __future__ import annotations
 
 import ast
+from collections.abc import Iterator
 from pathlib import PurePath
-from typing import Iterator
 
 
 def check_for_dedent_imports(tree: ast.AST, filename: str) -> Iterator[tuple[int, int, str, None]]:

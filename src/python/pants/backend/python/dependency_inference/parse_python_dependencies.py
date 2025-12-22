@@ -4,19 +4,19 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.python.dependency_inference.subsystem import PythonInferSubsystem
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.util_rules.source_files import SourceFilesRequest
-from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
+from pants.core.util_rules.stripped_source_files import strip_source_roots
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import CreateDigest, Digest, FileContent
-from pants.engine.internals.native_dep_inference import NativeParsedPythonDependencies
 from pants.engine.internals.native_engine import NativeDependenciesRequest
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.intrinsics import create_digest, parse_python_deps
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.resources import read_resource
@@ -94,7 +94,7 @@ async def get_scripts_digest(scripts_package: str, filenames: Iterable[str]) -> 
         )
         package = package.rpartition(".")[0]
 
-    digest = await Get(Digest, CreateDigest(contents))
+    digest = await create_digest(CreateDigest(contents))
     return digest
 
 
@@ -103,13 +103,12 @@ async def parse_python_dependencies(
     request: ParsePythonDependenciesRequest,
     python_infer_subsystem: PythonInferSubsystem,
 ) -> ParsedPythonDependencies:
-    stripped_sources = await Get(StrippedSourceFiles, SourceFilesRequest([request.source]))
+    stripped_sources = await strip_source_roots(**implicitly(SourceFilesRequest([request.source])))
     # We operate on PythonSourceField, which should be one file.
     assert len(stripped_sources.snapshot.files) == 1
 
-    native_result = await Get(
-        NativeParsedPythonDependencies,
-        NativeDependenciesRequest(stripped_sources.snapshot.digest),
+    native_result = await parse_python_deps(
+        NativeDependenciesRequest(stripped_sources.snapshot.digest)
     )
     imports = dict(native_result.imports)
     assets = set()

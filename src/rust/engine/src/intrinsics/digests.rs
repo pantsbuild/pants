@@ -6,25 +6,26 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use fs::{
-    DigestTrie, DirectoryDigest, GlobMatching, PathStat, RelativePath, SymlinkBehavior, TypedPath,
+    DigestTrie, DirectoryDigest, GlobMatching, PathGlobs, PathStat, RelativePath, SymlinkBehavior,
+    TypedPath,
 };
 use hashing::{Digest, EMPTY_DIGEST};
-use pyo3::prelude::{pyfunction, wrap_pyfunction, PyModule, PyRef, PyResult, Python};
+use pyo3::prelude::{PyModule, PyRef, PyResult, Python, pyfunction, wrap_pyfunction};
 use pyo3::types::{PyAnyMethods, PyModuleMethods, PyTuple, PyTypeMethods};
 use pyo3::{Bound, IntoPyObject, PyAny};
 use store::{SnapshotOps, SubsetParams};
 
 use crate::externs;
+use crate::externs::PyGeneratorResponseNativeCall;
 use crate::externs::fs::{
     PyAddPrefix, PyFileDigest, PyMergeDigests, PyPathMetadata, PyPathNamespace, PyRemovePrefix,
 };
-use crate::externs::PyGeneratorResponseNativeCall;
 use crate::nodes::{
-    lift_directory_digest, task_get_context, unmatched_globs_additional_context, DownloadedFile,
-    NodeResult, PathMetadataNode, Snapshot, SubjectPath,
+    DownloadedFile, NodeResult, PathMetadataNode, Snapshot, SubjectPath, lift_directory_digest,
+    task_get_context, unmatched_globs_additional_context,
 };
-use crate::python::{throw, Key, Value};
-use crate::Failure;
+use crate::python::{Key, Value, throw};
+use crate::{Context, Failure};
 
 pub fn register(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(add_prefix, m)?)?;
@@ -48,14 +49,14 @@ fn get_digest_contents(digest: Value) -> PyGeneratorResponseNativeCall {
     PyGeneratorResponseNativeCall::new(async move {
         let context = task_get_context();
 
-        let digest = Python::with_gil(|py| {
+        let digest = Python::attach(|py| {
             let py_digest = digest.bind(py);
             lift_directory_digest(py_digest)
         })?;
 
         let digest_contents = context.core.store().contents_for_directory(digest).await?;
 
-        Ok::<_, Failure>(Python::with_gil(|py| {
+        Ok::<_, Failure>(Python::attach(|py| {
             Snapshot::store_digest_contents(py, &context, &digest_contents)
         })?)
     })
@@ -66,12 +67,12 @@ fn get_digest_entries(digest: Value) -> PyGeneratorResponseNativeCall {
     PyGeneratorResponseNativeCall::new(async move {
         let context = task_get_context();
 
-        let digest = Python::with_gil(|py| {
+        let digest = Python::attach(|py| {
             let py_digest = digest.bind(py);
             lift_directory_digest(py_digest)
         })?;
         let digest_entries = context.core.store().entries_for_directory(digest).await?;
-        Ok::<_, Failure>(Python::with_gil(|py| {
+        Ok::<_, Failure>(Python::attach(|py| {
             Snapshot::store_digest_entries(py, &context, &digest_entries)
         })?)
     })
@@ -82,7 +83,7 @@ fn remove_prefix(remove_prefix: Value) -> PyGeneratorResponseNativeCall {
     PyGeneratorResponseNativeCall::new(async move {
         let context = task_get_context();
 
-        let (digest, prefix) = Python::with_gil(|py| {
+        let (digest, prefix) = Python::attach(|py| {
             let py_remove_prefix = remove_prefix
                 .bind(py)
                 .extract::<PyRef<PyRemovePrefix>>()
@@ -93,7 +94,7 @@ fn remove_prefix(remove_prefix: Value) -> PyGeneratorResponseNativeCall {
             res
         })?;
         let digest = context.core.store().strip_prefix(digest, &prefix).await?;
-        Ok::<_, Failure>(Python::with_gil(|py| {
+        Ok::<_, Failure>(Python::attach(|py| {
             Snapshot::store_directory_digest(py, digest)
         })?)
     })
@@ -104,7 +105,7 @@ fn add_prefix(add_prefix: Value) -> PyGeneratorResponseNativeCall {
     PyGeneratorResponseNativeCall::new(async move {
         let context = task_get_context();
 
-        let (digest, prefix) = Python::with_gil(|py| {
+        let (digest, prefix) = Python::attach(|py| {
             let py_add_prefix = add_prefix
                 .bind(py)
                 .extract::<PyRef<PyAddPrefix>>()
@@ -116,7 +117,7 @@ fn add_prefix(add_prefix: Value) -> PyGeneratorResponseNativeCall {
             res
         })?;
         let digest = context.core.store().add_prefix(digest, &prefix).await?;
-        Ok::<_, Failure>(Python::with_gil(|py| {
+        Ok::<_, Failure>(Python::attach(|py| {
             Snapshot::store_directory_digest(py, digest)
         })?)
     })
@@ -128,14 +129,12 @@ fn digest_to_snapshot(digest: Value) -> PyGeneratorResponseNativeCall {
         let context = task_get_context();
         let store = context.core.store();
 
-        let digest = Python::with_gil(|py| {
+        let digest = Python::attach(|py| {
             let py_digest = digest.bind(py);
             lift_directory_digest(py_digest)
         })?;
         let snapshot = store::Snapshot::from_digest(store, digest).await?;
-        Ok::<_, Failure>(Python::with_gil(|py| {
-            Snapshot::store_snapshot(py, snapshot)
-        })?)
+        Ok::<_, Failure>(Python::attach(|py| Snapshot::store_snapshot(py, snapshot))?)
     })
 }
 
@@ -147,7 +146,7 @@ fn merge_digests(digests: Value) -> PyGeneratorResponseNativeCall {
         let core = &context.core;
         let store = core.store();
 
-        let digests = Python::with_gil(|py| {
+        let digests = Python::attach(|py| {
             digests
                 .bind(py)
                 .extract::<PyRef<PyMergeDigests>>()
@@ -155,7 +154,7 @@ fn merge_digests(digests: Value) -> PyGeneratorResponseNativeCall {
                 .map_err(|e| throw(format!("{e}")))
         })?;
         let digest = store.merge(digests).await?;
-        Ok::<_, Failure>(Python::with_gil(|py| {
+        Ok::<_, Failure>(Python::attach(|py| {
             Snapshot::store_directory_digest(py, digest)
         })?)
     })
@@ -168,7 +167,7 @@ fn download_file(download_file: Value) -> PyGeneratorResponseNativeCall {
 
         let key = Key::from_value(download_file).map_err(Failure::from)?;
         let snapshot = context.get(DownloadedFile(key)).await?;
-        Ok::<_, Failure>(Python::with_gil(|py| {
+        Ok::<_, Failure>(Python::attach(|py| {
             Snapshot::store_directory_digest(py, snapshot.into())
         })?)
     })
@@ -178,17 +177,30 @@ fn download_file(download_file: Value) -> PyGeneratorResponseNativeCall {
 fn path_globs_to_digest(path_globs: Value) -> PyGeneratorResponseNativeCall {
     PyGeneratorResponseNativeCall::new(async move {
         let context = task_get_context();
-
-        let path_globs = Python::with_gil(|py| {
-            let py_path_globs = path_globs.bind(py);
-            Snapshot::lift_path_globs(py_path_globs)
-        })
-        .map_err(|e| throw(format!("Failed to parse PathGlobs: {e}")))?;
-        let snapshot = context.get(Snapshot::from_path_globs(path_globs)).await?;
-        Ok::<_, Failure>(Python::with_gil(|py| {
-            Snapshot::store_directory_digest(py, snapshot.into())
+        let digest = inner_path_globs_to_digest(path_globs, &context).await?;
+        Ok(Python::attach(|py| {
+            Snapshot::store_directory_digest(py, digest)
         })?)
     })
+}
+
+async fn inner_path_globs_to_digest(
+    path_globs: Value,
+    context: &Context,
+) -> Result<DirectoryDigest, Failure> {
+    let path_globs = lift_python_path_globs(path_globs)?;
+    Ok(context
+        .get(Snapshot::from_path_globs(path_globs))
+        .await?
+        .into())
+}
+
+fn lift_python_path_globs(path_globs: Value) -> Result<PathGlobs, Failure> {
+    Python::attach(|py| {
+        let py_path_globs = path_globs.bind(py);
+        Snapshot::lift_path_globs(py_path_globs)
+    })
+    .map_err(|e| throw(format!("Failed to parse PathGlobs: {e}")))
 }
 
 #[pyfunction]
@@ -197,11 +209,7 @@ fn path_globs_to_paths(path_globs: Value) -> PyGeneratorResponseNativeCall {
         let context = task_get_context();
         let core = &context.core;
 
-        let path_globs = Python::with_gil(|py| {
-            let py_path_globs = path_globs.bind(py);
-            Snapshot::lift_path_globs(py_path_globs)
-        })
-        .map_err(|e| throw(format!("Failed to parse PathGlobs: {e}")))?;
+        let path_globs = lift_python_path_globs(path_globs)?;
 
         let path_globs = path_globs.parse().map_err(throw)?;
         let path_stats = context
@@ -212,7 +220,7 @@ fn path_globs_to_paths(path_globs: Value) -> PyGeneratorResponseNativeCall {
             )
             .await?;
 
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let mut files = Vec::new();
             let mut dirs = Vec::new();
             for ps in path_stats.iter() {
@@ -249,11 +257,11 @@ enum CreateDigestItem {
 
 #[pyfunction]
 fn create_digest(py: Python, create_digest: Value) -> PyResult<PyGeneratorResponseNativeCall> {
-    let (items_to_store, trie) = py.allow_threads(|| -> Result<_, Failure> {
+    let (items_to_store, trie) = py.detach(|| -> Result<_, Failure> {
         let mut new_file_count = 0;
 
         let items: Vec<CreateDigestItem> = {
-            Python::with_gil(|py| -> Result<_, Failure> {
+            Python::attach(|py| -> Result<_, Failure> {
                 let py_create_digest = create_digest.bind(py);
                 Ok(externs::collect_iterable(py_create_digest)
                     .map_err(|e| {
@@ -333,7 +341,7 @@ fn create_digest(py: Python, create_digest: Value) -> PyResult<PyGeneratorRespon
         let context = task_get_context();
         let store = context.core.store();
         store.store_file_bytes_batch(items_to_store, true).await?;
-        Ok::<_, Failure>(Python::with_gil(|py| {
+        Ok::<_, Failure>(Python::attach(|py| {
             Snapshot::store_directory_digest(py, trie.into())
         })?)
     }))
@@ -345,7 +353,7 @@ fn digest_subset_to_digest(digest_subset: Value) -> PyGeneratorResponseNativeCal
         let context = task_get_context();
 
         let store = context.core.store();
-        let (path_globs, original_digest) = Python::with_gil(|py| {
+        let (path_globs, original_digest) = Python::attach(|py| {
             let py_digest_subset = digest_subset.bind(py);
             let py_path_globs: Bound<'_, PyAny> =
                 externs::getattr(py_digest_subset, "globs").unwrap();
@@ -358,7 +366,7 @@ fn digest_subset_to_digest(digest_subset: Value) -> PyGeneratorResponseNativeCal
         })?;
         let subset_params = SubsetParams { globs: path_globs };
         let digest = store.subset(original_digest, subset_params).await?;
-        Ok::<_, Failure>(Python::with_gil(|py| {
+        Ok::<_, Failure>(Python::attach(|py| {
             Snapshot::store_directory_digest(py, digest)
         })?)
     })
@@ -367,7 +375,7 @@ fn digest_subset_to_digest(digest_subset: Value) -> PyGeneratorResponseNativeCal
 #[pyfunction]
 fn path_metadata_request(single_path: Value) -> PyGeneratorResponseNativeCall {
     PyGeneratorResponseNativeCall::new(async move {
-        let subject_path = Python::with_gil(|py| -> Result<_, String> {
+        let subject_path = Python::attach(|py| -> Result<_, String> {
             let arg = single_path.bind(py);
             let path = externs::getattr_as_optional_string(arg, "path")
                 .map_err(|e| format!("Failed to get `path` for field: {e}"))?;
@@ -377,11 +385,11 @@ fn path_metadata_request(single_path: Value) -> PyGeneratorResponseNativeCall {
                 .map_err(|e| format!("Failed to get `namespace` for field: {e}"))?;
             match namespace {
                 PyPathNamespace::Workspace => SubjectPath::new_workspace(&path).map_err(|_| {
-                    format!("path_metadata_request error: path for PathNamespace.WORKSPACE must be a relative path. Instead, got `{}`", path)
+                    format!("path_metadata_request error: path for PathNamespace.WORKSPACE must be a relative path. Instead, got `{path}`")
                 }),
                 PyPathNamespace::System => SubjectPath::new_system(&path).map_err(|_| {
                     format!(
-                        "path_metadata_request error: path for PathNamespace.SYSTEM must an absolute path. Instead, got `{}`", path
+                        "path_metadata_request error: path for PathNamespace.SYSTEM must be an absolute path. Instead, got `{path}`"
                     )
                 }),
             }
@@ -393,7 +401,7 @@ fn path_metadata_request(single_path: Value) -> PyGeneratorResponseNativeCall {
             .await?
             .map(PyPathMetadata);
 
-        Ok(Python::with_gil(|py| {
+        Ok(Python::attach(|py| {
             let path_metadata_opt = match metadata_opt {
                 Some(m) => m
                     .into_pyobject(py)

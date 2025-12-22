@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import Callable
+from collections.abc import Callable
 
 # Adapted from Go toolchain:
 # https://github.com/golang/go/blob/6a70292d1cb3464e5b2c2c03341e5148730a1889/src/cmd/internal/pkgpattern/pkgpattern.go

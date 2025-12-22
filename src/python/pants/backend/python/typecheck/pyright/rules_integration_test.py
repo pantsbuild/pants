@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from textwrap import dedent
-from typing import Iterable
 
 import pytest
 
@@ -92,8 +92,8 @@ UNDEFINED_VARIABLE_TOML_CONFIG = dedent(
     """
 )
 
-PYRIGHT_VERSION = "1.1.383"
-PYRIGHT_INTEGRITY_HASH = "sha512-b540vUDWGXFlVwhxREgCrvKYT9bnUUPiDtSv5s7sUGxIokTxc06bPC2vfnGunUqaUu6hgIqlv1GRFdOKIEb09A=="
+PYRIGHT_VERSION = "1.1.396"
+PYRIGHT_INTEGRITY_HASH = "sha512-+/8GN9ZRlqS/EFUjSW3yb2FN9XF7KjGpnLVYLtfTPDiiH+tfua898acKenUTGYbdfvSf7J0GD/g1b5RItnyYPw=="
 PYRIGHT_LOCKFILE = json.dumps(
     {
         "name": "@the-company/project",
@@ -168,6 +168,18 @@ def test_failing(rule_runner: PythonRuleRunner) -> None:
     assert result[0].exit_code == 1
     assert f"{PACKAGE}/f.py:4" in result[0].stdout
     assert "2 errors" in result[0].stdout
+    assert result[0].report == EMPTY_DIGEST
+
+
+def test_spaces_in_filenames(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {f"{PACKAGE}/f f.py": GOOD_FILE, f"{PACKAGE}/BUILD": "python_sources()"}
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f f.py"))
+    result = run_pyright(rule_runner, [tgt])
+    assert len(result) == 1
+    assert result[0].exit_code == 0
+    assert "0 errors" in result[0].stdout
     assert result[0].report == EMPTY_DIGEST
 
 

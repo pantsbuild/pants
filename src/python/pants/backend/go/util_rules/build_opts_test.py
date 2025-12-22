@@ -5,8 +5,8 @@ from __future__ import annotations
 import os
 import pprint
 import subprocess
+from collections.abc import Callable, Iterable
 from textwrap import dedent
-from typing import Callable, Iterable
 
 import pytest
 
@@ -271,7 +271,7 @@ def test_runtime_check_enable_fields_work_as_expected(
         Address("mod_false", target_name="pkg"),
         True,
         for_tests=True,
-        msg=f"for go_package when --go-test-force-{field_name }and when {field_name}=False on go_mod",
+        msg=f"for go_package when --go-test-force-{field_name}and when {field_name}=False on go_mod",
     )
 
 
@@ -379,9 +379,9 @@ def test_compiler_flags_fields(rule_runner: RuleRunner) -> None:
                 ),
             ),
         )
-        assert opts.compiler_flags == tuple(
-            expected_value
-        ), f"{address}: expected `compiler_flags` to be {expected_value}"
+        assert opts.compiler_flags == tuple(expected_value), (
+            f"{address}: expected `compiler_flags` to be {expected_value}"
+        )
 
     assert_flags(Address("mod_with_field", target_name="mod"), ["-foo"])
     assert_flags(Address("mod_with_field", target_name="bin_without_field"), ["-foo"])
@@ -441,9 +441,9 @@ def test_linker_flags_fields(rule_runner: RuleRunner) -> None:
                 ),
             ),
         )
-        assert opts.linker_flags == tuple(
-            expected_value
-        ), f"{address}: expected `linker_flags` to be {expected_value}"
+        assert opts.linker_flags == tuple(expected_value), (
+            f"{address}: expected `linker_flags` to be {expected_value}"
+        )
 
     assert_flags(Address("mod_with_field", target_name="mod"), ["-foo"])
     assert_flags(Address("mod_with_field", target_name="bin_without_field"), ["-foo"])
@@ -503,9 +503,9 @@ def test_assembler_flags_fields(rule_runner: RuleRunner) -> None:
                 ),
             ),
         )
-        assert opts.assembler_flags == tuple(
-            expected_value
-        ), f"{address}: expected `assembler_flags` to be {expected_value}"
+        assert opts.assembler_flags == tuple(expected_value), (
+            f"{address}: expected `assembler_flags` to be {expected_value}"
+        )
 
     assert_flags(Address("mod_with_field", target_name="mod"), ["-foo"])
     assert_flags(Address("mod_with_field", target_name="bin_without_field"), ["-foo"])

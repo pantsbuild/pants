@@ -8,7 +8,7 @@ See https://clang.llvm.org/docs/ClangFormat.html for details.
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from pants.backend.cc.lint.clangformat import rules as clangformat_rules
 from pants.backend.cc.lint.clangformat import skip_field, subsystem

@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import os
-from typing import Iterable
+from collections.abc import Iterable
 
 from pants.core.goals.fix import FixFilesRequest, Partitions
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem

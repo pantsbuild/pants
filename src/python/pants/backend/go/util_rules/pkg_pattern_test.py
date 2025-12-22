@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from pants.backend.go.util_rules.pkg_pattern import match_pattern, match_simple_pattern
 
@@ -130,8 +130,8 @@ def _run_test(name: str, tests: str, fn: Callable[[str, str], bool]) -> None:
             for pattern in patterns:
                 for test_example in f[1:]:
                     result = fn(pattern, test_example)
-                    assert (
-                        result == want
-                    ), f"{name}({pattern})({test_example}): result={result}, want={want}"
+                    assert result == want, (
+                        f"{name}({pattern})({test_example}): result={result}, want={want}"
+                    )
         else:
             raise ValueError(f"Unknown directive {f[0]}")

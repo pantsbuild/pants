@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import ClassVar, Optional
+from typing import ClassVar
 
 from pants.backend.nfpm.config import NfpmContent
 from pants.backend.nfpm.fields._relationships import NfpmPackageRelationshipsField
@@ -312,7 +312,7 @@ class NfpmRpmCompressionField(StringField):
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
+    def compute_value(cls, raw_value: str | None, address: Address) -> str | None:
         if raw_value is None:
             # valid_choices has only algorithms, not compression level.
             # So, return default value, skipping check for default in valid_choices.

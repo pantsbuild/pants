@@ -15,14 +15,14 @@ use pyo3::pybacked::PyBackedStr;
 use pyo3::types::{PyIterator, PyString, PyTuple, PyType};
 
 use fs::{
-    DirectoryDigest, FilespecMatcher, GlobExpansionConjunction, PathGlobs, PathMetadata,
-    StrictGlobMatching, EMPTY_DIRECTORY_DIGEST,
+    DirectoryDigest, EMPTY_DIRECTORY_DIGEST, FilespecMatcher, GlobExpansionConjunction, PathGlobs,
+    PathMetadata, StrictGlobMatching,
 };
-use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
+use hashing::{Digest, EMPTY_DIGEST, Fingerprint};
 use store::Snapshot;
 
-use crate::python::PyComparedBool;
 use crate::Failure;
+use crate::python::PyComparedBool;
 
 pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDigest>()?;
@@ -397,10 +397,13 @@ impl PyRemovePrefix {
 // PathGlobs
 // -----------------------------------------------------------------------------
 
-struct PyPathGlobs(#[allow(dead_code)] PathGlobs);
+#[allow(dead_code)]
+struct PyPathGlobs(PathGlobs);
 
-impl<'py> FromPyObject<'py> for PyPathGlobs {
-    fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
+impl<'a, 'py> FromPyObject<'a, 'py> for PyPathGlobs {
+    type Error = PyErr;
+
+    fn extract(obj: Borrowed<'a, 'py, PyAny>) -> PyResult<Self> {
         let globs: Vec<String> = obj.getattr("globs")?.extract()?;
 
         let description_of_origin_field = obj.getattr("description_of_origin")?;
@@ -444,10 +447,9 @@ impl PyFilespecMatcher {
     #[new]
     fn __new__(includes: Vec<String>, excludes: Vec<String>, py: Python) -> PyResult<Self> {
         // Parsing the globs has shown up in benchmarks
-        // (https://github.com/pantsbuild/pants/issues/16122), so we use py.allow_threads().
-        let matcher = py.allow_threads(|| {
-            FilespecMatcher::new(includes, excludes).map_err(PyValueError::new_err)
-        })?;
+        // (https://github.com/pantsbuild/pants/issues/16122), so we use py.detach().
+        let matcher =
+            py.detach(|| FilespecMatcher::new(includes, excludes).map_err(PyValueError::new_err))?;
         Ok(Self(matcher))
     }
 
@@ -485,7 +487,7 @@ impl PyFilespecMatcher {
     }
 
     fn matches(&self, paths: Vec<String>, py: Python) -> PyResult<Vec<String>> {
-        py.allow_threads(|| {
+        py.detach(|| {
             Ok(paths
                 .into_iter()
                 .filter(|p| self.0.matches(Path::new(p)))
@@ -572,8 +574,18 @@ impl PyPathMetadata {
     }
 
     #[getter]
-    pub fn path(&self) -> PyResult<PathBuf> {
-        Ok(self.0.path.clone())
+    pub fn path(&self) -> PyResult<String> {
+        self.0
+            .path
+            .as_os_str()
+            .to_str()
+            .map(|s| s.to_string())
+            .ok_or_else(|| {
+                PyException::new_err(format!(
+                    "Could not convert PyPathMetadata.path `{}` to UTF8.",
+                    self.0.path.display()
+                ))
+            })
     }
 
     #[getter]
@@ -612,8 +624,22 @@ impl PyPathMetadata {
     }
 
     #[getter]
-    pub fn symlink_target(&self) -> PyResult<Option<PathBuf>> {
-        Ok(self.0.symlink_target.clone())
+    pub fn symlink_target(&self) -> PyResult<Option<String>> {
+        let Some(symlink_target) = self.0.symlink_target.as_ref() else {
+            return Ok(None);
+        };
+        Ok(Some(
+            symlink_target
+                .as_os_str()
+                .to_str()
+                .map(|s| s.to_string())
+                .ok_or_else(|| {
+                    PyException::new_err(format!(
+                        "Could not convert PyPathMetadata.symlink_target `{}` to UTF8.",
+                        symlink_target.display()
+                    ))
+                })?,
+        ))
     }
 
     pub fn copy(&self) -> PyResult<Self> {

@@ -1,6 +1,6 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from typing import Iterable, Type
+from collections.abc import Iterable
 
 import pytest
 
@@ -41,7 +41,7 @@ def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
         )
     )
 
-    def hydrate(sources_cls: Type[DebianSources], sources: Iterable[str]) -> HydratedSources:
+    def hydrate(sources_cls: type[DebianSources], sources: Iterable[str]) -> HydratedSources:
         return sources_rule_runner.request(
             HydratedSources,
             [

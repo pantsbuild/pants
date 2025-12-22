@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable, Optional
 
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import external_tool
@@ -20,7 +20,6 @@ from pants.engine.process import execute_process_or_raise
 from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
-from pants.util.meta import classproperty
 
 logger = logging.getLogger(__name__)
 
@@ -30,21 +29,12 @@ class MakeselfSubsystem(TemplatedExternalTool):
     help = "A tool to generate a self-extractable compressed tar archives."
 
     default_version = "2.5.0"
-
-    @classproperty
-    def default_known_versions(cls):
-        return [
-            "|".join(
-                (
-                    cls.default_version,
-                    platform,
-                    "4d2fa9d898be22c63bb3c6bb7cc3dc97237700dea6d6ad898dcbec0289df0bc4",
-                    "45867",
-                )
-            )
-            for platform in ["macos_arm64", "macos_x86_64", "linux_arm64", "linux_x86_64"]
-        ]
-
+    default_known_versions = [
+        "2.5.0|macos_arm64|4d2fa9d898be22c63bb3c6bb7cc3dc97237700dea6d6ad898dcbec0289df0bc4|45867",
+        "2.5.0|macos_x86_64|4d2fa9d898be22c63bb3c6bb7cc3dc97237700dea6d6ad898dcbec0289df0bc4|45867",
+        "2.5.0|linux_arm64|4d2fa9d898be22c63bb3c6bb7cc3dc97237700dea6d6ad898dcbec0289df0bc4|45867",
+        "2.5.0|linux_x86_64|4d2fa9d898be22c63bb3c6bb7cc3dc97237700dea6d6ad898dcbec0289df0bc4|45867",
+    ]
     default_url_template = "https://github.com/megastep/makeself/releases/download/release-{version}/makeself-{version}.run"
 
 
@@ -75,8 +65,8 @@ class RunMakeselfArchive:
     input_digest: Digest
     description: str
     level: LogLevel = LogLevel.INFO
-    output_directory: Optional[str] = None
-    extra_args: Optional[tuple[str, ...]] = None
+    output_directory: str | None = None
+    extra_args: tuple[str, ...] | None = None
     extra_tools: tuple[str, ...] = ()
 
 

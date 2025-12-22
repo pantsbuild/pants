@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import json
 from functools import partial
-from typing import Dict, List, Optional, Union
 
 import pytest
 
@@ -41,10 +40,10 @@ def rule_runner() -> RuleRunner:
 def assert_dependents(
     rule_runner: RuleRunner,
     *,
-    targets: List[str],
-    expected: Union[List[str], Dict[str, List[str]]],
+    targets: list[str],
+    expected: list[str] | dict[str, list[str]],
     transitive: bool = False,
-    output_file: Optional[str] = None,
+    output_file: str | None = None,
     closed: bool = False,
     output_format: DependentsOutputFormat = DependentsOutputFormat.text,
 ) -> None:

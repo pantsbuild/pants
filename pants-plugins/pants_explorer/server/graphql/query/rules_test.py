@@ -13,6 +13,7 @@ import pytest
             {"name": r"pants_explorer\."},
             {
                 "rules": [
+                    {"name": "pants_explorer.server.browser.get_browser"},
                     {"name": "pants_explorer.server.graphql.rules.get_graphql_uvicorn_setup"},
                 ]
             },

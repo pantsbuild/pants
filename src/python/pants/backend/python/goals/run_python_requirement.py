@@ -7,10 +7,9 @@ import logging
 import os
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Tuple
+from typing import TypeAlias
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
-from typing_extensions import TypeAlias
 
 from pants.backend.python.dependency_inference.module_mapper import (
     ResolveName,
@@ -25,23 +24,25 @@ from pants.backend.python.target_types import (
     PythonRequirementResolveField,
     PythonRequirementsField,
     PythonRequirementTypeStubModulesField,
-    ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
 )
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexRequest
+from pants.backend.python.target_types_rules import resolve_pex_entry_point
+from pants.backend.python.util_rules.pex import VenvPexRequest, create_venv_pex
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
-from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.util_rules.pex_from_targets import (
+    PexFromTargetsRequest,
+    create_pex_from_targets,
+)
 from pants.build_graph.address import Address
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 
 logger = logging.getLogger(__name__)
 
-InvertedModuleMapping: TypeAlias = FrozenDict[Address, Tuple[str, ...]]
+InvertedModuleMapping: TypeAlias = FrozenDict[Address, tuple[str, ...]]
 
 
 def _in_chroot(relpath: str) -> str:
@@ -95,9 +96,8 @@ async def _resolve_entry_point(
     entry_point_raw = field_set.entry_point.value
 
     if entry_point_raw:
-        resolved_entry_point = await Get(
-            ResolvedPexEntryPoint,
-            ResolvePexEntryPointRequest(field_set.entry_point),
+        resolved_entry_point = await resolve_pex_entry_point(
+            ResolvePexEntryPointRequest(field_set.entry_point)
         )
         entry_point = resolved_entry_point.val
 
@@ -115,7 +115,7 @@ async def _resolve_entry_point(
         entry_point_module = module_mapping[field_set.address][0]
     elif len(reqs) == 1:
         # Use the canonicalized project name for a single-requirement target
-        entry_point_module = canonicalize_project_name(reqs[0].project_name)
+        entry_point_module = canonicalize_project_name(reqs[0].name)
     else:
         raise Exception(
             "Requirement must provide a single module, specify a single requirement, or specify "
@@ -142,8 +142,7 @@ async def create_python_requirement_run_request(
     entry_point = await _resolve_entry_point(modules_for_address, field_set)
     filename = entry_point.spec.replace(".", "__").replace(":", "___")
 
-    pex_request = await Get(
-        PexRequest,
+    pex_request = await create_pex_from_targets(
         PexFromTargetsRequest(
             addresses,
             output_filename=f"{filename}.pex",
@@ -153,10 +152,13 @@ async def create_python_requirement_run_request(
             main=entry_point,
             additional_args=("--no-strip-pex-env",),
         ),
+        **implicitly(),
     )
 
     complete_pex_environment = pex_env.in_sandbox(working_directory=None)
-    venv_pex = await Get(VenvPex, VenvPexRequest(pex_request, complete_pex_environment))
+    venv_pex = await create_venv_pex(
+        VenvPexRequest(pex_request, complete_pex_environment), **implicitly()
+    )
     input_digest = venv_pex.digest
 
     extra_env = {

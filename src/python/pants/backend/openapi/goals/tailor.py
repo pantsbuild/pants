@@ -4,10 +4,10 @@
 from __future__ import annotations
 
 import itertools
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
-from pants.backend.openapi.dependency_inference import OpenApiDependencies, ParseOpenApiSources
+from pants.backend.openapi.dependency_inference import ParseOpenApiSources, parse_openapi_sources
 from pants.backend.openapi.subsystems.openapi import OpenApiSubsystem
 from pants.backend.openapi.target_types import (
     OPENAPI_FILE_EXTENSIONS,
@@ -20,9 +20,8 @@ from pants.core.goals.tailor import (
     PutativeTargets,
     PutativeTargetsRequest,
 )
-from pants.engine.fs import PathGlobs, Paths
-from pants.engine.internals.native_engine import Digest
-from pants.engine.internals.selectors import Get
+from pants.engine.fs import PathGlobs
+from pants.engine.intrinsics import path_globs_to_digest, path_globs_to_paths
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.dirutil import group_by_dir
@@ -43,20 +42,19 @@ async def find_putative_targets(
     if not openapi_subsystem.tailor_targets:
         return PutativeTargets()
 
-    all_openapi_files = await Get(
-        Paths, PathGlobs, req.path_globs(*(f"**/openapi{ext}" for ext in OPENAPI_FILE_EXTENSIONS))
+    all_openapi_files = await path_globs_to_paths(
+        req.path_globs(*(f"**/openapi{ext}" for ext in OPENAPI_FILE_EXTENSIONS))
     )
     targets = {*all_openapi_files.files}
     paths = tuple(targets)
 
     while paths:
-        digest = await Get(Digest, PathGlobs(paths))  # noqa: PNT30: this is inherently sequential
-        result = await Get(  # noqa: PNT30: this is inherently sequential
-            OpenApiDependencies,
+        digest = await path_globs_to_digest(PathGlobs(paths))  # noqa: PNT30: this is inherently sequential
+        result = await parse_openapi_sources(
             ParseOpenApiSources(
                 sources_digest=digest,
                 paths=tuple(paths),
-            ),
+            )
         )
 
         targets.update(result.dependencies.keys())

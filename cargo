@@ -27,5 +27,5 @@ if ! command -v rustup &> /dev/null; then
   die "Please install Rustup and ensure \`rustup\` is on your PATH (usually by adding ~/.cargo/bin). See https://rustup.rs."
 fi
 
-cd "${REPO_ROOT}/src/rust/engine" || exit "${PIPESTATUS[0]}"
+cd "${REPO_ROOT}/src/rust" || exit "${PIPESTATUS[0]}"
 exec cargo "$@"

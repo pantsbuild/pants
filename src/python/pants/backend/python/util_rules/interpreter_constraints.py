@@ -7,13 +7,13 @@ import itertools
 import logging
 import re
 from collections import defaultdict
-from typing import Iterable, Iterator, Protocol, Sequence, Tuple, TypeVar
+from collections.abc import Iterable, Iterator, Sequence
+from typing import Protocol, TypeVar
 
-from packaging.requirements import InvalidRequirement
-from pkg_resources import Requirement
+from packaging.requirements import InvalidRequirement, Requirement
 
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import InterpreterConstraintsField
+from pants.backend.python.target_types import InterpreterConstraintsField, PythonResolveField
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.target import Target
@@ -35,11 +35,14 @@ class FieldSetWithInterpreterConstraints(Protocol):
     @property
     def interpreter_constraints(self) -> InterpreterConstraintsField: ...
 
+    @property
+    def resolve(self) -> PythonResolveField: ...
+
 
 _FS = TypeVar("_FS", bound=FieldSetWithInterpreterConstraints)
 
 
-RawConstraints = Tuple[str, ...]
+RawConstraints = tuple[str, ...]
 
 
 # The current maxes are 2.7.18 and 3.6.15.  We go much higher, for safety.
@@ -66,13 +69,13 @@ def parse_constraint(constraint: str) -> Requirement:
     interpreter.py's `parse_requirement()`.
     """
     try:
-        parsed_requirement = Requirement.parse(constraint)
-    except ValueError as err:
+        parsed_requirement = Requirement(constraint)
+    except InvalidRequirement as err:
         try:
-            parsed_requirement = Requirement.parse(f"CPython{constraint}")
-        except ValueError:
+            parsed_requirement = Requirement(f"CPython{constraint}")
+        except InvalidRequirement:
             raise InvalidRequirement(
-                f"Failed to parse Python interpreter constraint `{constraint}`: {err.args[0]}"
+                f"Failed to parse Python interpreter constraint `{constraint}`: {err}"
             )
 
     return parsed_requirement
@@ -146,16 +149,15 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         if len(parsed_constraint_sets) == 1:
             return next(iter(parsed_constraint_sets))
 
-        def and_constraints(parsed_constraints: Sequence[Requirement]) -> Requirement:
-            merged_specs: set[tuple[str, str]] = set()
-            expected_interpreter = parsed_constraints[0].project_name
-            for parsed_constraint in parsed_constraints:
-                if parsed_constraint.project_name != expected_interpreter:
+        def and_constraints(parsed_requirements: Sequence[Requirement]) -> Requirement:
+            assert len(parsed_requirements) > 0, "At least one `Requirement` must be supplied."
+            expected_name = parsed_requirements[0].name
+            current_requirement_specifier = parsed_requirements[0].specifier
+            for requirement in parsed_requirements[1:]:
+                if requirement.name != expected_name:
                     return impossible
-                merged_specs.update(parsed_constraint.specs)
-
-            formatted_specs = ",".join(f"{op}{version}" for op, version in merged_specs)
-            return parse_constraint(f"{expected_interpreter}{formatted_specs}")
+                current_requirement_specifier &= requirement.specifier
+            return Requirement(f"{expected_name}{current_requirement_specifier}")
 
         ored_constraints = (
             and_constraints(constraints_product)
@@ -188,7 +190,10 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         which might not have any interdependencies, such as when you're merging unrelated roots.
         """
         fields = [
-            tgt[InterpreterConstraintsField]
+            (
+                tgt[InterpreterConstraintsField],
+                tgt[PythonResolveField] if tgt.has_field(PythonResolveField) else None,
+            )
             for tgt in targets
             if tgt.has_field(InterpreterConstraintsField)
         ]
@@ -197,8 +202,19 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         return cls.create_from_compatibility_fields(fields, python_setup)
 
     @classmethod
+    def create_from_field_sets(
+        cls, fs: Iterable[_FS], python_setup: PythonSetup
+    ) -> InterpreterConstraints:
+        return cls.create_from_compatibility_fields(
+            [(field_set.interpreter_constraints, field_set.resolve) for field_set in fs],
+            python_setup,
+        )
+
+    @classmethod
     def create_from_compatibility_fields(
-        cls, fields: Iterable[InterpreterConstraintsField], python_setup: PythonSetup
+        cls,
+        fields: Iterable[tuple[InterpreterConstraintsField, PythonResolveField | None]],
+        python_setup: PythonSetup,
     ) -> InterpreterConstraints:
         """Returns merged InterpreterConstraints for the given `InterpreterConstraintsField`s.
 
@@ -206,7 +222,9 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         dependencies, merging constraints like this is only necessary when you are _mixing_ code
         which might not have any inter-dependencies, such as when you're merging un-related roots.
         """
-        constraint_sets = {field.value_or_global_default(python_setup) for field in fields}
+        constraint_sets = {
+            ics.value_or_configured_default(python_setup, resolve) for ics, resolve in fields
+        }
         # This will OR within each field and AND across fields.
         merged_constraints = cls.merge_constraint_sets(constraint_sets)
         return InterpreterConstraints(merged_constraints)
@@ -218,7 +236,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         results = defaultdict(set)
         for fs in field_sets:
             constraints = cls.create_from_compatibility_fields(
-                [fs.interpreter_constraints], python_setup
+                [(fs.interpreter_constraints, fs.resolve)], python_setup
             )
             results[constraints].add(fs)
         return FrozenDict(
@@ -237,7 +255,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
     def _valid_patch_versions(self, major: int, minor: int) -> Iterator[int]:
         for p in range(0, _PATCH_VERSION_UPPER_BOUND + 1):
             for req in self:
-                if req.specifier.contains(f"{major}.{minor}.{p}"):  # type: ignore[attr-defined]
+                if req.specifier.contains(f"{major}.{minor}.{p}"):
                     yield p
 
     def _includes_version(self, major: int, minor: int) -> bool:
@@ -270,9 +288,9 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         for major, minor in sorted(_major_minor_to_int(s) for s in interpreter_universe):
             for p in range(0, _PATCH_VERSION_UPPER_BOUND + 1):
                 for req in self:
-                    if req.specifier.contains(f"{major}.{minor}.{p}"):  # type: ignore[attr-defined]
+                    if req.specifier.contains(f"{major}.{minor}.{p}"):
                         # We've found the minimum major.minor that is compatible.
-                        req_strs = [f"{req.project_name}=={major}.{minor}.*"]
+                        req_strs = [f"{req.name}=={major}.{minor}.*"]
                         # Now find any patches within that major.minor that we must exclude.
                         invalid_patches = sorted(
                             set(range(0, _PATCH_VERSION_UPPER_BOUND + 1))
@@ -301,13 +319,9 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         ]
 
         def valid_constraint(constraint: Requirement) -> bool:
-            if any(
-                constraint.specifier.contains(prior) for prior in prior_versions  # type: ignore[attr-defined]
-            ):
+            if any(constraint.specifier.contains(prior) for prior in prior_versions):
                 return False
-            if not any(
-                constraint.specifier.contains(allowed) for allowed in allowed_versions  # type: ignore[attr-defined]
-            ):
+            if not any(constraint.specifier.contains(allowed) for allowed in allowed_versions):
                 return False
             return True
 
@@ -330,7 +344,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         specifiers = []
         wildcard_encountered = False
         for constraint in self:
-            specifier = str(constraint.specifier)  # type: ignore[attr-defined]
+            specifier = str(constraint.specifier)
             if specifier:
                 specifiers.append(specifier)
             else:
@@ -479,21 +493,23 @@ def _major_minor_version_when_single_and_entire(ics: InterpreterConstraints) -> 
 
     req = next(iter(ics))
 
-    just_cpython = req.project_name == "CPython" and not req.extras and not req.marker
+    just_cpython = req.name == "CPython" and not req.extras and not req.marker
     if not just_cpython:
         raise _NonSimpleMajorMinor()
 
     # ==major.minor or ==major.minor.*
-    if len(req.specs) == 1:
-        operator, version = next(iter(req.specs))
-        if operator != "==":
+    if len(req.specifier) == 1:
+        specifier = next(iter(req.specifier))
+        if specifier.operator != "==":
             raise _NonSimpleMajorMinor()
 
-        return _parse_simple_version(version, require_any_patch=True)
+        return _parse_simple_version(specifier.version, require_any_patch=True)
 
     # >=major.minor,<major.(minor+1)
-    if len(req.specs) == 2:
-        (operator_lo, version_lo), (operator_hi, version_hi) = iter(req.specs)
+    if len(req.specifier) == 2:
+        specifiers = sorted(req.specifier, key=lambda s: s.version)
+        operator_lo, version_lo = (specifiers[0].operator, specifiers[0].version)
+        operator_hi, version_hi = (specifiers[1].operator, specifiers[1].version)
 
         if operator_lo != ">=":
             # if the lo operator isn't >=, they might be in the wrong order (or, if not, the check

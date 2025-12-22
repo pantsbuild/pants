@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from textwrap import dedent
-from typing import List, Mapping
 
 import pytest
 
@@ -287,7 +287,7 @@ def run_scalatest_test(
     target_name: str,
     relative_file_path: str,
     *,
-    extra_args: List[str] | None = None,
+    extra_args: list[str] | None = None,
     env: Mapping[str, str] | None = None,
 ) -> TestResult:
     args = extra_args or []

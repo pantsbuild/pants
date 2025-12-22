@@ -12,7 +12,7 @@ This guide will walk you through implementing lockfiles and hooking them into th
 
 ## 1. Expose your lockfiles to Pants
 
-Create subclasses of `KnownUserResolveNamesRequest` to inform Pants about which resolves exist, and a subclass of `RequestedUserResolveNames` for Pants to request those resolves later. Implement the resolve-finding logic in a Rule from your subclass of `KnownUserResolveNamesRequest` to `KnownUserResolveNames`. Set `KnownResolveNames.requested_resolve_names_cls` to your subclass of `RequestedUserResolveNames`. 
+Create subclasses of `KnownUserResolveNamesRequest` to inform Pants about which resolves exist, and a subclass of `RequestedUserResolveNames` for Pants to request those resolves later. Implement the resolve-finding logic in a Rule from your subclass of `KnownUserResolveNamesRequest` to `KnownUserResolveNames`. Set `KnownResolveNames.requested_resolve_names_cls` to your subclass of `RequestedUserResolveNames`.
 
 ```python tab={"label": "pants-plugins/fortran/lockfiles.py"}
 from pants.core.goals.generate_lockfiles import KnownUserResolveNamesRequest, RequestedUserResolveNames, KnownUserResolveNames
@@ -78,8 +78,7 @@ Create a rule from your subclass of `GenerateLockfile` to `GenerateLockfileResul
 ```python tab={"label": "pants-plugins/fortran/lockfiles.py"}
 from pants.backend.fortran.tool import FortranProcess
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult
-from pants.engine.internals.selectors import Get
-from pants.engine.process import ProcessResult
+from pants.engine.process import execute_process_or_raise
 from pants.engine.rules import rule
 
 
@@ -89,12 +88,15 @@ async def generate_lockfile_from_sources(
 ) -> GenerateLockfileResult:
     ...
 
-    result = await Get(
-        ProcessResult,
-        FortranProcess(...),
+    result = await execute_process_or_raise(
+        **implicitly(FortranProcess(...))
     )
 
-    return GenerateLockfileResult(result.output_digest, request.resolve_name, request.lockfile_dest)
+    return GenerateLockfileResult(
+        result.output_digest,
+        request.resolve_name,
+        request.lockfile_dest
+    )
 
 ```
 
@@ -138,12 +140,16 @@ from pathlib import Path
 
 from pants.engine.fs import PathGlobs
 from pants.engine.internals.native_engine import Snapshot
-from pants.engine.internals.selectors import Get
+from pants.engine.intrinsics import digest_to_snapshot
 from pants.engine.rules import rule
 
 
 @rule
 async def init_fortran(request: FortranInitRequest) -> FortranInitResponse:
     ...
-    Get(Snapshot, PathGlobs([(Path(request.root_module.address.spec_path) / ".fortran.lock").as_posix()])),
+    digest_to_snapshot(
+        **implicitly(PathGlobs(
+            [(Path(request.root_module.address.spec_path) / ".fortran.lock").as_posix()]
+        ))
+    )
 ```

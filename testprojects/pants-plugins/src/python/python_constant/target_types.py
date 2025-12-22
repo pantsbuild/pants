@@ -4,7 +4,7 @@ import ast
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, DefaultDict, List, Set, Tuple, cast
+from typing import Any, DefaultDict, cast
 
 from pants.backend.python.dependency_inference.module_mapper import (
     FirstPartyPythonModuleMapping,
@@ -14,9 +14,10 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonResolveField, PythonSourceField
 from pants.engine.addresses import Addresses
 from pants.engine.collection import Collection
-from pants.engine.fs import Digest, DigestContents
+from pants.engine.internals.graph import hydrate_sources, resolve_source_paths
 from pants.engine.internals.target_adaptor import SourceBlock, SourceBlocks
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.intrinsics import get_digest_contents
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AllTargets,
@@ -24,13 +25,11 @@ from pants.engine.target import (
     FieldSet,
     GeneratedTargets,
     GenerateTargetsRequest,
-    HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
     IntField,
     SingleSourceField,
-    SourcesPaths,
     SourcesPathsRequest,
     StringField,
     Target,
@@ -133,12 +132,11 @@ class PythonConstantVisitor(ast.NodeVisitor):
 async def generate_python_constant_targets(
     request: GeneratePythonConstantTargetsRequest,
 ) -> GeneratedTargets:
-    hydrated_sources = await Get(
-        HydratedSources,
-        HydrateSourcesRequest(request.generator[PythonConstantSourceField]),
+    hydrated_sources = await hydrate_sources(
+        HydrateSourcesRequest(request.generator[PythonConstantSourceField]), **implicitly()
     )
     logger.debug("python_constant sources: %s", hydrated_sources)
-    digest_files = await Get(DigestContents, Digest, hydrated_sources.snapshot.digest)
+    digest_files = await get_digest_contents(hydrated_sources.snapshot.digest)
     content = digest_files[0].content
     python_constants = PythonConstantVisitor.parse_constants(content)
     logger.debug("parsed python_constants: %s", python_constants)
@@ -186,7 +184,7 @@ class ImportVisitor(ast.NodeVisitor):
     def __init__(self, search_for_modules: set[str]) -> None:
         super().__init__()
         self._search_for = search_for_modules
-        self._found: Set[Var] = set()
+        self._found: set[Var] = set()
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> Any:
         if node.module not in self._search_for:
@@ -216,7 +214,7 @@ async def get_python_constant_targets(targets: AllTargets) -> AllPythonConstantT
     )
 
 
-class BackwardMapping(FrozenDict[ResolveName, FrozenDict[str, Tuple[str, ...]]]):
+class BackwardMapping(FrozenDict[ResolveName, FrozenDict[str, tuple[str, ...]]]):
     pass
 
 
@@ -230,13 +228,15 @@ async def get_backward_mapping(
     python_constant_targets: AllPythonConstantTargets,
     mapping: FirstPartyPythonModuleMapping,
 ) -> BackwardMapping:
-    paths = await MultiGet(
-        Get(SourcesPaths, SourcesPathsRequest(tgt.get(PythonConstantSourceField)))
+    paths = await concurrently(
+        resolve_source_paths(
+            SourcesPathsRequest(tgt.get(PythonConstantSourceField)), **implicitly()
+        )
         for tgt in python_constant_targets
     )
     search_for = {file for path in paths for file in path.files}
 
-    result: DefaultDict[str, DefaultDict[str, List[str]]] = defaultdict(lambda: defaultdict(list))
+    result: DefaultDict[str, DefaultDict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
     for resolve, m in mapping.resolves_to_modules_to_providers.items():
         for module, module_providers in m.items():
             for module_provider in module_providers:
@@ -265,8 +265,8 @@ async def infer_python_dependencies_on_python_constants(
 ) -> InferredDependencies:
     """Infers dependencies on PythonConstantTarget-s based on python source imports."""
 
-    sources = await Get(HydratedSources, HydrateSourcesRequest(request.field_set.source))
-    digest_files = await Get(DigestContents, Digest, sources.snapshot.digest)
+    sources = await hydrate_sources(HydrateSourcesRequest(request.field_set.source), **implicitly())
+    digest_files = await get_digest_contents(sources.snapshot.digest)
     content = digest_files[0].content
     resolve = request.field_set.resolve.normalized_value(python_setup)
     assert resolve is not None, "resolve is None"
@@ -274,8 +274,10 @@ async def infer_python_dependencies_on_python_constants(
     if not backward_mapping:
         raise ValueError("empty backward mapping")
 
-    paths = await MultiGet(
-        Get(SourcesPaths, SourcesPathsRequest(tgt.get(PythonConstantSourceField)))
+    paths = await concurrently(
+        resolve_source_paths(
+            SourcesPathsRequest(tgt.get(PythonConstantSourceField)), **implicitly()
+        )
         for tgt in python_constant_targets
     )
     logger.debug("backward mapping %s", backward_mapping)
@@ -290,7 +292,7 @@ async def infer_python_dependencies_on_python_constants(
     vars = ImportVisitor.search_for_vars(content, interesting_modules)
     logger.debug("vars %s", vars)
 
-    filenames_to_python_constant_targets: DefaultDict[str, List[PythonConstantTarget]] = (
+    filenames_to_python_constant_targets: DefaultDict[str, list[PythonConstantTarget]] = (
         defaultdict(list)
     )
     for path, target in zip(paths, python_constant_targets):

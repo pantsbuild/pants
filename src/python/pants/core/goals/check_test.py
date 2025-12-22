@@ -4,9 +4,9 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 from textwrap import dedent
-from typing import Iterable, Optional, Sequence, Tuple, Type
 
 import pytest
 
@@ -16,10 +16,9 @@ from pants.core.goals.check import (
     CheckResult,
     CheckResults,
     CheckSubsystem,
-    check,
+    check_goal,
 )
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, Workspace
@@ -30,9 +29,9 @@ from pants.engine.process import (
     ProcessResultMetadata,
 )
 from pants.engine.target import FieldSet, MultipleSourcesField, Target, Targets
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.testutil.option_util import create_subsystem
-from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
+from pants.testutil.rule_runner import RuleRunner, mock_console, run_rule_with_mocks
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 from pants.util.strutil import Simplifier
@@ -143,24 +142,30 @@ class InvalidRequest(MockCheckRequest):
         return -1
 
 
-def make_target(address: Optional[Address] = None) -> Target:
+def make_target(address: Address | None = None) -> Target:
     if address is None:
         address = Address("", target_name="tests")
     return MockTarget({}, address)
 
 
+def mock_check(__implicitly: tuple) -> CheckResults:
+    req, typ = next(iter(__implicitly[0].items()))
+    assert typ == CheckRequest
+    return req.check_results  # type: ignore
+
+
 def run_typecheck_rule(
     *,
-    request_types: Sequence[Type[CheckRequest]],
+    request_types: Sequence[type[CheckRequest]],
     targets: list[Target],
     only: list[str] | None = None,
-) -> Tuple[int, str]:
-    union_membership = UnionMembership({CheckRequest: request_types})
+) -> tuple[int, str]:
+    union_membership = UnionMembership.from_rules(UnionRule(CheckRequest, t) for t in request_types)
     check_subsystem = create_subsystem(CheckSubsystem, only=only or [])
     rule_runner = RuleRunner(bootstrap_args=["-lwarn"])
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
         result: Check = run_rule_with_mocks(
-            check,
+            check_goal,
             rule_args=[
                 console,
                 Workspace(rule_runner.scheduler, _enforce_effects=False),
@@ -169,22 +174,15 @@ def run_typecheck_rule(
                 union_membership,
                 check_subsystem,
             ],
-            mock_gets=[
-                MockGet(
-                    output_type=CheckResults,
-                    input_types=(
-                        CheckRequest,
-                        EnvironmentName,
-                    ),
-                    mock=lambda field_set_collection, _: field_set_collection.check_results,
+            mock_calls={
+                "pants.core.environments.rules.resolve_environment_name": lambda a: EnvironmentName(
+                    a.raw_value
                 ),
-                MockGet(
-                    output_type=EnvironmentName,
-                    input_types=(EnvironmentNameRequest,),
-                    mock=lambda a: EnvironmentName(a.raw_value),
-                ),
-            ],
+                "pants.core.goals.check.check": mock_check,
+            },
             union_membership=union_membership,
+            # We don't want temporary warnings to interfere with our expected output.
+            show_warnings=False,
         )
         assert not stdio_reader.get_stdout()
         return result.exit_code, stdio_reader.get_stderr()
@@ -313,6 +311,7 @@ def test_from_fallible_process_result_output_prepping() -> None:
                         remote_execution=False,
                         remote_execution_extra_platform_properties=[],
                         execute_in_workspace=False,
+                        keep_sandboxes="never",
                     ),
                     "ran_locally",
                     0,

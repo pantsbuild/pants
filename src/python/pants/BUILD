@@ -18,8 +18,9 @@ python_distribution(
     dependencies=[
         "./__main__.py",
         ":resources",
-        # Include the native client binary in the distribution.
+        # Include the native client and sandboxer binaries in the distribution.
         "src/python/pants/bin:native_client",
+        "src/python/pants/bin:sandboxer",
     ],
     # Because we have native code, this will cause the wheel to use whatever the ABI is for the
     # interpreter used to run setup.py, e.g. `cp39m-macosx_10_15_x86_64`.
@@ -38,6 +39,10 @@ python_distribution(
         python_requires="==3.11.*",
     ),
     entry_points={"console_scripts": {"pants": "pants.bin.pants_loader:main"}},
+    # We need to explicitly control the wheel tagging, rather than following whatever the current
+    # Python interpreter is tagged for (especially on macOS, where a 'universal' interpreter build
+    # can lead to single-platform wheels being tagged as `universal2` wheels, incorrectly)
+    env_vars=["_PYTHON_HOST_PLATFORM"],
 )
 
 pex_binary(

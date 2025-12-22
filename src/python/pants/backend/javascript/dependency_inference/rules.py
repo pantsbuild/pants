@@ -5,9 +5,9 @@ from __future__ import annotations
 import itertools
 import logging
 import os.path
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable
 
 from pants.backend.javascript import package_json
 from pants.backend.javascript.package_json import (
@@ -16,10 +16,10 @@ from pants.backend.javascript.package_json import (
     NodePackageNameField,
     OwningNodePackage,
     OwningNodePackageRequest,
-    PackageJsonEntryPoints,
     PackageJsonImports,
     PackageJsonSourceField,
     find_owning_package,
+    script_entrypoints_for_source,
     subpath_imports_for_source,
 )
 from pants.backend.javascript.subsystems.nodejs_infer import NodeJSInfer
@@ -40,19 +40,22 @@ from pants.core.util_rules.unowned_dependency_behavior import (
 )
 from pants.engine.addresses import Addresses
 from pants.engine.fs import PathGlobs
-from pants.engine.internals.graph import Owners, OwnersRequest
+from pants.engine.internals.graph import (
+    OwnersRequest,
+    find_owners,
+    hydrate_sources,
+    resolve_targets,
+)
 from pants.engine.internals.native_dep_inference import ParsedJavascriptDependencyCandidate
 from pants.engine.internals.native_engine import InferenceMetadata, NativeDependenciesRequest
-from pants.engine.internals.selectors import Get, concurrently
+from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import parse_javascript_deps, path_globs_to_paths
 from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.target import (
     FieldSet,
-    HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
-    Targets,
 )
 from pants.engine.unions import UnionRule
 from pants.util.docutil import doc_url
@@ -94,11 +97,11 @@ async def infer_node_package_dependencies(
 ) -> InferredDependencies:
     if not nodejs_infer.package_json_entry_points:
         return InferredDependencies(())
-    entry_points = await Get(
-        PackageJsonEntryPoints, PackageJsonSourceField, request.field_set.source
+    entry_points = await script_entrypoints_for_source(request.field_set.source)
+    candidate_js_files = await find_owners(
+        OwnersRequest(tuple(entry_points.globs_from_root())), **implicitly()
     )
-    candidate_js_files = await Get(Owners, OwnersRequest(tuple(entry_points.globs_from_root())))
-    js_targets = await Get(Targets, Addresses(candidate_js_files))
+    js_targets = await resolve_targets(**implicitly(Addresses(candidate_js_files)))
     return InferredDependencies(
         tgt.address for tgt in js_targets if tgt.has_field(JSRuntimeSourceField)
     )
@@ -117,7 +120,7 @@ class RequestNodePackagesCandidateMap:
 async def map_candidate_node_packages(
     req: RequestNodePackagesCandidateMap, first_party: FirstPartyNodePackageTargets
 ) -> NodePackageCandidateMap:
-    owning_pkg = await Get(OwningNodePackage, OwningNodePackageRequest(req.address))
+    owning_pkg = await find_owning_package(OwningNodePackageRequest(req.address))
     candidate_tgts = itertools.chain(
         first_party, owning_pkg.third_party if owning_pkg != OwningNodePackage.no_owner() else ()
     )
@@ -140,7 +143,7 @@ def _create_inference_metadata(
 async def _prepare_inference_metadata(address: Address, file_path: str) -> InferenceMetadata:
     owning_pkg, maybe_config = await concurrently(
         find_owning_package(OwningNodePackageRequest(address)),
-        find_parent_ts_config(ParentTSConfigRequest(file_path, "jsconfig.json"), **implicitly()),
+        find_parent_ts_config(ParentTSConfigRequest(file_path), **implicitly()),
     )
     if not owning_pkg.target:
         return InferenceMetadata.javascript(
@@ -161,12 +164,13 @@ async def _prepare_inference_metadata(address: Address, file_path: str) -> Infer
 
 def _add_extensions(file_imports: frozenset[str], file_extensions: tuple[str, ...]) -> PathGlobs:
     extensions = file_extensions + tuple(f"/index{ext}" for ext in file_extensions)
+    valid_file_extensions = set(file_extensions)
     return PathGlobs(
         string
         for file_import in file_imports
         for string in (
             [file_import]
-            if PurePath(file_import).suffix
+            if PurePath(file_import).suffix in valid_file_extensions
             else [f"{file_import}{ext}" for ext in extensions]
         )
     )
@@ -183,9 +187,8 @@ async def _determine_import_from_candidates(
             file_extensions,
         )
     )
-    local_owners = await Get(Owners, OwnersRequest(paths.files))
-
-    owning_targets = await Get(Targets, Addresses(local_owners))
+    local_owners = await find_owners(OwnersRequest(paths.files), **implicitly())
+    owning_targets = await resolve_targets(**implicitly(Addresses(local_owners)))
 
     addresses = Addresses(tgt.address for tgt in owning_targets)
     if not local_owners:
@@ -225,7 +228,7 @@ def _handle_unowned_imports(
 
         {bullet_list(sorted(unowned_imports))}
 
-        If you do not expect an import to be inferrable, add `// pants: no-infer-dep` to the
+        If you do not expect an import to be inferable, add `// pants: no-infer-dep` to the
         import line. Otherwise, see {url} for common problems.
         """
     )
@@ -249,8 +252,8 @@ async def infer_js_source_dependencies(
     if not nodejs_infer.imports:
         return InferredDependencies(())
 
-    sources = await Get(
-        HydratedSources, HydrateSourcesRequest(source, for_sources_types=[JSRuntimeSourceField])
+    sources = await hydrate_sources(
+        HydrateSourcesRequest(source, for_sources_types=[JSRuntimeSourceField]), **implicitly()
     )
     metadata = await _prepare_inference_metadata(request.field_set.address, source.file_path)
 

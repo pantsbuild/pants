@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from pants.backend.codegen.protobuf import jvm_symbol_mapper
-from pants.backend.codegen.protobuf.jvm_symbol_mapper import FirstPartyProtobufJvmMappingRequest
-from pants.engine.rules import collect_rules, rule
+from pants.backend.codegen.protobuf.jvm_symbol_mapper import (
+    FirstPartyProtobufJvmMappingRequest,
+    map_first_party_protobuf_jvm_targets_to_symbols,
+)
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import symbol_mapper
-from pants.jvm.dependency_inference.symbol_mapper import FirstPartyMappingRequest
+from pants.jvm.dependency_inference.symbol_mapper import FirstPartyMappingRequest, SymbolMap
 
 
 class FirstPartyProtobufScalaTargetsMappingRequest(FirstPartyMappingRequest):
@@ -17,8 +20,10 @@ class FirstPartyProtobufScalaTargetsMappingRequest(FirstPartyMappingRequest):
 @rule
 async def map_first_party_protobuf_scala_targets_to_symbols(
     _: FirstPartyProtobufScalaTargetsMappingRequest,
-) -> FirstPartyProtobufJvmMappingRequest:
-    return FirstPartyProtobufJvmMappingRequest(capitalize_base_name=False)
+) -> SymbolMap:
+    return await map_first_party_protobuf_jvm_targets_to_symbols(
+        FirstPartyProtobufJvmMappingRequest(capitalize_base_name=False), **implicitly()
+    )
 
 
 def rules():

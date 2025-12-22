@@ -15,10 +15,11 @@ import itertools
 import logging
 import re
 import tempfile
+from collections.abc import Generator
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import Dict, Generator, List, Optional, Tuple, TypeVar
+from typing import TypeVar
 from urllib.parse import urljoin, urlparse
 
 import gnupg
@@ -69,7 +70,7 @@ class Link:
     link: str
 
 
-Links = List[Link]
+Links = list[Link]
 
 
 def get_tf_page(url) -> BeautifulSoup:
@@ -118,15 +119,15 @@ class VersionHash:
 
 @dataclass(frozen=True)
 class VersionHashes:
-    sha256sums: List[VersionHash]
+    sha256sums: list[VersionHash]
     signature: bytes
 
-    def by_file(self) -> Dict[str, str]:
+    def by_file(self) -> dict[str, str]:
         """Get sha256sum by filename."""
         return {x.filename: x.sha256sum for x in self.sha256sums}
 
 
-def parse_sha256sums_file(file_text: str) -> List[VersionHash]:
+def parse_sha256sums_file(file_text: str) -> list[VersionHash]:
     """Parse Terraform's sha256sums file."""
     return [
         VersionHash(**x)
@@ -164,7 +165,7 @@ def get_file_size(url) -> int:
     return int(r.headers["content-length"])
 
 
-def parse_download_url(url: str) -> Tuple[str, str]:
+def parse_download_url(url: str) -> tuple[str, str]:
     """Get the version and platform from the url.
 
     The url is of the form "https://releases.hashicorp.com/terraform/{expected_platform}/terraform_{expected_version}_{expected_platform}.zip"
@@ -183,10 +184,10 @@ def is_prerelease(version_slug: str) -> bool:
 
 def fetch_platforms_for_version(
     verifier: GPGVerifier,
-    inverse_platform_mapping: Dict[str, str],
+    inverse_platform_mapping: dict[str, str],
     version_slug: str,
     version_links: TFVersionLinks,
-) -> Optional[List[ExternalToolVersion]]:
+) -> list[ExternalToolVersion] | None:
     """Fetch platform binary information for a particular Terraform version."""
     logging.info(
         f"processing version {version_slug} with {len(version_links.binary_links)} binaries"
@@ -230,7 +231,7 @@ def fetch_platforms_for_version(
 
 def fetch_versions(
     url: str, verifier: GPGVerifier
-) -> Generator[List[ExternalToolVersion], None, None]:
+) -> Generator[list[ExternalToolVersion], None, None]:
     """Crawl the Terraform version site and identify all supported Terraform binaries."""
     version_page = get_tf_page(url)
     version_links = get_tf_links(version_page)

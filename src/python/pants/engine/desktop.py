@@ -2,23 +2,22 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Tuple
 
-from pants.core.util_rules.environments import ChosenLocalEnvironmentName, EnvironmentName
-from pants.core.util_rules.system_binaries import BinaryPathRequest, BinaryPaths
-from pants.engine.env_vars import CompleteEnvironmentVars
-from pants.engine.platform import Platform
+from pants.core.environments.rules import ChosenLocalEnvironmentName, EnvironmentName
+from pants.core.util_rules.system_binaries import BinaryPathRequest, find_binary
+from pants.engine.internals.platform_rules import complete_environment_vars, current_platform
 from pants.engine.process import InteractiveProcess
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
 class OpenFilesRequest:
-    files: Tuple[PurePath, ...]
+    files: tuple[PurePath, ...]
     error_if_open_not_found: bool
 
     def __init__(self, files: Iterable[PurePath], *, error_if_open_not_found: bool = True) -> None:
@@ -28,7 +27,7 @@ class OpenFilesRequest:
 
 @dataclass(frozen=True)
 class OpenFiles:
-    processes: Tuple[InteractiveProcess, ...]
+    processes: tuple[InteractiveProcess, ...]
 
 
 @rule
@@ -36,19 +35,20 @@ async def find_open_program(
     request: OpenFilesRequest,
     local_environment_name: ChosenLocalEnvironmentName,
 ) -> OpenFiles:
-    plat, complete_env = await MultiGet(
-        Get(Platform, EnvironmentName, local_environment_name.val),
-        Get(CompleteEnvironmentVars, EnvironmentName, local_environment_name.val),
+    plat, complete_env = await concurrently(
+        current_platform(**implicitly({local_environment_name.val: EnvironmentName})),
+        complete_environment_vars(**implicitly(local_environment_name.val)),
     )
     open_program_name = "open" if plat.is_macos else "xdg-open"
-    open_program_paths = await Get(
-        BinaryPaths,
-        {
-            BinaryPathRequest(
-                binary_name=open_program_name, search_path=("/bin", "/usr/bin")
-            ): BinaryPathRequest,
-            local_environment_name.val: EnvironmentName,
-        },
+    open_program_paths = await find_binary(
+        **implicitly(
+            {
+                BinaryPathRequest(
+                    binary_name=open_program_name, search_path=("/bin", "/usr/bin")
+                ): BinaryPathRequest,
+                local_environment_name.val: EnvironmentName,
+            }
+        )
     )
     if not open_program_paths.first_path:
         error = (

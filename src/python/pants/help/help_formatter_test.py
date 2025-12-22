@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Tuple
 
 from pants.help.help_formatter import HelpFormatter
 from pants.help.help_info_extracter import HelpInfoExtracter, OptionHelpInfo
@@ -58,7 +57,7 @@ class TestOptionHelpFormatter:
         assert default_line.lstrip() == "default: kiwi"
 
     @classmethod
-    def _get_registrar_and_parser(cls) -> Tuple[OptionRegistrar, NativeOptionParser]:
+    def _get_registrar_and_parser(cls) -> tuple[OptionRegistrar, NativeOptionParser]:
         return OptionRegistrar(
             scope=GlobalOptions.options_scope,
         ), NativeOptionParser(

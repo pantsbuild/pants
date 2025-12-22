@@ -58,7 +58,7 @@ nuke_if_too_big ~/.cache/pants/named_caches 1024
 :::
 
 :::note Tip: check cache performance with `[stats].log`
-Set the option `[stats].log = true` in `pants.ci.toml` for Pants to print metrics of your cache's performance at the end of the run, including the number of cache hits and the total time saved thanks to caching, e.g.:
+Set the option `[stats].log = true` in `pants.ci.toml` for Pants to print metrics of your cache's performance at the end of the run, including the number of cache hits, the total time saved thanks to caching, and histograms of some metrics like the size of blobs/files cached, e.g.:
 
 ```
   local_cache_requests: 204
@@ -67,7 +67,6 @@ Set the option `[stats].log = true` in `pants.ci.toml` for Pants to print metric
   local_cache_total_time_saved_ms: 307200
 ```
 
-You can also add `plugins = ["hdrhistogram"]` to the `[GLOBAL]` section of `pants.ci.toml` for Pants to print histograms of cache performance, e.g. the size of blobs cached.
 :::
 
 :::tip Remote caching

@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import json
-from typing import Callable
+from collections.abc import Callable
 
 import strawberry
 from pants_explorer.server.browser import Browser

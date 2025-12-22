@@ -7,24 +7,24 @@ import dataclasses
 import re
 import xml.etree.ElementTree as ET
 from abc import ABC, ABCMeta, abstractmethod
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
-from typing import Callable, ClassVar, Iterable, Iterator, Optional, Tuple, Type, Union
+from typing import ClassVar
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
-from pants.core.goals.run import RestartableField, RunFieldSet, RunInSandboxBehavior, RunRequest
+from pants.core.goals.run import RestartableField, RunFieldSet, RunInSandboxBehavior
 from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
 from pants.core.target_types import (
     ResolveLikeField,
     ResolveLikeFieldToValueRequest,
     ResolveLikeFieldToValueResult,
 )
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.addresses import Address
-from pants.engine.fs import Digest, DigestContents
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import Rule, collect_rules, rule
+from pants.engine.intrinsics import get_digest_contents
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
@@ -52,7 +52,6 @@ from pants.jvm.subsystems import JvmSubsystem
 from pants.util.docutil import git_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized
 from pants.util.strutil import bullet_list, help_text, pluralize, softwrap
 
 # -----------------------------------------------------------------------------------------------
@@ -140,11 +139,6 @@ class JvmRunnableSourceFieldSet(RunFieldSet):
     run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
     jdk_version: JvmJdkField
     main_class: JvmMainClassNameField
-
-    @classmethod
-    def jvm_rules(cls) -> Iterable[Union[Rule, UnionRule]]:
-        yield from _jvm_source_run_request_rule(cls)
-        yield from cls.rules()
 
 
 @dataclass(frozen=True)
@@ -234,7 +228,7 @@ class JvmArtifactJarSourceField(OptionalSingleSourceField):
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
+    def compute_value(cls, raw_value: str | None, address: Address) -> str | None:
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default and value_or_default.startswith("file:"):
             raise InvalidFieldException(
@@ -327,7 +321,7 @@ class JvmArtifactExclusion:
 
 
 def _jvm_artifact_exclusions_field_help(
-    supported_exclusions: Callable[[], Iterable[type[JvmArtifactExclusion]]]
+    supported_exclusions: Callable[[], Iterable[type[JvmArtifactExclusion]]],
 ) -> str | Callable[[], str]:
     return help_text(
         lambda: f"""
@@ -339,7 +333,7 @@ def _jvm_artifact_exclusions_field_help(
         version conflicts in complex resolves.
 
         Supported exclusions are:
-        {bullet_list(f'`{exclusion.alias}`: {exclusion.help}' for exclusion in supported_exclusions())}
+        {bullet_list(f"`{exclusion.alias}`: {exclusion.help}" for exclusion in supported_exclusions())}
         """
     )
 
@@ -358,8 +352,8 @@ class JvmArtifactExclusionsField(SequenceField[JvmArtifactExclusion]):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Iterable[JvmArtifactExclusion]], address: Address
-    ) -> Optional[Tuple[JvmArtifactExclusion, ...]]:
+        cls, raw_value: Iterable[JvmArtifactExclusion] | None, address: Address
+    ) -> tuple[JvmArtifactExclusion, ...] | None:
         computed_value = super().compute_value(raw_value, address)
 
         if computed_value:
@@ -474,7 +468,7 @@ class JvmArtifactsPackageMappingField(DictStringToStringSequenceField):
         """
     )
     value: FrozenDict[str, tuple[str, ...]]
-    default: ClassVar[Optional[FrozenDict[str, tuple[str, ...]]]] = FrozenDict()
+    default: ClassVar[FrozenDict[str, tuple[str, ...]] | None] = FrozenDict()
 
     @classmethod
     def compute_value(  # type: ignore[override]
@@ -525,11 +519,8 @@ async def generate_from_pom_xml(
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
     generator = request.generator
-    pom_xml = await Get(
-        SourceFiles,
-        SourceFilesRequest([generator[PomXmlSourceField]]),
-    )
-    files = await Get(DigestContents, Digest, pom_xml.snapshot.digest)
+    pom_xml = await determine_source_files(SourceFilesRequest([generator[PomXmlSourceField]]))
+    files = await get_digest_contents(pom_xml.snapshot.digest)
     if not files:
         raise FileNotFoundError(f"pom.xml not found: {generator[PomXmlSourceField].value}")
 
@@ -734,7 +725,7 @@ class JvmShadingKeepRule(JvmShadingRule):
         return JvmShadingRule._validate_field(self.pattern, name="pattern", invalid_chars="/")
 
 
-JVM_SHADING_RULE_TYPES: list[Type[JvmShadingRule]] = [
+JVM_SHADING_RULE_TYPES: list[type[JvmShadingRule]] = [
     JvmShadingRelocateRule,
     JvmShadingRenameRule,
     JvmShadingZapRule,
@@ -749,7 +740,7 @@ def _shading_rules_field_help(intro: str) -> str:
 
         There are {pluralize(len(JVM_SHADING_RULE_TYPES), "possible shading rule")} available,
         which are as follows:
-        {bullet_list([f'`{rule.alias}`: {rule.help}' for rule in JVM_SHADING_RULE_TYPES])}
+        {bullet_list([f"`{rule.alias}`: {rule.help}" for rule in JVM_SHADING_RULE_TYPES])}
 
         When defining shading rules, just add them in this field using the previously listed rule
         alias and passing along the required parameters.
@@ -782,8 +773,8 @@ class JvmShadingRulesField(SequenceField[JvmShadingRule], metaclass=ABCMeta):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Iterable[JvmShadingRule]], address: Address
-    ) -> Optional[Tuple[JvmShadingRule, ...]]:
+        cls, raw_value: Iterable[JvmShadingRule] | None, address: Address
+    ) -> tuple[JvmShadingRule, ...] | None:
         computed_value = super().compute_value(raw_value, address)
 
         if computed_value:
@@ -868,8 +859,8 @@ class DeployJarDuplicatePolicyField(SequenceField[DeployJarDuplicateRule]):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Iterable[DeployJarDuplicateRule]], address: Address
-    ) -> Optional[Tuple[DeployJarDuplicateRule, ...]]:
+        cls, raw_value: Iterable[DeployJarDuplicateRule] | None, address: Address
+    ) -> tuple[DeployJarDuplicateRule, ...] | None:
         value = super().compute_value(raw_value, address)
         if value:
             errors = []
@@ -994,26 +985,11 @@ class JvmResolveFieldDefaultFactoryRequest(FieldDefaultFactoryRequest):
 
 
 @rule
-def jvm_resolve_field_default_factory(
+async def jvm_resolve_field_default_factory(
     request: JvmResolveFieldDefaultFactoryRequest,
     jvm: JvmSubsystem,
 ) -> FieldDefaultFactoryResult:
     return FieldDefaultFactoryResult(lambda f: f.normalized_value(jvm))
-
-
-@memoized
-def _jvm_source_run_request_rule(cls: type[JvmRunnableSourceFieldSet]) -> Iterable[Rule]:
-    from pants.jvm.run import rules as run_rules
-
-    @rule(
-        canonical_name_suffix=cls.__name__,
-        _param_type_overrides={"request": cls},
-        level=LogLevel.DEBUG,
-    )
-    async def jvm_source_run_request(request: JvmRunnableSourceFieldSet) -> RunRequest:
-        return await Get(RunRequest, GenericJvmRunRequest(request))
-
-    return [*run_rules(), *collect_rules(locals())]
 
 
 @rule
@@ -1030,7 +1006,7 @@ def rules():
         UnionRule(GenerateTargetsRequest, GenerateFromPomXmlRequest),
         UnionRule(FieldDefaultFactoryRequest, JvmResolveFieldDefaultFactoryRequest),
         UnionRule(ResolveLikeFieldToValueRequest, JvmResolveLikeFieldToValueRequest),
-        *JvmArtifactFieldSet.jvm_rules(),
+        # *JvmArtifactFieldSet.jvm_rules(),
     ]
 
 

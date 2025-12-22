@@ -5,9 +5,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, ClassVar, Generic, Iterable, Tuple, Type, TypeVar, cast
+from typing import Any, ClassVar, Generic, TypeVar, cast
 
 from pants.util.docutil import bin_name
 from pants.util.ordered_set import FrozenOrderedSet
@@ -24,11 +25,11 @@ class LockfileScope(Enum):
 
 _LockfileMetadataSubclass = TypeVar("_LockfileMetadataSubclass", bound="LockfileMetadata")
 # N.B. the value type is `type[_LockfileMetadataSubclass]`
-_concrete_metadata_classes: dict[Tuple[LockfileScope, int], type] = {}
+_concrete_metadata_classes: dict[tuple[LockfileScope, int], type] = {}
 
 
 # Registrar types (pre-declaring to avoid repetition)
-RegisterClassForVersion = Callable[[Type["LockfileMetadata"]], Type["LockfileMetadata"]]
+RegisterClassForVersion = Callable[[type["LockfileMetadata"]], type["LockfileMetadata"]]
 
 
 def lockfile_metadata_registrar(scope: LockfileScope) -> Callable[[int], RegisterClassForVersion]:
@@ -43,7 +44,7 @@ def lockfile_metadata_registrar(scope: LockfileScope) -> Callable[[int], Registe
         The class must be a frozen dataclass
         """
 
-        def _dec(cls: Type[LockfileMetadata]) -> Type[LockfileMetadata]:
+        def _dec(cls: type[LockfileMetadata]) -> type[LockfileMetadata]:
             # Only frozen dataclasses may be registered as lockfile metadata:
             cls_dataclass_params = getattr(cls, "__dataclass_params__", None)
             if not cls_dataclass_params or not cls_dataclass_params.frozen:
@@ -132,9 +133,8 @@ class LockfileMetadata:
             raise NoLockfileMetadataBlock(
                 f"Could not find a Pants metadata block in {lockfile_description}. {error_suffix}"
             )
-
         try:
-            metadata = json.loads(b"\n".join(metadata_lines))
+            json_dict = json.loads(b"\n".join(metadata_lines))
         except json.decoder.JSONDecodeError:
             raise InvalidLockfileError(
                 softwrap(
@@ -145,17 +145,25 @@ class LockfileMetadata:
                 )
                 + error_suffix
             )
+        return cls.from_json_dict(json_dict, lockfile_description, error_suffix)
 
-        version = metadata.get("version", 1)
+    @classmethod
+    def from_json_dict(
+        cls: type[_LockfileMetadataSubclass],
+        json_dict: dict[Any, Any],
+        lockfile_description: str,
+        error_suffix: str,
+    ) -> _LockfileMetadataSubclass:
+        version = json_dict.get("version", 1)
         concrete_class = _concrete_metadata_classes[(cls.scope, version)]
 
         assert issubclass(concrete_class, cls)
         assert concrete_class.scope == cls.scope, (
-            "The class used to call `from_lockfile` has a different scope than what was "
+            "The class used to call `from_json_dict` has a different scope than what was "
             f"expected given the metadata. Expected '{cls.scope}', got '{concrete_class.scope}'",
         )
 
-        return concrete_class._from_json_dict(metadata, lockfile_description, error_suffix)
+        return concrete_class._from_json_dict(json_dict, lockfile_description, error_suffix)
 
     @classmethod
     def _from_json_dict(
@@ -179,12 +187,17 @@ class LockfileMetadata:
             "`LockfileMetadata._from_json_dict` should not be directly called."
         )
 
+    def to_json(self, with_description: str | None = None) -> str:
+        metadata_dict = self.__render_header_dict()
+        if with_description is not None:
+            metadata_dict["description"] = with_description
+        return json.dumps(metadata_dict, ensure_ascii=True, indent=2)
+
     def add_header_to_lockfile(
         self, lockfile: bytes, *, delimeter: str, regenerate_command: str
     ) -> bytes:
-        metadata_dict = self.__render_header_dict()
-        metadata_json = json.dumps(metadata_dict, ensure_ascii=True, indent=2).splitlines()
-        metadata_as_a_comment = "\n".join(f"{delimeter} {l}" for l in metadata_json)
+        metadata_json = self.to_json()
+        metadata_as_a_comment = "\n".join(f"{delimeter} {l}" for l in metadata_json.splitlines())
 
         regenerate_command_bytes = "\n".join(
             [
@@ -215,7 +228,7 @@ class LockfileMetadata:
         `dict` containing the metadata attributes that should be stored in the lockfile.
         """
 
-        attrs: dict[Any, Tuple[Any, Type]] = {}  # attr name -> (value, where we first saw it)
+        attrs: dict[Any, tuple[Any, type]] = {}  # attr name -> (value, where we first saw it)
         for cls in reversed(self.__class__.__mro__[:-1]):
             new_attrs = cast(LockfileMetadata, cls).additional_header_attrs(self)
             for attr in new_attrs:

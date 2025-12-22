@@ -222,12 +222,21 @@ class DockerOptions(Subsystem):
 
             To provide the top-level options to the `docker` client, use
             `[{options_scope}].env_vars` to configure the
-            [Environment variables]({doc_links['docker_env_vars']}) as appropriate.
+            [Environment variables]({doc_links["docker_env_vars"]}) as appropriate.
 
             The arguments for the image entrypoint may be passed on the command line after a
             double dash (`--`), or using the `--run-args` option.
 
             Defaults to `--interactive --tty` when stdout is connected to a terminal.
+            """
+        ),
+    )
+    publish_noninteractively = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            If true, publish images non-interactively. This allows for pushes to be parallelized, but requires
+            docker to be pre-authenticated to the registries to which it is pushing.
             """
         ),
     )
@@ -257,6 +266,17 @@ class DockerOptions(Subsystem):
     tailor = BoolOption(
         default=True,
         help="If true, add `docker_image` targets with the `tailor` goal.",
+        advanced=True,
+    )
+
+    suggest_renames = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            When true and, the `docker_image` build fails, enrich the logs with suggestions
+            for renaming source file COPY instructions where possible.
+            """
+        ),
         advanced=True,
     )
 

@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, Optional
 
 from pants.util.meta import SingletonMetaclass
 
@@ -36,7 +36,7 @@ class BuildRoot(metaclass=SingletonMetaclass):
         return str(buildroot)
 
     def __init__(self) -> None:
-        self._root_dir: Optional[str] = None
+        self._root_dir: str | None = None
 
     @property
     def pathlib_path(self) -> Path:

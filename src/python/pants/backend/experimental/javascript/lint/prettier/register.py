@@ -8,7 +8,7 @@ See https://prettier.io/ for details.
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from pants.backend.javascript.lint.prettier import rules as prettier_rules
 from pants.backend.javascript.lint.prettier import skip_field

@@ -4,6 +4,7 @@
 
 See https://github.com/megastep/makeself.
 """
+
 from pants.backend.makeself import subsystem
 from pants.backend.makeself import system_binaries as makeself_system_binaries
 from pants.backend.makeself.goals import package, run

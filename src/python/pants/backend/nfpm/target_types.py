@@ -152,7 +152,7 @@ class NfpmApkPackage(NfpmPackageTarget):
         This will not install the package, only create an .apk file
         that you can then distribute and install, e.g. via pkg.
 
-        See {doc_url('nfpm-apk-package')}.
+        See {doc_url("nfpm-apk-package")}.
         """
     )
 
@@ -194,7 +194,7 @@ class NfpmArchlinuxPackage(NfpmPackageTarget):
         This will not install the package, only create an .tar.zst file
         that you can then distribute and install, e.g. via pkg.
 
-        See {doc_url('nfpm-archlinux-package')}.
+        See {doc_url("nfpm-archlinux-package")}.
         """
     )
 
@@ -248,7 +248,7 @@ class NfpmDebPackage(NfpmPackageTarget):
         This will not install the package, only create a .deb file
         that you can then distribute and install, e.g. via pkg.
 
-        See {doc_url('nfpm-deb-package')}.
+        See {doc_url("nfpm-deb-package")}.
         """
     )
 
@@ -300,7 +300,7 @@ class NfpmRpmPackage(NfpmPackageTarget):
         This will not install the package, only create an .rpm file
         that you can then distribute and install, e.g. via pkg.
 
-        See {doc_url('nfpm-rpm-package')}.
+        See {doc_url("nfpm-rpm-package")}.
         """
     )
 

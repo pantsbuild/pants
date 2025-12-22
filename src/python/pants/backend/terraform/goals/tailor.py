@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import os.path
 from dataclasses import dataclass
-from typing import List
 
 from pants.backend.terraform.target_types import (
     TerraformBackendTarget,
@@ -19,8 +18,7 @@ from pants.core.goals.tailor import (
     PutativeTargets,
     PutativeTargetsRequest,
 )
-from pants.engine.fs import PathGlobs, Paths
-from pants.engine.internals.selectors import Get
+from pants.engine.intrinsics import path_globs_to_paths
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.dirutil import group_by_dir
@@ -40,9 +38,9 @@ async def find_putative_terraform_module_targets(
 ) -> PutativeTargets:
     if not terraform.tailor:
         return PutativeTargets()
-    putative_targets: List[PutativeTarget] = []
+    putative_targets: list[PutativeTarget] = []
 
-    all_terraform_files = await Get(Paths, PathGlobs, request.path_globs("*.tf"))
+    all_terraform_files = await path_globs_to_paths(request.path_globs("*.tf"))
     unowned_terraform_files = set(all_terraform_files.files) - set(all_owned_sources)
 
     putative_targets.extend(
@@ -55,7 +53,7 @@ async def find_putative_terraform_module_targets(
         for dirname, filenames in group_by_dir(unowned_terraform_files).items()
     )
 
-    all_backend_files = await Get(Paths, PathGlobs, request.path_globs("*.tfbackend"))
+    all_backend_files = await path_globs_to_paths(request.path_globs("*.tfbackend"))
     unowned_backend_files = set(all_backend_files.files) - set(all_owned_sources)
     for backend_file in unowned_backend_files:
         dirname, filename = os.path.split(backend_file)
@@ -71,7 +69,7 @@ async def find_putative_terraform_module_targets(
 
     # We generate separate targets for each var file,
     # to not make assumptions that they're all together.
-    all_var_files = await Get(Paths, PathGlobs, request.path_globs("*.tfvars"))
+    all_var_files = await path_globs_to_paths(request.path_globs("*.tfvars"))
     unowned_var_files = set(all_var_files.files) - set(all_owned_sources)
     for var_file in unowned_var_files:
         dirname, filename = os.path.split(var_file)

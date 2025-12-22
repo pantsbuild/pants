@@ -5,8 +5,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.engine.fs import Digest, DigestEntries, DigestSubset, FileDigest, FileEntry, PathGlobs
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.fs import Digest, DigestSubset, FileDigest, FileEntry, PathGlobs
+from pants.engine.intrinsics import digest_subset_to_digest, get_digest_entries
+from pants.engine.rules import collect_rules, rule
 
 
 @dataclass(frozen=True)
@@ -17,8 +18,10 @@ class ExtractFileDigest:
 
 @rule
 async def digest_to_file_digest(request: ExtractFileDigest) -> FileDigest:
-    digest = await Get(Digest, DigestSubset(request.digest, PathGlobs([request.file_path])))
-    digest_entries = await Get(DigestEntries, Digest, digest)
+    digest = await digest_subset_to_digest(
+        DigestSubset(request.digest, PathGlobs([request.file_path]))
+    )
+    digest_entries = await get_digest_entries(digest)
 
     if len(digest_entries) == 0:
         raise Exception(f"ExtractFileDigest: '{request.file_path}' not found in {request.digest}.")

@@ -14,11 +14,13 @@ from pants.backend.docker.target_types import (
     DockerImageSourceField,
 )
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
-from pants.core.goals.package import BuiltPackage, PackageFieldSet
+from pants.core.goals.package import PackageFieldSet, build_package
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import WrappedTarget, WrappedTargetRequest
+from pants.core.util_rules.env_vars import environment_vars_subset
+from pants.engine.env_vars import EnvironmentVarsRequest
+from pants.engine.internals.graph import resolve_target
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
+from pants.engine.target import WrappedTargetRequest
 
 
 @dataclass(frozen=True)
@@ -39,9 +41,9 @@ async def docker_image_run_request(
     options: DockerOptions,
     options_env_aware: DockerOptions.EnvironmentAware,
 ) -> RunRequest:
-    wrapped_target = await Get(
-        WrappedTarget,
+    wrapped_target = await resolve_target(
         WrappedTargetRequest(field_set.address, description_of_origin="<infallible>"),
+        **implicitly(),
     )
     build_request = DockerPackageFieldSet.create(wrapped_target.target)
     registries = options.registries()
@@ -54,9 +56,9 @@ async def docker_image_run_request(
                 registries=DockerImageRegistriesField((registry.alias,), field_set.address),
             )
             break
-    env, image = await MultiGet(
-        Get(EnvironmentVars, EnvironmentVarsRequest(options_env_aware.env_vars)),
-        Get(BuiltPackage, PackageFieldSet, build_request),
+    env, image = await concurrently(
+        environment_vars_subset(EnvironmentVarsRequest(options_env_aware.env_vars), **implicitly()),
+        build_package(**implicitly({build_request: PackageFieldSet})),
     )
 
     tag = cast(BuiltDockerImage, image.artifacts[0]).tags[0]

@@ -16,32 +16,25 @@ from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
 from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggleField, ProtobufSourceField
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import PexResolveInfo, VenvPex, VenvPexRequest
+from pants.backend.python.util_rules.pex import (
+    VenvPexRequest,
+    create_venv_pex,
+    determine_venv_pex_resolve_info,
+)
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.core.goals.resolves import ExportableTool
-from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
+from pants.core.util_rules.external_tool import download_external_tool
 from pants.core.util_rules.source_files import SourceFilesRequest
-from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
-from pants.engine.fs import (
-    AddPrefix,
-    CreateDigest,
-    Digest,
-    Directory,
-    MergeDigests,
-    RemovePrefix,
-    Snapshot,
-)
+from pants.core.util_rules.stripped_source_files import strip_source_roots
+from pants.engine.fs import AddPrefix, CreateDigest, Directory, MergeDigests, RemovePrefix
+from pants.engine.internals.graph import transitive_targets as transitive_targets_get
+from pants.engine.intrinsics import create_digest, digest_to_snapshot, merge_digests, remove_prefix
 from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import (
-    GeneratedSources,
-    GenerateSourcesRequest,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-)
+from pants.engine.process import Process, execute_process_or_raise
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
+from pants.engine.target import GeneratedSources, GenerateSourcesRequest, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
-from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.source.source_root import SourceRootRequest, get_source_root
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -63,32 +56,31 @@ async def generate_python_from_protobuf(
     pex_environment: PexEnvironment,
     platform: Platform,
 ) -> GeneratedSources:
-    download_protoc_request = Get(
-        DownloadedExternalTool, ExternalToolRequest, protoc.get_request(platform)
-    )
+    download_protoc_request = download_external_tool(protoc.get_request(platform))
 
     output_dir = "_generated_files"
-    create_output_dir_request = Get(Digest, CreateDigest([Directory(output_dir)]))
+    create_output_dir_request = create_digest(CreateDigest([Directory(output_dir)]))
 
     # Protoc needs all transitive dependencies on `protobuf_libraries` to work properly. It won't
     # actually generate those dependencies; it only needs to look at their .proto files to work
     # with imports.
-    transitive_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequest([request.protocol_target.address])
+    transitive_targets = await transitive_targets_get(
+        TransitiveTargetsRequest([request.protocol_target.address]), **implicitly()
     )
 
     # NB: By stripping the source roots, we avoid having to set the value `--proto_path`
     # for Protobuf imports to be discoverable.
-    all_stripped_sources_request = Get(
-        StrippedSourceFiles,
-        SourceFilesRequest(
-            tgt[ProtobufSourceField]
-            for tgt in transitive_targets.closure
-            if tgt.has_field(ProtobufSourceField)
-        ),
+    all_stripped_sources_request = strip_source_roots(
+        **implicitly(
+            SourceFilesRequest(
+                tgt[ProtobufSourceField]
+                for tgt in transitive_targets.closure
+                if tgt.has_field(ProtobufSourceField)
+            )
+        )
     )
-    target_stripped_sources_request = Get(
-        StrippedSourceFiles, SourceFilesRequest([request.protocol_target[ProtobufSourceField]])
+    target_stripped_sources_request = strip_source_roots(
+        **implicitly(SourceFilesRequest([request.protocol_target[ProtobufSourceField]]))
     )
 
     (
@@ -96,7 +88,7 @@ async def generate_python_from_protobuf(
         empty_output_dir,
         all_sources_stripped,
         target_sources_stripped,
-    ) = await MultiGet(
+    ) = await concurrently(
         download_protoc_request,
         create_output_dir_request,
         all_stripped_sources_request,
@@ -109,24 +101,26 @@ async def generate_python_from_protobuf(
         all_sources_stripped.snapshot.digest,
         empty_output_dir,
     ]
+
+    pyi_gen_option = "pyi_out:" if python_protobuf_subsystem.generate_type_stubs else ""
     protoc_argv = [
         os.path.join(protoc_relpath, downloaded_protoc_binary.exe),
-        "--python_out",
-        output_dir,
+        f"--python_out={pyi_gen_option}{output_dir}",
     ]
+
     complete_pex_env = pex_environment.in_sandbox(working_directory=None)
 
     if python_protobuf_subsystem.mypy_plugin:
         protoc_gen_mypy_script = "protoc-gen-mypy"
         protoc_gen_mypy_grpc_script = "protoc-gen-mypy_grpc"
         mypy_request = python_protobuf_mypy_plugin.to_pex_request()
-        mypy_pex = await Get(
-            VenvPex,
+        mypy_pex = await create_venv_pex(
             VenvPexRequest(
                 pex_request=mypy_request,
                 complete_pex_env=complete_pex_env,
                 bin_names=[protoc_gen_mypy_script],
             ),
+            **implicitly(),
         )
         protoc_argv.extend(
             [
@@ -137,19 +131,19 @@ async def generate_python_from_protobuf(
         )
 
         if grpc_enabled and python_protobuf_subsystem.grpcio_plugin:
-            mypy_pex_info = await Get(PexResolveInfo, VenvPex, mypy_pex)
+            mypy_pex_info = await determine_venv_pex_resolve_info(mypy_pex)
 
             # In order to generate stubs for gRPC code, we need mypy-protobuf 2.0 or above.
             mypy_protobuf_info = mypy_pex_info.find("mypy-protobuf")
             if mypy_protobuf_info and mypy_protobuf_info.version.major >= 2:
                 # TODO: Use `pex_path` once VenvPex stores a Pex field.
-                mypy_pex = await Get(
-                    VenvPex,
+                mypy_pex = await create_venv_pex(
                     VenvPexRequest(
                         pex_request=mypy_request,
                         complete_pex_env=complete_pex_env,
                         bin_names=[protoc_gen_mypy_script, protoc_gen_mypy_grpc_script],
                     ),
+                    **implicitly(),
                 )
                 protoc_argv.extend(
                     [
@@ -172,10 +166,8 @@ async def generate_python_from_protobuf(
             )
 
         if python_protobuf_subsystem.grpcio_plugin:
-            downloaded_grpc_plugin = await Get(
-                DownloadedExternalTool,
-                ExternalToolRequest,
-                grpc_python_plugin.get_request(platform),
+            downloaded_grpc_plugin = await download_external_tool(
+                grpc_python_plugin.get_request(platform)
             )
             unmerged_digests.append(downloaded_grpc_plugin.digest)
             protoc_argv.extend(
@@ -185,13 +177,13 @@ async def generate_python_from_protobuf(
         if python_protobuf_subsystem.grpclib_plugin:
             protoc_gen_grpclib_script = "protoc-gen-grpclib_python"
             grpclib_request = python_protobuf_grpclib_plugin.to_pex_request()
-            grpclib_pex = await Get(
-                VenvPex,
+            grpclib_pex = await create_venv_pex(
                 VenvPexRequest(
                     pex_request=grpclib_request,
                     complete_pex_env=complete_pex_env,
                     bin_names=[protoc_gen_grpclib_script],
                 ),
+                **implicitly(),
             )
             unmerged_digests.append(grpclib_pex.digest)
             protoc_argv.extend(
@@ -202,20 +194,21 @@ async def generate_python_from_protobuf(
                 ]
             )
 
-    input_digest = await Get(Digest, MergeDigests(unmerged_digests))
+    input_digest = await merge_digests(MergeDigests(unmerged_digests))
     protoc_argv.extend(target_sources_stripped.snapshot.files)
-    result = await Get(
-        ProcessResult,
-        Process(
-            protoc_argv,
-            input_digest=input_digest,
-            immutable_input_digests={
-                protoc_relpath: downloaded_protoc_binary.digest,
-            },
-            description=f"Generating Python sources from {request.protocol_target.address}.",
-            level=LogLevel.DEBUG,
-            output_directories=(output_dir,),
-            append_only_caches=complete_pex_env.append_only_caches,
+    result = await execute_process_or_raise(
+        **implicitly(
+            Process(
+                protoc_argv,
+                input_digest=input_digest,
+                immutable_input_digests={
+                    protoc_relpath: downloaded_protoc_binary.digest,
+                },
+                description=f"Generating Python sources from {request.protocol_target.address}.",
+                level=LogLevel.DEBUG,
+                output_directories=(output_dir,),
+                append_only_caches=complete_pex_env.append_only_caches,
+            )
         ),
     )
 
@@ -229,15 +222,15 @@ async def generate_python_from_protobuf(
         # The target didn't specify a python source root, so use the protobuf_source's source root.
         source_root_request = SourceRootRequest.for_target(request.protocol_target)
 
-    normalized_digest, source_root = await MultiGet(
-        Get(Digest, RemovePrefix(result.output_digest, output_dir)),
-        Get(SourceRoot, SourceRootRequest, source_root_request),
+    normalized_digest, source_root = await concurrently(
+        remove_prefix(RemovePrefix(result.output_digest, output_dir)),
+        get_source_root(source_root_request),
     )
 
     source_root_restored = (
-        await Get(Snapshot, AddPrefix(normalized_digest, source_root.path))
+        await digest_to_snapshot(**implicitly(AddPrefix(normalized_digest, source_root.path)))
         if source_root.path != "."
-        else await Get(Snapshot, Digest, normalized_digest)
+        else await digest_to_snapshot(normalized_digest)
     )
     return GeneratedSources(source_root_restored)
 

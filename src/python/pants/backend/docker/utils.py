@@ -6,10 +6,9 @@ from __future__ import annotations
 import difflib
 import os.path
 import re
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from fnmatch import fnmatch
-from typing import Callable, Iterable, Iterator, Sequence, TypeVar
-
-from typing_extensions import Self
+from typing import Self, TypeVar
 
 from pants.help.maybe_color import MaybeColor
 from pants.util.ordered_set import FrozenOrderedSet

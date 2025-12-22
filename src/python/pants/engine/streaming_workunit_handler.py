@@ -6,18 +6,19 @@ from __future__ import annotations
 import logging
 import threading
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Sequence, Tuple
+from typing import Any
 
 from pants.base.specs import Specs
-from pants.core.util_rules.environments import determine_bootstrap_environment
+from pants.core.environments.rules import determine_bootstrap_environment
 from pants.engine.addresses import Addresses
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, DigestContents, FileDigest, Snapshot
 from pants.engine.internals.native_engine import PyThreadLocals
 from pants.engine.internals.scheduler import SchedulerSession, Workunit
-from pants.engine.internals.selectors import Params
-from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
+from pants.engine.internals.selectors import Params, concurrently
+from pants.engine.rules import QueryRule, collect_rules, implicitly, rule
 from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership, union
 from pants.goal.run_tracker import RunTracker
@@ -195,7 +196,7 @@ class WorkunitsCallbackFactory:
     callback_factory: Callable[[], WorkunitsCallback | None]
 
 
-class WorkunitsCallbackFactories(Tuple[WorkunitsCallbackFactory, ...]):
+class WorkunitsCallbackFactories(tuple[WorkunitsCallbackFactory, ...]):
     """A list of registered factories for WorkunitsCallback instances."""
 
 
@@ -204,13 +205,22 @@ class WorkunitsCallbackFactoryRequest:
     """A request for a particular WorkunitsCallbackFactory."""
 
 
+@rule(polymorphic=True)
+async def construct_workunit_callback_factory(
+    req: WorkunitsCallbackFactoryRequest, env_name: EnvironmentName
+) -> WorkunitsCallbackFactory:
+    raise NotImplementedError()
+
+
 @rule
 async def construct_workunits_callback_factories(
     union_membership: UnionMembership,
 ) -> WorkunitsCallbackFactories:
     request_types = union_membership.get(WorkunitsCallbackFactoryRequest)
-    workunit_callback_factories = await MultiGet(
-        Get(WorkunitsCallbackFactory, WorkunitsCallbackFactoryRequest, request_type())
+    workunit_callback_factories = await concurrently(
+        construct_workunit_callback_factory(
+            **implicitly({request_type(): WorkunitsCallbackFactoryRequest})
+        )
         for request_type in request_types
     )
     return WorkunitsCallbackFactories(workunit_callback_factories)

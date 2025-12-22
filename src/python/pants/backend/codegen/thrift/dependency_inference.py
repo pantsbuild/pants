@@ -14,13 +14,13 @@ from pants.backend.codegen.thrift.target_types import (
     ThriftDependenciesField,
     ThriftSourceField,
 )
-from pants.backend.codegen.thrift.thrift_parser import ParsedThrift, ParsedThriftRequest
-from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
+from pants.backend.codegen.thrift.thrift_parser import ParsedThriftRequest, parse_thrift_file
+from pants.core.util_rules.stripped_source_files import StrippedFileNameRequest, strip_file_name
 from pants.engine.addresses import Address
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.internals.graph import determine_explicitly_provided_dependencies
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     DependenciesRequest,
-    ExplicitlyProvidedDependencies,
     FieldSet,
     InferDependenciesRequest,
     InferredDependencies,
@@ -42,8 +42,8 @@ class ThriftMapping:
 
 @rule(desc="Creating map of Thrift file names to Thrift targets", level=LogLevel.DEBUG)
 async def map_thrift_files(thrift_targets: AllThriftTargets) -> ThriftMapping:
-    stripped_file_per_target = await MultiGet(
-        Get(StrippedFileName, StrippedFileNameRequest(tgt[ThriftSourceField].file_path))
+    stripped_file_per_target = await concurrently(
+        strip_file_name(StrippedFileNameRequest(tgt[ThriftSourceField].file_path))
         for tgt in thrift_targets
     )
 
@@ -89,9 +89,11 @@ async def infer_thrift_dependencies(
         return InferredDependencies([])
 
     address = request.field_set.address
-    explicitly_provided_deps, parsed_thrift = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
-        Get(ParsedThrift, ParsedThriftRequest(request.field_set.source)),
+    explicitly_provided_deps, parsed_thrift = await concurrently(
+        determine_explicitly_provided_dependencies(
+            **implicitly(DependenciesRequest(request.field_set.dependencies))
+        ),
+        parse_thrift_file(ParsedThriftRequest(request.field_set.source)),
     )
 
     result: OrderedSet[Address] = OrderedSet()

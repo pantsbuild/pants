@@ -7,9 +7,10 @@ import copy
 import inspect
 import logging
 import typing
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Iterator, Mapping
+from typing import Any
 
 from pants.base.deprecated import validate_deprecation_semver
 from pants.option.custom_types import (

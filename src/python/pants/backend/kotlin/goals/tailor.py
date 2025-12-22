@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.kotlin.subsystems.kotlin import KotlinSubsystem
 from pants.backend.kotlin.target_types import (
@@ -19,8 +19,7 @@ from pants.core.goals.tailor import (
     PutativeTargets,
     PutativeTargetsRequest,
 )
-from pants.engine.fs import PathGlobs, Paths
-from pants.engine.internals.selectors import Get
+from pants.engine.intrinsics import path_globs_to_paths
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
@@ -60,7 +59,7 @@ async def find_putative_targets(
 
     if kotlin_subsystem.tailor_source_targets:
         all_kotlin_files_globs = req.path_globs("*.kt")
-        all_kotlin_files = await Get(Paths, PathGlobs, all_kotlin_files_globs)
+        all_kotlin_files = await path_globs_to_paths(all_kotlin_files_globs)
         unowned_kotlin_files = set(all_kotlin_files.files) - set(all_owned_sources)
         classified_unowned_kotlin_files = classify_source_files(unowned_kotlin_files)
 

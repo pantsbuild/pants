@@ -7,25 +7,16 @@ import collections.abc
 import logging
 import os.path
 from abc import ABC, abstractmethod
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
-from enum import Enum
-from typing import (
-    TYPE_CHECKING,
-    ClassVar,
-    Iterable,
-    Iterator,
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
-    Union,
-    cast,
-)
+from enum import Enum, StrEnum
+from typing import TYPE_CHECKING, ClassVar, cast
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setup import PythonSetup
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
@@ -36,7 +27,7 @@ from pants.core.goals.test import (
     TestSubsystem,
 )
 from pants.core.target_types import ResolveLikeField, ResolveLikeFieldToValueRequest
-from pants.core.util_rules.environments import EnvironmentField
+from pants.core.environments.target_types import EnvironmentField
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -114,12 +105,14 @@ class InterpreterConstraintsField(StringSequenceField, AsyncFieldMixin):
 
         If the field is not set, it will default to the option `[python].interpreter_constraints`.
 
-        See {doc_url('docs/python/overview/interpreter-compatibility')} for how these interpreter
+        See {doc_url("docs/python/overview/interpreter-compatibility")} for how these interpreter
         constraints are merged with the constraints of dependencies.
         """
     )
 
-    def value_or_global_default(self, python_setup: PythonSetup) -> Tuple[str, ...]:
+    def value_or_configured_default(
+        self, python_setup: PythonSetup, resolve: PythonResolveField | None
+    ) -> tuple[str, ...]:
         """Return either the given `compatibility` field or the global interpreter constraints.
 
         If interpreter constraints are supplied by the CLI flag, return those only.
@@ -134,8 +127,12 @@ class InterpreterConstraintsField(StringSequenceField, AsyncFieldMixin):
                 self.value,
                 description_of_origin=f"the `{self.alias}` field on target at `{self.address}`",
             )
-
-        return python_setup.compatibility_or_constraints(self.value)
+        return python_setup.compatibility_or_constraints(
+            self.value,
+            resolve.normalized_value(python_setup)
+            if resolve and python_setup.enable_resolves
+            else None,
+        )
 
 
 class PythonResolveLikeFieldToValueRequest(ResolveLikeFieldToValueRequest):
@@ -359,7 +356,7 @@ class EntryPointField(AsyncFieldMixin, Field):
     value: EntryPoint | None
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[EntryPoint]:
+    def compute_value(cls, raw_value: str | None, address: Address) -> EntryPoint | None:
         value = super().compute_value(raw_value, address)
         if value is None:
             return None
@@ -405,7 +402,7 @@ class PexScriptField(Field):
     value: ConsoleScript | None
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[ConsoleScript]:
+    def compute_value(cls, raw_value: str | None, address: Address) -> ConsoleScript | None:
         value = super().compute_value(raw_value, address)
         if value is None:
             return None
@@ -430,7 +427,7 @@ class PexExecutableField(Field):
     value: Executable | None
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[Executable]:
+    def compute_value(cls, raw_value: str | None, address: Address) -> Executable | None:
         value = super().compute_value(raw_value, address)
         if value is None:
             return None
@@ -513,7 +510,7 @@ class PexCompletePlatformsField(SpecialCasedDependencies):
         complete platform JSON as described by Pex
         (https://pex.readthedocs.io/en/latest/buildingpex.html#complete-platform).
 
-        See {doc_url('docs/python/overview/pex#generating-the-complete_platforms-file')} for details on how to create this file.
+        See {doc_url("docs/python/overview/pex#generating-the-complete_platforms-file")} for details on how to create this file.
         """
     )
 
@@ -532,9 +529,7 @@ class PexInheritPathField(StringField):
 
     # TODO(#9388): deprecate allowing this to be a `bool`.
     @classmethod
-    def compute_value(
-        cls, raw_value: Optional[Union[str, bool]], address: Address
-    ) -> Optional[str]:
+    def compute_value(cls, raw_value: str | bool | None, address: Address) -> str | None:
         if isinstance(raw_value, bool):
             return "prefer" if raw_value else "false"
         return super().compute_value(raw_value, address)
@@ -739,6 +734,191 @@ class PexVenvHermeticScripts(BoolField):
     )
 
 
+class PexScieField(StringField):
+    alias = "scie"
+    valid_choices = ("lazy", "eager")
+    default = None
+    help = help_text(
+        """
+        Create one or more native executable scies from your PEX that include
+        a portable CPython interpreter along with your PEX making for a truly
+        hermetic PEX that can run on machines with no Python installed at
+        all. If your PEX has multiple targets then one PEX scie will be made
+        for each platform, selecting the latest compatible portable CPython or
+        PyPy interpreter as appropriate. Note that only Python>=3.8 is
+        supported. If you'd like to explicitly control the target platforms or
+        the exact portable CPython selected, see `scie_platform`,
+        `scie_pbs_release` and `scie_python_version`.  Specifying `lazy` will
+        fetch the portable CPython interpreter just in time on first boot of
+        the PEX scie on a given machine if needed. Specifying `eager` will
+        embed the portable CPython interpreter in your PEX scie making for a
+        larger file, but requiring no internet access to boot. See
+        https://science.scie.app for further details.
+
+        This field must be set for any other `scie_*` fields to take effect.
+
+        NOTE: `pants run` will always run the "regular" PEX, use `package` to
+        create scie PEXs.  """
+    )
+
+
+class ScieNameStyle(StrEnum):
+    DYNAMIC = "dynamic"
+    PLATFORM_PARENT_DIR = "platform-parent-dir"
+    PLATFORM_FILE_SUFFIX = "platform-file-suffix"
+
+
+class PexScieNameStyleField(StringField):
+    alias = "scie_name_style"
+    valid_choices = ScieNameStyle
+    expected_type = str
+    default = ScieNameStyle.DYNAMIC
+    help = help_text(
+        """
+        Control how the output file translates to a scie name. By default
+        (`dynamic`), the platform is used as a file suffix only when needed
+        for disambiguation when targeting a local platform.  Specifying
+        `platform-file-suffix` forces the scie target platform name to be
+        added as a suffix of the output filename; Specifying
+        `platform-parent-dir` places the scie in a sub- directory with the
+        name of the platform it targets."""
+    )
+
+
+class PexScieBusyBox(StringField):
+    alias = "scie_busybox"
+    default = None
+    help = help_text(
+        """
+        Make the PEX scie a BusyBox over the specified entry points. The entry
+        points can either be console scripts or entry point specifiers. To
+        select all console scripts in all distributions contained in the PEX,
+        use `@`. To just pick all the console scripts from a particular
+        project name's distributions in the PEX, use `@<project name>`; e.g.:
+        `@ansible-core`. To exclude all the console scripts from a project,
+        prefix with a `!`; e.g.: `@,!@ansible-core` selects all console
+        scripts except those provided by the `ansible- core` project. To
+        select an individual console script, just use its name or prefix the
+        name with `!` to exclude that individual console script. To specify an
+        arbitrary entry point in a module contained within one of the
+        distributions in the PEX, use a string of the form
+        `<name>=<module>(:<function>)`; e.g.: 'run- baz=foo.bar:baz' to
+        execute the `baz` function in the `foo.bar` module as the entry point
+        named `run-baz`.
+
+        A BusyBox scie has no default entrypoint; instead, when run, it
+        inspects argv0; if that matches one of its embedded entry points, it
+        runs that entry point; if not, it lists all available entrypoints for
+        you to pick from. To run a given entry point, you specify it as the
+        first argument and all other arguments after that are forwarded to
+        that entry point. BusyBox PEX scies allow you to install all their
+        contained entry points into a given directory.  For more information,
+        run `SCIE=help <your PEX scie>` and review the `install` command help.
+
+        NOTE: This is only available for formal Python entry points
+        <https://packaging.python.org/en/latest/specifications/entry-points/>
+        and not the informal use by the `pex_binary` field `entry_point` to
+        run first party files.
+        """
+    )
+
+
+class PexScieBusyboxPexEntrypointEnvPassthrough(TriBoolField):
+    alias = "scie_busybox_pex_entrypoint_env_passthrough"
+    required = False
+    default = None
+    help = help_text(
+        """ When creating a busybox, allow overriding the primary entrypoint
+        at runtime via PEX_INTERPRETER, PEX_SCRIPT and PEX_MODULE. Note that
+        when using the `venv` execution mode this adds modest startup overhead
+        on the order of 10ms.  """
+    )
+
+
+class PexSciePlatformField(StringSequenceField):
+    alias = "scie_platform"
+    valid_choices = (
+        "current",
+        "linux-aarch64",
+        "linux-armv7l",
+        "linux-powerpc64",
+        "linux-riscv64",
+        "linux-s390x",
+        "linux-x86_64",
+        "macos-aarch64",
+        "macos-x86_64",
+    )
+    expected_type = str
+    help = help_text(
+        """ The platform to produce the native PEX scie executable for.  You
+        can use a value of `current` to select the current platform. If left
+        unspecified, the platforms implied by the targets selected to build
+        the PEX with are used. Those targets are influenced by the current
+        interpreter running Pex as well as use of `complete_platforms` and
+        `interpreter_constraints`. Note that, in general, `scie_platform`
+        should only be used to select a subset of the platforms implied by the
+        targets selected via other options.  """
+    )
+
+
+class PexSciePbsReleaseField(StringField):
+    alias = "scie_pbs_release"
+    default = None
+    help = help_text(
+        """ The Python Standalone Builds release to use when a CPython
+        interpreter distribution is needed for the PEX scie. Currently,
+        releases are dates of the form YYYYMMDD, e.g.: '20240713'. See their
+        GitHub releases page at
+        <https://github.com/astral-sh/python-build-standalone/releases> to
+        discover available releases. If left unspecified the latest release is
+        used.
+        """
+    )
+
+
+class PexSciePythonVersion(StringField):
+    alias = "scie_python_version"
+    default = None
+    help = help_text(
+        """ The portable CPython version to select. Can be either in
+        `<major>.<minor>` form; e.g.: '3.11', or else fully specified as
+        `<major>.<minor>.<patch>`; e.g.: '3.11.3'. If you don't specify this
+        option, Pex will do its best to guess appropriate portable CPython
+        versions. N.B.: Python Standalone Builds does not provide all patch
+        versions; so you should check their releases at
+        <https://github.com/astral-sh/python-build-standalone/releases> if you
+        wish to pin down to the patch level.
+        """
+    )
+
+
+class PexSciePbsStripped(TriBoolField):
+    alias = "scie_pbs_stripped"
+    required = False
+    default = None
+    help = help_text(
+        """ Should the Python Standalone Builds CPython distributions used be
+        stripped of debug symbols or not. For Linux and Windows particularly,
+        the stripped distributions are less than half the size of the
+        distributions that ship with debug symbols.  """
+    )
+
+
+class PexScieHashAlgField(StringField):
+    alias = "scie_hash_alg"
+    help = help_text(
+        """ Output a checksum file for each scie generated that is compatible
+        with the shasum family of tools. For each unique algorithm specified,
+        a sibling file to each scie executable will be generated with the same
+        stem as that scie file and hash algorithm name suffix.  The file will
+        contain the hex fingerprint of the scie executable using that
+        algorithm to hash it. Supported algorithms include at least md5, sha1,
+        sha256, sha384 and sha512. For the complete list of supported hash
+        algorithms, see the science tool --hash documentation here:
+        <https://science.scie.app/cli.html#science-lift-build>.  """
+    )
+
+
 _PEX_BINARY_COMMON_FIELDS = (
     EnvironmentField,
     InterpreterConstraintsField,
@@ -763,12 +943,25 @@ _PEX_BINARY_COMMON_FIELDS = (
     RestartableField,
 )
 
+_PEX_SCIE_BINARY_FIELDS = (
+    PexScieField,
+    PexScieNameStyleField,
+    PexScieBusyBox,
+    PexScieBusyboxPexEntrypointEnvPassthrough,
+    PexSciePlatformField,
+    PexSciePbsReleaseField,
+    PexSciePythonVersion,
+    PexSciePbsStripped,
+    PexScieHashAlgField,
+)
+
 
 class PexBinary(Target):
     alias = "pex_binary"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         *_PEX_BINARY_COMMON_FIELDS,
+        *_PEX_SCIE_BINARY_FIELDS,
         PexEntryPointField,
         PexScriptField,
         PexExecutableField,
@@ -781,7 +974,7 @@ class PexBinary(Target):
         A Python target that can be converted into an executable PEX file.
 
         PEX files are self-contained executable files that contain a complete Python environment
-        capable of running the target. For more information, see {doc_url('docs/python/overview/pex')}.
+        capable of running the target. For more information, see {doc_url("docs/python/overview/pex")}.
         """
     )
 
@@ -960,8 +1153,10 @@ class PythonTestsEntryPointDependenciesField(DictStringToStringSequenceField):
         Plus, an `entry_points.txt` file will be generated in the sandbox so that
         each of the `{PythonDistribution.alias}`s appear to be "installed". The
         `entry_points.txt` file will only include the entry points requested on this
-        field. This allows the tests, or the code under test, to lookup entry points
-        metadata using something like `pkg_resources.iter_entry_points` from `setuptools`.
+        field. This allows the tests, or the code under test, to lookup entry points'
+        metadata using an API like the `importlib.metadata.entry_points()` API in the
+        standard library (available on older Python interpreters via the
+        `importlib-metadata` distribution).
         """
     )
 
@@ -980,7 +1175,7 @@ class PythonTestsTimeoutField(IntField):
     )
     valid_numbers = ValidNumbers.positive_only
 
-    def calculate_from_global_options(self, test: TestSubsystem, pytest: PyTest) -> Optional[int]:
+    def calculate_from_global_options(self, test: TestSubsystem, pytest: PyTest) -> int | None:
         """Determine the timeout (in seconds) after resolving conflicting global options in the
         `pytest` and `test` scopes.
 
@@ -1071,7 +1266,7 @@ class PythonTestTarget(Target):
         target and then be included in the `dependencies` field. (You can use the
         `python_test_utils` target to generate these `python_source` targets.)
 
-        See {doc_url('docs/python/goals/test')}
+        See {doc_url("docs/python/goals/test")}
         """
     )
 
@@ -1252,8 +1447,8 @@ class _PipRequirementSequenceField(Field):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Iterable[str]], address: Address
-    ) -> Tuple[PipRequirement, ...]:
+        cls, raw_value: Iterable[str] | None, address: Address
+    ) -> tuple[PipRequirement, ...]:
         value = super().compute_value(raw_value, address)
         if value is None:
             return ()
@@ -1410,7 +1605,7 @@ class PythonRequirementTarget(Target):
         requirement into a `python_requirement` target automatically. For Poetry, use
         `poetry_requirements`.
 
-        See {doc_url('docs/python/overview/third-party-dependencies')}.
+        See {doc_url("docs/python/overview/third-party-dependencies")}.
         """
     )
 
@@ -1455,12 +1650,12 @@ class PythonProvidesField(ScalarField, AsyncFieldMixin):
         in the `setup()` function:
         (https://packaging.python.org/guides/distributing-packages-using-setuptools/#setup-args).
 
-        See {doc_url('docs/writing-plugins/common-plugin-tasks/custom-python-artifact-kwargs')} for how to write a plugin to dynamically generate kwargs.
+        See {doc_url("docs/writing-plugins/common-plugin-tasks/custom-python-artifact-kwargs")} for how to write a plugin to dynamically generate kwargs.
         """
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[PythonArtifact], address: Address) -> PythonArtifact:
+    def compute_value(cls, raw_value: PythonArtifact | None, address: Address) -> PythonArtifact:
         return cast(PythonArtifact, super().compute_value(raw_value, address))
 
 
@@ -1516,7 +1711,7 @@ class PythonDistributionEntryPoint:
     """Note that this stores if the entry point comes from an address to a `pex_binary` target."""
 
     entry_point: EntryPoint
-    pex_binary_address: Optional[Address]
+    pex_binary_address: Address | None
 
 
 # See `target_type_rules.py` for the `Resolve..Request -> Resolved..` rule
@@ -1564,8 +1759,8 @@ class ResolvePythonDistributionEntryPointsRequest:
     logic for resolving pex_binary addresses etc.
     """
 
-    entry_points_field: Optional[PythonDistributionEntryPointsField] = None
-    provides_field: Optional[PythonProvidesField] = None
+    entry_points_field: PythonDistributionEntryPointsField | None = None
+    provides_field: PythonProvidesField | None = None
 
     def __post_init__(self):
         # Must provide at least one of these fields.
@@ -1689,7 +1884,7 @@ class PythonDistribution(Target):
         f"""
         A publishable Python setuptools distribution (e.g. an sdist or wheel).
 
-        See {doc_url('docs/python/overview/building-distributions')}.
+        See {doc_url("docs/python/overview/building-distributions")}.
         """
     )
 

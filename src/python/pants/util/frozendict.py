@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Iterable, Iterator, Mapping, TypeVar, cast, overload
+from collections.abc import Callable, Iterable, Iterator, Mapping
+from typing import Any, TypeVar, cast, overload
 
 from pants.util.memo import memoized_method
 from pants.util.strutil import softwrap
@@ -38,7 +39,7 @@ class FrozenDict(Mapping[K, V]):
 
         # NB: Keep the variable name `_data` in sync with `externs/mod.rs`.
         self._data = dict(item[0]) if item else dict()
-        self._data.update(**kwargs)
+        self._data.update(**kwargs)  # type: ignore[call-overload]
 
         # NB: We eagerly compute the hash to validate that the values are hashable and to avoid
         # performing the calculation multiple times. This can be revisited if it's found to be a

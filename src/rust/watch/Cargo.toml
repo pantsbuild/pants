@@ -1,0 +1,25 @@
+[package]
+version = "0.0.1"
+edition = "2024"
+name = "watch"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[dependencies]
+crossbeam-channel = { workspace = true }
+fs = { path = "../fs" }
+futures = { workspace = true }
+hashing = { path = "../hashing" }
+log = { workspace = true }
+# TODO: See https://github.com/notify-rs/notify/issues/255.
+notify = { workspace = true }
+parking_lot = { workspace = true }
+task_executor = { path = "../task_executor" }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+testutil = { path = "../testutil" }
+tokio = { workspace = true, features = ["rt", "macros"] }
+
+[lints]
+workspace = true

@@ -20,9 +20,8 @@ from pants.core.goals.export import (
 from pants.core.util_rules import archive, distdir
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import CreateDigest, FileContent
-from pants.engine.internals.native_engine import Digest
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import rule
+from pants.engine.intrinsics import create_digest
+from pants.engine.rules import concurrently, rule
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner, mock_console
 
@@ -90,8 +89,7 @@ async def export_mybin(req: _ExportMyBinForResolve) -> ExportResult:
     tool = classes[req.resolve]
     bins_to_export = tool.bins_to_export()
 
-    digest = await Get(
-        Digest,
+    digest = await create_digest(
         CreateDigest(
             [
                 *[FileContent(e.path_in_export, req.resolve.encode()) for e in bins_to_export],
@@ -113,8 +111,8 @@ async def export_mybin(req: _ExportMyBinForResolve) -> ExportResult:
 async def export_external_tools(
     request: ExportMyBinRequest, export: ExportSubsystem
 ) -> ExportResults:
-    maybe_tools = await MultiGet(
-        Get(ExportResult, _ExportMyBinForResolve(resolve)) for resolve in export.binaries
+    maybe_tools = await concurrently(
+        export_mybin(_ExportMyBinForResolve(resolve)) for resolve in export.binaries
     )
     return ExportResults(maybe_tools)
 
@@ -144,13 +142,13 @@ def assert_export(rule_runner: RuleRunner, cls, was_linked: bool = True) -> None
         linked_path = os.path.join("dist", "export", "bin", bin.name)
         linked_content = rule_runner.read_file(linked_path)
         if was_linked:
-            assert (
-                linked_content == resolve
-            ), f"bin {bin.name} was not linked to the `bin` directory, instead {linked_content!r} was"
+            assert linked_content == resolve, (
+                f"bin {bin.name} was not linked to the `bin` directory, instead {linked_content!r} was"
+            )
         else:
-            assert (
-                linked_content != resolve
-            ), f"bin {bin.name} was linked to `bin` directory but we expected it to not be"
+            assert linked_content != resolve, (
+                f"bin {bin.name} was linked to `bin` directory but we expected it to not be"
+            )
 
 
 def test_export_binary(rule_runner):

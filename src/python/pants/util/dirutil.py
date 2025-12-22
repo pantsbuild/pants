@@ -12,9 +12,10 @@ import tempfile
 import threading
 import uuid
 from collections import defaultdict
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, DefaultDict, Iterable, Iterator, Literal, Sequence, overload
+from typing import Any, DefaultDict, Literal, overload
 
 from pants.util.strutil import ensure_text
 

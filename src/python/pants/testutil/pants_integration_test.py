@@ -8,11 +8,12 @@ import glob
 import os
 import subprocess
 import sys
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from io import BytesIO
 from threading import Thread
-from typing import Any, Iterator, List, Mapping, TextIO, Union, cast
+from typing import Any, TextIO, Union, cast
 
 import pytest
 import toml
@@ -27,13 +28,13 @@ from pants.util.osutil import Pid
 from pants.util.strutil import ensure_binary
 
 # NB: If `shell=True`, it's a single `str`.
-Command = Union[str, List[str]]
+Command = Union[str, list[str]]
 
 # Sometimes we mix strings and bytes as keys and/or values, but in most
 # cases we pass strict str->str, and we want both to typecheck.
 # TODO: The complexity of this type, and the casting and # type: ignoring we have to do below,
 #  is a code smell. We should use bytes everywhere, and convert lazily as needed.
-Env = Union[Mapping[str, str], Mapping[bytes, bytes], Mapping[Union[str, bytes], Union[str, bytes]]]
+Env = Union[Mapping[str, str], Mapping[bytes, bytes], Mapping[str | bytes, str | bytes]]
 
 
 @dataclass(frozen=True)
@@ -190,7 +191,7 @@ def run_pants_with_workdir_without_waiting(
     if any("pants.backend.python" in arg for arg in command) and not any(
         "--python-interpreter-constraints" in arg for arg in command
     ):
-        args.append("--python-interpreter-constraints=['>=3.8,<4']")
+        args.append("--python-interpreter-constraints=['>=3.9,<3.15']")
 
     pants_script = [sys.executable, "-m", "pants"]
 
@@ -205,7 +206,7 @@ def run_pants_with_workdir_without_waiting(
     # Only allow-listed entries will be included in the environment if hermetic=True. Note that
     # the env will already be fairly hermetic thanks to the v2 engine; this provides an
     # additional layer of hermiticity.
-    env: dict[Union[str, bytes], Union[str, bytes]]
+    env: dict[str | bytes, str | bytes]
     if hermetic:
         # With an empty environment, we would generally get the true underlying system default
         # encoding, which is unlikely to be what we want (it's generally ASCII, still). So we
@@ -226,11 +227,11 @@ def run_pants_with_workdir_without_waiting(
                 if value is not None:
                     env[h] = value
     else:
-        env = cast(dict[Union[str, bytes], Union[str, bytes]], os.environ.copy())
+        env = cast(dict[str | bytes, str | bytes], os.environ.copy())
 
     env.update(PYTHONPATH=os.pathsep.join(sys.path), NO_SCIE_WARNING="1")
     if extra_env:
-        env.update(cast(dict[Union[str, bytes], Union[str, bytes]], extra_env))
+        env.update(cast(dict[str | bytes, str | bytes], extra_env))
 
     # Pants command that was called from the test shouldn't have a parent.
     if "PANTS_PARENT_BUILD_ID" in env:

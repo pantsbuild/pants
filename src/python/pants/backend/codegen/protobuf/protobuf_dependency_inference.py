@@ -21,16 +21,16 @@ from pants.core.target_types import (
     ResolveLikeFieldToValueRequest,
     ResolveLikeFieldToValueResult,
 )
-from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
+from pants.core.util_rules.stripped_source_files import StrippedFileNameRequest, strip_file_name
 from pants.engine.addresses import Address
-from pants.engine.fs import Digest, DigestContents
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.internals.graph import determine_explicitly_provided_dependencies, hydrate_sources
+from pants.engine.intrinsics import get_digest_contents
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
     Field,
     FieldSet,
-    HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
@@ -65,9 +65,10 @@ class ProtobufMapping:
     ambiguous_modules: FrozenDict[ProtobufMappingResolveKey, FrozenDict[str, tuple[Address, ...]]]
 
 
-async def _map_single_pseudo_resolve(protobuf_targets: AllProtobufTargets) -> ProtobufMapping:
-    stripped_file_per_target = await MultiGet(
-        Get(StrippedFileName, StrippedFileNameRequest(tgt[ProtobufSourceField].file_path))
+@rule(desc="Creating map of Protobuf file names to Protobuf targets", level=LogLevel.DEBUG)
+async def map_protobuf_files(protobuf_targets: AllProtobufTargets) -> ProtobufMapping:
+    stripped_file_per_target = await concurrently(
+        strip_file_name(StrippedFileNameRequest(tgt[ProtobufSourceField].file_path))
         for tgt in protobuf_targets
     )
 
@@ -269,11 +270,13 @@ async def infer_protobuf_dependencies(
     else:
         resolve_key = await get_resolve_key_from_target(address)
 
-    explicitly_provided_deps, hydrated_sources = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
-        Get(HydratedSources, HydrateSourcesRequest(request.field_set.source)),
+    explicitly_provided_deps, hydrated_sources = await concurrently(
+        determine_explicitly_provided_dependencies(
+            **implicitly(DependenciesRequest(request.field_set.dependencies))
+        ),
+        hydrate_sources(HydrateSourcesRequest(request.field_set.source), **implicitly()),
     )
-    digest_contents = await Get(DigestContents, Digest, hydrated_sources.snapshot.digest)
+    digest_contents = await get_digest_contents(hydrated_sources.snapshot.digest)
     assert len(digest_contents) == 1
     file_content = digest_contents[0]
 

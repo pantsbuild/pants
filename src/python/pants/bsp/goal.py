@@ -8,7 +8,7 @@ import os
 import shlex
 import sys
 import textwrap
-from typing import Mapping
+from collections.abc import Mapping
 
 from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
@@ -169,7 +169,7 @@ class BSPGoal(AuxiliaryGoal):
                 f"""\
                 #!/bin/sh
                 {run_script_env_lines_str}
-                exec 2>>{shlex.quote(str(bsp_logs_dir / 'stderr.log'))}
+                exec 2>>{shlex.quote(str(bsp_logs_dir / "stderr.log"))}
                 env 1>&2
                 exec {shlex.quote(bin_name())} --no-pantsd {self.name} --server
                 """

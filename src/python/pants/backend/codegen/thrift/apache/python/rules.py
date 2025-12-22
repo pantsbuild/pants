@@ -9,14 +9,14 @@ from pants.backend.codegen.thrift.apache.python import subsystem
 from pants.backend.codegen.thrift.apache.python.additional_fields import ThriftPythonResolveField
 from pants.backend.codegen.thrift.apache.python.subsystem import ThriftPythonSubsystem
 from pants.backend.codegen.thrift.apache.rules import (
-    GeneratedThriftSources,
     GenerateThriftSourcesRequest,
+    generate_apache_thrift_sources,
 )
 from pants.backend.codegen.thrift.target_types import ThriftDependenciesField, ThriftSourceField
 from pants.backend.codegen.utils import find_python_runtime_library_or_raise_error
 from pants.backend.python.dependency_inference.module_mapper import (
-    PythonModuleOwners,
     PythonModuleOwnersRequest,
+    map_module_to_address,
 )
 from pants.backend.python.dependency_inference.subsystem import (
     AmbiguityResolution,
@@ -24,8 +24,9 @@ from pants.backend.python.dependency_inference.subsystem import (
 )
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonSourceField
-from pants.engine.fs import AddPrefix, Digest, Snapshot
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.fs import AddPrefix
+from pants.engine.intrinsics import digest_to_snapshot
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
     FieldSet,
     GeneratedSources,
@@ -34,7 +35,7 @@ from pants.engine.target import (
     InferredDependencies,
 )
 from pants.engine.unions import UnionRule
-from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.source.source_root import SourceRootRequest, get_source_root
 from pants.util.logging import LogLevel
 
 
@@ -48,26 +49,24 @@ async def generate_python_from_thrift(
     request: GeneratePythonFromThriftRequest,
     thrift_python: ThriftPythonSubsystem,
 ) -> GeneratedSources:
-    result = await Get(
-        GeneratedThriftSources,
+    result = await generate_apache_thrift_sources(
         GenerateThriftSourcesRequest(
             thrift_source_field=request.protocol_target[ThriftSourceField],
             lang_id="py",
             lang_options=thrift_python.gen_options,
             lang_name="Python",
         ),
+        **implicitly(),
     )
 
     # We must add back the source root for Python imports to work properly. Note that the file
     # paths will be different depending on whether `namespace py` was used. See the tests for
     # examples.
-    source_root = await Get(
-        SourceRoot, SourceRootRequest, SourceRootRequest.for_target(request.protocol_target)
-    )
+    source_root = await get_source_root(SourceRootRequest.for_target(request.protocol_target))
     source_root_restored = (
-        await Get(Snapshot, AddPrefix(result.snapshot.digest, source_root.path))
+        await digest_to_snapshot(**implicitly(AddPrefix(result.snapshot.digest, source_root.path)))
         if source_root.path != "."
-        else await Get(Snapshot, Digest, result.snapshot.digest)
+        else await digest_to_snapshot(result.snapshot.digest)
     )
     return GeneratedSources(source_root_restored)
 
@@ -98,18 +97,18 @@ async def find_apache_thrift_python_requirement(
 
     locality = None
     if python_infer_subsystem.ambiguity_resolution == AmbiguityResolution.by_source_root:
-        source_root = await Get(
-            SourceRoot, SourceRootRequest, SourceRootRequest.for_address(request.field_set.address)
+        source_root = await get_source_root(
+            SourceRootRequest.for_address(request.field_set.address)
         )
         locality = source_root.path
 
-    addresses_for_thrift = await Get(
-        PythonModuleOwners,
+    addresses_for_thrift = await map_module_to_address(
         PythonModuleOwnersRequest(
             "thrift",
             resolve=resolve,
             locality=locality,
         ),
+        **implicitly(),
     )
 
     addr = find_python_runtime_library_or_raise_error(

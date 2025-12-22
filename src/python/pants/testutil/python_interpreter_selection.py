@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import os
 import subprocess
+from collections.abc import Iterable
 from functools import lru_cache
-from typing import Iterable
 from unittest import skipIf
 
 import _pytest.mark.structures
@@ -110,6 +110,11 @@ def skip_unless_python310_present(func):
 def skip_unless_python311_present(func):
     """A test skip decorator that only runs a test method if python3.11 is present."""
     return skip_unless_all_pythons_present(PY_311)(func)
+
+
+def skip_unless_python310_and_python311_present(func):
+    """A test skip decorator that only runs a test method if python3.8 and python3.9 are present."""
+    return skip_unless_all_pythons_present(PY_310, PY_311)(func)
 
 
 def skip_unless_python27_and_python3_present(func):
