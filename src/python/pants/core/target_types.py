@@ -932,7 +932,13 @@ class ResolveLikeFieldToValueRequest:
 
 @dataclass(frozen=True)
 class ResolveLikeFieldToValueResult:
-    value: str
+    """Result of resolving a resolve-like field to its string value.
+
+    The value will be the actual resolve name (e.g., "prod", "dev"), or None
+    if the language backend has disabled resolves (in which case all targets
+    should be treated as belonging to a single implicit resolve).
+    """
+    value: str | None
 
 
 @rule(polymorphic=True)

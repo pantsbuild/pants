@@ -684,6 +684,8 @@ async def validate_python_dependencies(
 async def python_resolve_field_to_string(
     request: PythonResolveLikeFieldToValueRequest, python_setup: PythonSetup
 ) -> ResolveLikeFieldToValueResult:
+    if not python_setup.enable_resolves:
+        return ResolveLikeFieldToValueResult(value=None)
     resolve = request.target[PythonResolveField].normalized_value(python_setup)
     return ResolveLikeFieldToValueResult(value=resolve)
 

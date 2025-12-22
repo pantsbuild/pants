@@ -58,8 +58,12 @@ class ProtobufMappingResolveKey:
 
 
 _NO_RESOLVE_LIKE_FIELDS_DEFINED = ProtobufMappingResolveKey(
-    field_type=ProtobufSourceField, resolve="NONE"
+    field_type=ProtobufSourceField, resolve="<no-resolve>"
 )
+# Note: This key is used when:
+# 1. No resolve-like fields are registered on protobuf_source targets
+# 2. Resolve-like fields exist but resolves are disabled (ResolveLikeFieldToValueResult returns None)
+# In both cases, all targets are treated as belonging to a single implicit resolve.
 
 
 @dataclass(frozen=True)
@@ -153,7 +157,13 @@ async def map_protobuf_files(
     for resolve_result, (target, field_type) in zip(
         resolve_results, target_and_field_type_for_resolve_requests
     ):
-        resolve_key = ProtobufMappingResolveKey(field_type=field_type, resolve=resolve_result.value)
+        # When a resolve field returns None (resolves disabled), canonicalize to
+        # _NO_RESOLVE_LIKE_FIELDS_DEFINED to ensure all "resolves disabled" targets share
+        # the same partition regardless of which resolve-like field they have.
+        if resolve_result.value is None:
+            resolve_key = _NO_RESOLVE_LIKE_FIELDS_DEFINED
+        else:
+            resolve_key = ProtobufMappingResolveKey(field_type=field_type, resolve=resolve_result.value)
         targets_partitioned_by_resolve[resolve_key].append(target)
 
     stripped_file_per_target = await concurrently(
@@ -277,6 +287,7 @@ async def infer_protobuf_dependencies(
         resolve_key = _NO_RESOLVE_LIKE_FIELDS_DEFINED
     else:
         resolve_key = await get_resolve_key_from_target(address)
+    print(f"protobuf_mapping={protobuf_mapping}; resolve_key={resolve_key}")
 
     explicitly_provided_deps, hydrated_sources = await concurrently(
         determine_explicitly_provided_dependencies(

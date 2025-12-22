@@ -77,6 +77,22 @@ def test_parse_proto_imports(file_content: str, expected: set[str]) -> None:
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
+    """Base rule runner without Python resolve support for testing core protobuf mapping."""
+    return RuleRunner(
+        rules=[
+            *stripped_source_files.rules(),
+            *protobuf_dependency_inference.rules(),
+            *target_types_rules(),
+            QueryRule(ProtobufMapping, []),
+            QueryRule(InferredDependencies, [InferProtobufDependencies]),
+        ],
+        target_types=[ProtobufSourcesGeneratorTarget],
+    )
+
+
+@pytest.fixture
+def rule_runner_with_python_resolves() -> RuleRunner:
+    """Rule runner with Python resolve support for testing multi-resolve scenarios."""
     return RuleRunner(
         rules=[
             *stripped_source_files.rules(),
@@ -210,23 +226,23 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
 # Multi-resolve tests
 
 
-def test_protobuf_mapping_with_single_resolve(rule_runner: RuleRunner) -> None:
+def test_protobuf_mapping_with_single_resolve(rule_runner_with_python_resolves: RuleRunner) -> None:
     """Verify that when all protobuf targets use the same resolve, they are correctly grouped."""
-    rule_runner.set_options(
+    rule_runner_with_python_resolves.set_options(
         [
             "--source-root-patterns=['protos']",
             "--python-enable-resolves",
             "--python-resolves={'python-default': ''}",
         ]
     )
-    rule_runner.write_files(
+    rule_runner_with_python_resolves.write_files(
         {
             "protos/a.proto": "",
             "protos/b.proto": "",
             "protos/BUILD": "protobuf_sources(python_resolve='python-default')",
         }
     )
-    result = rule_runner.request(ProtobufMapping, [])
+    result = rule_runner_with_python_resolves.request(ProtobufMapping, [])
 
     # Assert only one resolve key exists
     assert len(result.mapping) == 1
@@ -243,16 +259,16 @@ def test_protobuf_mapping_with_single_resolve(rule_runner: RuleRunner) -> None:
     assert mapping["b.proto"] == Address("protos", relative_file_path="b.proto")
 
 
-def test_protobuf_mapping_with_multiple_resolves(rule_runner: RuleRunner) -> None:
+def test_protobuf_mapping_with_multiple_resolves(rule_runner_with_python_resolves: RuleRunner) -> None:
     """Verify correct partitioning when targets use different resolves."""
-    rule_runner.set_options(
+    rule_runner_with_python_resolves.set_options(
         [
             "--source-root-patterns=['protos']",
             "--python-enable-resolves",
             "--python-resolves={'prod': '', 'dev': ''}",
         ]
     )
-    rule_runner.write_files(
+    rule_runner_with_python_resolves.write_files(
         {
             "protos/prod/service.proto": "",
             "protos/prod/BUILD": "protobuf_sources(python_resolve='prod')",
@@ -260,7 +276,7 @@ def test_protobuf_mapping_with_multiple_resolves(rule_runner: RuleRunner) -> Non
             "protos/dev/BUILD": "protobuf_sources(python_resolve='dev')",
         }
     )
-    result = rule_runner.request(ProtobufMapping, [])
+    result = rule_runner_with_python_resolves.request(ProtobufMapping, [])
 
     # Assert two resolve keys exist
     assert len(result.mapping) == 2
@@ -291,16 +307,16 @@ def test_protobuf_mapping_with_multiple_resolves(rule_runner: RuleRunner) -> Non
     assert "prod/service.proto" not in dev_mapping
 
 
-def test_dependency_inference_within_resolve(rule_runner: RuleRunner) -> None:
+def test_dependency_inference_within_resolve(rule_runner_with_python_resolves: RuleRunner) -> None:
     """Verify that dependency inference only finds dependencies within the same resolve."""
-    rule_runner.set_options(
+    rule_runner_with_python_resolves.set_options(
         [
             "--source-root-patterns=['protos']",
             "--python-enable-resolves",
             "--python-resolves={'resolve-a': '', 'resolve-b': ''}",
         ]
     )
-    rule_runner.write_files(
+    rule_runner_with_python_resolves.write_files(
         {
             "protos/resolve_a/a.proto": "import 'b.proto';",
             "protos/resolve_a/b.proto": "",
@@ -312,8 +328,8 @@ def test_dependency_inference_within_resolve(rule_runner: RuleRunner) -> None:
     )
 
     def run_dep_inference(address: Address) -> InferredDependencies:
-        tgt = rule_runner.get_target(address)
-        return rule_runner.request(
+        tgt = rule_runner_with_python_resolves.get_target(address)
+        return rule_runner_with_python_resolves.request(
             InferredDependencies,
             [InferProtobufDependencies(ProtobufDependencyInferenceFieldSet.create(tgt))],
         )
@@ -331,16 +347,16 @@ def test_dependency_inference_within_resolve(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_dependency_inference_no_cross_resolve(rule_runner: RuleRunner) -> None:
+def test_dependency_inference_no_cross_resolve(rule_runner_with_python_resolves: RuleRunner) -> None:
     """Verify that imports cannot be resolved across different resolves."""
-    rule_runner.set_options(
+    rule_runner_with_python_resolves.set_options(
         [
             "--source-root-patterns=['protos']",
             "--python-enable-resolves",
             "--python-resolves={'resolve-a': '', 'resolve-b': ''}",
         ]
     )
-    rule_runner.write_files(
+    rule_runner_with_python_resolves.write_files(
         {
             "protos/a/main.proto": "import 'common.proto';",
             "protos/a/BUILD": "protobuf_sources(python_resolve='resolve-a')",
@@ -350,8 +366,8 @@ def test_dependency_inference_no_cross_resolve(rule_runner: RuleRunner) -> None:
     )
 
     def run_dep_inference(address: Address) -> InferredDependencies:
-        tgt = rule_runner.get_target(address)
-        return rule_runner.request(
+        tgt = rule_runner.rule_runner_with_python_resolves(address)
+        return rule_runner_with_python_resolves.request(
             InferredDependencies,
             [InferProtobufDependencies(ProtobufDependencyInferenceFieldSet.create(tgt))],
         )
@@ -361,16 +377,16 @@ def test_dependency_inference_no_cross_resolve(rule_runner: RuleRunner) -> None:
     assert deps == InferredDependencies([])
 
 
-def test_ambiguous_imports_within_resolve(rule_runner: RuleRunner, caplog) -> None:
+def test_ambiguous_imports_within_resolve(rule_runner_with_python_resolves: RuleRunner, caplog) -> None:
     """Verify that ambiguous proto file names within a single resolve are handled correctly."""
-    rule_runner.set_options(
+    rule_runner_with_python_resolves.set_options(
         [
             "--source-root-patterns=['root']",
             "--python-enable-resolves",
             "--python-resolves={'prod': ''}",
         ]
     )
-    rule_runner.write_files(
+    rule_runner_with_python_resolves.write_files(
         {
             "root/loc1/common.proto": "",
             "root/loc1/BUILD": "protobuf_sources(name='common1', python_resolve='prod')",
@@ -382,7 +398,7 @@ def test_ambiguous_imports_within_resolve(rule_runner: RuleRunner, caplog) -> No
     )
 
     # Check that both are marked as ambiguous
-    result = rule_runner.request(ProtobufMapping, [])
+    result = rule_runner_with_python_resolves.request(ProtobufMapping, [])
 
     # Find the prod resolve key
     prod_key = [key for key in result.ambiguous_modules.keys() if key.resolve == "prod"][0]
@@ -402,8 +418,8 @@ def test_ambiguous_imports_within_resolve(rule_runner: RuleRunner, caplog) -> No
 
     # Test dependency inference warns
     def run_dep_inference(address: Address) -> InferredDependencies:
-        tgt = rule_runner.get_target(address)
-        return rule_runner.request(
+        tgt = rule_runner_with_python_resolves.get_target(address)
+        return rule_runner_with_python_resolves.request(
             InferredDependencies,
             [InferProtobufDependencies(ProtobufDependencyInferenceFieldSet.create(tgt))],
         )
@@ -413,16 +429,16 @@ def test_ambiguous_imports_within_resolve(rule_runner: RuleRunner, caplog) -> No
     assert "ambiguous" in caplog.text.lower()
 
 
-def test_ambiguous_imports_across_resolves_ok(rule_runner: RuleRunner, caplog) -> None:
+def test_ambiguous_imports_across_resolves_ok(rule_runner_with_python_resolves: RuleRunner, caplog) -> None:
     """Verify that the same proto file name in different resolves does NOT cause ambiguity."""
-    rule_runner.set_options(
+    rule_runner_with_python_resolves.set_options(
         [
             "--source-root-patterns=['protos']",
             "--python-enable-resolves",
             "--python-resolves={'resolve-a': '', 'resolve-b': ''}",
         ]
     )
-    rule_runner.write_files(
+    rule_runner_with_python_resolves.write_files(
         {
             "protos/a/common.proto": "",
             "protos/a/BUILD": "protobuf_sources(python_resolve='resolve-a')",
@@ -432,7 +448,7 @@ def test_ambiguous_imports_across_resolves_ok(rule_runner: RuleRunner, caplog) -
     )
 
     caplog.clear()
-    result = rule_runner.request(ProtobufMapping, [])
+    result = rule_runner_with_python_resolves.request(ProtobufMapping, [])
 
     # Find resolve keys
     resolve_keys = {key.resolve: key for key in result.mapping.keys()}
@@ -544,16 +560,16 @@ def test_empty_proto_file(rule_runner: RuleRunner) -> None:
     assert "empty.proto" in result.mapping[prod_key]
 
 
-def test_proto_with_no_imports(rule_runner: RuleRunner) -> None:
+def test_proto_with_no_imports(rule_runner_with_python_resolves: RuleRunner) -> None:
     """Proto files with no imports in multi-resolve setup."""
-    rule_runner.set_options(
+    rule_runner_with_python_resolves.set_options(
         [
             "--source-root-patterns=['protos']",
             "--python-enable-resolves",
             "--python-resolves={'prod': '', 'dev': ''}",
         ]
     )
-    rule_runner.write_files(
+    rule_runner_with_python_resolves.write_files(
         {
             "protos/standalone.proto": dedent(
                 """\
@@ -569,8 +585,8 @@ def test_proto_with_no_imports(rule_runner: RuleRunner) -> None:
     )
 
     def run_dep_inference(address: Address) -> InferredDependencies:
-        tgt = rule_runner.get_target(address)
-        return rule_runner.request(
+        tgt = rule_runner_with_python_resolves.get_target(address)
+        return rule_runner_with_python_resolves.request(
             InferredDependencies,
             [InferProtobufDependencies(ProtobufDependencyInferenceFieldSet.create(tgt))],
         )
@@ -579,21 +595,21 @@ def test_proto_with_no_imports(rule_runner: RuleRunner) -> None:
     deps = run_dep_inference(Address("protos", relative_file_path="standalone.proto"))
     assert deps == InferredDependencies([])
 
-    result = rule_runner.request(ProtobufMapping, [])
+    result = rule_runner_with_python_resolves.request(ProtobufMapping, [])
     prod_key = [key for key in result.mapping.keys() if key.resolve == "prod"][0]
     assert "standalone.proto" in result.mapping[prod_key]
 
 
-def test_multiple_resolves_with_same_import_structure(rule_runner: RuleRunner) -> None:
+def test_multiple_resolves_with_same_import_structure(rule_runner_with_python_resolves: RuleRunner) -> None:
     """Test that identical import structures in different resolves work independently."""
-    rule_runner.set_options(
+    rule_runner_with_python_resolves.set_options(
         [
             "--source-root-patterns=['protos']",
             "--python-enable-resolves",
             "--python-resolves={'prod': '', 'dev': ''}",
         ]
     )
-    rule_runner.write_files(
+    rule_runner_with_python_resolves.write_files(
         {
             # Prod resolve
             "protos/prod/main.proto": "import 'common.proto';",
@@ -607,8 +623,8 @@ def test_multiple_resolves_with_same_import_structure(rule_runner: RuleRunner) -
     )
 
     def run_dep_inference(address: Address) -> InferredDependencies:
-        tgt = rule_runner.get_target(address)
-        return rule_runner.request(
+        tgt = rule_runner_with_python_resolves.get_target(address)
+        return rule_runner_with_python_resolves.request(
             InferredDependencies,
             [InferProtobufDependencies(ProtobufDependencyInferenceFieldSet.create(tgt))],
         )
@@ -626,16 +642,16 @@ def test_multiple_resolves_with_same_import_structure(rule_runner: RuleRunner) -
     )
 
 
-def test_resolve_with_complex_import_paths(rule_runner: RuleRunner) -> None:
+def test_resolve_with_complex_import_paths(rule_runner_with_python_resolves: RuleRunner) -> None:
     """Test that complex import paths work correctly with multi-resolve."""
-    rule_runner.set_options(
+    rule_runner_with_python_resolves.set_options(
         [
             "--source-root-patterns=['protos']",
             "--python-enable-resolves",
             "--python-resolves={'prod': ''}",
         ]
     )
-    rule_runner.write_files(
+    rule_runner_with_python_resolves.write_files(
         {
             "protos/api/v1/service.proto": "import 'api/v1/models/user.proto';",
             "protos/api/v1/models/user.proto": "",
@@ -645,8 +661,8 @@ def test_resolve_with_complex_import_paths(rule_runner: RuleRunner) -> None:
     )
 
     def run_dep_inference(address: Address) -> InferredDependencies:
-        tgt = rule_runner.get_target(address)
-        return rule_runner.request(
+        tgt = rule_runner_with_python_resolves.get_target(address)
+        return rule_runner_with_python_resolves.request(
             InferredDependencies,
             [InferProtobufDependencies(ProtobufDependencyInferenceFieldSet.create(tgt))],
         )
