@@ -163,7 +163,9 @@ async def map_protobuf_files(
         if resolve_result.value is None:
             resolve_key = _NO_RESOLVE_LIKE_FIELDS_DEFINED
         else:
-            resolve_key = ProtobufMappingResolveKey(field_type=field_type, resolve=resolve_result.value)
+            resolve_key = ProtobufMappingResolveKey(
+                field_type=field_type, resolve=resolve_result.value
+            )
         targets_partitioned_by_resolve[resolve_key].append(target)
 
     stripped_file_per_target = await concurrently(
