@@ -381,7 +381,7 @@ def test_ambiguous_imports_within_resolve(rule_runner_with_python_resolves: Rule
     """Verify that ambiguous proto file names within a single resolve are handled correctly."""
     rule_runner_with_python_resolves.set_options(
         [
-            "--source-root-patterns=['root']",
+            "--source-root-patterns=['root/*']",
             "--python-enable-resolves",
             "--python-resolves={'prod': ''}",
         ]
@@ -392,8 +392,8 @@ def test_ambiguous_imports_within_resolve(rule_runner_with_python_resolves: Rule
             "root/loc1/BUILD": "protobuf_sources(name='common1', python_resolve='prod')",
             "root/loc2/common.proto": "",
             "root/loc2/BUILD": "protobuf_sources(name='common2', python_resolve='prod')",
-            "root/main.proto": "import 'common.proto';",
-            "root/BUILD": "protobuf_sources(name='main', python_resolve='prod')",
+            "root/loc3/main.proto": "import 'common.proto';",
+            "root/loc3/BUILD": "protobuf_sources(name='main', python_resolve='prod')",
         }
     )
 
@@ -425,7 +425,7 @@ def test_ambiguous_imports_within_resolve(rule_runner_with_python_resolves: Rule
         )
 
     caplog.clear()
-    run_dep_inference(Address("root", target_name="main", relative_file_path="main.proto"))
+    run_dep_inference(Address("root/loc3", target_name="main", relative_file_path="main.proto"))
     assert "ambiguous" in caplog.text.lower()
 
 
