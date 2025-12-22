@@ -61,7 +61,7 @@ We strongly recommend removing the `./pants` script from your repo and using the
 ## Installation in Docker / Containers
 The standard installation method uses a installer-launcher that dynamically can install python versions and pants binaries depending on configuration.
 
-For container environments where a static or airtight installation is often important, you can directly install pants binaries directly. These are published in [github actions](https://github.com/pantsbuild/pants/releases). Here's a minimal docker example on how to do this with `uv`:
+For container environments where a static or airtight installation is often important, you can install pants binaries directly. These are published in [github actions](https://github.com/pantsbuild/pants/releases). Here's a minimal docker example on how to do this with `uv`:
 ```dockerfile
 FROM debian:bookworm-slim
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/
@@ -71,7 +71,7 @@ RUN UV_TOOL_BIN_DIR=/usr/local/bin UV_TOOL_DIR=/usr/local/share uv tool install 
   https://github.com/pantsbuild/pants/releases/download/release_${PANTS_VERSION}/pantsbuild_pants-${PANTS_VERSION}-cp311-cp311-manylinux2014_x86_64.whl \
   --python 3.11
 ```
-You can avoid hardcoding wheel wheel URLs and satisfy firewall constraints by uploading these pants wheels on your private [package indexes](https://docs.astral.sh/uv/concepts/indexes/) and use these as per `uv tool`'s documentation (i.e. using `uv tool --index-url`).
+You can avoid hardcoding wheel URLs and satisfy firewall constraints by uploading these pants wheels on your private [package indexes](https://docs.astral.sh/uv/concepts/indexes/) and use these as per `uv tool`'s documentation (i.e. using `uv tool --index-url`).
 
 ## The `pants` binary's implementation
 
