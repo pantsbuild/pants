@@ -313,7 +313,7 @@ def test_dependency_inference_within_resolve(rule_runner_with_python_resolves: R
     """Verify that dependency inference only finds dependencies within the same resolve."""
     rule_runner_with_python_resolves.set_options(
         [
-            "--source-root-patterns=['protos']",
+            "--source-root-patterns=['protos/resolve_a', 'protos/resolve_b']",
             "--python-enable-resolves",
             "--python-resolves={'resolve-a': '', 'resolve-b': ''}",
         ]

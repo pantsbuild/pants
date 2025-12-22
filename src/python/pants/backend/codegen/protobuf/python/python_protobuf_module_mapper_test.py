@@ -186,7 +186,7 @@ def test_grpc_modules_with_multiple_resolves(rule_runner: RuleRunner) -> None:
 
 
 def test_mypy_protobuf_modules_with_resolves(rule_runner: RuleRunner) -> None:
-    """Verify mypy-protobuf stub files (.pyi) are mapped per resolve."""
+    """Verify mypy-protobuf does not change module mapping across resolves."""
     rule_runner.set_options(
         [
             "--source-root-patterns=['protos']",
@@ -211,16 +211,10 @@ def test_mypy_protobuf_modules_with_resolves(rule_runner: RuleRunner) -> None:
     assert result == FirstPartyPythonMappingImpl.create(
         {
             "resolve-a": {
-                "a.model_pb2": providers([Address("protos/a", relative_file_path="model.proto")]),
-                "a.model_pb2.pyi": providers(
-                    [Address("protos/a", relative_file_path="model.proto")]
-                ),
+                "a.model_pb2": providers([Address("protos/a", relative_file_path="model.proto")])
             },
             "resolve-b": {
-                "b.model_pb2": providers([Address("protos/b", relative_file_path="model.proto")]),
-                "b.model_pb2.pyi": providers(
-                    [Address("protos/b", relative_file_path="model.proto")]
-                ),
+                "b.model_pb2": providers([Address("protos/b", relative_file_path="model.proto")])
             },
         }
     )
