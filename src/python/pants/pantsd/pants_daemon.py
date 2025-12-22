@@ -208,7 +208,6 @@ class PantsDaemon(PantsDaemonProcessManager):
         with (
             initialize_stdio(global_bootstrap_options),
             argv_as(tuple()),
-            hermetic_environment_as(*_PRESERVED_ENV_VARS),
         ):
             # Install signal and panic handling.
             ExceptionSink.install(
