@@ -106,7 +106,7 @@ async def run_golangci_lint(
 ) -> LintResult:
     # Get the single go.mod address for this partition
     go_mod_address = request.partition_metadata.go_mod_address
-    go_mod_dir = go_mod_address.spec_path
+    go_mod_dir = os.path.normpath(go_mod_address.spec_path) if go_mod_address.spec_path else ""
 
     transitive_targets = await transitive_targets_get(
         TransitiveTargetsRequest(field_set.address for field_set in request.elements),
