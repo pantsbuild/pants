@@ -7,6 +7,9 @@ from textwrap import dedent
 
 import pytest
 
+from pants.core.target_types import rules as core_target_types_rules
+from pants.backend.codegen.protobuf import protobuf_dependency_inference
+from pants.backend.codegen.protobuf.python.register import rules as python_protobuf_backend_rules
 from pants.backend.codegen.protobuf.python import additional_fields
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufMypyPlugin
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
@@ -18,7 +21,8 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceField,
     ProtobufSourcesGeneratorTarget,
 )
-from pants.backend.codegen.protobuf.target_types import rules as target_types_rules
+from pants.backend.codegen.protobuf.target_types import rules as protobuf_target_types_rules
+from pants.backend.python import target_types_rules as python_target_types_rules
 from pants.backend.python.dependency_inference import module_mapper
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
@@ -56,11 +60,15 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *protobuf_rules(),
+            *python_protobuf_backend_rules(),
+            *protobuf_dependency_inference.rules(),
             *protobuf_subsystem_rules(),
             *additional_fields.rules(),
+            *protobuf_target_types_rules(),
+            *python_target_types_rules.rules(),
             *stripped_source_files.rules(),
-            *target_types_rules(),
             *module_mapper.rules(),
+            *core_target_types_rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GeneratePythonFromProtobufRequest]),
         ],
