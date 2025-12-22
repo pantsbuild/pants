@@ -58,7 +58,7 @@ jobs:
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.1
+      uses: Swatinem/rust-cache@v2.8.2
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -166,7 +166,7 @@ jobs:
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.1
+      uses: Swatinem/rust-cache@v2.8.2
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -281,7 +281,7 @@ jobs:
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.1
+      uses: Swatinem/rust-cache@v2.8.2
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -477,11 +477,11 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.24.9
     - env:
@@ -561,7 +561,7 @@ jobs:
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.1
+      uses: Swatinem/rust-cache@v2.8.2
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -572,11 +572,11 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.24.9
     - env:
@@ -648,7 +648,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       if: github.event_name == 'pull_request' && !needs.classify_changes.outputs.notes
       name: Ensure appropriate label
-      uses: mheap/github-action-required-labels@v4.0.0
+      uses: mheap/github-action-required-labels@v5.5.1
       with:
         count: 1
         labels: release-notes:not-required, category:internal
@@ -777,7 +777,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v7
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -885,15 +885,15 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.24.9
     - name: Download native binaries
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v7
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
         path: src/python/pants
@@ -993,11 +993,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -1019,7 +1019,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v7
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1119,11 +1119,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -1145,7 +1145,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v7
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1245,11 +1245,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -1271,7 +1271,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v7
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1371,11 +1371,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -1397,7 +1397,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v7
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1497,11 +1497,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -1523,7 +1523,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v7
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1623,11 +1623,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -1649,7 +1649,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v7
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1749,11 +1749,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -1775,7 +1775,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v7
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1875,11 +1875,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -1901,7 +1901,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v7
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -2001,11 +2001,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -2027,7 +2027,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v7
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -2127,11 +2127,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.24.9
     - if: runner.os == 'Linux'
@@ -2153,7 +2153,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v7
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -2229,11 +2229,11 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
       with:
         go-version: 1.24.9
     - name: Set up Python 3.9, 3.10, 3.12, 3.13, 3.11
@@ -2246,7 +2246,7 @@ jobs:
           3.13
           3.11
     - name: Download native binaries
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v7
       with:
         name: native_binaries.${{ matrix.python-version }}.macOS14-ARM64
         path: src/python/pants
