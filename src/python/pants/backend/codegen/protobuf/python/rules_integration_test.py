@@ -7,14 +7,13 @@ from textwrap import dedent
 
 import pytest
 
-from pants.core.target_types import rules as core_target_types_rules
 from pants.backend.codegen.protobuf import protobuf_dependency_inference
-from pants.backend.codegen.protobuf.python.register import rules as python_protobuf_backend_rules
 from pants.backend.codegen.protobuf.python import additional_fields
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufMypyPlugin
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
     rules as protobuf_subsystem_rules,
 )
+from pants.backend.codegen.protobuf.python.register import rules as python_protobuf_backend_rules
 from pants.backend.codegen.protobuf.python.rules import GeneratePythonFromProtobufRequest
 from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
 from pants.backend.codegen.protobuf.target_types import (
@@ -24,6 +23,7 @@ from pants.backend.codegen.protobuf.target_types import (
 from pants.backend.codegen.protobuf.target_types import rules as protobuf_target_types_rules
 from pants.backend.python import target_types_rules as python_target_types_rules
 from pants.backend.python.dependency_inference import module_mapper
+from pants.core.target_types import rules as core_target_types_rules
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
