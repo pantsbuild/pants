@@ -1006,7 +1006,6 @@ def rules():
         UnionRule(GenerateTargetsRequest, GenerateFromPomXmlRequest),
         UnionRule(FieldDefaultFactoryRequest, JvmResolveFieldDefaultFactoryRequest),
         UnionRule(ResolveLikeFieldToValueRequest, JvmResolveLikeFieldToValueRequest),
-        # *JvmArtifactFieldSet.jvm_rules(),
     ]
 
 

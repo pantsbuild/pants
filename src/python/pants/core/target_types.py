@@ -936,7 +936,9 @@ class ResolveLikeFieldToValueResult:
 
 
 @rule(polymorphic=True)
-async def get_resolve_from_resolve_like_field_request(request: ResolveLikeFieldToValueRequest) -> ResolveLikeFieldToValueResult:
+async def get_resolve_from_resolve_like_field_request(
+    request: ResolveLikeFieldToValueRequest,
+) -> ResolveLikeFieldToValueResult:
     raise NotImplementedError()
 
 
