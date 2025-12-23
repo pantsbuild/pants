@@ -29,10 +29,8 @@ from pants.engine.internals.selectors import (
 from pants.util.docutil import doc_url
 from pants.util.memo import memoized
 from pants.util.strutil import softwrap
-from pants.util.typing import patch_forward_ref
 
 logger = logging.getLogger(__name__)
-patch_forward_ref()
 
 
 def _get_starting_indent(source: str) -> int:
