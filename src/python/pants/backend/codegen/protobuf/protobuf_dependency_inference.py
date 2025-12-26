@@ -57,13 +57,12 @@ class ProtobufMappingResolveKey:
     resolve: str
 
 
+# Sentinnel value for when:
+#   1. No resolve-like fields are registered on protobuf_source targets.
+# .  2. Resolve-like fields exist but resolves are disabled for a language backend.
 _NO_RESOLVE_LIKE_FIELDS_DEFINED = ProtobufMappingResolveKey(
     field_type=ProtobufSourceField, resolve="<no-resolve>"
 )
-# Note: This key is used when:
-# 1. No resolve-like fields are registered on protobuf_source targets
-# 2. Resolve-like fields exist but resolves are disabled (ResolveLikeFieldToValueResult returns None)
-# In both cases, all targets are treated as belonging to a single implicit resolve.
 
 
 @dataclass(frozen=True)

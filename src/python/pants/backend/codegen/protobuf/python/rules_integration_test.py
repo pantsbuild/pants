@@ -438,55 +438,55 @@ def test_code_generation_with_multiple_resolves(rule_runner: RuleRunner) -> None
     """End-to-end test that code is generated correctly for different resolves."""
     rule_runner.write_files(
         {
-            "src/protobuf/prod/service.proto": dedent(
+            "src/protobuf/a/service.proto": dedent(
                 """\
                 syntax = "proto3";
 
-                package prod;
+                package a;
 
                 message Request {
                   string name = 1;
                 }
                 """
             ),
-            "src/protobuf/prod/BUILD": "protobuf_sources(python_resolve='prod')",
-            "src/protobuf/dev/service.proto": dedent(
+            "src/protobuf/a/BUILD": "protobuf_sources(python_resolve='a')",
+            "src/protobuf/b/service.proto": dedent(
                 """\
                 syntax = "proto3";
 
-                package dev;
+                package b;
 
                 message Request {
                   string name = 1;
                 }
                 """
             ),
-            "src/protobuf/dev/BUILD": "protobuf_sources(python_resolve='dev')",
+            "src/protobuf/b/BUILD": "protobuf_sources(python_resolve='b')",
         }
     )
 
     # Test code generation for prod resolve
     assert_files_generated(
         rule_runner,
-        Address("src/protobuf/prod", relative_file_path="service.proto"),
+        Address("src/protobuf/a", relative_file_path="service.proto"),
         source_roots=["src/protobuf"],
         extra_args=[
             "--python-enable-resolves",
-            "--python-resolves={'prod': '', 'dev': ''}",
+            "--python-resolves={'a': '', 'b': ''}",
         ],
-        expected_files=["src/protobuf/prod/service_pb2.py"],
+        expected_files=["src/protobuf/a/service_pb2.py"],
     )
 
     # Test code generation for dev resolve
     assert_files_generated(
         rule_runner,
-        Address("src/protobuf/dev", relative_file_path="service.proto"),
+        Address("src/protobuf/b", relative_file_path="service.proto"),
         source_roots=["src/protobuf"],
         extra_args=[
             "--python-enable-resolves",
-            "--python-resolves={'prod': '', 'dev': ''}",
+            "--python-resolves={'a': '', 'b': ''}",
         ],
-        expected_files=["src/protobuf/dev/service_pb2.py"],
+        expected_files=["src/protobuf/b/service_pb2.py"],
     )
 
 
@@ -525,7 +525,7 @@ def test_transitive_dependencies_within_resolve(rule_runner: RuleRunner) -> None
                 }
                 """
             ),
-            "src/protobuf/BUILD": "protobuf_sources(python_resolve='my-resolve')",
+            "src/protobuf/BUILD": "protobuf_sources(python_resolve='python-default')",
         }
     )
 
@@ -536,7 +536,7 @@ def test_transitive_dependencies_within_resolve(rule_runner: RuleRunner) -> None
         source_roots=["src/protobuf"],
         extra_args=[
             "--python-enable-resolves",
-            "--python-resolves={'my-resolve': ''}",
+            "--python-resolves={'python-default': ''}",
         ],
         expected_files=["src/protobuf/a_pb2.py"],
     )

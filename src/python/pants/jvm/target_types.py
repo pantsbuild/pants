@@ -993,7 +993,7 @@ async def jvm_resolve_field_default_factory(
 
 
 @rule
-async def jvm_resolve_like_field_to_value_request(
+async def jvm_get_resolve_from_resolve_like_field_request(
     request: JvmResolveLikeFieldToValueRequest, jvm: JvmSubsystem
 ) -> ResolveLikeFieldToValueResult:
     resolve = request.target[JvmResolveField].normalized_value(jvm)

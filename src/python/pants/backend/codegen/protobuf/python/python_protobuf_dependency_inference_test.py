@@ -1,13 +1,14 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from textwrap import dedent
-
 import pytest
 
-from pants.backend.codegen.protobuf import protobuf_dependency_inference
+from pants.backend.codegen.protobuf import (
+    protobuf_dependency_inference,
+)
 from pants.backend.codegen.protobuf.protobuf_dependency_inference import (
     InferProtobufDependencies,
+    ProtobufDependencyInferenceFieldSet,
     ProtobufMapping,
 )
 from pants.backend.codegen.protobuf.python import additional_fields
@@ -18,7 +19,6 @@ from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.target import InferredDependencies
 from pants.testutil.rule_runner import QueryRule, RuleRunner
-from pants.util.frozendict import FrozenDict
 
 
 @pytest.fixture
@@ -79,15 +79,15 @@ def test_protobuf_mapping_with_multiple_resolves(
         [
             "--source-root-patterns=['protos']",
             "--python-enable-resolves",
-            "--python-resolves={'prod': '', 'dev': ''}",
+            "--python-resolves={'a': '', 'b': ''}",
         ]
     )
     rule_runner_with_python_resolves.write_files(
         {
-            "protos/prod/service.proto": "",
-            "protos/prod/BUILD": "protobuf_sources(python_resolve='prod')",
-            "protos/dev/service.proto": "",  # Same name, different resolve
-            "protos/dev/BUILD": "protobuf_sources(python_resolve='dev')",
+            "protos/a/service.proto": "",
+            "protos/a/BUILD": "protobuf_sources(python_resolve='a')",
+            "protos/b/service.proto": "",  # Same name, different resolve
+            "protos/b/BUILD": "protobuf_sources(python_resolve='b')",
         }
     )
     result = rule_runner_with_python_resolves.request(ProtobufMapping, [])
@@ -95,49 +95,45 @@ def test_protobuf_mapping_with_multiple_resolves(
     # Assert two resolve keys exist
     assert len(result.mapping) == 2
 
-    # Find the resolve keys
+    # Find the resolve keys.
     resolve_keys = {key.resolve: key for key in result.mapping.keys()}
-    assert "prod" in resolve_keys
-    assert "dev" in resolve_keys
+    assert "a" in resolve_keys
+    assert "b" in resolve_keys
 
-    # Assert each resolve has its own mapping
-    prod_mapping = result.mapping[resolve_keys["prod"]]
-    dev_mapping = result.mapping[resolve_keys["dev"]]
+    # Assert each resolve has its own mapping.
+    a_mapping = result.mapping[resolve_keys["a"]]
+    b_mapping = result.mapping[resolve_keys["b"]]
 
-    # Assert files in prod resolve map to prod targets only
-    assert "prod/service.proto" in prod_mapping
-    assert prod_mapping["prod/service.proto"] == Address(
-        "protos/prod", relative_file_path="service.proto"
-    )
+    # Assert files in resolve `a` map to "a" targets only.
+    assert "a/service.proto" in a_mapping
+    assert a_mapping["a/service.proto"] == Address("protos/a", relative_file_path="service.proto")
 
-    # Assert files in dev resolve map to dev targets only
-    assert "dev/service.proto" in dev_mapping
-    assert dev_mapping["dev/service.proto"] == Address(
-        "protos/dev", relative_file_path="service.proto"
-    )
+    # Assert files in resolve `b` ,ap to "b" targets only.
+    assert "b/service.proto" in b_mapping
+    assert b_mapping["b/service.proto"] == Address("protos/b", relative_file_path="service.proto")
 
-    # Assert no cross-contamination
-    assert "dev/service.proto" not in prod_mapping
-    assert "prod/service.proto" not in dev_mapping
+    # Assert no references in one mapping to files from the other resolve.
+    assert "a/service.proto" not in b_mapping
+    assert "b/service.proto" not in a_mapping
 
 
 def test_dependency_inference_within_resolve(rule_runner_with_python_resolves: RuleRunner) -> None:
     """Verify that dependency inference only finds dependencies within the same resolve."""
     rule_runner_with_python_resolves.set_options(
         [
-            "--source-root-patterns=['protos/resolve_a', 'protos/resolve_b']",
+            "--source-root-patterns=['protos/a', 'protos/b']",
             "--python-enable-resolves",
-            "--python-resolves={'resolve-a': '', 'resolve-b': ''}",
+            "--python-resolves={'a': '', 'b': ''}",
         ]
     )
     rule_runner_with_python_resolves.write_files(
         {
-            "protos/resolve_a/a.proto": "import 'b.proto';",
-            "protos/resolve_a/b.proto": "",
-            "protos/resolve_a/BUILD": "protobuf_sources(python_resolve='resolve-a')",
-            "protos/resolve_b/a.proto": "import 'b.proto';",
-            "protos/resolve_b/b.proto": "",
-            "protos/resolve_b/BUILD": "protobuf_sources(python_resolve='resolve-b')",
+            "protos/a/a.proto": "import 'b.proto';",
+            "protos/a/b.proto": "",
+            "protos/a/BUILD": "protobuf_sources(python_resolve='a')",
+            "protos/b/a.proto": "import 'b.proto';",
+            "protos/b/b.proto": "",
+            "protos/b/BUILD": "protobuf_sources(python_resolve='b')",
         }
     )
 
@@ -148,17 +144,13 @@ def test_dependency_inference_within_resolve(rule_runner_with_python_resolves: R
             [InferProtobufDependencies(ProtobufDependencyInferenceFieldSet.create(tgt))],
         )
 
-    # Test inference for resolve-a
-    deps_a = run_dep_inference(Address("protos/resolve_a", relative_file_path="a.proto"))
-    assert deps_a == InferredDependencies(
-        [Address("protos/resolve_a", relative_file_path="b.proto")]
-    )
+    # Test inference for resolve `a`.`
+    deps_a = run_dep_inference(Address("protos/a", relative_file_path="a.proto"))
+    assert deps_a == InferredDependencies([Address("protos/a", relative_file_path="b.proto")])
 
-    # Test inference for resolve-b
-    deps_b = run_dep_inference(Address("protos/resolve_b", relative_file_path="a.proto"))
-    assert deps_b == InferredDependencies(
-        [Address("protos/resolve_b", relative_file_path="b.proto")]
-    )
+    # Test inference for resolve `b`.
+    deps_b = run_dep_inference(Address("protos/b", relative_file_path="a.proto"))
+    assert deps_b == InferredDependencies([Address("protos/b", relative_file_path="b.proto")])
 
 
 def test_dependency_inference_no_cross_resolve(
@@ -169,15 +161,15 @@ def test_dependency_inference_no_cross_resolve(
         [
             "--source-root-patterns=['protos']",
             "--python-enable-resolves",
-            "--python-resolves={'resolve-a': '', 'resolve-b': ''}",
+            "--python-resolves={'a': '', 'b': ''}",
         ]
     )
     rule_runner_with_python_resolves.write_files(
         {
             "protos/a/main.proto": "import 'common.proto';",
-            "protos/a/BUILD": "protobuf_sources(python_resolve='resolve-a')",
+            "protos/a/BUILD": "protobuf_sources(python_resolve='a')",
             "protos/b/common.proto": "",
-            "protos/b/BUILD": "protobuf_sources(python_resolve='resolve-b')",
+            "protos/b/BUILD": "protobuf_sources(python_resolve='b')",
         }
     )
 
@@ -189,7 +181,7 @@ def test_dependency_inference_no_cross_resolve(
         )
 
     deps = run_dep_inference(Address("protos/a", relative_file_path="main.proto"))
-    # Should be empty since common.proto is in different resolve
+    # Should be empty since common.proto is in different resolve.
     assert deps == InferredDependencies([])
 
 
@@ -201,29 +193,31 @@ def test_ambiguous_imports_within_resolve(
         [
             "--source-root-patterns=['root/*']",
             "--python-enable-resolves",
-            "--python-resolves={'prod': ''}",
+            "--python-resolves={'python-default': ''}",
         ]
     )
     rule_runner_with_python_resolves.write_files(
         {
             "root/loc1/common.proto": "",
-            "root/loc1/BUILD": "protobuf_sources(name='common1', python_resolve='prod')",
+            "root/loc1/BUILD": "protobuf_sources(name='common1', python_resolve='python-default')",
             "root/loc2/common.proto": "",
-            "root/loc2/BUILD": "protobuf_sources(name='common2', python_resolve='prod')",
+            "root/loc2/BUILD": "protobuf_sources(name='common2', python_resolve='python-default')",
             "root/loc3/main.proto": "import 'common.proto';",
-            "root/loc3/BUILD": "protobuf_sources(name='main', python_resolve='prod')",
+            "root/loc3/BUILD": "protobuf_sources(name='main', python_resolve='python-default')",
         }
     )
 
     # Check that both are marked as ambiguous
     result = rule_runner_with_python_resolves.request(ProtobufMapping, [])
 
-    # Find the prod resolve key
-    prod_key = [key for key in result.ambiguous_modules.keys() if key.resolve == "prod"][0]
+    # Find the resolve key for `python-default`.
+    resolve_key = [
+        key for key in result.ambiguous_modules.keys() if key.resolve == "python-default"
+    ][0]
 
     # Assert ambiguous_modules contains the conflict
-    assert "common.proto" in result.ambiguous_modules[prod_key]
-    ambiguous_addrs = result.ambiguous_modules[prod_key]["common.proto"]
+    assert "common.proto" in result.ambiguous_modules[resolve_key]
+    ambiguous_addrs = result.ambiguous_modules[resolve_key]["common.proto"]
     assert len(ambiguous_addrs) == 2
     assert (
         Address("root/loc1", target_name="common1", relative_file_path="common.proto")
@@ -255,25 +249,25 @@ def test_ambiguous_imports_across_resolves_ok(
         [
             "--source-root-patterns=['protos']",
             "--python-enable-resolves",
-            "--python-resolves={'resolve-a': '', 'resolve-b': ''}",
+            "--python-resolves={'a': '', 'b': ''}",
         ]
     )
     rule_runner_with_python_resolves.write_files(
         {
             "protos/a/common.proto": "",
-            "protos/a/BUILD": "protobuf_sources(python_resolve='resolve-a')",
+            "protos/a/BUILD": "protobuf_sources(python_resolve='a')",
             "protos/b/common.proto": "",  # Same name, different resolve
-            "protos/b/BUILD": "protobuf_sources(python_resolve='resolve-b')",
+            "protos/b/BUILD": "protobuf_sources(python_resolve='b')",
         }
     )
 
     caplog.clear()
     result = rule_runner_with_python_resolves.request(ProtobufMapping, [])
 
-    # Find resolve keys
+    # Find resolve keys.
     resolve_keys = {key.resolve: key for key in result.mapping.keys()}
-    resolve_key_a = resolve_keys["resolve-a"]
-    resolve_key_b = resolve_keys["resolve-b"]
+    resolve_key_a = resolve_keys["a"]
+    resolve_key_b = resolve_keys["b"]
 
     # Assert both resolves have their own mapping
     assert "a/common.proto" in result.mapping[resolve_key_a]
@@ -294,7 +288,6 @@ def test_default_resolve_behavior(rule_runner_with_python_resolves: RuleRunner) 
             "--source-root-patterns=['protos']",
             "--python-enable-resolves",
             "--python-resolves={'python-default': '', 'other': ''}",
-            "--python-default-resolve=python-default",
         ]
     )
     rule_runner_with_python_resolves.write_files(
@@ -307,7 +300,7 @@ def test_default_resolve_behavior(rule_runner_with_python_resolves: RuleRunner) 
 
     result = rule_runner_with_python_resolves.request(ProtobufMapping, [])
 
-    # Assert targets are in python-default resolve
+    # Assert targets are in python-default resolve.
     default_key = [key for key in result.mapping.keys() if key.resolve == "python-default"][0]
     assert "a.proto" in result.mapping[default_key]
     assert "b.proto" in result.mapping[default_key]
@@ -324,44 +317,21 @@ def test_default_resolve_behavior(rule_runner_with_python_resolves: RuleRunner) 
     assert deps == InferredDependencies([Address("protos", relative_file_path="b.proto")])
 
 
-def test_empty_proto_file(rule_runner_with_python_resolves: RuleRunner) -> None:
-    """Handle empty proto files in multi-resolve scenarios."""
-    rule_runner_with_python_resolves.set_options(
-        [
-            "--source-root-patterns=['protos']",
-            "--python-enable-resolves",
-            "--python-resolves={'prod': ''}",
-        ]
-    )
-    rule_runner_with_python_resolves.write_files(
-        {
-            "protos/empty.proto": "",
-            "protos/BUILD": "protobuf_sources(python_resolve='prod')",
-        }
-    )
-
-    result = rule_runner_with_python_resolves.request(ProtobufMapping, [])
-
-    # Assert empty file is mapped correctly
-    prod_key = [key for key in result.mapping.keys() if key.resolve == "prod"][0]
-    assert "empty.proto" in result.mapping[prod_key]
-
-
 def test_resolve_with_complex_import_paths(rule_runner_with_python_resolves: RuleRunner) -> None:
     """Test that complex import paths work correctly with multi-resolve."""
     rule_runner_with_python_resolves.set_options(
         [
             "--source-root-patterns=['protos']",
             "--python-enable-resolves",
-            "--python-resolves={'prod': ''}",
+            "--python-resolves={'python-default': ''}",
         ]
     )
     rule_runner_with_python_resolves.write_files(
         {
             "protos/api/v1/service.proto": "import 'api/v1/models/user.proto';",
             "protos/api/v1/models/user.proto": "",
-            "protos/api/v1/BUILD": "protobuf_sources(python_resolve='prod')",
-            "protos/api/v1/models/BUILD": "protobuf_sources(python_resolve='prod')",
+            "protos/api/v1/BUILD": "protobuf_sources(python_resolve='python-default')",
+            "protos/api/v1/models/BUILD": "protobuf_sources(python_resolve='python-default')",
         }
     )
 

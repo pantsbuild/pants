@@ -147,15 +147,15 @@ def test_grpc_modules_with_multiple_resolves(rule_runner: RuleRunner) -> None:
         [
             "--source-root-patterns=['protos']",
             "--python-enable-resolves",
-            "--python-resolves={'prod': '', 'dev': ''}",
+            "--python-resolves={'a': '', 'b': ''}",
         ]
     )
     rule_runner.write_files(
         {
-            "protos/prod/service.proto": "",
-            "protos/prod/BUILD": "protobuf_sources(grpc=True, python_resolve='prod')",
-            "protos/dev/service.proto": "",
-            "protos/dev/BUILD": "protobuf_sources(grpc=True, python_resolve='dev')",
+            "protos/a/service.proto": "",
+            "protos/a/BUILD": "protobuf_sources(grpc=True, python_resolve='a')",
+            "protos/b/service.proto": "",
+            "protos/b/BUILD": "protobuf_sources(grpc=True, python_resolve='b')",
         }
     )
     result = rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
@@ -165,20 +165,20 @@ def test_grpc_modules_with_multiple_resolves(rule_runner: RuleRunner) -> None:
 
     assert result == FirstPartyPythonMappingImpl.create(
         {
-            "prod": {
-                "prod.service_pb2": providers(
-                    [Address("protos/prod", relative_file_path="service.proto")]
+            "a": {
+                "a.service_pb2": providers(
+                    [Address("protos/a", relative_file_path="service.proto")]
                 ),
-                "prod.service_pb2_grpc": providers(
-                    [Address("protos/prod", relative_file_path="service.proto")]
+                "a.service_pb2_grpc": providers(
+                    [Address("protos/a", relative_file_path="service.proto")]
                 ),
             },
-            "dev": {
-                "dev.service_pb2": providers(
-                    [Address("protos/dev", relative_file_path="service.proto")]
+            "b": {
+                "b.service_pb2": providers(
+                    [Address("protos/b", relative_file_path="service.proto")]
                 ),
-                "dev.service_pb2_grpc": providers(
-                    [Address("protos/dev", relative_file_path="service.proto")]
+                "b.service_pb2_grpc": providers(
+                    [Address("protos/b", relative_file_path="service.proto")]
                 ),
             },
         }
@@ -191,16 +191,16 @@ def test_mypy_protobuf_modules_with_resolves(rule_runner: RuleRunner) -> None:
         [
             "--source-root-patterns=['protos']",
             "--python-enable-resolves",
-            "--python-resolves={'resolve-a': '', 'resolve-b': ''}",
+            "--python-resolves={'a': '', 'b': ''}",
             "--python-protobuf-mypy-plugin",
         ]
     )
     rule_runner.write_files(
         {
             "protos/a/model.proto": "",
-            "protos/a/BUILD": "protobuf_sources(python_resolve='resolve-a')",
+            "protos/a/BUILD": "protobuf_sources(python_resolve='a')",
             "protos/b/model.proto": "",
-            "protos/b/BUILD": "protobuf_sources(python_resolve='resolve-b')",
+            "protos/b/BUILD": "protobuf_sources(python_resolve='b')",
         }
     )
     result = rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
@@ -210,10 +210,10 @@ def test_mypy_protobuf_modules_with_resolves(rule_runner: RuleRunner) -> None:
 
     assert result == FirstPartyPythonMappingImpl.create(
         {
-            "resolve-a": {
+            "a": {
                 "a.model_pb2": providers([Address("protos/a", relative_file_path="model.proto")])
             },
-            "resolve-b": {
+            "b": {
                 "b.model_pb2": providers([Address("protos/b", relative_file_path="model.proto")])
             },
         }

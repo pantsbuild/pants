@@ -681,7 +681,7 @@ async def validate_python_dependencies(
 
 
 @rule
-async def python_resolve_field_to_string(
+async def python_get_resolve_from_resolve_like_field_request(
     request: PythonResolveLikeFieldToValueRequest, python_setup: PythonSetup
 ) -> ResolveLikeFieldToValueResult:
     if not python_setup.enable_resolves:
