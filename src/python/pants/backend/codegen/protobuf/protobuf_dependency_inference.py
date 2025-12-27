@@ -57,7 +57,7 @@ class ProtobufMappingResolveKey:
     resolve: str
 
 
-# Sentinnel value for when:
+# Sentinel value for when:
 #   1. No resolve-like fields are registered on protobuf_source targets.
 # .  2. Resolve-like fields exist but resolves are disabled for a language backend.
 _NO_RESOLVE_LIKE_FIELDS_DEFINED = ProtobufMappingResolveKey(
