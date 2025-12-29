@@ -957,19 +957,15 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484",
-              "url": "https://files.pythonhosted.org/packages/20/12/38679034af332785aac8774540895e234f4d07f7545804097de4b666afd8/packaging-25.0-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "d443872c98d677bf60f6a1f2f8c1cb748e8fe762d2bf9d3148b5599295b0fc4f",
-              "url": "https://files.pythonhosted.org/packages/a1/d4/1fc4078c65507b51b96ca8f8c3ba19e6a61c8253c72794544580a7b6c24d/packaging-25.0.tar.gz"
+              "commit_id": "994a371eca41e89336ac9a0d4d9e7d97791f8383",
+              "hash": "9647cb5752cbdd01e484f1fce91b08d211b1189694289138bd7994b184202af6",
+              "url": "git+https://github.com/pypa/packaging.git@994a371eca41e89336ac9a0d4d9e7d97791f8383"
             }
           ],
           "project_name": "packaging",
           "requires_dists": [],
           "requires_python": ">=3.8",
-          "version": "25.0"
+          "version": "25.1.dev0"
         },
         {
           "artifacts": [
@@ -2255,7 +2251,7 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.73.1",
+  "pex_version": "2.76.1",
   "pip_version": "25.3",
   "prefer_older_binary": false,
   "requirements": [
@@ -2274,7 +2270,7 @@
     "libcst==1.8.5",
     "mypy-typing-asserts==0.1.1",
     "node-semver==0.9.0",
-    "packaging==25.0",
+    "packaging @ git+https://github.com/pypa/packaging.git@994a371eca41e89336ac9a0d4d9e7d97791f8383",
     "pex==2.76.1",
     "psutil==5.9.8",
     "pydevd-pycharm==251.23536.40",

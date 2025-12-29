@@ -2,7 +2,11 @@ pytest==8.4.1
 pytest-cov==6.2.1
 pytest-xdist==3.8.0
 ipdb
-pytest-asyncio
+# Dec 28, 2025: Fixing this to 1.2.0, as 1.3.0 removes Python 3.9 support, and that shouldn't be part of the pex upgrade
+pytest-asyncio==1.2.0
 pytest-html
 pytest-icdiff
 pygments
+
+# Dec 28, 2025: SHA required until https://github.com/pypa/packaging/pull/953 in a release
+packaging @ git+https://github.com/pypa/packaging.git@994a371eca41e89336ac9a0d4d9e7d97791f8383
