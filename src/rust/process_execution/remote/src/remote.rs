@@ -905,6 +905,16 @@ impl process_execution::CommandRunner for CommandRunner {
         _workunit: &mut RunningWorkunit,
         request: Process,
     ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
+        // Processes with stdin should have been forced to local execution in lift_process_fields.
+        // This assertion ensures they never reach the remote execution code path.
+        if request.stdin.is_some() {
+            return Err(ProcessError::Unclassified(
+                "Internal error: Process with stdin reached remote execution. \
+                 Stdin should have been handled by forcing local execution."
+                    .to_string(),
+            ));
+        }
+
         // Retrieve capabilities for this server.
         let capabilities = self.get_capabilities().await?;
         trace!("RE capabilities: {:?}", &capabilities);

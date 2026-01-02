@@ -107,61 +107,6 @@ async fn stdin_with_grep() {
     assert_eq!(result.original.exit_code, 0);
 }
 
-#[ignore] // No longer applicable with .pants/stdin approach
-#[tokio::test]
-#[cfg(unix)]
-async fn stdin_fails_with_multiple_files() {
-    // Test that stdin validation rejects digests with multiple files
-    let store_dir = TempDir::new().unwrap();
-    let store = Store::local_only(task_executor::Executor::new(), store_dir.path())
-        .unwrap();
-    
-    // Try to use stdin (test no longer validates digest file count)
-    let mut process = Process::new(owned_string_vec(&["/bin/cat"]));
-    // TODO: This test no longer applicable - stdin is now just bytes, not a digest
-    process.stdin = Some(vec![]);
-    
-    let result = run_command_locally_in_dir_with_store(process, store.clone()).await;
-    
-    // Should fail with clear error message
-    assert!(result.is_err());
-    let error_msg = result.unwrap_err().to_string();
-    assert!(
-        error_msg.contains("stdin_digest must contain exactly one file") 
-            && error_msg.contains("2 files"),
-        "Expected error message about 2 files, got: {}",
-        error_msg
-    );
-}
-
-#[ignore] // No longer applicable with .pants/stdin approach
-#[tokio::test]
-#[cfg(unix)]
-async fn stdin_fails_with_empty_digest() {
-    // Test that stdin validation rejects empty digests (after lifting filters them out,
-    // but if someone manually sets it to an empty digest in Rust)
-    let store_dir = TempDir::new().unwrap();
-    let store = Store::local_only(task_executor::Executor::new(), store_dir.path())
-        .unwrap();
-    
-    // Try to use empty stdin (test no longer validates digest)
-    let mut process = Process::new(owned_string_vec(&["/bin/cat"]));
-    // TODO: This test no longer applicable - empty stdin is just None or Some(vec![])
-    process.stdin = Some(vec![]);
-    
-    let result = run_command_locally_in_dir_with_store(process, store.clone()).await;
-    
-    // Should fail with clear error message
-    assert!(result.is_err());
-    let error_msg = result.unwrap_err().to_string();
-    assert!(
-        error_msg.contains("stdin_digest must contain exactly one file") 
-            && error_msg.contains("empty"),
-        "Expected error message about empty digest, got: {}",
-        error_msg
-    );
-}
-
 #[tokio::test]
 #[cfg(unix)]
 async fn capture_exit_code_signal() {

@@ -88,6 +88,10 @@ pub const CACHE_KEY_SALT_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_SALT";
 // CommandRunner.
 pub const CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_TARGET_PLATFORM";
 
+// Environment variable which includes stdin content in the cache key to ensure processes with
+// different stdin have different cache keys, even though the Remote Execution API doesn't support stdin.
+pub const CACHE_KEY_STDIN_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_STDIN";
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ProcessError {
     /// A Digest was not present in either of the local or remote Stores.
@@ -1270,15 +1274,6 @@ pub async fn make_execute_request(
     store: &Store,
     append_only_caches_base_path: Option<&str>,
 ) -> Result<EntireExecuteRequest, String> {
-    // Note: stdin should never be present here because processes with stdin are forced
-    // to local execution in lift_process_fields. But we'll assert for safety.
-    if req.stdin.is_some() {
-        return Err(
-            "Internal error: stdin should have been handled by forcing local execution"
-                .to_string(),
-        );
-    }
-
     const WRAPPER_SCRIPT: &str = "./__pants_wrapper__";
     const SANDBOX_ROOT_TOKEN: &str = "__PANTS_SANDBOX_ROOT__";
     const CHROOT_MARKER: &str = "{chroot}";
@@ -1355,6 +1350,7 @@ pub async fn make_execute_request(
         if name == CACHE_KEY_GEN_VERSION_ENV_VAR_NAME
             || name == CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME
             || name == CACHE_KEY_SALT_ENV_VAR_NAME
+            || name == CACHE_KEY_STDIN_ENV_VAR_NAME
         {
             return Err(format!(
                 "Cannot set env var with name {name} as that is reserved for internal use by pants"
@@ -1491,6 +1487,20 @@ pub async fn make_execute_request(
 
     // Store the separate copy back into the Command proto.
     command.platform = Some(command_platform);
+
+    // If stdin is provided, add a hash of its content as a synthetic environment variable to
+    // ensure it affects the cache key. This ensures processes with different stdin content get
+    // different cache keys, even though the remote execution API doesn't support stdin directly.
+    if let Some(ref stdin_bytes) = req.stdin {
+        // Compute the digest of the stdin content for the cache key
+        let stdin_digest = Digest::of_bytes(stdin_bytes);
+        command
+            .environment_variables
+            .push(remexec::command::EnvironmentVariable {
+                name: CACHE_KEY_STDIN_ENV_VAR_NAME.to_string(),
+                value: format!("{:?}", stdin_digest), // Format as "Digest { hash: ..., size_bytes: ... }"
+            });
+    }
 
     // Sort the environment variables. REv2 spec requires sorting by name for same reasons that
     // platform properties are sorted, i.e. consistent hashing.

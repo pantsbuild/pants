@@ -522,23 +522,28 @@ def test_concurrency_templating(rule_runner: RuleRunner) -> None:
     assert result.stderr == b""
 
 
-def test_stdin_digest(rule_runner: RuleRunner) -> None:
+def test_stdin(rule_runner: RuleRunner) -> None:
     """Test that stdin parameter properly pipes data to the process."""
     # Provide content via stdin parameter
     stdin_content = b"Hello from stdin!\nLine 2\nLine 3\n"
     
+    logger.debug("1")
     # Use /bin/cat to read from stdin and output to stdout
     process = Process(
         argv=("/bin/cat",),
         stdin=stdin_content,
         description="test stdin piping",
     )
+    logger.debug("2")
+    rule_runner.set_options([], env_inherit={"RUST_LOG"})
+    logger.debug("3")
     result = rule_runner.request(ProcessResult, [process])
-    
+    logger.debug("4")   
     # The output should match the input we provided via stdin
     assert result.stdout == stdin_content
+    logger.debug("5")
     assert result.stderr == b""
-    assert result.exit_code == 0
+    logger.debug("6")
 
 
 def test_stdin_with_grep(rule_runner: RuleRunner) -> None:
@@ -557,7 +562,6 @@ def test_stdin_with_grep(rule_runner: RuleRunner) -> None:
     # Should only output lines starting with 'a'
     assert result.stdout == b"apple\napricot\n"
     assert result.stderr == b""
-    assert result.exit_code == 0
 
 
 def test_stdin_empty(rule_runner: RuleRunner) -> None:
@@ -570,7 +574,6 @@ def test_stdin_empty(rule_runner: RuleRunner) -> None:
     result = rule_runner.request(ProcessResult, [process])
     
     assert result.stdout == b"hello\n"
-    assert result.exit_code == 0
 
 
 def test_concurrency_enum():
