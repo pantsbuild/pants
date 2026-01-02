@@ -181,11 +181,11 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@v6
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@v6
       with:
         go-version: 1.24.9
     - env:
@@ -317,7 +317,7 @@ jobs:
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.1
+      uses: Swatinem/rust-cache@v2.8.2
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -328,11 +328,11 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@v6
       with:
         go-version: 1.25.3
     - name: Install Go
-      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
+      uses: actions/setup-go@v6
       with:
         go-version: 1.24.9
     - env:
@@ -439,7 +439,7 @@ jobs:
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.1
+      uses: Swatinem/rust-cache@v2.8.2
       with:
         cache-bin: 'false'
         shared-key: engine
