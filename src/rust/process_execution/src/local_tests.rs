@@ -62,6 +62,108 @@ async fn stdout_and_stderr_and_exit_code() {
 
 #[tokio::test]
 #[cfg(unix)]
+async fn stdin_input() {
+    // Test that stdin properly pipes data to the process
+    let store_dir = TempDir::new().unwrap();
+    let store = Store::local_only(task_executor::Executor::new(), store_dir.path())
+        .unwrap();
+    
+    // Provide test data via stdin bytes
+    let stdin_content = "test input from stdin\n";
+    
+    // Use stdin bytes directly
+    let mut process = Process::new(owned_string_vec(&["/bin/cat"]));
+    process.stdin = Some(stdin_content.as_bytes().to_vec());
+    
+    let result = run_command_locally_in_dir_with_store(process, store.clone())
+        .await
+        .unwrap();
+    
+    assert_eq!(result.stdout_bytes, stdin_content.as_bytes());
+    assert_eq!(result.stderr_bytes, "".as_bytes());
+    assert_eq!(result.original.exit_code, 0);
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn stdin_with_grep() {
+    // Test stdin with a more complex command (grep)
+    let store_dir = TempDir::new().unwrap();
+    let store = Store::local_only(task_executor::Executor::new(), store_dir.path())
+        .unwrap();
+    
+    // Provide multi-line input via stdin bytes
+    let stdin_content = "line one\nline two\nline three\n";
+    
+    // Use grep to filter stdin
+    let mut process = Process::new(owned_string_vec(&["/bin/grep", "two"]));
+    process.stdin = Some(stdin_content.as_bytes().to_vec());
+    
+    let result = run_command_locally_in_dir_with_store(process, store.clone())
+        .await
+        .unwrap();
+    
+    assert_eq!(result.stdout_bytes, "line two\n".as_bytes());
+    assert_eq!(result.original.exit_code, 0);
+}
+
+#[ignore] // No longer applicable with .pants/stdin approach
+#[tokio::test]
+#[cfg(unix)]
+async fn stdin_fails_with_multiple_files() {
+    // Test that stdin validation rejects digests with multiple files
+    let store_dir = TempDir::new().unwrap();
+    let store = Store::local_only(task_executor::Executor::new(), store_dir.path())
+        .unwrap();
+    
+    // Try to use stdin (test no longer validates digest file count)
+    let mut process = Process::new(owned_string_vec(&["/bin/cat"]));
+    // TODO: This test no longer applicable - stdin is now just bytes, not a digest
+    process.stdin = Some(vec![]);
+    
+    let result = run_command_locally_in_dir_with_store(process, store.clone()).await;
+    
+    // Should fail with clear error message
+    assert!(result.is_err());
+    let error_msg = result.unwrap_err().to_string();
+    assert!(
+        error_msg.contains("stdin_digest must contain exactly one file") 
+            && error_msg.contains("2 files"),
+        "Expected error message about 2 files, got: {}",
+        error_msg
+    );
+}
+
+#[ignore] // No longer applicable with .pants/stdin approach
+#[tokio::test]
+#[cfg(unix)]
+async fn stdin_fails_with_empty_digest() {
+    // Test that stdin validation rejects empty digests (after lifting filters them out,
+    // but if someone manually sets it to an empty digest in Rust)
+    let store_dir = TempDir::new().unwrap();
+    let store = Store::local_only(task_executor::Executor::new(), store_dir.path())
+        .unwrap();
+    
+    // Try to use empty stdin (test no longer validates digest)
+    let mut process = Process::new(owned_string_vec(&["/bin/cat"]));
+    // TODO: This test no longer applicable - empty stdin is just None or Some(vec![])
+    process.stdin = Some(vec![]);
+    
+    let result = run_command_locally_in_dir_with_store(process, store.clone()).await;
+    
+    // Should fail with clear error message
+    assert!(result.is_err());
+    let error_msg = result.unwrap_err().to_string();
+    assert!(
+        error_msg.contains("stdin_digest must contain exactly one file") 
+            && error_msg.contains("empty"),
+        "Expected error message about empty digest, got: {}",
+        error_msg
+    );
+}
+
+#[tokio::test]
+#[cfg(unix)]
 async fn capture_exit_code_signal() {
     // Launch a process that kills itself with a signal.
     let result = run_command_locally(Process::new(owned_string_vec(&[
@@ -763,6 +865,16 @@ async fn run_command_locally(req: Process) -> Result<LocalTestResult, ProcessErr
     let work_dir = TempDir::new().unwrap();
     let work_dir_path = work_dir.path().to_owned();
     run_command_locally_in_dir(req, work_dir_path, &mut workunit, None, None).await
+}
+
+async fn run_command_locally_in_dir_with_store(
+    req: Process,
+    store: Store,
+) -> Result<LocalTestResult, ProcessError> {
+    let (_, mut workunit) = WorkunitStore::setup_for_tests();
+    let work_dir = TempDir::new().unwrap();
+    let work_dir_path = work_dir.path().to_owned();
+    run_command_locally_in_dir(req, work_dir_path, &mut workunit, Some(store), None).await
 }
 
 async fn run_command_locally_in_dir(

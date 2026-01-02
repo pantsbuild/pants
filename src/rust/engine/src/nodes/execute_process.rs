@@ -15,6 +15,7 @@ use process_execution::{
 use pyo3::Bound;
 use pyo3::prelude::{PyAny, Python};
 use pyo3::pybacked::PyBackedStr;
+use pyo3::types::PyAnyMethods;
 use store::{self, Store, StoreError};
 use workunit_store::{
     Metric, ObservationMetric, RunningWorkunit, UserMetadataItem, WorkunitMetadata,
@@ -81,6 +82,18 @@ impl ExecuteProcess {
             .map_err(|e| format!("Failed to get `working_directory` from field: {e}"))?
             .map(RelativePath::new)
             .transpose()?;
+
+        let stdin = {
+            let stdin_py: Bound<'_, PyAny> = externs::getattr(value, "stdin")?;
+            let stdin_bytes: Vec<u8> = stdin_py
+                .extract()
+                .map_err(|e| format!("Failed to extract `stdin` bytes: {e}"))?;
+            if stdin_bytes.is_empty() {
+                None
+            } else {
+                Some(stdin_bytes)
+            }
+        };
 
         let output_files = externs::getattr::<Vec<String>>(value, "output_files")?
             .into_iter()
@@ -160,11 +173,33 @@ impl ExecuteProcess {
 
         let attempt = externs::getattr::<usize>(value, "attempt").unwrap_or(0);
 
+        // Force local execution if stdin is provided, since remote execution doesn't support stdin.
+        // The Bazel Remote Execution API's Command proto has no stdin field, so we transparently
+        // fall back to local execution rather than failing.
+        let execution_environment = if stdin.is_some()
+            && !matches!(
+                process_config.environment.strategy,
+                ProcessExecutionStrategy::Local
+            )
+        {
+            log::info!(
+                "Process requires stdin; forcing local execution for: {}",
+                description
+            );
+            process_execution::ProcessExecutionEnvironment {
+                strategy: ProcessExecutionStrategy::Local,
+                ..process_config.environment
+            }
+        } else {
+            process_config.environment
+        };
+
         Ok(Process {
             argv: externs::getattr(value, "argv")?,
             env,
             working_directory,
             input_digests,
+            stdin,
             output_files,
             output_directories,
             timeout,
@@ -176,7 +211,7 @@ impl ExecuteProcess {
             concurrency_available,
             concurrency,
             cache_scope,
-            execution_environment: process_config.environment,
+            execution_environment,
             remote_cache_speculation_delay,
             attempt,
         })
@@ -187,10 +222,15 @@ impl ExecuteProcess {
         value: Value,
         process_config: externs::process::PyProcessExecutionEnvironment,
     ) -> Result<Self, StoreError> {
+        log::debug!("ExecuteProcess::lift starting");
         let input_digests = Self::lift_process_input_digests(store, &value).await?;
+        log::debug!("ExecuteProcess::lift input_digests lifted");
         let process = Python::attach(|py| {
+            log::debug!("ExecuteProcess::lift calling lift_process_fields");
             Self::lift_process_fields(value.bind(py), input_digests, process_config)
         })?;
+        log::debug!("ExecuteProcess::lift process fields lifted, stdin_bytes={}", 
+                   process.stdin.as_ref().map(|b| b.len()).unwrap_or(0));
         Ok(Self { process })
     }
 
@@ -200,6 +240,7 @@ impl ExecuteProcess {
         workunit: &mut RunningWorkunit,
         backtrack_level: usize,
     ) -> NodeResult<ProcessResult> {
+        log::info!("ExecuteProcess::run_node starting for: {}", self.process.description);
         let request = self.process;
 
         let command_runner = context

@@ -3,11 +3,14 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import textwrap
 from pathlib import Path
 
 import pytest
+
+logger = logging.getLogger(__name__)
 
 from pants.core.environments.target_types import LocalWorkspaceEnvironmentTarget
 from pants.engine.environment import EnvironmentName
@@ -517,6 +520,57 @@ def test_concurrency_templating(rule_runner: RuleRunner) -> None:
     result = rule_runner.request(ProcessResult, [process])
     assert result.stdout == b"concurrency: 1\n"
     assert result.stderr == b""
+
+
+def test_stdin_digest(rule_runner: RuleRunner) -> None:
+    """Test that stdin parameter properly pipes data to the process."""
+    # Provide content via stdin parameter
+    stdin_content = b"Hello from stdin!\nLine 2\nLine 3\n"
+    
+    # Use /bin/cat to read from stdin and output to stdout
+    process = Process(
+        argv=("/bin/cat",),
+        stdin=stdin_content,
+        description="test stdin piping",
+    )
+    result = rule_runner.request(ProcessResult, [process])
+    
+    # The output should match the input we provided via stdin
+    assert result.stdout == stdin_content
+    assert result.stderr == b""
+    assert result.exit_code == 0
+
+
+def test_stdin_with_grep(rule_runner: RuleRunner) -> None:
+    """Test that stdin works with filtering commands like grep."""
+    # Provide stdin content with multiple lines
+    stdin_content = b"apple\nbanana\ncherry\napricot\nblueberry\n"
+    
+    # Use grep to filter lines starting with 'a'
+    process = Process(
+        argv=("/bin/grep", "^a"),
+        stdin=stdin_content,
+        description="test stdin with grep",
+    )
+    result = rule_runner.request(ProcessResult, [process])
+    
+    # Should only output lines starting with 'a'
+    assert result.stdout == b"apple\napricot\n"
+    assert result.stderr == b""
+    assert result.exit_code == 0
+
+
+def test_stdin_empty(rule_runner: RuleRunner) -> None:
+    """Test that processes work normally when stdin is not provided."""
+    # Process without stdin should work normally
+    process = Process(
+        argv=("/bin/echo", "hello"),
+        description="test no stdin",
+    )
+    result = rule_runner.request(ProcessResult, [process])
+    
+    assert result.stdout == b"hello\n"
+    assert result.exit_code == 0
 
 
 def test_concurrency_enum():

@@ -293,6 +293,9 @@ impl CapturedWorkdir for CommandRunner {
         req: Process,
         exclusive_spawn: bool,
     ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, CapturedWorkdirError> {
+        // Get stdin bytes from the process if provided
+        let stdin_bytes = req.stdin.as_ref().map(|bytes| bytes.clone());
+
         let cwd = if let Some(ref working_directory) = req.working_directory {
             workdir_path.join(working_directory)
         } else {
@@ -307,7 +310,11 @@ impl CapturedWorkdir for CommandRunner {
             .args(&req.argv[1..])
             .current_dir(cwd)
             .envs(&req.env)
-            .stdin(Stdio::null())
+            .stdin(if stdin_bytes.is_some() {
+                Stdio::piped()
+            } else {
+                Stdio::null()
+            })
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 
@@ -315,6 +322,30 @@ impl CapturedWorkdir for CommandRunner {
             ManagedChild::spawn(&mut command, None)
         })
         .await?;
+
+            // If we have stdin bytes, spawn a task to write them to the child's stdin
+            if let Some(bytes) = stdin_bytes {
+                debug!("Preparing to write {} bytes to stdin", bytes.len());
+                if let Some(mut stdin) = child.stdin.take() {
+                    tokio::spawn(async move {
+                        use tokio::io::AsyncWriteExt;
+                        debug!("Writing {} bytes to stdin", bytes.len());
+                        match stdin.write_all(&bytes).await {
+                            Ok(_) => {
+                                debug!("Successfully wrote {} bytes to stdin", bytes.len());
+                            }
+                            Err(e) => {
+                                debug!("Failed to write stdin: {:?}", e);
+                            }
+                        }
+                        // Close stdin by dropping it
+                        drop(stdin);
+                        debug!("Closed stdin");
+                    });
+                } else {
+                    debug!("Warning: child.stdin was None");
+                }
+            }
 
         debug!("spawned local process as {:?} for {:?}", child.id(), req);
         let stdout_stream = FramedRead::new(child.stdout.take().unwrap(), BytesCodec::new())

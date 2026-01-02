@@ -605,6 +605,8 @@ pub struct Process {
     ///
     pub input_digests: InputDigests,
 
+    ///
+
     pub output_files: BTreeSet<RelativePath>,
 
     pub output_directories: BTreeSet<RelativePath>,
@@ -673,6 +675,13 @@ pub struct Process {
     /// This is included in hash/eq so it creates a unique node in the runtime graph.
     ///
     pub attempt: usize,
+    
+    ///
+    /// Optional bytes to pipe to the process's standard input.
+    ///
+    /// If set, these bytes will be piped to the process's stdin.
+    ///
+    pub stdin: Option<Vec<u8>>,
 }
 
 impl Process {
@@ -712,6 +721,7 @@ impl Process {
             },
             remote_cache_speculation_delay: std::time::Duration::from_millis(0),
             attempt: 0,
+            stdin: None,
         }
     }
 
@@ -1260,6 +1270,15 @@ pub async fn make_execute_request(
     store: &Store,
     append_only_caches_base_path: Option<&str>,
 ) -> Result<EntireExecuteRequest, String> {
+    // Note: stdin should never be present here because processes with stdin are forced
+    // to local execution in lift_process_fields. But we'll assert for safety.
+    if req.stdin.is_some() {
+        return Err(
+            "Internal error: stdin should have been handled by forcing local execution"
+                .to_string(),
+        );
+    }
+
     const WRAPPER_SCRIPT: &str = "./__pants_wrapper__";
     const SANDBOX_ROOT_TOKEN: &str = "__PANTS_SANDBOX_ROOT__";
     const CHROOT_MARKER: &str = "{chroot}";
