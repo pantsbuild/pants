@@ -3,14 +3,11 @@
 
 from __future__ import annotations
 
-import logging
 import os
 import textwrap
 from pathlib import Path
 
 import pytest
-
-logger = logging.getLogger(__name__)
 
 from pants.core.environments.target_types import LocalWorkspaceEnvironmentTarget
 from pants.engine.environment import EnvironmentName
@@ -527,23 +524,17 @@ def test_stdin(rule_runner: RuleRunner) -> None:
     # Provide content via stdin parameter
     stdin_content = b"Hello from stdin!\nLine 2\nLine 3\n"
     
-    logger.debug("1")
     # Use /bin/cat to read from stdin and output to stdout
     process = Process(
         argv=("/bin/cat",),
         stdin=stdin_content,
         description="test stdin piping",
     )
-    logger.debug("2")
-    rule_runner.set_options([], env_inherit={"RUST_LOG"})
-    logger.debug("3")
     result = rule_runner.request(ProcessResult, [process])
-    logger.debug("4")   
+
     # The output should match the input we provided via stdin
     assert result.stdout == stdin_content
-    logger.debug("5")
     assert result.stderr == b""
-    logger.debug("6")
 
 
 def test_stdin_with_grep(rule_runner: RuleRunner) -> None:
