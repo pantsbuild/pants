@@ -29,6 +29,7 @@ from pants.backend.docker.target_types import (
     DockerBuildOptionFieldMultiValueMixin,
     DockerBuildOptionFieldValueMixin,
     DockerBuildOptionFlagFieldMixin,
+    DockerImageBuildExtraArgsForDockerBuild,
     DockerImageBuildImageOutputField,
     DockerImageContextRootField,
     DockerImageRegistriesField,
@@ -89,6 +90,7 @@ class DockerPackageFieldSet(PackageFieldSet):
     target_stage: DockerImageTargetStageField
     output_path: OutputPathField
     output: DockerImageBuildImageOutputField
+    extra_args_for_docker_build: DockerImageBuildExtraArgsForDockerBuild
 
     def pushes_on_package(self) -> bool:
         """Returns True if this docker_image target would push to a registry during packaging."""
@@ -330,6 +332,7 @@ def get_build_options(
     global_target_stage_option: str | None,
     global_build_hosts_options: dict | None,
     global_build_no_cache_option: bool | None,
+    global_args_for_docker_build: tuple[str, ...],
     use_buildx_option: bool,
     target: Target,
 ) -> Iterator[str]:
@@ -392,6 +395,9 @@ def get_build_options(
 
     if global_build_no_cache_option:
         yield "--no-cache"
+
+    yield from global_args_for_docker_build
+    yield from field_set.extra_args_for_docker_build.value or ()
 
 
 @rule
@@ -482,6 +488,7 @@ async def build_docker_image(
                 global_target_stage_option=options.build_target_stage,
                 global_build_hosts_options=options.build_hosts,
                 global_build_no_cache_option=options.build_no_cache,
+                global_args_for_docker_build=options.args_for_docker_build,
                 use_buildx_option=options.use_buildx,
                 target=wrapped_target.target,
             )
