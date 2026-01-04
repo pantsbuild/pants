@@ -5,14 +5,14 @@
 [profile.dev]
 # Increase the optimization level of the dev profile slightly, as otherwise `rule_graph`
 # solving takes prohibitively long.
-#opt-level = 1
+opt-level = 1
 
 [profile.release]
 # Enable only "line tables", which give line information in backtraces, but do not record information
 # about local variables.
 debug = 1
 # Optimise for the speed of our binary, rather than the speed of compilation.
-#codegen-units = 1
+codegen-units = 1
 
 [workspace]
 resolver = "2"
