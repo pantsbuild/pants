@@ -180,6 +180,7 @@ def assert_build(
         opts.setdefault("use_buildx", False)
         opts.setdefault("env_vars", [])
         opts.setdefault("suggest_renames", True)
+        opts.setdefault("args_for_docker_build", [])
 
         docker_options = create_subsystem(
             DockerOptions,
@@ -928,6 +929,54 @@ def test_docker_extra_build_args_field(rule_runner: RuleRunner) -> None:
                 "FROM_ENV": "env value",
                 "__UPSTREAM_IMAGE_IDS": "",
             }
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        process_assertions=check_docker_proc,
+    )
+
+
+def test_docker_extra_args_for_docker_build(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  extra_args_for_docker_build=[
+                    "--shm-size",
+                    "256m",
+                  ]
+                )
+                """
+            ),
+        }
+    )
+    rule_runner.set_options(
+        [
+            "--docker-args-for-docker-build=--progress plain",
+            "--docker-args-for-docker-build=--label my_label",
+        ],
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "--pull=False",
+            "--progress",
+            "plain",
+            "--label",
+            "my_label",
+            "--shm-size",
+            "256m",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
         )
 
     assert_build(
