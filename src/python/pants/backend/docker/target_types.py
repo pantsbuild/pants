@@ -588,6 +588,14 @@ class DockerImageBuildPlatformOptionField(
     docker_build_option = "--platform"
 
 
+class DockerImageBuildExtraArgsForDockerBuild(StringSequenceField):
+    alias = "extra_args_for_docker_build"
+    default = ()
+    help = help_text(
+        lambda: f"Extra arguments to pass into the invocation of `docker build`. These are in addition to those at the `[{DockerOptions.options_scope}].args_for_docker_build`"
+    )
+
+
 class DockerImageRunExtraArgsField(StringSequenceField):
     alias: ClassVar[str] = "extra_run_args"
     default = ()
@@ -621,6 +629,7 @@ class DockerImageTarget(Target):
         DockerImageBuildImageCacheToField,
         DockerImageBuildImageCacheFromField,
         DockerImageBuildImageOutputField,
+        DockerImageBuildExtraArgsForDockerBuild,
         DockerImageRunExtraArgsField,
         OutputPathField,
         RestartableField,
