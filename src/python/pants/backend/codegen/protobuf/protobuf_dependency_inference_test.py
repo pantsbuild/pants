@@ -7,6 +7,7 @@ import pytest
 
 from pants.backend.codegen.protobuf import protobuf_dependency_inference
 from pants.backend.codegen.protobuf.protobuf_dependency_inference import (
+    _NO_RESOLVE_LIKE_FIELDS_DEFINED,
     InferProtobufDependencies,
     ProtobufDependencyInferenceFieldSet,
     ProtobufMapping,
@@ -74,6 +75,7 @@ def test_parse_proto_imports(file_content: str, expected: set[str]) -> None:
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
+    """Base rule runner without Python resolve support for testing core protobuf mapping."""
     return RuleRunner(
         rules=[
             *stripped_source_files.rules(),
@@ -105,15 +107,23 @@ def test_protobuf_mapping(rule_runner: RuleRunner) -> None:
     assert result == ProtobufMapping(
         mapping=FrozenDict(
             {
-                "protos/f1.proto": Address("root1/protos", relative_file_path="f1.proto"),
-                "protos/f2.proto": Address("root1/protos", relative_file_path="f2.proto"),
+                _NO_RESOLVE_LIKE_FIELDS_DEFINED: FrozenDict(
+                    {
+                        "protos/f1.proto": Address("root1/protos", relative_file_path="f1.proto"),
+                        "protos/f2.proto": Address("root1/protos", relative_file_path="f2.proto"),
+                    }
+                )
             }
         ),
         ambiguous_modules=FrozenDict(
             {
-                "two_owners/f.proto": (
-                    Address("root1/two_owners", relative_file_path="f.proto"),
-                    Address("root2/two_owners", relative_file_path="f.proto"),
+                _NO_RESOLVE_LIKE_FIELDS_DEFINED: FrozenDict(
+                    {
+                        "two_owners/f.proto": (
+                            Address("root1/two_owners", relative_file_path="f.proto"),
+                            Address("root2/two_owners", relative_file_path="f.proto"),
+                        )
+                    }
                 )
             }
         ),
@@ -192,3 +202,33 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
         in caplog.text
     )
     assert "disambiguated.proto" not in caplog.text
+
+
+def test_no_resolve_fields_fallback(rule_runner: RuleRunner) -> None:
+    """Test the _NO_RESOLVE_LIKE_FIELDS_DEFINED fallback when resolves are not enabled."""
+    # Don't enable resolves
+    rule_runner.set_options(["--source-root-patterns=['protos']"])
+    rule_runner.write_files(
+        {
+            "protos/a.proto": "import 'b.proto';",
+            "protos/b.proto": "",
+            "protos/BUILD": "protobuf_sources()",
+        }
+    )
+
+    result = rule_runner.request(ProtobufMapping, [])
+
+    # Assert only _NO_RESOLVE_LIKE_FIELDS_DEFINED key exists
+    assert _NO_RESOLVE_LIKE_FIELDS_DEFINED in result.mapping
+    assert len(result.mapping) == 1
+
+    # Assert dependency inference works
+    def run_dep_inference(address: Address) -> InferredDependencies:
+        tgt = rule_runner.get_target(address)
+        return rule_runner.request(
+            InferredDependencies,
+            [InferProtobufDependencies(ProtobufDependencyInferenceFieldSet.create(tgt))],
+        )
+
+    deps = run_dep_inference(Address("protos", relative_file_path="a.proto"))
+    assert deps == InferredDependencies([Address("protos", relative_file_path="b.proto")])

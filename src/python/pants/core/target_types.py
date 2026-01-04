@@ -25,6 +25,7 @@ from pants.core.util_rules.archive import ArchiveFormat, CreateArchive, create_a
 from pants.core.util_rules.archive import rules as archive_rules
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.download_file import download_file
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -61,7 +62,7 @@ from pants.engine.target import (
     generate_file_based_overrides_field_help_message,
     generate_multiple_sources_field_help_message,
 )
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionRule, union
 from pants.option.bootstrap_options import UnmatchedBuildFileGlobs
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
@@ -916,6 +917,45 @@ class LockfilesGeneratorTarget(TargetFilesGenerator):
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (LockfileDependenciesField,)
     help = "Generate a `_lockfile` target for each file in the `sources` field."
+
+
+# -----------------------------------------------------------------------------------------------
+#  Resolve-like fields
+# -----------------------------------------------------------------------------------------------
+
+
+@union(in_scope_types=[EnvironmentName])
+@dataclass(frozen=True)
+class ResolveLikeFieldToValueRequest:
+    target: Target
+
+
+@dataclass(frozen=True)
+class ResolveLikeFieldToValueResult:
+    """Result of resolving a resolve-like field to the resolve name as a string.
+
+    The value will be the actual resolve name (e.g., "python-default", "jvm-default"), or None if
+    the language backend has disabled resolves (in which case all targets should be treated as
+    belonging to a single implicit resolve).
+    """
+
+    value: str | None
+
+
+@rule(polymorphic=True)
+async def get_resolve_from_resolve_like_field_request(
+    request: ResolveLikeFieldToValueRequest,
+) -> ResolveLikeFieldToValueResult:
+    raise NotImplementedError()
+
+
+class ResolveLikeField:
+    """Mix-in for any field which behaves like a `resolve` field."""
+
+    def get_resolve_like_field_to_value_request(self) -> type[ResolveLikeFieldToValueRequest]:
+        """Return a `ResolveLikeFieldToValueRequest` subclass which can be used to obtain a string
+        field value."""
+        raise NotImplementedError()
 
 
 def rules():

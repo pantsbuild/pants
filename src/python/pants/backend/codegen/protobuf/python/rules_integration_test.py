@@ -7,19 +7,23 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.codegen.protobuf import protobuf_dependency_inference
 from pants.backend.codegen.protobuf.python import additional_fields
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufMypyPlugin
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
     rules as protobuf_subsystem_rules,
 )
+from pants.backend.codegen.protobuf.python.register import rules as python_protobuf_backend_rules
 from pants.backend.codegen.protobuf.python.rules import GeneratePythonFromProtobufRequest
 from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
 from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceField,
     ProtobufSourcesGeneratorTarget,
 )
-from pants.backend.codegen.protobuf.target_types import rules as target_types_rules
+from pants.backend.codegen.protobuf.target_types import rules as protobuf_target_types_rules
+from pants.backend.python import target_types_rules as python_target_types_rules
 from pants.backend.python.dependency_inference import module_mapper
+from pants.core.target_types import rules as core_target_types_rules
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
@@ -56,11 +60,15 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *protobuf_rules(),
+            *python_protobuf_backend_rules(),
+            *protobuf_dependency_inference.rules(),
             *protobuf_subsystem_rules(),
             *additional_fields.rules(),
+            *protobuf_target_types_rules(),
+            *python_target_types_rules.rules(),
             *stripped_source_files.rules(),
-            *target_types_rules(),
             *module_mapper.rules(),
+            *core_target_types_rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GeneratePythonFromProtobufRequest]),
         ],
@@ -423,4 +431,112 @@ def test_all_plugins(rule_runner: RuleRunner) -> None:
             "src/protobuf/dir1/f_pb2_grpc.pyi",
             "src/protobuf/dir1/f_grpc.py",
         ],
+    )
+
+
+def test_code_generation_with_multiple_resolves(rule_runner: RuleRunner) -> None:
+    """End-to-end test that code is generated correctly for different resolves."""
+    rule_runner.write_files(
+        {
+            "src/protobuf/a/service.proto": dedent(
+                """\
+                syntax = "proto3";
+
+                package a;
+
+                message Request {
+                  string name = 1;
+                }
+                """
+            ),
+            "src/protobuf/a/BUILD": "protobuf_sources(python_resolve='a')",
+            "src/protobuf/b/service.proto": dedent(
+                """\
+                syntax = "proto3";
+
+                package b;
+
+                message Request {
+                  string name = 1;
+                }
+                """
+            ),
+            "src/protobuf/b/BUILD": "protobuf_sources(python_resolve='b')",
+        }
+    )
+
+    # Test code generation for prod resolve
+    assert_files_generated(
+        rule_runner,
+        Address("src/protobuf/a", relative_file_path="service.proto"),
+        source_roots=["src/protobuf"],
+        extra_args=[
+            "--python-enable-resolves",
+            "--python-resolves={'a': '', 'b': ''}",
+        ],
+        expected_files=["src/protobuf/a/service_pb2.py"],
+    )
+
+    # Test code generation for dev resolve
+    assert_files_generated(
+        rule_runner,
+        Address("src/protobuf/b", relative_file_path="service.proto"),
+        source_roots=["src/protobuf"],
+        extra_args=[
+            "--python-enable-resolves",
+            "--python-resolves={'a': '', 'b': ''}",
+        ],
+        expected_files=["src/protobuf/b/service_pb2.py"],
+    )
+
+
+def test_transitive_dependencies_within_resolve(rule_runner: RuleRunner) -> None:
+    """Test transitive proto imports within a resolve."""
+    rule_runner.write_files(
+        {
+            "src/protobuf/a.proto": dedent(
+                """\
+                syntax = "proto3";
+
+                import "b.proto";
+
+                message A {
+                  B b = 1;
+                }
+                """
+            ),
+            "src/protobuf/b.proto": dedent(
+                """\
+                syntax = "proto3";
+
+                import "c.proto";
+
+                message B {
+                  C c = 1;
+                }
+                """
+            ),
+            "src/protobuf/c.proto": dedent(
+                """\
+                syntax = "proto3";
+
+                message C {
+                  string value = 1;
+                }
+                """
+            ),
+            "src/protobuf/BUILD": "protobuf_sources(python_resolve='python-default')",
+        }
+    )
+
+    # Test that code generation succeeds with transitive dependencies resolved
+    assert_files_generated(
+        rule_runner,
+        Address("src/protobuf", relative_file_path="a.proto"),
+        source_roots=["src/protobuf"],
+        extra_args=[
+            "--python-enable-resolves",
+            "--python-resolves={'python-default': ''}",
+        ],
+        expected_files=["src/protobuf/a_pb2.py"],
     )

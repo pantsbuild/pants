@@ -5,7 +5,6 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 
 use clap::Parser;
-use clap::command;
 
 use crate::StoreCliOpt;
 
