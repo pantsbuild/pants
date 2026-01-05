@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TypeVar
 
@@ -13,17 +14,17 @@ from pants.bsp.util_rules.targets import (
     BSPBuildTargetInternal,
     BSPResourcesRequest,
     BSPResourcesResult,
+    get_bsp_resources,
     resolve_bsp_build_target_addresses,
     resolve_bsp_build_target_identifier,
 )
 from pants.engine.fs import Workspace
 from pants.engine.internals.native_engine import EMPTY_DIGEST, MergeDigests
-from pants.engine.internals.selectors import Get, concurrently
+from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import merge_digests
 from pants.engine.rules import _uncacheable_rule, collect_rules, implicitly, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.util.ordered_set import FrozenOrderedSet
 
 _logger = logging.getLogger(__name__)
 
@@ -47,7 +48,7 @@ async def resources_bsp_target(
     union_membership: UnionMembership,
 ) -> BSPResourcesResult:
     targets = await resolve_bsp_build_target_addresses(request.bsp_target, **implicitly())
-    resources_request_types: FrozenOrderedSet[type[BSPResourcesRequest]] = union_membership.get(
+    resources_request_types: Sequence[type[BSPResourcesRequest]] = union_membership.get(
         BSPResourcesRequest
     )
     field_sets_by_request_type: dict[type[BSPResourcesRequest], set[FieldSet]] = defaultdict(set)
@@ -59,10 +60,14 @@ async def resources_bsp_target(
                 field_sets_by_request_type[resources_request_type].add(field_set)
 
     resources_results = await concurrently(
-        Get(
-            BSPResourcesResult,
-            BSPResourcesRequest,
-            resources_request_type(bsp_target=request.bsp_target, field_sets=tuple(field_sets)),
+        get_bsp_resources(
+            **implicitly(
+                {
+                    resources_request_type(
+                        bsp_target=request.bsp_target, field_sets=tuple(field_sets)
+                    ): BSPResourcesRequest
+                }
+            )
         )
         for resources_request_type, field_sets in field_sets_by_request_type.items()
     )

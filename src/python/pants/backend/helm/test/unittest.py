@@ -44,13 +44,13 @@ from pants.engine.intrinsics import (
     add_prefix,
     digest_subset_to_digest,
     digest_to_snapshot,
+    execute_process_with_retry,
     merge_digests,
     remove_prefix,
 )
 from pants.engine.process import (
     ProcessCacheScope,
     ProcessWithRetries,
-    execute_process_with_retry,
     fallible_to_exec_result_or_raise,
 )
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
@@ -83,7 +83,7 @@ class HelmUnitTestFieldSet(TestFieldSet, GenerateSnapshotsFieldSet):
 
 
 class HelmUnitTestRequest(TestRequest):
-    tool_subsystem = HelmUnitTestSubsystem
+    tool_subsystem = HelmUnitTestSubsystem  # type: ignore[assignment]
     field_set_type = HelmUnitTestFieldSet
 
 

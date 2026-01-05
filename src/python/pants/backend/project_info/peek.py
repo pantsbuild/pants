@@ -30,7 +30,7 @@ from pants.engine.internals.build_files import (
 from pants.engine.internals.dep_rules import DependencyRuleApplication, DependencyRuleSet
 from pants.engine.internals.graph import hydrate_sources, resolve_targets
 from pants.engine.internals.specs_rules import find_valid_field_sets_for_target_roots
-from pants.engine.rules import Get, Rule, collect_rules, concurrently, goal_rule, implicitly, rule
+from pants.engine.rules import Rule, collect_rules, concurrently, goal_rule, implicitly, rule
 from pants.engine.target import (
     AlwaysTraverseDeps,
     Dependencies,
@@ -117,6 +117,13 @@ class AdditionalTargetData:
         elif isinstance(data, (list, set)):
             data = tuple(data)
         object.__setattr__(self, "data", data)
+
+
+@rule(polymorphic=True)
+async def get_additional_target_data(
+    field_set: HasAdditionalTargetDataFieldSet, env_name: EnvironmentName
+) -> AdditionalTargetData:
+    raise NotImplementedError()
 
 
 @dataclass(frozen=True)
@@ -326,7 +333,7 @@ async def get_target_data(
             if field_set_type.is_applicable(tgt)
         ]
         additional_infos = await concurrently(
-            Get(AdditionalTargetData, HasAdditionalTargetDataFieldSet, field_set)
+            get_additional_target_data(**implicitly({field_set: HasAdditionalTargetDataFieldSet}))
             for field_set in additional_info_field_sets
         )
         group_additional_infos_by_address_builder = collections.defaultdict(list)

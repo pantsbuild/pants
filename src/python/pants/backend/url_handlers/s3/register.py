@@ -9,12 +9,12 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from pants.backend.url_handlers.s3.subsystem import S3AuthSigning, S3Subsystem
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.engine.download_file import URLDownloadHandler
 from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import Digest, NativeDownloadFile
 from pants.engine.internals.native_engine import EMPTY_FILE_DIGEST, FileDigest
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.intrinsics import download_file
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule

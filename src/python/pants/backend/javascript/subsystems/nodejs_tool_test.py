@@ -29,7 +29,7 @@ class CowsayTool(NodeJSToolBase):
 class TypescriptTool(NodeJSToolBase):
     options_scope = "typescript"
     name = "TypeScript"
-    default_version = "typescript@5.8.3"
+    default_version = "typescript@5.9.3"
     help = "The TypeScript compiler"
 
 
@@ -104,8 +104,8 @@ def test_execute_process_with_package_manager(
     "package_manager, version",
     [
         pytest.param("yarn", "1.22.22", id="yarn"),
-        pytest.param("npm", "10.9.2", id="npm"),
-        pytest.param("pnpm", "9.15.6", id="pnpm"),
+        pytest.param("npm", "11.6.2", id="npm"),
+        pytest.param("pnpm", "10.19.0", id="pnpm"),
     ],
 )
 def test_execute_process_with_package_manager_version_from_configuration(
@@ -132,9 +132,11 @@ def test_execute_process_with_package_manager_version_from_configuration(
     "lockfile_path, package_manager, version",
     [
         pytest.param(Path(__file__).parent / "yarn.lock", "yarn", "1.22.22", id="yarn_resolve"),
-        pytest.param(Path(__file__).parent / "pnpm-lock.yaml", "pnpm", "9.15.6", id="pnpm_resolve"),
         pytest.param(
-            Path(__file__).parent / "package-lock.json", "npm", "10.9.2", id="npm_resolve"
+            Path(__file__).parent / "pnpm-lock.yaml", "pnpm", "10.19.0", id="pnpm_resolve"
+        ),
+        pytest.param(
+            Path(__file__).parent / "package-lock.json", "npm", "11.6.2", id="npm_resolve"
         ),
     ],
 )
@@ -223,17 +225,17 @@ def request_package_manager_version_for_tool(
     [
         pytest.param(
             "yarn",
-            ("yarn", "dlx", "--quiet", "--package", "typescript@5.8.3", "tsc", "--version"),
+            ("yarn", "dlx", "--quiet", "--package", "typescript@5.9.3", "tsc", "--version"),
             id="yarn",
         ),
         pytest.param(
             "npm",
-            ("npm", "exec", "--yes", "--package", "typescript@5.8.3", "--", "tsc", "--version"),
+            ("npm", "exec", "--yes", "--package", "typescript@5.9.3", "--", "tsc", "--version"),
             id="npm",
         ),
         pytest.param(
             "pnpm",
-            ("pnpm", "--package", "typescript@5.8.3", "dlx", "tsc", "--version"),
+            ("pnpm", "--package", "typescript@5.9.3", "dlx", "tsc", "--version"),
             id="pnpm",
         ),
     ],
@@ -245,7 +247,7 @@ def test_execute_packaged_tool_with_binary_name_override(
 ):
     rule_runner.set_options(
         [
-            "--typescript-version=typescript@5.8.3",
+            "--typescript-version=typescript@5.9.3",
             "--typescript-binary-name=tsc",
             f"--nodejs-package-manager={package_manager}",
         ],

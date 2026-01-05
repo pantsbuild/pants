@@ -7,7 +7,7 @@ import enum
 import logging
 import os
 from collections.abc import Iterable
-from typing import Optional, TypeVar, cast
+from typing import TypeVar, cast
 
 from packaging.utils import canonicalize_name
 
@@ -103,7 +103,7 @@ class PythonSetup(Subsystem):
             #  We'll probably want to find and modify all those tests to set an explicit IC, but
             #  that will take time.
             if "PYTEST_CURRENT_TEST" in os.environ:
-                return (">=3.8,<4",)
+                return (">=3.9,<3.15",)
             raise OptionsError(
                 softwrap(
                     f"""\
@@ -244,6 +244,45 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
+
+    _default_to_resolve_interpreter_constraints = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            For Python targets with both `resolve` and `interpreter_constraints` fields, default to using the `interpreter_constraints` field of the resolve if `interpreter_constraints` is not set on the target itself.
+
+            `[python].enable_resolves` must be `True` for this option to also be enabled. This will become True by default in a future version of Pants and eventually be deprecated and then removed.
+            """
+        ),
+        advanced=True,
+    )
+
+    @memoized_property
+    def default_to_resolve_interpreter_constraints(self) -> bool:
+        if self._default_to_resolve_interpreter_constraints and not self.enable_resolves:
+            raise OptionsError(
+                softwrap(
+                    """
+                You cannot set `[python].default_to_resolve_interpreter_constraints = true` without setting `[python].enable_resolves = true`.
+
+                Please either enable resolves or set `[python].default_to_resolve_interpreter_constraints = false` (the default setting).
+                """
+                )
+            )
+        return self._default_to_resolve_interpreter_constraints
+
+    separate_lockfile_metadata_file = BoolOption(
+        advanced=True,
+        default=False,
+        help=softwrap(
+            """
+            If set, lockfile metadata will be written to a separate sibling file, rather than
+            prepended as a header to the lockfile (which has various disadvantages).
+            This will soon become True by default and eventually the header option will be
+            deprecated and then removed.
+            """
+        ),
+    )
     default_run_goal_use_sandbox = BoolOption(
         default=True,
         help=softwrap(
@@ -364,6 +403,123 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
+    _resolves_to_excludes = DictOption[list[str]](
+        help=softwrap(
+            """ Specifies requirements to exclude from a resolve and its
+            lockfile.  Any distribution included in the PEX's resolve that
+            matches the requirement is excluded from the built PEX along with
+            all of its transitive dependencies that are not also required by
+            other non-excluded distributions.  At runtime, the PEX will boot
+            without checking the excluded dependencies are available.
+            """
+        ),
+        advanced=True,
+    )
+    _resolves_to_overrides = DictOption[list[str]](
+        help=softwrap(
+            """ Specifies a transitive requirement to override in a resolve
+            and its lockfile.  Overrides can either modify an existing
+            dependency on a project name by changing extras, version
+            constraints or markers or else they can completely swap out the
+            dependency for a dependency on another project altogether. For the
+            former, simply supply the requirement you wish. For example,
+            specifying `--override cowsay==5.0` will override any transitive
+            dependency on cowsay that has any combination of extras, version
+            constraints or markers with the requirement `cowsay==5.0`. To
+            completely replace cowsay with another library altogether, you can
+            specify an override like `--override cowsay=my-cowsay>2`. This
+            will replace any transitive dependency on cowsay that has any
+            combination of extras, version constraints or markers with the
+            requirement `my-cowsay>2`."""
+        ),
+        advanced=True,
+    )
+
+    _resolves_to_sources = DictOption[list[str]](
+        help=softwrap(""" Defines a limited scope to use a named find links repo or
+            index for specific dependencies in a resolve and its lockfile.
+            Sources take the form `<name>=<scope>` where the name must match
+            a find links repo or index defined via `[python-repos].indexes` or
+            `[python-repos].find_links`. The scope can be a project name
+            (e.g., `internal=torch` to resolve the `torch` project from the
+            `internal` repo), a project name with a marker (e.g.,
+            `internal=torch; sys_platform != 'darwin'` to resolve `torch` from
+            the `internal` repo except on macOS), or just a marker (e.g.,
+            `piwheels=platform_machine == 'armv7l'` to resolve from the
+            `piwheels` repo when targeting 32bit ARM machines)."""),
+        advanced=True,
+    )
+
+    _resolves_to_lock_style = DictOption[str](
+        help=softwrap(
+            f"""
+            The style of lock to generate. Valid values are 'strict', 'sources', or 'universal'
+            (additional styles may be supported in future PEX versions).
+
+            The 'strict' style generates a lock file that contains exactly the
+            distributions that would be used in a local PEX build. If an sdist would be used, the sdist is included, but if a
+            wheel would be used, an accompanying sdist will not be included. The 'sources' style includes locks containing both
+            wheels and the associated sdists when available. The 'universal' style generates a universal lock for all possible
+            target interpreters and platforms, although the scope can be constrained via `[python].resolves_to_interpreter_constraints`. Of
+            the three lock styles, only 'strict' can give you full confidence in the lock since it includes exactly the artifacts
+            that are included in the local PEX you'll build to test the lock result with before checking in the lock. With the
+            other two styles you lock un-vetted artifacts in addition to the 'strict' ones; so, even though you can be sure to
+            reproducibly resolve those same un-vetted artifacts in the future, they're still un-vetted and could be innocently or
+            maliciously different from the 'strict' artifacts you can locally vet before committing the lock to version control.
+            The effects of the differences could range from failing a resolve using the lock when the un-vetted artifacts have
+            different dependencies from their sibling artifacts, to your application crashing due to different code in the sibling
+            artifacts to being compromised by differing code in the sibling artifacts. So, although the more permissive lock
+            styles will allow the lock to work on a wider range of machines /are apparently more convenient, the convenience comes
+            with a potential price and using these styles should be considered carefully.
+
+            Expects a dictionary of resolve names from `[python].resolves` to style values.
+            If a resolve is not set in the dictionary, it will default to 'universal'.
+
+            Examples:
+            - `{{'data-science': 'strict', 'web-app': 'universal'}}` - use strict style for data-science resolve, universal for web-app
+            - `{{'python-default': 'sources'}}` - use sources style for the default resolve
+
+            You can use the key `{RESOLVE_OPTION_KEY__DEFAULT}` to set a default value for all
+            resolves.
+
+            See https://docs.pex-tool.org/api/pex.html for more information on lockfile styles.
+            """
+        ),
+        advanced=True,
+    )
+
+    _resolves_to_complete_platforms = DictOption[list[str]](
+        help=softwrap(
+            f"""
+            The platforms the built PEX should be compatible with when generating lockfiles.
+
+            Complete platforms allow you to create lockfiles for specific target platforms
+            (e.g., different CPU architectures or operating systems) rather than the default
+            universal platforms. This is particularly useful for cross-platform builds or
+            when you need strict platform-specific dependencies.
+
+            You can give a list of multiple complete platforms to create a multiplatform lockfile,
+            meaning that the lockfile will include wheels for all of the supported environments.
+
+            Expects a dictionary of resolve names from `[python].resolves` to lists of addresses of
+            `file` or `resource` targets that point to files containing complete platform JSON as
+            described by Pex (https://pex.readthedocs.io/en/latest/buildingpex.html#complete-platform).
+
+            For example:
+            `{{'python-default': ['3rdparty/platforms:linux_aarch64', '3rdparty/platforms:macos_arm64']}}`.
+
+            You can use the key `{RESOLVE_OPTION_KEY__DEFAULT}` to set a default value for all
+            resolves.
+
+            Complete platform JSON files can be generated using PEX's interpreter inspect command on
+            the target platform: `pex3 interpreter inspect --markers --tags > platform.json`
+
+            See https://docs.pex-tool.org for more information.
+            """
+        ),
+        advanced=True,
+    )
+
     invalid_lockfile_behavior = EnumOption(
         default=InvalidLockfileBehavior.error,
         help=softwrap(
@@ -676,9 +832,53 @@ class PythonSetup(Subsystem):
             ).items()
         }
 
+    @memoized_method
+    def resolves_to_excludes(self) -> dict[str, list[str]]:
+        return {
+            resolve: sorted(vals)
+            for resolve, vals in self._resolves_to_option_helper(
+                self._resolves_to_excludes,
+                "resolves_to_excludes",
+            ).items()
+        }
+
+    @memoized_method
+    def resolves_to_overrides(self) -> dict[str, list[str]]:
+        return {
+            resolve: sorted(vals)
+            for resolve, vals in self._resolves_to_option_helper(
+                self._resolves_to_overrides,
+                "resolves_to_overrides",
+            ).items()
+        }
+
+    @memoized_method
+    def resolves_to_sources(self) -> dict[str, list[str]]:
+        return {
+            resolve: sorted(vals)
+            for resolve, vals in self._resolves_to_option_helper(
+                self._resolves_to_sources,
+                "resolves_to_sources",
+            ).items()
+        }
+
+    @memoized_method
+    def resolves_to_lock_style(self) -> dict[str, str]:
+        return self._resolves_to_option_helper(
+            self._resolves_to_lock_style,
+            "resolves_to_lock_style",
+        )
+
+    @memoized_method
+    def resolves_to_complete_platforms(self) -> dict[str, list[str]]:
+        return self._resolves_to_option_helper(
+            self._resolves_to_complete_platforms,
+            "resolves_to_complete_platforms",
+        )
+
     @property
     def manylinux(self) -> str | None:
-        manylinux = cast(Optional[str], self.resolver_manylinux)
+        manylinux = cast(str | None, self.resolver_manylinux)
         if manylinux is None or manylinux.lower() in ("false", "no", "none"):
             return None
         return manylinux
@@ -704,20 +904,19 @@ class PythonSetup(Subsystem):
     def scratch_dir(self):
         return os.path.join(self.options.pants_workdir, *self.options_scope.split("."))
 
-    def compatibility_or_constraints(self, compatibility: Iterable[str] | None) -> tuple[str, ...]:
+    def compatibility_or_constraints(
+        self, compatibility: Iterable[str] | None, resolve: str | None
+    ) -> tuple[str, ...]:
         """Return either the given `compatibility` field or the global interpreter constraints.
 
         If interpreter constraints are supplied by the CLI flag, return those only.
         """
         if self.options.is_flagged("interpreter_constraints"):
             return self.interpreter_constraints
-        return tuple(compatibility or self.interpreter_constraints)
-
-    def compatibilities_or_constraints(
-        self, compatibilities: Iterable[Iterable[str] | None]
-    ) -> tuple[str, ...]:
-        return tuple(
-            constraint
-            for compatibility in compatibilities
-            for constraint in self.compatibility_or_constraints(compatibility)
-        )
+        if compatibility:
+            return tuple(compatibility)
+        if resolve and self.default_to_resolve_interpreter_constraints:
+            return self.resolves_to_interpreter_constraints.get(
+                resolve, self.interpreter_constraints
+            )
+        return self.interpreter_constraints

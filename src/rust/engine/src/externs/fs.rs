@@ -397,10 +397,13 @@ impl PyRemovePrefix {
 // PathGlobs
 // -----------------------------------------------------------------------------
 
-struct PyPathGlobs(#[allow(dead_code)] PathGlobs);
+#[allow(dead_code)]
+struct PyPathGlobs(PathGlobs);
 
-impl<'py> FromPyObject<'py> for PyPathGlobs {
-    fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
+impl<'a, 'py> FromPyObject<'a, 'py> for PyPathGlobs {
+    type Error = PyErr;
+
+    fn extract(obj: Borrowed<'a, 'py, PyAny>) -> PyResult<Self> {
         let globs: Vec<String> = obj.getattr("globs")?.extract()?;
 
         let description_of_origin_field = obj.getattr("description_of_origin")?;
@@ -444,10 +447,9 @@ impl PyFilespecMatcher {
     #[new]
     fn __new__(includes: Vec<String>, excludes: Vec<String>, py: Python) -> PyResult<Self> {
         // Parsing the globs has shown up in benchmarks
-        // (https://github.com/pantsbuild/pants/issues/16122), so we use py.allow_threads().
-        let matcher = py.allow_threads(|| {
-            FilespecMatcher::new(includes, excludes).map_err(PyValueError::new_err)
-        })?;
+        // (https://github.com/pantsbuild/pants/issues/16122), so we use py.detach().
+        let matcher =
+            py.detach(|| FilespecMatcher::new(includes, excludes).map_err(PyValueError::new_err))?;
         Ok(Self(matcher))
     }
 
@@ -485,7 +487,7 @@ impl PyFilespecMatcher {
     }
 
     fn matches(&self, paths: Vec<String>, py: Python) -> PyResult<Vec<String>> {
-        py.allow_threads(|| {
+        py.detach(|| {
             Ok(paths
                 .into_iter()
                 .filter(|p| self.0.matches(Path::new(p)))

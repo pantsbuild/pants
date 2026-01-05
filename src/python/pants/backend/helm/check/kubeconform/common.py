@@ -14,10 +14,10 @@ from pants.backend.helm.check.kubeconform.subsystem import KubeconformSubsystem
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.util_rules.renderer import RenderedHelmFiles
 from pants.core.goals.check import CheckRequest, CheckResult
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.external_tool import DownloadedExternalTool, download_external_tool
 from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.fs import CreateDigest, FileEntry
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.intrinsics import create_digest, execute_process
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope

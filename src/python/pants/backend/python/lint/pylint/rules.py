@@ -37,7 +37,7 @@ from pants.core.goals.lint import REPORT_DIR, LintResult, LintTargetsRequest, Pa
 from pants.core.util_rules.config_files import find_config_file
 from pants.core.util_rules.partitions import Partition
 from pants.engine.fs import CreateDigest, Directory, MergeDigests, RemovePrefix
-from pants.engine.internals.graph import coarsened_targets as coarsened_targets_get
+from pants.engine.internals.graph import resolve_coarsened_targets as coarsened_targets_get
 from pants.engine.intrinsics import create_digest, execute_process, merge_digests, remove_prefix
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest
@@ -60,7 +60,7 @@ class PartitionMetadata:
 
 class PylintRequest(LintTargetsRequest):
     field_set_type = PylintFieldSet
-    tool_subsystem = Pylint
+    tool_subsystem = Pylint  # type: ignore[assignment]
 
 
 def generate_argv(field_sets: tuple[PylintFieldSet, ...], pylint: Pylint) -> tuple[str, ...]:
@@ -84,7 +84,7 @@ async def partition_pylint(
         return Partitions()
 
     first_party_ics = InterpreterConstraints.create_from_compatibility_fields(
-        first_party_plugins.interpreter_constraints_fields, python_setup
+        first_party_plugins.interpreter_constraints_and_resolve_fields, python_setup
     )
 
     resolve_and_interpreter_constraints_to_field_sets = (

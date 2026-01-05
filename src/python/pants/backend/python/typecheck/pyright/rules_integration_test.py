@@ -171,6 +171,18 @@ def test_failing(rule_runner: PythonRuleRunner) -> None:
     assert result[0].report == EMPTY_DIGEST
 
 
+def test_spaces_in_filenames(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {f"{PACKAGE}/f f.py": GOOD_FILE, f"{PACKAGE}/BUILD": "python_sources()"}
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f f.py"))
+    result = run_pyright(rule_runner, [tgt])
+    assert len(result) == 1
+    assert result[0].exit_code == 0
+    assert "0 errors" in result[0].stdout
+    assert result[0].report == EMPTY_DIGEST
+
+
 def test_multiple_targets(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {

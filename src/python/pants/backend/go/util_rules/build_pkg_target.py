@@ -6,7 +6,7 @@ from __future__ import annotations
 import dataclasses
 import json
 from dataclasses import dataclass
-from typing import ClassVar, cast
+from typing import ClassVar
 
 from pants.backend.go.go_sources.load_go_binary import LoadedGoBinaryRequest, setup_go_binary
 from pants.backend.go.target_type_rules import (
@@ -64,7 +64,7 @@ from pants.engine.internals.graph import (
     resolve_targets,
 )
 from pants.engine.internals.native_engine import EMPTY_DIGEST, MergeDigests
-from pants.engine.internals.selectors import Get, concurrently
+from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import create_digest, execute_process, merge_digests
 from pants.engine.process import Process
 from pants.engine.rules import collect_rules, implicitly, rule
@@ -78,7 +78,6 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, union
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import bullet_list
 
 
@@ -281,14 +280,19 @@ class GoCodegenBuildRequest:
     generate_from: ClassVar[type[SourcesField]]
 
 
+@rule(polymorphic=True)
+async def get_build_request_for_generated_code(
+    req: GoCodegenBuildRequest, env_name: EnvironmentName
+) -> FallibleBuildGoPackageRequest:
+    raise NotImplementedError()
+
+
 def maybe_get_codegen_request_type(
     tgt: Target, build_opts: GoBuildOptions, union_membership: UnionMembership
 ) -> GoCodegenBuildRequest | None:
     if not tgt.has_field(SourcesField):
         return None
-    generate_request_types = cast(
-        FrozenOrderedSet[type[GoCodegenBuildRequest]], union_membership.get(GoCodegenBuildRequest)
-    )
+    generate_request_types = union_membership.get(GoCodegenBuildRequest)
     sources_field = tgt[SourcesField]
     relevant_requests = [
         req for req in generate_request_types if isinstance(sources_field, req.generate_from)
@@ -322,8 +326,8 @@ async def setup_build_go_package_target_request(
     codegen_request = maybe_get_codegen_request_type(target, request.build_opts, union_membership)
     if codegen_request:
         # TODO need to move setup_build_go_package_target_request_for_stdlib around to resolve circular dependency
-        codegen_result = await Get(
-            FallibleBuildGoPackageRequest, GoCodegenBuildRequest, codegen_request
+        codegen_result = await get_build_request_for_generated_code(
+            **implicitly({codegen_request: GoCodegenBuildRequest})
         )
         return codegen_result
 

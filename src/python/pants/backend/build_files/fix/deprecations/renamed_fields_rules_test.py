@@ -37,7 +37,9 @@ async def test_determine_renamed_fields() -> None:
         moved_fields = (DeprecatedField, OkayField)
 
     registered_targets = RegisteredTargetTypes.create([Tgt, TgtGenerator])
-    result = await determine_renamed_field_types.rule.func(registered_targets, UnionMembership({}))  # type: ignore[attr-defined]
+    result = await determine_renamed_field_types.rule.func(  # type: ignore[attr-defined]
+        registered_targets, UnionMembership.empty()
+    )
     deprecated_fields = FrozenDict({DeprecatedField.deprecated_alias: DeprecatedField.alias})
     assert result.target_field_renames == FrozenDict(
         {k: deprecated_fields for k in (TgtGenerator.alias, Tgt.alias, Tgt.deprecated_alias)}

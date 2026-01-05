@@ -7,27 +7,26 @@ How to safely run subprocesses in your plugin.
 
 ---
 
-It is not safe to use `subprocess.run()` like you normally would because this can break caching and will not leverage Pants's parallelism. Instead, Pants has safe alternatives with `Process` and `InteractiveProcess`.
+It is not safe to use `subprocess.run()` like you normally would, because this can break caching and will not leverage Pants's concurrency mechanisms. Instead, Pants has the safe alternatives `Process` and `InteractiveProcess`.
 
 ## `Process`
 
 ### Overview
 
-`Process` is similar to Python's `subprocess.Popen()`. The process will run in the background, and you can run multiple processes in parallel.
+`Process` is similar to Python's `subprocess.Popen()`. The process will run in the background, and you can run multiple processes concurrently.
 
 ```python
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, rule
+from pants.engine.process import Process, ProcessResult, execute_process_or_raise
+from pants.engine.rules import rule
 
 @rule
 async def demo(...) -> Foo:
-    result = await Get(
-        ProcessResult,
+    result: ProcessResult = await execute_process_or_raise(**implicitly(
         Process(
             argv=["/bin/echo", "hello world"],
             description="Demonstrate processes.",
         )
-    )
+    ))
     logger.info(result.stdout.decode())
     logger.info(result.stderr.decode())
 ```
@@ -35,6 +34,8 @@ async def demo(...) -> Foo:
 This will return a `ProcessResult` object, which has the fields `stdout: bytes`, `stderr: bytes`, and `output_digest: Digest`.
 
 The process will run in a temporary directory and is hermetic, meaning that it cannot read any arbitrary file from your project and that it will be stripped of environment variables. This sandbox is important for reproducibility and to allow running your `Process` anywhere, such as through remote execution.
+
+If the process fails (i.e., returns a non-zero exit code) then an exception will be raised. If non-zero exit codes are not errors, and you want your code to be able to handle them, instead call `pants.engine.intrinsics.execute_process`, which returns a `FallibleProcessResult`. Like `ProcessResult`, `FallibleProcessResult` has the attributes `stdout: bytes`, `stderr: bytes`, and `output_digest: Digest`, and it adds `exit_code: int`.
 
 :::note Debugging a `Process`
 Setting the [`--keep-sandboxes=always`](./tips-and-debugging.mdx#debugging-look-inside-the-chroot) flag will cause the sandboxes of `Process`es to be preserved and logged to the console for inspection.
@@ -55,12 +56,15 @@ The `EnvironmentVars` type contains a subset of the environment that Pants was r
 ```python
 
 from pants.engine.env_vars import EnvironmentVarsRequest, EnvironmentVars
-from pants.engine.rules import Get, rule
+from pants.engine.rules import rule
+from pants.core.util_rules.env_vars import environment_vars_subset
 
 
 @rule
 async def partial_env(...) -> Foo:
-    relevant_env_vars = await Get(EnvironmentVars, EnvironmentVarsRequest(["RELEVANT_VAR", "PATH"]))
+    relevant_env_vars: EnvironmentVars = await environment_vars_subset(
+        EnvironmentVarsRequest(["RELEVANT_VAR", "PATH"])
+    )
     ...
 ```
 
@@ -95,14 +99,6 @@ async def demo(...) -> Foo:
 `ProcessCacheScope` supports other options as well, including `ALWAYS`.
 :::
 
-### FallibleProcessResult
-
-Normally, a `ProcessResult` will raise an exception if the return code is not `0`. Instead, a `FallibleProcessResult` allows for any return code.
-
-Use `Get(FallibleProcessResult, Process)` if you expect that the process may fail, such as when running a linter or tests.
-
-Like `ProcessResult`, `FallibleProcessResult` has the attributes `stdout: bytes`, `stderr: bytes`, and `output_digest: Digest`, and it adds `exit_code: int`.
-
 ## `InteractiveProcess`
 
 `InteractiveProcess` is similar to Python's `subprocess.run()`. The process will run in the foreground, optionally with access to the workspace.
@@ -134,6 +130,11 @@ The `Effect` will return an `InteractiveProcessResult`, which has a single field
 A `Process` can be retried by wrapping it in a `ProcessWithRetries` and requesting a `ProcessResultWithRetries`. The last result, whether succeeded or failed, is available with the `last` parameter. For example, the following will allow for up to 5 attempts at running `my_process`:
 
 ```python
-results = await Get(ProcessResultWithRetries, ProcessWithRetries(my_process, 5))
+from pants.engine.intrinsics import execute_process_with_retry
+from pants.engine.process import ProcessWithRetries, ProcessResultWithRetries
+
+results: ProcessResultWithRetries = await execute_process_with_retry(
+    ProcessWithRetries(my_process, 5)
+)
 last_result = results.last
 ```

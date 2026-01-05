@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.util_rules import asdf, search_paths
 from pants.core.util_rules.asdf import AsdfPathString, AsdfToolPathsResult
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.search_paths import (
     ValidateSearchPathsRequest,
     VersionManagerSearchPathsRequest,
@@ -20,7 +21,6 @@ from pants.core.util_rules.search_paths import (
     validate_search_paths,
 )
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest, PathEnvironmentVariable
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.internals.selectors import concurrently
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.option.option_types import DictOption, StrListOption

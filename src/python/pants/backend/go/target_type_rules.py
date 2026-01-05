@@ -13,6 +13,7 @@ from pants.backend.go.dependency_inference import (
     GoModuleImportPathsMapping,
     GoModuleImportPathsMappings,
     GoModuleImportPathsMappingsHook,
+    get_go_module_import_paths_mapping,
 )
 from pants.backend.go.target_types import (
     GoImportPathField,
@@ -58,7 +59,7 @@ from pants.core.target_types import (
 from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.intrinsics import digest_to_snapshot
-from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     AllTargets,
     Dependencies,
@@ -158,7 +159,7 @@ async def go_merge_import_paths_analysis(
 ) -> AllGoModuleImportPathsMappings:
     import_path_mappers = union_membership.get(GoModuleImportPathsMappingsHook)
     all_results = await concurrently(
-        Get(GoModuleImportPathsMappings, GoModuleImportPathsMappingsHook, impl())
+        get_go_module_import_paths_mapping(**implicitly({impl(): GoModuleImportPathsMappingsHook}))
         for impl in import_path_mappers
     )
 

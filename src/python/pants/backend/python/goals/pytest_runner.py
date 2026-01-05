@@ -55,6 +55,7 @@ from pants.core.goals.test import (
 )
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.config_files import find_config_file
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.partitions import Partition, PartitionerType, Partitions
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.addresses import Address
@@ -74,22 +75,16 @@ from pants.engine.fs import (
 )
 from pants.engine.internals.graph import resolve_target
 from pants.engine.internals.graph import transitive_targets as transitive_targets_get
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.intrinsics import (
     create_digest,
     digest_subset_to_digest,
     digest_to_snapshot,
+    execute_process_with_retry,
     get_digest_contents,
     merge_digests,
 )
-from pants.engine.process import (
-    InteractiveProcess,
-    Process,
-    ProcessCacheScope,
-    ProcessWithRetries,
-    execute_process_with_retry,
-)
-from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.process import InteractiveProcess, Process, ProcessCacheScope, ProcessWithRetries
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import Target, TransitiveTargetsRequest, WrappedTargetRequest
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import GlobalOptions
@@ -138,6 +133,11 @@ class PytestPluginSetupRequest(ABC):
         """Whether the setup implementation should be used for this target or not."""
 
 
+@rule(polymorphic=True)
+async def get_pytest_plugin_setup(req: PytestPluginSetupRequest) -> PytestPluginSetup:
+    raise NotImplementedError()
+
+
 class AllPytestPluginSetups(Collection[PytestPluginSetup]):
     pass
 
@@ -165,7 +165,8 @@ async def run_all_setup_plugins(
         if request_type.is_applicable(wrapped_tgt.target)
     ]
     setups = await concurrently(
-        Get(PytestPluginSetup, PytestPluginSetupRequest, request) for request in setup_requests
+        get_pytest_plugin_setup(**implicitly({request: PytestPluginSetupRequest}))
+        for request in setup_requests
     )
     return AllPytestPluginSetups(setups)
 
@@ -477,7 +478,7 @@ async def setup_pytest_for_target(
 
 
 class PyTestRequest(TestRequest):
-    tool_subsystem = PyTest
+    tool_subsystem = PyTest  # type: ignore[assignment]
     field_set_type = PythonTestFieldSet
     partitioner_type = PartitionerType.CUSTOM
     supports_debug = True
@@ -494,8 +495,8 @@ async def partition_python_tests(
 
     for field_set in request.field_sets:
         metadata = TestMetadata(
-            interpreter_constraints=InterpreterConstraints.create_from_compatibility_fields(
-                [field_set.interpreter_constraints], python_setup
+            interpreter_constraints=InterpreterConstraints.create_from_field_sets(
+                [field_set], python_setup
             ),
             extra_env_vars=field_set.extra_env_vars.sorted(),
             xdist_concurrency=field_set.xdist_concurrency.value,
@@ -520,6 +521,7 @@ async def partition_python_tests(
 @rule(desc="Run Pytest", level=LogLevel.DEBUG)
 async def run_python_tests(
     batch: PyTestRequest.Batch[PythonTestFieldSet, TestMetadata],
+    pytest: PyTest,
     test_subsystem: TestSubsystem,
     global_options: GlobalOptions,
 ) -> TestResult:
@@ -572,6 +574,9 @@ async def run_python_tests(
         **implicitly(RemovePrefix(extra_output_snapshot.digest, _EXTRA_OUTPUT_DIR))
     )
 
+    if last_result.exit_code == 5 and pytest.allow_empty_test_collection:
+        return TestResult.no_tests_found_in_batch(batch, test_subsystem.output)
+
     return TestResult.from_batched_fallible_process_result(
         results.results,
         batch=batch,
@@ -606,8 +611,8 @@ async def debugpy_python_test(
 ) -> TestDebugAdapterRequest:
     debugpy_pex = await create_pex(
         debugpy.to_pex_request(
-            interpreter_constraints=InterpreterConstraints.create_from_compatibility_fields(
-                [field_set.interpreter_constraints for field_set in batch.elements], python_setup
+            interpreter_constraints=InterpreterConstraints.create_from_field_sets(
+                batch.elements, python_setup
             )
         )
     )

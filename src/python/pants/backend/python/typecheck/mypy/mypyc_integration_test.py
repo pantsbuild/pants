@@ -23,6 +23,10 @@ def test_mypyc_build() -> None:
         [
             "--backend-packages=['pants.backend.python','pants.backend.python.typecheck.mypy']",
             f"--python-interpreter-constraints=['=={pyver}']",
+            # mypy>=1.15.0 searches up the filesystem for config, and it will find our root
+            # pyproject.toml and try to load the plugins specified there, but fail, since they
+            # aren't in the default lockfile. So we hide the pyproject.toml from this run.
+            "--pants-ignore=pyproject.toml",
             "package",
             "testprojects/src/python/mypyc_fib:dist",
         ],

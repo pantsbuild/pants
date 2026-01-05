@@ -3,4 +3,11 @@
 
 python_sources()
 
-python_tests(name="tests", extra_env_vars=["RUSTUP_HOME"])
+python_tests(
+    name="tests",
+    # These tests no longer work on the current CI environment.  How
+    # they worked before is poorly understood See
+    # https://github.com/pantsbuild/pants/pull/22704
+    skip_tests=True,
+    extra_env_vars=["RUSTUP_HOME"],
+)

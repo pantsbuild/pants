@@ -77,12 +77,12 @@ class ScalafixFieldSet(FieldSet):
 
 class ScalafixFixRequest(FixTargetsRequest):
     field_set_type = ScalafixFieldSet
-    tool_subsystem = ScalafixSubsystem
+    tool_subsystem = ScalafixSubsystem  # type: ignore[assignment]
 
 
 class ScalafixLintRequest(LintTargetsRequest):
     field_set_type = ScalafixFieldSet
-    tool_subsystem = ScalafixSubsystem
+    tool_subsystem = ScalafixSubsystem  # type: ignore[assignment]
 
 
 @dataclass(frozen=True)
@@ -261,15 +261,17 @@ async def _partition_scalafix(
 @rule
 async def _scalafix_fix_partitions(
     request: ScalafixFixRequest.PartitionRequest[ScalafixFieldSet],
-) -> _ScalafixPartitionRequest:
-    return _ScalafixPartitionRequest(request.field_sets)
+) -> Partitions:
+    ret = await _partition_scalafix(_ScalafixPartitionRequest(request.field_sets), **implicitly())
+    return ret
 
 
 @rule
 async def _scalafix_lint_partitions(
     request: ScalafixLintRequest.PartitionRequest[ScalafixFieldSet],
-) -> _ScalafixPartitionRequest:
-    return _ScalafixPartitionRequest(request.field_sets)
+) -> Partitions:
+    ret = await _partition_scalafix(_ScalafixPartitionRequest(request.field_sets), **implicitly())
+    return ret
 
 
 async def _restore_source_roots(source_roots_result: SourceRootsResult, digest: Digest) -> Snapshot:

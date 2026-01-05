@@ -18,10 +18,7 @@ from pants.backend.javascript.package_json import (
     OwningNodePackageRequest,
     PackageJsonImports,
     PackageJsonSourceField,
-)
-from pants.backend.javascript.package_json import find_owning_package
-from pants.backend.javascript.package_json import find_owning_package as find_owning_package_get
-from pants.backend.javascript.package_json import (
+    find_owning_package,
     script_entrypoints_for_source,
     subpath_imports_for_source,
 )
@@ -123,7 +120,7 @@ class RequestNodePackagesCandidateMap:
 async def map_candidate_node_packages(
     req: RequestNodePackagesCandidateMap, first_party: FirstPartyNodePackageTargets
 ) -> NodePackageCandidateMap:
-    owning_pkg = await find_owning_package_get(OwningNodePackageRequest(req.address))
+    owning_pkg = await find_owning_package(OwningNodePackageRequest(req.address))
     candidate_tgts = itertools.chain(
         first_party, owning_pkg.third_party if owning_pkg != OwningNodePackage.no_owner() else ()
     )

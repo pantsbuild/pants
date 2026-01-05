@@ -72,7 +72,7 @@ from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.pytest_util import assert_logged, no_exception
-from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
+from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
 from pants.util.value_interpolation import InterpolationContext, InterpolationError
 
@@ -206,24 +206,12 @@ def assert_build(
         mock_calls={
             "pants.backend.docker.util_rules.docker_build_context.create_docker_build_context": build_context_mock,
             "pants.engine.internals.graph.resolve_target": lambda _: WrappedTarget(tgt),
+            "pants.backend.docker.target_types.get_docker_image_tags": lambda __implicitly: DockerImageTags(
+                plugin_tags
+            ),
+            "pants.engine.intrinsics.execute_process": run_process_mock,
+            "pants.engine.intrinsics.create_digest": mock_get_info_file,
         },
-        mock_gets=[
-            MockGet(
-                output_type=DockerImageTags,
-                input_types=(DockerImageTagsRequestPlugin,),
-                mock=lambda _: DockerImageTags(plugin_tags),
-            ),
-            MockGet(
-                output_type=FallibleProcessResult,
-                input_types=(Process,),
-                mock=run_process_mock,
-            ),
-            MockGet(
-                output_type=Digest,
-                input_types=(CreateDigest,),
-                mock=mock_get_info_file,
-            ),
-        ],
         union_membership=union_membership,
         show_warnings=False,
     )

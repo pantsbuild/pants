@@ -53,9 +53,9 @@ from pants.bsp.util_rules.targets import (
 from pants.core.util_rules.system_binaries import BashBinary, ReadlinkBinary
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests, Workspace
-from pants.engine.internals.graph import coarsened_targets as coarsened_targets_get
+from pants.engine.internals.graph import resolve_coarsened_targets as coarsened_targets_get
 from pants.engine.internals.native_engine import Snapshot
-from pants.engine.internals.selectors import Get, concurrently
+from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import add_prefix, create_digest, digest_to_snapshot, merge_digests
 from pants.engine.process import Process, execute_process_or_raise
 from pants.engine.rules import _uncacheable_rule, collect_rules, implicitly, rule
@@ -66,7 +66,13 @@ from pants.jvm.bsp.compile import rules as jvm_compile_rules
 from pants.jvm.bsp.resources import _jvm_bsp_resources
 from pants.jvm.bsp.resources import rules as jvm_resources_rules
 from pants.jvm.bsp.spec import JvmBuildTarget, MavenDependencyModule, MavenDependencyModuleArtifact
-from pants.jvm.compile import ClasspathEntry, ClasspathEntryRequest, ClasspathEntryRequestFactory
+from pants.jvm.compile import (
+    ClasspathEntry,
+    ClasspathEntryRequest,
+    ClasspathEntryRequestFactory,
+    get_fallible_classpath_entry,
+    required_classfiles,
+)
 from pants.jvm.jdk_rules import DefaultJdk, JdkRequest, prepare_jdk_environment
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
 from pants.jvm.resolve.coordinate import Coordinate
@@ -148,13 +154,20 @@ async def collect_thirdparty_modules(
                 continue
             applicable_lockfile_entries[entry] = ct
 
-    classpath_entries = await concurrently(
-        Get(
-            ClasspathEntry,
-            ClasspathEntryRequest,
-            classpath_entry_request.for_targets(component=target, resolve=resolve),
+    fallible_classpath_entries = await concurrently(
+        get_fallible_classpath_entry(
+            **implicitly(
+                {
+                    classpath_entry_request.for_targets(
+                        component=target, resolve=resolve
+                    ): ClasspathEntryRequest
+                }
+            )
         )
         for target in applicable_lockfile_entries.values()
+    )
+    classpath_entries = await concurrently(
+        required_classfiles(fce) for fce in fallible_classpath_entries
     )
 
     resolve_digest = await merge_digests(MergeDigests(cpe.digest for cpe in classpath_entries))

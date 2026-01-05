@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from pants.build_graph.address import Address
 from pants.engine.environment import EnvironmentName
+from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import union
 from pants.util.frozendict import FrozenDict
 
@@ -46,5 +47,16 @@ class GoModuleImportPathsMappings:
     modules: FrozenDict[Address, GoModuleImportPathsMapping]
 
 
+@rule(polymorphic=True)
+async def get_go_module_import_paths_mapping(
+    req: GoModuleImportPathsMappingsHook, env_name: EnvironmentName
+) -> GoModuleImportPathsMappings:
+    raise NotImplementedError()
+
+
 class AllGoModuleImportPathsMappings(GoModuleImportPathsMappings):
     pass
+
+
+def rules():
+    return collect_rules()

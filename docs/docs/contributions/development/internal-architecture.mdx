@@ -9,7 +9,7 @@
 
 ### Overview
 
-Build logic in [Pants](https://www.pantsbuild.org/) is declared using collections of `@rules` with recursively memoized and invalidated results. This framework (known as Pants' "Engine") has similar goals to Bazel's [Skyframe](https://bazel.build/designs/skyframe.html) and the [Salsa](https://github.com/salsa-rs/salsa) framework: users define logic using a particular API, and the framework manages tracking the dependencies between nodes in a runtime graph.
+Build logic in [Pants](https://www.pantsbuild.org/) is declared using collections of `@rules` with recursively memoized and invalidated results. This framework (known as Pants's "Engine") has similar goals to Bazel's [Skyframe](https://bazel.build/designs/skyframe.html) and the [Salsa](https://github.com/salsa-rs/salsa) framework: users define logic using a particular API, and the framework manages tracking the dependencies between nodes in a runtime graph.
 
 In order to maximize the amount of work that can be reused at runtime, Pants statically computes the memoization keys for the nodes of the runtime graph from the user specified `@rules` during startup: this process is known as "rule graph construction". See the `Goals` section for more information on the strategy and reasoning for this.
 
@@ -25,11 +25,9 @@ A `Rule` is a function or coroutine with all of its inputs declared as part of i
 
 1. the return type of the `Rule`
 2. the positional arguments to the `Rule`
-3. a set of `Get`s which declare the runtime requirements of a coroutine, of the form `Get(output_type, input_type)`
+3. a set of `Call`s which declare the runtime requirements of a coroutine, of the form `rule_name(output_type, (*input_types))`
 
-In the `RuleGraph`, these are encoded in a [Rule](https://github.com/pantsbuild/pants/blob/3a188a1e06d8c27ff86d8c311ff1b2bdea0d39ff/src/rust/engine/rule_graph/src/rules.rs#L76-L95) trait, with a [DependencyKey](https://github.com/pantsbuild/pants/blob/3a188a1e06d8c27ff86d8c311ff1b2bdea0d39ff/src/rust/engine/rule_graph/src/rules.rs#L21-L41) trait representing both the positional arguments (which have no provided `Param`) and the `Get`s (which provide their input type as a `Param`).
-
-`Rule`s never refer to one another by name (i.e., they do not call one another by name): instead, their signature declares their requirements in terms of input/output types, and rule graph construction decides which potential dependencies will provide those requirements.
+In the `RuleGraph`, these are encoded in a [Rule](https://github.com/pantsbuild/pants/blob/3a188a1e06d8c27ff86d8c311ff1b2bdea0d39ff/src/rust/engine/rule_graph/src/rules.rs#L76-L95) trait, with a [DependencyKey](https://github.com/pantsbuild/pants/blob/3a188a1e06d8c27ff86d8c311ff1b2bdea0d39ff/src/rust/engine/rule_graph/src/rules.rs#L21-L41) trait representing both the positional arguments (which have no provided `Param`) and the `Call`s (which provide their input types as `Params`).
 
 #### Queries
 
@@ -41,35 +39,29 @@ If a user makes a request to the engine that does not have a corresponding `Quer
 
 `Params` are typed, comparable (`eq`/`hash`) values that represent both the inputs to `Rules`, and the building block of the runtime memoization key for a `Rule`. The set of `Params` (unique by type) that are consumed to create a `Rule`'s inputs (plus the `Rule`'s own identity) make up the memoization key for a runtime instance of the `Rule`.
 
-`Param`s are eventually used as positional args to `Rule`s, but it's important to note that the `Param`s in a `Rule` instance's identity/memoization-key will not always become the positional arguments to _that_ `Rule`: in many cases, a `Param` will be used by a `Rule`'s transitive dependencies in order to produce an output value that becomes either a positional argument to the `Rule` as it starts, or the result of a `Get` while a coroutine `Rule` runs.
+`Param`s are eventually used as positional args to `Rule`s, but it's important to note that the `Param`s in a `Rule` instance's identity/memoization-key will not always become the positional arguments to _that_ `Rule`: in many cases, a `Param` will be used by a `Rule`'s transitive dependencies in order to produce an output value that becomes either a positional argument to the `Rule` as it starts, or the result of a `Call` while a coroutine `Rule` runs.
 
-The `Param`s that are available to a `Rule` are made available by the `Rule`'s dependents (its "callers"), but similar to how `Rule`s are not called by name, neither are all of their `Param`s passed explicitly at each use site. A `Rule` will be used to compute the output value for a `DependencyKey`: i.e., a positional argument, `Get` result, or `Query` result. Of these usage sites, only `Query` specifies the complete set of `Params` that will be available: the other two usages (positional arguments and `Get`s) are able to use any Param that will be "in scope" at the use site.
+The `Param`s that are available to a `Rule` are made available by the `Rule`'s dependents (its "callers"), but `Param`s need not be passed explicitly at each use site. A `Rule` will be used to compute the output value for a `DependencyKey`: i.e., a positional argument, `Call` result, or `Query` result. Of these usage sites, only `Query` specifies the complete set of `Params` that will be available: the other two usages (positional arguments and `Call`s) are able to use any Param that will be "in scope" at the use site.
 
-`Params` flow down the graph from `Query`s and the provided `Param`s of `Get`s: their presence does not need to be re-declared at each intermediate callsite. When a `Rule` consumes a `Param` as a positional argument, that `Param` will no longer be available to that `Rule`'s dependencies (but it might still be present in other subgraphs adjacent to that `Rule`).
+`Params` flow down the graph from `Query`s and the provided `Param`s of `Call`s: their presence does not need to be re-declared at each intermediate callsite. When a `Rule` consumes a `Param` as a positional argument, that `Param` will no longer be available to that `Rule`'s dependencies (but it might still be present in other subgraphs adjacent to that `Rule`).
 
 ### Goals
 
-The goals of `RuleGraph` construction are:
+The goal of `RuleGraph` construction is to determine the minimum set of `Param` inputs needed to satisfy the `Rule`s below those `Query`s.
 
-1. decide which `Rule`s to use to answer `Query`s (transitively, since `Rule`s do not call one another by name); and
-2. determine the minimum set of `Param` inputs needed to satisfy the `Rule`s below those `Query`s
+As explained above, usage sites need not explicitly declare all `Param`s that their dependencies might consume.  The rule graph is used to "fill in the blanks" and figure out how to provide implicit inputs by (transitively) computing them from `Param`s via `Rule`s.
 
-If either of the goals were removed, `RuleGraph` construction might be more straightforward:
-
-1. If rather than being type-driven, `Rule`s called one another by name, you could statically determine their input `Params` by walking the call graph of `Rule`s by name, and collecting their transitive input `Params`.
-2. If rather than needing to compute a minimum set of `Param` inputs for the memoization key, we instead required that all usage sites explicitly declared all `Param`s that their dependencies might need, we could relatively easily eliminate candidates based on the combination of `Param` types at a use site. And if we were willing to have very large memoization keys, we could continue to have simple callsites, but skip pruning the `Params` that pass from a dependent to a dependency at runtime, and include any `Params` declared in any of a `Rule`s transitive dependents to be part of its identity.
-
-But both of the goals are important because together they allow for an API that is easy to write `Rule`s for, with minimal boilerplate required to get the inputs needed for a `Rule` to compute a value, and minimal invalidation. Because the identity of a `Rule` is computed from its transitive input `Param`s rather than from its positional arguments, `Rule`s can accept arbitrarily-many large input values (which don't need to implement hash) with no impact on its memoization hit rate.
+Because the identity of a `Rule` is computed from its transitive input `Param`s rather than from its positional arguments, `Rule`s can accept arbitrarily-many large input values (which don't need to implement hash) with no impact on its memoization hit rate.
 
 ### Constraints
 
 There are a few constraints that decide which `Rule`s are able to provide dependencies for one another:
 
 - `param_consumption` - When a `Rule` directly uses a `Param` as a positional argument, that `Param` is removed from scope for any of that `Rule`'s dependencies.
-  - For example, for a `Rule` `y` with a positional argument `A` and a `Get(B, C)`: if there is a `Param` `A` in scope at `y` and it is used to satisfy the positional argument, it cannot also be used to (transitively) to satisfy the `Get(B, C)` (i.e., a hypothetical rule that consumes both `A` and `C` would not be eligible in that position).
-  - On the other hand, for a `Rule` `w` with `Get(B, C)` and `Get(D, E)`, if there is a `Param` `A` in scope at `w`, two dependency `Rule`s that consume `A` (transitively) _can_ be used to satisfy those `Get`s. Only consuming a `Param` as a positional argument removes it from scope.
-- `provided_params` - When deciding whether one `Rule` can use another `Rule` to provide the output type of a `Get`, a constraint is applied that the candidate dependency must (transitively) consume the `Param` that is provided by the `Get`.
-  - For example: if a `Rule` `z` has a `Get(A, B)`, only `Rule`s that compute an `A` and (transitively) consume a `B` are eligible to be used. This also means that a `Param` `A` which is already in scope for `Rule` `z` is not eligible to be used, because it would trivially not consume `B`.
+  - For example, for a `Rule` `y` with a positional argument `A` and a `Call(B, C)`: if there is a `Param` `A` in scope at `y` and it is used to satisfy the positional argument, it cannot also be used to (transitively) to satisfy the `Call(B, C)` (i.e., a hypothetical rule that consumes both `A` and `C` would not be eligible in that position).
+  - On the other hand, for a `Rule` `w` with `Call(B, C)` and `Call(D, E)`, if there is a `Param` `A` in scope at `w`, two dependency `Rule`s that consume `A` (transitively) _can_ be used to satisfy those `Call`s. Only consuming a `Param` as a positional argument removes it from scope.
+- `provided_params` - When deciding whether one `Rule` can use another `Rule` to provide the output type of a `Call`, a constraint is applied that the candidate dependency must (transitively) consume the `Param` that is provided by the `Call`.
+  - For example: if a `Rule` `z` has a `Call(A, B)`, only `Rule`s that compute an `A` and (transitively) consume a `B` are eligible to be used. This also means that a `Param` `A` which is already in scope for `Rule` `z` is not eligible to be used, because it would trivially not consume `B`.
 
 ### Implementation
 

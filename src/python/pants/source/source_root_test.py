@@ -21,7 +21,7 @@ from pants.source.source_root import (
 )
 from pants.source.source_root import rules as source_root_rules
 from pants.testutil.option_util import create_subsystem
-from pants.testutil.rule_runner import MockGet, RuleRunner, run_rule_with_mocks
+from pants.testutil.rule_runner import RuleRunner, run_rule_with_mocks
 
 
 def _find_root(
@@ -48,14 +48,10 @@ def _find_root(
         return run_rule_with_mocks(
             get_optional_source_root,
             rule_args=[src_root_req, source_root_config],
-            mock_calls={"pants.engine.intrinsics.path_globs_to_paths": _mock_fs_check},
-            mock_gets=[
-                MockGet(
-                    output_type=OptionalSourceRoot,
-                    input_types=(SourceRootRequest,),
-                    mock=_do_find_root,
-                ),
-            ],
+            mock_calls={
+                "pants.engine.intrinsics.path_globs_to_paths": _mock_fs_check,
+                "pants.source.source_root.get_optional_source_root": _do_find_root,
+            },
         )
 
     source_root = _do_find_root(SourceRootRequest(PurePath(path))).source_root

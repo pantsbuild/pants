@@ -85,6 +85,7 @@ async def resolve_plugins(
                 python=python,
                 requirements=requirements,
                 interpreter_constraints=request.interpreter_constraints or InterpreterConstraints(),
+                additional_args=("--preserve-pip-download-log", "pex-pip-download.log"),
                 description=f"Resolving plugins: {', '.join(req_strings)}",
             )
         )
@@ -178,7 +179,7 @@ class PluginResolver:
         params = Params(request, determine_bootstrap_environment(session))
         return cast(
             ResolvedPluginDistributions,
-            session.product_request(ResolvedPluginDistributions, [params])[0],
+            session.product_request(ResolvedPluginDistributions, params)[0],
         )
 
 

@@ -21,9 +21,8 @@ from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest
-from pants.engine.internals.selectors import Get
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import collect_rules, concurrently, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     CoarsenedTarget,
     Field,
@@ -384,6 +383,14 @@ class FallibleClasspathEntry(EngineAwareReturnType):
         return self.exit_code == 0
 
 
+@rule(polymorphic=True)
+async def get_fallible_classpath_entry(
+    req: ClasspathEntryRequest,
+    environment_name: EnvironmentName,
+) -> FallibleClasspathEntry:
+    raise NotImplementedError()
+
+
 class ClasspathEntryRequests(Collection[ClasspathEntryRequest]):
     pass
 
@@ -446,7 +453,8 @@ async def classpath_dependency_requests(
 async def compile_classpath_entries(requests: ClasspathEntryRequests) -> FallibleClasspathEntries:
     return FallibleClasspathEntries(
         await concurrently(
-            Get(FallibleClasspathEntry, ClasspathEntryRequest, request) for request in requests
+            get_fallible_classpath_entry(**implicitly({request: ClasspathEntryRequest}))
+            for request in requests
         )
     )
 

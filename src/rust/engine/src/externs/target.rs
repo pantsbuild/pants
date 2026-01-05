@@ -38,7 +38,7 @@ impl NoFieldValue {
 
 #[pyclass(subclass)]
 pub struct Field {
-    value: PyObject,
+    value: Py<PyAny>,
 }
 
 #[pymethods]

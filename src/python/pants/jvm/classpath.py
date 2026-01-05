@@ -12,9 +12,15 @@ from pants.core.util_rules.system_binaries import UnzipBinary
 from pants.engine.fs import Digest, MergeDigests, RemovePrefix
 from pants.engine.intrinsics import merge_digests, remove_prefix
 from pants.engine.process import Process, execute_process_or_raise
-from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import CoarsenedTargets
-from pants.jvm.compile import ClasspathEntry, ClasspathEntryRequest, ClasspathEntryRequestFactory
+from pants.jvm.compile import (
+    ClasspathEntry,
+    ClasspathEntryRequest,
+    ClasspathEntryRequestFactory,
+    get_fallible_classpath_entry,
+    required_classfiles,
+)
 from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.resolve.coursier_fetch import select_coursier_resolve_for_targets
 from pants.jvm.resolve.key import CoursierResolveKey
@@ -82,13 +88,20 @@ async def classpath(
     resolve = await select_coursier_resolve_for_targets(coarsened_targets, **implicitly())
 
     # Then request classpath entries for each root.
-    classpath_entries = await concurrently(
-        Get(
-            ClasspathEntry,
-            ClasspathEntryRequest,
-            classpath_entry_request.for_targets(component=t, resolve=resolve, root=True),
+    fallible_classpath_entries = await concurrently(
+        get_fallible_classpath_entry(
+            **implicitly(
+                {
+                    classpath_entry_request.for_targets(
+                        component=t, resolve=resolve, root=True
+                    ): ClasspathEntryRequest
+                }
+            )
         )
         for t in coarsened_targets
+    )
+    classpath_entries = await concurrently(
+        required_classfiles(fce) for fce in fallible_classpath_entries
     )
 
     return Classpath(classpath_entries, resolve)

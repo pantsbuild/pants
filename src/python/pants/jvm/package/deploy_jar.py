@@ -28,12 +28,10 @@ from pants.jvm.compile import (
     FallibleClasspathEntry,
     compile_classpath_entries,
 )
-from pants.jvm.jar_tool.jar_tool import JarToolRequest
+from pants.jvm.jar_tool.jar_tool import JarToolRequest, run_jar_tool
 from pants.jvm.jar_tool.jar_tool import rules as jar_tool_rules
-from pants.jvm.jar_tool.jar_tool import run_jar_tool
-from pants.jvm.shading.rules import ShadeJarRequest
+from pants.jvm.shading.rules import ShadeJarRequest, shade_jar
 from pants.jvm.shading.rules import rules as shaded_jar_rules
-from pants.jvm.shading.rules import shade_jar
 from pants.jvm.strip_jar.strip_jar import StripJarRequest, strip_jar
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (

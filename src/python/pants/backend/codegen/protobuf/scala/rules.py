@@ -22,6 +22,7 @@ from pants.backend.scala.util_rules.versions import (
 )
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import distdir
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.external_tool import download_external_tool
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import strip_source_roots
@@ -37,7 +38,6 @@ from pants.engine.fs import (
 )
 from pants.engine.internals.graph import transitive_targets
 from pants.engine.internals.native_engine import EMPTY_DIGEST
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import (
     add_prefix,

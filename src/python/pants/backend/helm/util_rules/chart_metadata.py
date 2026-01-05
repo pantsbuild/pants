@@ -6,7 +6,7 @@ from __future__ import annotations
 import dataclasses
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, cast
+from typing import Any
 
 import yaml
 
@@ -208,7 +208,7 @@ class HelmChartMetadata:
         return d
 
     def to_yaml(self) -> str:
-        return cast("str", yaml.dump(self.to_json_dict()))
+        return yaml.dump(self.to_json_dict())
 
 
 HELM_CHART_METADATA_FILENAMES = ["Chart.yaml", "Chart.yml"]

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 
 from pants.engine.environment import EnvironmentName
@@ -37,6 +38,8 @@ from pants.engine.process import (
     InteractiveProcessResult,
     Process,
     ProcessExecutionEnvironment,
+    ProcessResultWithRetries,
+    ProcessWithRetries,
 )
 from pants.engine.rules import _uncacheable_rule, collect_rules, implicitly, rule
 from pants.util.docutil import git_url
@@ -105,6 +108,20 @@ async def execute_process(
     process: Process, process_execution_environment: ProcessExecutionEnvironment
 ) -> FallibleProcessResult:
     return await native_engine.execute_process(process, process_execution_environment)
+
+
+@rule
+async def execute_process_with_retry(req: ProcessWithRetries) -> ProcessResultWithRetries:
+    results: list[FallibleProcessResult] = []
+    for attempt in range(0, req.attempts):
+        proc = dataclasses.replace(req.proc, attempt=attempt)
+        result = await execute_process(  # noqa: PNT30: We only know that we need to rerun the test after we run it
+            proc, **implicitly()
+        )
+        results.append(result)
+        if result.exit_code == 0:
+            break
+    return ProcessResultWithRetries(tuple(results))
 
 
 @rule

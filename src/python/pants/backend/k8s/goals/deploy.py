@@ -15,12 +15,12 @@ from pants.backend.k8s.target_types import (
     K8sSourceField,
 )
 from pants.core.goals.deploy import DeployFieldSet, DeployProcess
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.external_tool import download_external_tool
 from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.fs import MergeDigests
 from pants.engine.internals.graph import hydrate_sources, resolve_targets
 from pants.engine.internals.native_engine import Digest
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.intrinsics import digest_to_snapshot
 from pants.engine.platform import Platform
 from pants.engine.process import InteractiveProcess, Process, ProcessCacheScope

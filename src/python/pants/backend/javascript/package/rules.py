@@ -34,9 +34,9 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.target_types import ResourceSourceField
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.internals.native_engine import AddPrefix
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.intrinsics import add_prefix, digest_to_snapshot
 from pants.engine.process import ProcessResult, fallible_to_exec_result_or_raise
 from pants.engine.rules import Rule, collect_rules, implicitly, rule

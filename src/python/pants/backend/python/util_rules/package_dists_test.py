@@ -35,7 +35,6 @@ from pants.backend.python.util_rules.package_dists import (
     ExportedTargetRequirements,
     FinalizedSetupKwargs,
     GenerateSetupPyRequest,
-    InvalidEntryPoint,
     InvalidSetupPyArgs,
     NoDistTypeSelected,
     NoOwnerError,
@@ -43,7 +42,7 @@ from pants.backend.python.util_rules.package_dists import (
     OwnedDependency,
     SetupKwargs,
     SetupKwargsRequest,
-    SetupPyError,
+    create_dist_build_environment,
     declares_pkg_resources_namespace_package,
     determine_explicitly_provided_setup_kwargs,
     determine_finalized_setup_kwargs,
@@ -52,6 +51,7 @@ from pants.backend.python.util_rules.package_dists import (
     get_exporting_owner,
     get_owned_dependencies,
     get_requirements,
+    get_setup_kwargs,
     get_sources,
     merge_entry_points,
     validate_commands,
@@ -115,6 +115,7 @@ def chroot_rule_runner() -> PythonRuleRunner:
             determine_finalized_setup_kwargs,
             get_sources,
             get_requirements,
+            get_setup_kwargs,
             get_owned_dependencies,
             get_exporting_owner,
             *python_sources.rules(),
@@ -137,7 +138,7 @@ def assert_chroot(
     interpreter_constraints: InterpreterConstraints | None = None,
 ) -> None:
     if interpreter_constraints is None:
-        interpreter_constraints = InterpreterConstraints(["CPython>=3.8,<4"])
+        interpreter_constraints = InterpreterConstraints(["CPython>=3.8,<3.15"])
 
     tgt = rule_runner.get_target(addr)
     req = DistBuildChrootRequest(
@@ -166,7 +167,7 @@ def assert_chroot_error(
             [
                 DistBuildChrootRequest(
                     ExportedTarget(tgt),
-                    InterpreterConstraints(["CPython>=3.8,<4"]),
+                    InterpreterConstraints(["CPython>=3.8,<3.15"]),
                 )
             ],
         )
@@ -305,7 +306,7 @@ def test_use_generate_setup_script_package_provenance_agnostic(chroot_rule_runne
                 )
             },
             "install_requires": (),
-            "python_requires": "<4,>=3.8",
+            "python_requires": "<3.15,>=3.8",
         },
         Address("src/python", target_name="foo-dist"),
     )
@@ -435,7 +436,7 @@ def test_generate_chroot(chroot_rule_runner: PythonRuleRunner) -> None:
             "namespace_packages": ("foo",),
             "package_data": {"foo": ("resources/js/code.js",), "foo.qux": ("qux.pyi",)},
             "install_requires": ("baz==1.1.1",),
-            "python_requires": "<4,>=3.8",
+            "python_requires": "<3.15,>=3.8",
             "entry_points": {"console_scripts": ["foo_main = foo.qux.bin:main"]},
         },
         Address("src/python/foo", target_name="foo-dist"),
@@ -508,7 +509,7 @@ def test_generate_chroot_entry_points(chroot_rule_runner: PythonRuleRunner) -> N
             "namespace_packages": tuple(),
             "package_data": {},
             "install_requires": tuple(),
-            "python_requires": "<4,>=3.8",
+            "python_requires": "<3.15,>=3.8",
             "entry_points": {
                 "console_scripts": [
                     "foo_main = foo.qux.bin:main",
@@ -561,7 +562,7 @@ def test_generate_long_description_field_from_file(chroot_rule_runner: PythonRul
             "namespace_packages": tuple(),
             "package_data": {},
             "install_requires": tuple(),
-            "python_requires": "<4,>=3.8",
+            "python_requires": "<3.15,>=3.8",
             "long_description": "Some long description.",
         },
         Address("src/python/foo", target_name="foo-dist"),
@@ -674,17 +675,17 @@ def test_invalid_binary(chroot_rule_runner: PythonRuleRunner) -> None:
     assert_chroot_error(
         chroot_rule_runner,
         Address("src/python/invalid_binary", target_name="invalid_bin1"),
-        InvalidEntryPoint,
+        target_types_rules.InvalidEntryPoint,
     )
     assert_chroot_error(
         chroot_rule_runner,
         Address("src/python/invalid_binary", target_name="invalid_bin2"),
-        InvalidEntryPoint,
+        target_types_rules.InvalidEntryPoint,
     )
     assert_chroot_error(
         chroot_rule_runner,
         Address("src/python/invalid_binary", target_name="invalid_bin3"),
-        InvalidEntryPoint,
+        target_types_rules.InvalidEntryPoint,
     )
 
 
@@ -721,7 +722,7 @@ def test_binary_shorthand(chroot_rule_runner: PythonRuleRunner) -> None:
             "packages": ("project",),
             "namespace_packages": (),
             "install_requires": (),
-            "python_requires": "<4,>=3.8",
+            "python_requires": "<3.15,>=3.8",
             "package_data": {},
             "entry_points": {"console_scripts": ["foo = project.app:func"]},
         },
@@ -784,7 +785,7 @@ def test_get_sources() -> None:
             [
                 DistBuildChrootRequest(
                     ExportedTarget(owner_tgt),
-                    InterpreterConstraints(["CPython>=3.8,<4"]),
+                    InterpreterConstraints(["CPython>=3.8,<3.15"]),
                 )
             ],
         )
@@ -865,6 +866,7 @@ def test_get_requirements() -> None:
         rules=[
             determine_explicitly_provided_setup_kwargs,
             get_requirements,
+            get_setup_kwargs,
             get_owned_dependencies,
             get_exporting_owner,
             *target_types_rules.rules(),
@@ -943,6 +945,7 @@ def test_get_requirements_with_exclude() -> None:
         rules=[
             determine_explicitly_provided_setup_kwargs,
             get_requirements,
+            get_setup_kwargs,
             get_owned_dependencies,
             get_exporting_owner,
             *target_types_rules.rules(),
@@ -988,6 +991,7 @@ def test_get_requirements_with_override_dependency_issue_17593() -> None:
         rules=[
             determine_explicitly_provided_setup_kwargs,
             get_requirements,
+            get_setup_kwargs,
             get_owned_dependencies,
             get_exporting_owner,
             *target_types_rules.rules(),
@@ -1401,12 +1405,14 @@ def test_does_not_declare_pkg_resources_namespace_package(python_src: str) -> No
 def test_no_dist_type_selected() -> None:
     rule_runner = PythonRuleRunner(
         rules=[
+            create_dist_build_environment,
             determine_explicitly_provided_setup_kwargs,
             generate_chroot,
             generate_setup_py,
             determine_finalized_setup_kwargs,
             get_sources,
             get_requirements,
+            get_setup_kwargs,
             get_owned_dependencies,
             get_exporting_owner,
             package_python_dist,
@@ -1481,7 +1487,7 @@ def test_too_many_interpreter_constraints(chroot_rule_runner: PythonRuleRunner) 
         """
     )
 
-    with engine_error(SetupPyError, contains=err):
+    with engine_error(target_types_rules.SetupPyError, contains=err):
         chroot_rule_runner.request(
             DistBuildChroot,
             [

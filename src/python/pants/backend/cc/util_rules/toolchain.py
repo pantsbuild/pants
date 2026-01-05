@@ -12,6 +12,7 @@ from pants.backend.cc.subsystems.compiler import CCSubsystem, ExternalCCSubsyste
 from pants.backend.cc.target_types import CCLanguage
 from pants.core.util_rules.archive import maybe_extract_archive
 from pants.core.util_rules.archive import rules as archive_rules
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.system_binaries import (
     BinaryNotFoundError,
     BinaryPathRequest,
@@ -21,7 +22,6 @@ from pants.core.util_rules.system_binaries import (
 from pants.engine.download_file import download_file
 from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import Rule, collect_rules, implicitly, rule

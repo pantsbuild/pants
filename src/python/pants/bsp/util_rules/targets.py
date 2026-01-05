@@ -47,7 +47,7 @@ from pants.engine.environment import EnvironmentName
 from pants.engine.fs import PathGlobs, Workspace
 from pants.engine.internals.graph import resolve_source_paths, resolve_targets
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
-from pants.engine.internals.selectors import Get, concurrently
+from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import get_digest_contents, merge_digests
 from pants.engine.rules import _uncacheable_rule, collect_rules, implicitly, rule
 from pants.engine.target import (
@@ -61,7 +61,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.source.source_root import SourceRootsRequest, get_source_roots
 from pants.util.frozendict import FrozenDict
-from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import bullet_list
 
 _logger = logging.getLogger(__name__)
@@ -76,7 +76,7 @@ class BSPBuildTargetsMetadataRequest(Generic[_FS]):
 
     language_id: ClassVar[str]
     can_merge_metadata_from: ClassVar[tuple[str, ...]]
-    field_set_type: ClassVar[type[_FS]]  # type: ignore[misc]
+    field_set_type: ClassVar[type[_FS]]
 
     resolve_prefix: ClassVar[str]
     resolve_field: ClassVar[type[Field]]
@@ -93,6 +93,13 @@ class BSPBuildTargetsMetadataResult:
 
     # Output to write into `.pants.d/bsp` for access by IDE.
     digest: Digest = EMPTY_DIGEST
+
+
+@rule(polymorphic=True)
+async def get_bsp_build_targets_metadata(
+    req: BSPBuildTargetsMetadataRequest, env_name: EnvironmentName
+) -> BSPBuildTargetsMetadataResult:
+    raise NotImplementedError()
 
 
 @dataclass(frozen=True)
@@ -358,8 +365,8 @@ async def generate_one_bsp_build_target_request(
     field_sets_by_request_type: dict[type[BSPBuildTargetsMetadataRequest], OrderedSet[FieldSet]] = (
         defaultdict(OrderedSet)
     )
-    metadata_request_types: FrozenOrderedSet[type[BSPBuildTargetsMetadataRequest]] = (
-        union_membership.get(BSPBuildTargetsMetadataRequest)
+    metadata_request_types: Sequence[type[BSPBuildTargetsMetadataRequest]] = union_membership.get(
+        BSPBuildTargetsMetadataRequest
     )
     metadata_request_types_by_lang_id: dict[str, type[BSPBuildTargetsMetadataRequest]] = {}
     for metadata_request_type in metadata_request_types:
@@ -381,10 +388,10 @@ async def generate_one_bsp_build_target_request(
 
     # Request each language backend to provide metadata for the BuildTarget, and then merge it.
     metadata_results = await concurrently(
-        Get(
-            BSPBuildTargetsMetadataResult,
-            BSPBuildTargetsMetadataRequest,
-            request_type(field_sets=tuple(field_sets)),
+        get_bsp_build_targets_metadata(
+            **implicitly(
+                {request_type(field_sets=tuple(field_sets)): BSPBuildTargetsMetadataRequest}
+            )
         )
         for request_type, field_sets in field_sets_by_request_type.items()
     )
@@ -545,7 +552,7 @@ async def bsp_dependency_sources(request: DependencySourcesParams) -> Dependency
 class BSPDependencyModulesRequest(Generic[_FS]):
     """Hook to allow language backends to provide dependency modules."""
 
-    field_set_type: ClassVar[type[_FS]]  # type: ignore[misc]
+    field_set_type: ClassVar[type[_FS]]
 
     field_sets: tuple[_FS, ...]
 
@@ -554,6 +561,13 @@ class BSPDependencyModulesRequest(Generic[_FS]):
 class BSPDependencyModulesResult:
     modules: tuple[DependencyModule, ...]
     digest: Digest = EMPTY_DIGEST
+
+
+@rule(polymorphic=True)
+async def get_bsp_dependency_modules(
+    req: BSPDependencyModulesRequest, env_name: EnvironmentName
+) -> BSPDependencyModulesResult:
+    raise NotImplementedError()
 
 
 class DependencyModulesHandlerMapping(BSPHandlerMapping):
@@ -584,8 +598,8 @@ async def resolve_one_dependency_module(
     field_sets_by_request_type: dict[type[BSPDependencyModulesRequest], list[FieldSet]] = (
         defaultdict(list)
     )
-    dep_module_request_types: FrozenOrderedSet[type[BSPDependencyModulesRequest]] = (
-        union_membership.get(BSPDependencyModulesRequest)
+    dep_module_request_types: Sequence[type[BSPDependencyModulesRequest]] = union_membership.get(
+        BSPDependencyModulesRequest
     )
     for tgt in targets:
         for dep_module_request_type in dep_module_request_types:
@@ -598,10 +612,10 @@ async def resolve_one_dependency_module(
         return ResolveOneDependencyModuleResult(bsp_target_id=request.bsp_target_id)
 
     responses = await concurrently(
-        Get(
-            BSPDependencyModulesResult,
-            BSPDependencyModulesRequest,
-            dep_module_request_type(field_sets=tuple(field_sets)),
+        get_bsp_dependency_modules(
+            **implicitly(
+                {dep_module_request_type(field_sets=tuple(field_sets)): BSPDependencyModulesRequest}
+            )
         )
         for dep_module_request_type, field_sets in field_sets_by_request_type.items()
     )
@@ -643,7 +657,7 @@ async def bsp_dependency_modules(
 class BSPCompileRequest(Generic[_FS]):
     """Hook to allow language backends to compile targets."""
 
-    field_set_type: ClassVar[type[_FS]]  # type: ignore[misc]
+    field_set_type: ClassVar[type[_FS]]
 
     bsp_target: BSPBuildTargetInternal
     field_sets: tuple[_FS, ...]
@@ -656,6 +670,11 @@ class BSPCompileResult:
 
     status: StatusCode
     output_digest: Digest
+
+
+@rule(polymorphic=True)
+async def bsp_compile(req: BSPCompileRequest, env_name: EnvironmentName) -> BSPCompileResult:
+    raise NotImplementedError()
 
 
 # -----------------------------------------------------------------------------------------------
@@ -673,7 +692,7 @@ class BSPCompileResult:
 class BSPResourcesRequest(Generic[_FS]):
     """Hook to allow language backends to provide resources for targets."""
 
-    field_set_type: ClassVar[type[_FS]]  # type: ignore[misc]
+    field_set_type: ClassVar[type[_FS]]
 
     bsp_target: BSPBuildTargetInternal
     field_sets: tuple[_FS, ...]
@@ -685,6 +704,13 @@ class BSPResourcesResult:
 
     resources: tuple[Uri, ...]
     output_digest: Digest
+
+
+@rule(polymorphic=True)
+async def get_bsp_resources(
+    req: BSPResourcesRequest, env_name: EnvironmentName
+) -> BSPResourcesResult:
+    raise NotImplementedError()
 
 
 def rules():

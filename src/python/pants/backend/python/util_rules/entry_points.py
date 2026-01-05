@@ -5,7 +5,6 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
 from pants.backend.python.dependency_inference.module_mapper import (
-    PythonModuleOwners,
     PythonModuleOwnersRequest,
     map_module_to_address,
 )
@@ -23,13 +22,17 @@ from pants.backend.python.target_types import (
     ResolvedPythonDistributionEntryPoints,
     ResolvePythonDistributionEntryPointsRequest,
 )
+from pants.backend.python.target_types_rules import (
+    get_python_distribution_entry_point_unambiguous_module_owners,
+    resolve_python_distribution_entry_points,
+)
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import CreateDigest, FileContent, PathGlobs, Paths
 from pants.engine.internals.graph import determine_explicitly_provided_dependencies, resolve_targets
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Address, Digest
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import create_digest, path_globs_to_paths
-from pants.engine.rules import Get, collect_rules, implicitly, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
@@ -43,38 +46,9 @@ from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
-from pants.util.strutil import softwrap
 
 PythonDistributionEntryPointGroupPredicate = Callable[[Target, str], bool]
 PythonDistributionEntryPointPredicate = Callable[[Target, str, str], bool]
-
-
-def get_python_distribution_entry_point_unambiguous_module_owners(
-    address: Address,
-    entry_point_group: str,  # group is the pypa term; aka category or namespace
-    entry_point_name: str,
-    entry_point: EntryPoint,
-    explicitly_provided_deps: ExplicitlyProvidedDependencies,
-    owners: PythonModuleOwners,
-) -> tuple[Address, ...]:
-    field_str = repr({entry_point_group: {entry_point_name: entry_point.spec}})
-    explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
-        owners.ambiguous,
-        address,
-        import_reference="module",
-        context=softwrap(
-            f"""
-            The python_distribution target {address} has the field
-            `entry_points={field_str}`, which maps to the Python module
-            `{entry_point.module}`
-            """
-        ),
-    )
-    maybe_disambiguated = explicitly_provided_deps.disambiguated(owners.ambiguous)
-    unambiguous_owners = owners.unambiguous or (
-        (maybe_disambiguated,) if maybe_disambiguated else ()
-    )
-    return unambiguous_owners
 
 
 @dataclass(frozen=True)
@@ -106,9 +80,8 @@ async def get_filtered_entry_point_dependencies(
     )
     # TODO: This is a circular import on call-by-name
     resolved_entry_points = await concurrently(
-        Get(
-            ResolvedPythonDistributionEntryPoints,
-            ResolvePythonDistributionEntryPointsRequest(tgt[PythonDistributionEntryPointsField]),
+        resolve_python_distribution_entry_points(
+            ResolvePythonDistributionEntryPointsRequest(tgt[PythonDistributionEntryPointsField])
         )
         for tgt in request.targets
     )
@@ -272,11 +245,9 @@ async def generate_entry_points_txt(request: GenerateEntryPointsTxtRequest) -> E
     if not request.targets:
         return EntryPointsTxt(EMPTY_DIGEST)
 
-    # TODO: This is a circular import on call-by-name
     all_resolved_entry_points = await concurrently(
-        Get(
-            ResolvedPythonDistributionEntryPoints,
-            ResolvePythonDistributionEntryPointsRequest(tgt[PythonDistributionEntryPointsField]),
+        resolve_python_distribution_entry_points(
+            ResolvePythonDistributionEntryPointsRequest(tgt[PythonDistributionEntryPointsField])
         )
         for tgt in request.targets
     )

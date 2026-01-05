@@ -5,7 +5,7 @@ from dataclasses import fields
 from enum import Enum
 from typing import Any
 
-from pants.option.global_options import DynamicRemoteOptions
+from pants.option.bootstrap_options import DynamicRemoteOptions
 
 
 def summarize_options_map_diff(old: dict[str, Any], new: dict[str, Any]) -> str:

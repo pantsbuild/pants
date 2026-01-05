@@ -12,9 +12,9 @@ from pants.core.environments.target_types import (
     EnvironmentTarget,
     RemotePlatformField,
 )
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.engine.env_vars import (
     CompleteEnvironmentVars,
-    EnvironmentVars,
     EnvironmentVarsRequest,
     PathEnvironmentVariable,
 )
@@ -90,19 +90,6 @@ async def complete_environment_vars(
         k, v = line.split("=", maxsplit=1)
         result[k] = v
     return CompleteEnvironmentVars(result)
-
-
-@rule
-async def environment_vars_subset(
-    request: EnvironmentVarsRequest,
-    complete_env_vars: CompleteEnvironmentVars,
-) -> EnvironmentVars:
-    return EnvironmentVars(
-        complete_env_vars.get_subset(
-            requested=tuple(request.requested),
-            allowed=(None if request.allowed is None else tuple(request.allowed)),
-        ).items()
-    )
 
 
 @rule

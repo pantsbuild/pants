@@ -13,17 +13,11 @@ from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadataV3
 from pants.backend.python.util_rules.pex import PexRequirementsInfo
-from pants.backend.python.util_rules.pex_requirements import (
-    LoadedLockfile,
-    LoadedLockfileRequest,
-    Lockfile,
-    PexRequirements,
-    Resolve,
-)
+from pants.backend.python.util_rules.pex_requirements import LoadedLockfile, Lockfile
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.testutil.option_util import create_subsystem
-from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
+from pants.testutil.rule_runner import run_rule_with_mocks
 from pants.util.pip_requirement import PipRequirement
 
 EXAMPLE_TEST1 = b"""
@@ -108,19 +102,18 @@ def test_validate_pytest_cov_included(entire_lockfile: bool) -> None:
         run_rule_with_mocks(
             validate_pytest_cov_included,
             rule_args=[tool],
-            mock_gets=[
-                MockGet(
-                    PexRequirementsInfo,
-                    (PexRequirements,),
-                    lambda x: PexRequirementsInfo(tuple(reqs), ()),
+            mock_calls={
+                "pants.backend.python.util_rules.pex_requirements.get_lockfile_for_resolve": lambda _: lockfile,
+                "pants.backend.python.util_rules.pex_requirements.load_lockfile": lambda x: loaded_lockfile
+                if x.lockfile == lockfile
+                else None,
+            }
+            if entire_lockfile or not reqs
+            else {
+                "pants.backend.python.util_rules.pex.get_req_strings": lambda _: PexRequirementsInfo(
+                    tuple(reqs), ()
                 ),
-                MockGet(Lockfile, (Resolve,), lambda x: lockfile),
-                MockGet(
-                    LoadedLockfile,
-                    (LoadedLockfileRequest,),
-                    lambda x: loaded_lockfile if x.lockfile == lockfile else None,
-                ),
-            ],
+            },
         )
 
     # Canonicalize project name.

@@ -24,10 +24,7 @@ from pants.util.dirutil import fast_relpath
 
 @dataclass(frozen=True)
 class StrippedSourceFiles:
-    """Wrapper for a snapshot of files whose source roots have been stripped.
-
-    Use via `Get(StrippedSourceFiles, SourceFilesRequest([tgt.get(SourcesField)])`.
-    """
+    """Wrapper for a snapshot of files whose source roots have been stripped."""
 
     snapshot: Snapshot
 
@@ -112,10 +109,7 @@ async def strip_file_name(request: StrippedFileNameRequest) -> StrippedFileName:
 
 
 class StrippedSourceFileNames(Collection[str]):
-    """The file names from a target's `sources` field, with source roots stripped.
-
-    Use via `Get(StrippedSourceFileNames, SourcePathsRequest(tgt.get(SourcesField))`.
-    """
+    """The file names from a target's `sources` field, with source roots stripped."""
 
 
 @rule

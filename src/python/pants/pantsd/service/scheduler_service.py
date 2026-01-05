@@ -81,7 +81,7 @@ class SchedulerService(PantsService):
         try:
             snapshot = self._scheduler_session.product_request(
                 Snapshot,
-                subjects=[PathGlobs(globs)],
+                subject=PathGlobs(globs),
                 poll=poll,
                 timeout=timeout,
             )[0]

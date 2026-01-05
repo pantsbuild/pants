@@ -11,7 +11,11 @@ from typing import Any
 from pants.backend.docker.goals.package_image import DockerPackageFieldSet
 from pants.backend.docker.subsystems import dockerfile_parser
 from pants.backend.docker.subsystems.docker_options import DockerOptions
-from pants.backend.docker.target_types import DockerImageTags, DockerImageTagsRequest
+from pants.backend.docker.target_types import (
+    DockerImageTags,
+    DockerImageTagsRequest,
+    get_docker_image_tags,
+)
 from pants.backend.docker.util_rules import (
     docker_binary,
     docker_build_args,
@@ -34,7 +38,7 @@ from pants.backend.helm.target_types import HelmDeploymentFieldSet
 from pants.engine.addresses import Address, Addresses
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.internals.graph import resolve_target, resolve_targets
-from pants.engine.rules import Get, collect_rules, concurrently, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import WrappedTargetRequest
 from pants.engine.unions import UnionMembership
 from pants.util.logging import LogLevel
@@ -63,7 +67,9 @@ async def _obtain_custom_image_tags(
 
     image_tags_requests = union_membership.get(DockerImageTagsRequest)
     found_image_tags = await concurrently(
-        Get(DockerImageTags, DockerImageTagsRequest, image_tags_request_cls(wrapped_target.target))
+        get_docker_image_tags(
+            **implicitly({image_tags_request_cls(wrapped_target.target): DockerImageTagsRequest})
+        )
         for image_tags_request_cls in image_tags_requests
         if image_tags_request_cls.is_applicable(wrapped_target.target)
     )

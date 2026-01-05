@@ -33,7 +33,8 @@ from pants.init.engine_initializer import EngineInitializer, GraphScheduler, Gra
 from pants.init.logging import stdio_destination_use_color
 from pants.init.options_initializer import OptionsInitializer
 from pants.init.specs_calculator import calculate_specs
-from pants.option.global_options import DynamicRemoteOptions, DynamicUIRenderer, GlobalOptions
+from pants.option.bootstrap_options import DynamicRemoteOptions
+from pants.option.global_options import DynamicUIRenderer, GlobalOptions
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.logging import LogLevel
@@ -206,7 +207,7 @@ class LocalPantsRunner:
             determine_bootstrap_environment(self.graph_session.scheduler_session),
         )
         (workunits_callback_factories,) = self.graph_session.scheduler_session.product_request(
-            WorkunitsCallbackFactories, [params]
+            WorkunitsCallbackFactories, params
         )
         return tuple(filter(bool, (wcf.callback_factory() for wcf in workunits_callback_factories)))
 

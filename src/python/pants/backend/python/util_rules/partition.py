@@ -6,11 +6,14 @@ from __future__ import annotations
 import itertools
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Protocol, TypeVar
+from typing import TypeVar
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField, PythonResolveField
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.interpreter_constraints import (
+    FieldSetWithInterpreterConstraints,
+    InterpreterConstraints,
+)
 from pants.engine.internals.graph import find_all_targets
 from pants.engine.rules import implicitly
 from pants.engine.target import FieldSet
@@ -19,15 +22,7 @@ from pants.util.ordered_set import OrderedSet
 ResolveName = str
 
 
-class _FieldSetWithResolveAndICs(Protocol):
-    @property
-    def resolve(self) -> PythonResolveField: ...
-
-    @property
-    def interpreter_constraints(self) -> InterpreterConstraintsField: ...
-
-
-_FS = TypeVar("_FS", bound=_FieldSetWithResolveAndICs)
+_FS = TypeVar("_FS", bound=FieldSetWithInterpreterConstraints)
 
 
 def _partition_by_interpreter_constraints_and_resolve(
@@ -39,8 +34,8 @@ def _partition_by_interpreter_constraints_and_resolve(
     ] = defaultdict(lambda: OrderedSet())
     for field_set in field_sets:
         resolve = field_set.resolve.normalized_value(python_setup)
-        interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
-            [field_set.interpreter_constraints], python_setup
+        interpreter_constraints = InterpreterConstraints.create_from_field_sets(
+            [field_set], python_setup
         )
         resolve_and_interpreter_constraints_to_field_sets[(resolve, interpreter_constraints)].add(
             field_set
@@ -66,9 +61,19 @@ async def _find_all_unique_interpreter_constraints(
     Returns the global interpreter constraints if no relevant targets were matched.
     """
     all_tgts = await find_all_targets(**implicitly())
+    extra_constraints_blank_resolves = [
+        (ics_field, None) for ics_field in extra_constraints_per_tgt
+    ]
     unique_constraints = {
         InterpreterConstraints.create_from_compatibility_fields(
-            [tgt[InterpreterConstraintsField], *extra_constraints_per_tgt], python_setup
+            [
+                (
+                    tgt[InterpreterConstraintsField],
+                    tgt[PythonResolveField] if tgt.has_field(PythonResolveField) else None,
+                ),
+                *extra_constraints_blank_resolves,
+            ],
+            python_setup,
         )
         for tgt in all_tgts
         if tgt.has_field(InterpreterConstraintsField) and field_set_type.is_applicable(tgt)
@@ -76,7 +81,7 @@ async def _find_all_unique_interpreter_constraints(
     if not unique_constraints and extra_constraints_per_tgt:
         unique_constraints.add(
             InterpreterConstraints.create_from_compatibility_fields(
-                extra_constraints_per_tgt,
+                extra_constraints_blank_resolves,
                 python_setup,
             )
         )

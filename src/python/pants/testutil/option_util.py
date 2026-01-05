@@ -10,7 +10,7 @@ from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.goal import GoalSubsystem
 from pants.engine.unions import UnionMembership
 from pants.init.options_initializer import OptionsInitializer
-from pants.option.global_options import DynamicRemoteOptions
+from pants.option.bootstrap_options import DynamicRemoteOptions
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.ranked_value import Rank, RankedValue, Value
@@ -54,7 +54,9 @@ def create_dynamic_remote_options(
     env = CompleteEnvironmentVars({})
     oi = OptionsInitializer(ob, rule_runner.EXECUTOR)
     _build_config = oi.build_config(ob, env)
-    options = oi.options(ob, env, _build_config, union_membership=UnionMembership({}), raise_=False)
+    options = oi.options(
+        ob, env, _build_config, union_membership=UnionMembership.empty(), raise_=False
+    )
     return DynamicRemoteOptions.from_options(
         options, env, remote_auth_plugin_func=_build_config.remote_auth_plugin_func
     )[0]

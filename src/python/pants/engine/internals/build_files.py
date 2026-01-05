@@ -26,6 +26,7 @@ from pants.build_graph.address import (
     MaybeAddress,
     ResolveError,
 )
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import FileContent, GlobMatchErrorBehavior, PathGlobs
@@ -42,7 +43,6 @@ from pants.engine.internals.parser import (
     Parser,
     error_on_imports,
 )
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.internals.selectors import concurrently
 from pants.engine.internals.session import SessionValues
 from pants.engine.internals.synthetic_targets import (
@@ -264,7 +264,7 @@ class BUILDFileEnvVarExtractor(ast.NodeVisitor):
                 value = arg.value if isinstance(arg, ast.Constant) else None
             if value:
                 # Found env name in this call, we're done here.
-                self.env_vars.add(value)
+                self.env_vars.add(value)  # type: ignore[arg-type]
                 return
             else:
                 logger.warning(

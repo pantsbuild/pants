@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import datetime
 from io import RawIOBase
-from typing import Any, ClassVar, Generic, Optional, Protocol, Self, TextIO, TypeVar, overload
+from typing import Any, ClassVar, Generic, Protocol, Self, TextIO, TypeVar, overload
 
 from pants.engine.fs import (
     CreateDigest,
@@ -259,6 +259,51 @@ class Address:
     def __gt__(self, other: Any) -> bool: ...
 
 # ------------------------------------------------------------------------------
+# Union
+# ------------------------------------------------------------------------------
+
+class UnionRule:
+    union_base: type
+    union_member: type
+
+    def __init__(self, union_base: type, union_member: type) -> None: ...
+
+_T = TypeVar("_T", bound=type)
+
+class UnionMembership:
+    @staticmethod
+    def from_rules(rules: Iterable[UnionRule]) -> UnionMembership: ...
+    @staticmethod
+    def empty() -> UnionMembership: ...
+    def __contains__(self, union_type: _T) -> bool: ...
+    def __getitem__(self, union_type: _T) -> Sequence[_T]:
+        """Get all members of this union type.
+
+        If the union type does not exist because it has no members registered, this will raise an
+        IndexError.
+
+        Note that the type hint assumes that all union members will have subclassed the union type
+        - this is only a convention and is not actually enforced. So, you may have inaccurate type
+        hints.
+        """
+
+    def get(self, union_type: _T) -> Sequence[_T]:
+        """Get all members of this union type.
+
+        If the union type does not exist because it has no members registered, return an empty
+        Sequence.
+
+        Note that the type hint assumes that all union members will have subclassed the union type
+        - this is only a convention and is not actually enforced. So, you may have inaccurate type
+        hints.
+        """
+
+    def items(self) -> Iterable[tuple[type, Sequence[type]]]: ...
+    def is_member(self, union_type: type, putative_member: type) -> bool: ...
+    def has_members(self, union_type: type) -> bool:
+        """Check whether the union has an implementation or not."""
+
+# ------------------------------------------------------------------------------
 # Scheduler
 # ------------------------------------------------------------------------------
 
@@ -370,11 +415,7 @@ class Field:
 # ------------------------------------------------------------------------------
 
 class Digest:
-    """A Digest is a lightweight reference to a set of files known about by the engine.
-
-    You can use `await Get(Snapshot, Digest)` to see the file names referred to, or use `await
-    Get(DigestContents, Digest)` to see the actual file content.
-    """
+    """A Digest is a lightweight reference to a set of files known about by the engine."""
 
     def __init__(self, fingerprint: str, serialized_bytes_length: int) -> None: ...
     @property
@@ -401,11 +442,8 @@ class Snapshot:
     """A Snapshot is a collection of sorted file paths and dir paths fingerprinted by their
     names/content.
 
-    You can lift a `Digest` to a `Snapshot` with `await Get(Snapshot, Digest, my_digest)`.
-
     The `files` and `dirs` properties are symlink oblivious. If you require knowing about symlinks,
-    you can use the `digest` property to request the `DigestEntries`:
-    `await Get(DigestEntries, Digest, snapshot.digest)`.
+    you can use the `digest` property to request the `DigestEntries`.
     """
 
     @classmethod
@@ -433,12 +471,8 @@ class Snapshot:
 class MergeDigests:
     """A request to merge several digests into one single digest.
 
-    This will fail if there are any conflicting changes, such as two digests having the same
-    file but with different content.
-
-    Example:
-
-        result = await Get(Digest, MergeDigests([digest1, digest2])
+    This will fail if there are any conflicting changes, such as two digests having the same file
+    but with different content.
     """
 
     def __init__(self, digests: Iterable[Digest]) -> None: ...
@@ -447,12 +481,7 @@ class MergeDigests:
     def __repr__(self) -> str: ...
 
 class AddPrefix:
-    """A request to add the specified prefix path to every file and directory in the digest.
-
-    Example:
-
-        result = await Get(Digest, AddPrefix(input_digest, "my_dir")
-    """
+    """A request to add the specified prefix path to every file and directory in the digest."""
 
     def __init__(self, digest: Digest, prefix: str) -> None: ...
     def __eq__(self, other: AddPrefix | Any) -> bool: ...
@@ -464,10 +493,6 @@ class RemovePrefix:
 
     This will fail if there are any files or directories in the original input digest without the
     specified prefix.
-
-    Example:
-
-        result = await Get(Digest, RemovePrefix(input_digest, "my_dir")
     """
 
     def __init__(self, digest: Digest, prefix: str) -> None: ...
@@ -672,7 +697,7 @@ T = TypeVar("T")
 OptionValueDerivation = list[tuple[T, int, str]]
 
 # A tuple (value, rank of value, optional derivation of value).
-OptionValue = tuple[Optional[T], int, Optional[OptionValueDerivation]]
+OptionValue = tuple[T | None, int, OptionValueDerivation | None]
 
 def py_bin_name() -> str: ...
 
@@ -748,10 +773,6 @@ class NativeDependenciesRequest:
     * Depending on the implementation, a `metadata` structure
       can be passed. It will be supplied to the native parser, and
       it will be incorporated into the cache key.
-
-
-    Example:
-        result = await Get(NativeParsedPythonDependencies, NativeDependenciesRequest(input_digest, None)
     """
 
     def __init__(self, digest: Digest, metadata: InferenceMetadata | None = None) -> None: ...

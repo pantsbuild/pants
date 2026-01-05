@@ -19,7 +19,11 @@ from pants.backend.python.target_types import (
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_diff import _generate_python_lockfile_diff
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
-from pants.backend.python.util_rules.pex import find_interpreter
+from pants.backend.python.util_rules.pex import (
+    CompletePlatforms,
+    digest_complete_platform_addresses,
+    find_interpreter,
+)
 from pants.backend.python.util_rules.pex_cli import PexCliProcess, maybe_log_pex_stderr
 from pants.backend.python.util_rules.pex_environment import PexSubsystem
 from pants.backend.python.util_rules.pex_requirements import (
@@ -41,6 +45,7 @@ from pants.core.goals.generate_lockfiles import (
 )
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
+from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
 from pants.engine.internals.target_adaptor import TargetAdaptor
@@ -61,6 +66,8 @@ class GeneratePythonLockfile(GenerateLockfile):
     requirements: FrozenOrderedSet[str]
     find_links: FrozenOrderedSet[str]
     interpreter_constraints: InterpreterConstraints
+    lock_style: str
+    complete_platforms: tuple[str, ...]
 
     @property
     def requirements_hex_digest(self) -> str:
@@ -113,44 +120,87 @@ async def generate_lockfile(
 
     python = await find_interpreter(req.interpreter_constraints, **implicitly())
 
+    # Resolve complete platform targets if specified
+    complete_platforms: CompletePlatforms | None = None
+    if req.complete_platforms:
+        # Resolve target addresses to get platform JSON files
+        complete_platforms = await digest_complete_platform_addresses(
+            UnparsedAddressInputs(
+                req.complete_platforms,
+                owning_address=None,
+                description_of_origin=f"the `[python].resolves_to_complete_platforms` for resolve `{req.resolve_name}`",
+            )
+        )
+
+    # Add complete platforms if specified, otherwise use default target systems for universal locks
+    if complete_platforms:
+        target_system_args = tuple(
+            f"--complete-platform={platform}" for platform in complete_platforms
+        )
+    elif req.lock_style == "universal":
+        # PEX files currently only run on Linux and Mac machines; so we hard code this
+        # limit on lock universality to avoid issues locking due to irrelevant
+        # Windows-only dependency issues. See this Pex issue that originated from a
+        # Pants user issue presented in Slack:
+        #   https://github.com/pex-tool/pex/issues/1821
+        #
+        # Note: --target-system only applies to universal locks. For other lock styles
+        # (strict, sources) without complete platforms, we don't specify platform args
+        # and PEX will lock for the current platform only.
+        target_system_args = (
+            "--target-system",
+            "linux",
+            "--target-system",
+            "mac",
+        )
+    else:
+        # For non-universal lock styles without complete platforms, don't specify
+        # platform arguments - PEX will lock for the current platform only
+        target_system_args = ()
+
     result = await fallible_to_exec_result_or_raise(
         **implicitly(
             PexCliProcess(
                 subcommand=("lock", "create"),
                 extra_args=(
-                    "--output=lock.json",
-                    # See https://github.com/pantsbuild/pants/issues/12458. For now, we always
-                    # generate universal locks because they have the best compatibility. We may
-                    # want to let users change this, as `style=strict` is safer.
-                    "--style=universal",
+                    f"--output={req.lockfile_dest}",
+                    f"--style={req.lock_style}",
                     "--pip-version",
                     python_setup.pip_version,
                     "--resolver-version",
                     "pip-2020-resolver",
                     "--preserve-pip-download-log",
                     "pex-pip-download.log",
-                    # PEX files currently only run on Linux and Mac machines; so we hard code this
-                    # limit on lock universality to avoid issues locking due to irrelevant
-                    # Windows-only dependency issues. See this Pex issue that originated from a
-                    # Pants user issue presented in Slack:
-                    #   https://github.com/pex-tool/pex/issues/1821
-                    #
-                    # At some point it will probably make sense to expose `--target-system` for
-                    # configuration.
-                    "--target-system",
-                    "linux",
-                    "--target-system",
-                    "mac",
+                    *target_system_args,
                     # This makes diffs more readable when lockfiles change.
                     "--indent=2",
                     f"--python-path={python.path}",
                     *(f"--find-links={link}" for link in req.find_links),
                     *pip_args_setup.args,
-                    *req.interpreter_constraints.generate_pex_arg_list(),
+                    # When complete platforms are specified, don't pass interpreter constraints.
+                    # The complete platforms already define Python versions and platforms.
+                    # Passing both causes PEX to generate duplicate locked_requirements entries
+                    # when the local platform matches a complete platform.
+                    # TODO(#9560): Consider validating that these platforms are valid with the
+                    #  interpreter constraints.
+                    *(
+                        req.interpreter_constraints.generate_pex_arg_list()
+                        if not complete_platforms
+                        else ()
+                    ),
+                    *(
+                        f"--override={override}"
+                        for override in pip_args_setup.resolve_config.overrides
+                    ),
                     *req.requirements,
                 ),
-                additional_input_digest=pip_args_setup.digest,
-                output_files=("lock.json",),
+                additional_input_digest=await merge_digests(
+                    MergeDigests(
+                        [pip_args_setup.digest]
+                        + ([complete_platforms.digest] if complete_platforms else [])
+                    )
+                ),
+                output_files=(req.lockfile_dest,),
                 description=f"Generate lockfile for {req.resolve_name}",
                 # Instead of caching lockfile generation with LMDB, we instead use the invalidation
                 # scheme from `lockfile_metadata.py` to check for stale/invalid lockfiles. This is
@@ -166,10 +216,8 @@ async def generate_lockfile(
             )
         )
     )
-
     maybe_log_pex_stderr(result.stderr, pex_subsystem.verbosity)
 
-    initial_lockfile_digest_contents = await get_digest_contents(result.output_digest)
     metadata = PythonLockfileMetadata.new(
         valid_for_interpreter_constraints=req.interpreter_constraints,
         requirements={
@@ -187,18 +235,45 @@ async def generate_lockfile(
         ),
         only_binary=set(pip_args_setup.resolve_config.only_binary),
         no_binary=set(pip_args_setup.resolve_config.no_binary),
+        excludes=set(pip_args_setup.resolve_config.excludes),
+        overrides=set(pip_args_setup.resolve_config.overrides),
+        sources=set(pip_args_setup.resolve_config.sources),
+        lock_style=req.lock_style,
+        complete_platforms=req.complete_platforms,
     )
-    lockfile_with_header = metadata.add_header_to_lockfile(
-        initial_lockfile_digest_contents[0].content,
-        regenerate_command=(
-            generate_lockfiles_subsystem.custom_command
-            or f"{bin_name()} generate-lockfiles --resolve={req.resolve_name}"
-        ),
-        delimeter=header_delimiter,
+    regenerate_command = (
+        generate_lockfiles_subsystem.custom_command
+        or f"{bin_name()} generate-lockfiles --resolve={req.resolve_name}"
     )
-    final_lockfile_digest = await create_digest(
-        CreateDigest([FileContent(req.lockfile_dest, lockfile_with_header)])
-    )
+    if python_setup.separate_lockfile_metadata_file:
+        descr = f"This lockfile was generated by Pants. To regenerate, run: {regenerate_command}"
+        metadata_digest = await create_digest(
+            CreateDigest(
+                [
+                    FileContent(
+                        PythonLockfileMetadata.metadata_location_for_lockfile(req.lockfile_dest),
+                        metadata.to_json(with_description=descr).encode(),
+                    ),
+                ]
+            )
+        )
+        final_lockfile_digest = await merge_digests(
+            MergeDigests([metadata_digest, result.output_digest])
+        )
+    else:
+        initial_lockfile_digest_contents = await get_digest_contents(result.output_digest)
+        lockfile_with_header = metadata.add_header_to_lockfile(
+            initial_lockfile_digest_contents[0].content,
+            regenerate_command=regenerate_command,
+            delimeter=header_delimiter,
+        )
+        final_lockfile_digest = await create_digest(
+            CreateDigest(
+                [
+                    FileContent(req.lockfile_dest, lockfile_with_header),
+                ]
+            )
+        )
 
     if req.diff:
         diff = await _generate_python_lockfile_diff(
@@ -286,6 +361,10 @@ async def setup_user_lockfile_requests(
                     resolve_name=resolve,
                     lockfile_dest=python_setup.resolves[resolve],
                     diff=False,
+                    lock_style=python_setup.resolves_to_lock_style().get(resolve, "universal"),
+                    complete_platforms=tuple(
+                        python_setup.resolves_to_complete_platforms().get(resolve, [])
+                    ),
                 )
             )
         else:
@@ -307,6 +386,8 @@ async def setup_user_lockfile_requests(
                     resolve_name=resolve,
                     lockfile_dest=DEFAULT_TOOL_LOCKFILE,
                     diff=False,
+                    lock_style="universal",  # Tools always use universal style
+                    complete_platforms=(),  # Tools don't use complete platforms
                 )
             )
 

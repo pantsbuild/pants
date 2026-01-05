@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-import os.path
+import os
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
@@ -37,12 +37,17 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
+_PEX_VERSION = "v2.73.1"
+_PEX_BINARY_HASH = "e6907e079a3f7c917dc88b41d892f732d4b8dbe388abfefc064d19c4a9f3c7e8"
+_PEX_BINARY_SIZE = 4939987
+
+
 class PexCli(TemplatedExternalTool):
     options_scope = "pex-cli"
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pex-tool/pex)."
 
-    default_version = "v2.45.2"
+    default_version = _PEX_VERSION
     default_url_template = "https://github.com/pex-tool/pex/releases/download/{version}/pex"
     version_constraints = ">=2.13.0,<3.0"
 
@@ -59,10 +64,8 @@ class PexCli(TemplatedExternalTool):
     )
 
     default_known_versions = [
-        "v2.45.2|macos_x86_64|570a3d5ca306a39aa3a180bd4cf3e2661b7c74b0579422b34659246daf122384|4833957",
-        "v2.45.2|macos_arm64|570a3d5ca306a39aa3a180bd4cf3e2661b7c74b0579422b34659246daf122384|4833957",
-        "v2.45.2|linux_x86_64|570a3d5ca306a39aa3a180bd4cf3e2661b7c74b0579422b34659246daf122384|4833957",
-        "v2.45.2|linux_arm64|570a3d5ca306a39aa3a180bd4cf3e2661b7c74b0579422b34659246daf122384|4833957",
+        f"{_PEX_VERSION}|{platform}|{_PEX_BINARY_HASH}|{_PEX_BINARY_SIZE}"
+        for platform in ["macos_x86_64", "macos_arm64", "linux_x86_64", "linux_arm64"]
     ]
 
 
@@ -200,7 +203,7 @@ async def setup_pex_cli_process(
     env = {
         **complete_pex_env.environment_dict(python=bootstrap_python),
         **python_native_code.subprocess_env_vars,
-        **(request.extra_env or {}),  # type: ignore[dict-item]
+        **(request.extra_env or {}),
         # If a subcommand is used, we need to use the `pex3` console script.
         **({"PEX_SCRIPT": "pex3"} if request.subcommand else {}),
     }

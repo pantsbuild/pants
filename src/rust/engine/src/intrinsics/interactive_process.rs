@@ -56,7 +56,7 @@ pub async fn interactive_process_inner(
         Value,
         Value,
         externs::process::PyProcessExecutionEnvironment,
-    ) = Python::with_gil(|py| {
+    ) = Python::attach(|py| {
         let py_interactive_process = interactive_process.bind(py);
         let py_process: Value = externs::getattr(py_interactive_process, "process").unwrap();
         let process_config = process_config.bind(py).extract().unwrap();
@@ -81,7 +81,7 @@ pub async fn interactive_process_inner(
     let mut process = ExecuteProcess::lift(&context.core.store(), py_process, process_config)
         .await?
         .process;
-    let (run_in_workspace, keep_sandboxes) = Python::with_gil(|py| {
+    let (run_in_workspace, keep_sandboxes) = Python::attach(|py| {
         let py_interactive_process = py_interactive_process.bind(py);
         let run_in_workspace: bool =
             externs::getattr(py_interactive_process, "run_in_workspace").unwrap();
@@ -133,9 +133,22 @@ pub async fn interactive_process_inner(
     };
 
     let mut command = process::Command::new(program_name);
-    if !run_in_workspace {
-        command.current_dir(tempdir.path());
+
+    let cwd = match (&process.working_directory, run_in_workspace) {
+        (Some(working_directory), true) => Some(
+            current_dir()
+                .map_err(|e| format!("Could not detect current working directory: {e}"))?
+                .join(working_directory),
+        ),
+        (Some(working_directory), false) => Some(tempdir.path().join(working_directory)),
+        (None, false) => Some(tempdir.path().to_owned()),
+        (None, true) => None,
+    };
+
+    if let Some(cwd) = cwd {
+        command.current_dir(cwd);
     }
+
     for arg in process.argv[1..].iter() {
         command.arg(arg);
     }
@@ -215,7 +228,7 @@ pub async fn interactive_process_inner(
             do_setup_run_sh_script(tempdir.path())?;
         }
     }
-    Ok::<_, Failure>(Python::with_gil(|py| {
+    Ok::<_, Failure>(Python::attach(|py| {
         externs::unsafe_call(
             py,
             interactive_process_result,

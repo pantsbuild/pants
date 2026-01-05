@@ -944,7 +944,7 @@ def test_no_applicable_targets_exception() -> None:
     exc = NoApplicableTargetsException(
         [],
         Specs.empty(),
-        UnionMembership({}),
+        UnionMembership.empty(),
         applicable_target_types=[Tgt1],
         goal_description="the `foo` goal",
     )
@@ -970,7 +970,7 @@ def test_no_applicable_targets_exception() -> None:
             ),
             ignores=RawSpecs(description_of_origin="tests"),
         ),
-        UnionMembership({}),
+        UnionMembership.empty(),
         applicable_target_types=[Tgt1, Tgt2],
         goal_description="the `foo` goal",
     )
@@ -1003,7 +1003,7 @@ def test_no_applicable_targets_exception() -> None:
             ),
             ignores=RawSpecs(description_of_origin="tests"),
         ),
-        UnionMembership({}),
+        UnionMembership.empty(),
         applicable_target_types=[Tgt1],
         goal_description="the `foo` goal",
     )
@@ -1018,7 +1018,7 @@ def test_no_applicable_targets_exception() -> None:
             ),
             ignores=RawSpecs(description_of_origin="tests"),
         ),
-        UnionMembership({}),
+        UnionMembership.empty(),
         applicable_target_types=[Tgt1],
         goal_description="the `foo` goal",
     )

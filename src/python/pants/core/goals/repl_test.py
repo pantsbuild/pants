@@ -5,6 +5,7 @@ import pytest
 
 from pants.core.goals.repl import Repl, ReplImplementation, ReplRequest
 from pants.core.goals.repl import rules as repl_rules
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.intrinsics import create_digest
 from pants.engine.rules import rule
@@ -18,7 +19,9 @@ class MockRepl(ReplImplementation):
 
 
 @rule
-async def create_mock_repl_request(repl: MockRepl) -> ReplRequest:
+async def create_mock_repl_request(
+    repl: MockRepl, environment_name: EnvironmentName
+) -> ReplRequest:
     digest = await create_digest(CreateDigest([FileContent("repl.sh", b"exit 0")]))
     return ReplRequest(
         digest=digest,

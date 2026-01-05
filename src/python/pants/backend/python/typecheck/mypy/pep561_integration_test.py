@@ -26,8 +26,8 @@ def test_typechecking() -> None:
     # NB: We install pantsbuild.pants.testutil and pantsbuild.pants in the same test because
     # pantsbuild.pants.testutil depends on pantsbuild.pants, and we need to install that dependency
     # from the filesystem, rather than falling back to PyPI.
-    pants_wheel = list(Path.cwd().glob("pantsbuild.pants-*.whl"))[0]
-    testutil_wheel = list(Path.cwd().glob("pantsbuild.pants.testutil-*.whl"))[0]
+    pants_wheel = list(Path.cwd().glob("pantsbuild_pants-*.whl"))[0]
+    testutil_wheel = list(Path.cwd().glob("pantsbuild_pants_testutil-*.whl"))[0]
     project = {
         "BUILD": dedent(
             f"""\

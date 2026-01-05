@@ -96,11 +96,11 @@ test("get_prereqs fails when no milestone", async () => {
   const result = await helper.get_prereqs();
 
   expect(result).toBe(null);
-  expect(helper.octokit.rest.issues.addLabels).toBeCalledTimes(1);
+  expect(helper.octokit.rest.issues.addLabels).toHaveBeenCalledTimes(1);
   expect(helper.octokit.rest.issues.addLabels.mock.calls[0][0].labels).toEqual([
     "auto-cherry-picking-failed",
   ]);
-  expect(helper.octokit.rest.issues.createComment).toBeCalledTimes(1);
+  expect(helper.octokit.rest.issues.createComment).toHaveBeenCalledTimes(1);
   expect(
     helper.octokit.rest.issues.createComment.mock.calls[0][0].body,
   ).toEqual(
@@ -110,7 +110,7 @@ test("get_prereqs fails when no milestone", async () => {
 
 :robot: [Beep Boop here's my run link](https://github.com/pantsbuild/pants/actions/runs/5148273558)`,
   );
-  expect(helper.core.setFailed).toBeCalledTimes(1);
+  expect(helper.core.setFailed).toHaveBeenCalledTimes(1);
 });
 
 test("get_prereqs ok_with_no_relevant_milestones", async () => {
@@ -170,7 +170,7 @@ test("get_prereqs ok_with_no_relevant_milestones", async () => {
     pr_num: 19214,
   });
 
-  expect(helper.core.setFailed).not.toBeCalled();
+  expect(helper.core.setFailed).not.toHaveBeenCalled();
 });
 
 test("cherry_pick_finished one pass one fail", async () => {
@@ -197,7 +197,7 @@ test("cherry_pick_finished one pass one fail", async () => {
     { branch_name: "cherry-pick-19214-to-2.17.x", milestone: "2.17.x" },
   ]);
 
-  expect(helper.octokit.rest.issues.addLabels).toBeCalledTimes(1);
+  expect(helper.octokit.rest.issues.addLabels).toHaveBeenCalledTimes(1);
   expect(helper.octokit.rest.issues.addLabels.mock.calls[0][0].labels).toEqual([
     "auto-cherry-picking-failed",
   ]);
@@ -260,7 +260,7 @@ test("cherry_pick_finished all pass", async () => {
     { branch_name: "cherry-pick-19214-to-2.16.x", milestone: "2.16.x" },
   ]);
 
-  expect(helper.octokit.rest.issues.removeLabel).toBeCalledTimes(1);
+  expect(helper.octokit.rest.issues.removeLabel).toHaveBeenCalledTimes(1);
   expect(helper.octokit.rest.issues.removeLabel.mock.calls[0][0].name).toEqual(
     "needs-cherrypick",
   );

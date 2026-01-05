@@ -16,7 +16,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.target_types import GenericTarget, ResourceTarget
 from pants.engine.addresses import Address, AddressInput, BuildFileAddress
 from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars
-from pants.engine.fs import DigestContents, FileContent, PathGlobs
+from pants.engine.fs import DigestContents, FileContent
 from pants.engine.internals.build_files import (
     AddressFamilyDir,
     BUILDFileEnvVarExtractor,
@@ -49,13 +49,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership
 from pants.init.bootstrap_scheduler import BootstrapStatus
 from pants.testutil.pytest_util import assert_logged
-from pants.testutil.rule_runner import (
-    MockGet,
-    QueryRule,
-    RuleRunner,
-    engine_error,
-    run_rule_with_mocks,
-)
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
 
@@ -69,7 +63,7 @@ def test_parse_address_family_empty() -> None:
             Parser(
                 build_root="",
                 registered_target_types=RegisteredTargetTypes({}),
-                union_membership=UnionMembership({}),
+                union_membership=UnionMembership.empty(),
                 object_aliases=BuildFileAliases(),
                 ignore_unrecognized_symbols=False,
             ),
@@ -77,19 +71,19 @@ def test_parse_address_family_empty() -> None:
             BuildFileOptions(("BUILD",)),
             BuildFilePreludeSymbols(FrozenDict(), ()),
             RegisteredTargetTypes({}),
-            UnionMembership({}),
+            UnionMembership.empty(),
             MaybeBuildFileDependencyRulesImplementation(None),
             SessionValues({CompleteEnvironmentVars: CompleteEnvironmentVars({})}),
         ],
         mock_calls={
-            "pants.engine.intrinsics.get_digest_contents": lambda: DigestContents(
+            "pants.engine.intrinsics.get_digest_contents": lambda __implicitly: DigestContents(
                 [FileContent(path="/dev/null/BUILD", content=b"")]
             ),
             "pants.engine.internals.synthetic_targets.get_synthetic_address_maps": lambda _: SyntheticAddressMaps(),
             "pants.engine.internals.build_files.parse_address_family": lambda *_: OptionalAddressFamily(
                 "/dev"
             ),
-            "pants.engine.internals.platform_rules.environment_vars_subset": lambda _1,
+            "pants.core.util_rules.env_vars.environment_vars_subset": lambda _1,
             _2: EnvironmentVars({}),
         },
     )
@@ -108,7 +102,7 @@ def test_extend_synthetic_target() -> None:
             Parser(
                 build_root="",
                 registered_target_types=RegisteredTargetTypes({"resource": ResourceTarget}),
-                union_membership=UnionMembership({}),
+                union_membership=UnionMembership.empty(),
                 object_aliases=BuildFileAliases(),
                 ignore_unrecognized_symbols=False,
             ),
@@ -116,12 +110,12 @@ def test_extend_synthetic_target() -> None:
             BuildFileOptions(("BUILD",)),
             BuildFilePreludeSymbols(FrozenDict(), ()),
             RegisteredTargetTypes({"resource": ResourceTarget}),
-            UnionMembership({}),
+            UnionMembership.empty(),
             MaybeBuildFileDependencyRulesImplementation(None),
             SessionValues({CompleteEnvironmentVars: CompleteEnvironmentVars({})}),
         ],
         mock_calls={
-            "pants.engine.intrinsics.get_digest_contents": lambda: DigestContents(
+            "pants.engine.intrinsics.get_digest_contents": lambda __implicitly: DigestContents(
                 [
                     FileContent(
                         path="/foo/BUILD.1", content=b"resource(name='aaa', description='a')"
@@ -132,7 +126,7 @@ def test_extend_synthetic_target() -> None:
                     ),
                 ]
             ),
-            "pants.engine.internals.synthetic_targets.get_synthetic_address_maps": lambda _: SyntheticAddressMaps(
+            "pants.engine.internals.synthetic_targets.get_synthetic_address_maps": lambda __implicitly: SyntheticAddressMaps(
                 [
                     SyntheticAddressMap.create(
                         "/foo/synthetic1",
@@ -149,7 +143,7 @@ def test_extend_synthetic_target() -> None:
                     ),
                 ]
             ),
-            "pants.engine.internals.build_files.parse_address_family": lambda _: OptionalAddressFamily(
+            "pants.engine.internals.build_files.parse_address_family": lambda __implicitly: OptionalAddressFamily(
                 "/",
                 address_family=AddressFamily.create(
                     "/",
@@ -159,7 +153,7 @@ def test_extend_synthetic_target() -> None:
                     ),
                 ),
             ),
-            "pants.engine.internals.platform_rules.environment_vars_subset": lambda _1,
+            "pants.core.util_rules.env_vars.environment_vars_subset": lambda _1,
             _2: EnvironmentVars({}),
         },
     )
@@ -193,20 +187,16 @@ def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
             Parser(
                 build_root="",
                 registered_target_types=RegisteredTargetTypes({"target": GenericTarget}),
-                union_membership=UnionMembership({}),
+                union_membership=UnionMembership.empty(),
                 object_aliases=BuildFileAliases(),
                 ignore_unrecognized_symbols=False,
             ),
         ],
-        mock_gets=[
-            MockGet(
-                output_type=DigestContents,
-                input_types=(PathGlobs,),
-                mock=lambda _: DigestContents(
-                    [FileContent(path="/dev/null/prelude", content=prelude_content.encode())]
-                ),
-            ),
-        ],
+        mock_calls={
+            "pants.engine.intrinsics.get_digest_contents": lambda __implicitly: DigestContents(
+                [FileContent(path="/dev/null/prelude", content=prelude_content.encode())]
+            )
+        },
     )
     return symbols
 
@@ -916,39 +906,35 @@ def test_build_files_share_globals() -> None:
             Parser(
                 build_root="",
                 registered_target_types=RegisteredTargetTypes({}),
-                union_membership=UnionMembership({}),
+                union_membership=UnionMembership.empty(),
                 object_aliases=BuildFileAliases(),
                 ignore_unrecognized_symbols=False,
             ),
         ],
-        mock_gets=[
-            MockGet(
-                output_type=DigestContents,
-                input_types=(PathGlobs,),
-                mock=lambda _: DigestContents(
-                    [
-                        FileContent(
-                            path="/dev/null/prelude1",
-                            content=dedent(
-                                """\
+        mock_calls={
+            "pants.engine.intrinsics.get_digest_contents": lambda _: DigestContents(
+                [
+                    FileContent(
+                        path="/dev/null/prelude1",
+                        content=dedent(
+                            """\
                                 def hello():
                                     pass
                                 """
-                            ).encode(),
-                        ),
-                        FileContent(
-                            path="/dev/null/prelude2",
-                            content=dedent(
-                                """\
+                        ).encode(),
+                    ),
+                    FileContent(
+                        path="/dev/null/prelude2",
+                        content=dedent(
+                            """\
                                 def world():
                                     pass
                                 """
-                            ).encode(),
-                        ),
-                    ]
-                ),
+                        ).encode(),
+                    ),
+                ]
             ),
-        ],
+        },
     )
     assert symbols.symbols["hello"].__globals__ is symbols.symbols["world"].__globals__
     assert "world" in symbols.symbols["hello"].__globals__

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import atexit
 import dataclasses
+import difflib
 import functools
 import inspect
 import os
@@ -22,16 +23,18 @@ from typing import Any, Generic, TypeVar, cast, overload
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.specs_parser import SpecsParser
+from pants.build_graph import build_configuration
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.core.util_rules import adhoc_binaries
+from pants.core.goals.run import generate_run_request
+from pants.core.util_rules import adhoc_binaries, misc
 from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import CreateDigest, Digest, FileContent, Snapshot, Workspace
 from pants.engine.goal import CurrentExecutingGoals, Goal
-from pants.engine.internals import native_engine
+from pants.engine.internals import native_engine, options_parsing
 from pants.engine.internals.native_engine import ProcessExecutionEnvironment, PyExecutor
 from pants.engine.internals.scheduler import ExecutionError, Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Call, Effect, Get, Params
@@ -44,12 +47,8 @@ from pants.engine.unions import UnionMembership, UnionRule
 from pants.goal.auxiliary_goal import AuxiliaryGoal
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import initialize_stdio, initialize_stdio_raw, stdio_destination
-from pants.option.global_options import (
-    DynamicRemoteOptions,
-    ExecutionOptions,
-    GlobalOptions,
-    LocalStoreOptions,
-)
+from pants.option.bootstrap_options import DynamicRemoteOptions, ExecutionOptions, LocalStoreOptions
+from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source import source_root
 from pants.testutil.option_util import create_options_bootstrapper
@@ -156,6 +155,9 @@ def engine_error(
             else:
                 errmsg = str(underlying)
             if contains not in errmsg:
+                diff = "\n".join(
+                    difflib.Differ().compare(contains.splitlines(), errmsg.splitlines())
+                )
                 raise AssertionError(
                     softwrap(
                         f"""
@@ -164,6 +166,8 @@ def engine_error(
                         => Expected: {contains}
 
                         => Actual: {errmsg}
+
+                        => Diff: {diff}
                         """
                     )
                 )
@@ -281,8 +285,13 @@ class RuleRunner:
         self.rules = tuple(rewrite_rule_for_inherent_environment(rule) for rule in (rules or ()))
         all_rules = (
             *self.rules,
+            *build_configuration.rules(),
             *source_root.rules(),
+            *options_parsing.rules(),
+            *misc.rules(),
             *adhoc_binaries.rules(),
+            # Many tests indirectly rely on this rule.
+            generate_run_request,
             QueryRule(WrappedTarget, [WrappedTargetRequest]),
             QueryRule(AllTargets, []),
             QueryRule(UnionMembership, []),
@@ -314,10 +323,11 @@ class RuleRunner:
                 args=bootstrap_args, env=None
             )
             options = self.options_bootstrapper.full_options(
-                self.build_config,
+                known_scope_infos=self.build_config.known_scope_infos,
                 union_membership=UnionMembership.from_rules(
                     rule for rule in self.rules if isinstance(rule, UnionRule)
                 ),
+                allow_unknown_options=self.build_config.allow_unknown_options,
             )
             global_options = self.options_bootstrapper.bootstrap_options.for_global_scope()
 
@@ -399,7 +409,7 @@ class RuleRunner:
             else Params(*inputs)
         )
         with self.pushd():
-            result = assert_single_element(self.scheduler.product_request(output_type, [params]))
+            result = assert_single_element(self.scheduler.product_request(output_type, params))
         return cast(_O, result)
 
     def run_goal_rule(
@@ -758,13 +768,17 @@ def run_rule_with_mocks(
             assert locals is not None
             rule_id = locals["rule_id"]
             args = locals["args"]
+            kwargs = dict(locals["kwargs"])
+            __implicitly = locals.get("__implicitly")
+            if __implicitly:
+                kwargs["__implicitly"] = __implicitly
             mock_call = mock_calls.get(rule_id)
             if mock_call:
                 unconsumed_mock_calls.discard(rule_id)
                 # Close the original, unmocked, coroutine, to prevent the "was never awaited"
                 # warning polluting stderr data that the test may examine.
                 res.close()
-                return mock_call(*args)
+                return mock_call(*args, **kwargs)
             raise AssertionError(f"No mock_call provided for {rule_id}.")
         elif isinstance(res, Call):
             mock_call = mock_calls.get(res.rule_id)
@@ -831,10 +845,10 @@ def run_rule_with_mocks(
             if isinstance(res, (Get, Effect, Call)):
                 rule_input = get(res)
             elif type(res) in (tuple, list):
-                rule_input = [get(g) for g in res]  # type: ignore[union-attr]
+                rule_input = [get(g) for g in res]
             else:
                 warn_on_unconsumed_mocks()
-                return res  # type: ignore[return-value]
+                return res  # type: ignore[no-any-return]
         except StopIteration as e:
             warn_on_unconsumed_mocks()
             return e.value  # type: ignore[no-any-return]
@@ -861,7 +875,9 @@ def mock_console(
         global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
         colors = (
             options_bootstrapper.full_options_for_scopes(
-                [GlobalOptions.get_scope_info()], UnionMembership({}), allow_unknown_options=True
+                [GlobalOptions.get_scope_info()],
+                UnionMembership.empty(),
+                allow_unknown_options=True,
             )
             .for_global_scope()
             .colors

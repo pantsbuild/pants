@@ -1,20 +1,101 @@
+# https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference
+
 version: 2
 updates:
-  - package-ecosystem: "cargo"
-    directory: "/src/rust/engine"
-    open-pull-requests-limit: 5
-    rebase-strategy: auto
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    groups:
+      gha-deps:
+        patterns:
+          - "*"
+    ignore:
+      - dependency-name: "dawidd6/action-send-mail"
+      - dependency-name: "mheap/github-action-required-labels"
     labels:
       - "category:internal"
+      - "dependencies"
+      - "release-notes:not-required"
+    reviewers:
+      - sureshjoshi
     schedule:
-      interval: "weekly" 
-      day: "wednesday"
-      time: "03:00"
-      timezone: "US/Pacific"
+      interval: "monthly"
+
+  - package-ecosystem: "cargo"
+    directory: "/src/rust"
+    groups:
+      rust-security-updates:
+        applies-to: security-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      rust-version-updates:
+        applies-to: version-updates
+        patterns:
+          - "*"
+    labels:
+      - "category:internal"
+      - "dependencies"
+      - "release-notes:not-required"
     reviewers:
       - benjyw
       - cburroughs
-      - huonw
       - sureshjoshi
       - tdyas
-      - tgolsson
+    schedule:
+      interval: "monthly"
+  
+  - package-ecosystem: pip
+    directory: "/3rdparty/python"
+    groups:
+      python-security-updates:
+        applies-to: security-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      python-version-updates:
+        applies-to: version-updates
+        patterns:
+          - "*"
+    labels:
+      - "category:internal"
+      - "dependencies"
+      - "release-notes:not-required"
+    reviewers:
+      - benjyw
+      - cburroughs
+      - sureshjoshi
+      - tdyas
+    schedule:
+      interval: "monthly"
+
+  - package-ecosystem: "npm"
+    directories: 
+      - "build-support/**/*"
+      - "src/python/pants/backend/javascript/**/*"
+      - "src/python/pants/backend/typescript/**/*"
+      - "testprojects/src/js/**/*"
+      - "testprojects/src/ts/**/*"
+    groups:
+      js-security-updates:
+        applies-to: security-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      js-version-updates:
+        applies-to: version-updates
+        patterns:
+          - "*"
+    labels:
+      - "category:internal"
+      - "dependencies"
+      - "release-notes:not-required"
+    reviewers:
+      - sureshjoshi
+    schedule:
+      interval: "monthly"

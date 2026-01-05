@@ -1,0 +1,22 @@
+[package]
+name = "sharded_lmdb"
+version = "0.0.1"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+edition = "2024"
+
+[dependencies]
+bytes = { workspace = true }
+fs = { path = "../fs" }
+futures = { workspace = true }
+hashing = { path = "../hashing" }
+lmdb-rkv = { workspace = true }
+log = { workspace = true }
+task_executor = { path = "../task_executor" }
+tempfile = { workspace = true }
+
+[dev-dependencies]
+parking_lot = { workspace = true }
+tokio = { workspace = true, features = ["macros"] }
+
+[lints]
+workspace = true

@@ -41,16 +41,14 @@ from pants.backend.python.target_types import (
     PythonFilesGeneratorSettingsRequest,
     PythonProvidesField,
     PythonResolveField,
+    PythonResolveLikeFieldToValueRequest,
     ResolvedPexEntryPoint,
     ResolvedPythonDistributionEntryPoints,
     ResolvePexEntryPointRequest,
     ResolvePythonDistributionEntryPointsRequest,
 )
-from pants.backend.python.util_rules.entry_points import (
-    get_python_distribution_entry_point_unambiguous_module_owners,
-)
 from pants.backend.python.util_rules.interpreter_constraints import interpreter_constraints_contains
-from pants.backend.python.util_rules.package_dists import InvalidEntryPoint
+from pants.core.target_types import ResolveLikeFieldToValueRequest, ResolveLikeFieldToValueResult
 from pants.core.util_rules.unowned_dependency_behavior import (
     UnownedDependencyError,
     UnownedDependencyUsage,
@@ -67,6 +65,7 @@ from pants.engine.intrinsics import path_globs_to_paths
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     DependenciesRequest,
+    ExplicitlyProvidedDependencies,
     FieldDefaultFactoryRequest,
     FieldDefaultFactoryResult,
     FieldSet,
@@ -89,6 +88,15 @@ from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import bullet_list, softwrap
 
 logger = logging.getLogger(__name__)
+
+
+class SetupPyError(Exception):
+    def __init__(self, msg: str):
+        super().__init__(f"{msg} See {doc_url('docs/python/overview/building-distributions')}.")
+
+
+class InvalidEntryPoint(SetupPyError, InvalidFieldException):
+    """Indicates that a specified binary entry point was invalid."""
 
 
 @rule
@@ -409,8 +417,8 @@ async def resolve_python_distribution_entry_points(
         entry_point_str for is_target, _, _, entry_point_str in classified_entry_points if is_target
     ]
 
-    # Intermediate step, as Get(Targets) returns a deduplicated set which breaks in case of
-    # multiple input refs that maps to the same target.
+    # Intermediate step, as resolve_targets() returns a deduplicated set which breaks in case of
+    # multiple input refs that map to the same target.
     target_addresses = await resolve_unparsed_address_inputs(
         UnparsedAddressInputs(
             target_refs,
@@ -506,6 +514,34 @@ class InferPythonDistributionDependencies(InferDependenciesRequest):
     infer_from = PythonDistributionDependenciesInferenceFieldSet
 
 
+def get_python_distribution_entry_point_unambiguous_module_owners(
+    address: Address,
+    entry_point_group: str,  # group is the pypa term; aka category or namespace
+    entry_point_name: str,
+    entry_point: EntryPoint,
+    explicitly_provided_deps: ExplicitlyProvidedDependencies,
+    owners: PythonModuleOwners,
+) -> tuple[Address, ...]:
+    field_str = repr({entry_point_group: {entry_point_name: entry_point.spec}})
+    explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
+        owners.ambiguous,
+        address,
+        import_reference="module",
+        context=softwrap(
+            f"""
+            The python_distribution target {address} has the field
+            `entry_points={field_str}`, which maps to the Python module
+            `{entry_point.module}`
+            """
+        ),
+    )
+    maybe_disambiguated = explicitly_provided_deps.disambiguated(owners.ambiguous)
+    unambiguous_owners = owners.unambiguous or (
+        (maybe_disambiguated,) if maybe_disambiguated else ()
+    )
+    return unambiguous_owners
+
+
 @rule
 async def infer_python_distribution_dependencies(
     request: InferPythonDistributionDependencies, python_infer_subsystem: PythonInferSubsystem
@@ -587,6 +623,7 @@ class DependencyValidationFieldSet(FieldSet):
     required_fields = (InterpreterConstraintsField,)
 
     interpreter_constraints: InterpreterConstraintsField
+    resolve: PythonResolveField | None = None
 
 
 class PythonValidateDependenciesRequest(ValidateDependenciesRequest):
@@ -609,12 +646,17 @@ async def validate_python_dependencies(
     )
 
     # Validate that the ICs for dependencies are all compatible with our own.
-    target_ics = request.field_set.interpreter_constraints.value_or_global_default(python_setup)
+    target_ics = request.field_set.interpreter_constraints.value_or_configured_default(
+        python_setup, request.field_set.resolve
+    )
     non_subset_items = []
     for dep in dependencies:
         if not dep.target.has_field(InterpreterConstraintsField):
             continue
-        dep_ics = dep.target[InterpreterConstraintsField].value_or_global_default(python_setup)
+        dep_ics = dep.target[InterpreterConstraintsField].value_or_configured_default(
+            python_setup,
+            dep.target[PythonResolveField] if dep.target.has_field(PythonResolveField) else None,
+        )
         if not interpreter_constraints_contains(
             dep_ics, target_ics, python_setup.interpreter_versions_universe
         ):
@@ -638,6 +680,16 @@ async def validate_python_dependencies(
     return ValidatedDependencies()
 
 
+@rule
+async def python_get_resolve_from_resolve_like_field_request(
+    request: PythonResolveLikeFieldToValueRequest, python_setup: PythonSetup
+) -> ResolveLikeFieldToValueResult:
+    if not python_setup.enable_resolves:
+        return ResolveLikeFieldToValueResult(value=None)
+    resolve = request.target[PythonResolveField].normalized_value(python_setup)
+    return ResolveLikeFieldToValueResult(value=resolve)
+
+
 def rules():
     return (
         *collect_rules(),
@@ -648,4 +700,5 @@ def rules():
         UnionRule(InferDependenciesRequest, InferPexBinaryEntryPointDependency),
         UnionRule(InferDependenciesRequest, InferPythonDistributionDependencies),
         UnionRule(ValidateDependenciesRequest, PythonValidateDependenciesRequest),
+        UnionRule(ResolveLikeFieldToValueRequest, PythonResolveLikeFieldToValueRequest),
     )

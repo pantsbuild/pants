@@ -25,10 +25,10 @@ from pants.backend.python.util_rules.pex_venv import (
 )
 from pants.backend.python.util_rules.pex_venv import rules as pex_venv_rules
 from pants.engine.fs import CreateDigest, DigestContents, FileContent
-from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests, Snapshot
+from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessResult
-from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
+from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 
 
 @pytest.fixture
@@ -256,14 +256,10 @@ def test_extra_args_should_be_passed_through(
     run_rule_with_mocks(
         pex_venv,
         rule_args=[request],
-        mock_gets=[
-            MockGet(output_type=Digest, input_types=(MergeDigests,), mock=lambda _: EMPTY_DIGEST),
-            MockGet(
-                output_type=ProcessResult,
-                input_types=(PexCliProcess,),
-                mock=mocked_run_pex_cli_process,
-            ),
-        ],
+        mock_calls={
+            "pants.engine.intrinsics.merge_digests": lambda _: EMPTY_DIGEST,
+            "pants.engine.process.fallible_to_exec_result_or_raise": mocked_run_pex_cli_process,
+        },
     )
 
     # Verify

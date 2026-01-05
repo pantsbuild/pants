@@ -6,6 +6,7 @@ import logging
 import time
 import uuid
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TypeVar
 
@@ -18,17 +19,17 @@ from pants.bsp.util_rules.targets import (
     BSPBuildTargetInternal,
     BSPCompileRequest,
     BSPCompileResult,
+    bsp_compile,
     resolve_bsp_build_target_addresses,
     resolve_bsp_build_target_identifier,
 )
 from pants.engine.fs import Workspace
 from pants.engine.internals.native_engine import EMPTY_DIGEST, MergeDigests
-from pants.engine.internals.selectors import Get, concurrently
+from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import merge_digests
 from pants.engine.rules import _uncacheable_rule, collect_rules, implicitly, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.util.ordered_set import FrozenOrderedSet
 
 _logger = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ async def compile_bsp_target(
     union_membership: UnionMembership,
 ) -> BSPCompileResult:
     targets = await resolve_bsp_build_target_addresses(request.bsp_target, **implicitly())
-    compile_request_types: FrozenOrderedSet[type[BSPCompileRequest]] = union_membership.get(
+    compile_request_types: Sequence[type[BSPCompileRequest]] = union_membership.get(
         BSPCompileRequest
     )
     field_sets_by_request_type: dict[type[BSPCompileRequest], set[FieldSet]] = defaultdict(set)
@@ -86,12 +87,14 @@ async def compile_bsp_target(
     )
 
     compile_results = await concurrently(
-        Get(
-            BSPCompileResult,
-            BSPCompileRequest,
-            compile_request_type(
-                bsp_target=request.bsp_target, field_sets=tuple(field_sets), task_id=task_id
-            ),
+        bsp_compile(
+            **implicitly(
+                {
+                    compile_request_type(
+                        bsp_target=request.bsp_target, field_sets=tuple(field_sets), task_id=task_id
+                    ): BSPCompileRequest
+                }
+            )
         )
         for compile_request_type, field_sets in field_sets_by_request_type.items()
     )

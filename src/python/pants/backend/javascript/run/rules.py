@@ -23,8 +23,8 @@ from pants.backend.javascript.package_json import (
 )
 from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.engine.env_vars import EnvironmentVarsRequest
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 

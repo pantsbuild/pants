@@ -16,6 +16,8 @@ from nodesemver import min_satisfying
 from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.util_rules import asdf, search_paths, system_binaries
 from pants.core.util_rules.asdf import AsdfPathString, AsdfToolPathsResult
+from pants.core.util_rules.env_vars import environment_vars_subset
+from pants.core.util_rules.env_vars import environment_vars_subset as environment_vars_subset_get
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalToolRequest,
@@ -45,10 +47,6 @@ from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP, EnvironmentVars, En
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, DownloadFile
 from pants.engine.internals.native_engine import FileDigest, MergeDigests
 from pants.engine.internals.platform_rules import environment_path_variable
-from pants.engine.internals.platform_rules import environment_vars_subset
-from pants.engine.internals.platform_rules import (
-    environment_vars_subset as environment_vars_subset_get,
-)
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import create_digest, merge_digests
 from pants.engine.platform import Platform
@@ -70,12 +68,12 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
     options_scope = "nodejs"
     help = "The Node.js Javascript runtime (including Corepack)."
 
-    default_version = "v22.14.0"
+    default_version = "v24.10.0"
     default_known_versions = [
-        "v22.14.0|macos_arm64|e9404633bc02a5162c5c573b1e2490f5fb44648345d64a958b17e325729a5e42|47035396",
-        "v22.14.0|macos_x86_64|6698587713ab565a94a360e091df9f6d91c8fadda6d00f0cf6526e9b40bed250|48656392",
-        "v22.14.0|linux_arm64|08bfbf538bad0e8cbb0269f0173cca28d705874a67a22f60b57d99dc99e30050|28636440",
-        "v22.14.0|linux_x86_64|69b09dba5c8dcb05c4e4273a4340db1005abeafe3927efda2bc5b249e80437ec|29893360",
+        "v24.10.0|macos_arm64|fbc3d6e1e1d962450d058e918214373872cc4c46e08673f31c35932afac4a8c5|51169103",
+        "v24.10.0|macos_x86_64|627b884f66db0dd35f4b46fb9e994774ce560a7fb60798ba1ab81e867a73687d|52347633",
+        "v24.10.0|linux_arm64|07f0558316ebb8977dd6fb29b4de8d369a639d3d8cef544293852a6f5eea6af8|31020300",
+        "v24.10.0|linux_x86_64|2642f4428869aca32443660fd71b3918e2be1277a899bdcaeb64c93b54b5af17|32102040",
     ]
 
     default_url_template = "https://nodejs.org/dist/{version}/node-{version}-{platform}.tar"
@@ -146,7 +144,7 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
     )
 
     package_managers = DictOption[str](
-        default={"npm": "10.9.2", "yarn": "1.22.22", "pnpm": "9.15.6"},
+        default={"npm": "11.6.2", "yarn": "1.22.22", "pnpm": "10.19.0"},
         help=help_text(
             """
             A mapping of package manager versions to semver releases.
@@ -451,7 +449,7 @@ async def node_process_environment(
 ) -> NodeJSProcessEnvironment:
     default_required_tools = ["sh", "bash"]
     tools_used_by_setup_scripts = ["mkdir", "rm", "touch", "which"]
-    pnpm_shim_tools = ["sed", "dirname"]
+    pnpm_shim_tools = ["sed", "dirname", "uname"]
 
     binary_shims = await get_nodejs_process_tools_shims(
         tools=[

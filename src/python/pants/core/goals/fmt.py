@@ -7,14 +7,19 @@ import logging
 from collections.abc import Iterable
 
 from pants.base.specs import Specs
-from pants.core.goals.fix import AbstractFixRequest, FixFilesRequest, FixResult, FixTargetsRequest
+from pants.core.goals.fix import (
+    AbstractFixRequest,
+    FixFilesRequest,
+    FixResult,
+    FixTargetsRequest,
+    _do_fix,
+)
 from pants.core.goals.fix import Partitions as Partitions  # re-export
-from pants.core.goals.fix import _do_fix
 from pants.core.goals.multi_tool_goal_helper import BatchSizeOption, OnlyOption
 from pants.engine.console import Console
 from pants.engine.fs import Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.rules import Get, collect_rules, goal_rule
+from pants.engine.rules import collect_rules, goal_rule, implicitly, rule
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.docutil import doc_url
 from pants.util.strutil import softwrap
@@ -87,6 +92,16 @@ class Fmt(Goal):
     environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
+@rule(polymorphic=True)
+async def partition_targets(req: FmtTargetsRequest.PartitionRequest) -> Partitions:
+    raise NotImplementedError()
+
+
+@rule(polymorphic=True)
+async def partition_files(req: FmtFilesRequest.PartitionRequest) -> Partitions:
+    raise NotImplementedError()
+
+
 @goal_rule
 async def fmt(
     console: Console,
@@ -100,12 +115,16 @@ async def fmt(
         union_membership.get(FmtTargetsRequest.PartitionRequest),
         union_membership.get(FmtFilesRequest.PartitionRequest),
         Fmt,
-        fmt_subsystem,
+        fmt_subsystem,  # type: ignore[arg-type]
         specs,
         workspace,
         console,
-        lambda request_type: Get(Partitions, FmtTargetsRequest.PartitionRequest, request_type),
-        lambda request_type: Get(Partitions, FmtFilesRequest.PartitionRequest, request_type),
+        lambda request_type: partition_targets(
+            **implicitly({request_type: FmtTargetsRequest.PartitionRequest})
+        ),
+        lambda request_type: partition_files(
+            **implicitly({request_type: FmtFilesRequest.PartitionRequest})
+        ),
     )
 
 

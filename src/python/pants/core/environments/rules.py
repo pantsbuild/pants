@@ -47,12 +47,14 @@ from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.intrinsics import docker_resolve_image
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, QueryRule, collect_rules, concurrently, implicitly, rule
+from pants.engine.rules import QueryRule, collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
+    NO_VALUE,
     Field,
     FieldDefaultFactoryRequest,
     FieldDefaultFactoryResult,
     FieldSet,
+    SequenceField,
     StringField,
     StringSequenceField,
     Target,
@@ -101,16 +103,17 @@ async def _warn_on_non_local_environments(specified_targets: Iterable[Target], s
     ]
 
     env_tgts = await concurrently(
-        Get(
-            EnvironmentTarget,
-            EnvironmentNameRequest(
-                name,
-                description_of_origin=(
-                    "the `environment` field of targets including , ".join(
-                        tgt.address.spec for tgt in tgts[:3]
-                    )
-                ),
-            ),
+        get_target_for_environment_name(
+            **implicitly(
+                EnvironmentNameRequest(
+                    name,
+                    description_of_origin=(
+                        "the `environment` field of targets including , ".join(
+                            tgt.address.spec for tgt in tgts[:3]
+                        )
+                    ),
+                )
+            )
         )
         for name, tgts in env_names_and_targets
     )
@@ -147,7 +150,7 @@ async def _warn_on_non_local_environments(specified_targets: Iterable[Target], s
 def determine_bootstrap_environment(session: SchedulerSession) -> EnvironmentName:
     local_env = cast(
         ChosenLocalEnvironmentName,
-        session.product_request(ChosenLocalEnvironmentName, [Params()])[0],
+        session.product_request(ChosenLocalEnvironmentName, Params())[0],
     )
     return local_env.val
 
@@ -381,10 +384,9 @@ async def get_target_for_environment_name(
             softwrap(
                 f"""
                 The name `{env_name.val}` is not defined. The name should have been normalized and
-                validated in the rule `EnvironmentNameRequest -> EnvironmentName`
-                already. If you directly wrote
-                `Get(EnvironmentTarget, EnvironmentName(my_name))`, refactor to
-                `Get(EnvironmentTarget, EnvironmentNameRequest(my_name, ...))`.
+                validated in the resolve_environment_name() rule already. If you called
+                `get_target_for_environment_name(EnvironmentName(name))`, refactor to
+                `get_target_for_environment_name(**implicitly(EnvironmentNameRequest(name, ...))`.
                 """
             )
         )
@@ -425,14 +427,14 @@ async def _apply_fallback_environment(env_tgt: Target, error_msg: str) -> Enviro
     fallback_field = env_tgt[FallbackEnvironmentField]
     if fallback_field.value is None:
         raise NoFallbackEnvironmentError(error_msg)
-    return await Get(
-        EnvironmentName,
+    return await resolve_environment_name(
         EnvironmentNameRequest(
             fallback_field.value,
             description_of_origin=(
                 f"the `{fallback_field.alias}` field of the target {env_tgt.address}"
             ),
         ),
+        **implicitly(),
     )
 
 
@@ -764,20 +766,35 @@ def _add_option_field_for(
                 "value type."
             )
 
-    # The below class will never be used for static type checking outside of this function.
-    # so it's reasonably safe to use `ignore[name-defined]`. Ensure that all this remains valid
-    # if `_SIMPLE_OPTIONS` or `_LIST_OPTIONS` are ever modified.
-    class OptionField(field_type, _EnvironmentSensitiveOptionFieldMixin):  # type: ignore[valid-type, misc]
-        alias = f"{scope}_{snake_name}".replace("-", "_")
-        required = False
-        value: Any
-        help = (
+    class_attrs = {
+        "alias": f"{scope}_{snake_name}".replace("-", "_"),
+        "required": False,
+        "help": (
             f"Overrides the default value from the option `[{scope}].{snake_name}` when this "
             "environment target is active."
-        )
-        subsystem = env_aware_t
-        option_name = option.args[0]
+        ),
+        "subsystem": env_aware_t,
+        "option_name": option.args[0],
+    }
 
+    # For sequence fields, use special handling to distinguish "not specified" from "explicitly empty"
+    if issubclass(field_type, SequenceField):
+        class_attrs["none_is_valid_value"] = True
+
+        def compute_value(cls, raw_value: Any | None, address: Address) -> Any | None:
+            # When field is not specified in BUILD file, return None to indicate inheritance
+            if raw_value is NO_VALUE:
+                return None
+            # For other values, use normal field processing
+            return field_type.compute_value(raw_value, address)
+
+        class_attrs["compute_value"] = classmethod(compute_value)
+
+    # Create the OptionField class dynamically
+    OptionField = cast(
+        "type[Field]",
+        type("OptionField", (field_type, _EnvironmentSensitiveOptionFieldMixin), class_attrs),
+    )
     setattr(OptionField, "__qualname__", f"{option_type.__qualname__}.{OptionField.__name__}")
 
     return [
@@ -804,8 +821,8 @@ def resolve_environment_sensitive_option(name: str, subsystem: Subsystem.Environ
     maybe = options.get((type(subsystem), name))
     if maybe is None or maybe.value is None:
         return None
-    else:
-        return maybe.value
+
+    return maybe.value
 
 
 @memoized

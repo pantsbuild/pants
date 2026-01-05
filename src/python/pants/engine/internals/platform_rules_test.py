@@ -176,7 +176,7 @@ def test_get_environment_paths(env: dict[str, str], expected_entries: list[str])
     paths = run_rule_with_mocks(
         environment_path_variable,
         mock_calls={
-            "pants.engine.internals.platform_rules.environment_vars_subset": mock_environment_vars_subset,
+            "pants.core.util_rules.env_vars.environment_vars_subset": mock_environment_vars_subset,
         },
     )
     assert list(paths) == expected_entries

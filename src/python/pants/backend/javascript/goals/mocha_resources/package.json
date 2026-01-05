@@ -4,6 +4,6 @@
   "type": "module",
   "main": "./src/index.mjs",
   "devDependencies": {
-    "mocha": "^11.1.0"
+    "mocha": "11.7.4"
   }
 }

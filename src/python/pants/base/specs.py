@@ -349,8 +349,7 @@ class RawSpecs:
 class RawSpecsWithoutFileOwners:
     """The subset of `RawSpecs` that do not use the `Owners` rule to match targets.
 
-    This exists to work around a cycle in the rule graph. Usually, consumers should use the simpler
-    `Get(Addresses, RawSpecs)`, which will result in this rule being used.
+    This exists to work around a cycle in the rule graph. Usually, consumers should use RawSpecs.
     """
 
     description_of_origin: str
@@ -436,8 +435,7 @@ class RawSpecsWithoutFileOwners:
 class RawSpecsWithOnlyFileOwners:
     """The subset of `RawSpecs` that require using the `Owners` rule to match targets.
 
-    This exists to work around a cycle in the rule graph. Usually, consumers should use the simpler
-    `Get(Addresses, RawSpecs)`, which will result in this rule being used.
+    This exists to work around a cycle in the rule graph. Usually, consumers should use RawSpecs.
     """
 
     description_of_origin: str

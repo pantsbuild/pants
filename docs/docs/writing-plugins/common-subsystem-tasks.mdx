@@ -139,25 +139,28 @@ Only some language backends support `pants export`. These include the Python and
             )
     ```
 
-4. Make a request for the config files in a rule for running the tool. Use a `Get(ConfigFiles, ConfigFilesRequest)` to get the config files. This has a snapshot that contains the config files (or will be empty if none are found). You can merge these with the other digests to pass the files to your `Process`. If a custom value was provided for the config file, you may need to pass that as an argument to the `Process`. You may also need to register rules from `pants.core.util_rules.config_files`.
+4. Make a request for the config files in a rule for running the tool. Use `find_config_file(ConfigFilesRequest(...))` to get the config files. The resulting `ConfigFiles` instance has a snapshot containing the config files (or will be empty if none are found). You can merge these with the other digests to pass the files to your `Process`. If a custom value was provided for the config file, you may need to pass that as an argument to the `Process`. You may also need to register rules from `pants.core.util_rules.config_files`.
 
     ```python
     from pants.core.goals.lint import LintResult
     from pants.core.util_rules import config_files
-    from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
-    from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-    from pants.engine.fs import Digest, MergeDigests
-    from pants.engine.rules import Get, MultiGet, collect_rules, rule
+    from pants.core.util_rules.config_files import ConfigFilesRequest, find_config_file
+    from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
+    from pants.engine.fs import MergeDigests
+    from pants.engine.intrinsics import merge_digests
+    from pants.engine.rules import collect_rules, concurrently, rule
 
     @rule
     async def run_fortran_lint(request: FortranlintRequest.Batch, subsystem: FortranLint) -> LintResult:
-        sources, config_file = await MultiGet(
-            Get(SourceFiles, SourceFilesRequest(fs.sources for fs in request.elements)),
-            Get(ConfigFiles, ConfigFilesRequest, subsystem.config_request()),
+        sources, config_file = await concurrently(
+            determine_source_files(
+                SourceFilesRequest(fs.sources for fs in request.elements)
+            ),
+            find_config_file(subsystem.config_request()),
         )
 
-        input_digest = await Get(
-            Digest, MergeDigests((sources.snapshot.digest, config_file.snapshot.digest))
+        input_digest = await merge_digests(
+            MergeDigests((sources.snapshot.digest, config_file.snapshot.digest))
         )
 
         args = []

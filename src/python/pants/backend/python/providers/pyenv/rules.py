@@ -10,12 +10,12 @@ from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.core.goals.resolves import ExportableTool
 from pants.core.goals.run import RunRequest
 from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.external_tool import TemplatedExternalTool, download_external_tool
 from pants.core.util_rules.external_tool import rules as external_tools_rules
 from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP, EnvironmentVarsRequest
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import MergeDigests
-from pants.engine.internals.platform_rules import environment_vars_subset
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import create_digest, merge_digests
 from pants.engine.platform import Platform

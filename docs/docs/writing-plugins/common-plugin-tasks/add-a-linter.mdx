@@ -110,36 +110,32 @@ async def run_shellcheck(
 
 The `ShellcheckRequest.Batch` instance has a property called `.elements`, which in this case, stores a collection of the `FieldSet`s defined in step 2. Each `FieldSet` corresponds to a single target. Pants will have already validated that there is at least one valid `FieldSet`.
 
-If you used `ExternalTool` in step 1, you will use `Get(DownloadedExternalTool, ExternalToolRequest)` to install the tool.
+If you used `ExternalTool` in step 1, you will use `download_external_tool()` to install the tool.
 
-Typically, you will use `Get(SourceFiles, SourceFilesRequest)` to get all the sources you want to run your linter on.
+Typically, you will use `determine_source_files()` to get all the sources you want to run your linter on.
 
-If you have a `--config` option, you should use `Get(Digest, PathGlobs)` to find the config file and include it in the `input_digest`.
+If you have a `--config` option, you should use `path_globs_to_digest()` to find the config file and include it in the `input_digest`.
 
-Use `Get(Digest, MergeDigests)` to combine the different inputs together, such as merging the source files, config file, and downloaded tool.
+Use `merge_digests()` to combine the different inputs together, such as merging the source files, config file, and downloaded tool.
 
-Usually, you will use `Get(FallibleProcessResult, Process)` to run a subprocess (see [Processes](../the-rules-api/processes.mdx)). We use `Fallible` because Pants should not throw an exception if the linter returns a non-zero exit code. Then, you can use `LintResult.from_fallible_process_result()` to convert this into a `LintResult`.
+Usually, you will use `execute_process()` to run a subprocess (see [Processes](../the-rules-api/processes.mdx)) and get a FallibleProcessResult. We use the fallible variant because Pants should not throw an exception if the linter returns a non-zero exit code. Then, you can use `LintResult.from_fallible_process_result()` to convert this into a `LintResult`.
 
 ```python
-from pants.core.goals.lint import LintTargetsRequest, LintResult, LintResults
+from pants.core.goals.lint import LintResult
 from pants.core.util_rules.source_files import (
     SourceFilesRequest,
-    SourceFiles,
+    determine_source_files
 )
-from pants.core.util_rules.external_tool import (
-    DownloadedExternalTool,
-    ExternalTool,
-    ExternalToolRequest,
-)
+from pants.core.util_rules.external_tool import download_external_tool
 from pants.engine.fs import (
-    Digest,
     GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
 )
+from pants.engine.intrinsics import execute_process, merge_digests, path_globs_to_digest
 from pants.engine.platform import Platform
-from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import Get, MultiGet, rule
+from pants.engine.process import Process
+from pants.engine.rules import concurrently, implicitly, rule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -149,21 +145,17 @@ from pants.util.strutil import pluralize
 async def run_shellcheck(
     request: ShellcheckRequest.Batch, shellcheck: Shellcheck, platform: Platform
 ) -> LintResult:
-    download_shellcheck_request = Get(
-        DownloadedExternalTool,
-        ExternalToolRequest,
+    download_shellcheck_call = download_external_tool(
         shellcheck.get_request(platform),
     )
 
-    sources_request = Get(
-        SourceFiles,
+    sources_call = determine_source_files(
         SourceFilesRequest(field_set.sources for field_set in request.elements),
     )
 
     # If the user specified `--shellcheck-config`, we must search for the file they specified with
     # `PathGlobs` to include it in the `input_digest`. We error if the file cannot be found.
-    config_digest_request = Get(
-        Digest,
+    config_digest_call = path_globs_to_digest(
         PathGlobs(
             globs=[shellcheck.config] if shellcheck.config else [],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
@@ -171,13 +163,12 @@ async def run_shellcheck(
         ),
     )
 
-    downloaded_shellcheck, sources, config_digest = await MultiGet(
-        download_shellcheck_request, sources_request, config_digest_request
+    downloaded_shellcheck, sources, config_digest = await concurrently(
+        download_shellcheck_call, sources_call, config_digest_call
     )
 
     # The Process needs one single `Digest`, so we merge everything together.
-    input_digest = await Get(
-        Digest,
+    input_digest = await merge_digests(
         MergeDigests(
             (
                 downloaded_shellcheck.digest,
@@ -187,8 +178,7 @@ async def run_shellcheck(
         ),
     )
 
-    process_result = await Get(
-        FallibleProcessResult,
+    process_result = await execute_process(
         Process(
             argv=[
                 downloaded_shellcheck.exe,
@@ -199,6 +189,7 @@ async def run_shellcheck(
             description=f"Run Shellcheck on {pluralize(len(request.elements), 'file')}.",
             level=LogLevel.DEBUG,
         ),
+        **implicitly(),
     )
     return LintResult.create(request, process_result)
 

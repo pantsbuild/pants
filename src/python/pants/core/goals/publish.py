@@ -48,7 +48,7 @@ from pants.engine.process import (
     Process,
     ProcessCacheScope,
 )
-from pants.engine.rules import Get, collect_rules, concurrently, goal_rule, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, goal_rule, implicitly, rule
 from pants.engine.target import (
     FieldSet,
     ImmutableValue,
@@ -109,7 +109,7 @@ class PublishFieldSet(Generic[_T], FieldSet, metaclass=ABCMeta):
     """
 
     # Subclasses must provide this, to a union member (subclass) of `PublishRequest`.
-    publish_request_type: ClassVar[type[_T]]  # type: ignore[misc]
+    publish_request_type: ClassVar[type[_T]]
 
     @final
     def _request(self, packages: tuple[BuiltPackage, ...]) -> _T:
@@ -178,6 +178,14 @@ class PublishProcesses(Collection[PublishPackages]):
     Depending on the capabilities of the publishing tool, the work may be partitioned based on
     number of artifacts and/or repositories to publish to.
     """
+
+
+@rule(polymorphic=True)
+async def create_publish_processes(
+    req: PublishRequest,
+    environment_name: EnvironmentName,
+) -> PublishProcesses:
+    raise NotImplementedError()
 
 
 @dataclass(frozen=True)
@@ -266,12 +274,13 @@ async def package_for_publish(
                 logger.info(str(artifact.extra_log_lines[0]))
 
     publish = await concurrently(
-        Get(
-            PublishProcesses,
-            {
-                field_set._request(packages): PublishRequest,
-                local_environment.val: EnvironmentName,
-            },
+        create_publish_processes(
+            **implicitly(
+                {
+                    field_set._request(packages): PublishRequest,
+                    local_environment.val: EnvironmentName,
+                }
+            )
         )
         for field_set in request.publish_field_sets
     )

@@ -27,11 +27,11 @@ from pants.engine.fs import CreateDigest, DigestContents, DownloadFile, FileCont
 from pants.engine.internals.native_engine import Digest
 from pants.engine.platform import Platform
 from pants.engine.rules import QueryRule
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.scope import Scope, ScopedOptions
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.pytest_util import no_exception
-from pants.testutil.rule_runner import MockGet, RuleRunner, run_rule_with_mocks
+from pants.testutil.rule_runner import RuleRunner, run_rule_with_mocks
 from pants.util.strutil import softwrap
 
 
@@ -151,10 +151,12 @@ def test_export(rule_runner) -> None:
 
     Ensures we locate the class and prepare the Digest correctly
     """
-
     platform = Platform.linux_x86_64
-    union_membership = UnionMembership(
-        {ExportRequest: [ExportExternalToolRequest], ExportableTool: [TemplatedFooBar]}
+    union_membership = UnionMembership.from_rules(
+        {
+            UnionRule(ExportRequest, ExportExternalToolRequest),
+            UnionRule(ExportableTool, TemplatedFooBar),
+        }
     )
 
     templated_foobar = create_subsystem(
@@ -194,14 +196,10 @@ def test_export(rule_runner) -> None:
     result: MaybeExportResult = run_rule_with_mocks(
         export_external_tool,
         rule_args=[_ExportExternalToolForResolveRequest("foobar"), platform, union_membership],
-        mock_gets=[
-            MockGet(output_type=ScopedOptions, input_types=(Scope,), mock=fake_get_options),
-            MockGet(
-                output_type=DownloadedExternalTool,
-                input_types=(ExternalToolRequest,),
-                mock=fake_download,
-            ),
-        ],
+        mock_calls={
+            "pants.engine.internals.options_parsing.scope_options": fake_get_options,
+            "pants.core.util_rules.external_tool.download_external_tool": fake_download,
+        },
         union_membership=union_membership,
     )
 

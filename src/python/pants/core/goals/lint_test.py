@@ -13,8 +13,6 @@ from typing import Any, TypeVar
 import pytest
 
 from pants.base.specs import Specs
-from pants.core.environments.rules import EnvironmentNameRequest
-from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.goals.fix import FixFilesRequest, FixTargetsRequest
 from pants.core.goals.fmt import FmtFilesRequest, FmtTargetsRequest
 from pants.core.goals.lint import (
@@ -25,20 +23,20 @@ from pants.core.goals.lint import (
     LintSubsystem,
     LintTargetsRequest,
     Partitions,
-    lint,
 )
+from pants.core.goals.lint_goal import lint
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.partitions import PartitionerType, _EmptyMetadata
 from pants.engine.addresses import Address
-from pants.engine.fs import PathGlobs, SpecsPaths, Workspace
-from pants.engine.internals.native_engine import EMPTY_SNAPSHOT, Snapshot
+from pants.engine.fs import SpecsPaths, Workspace
+from pants.engine.internals.native_engine import EMPTY_SNAPSHOT
 from pants.engine.rules import QueryRule
 from pants.engine.target import Field, FieldSet, FilteredTargets, MultipleSourcesField, Target
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
 from pants.testutil.option_util import create_goal_subsystem
-from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
+from pants.testutil.rule_runner import RuleRunner, mock_console, run_rule_with_mocks
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 
@@ -178,9 +176,9 @@ def _all_lint_requests() -> Iterable[type[MockLintRequest]]:
         yield from subclasses
 
 
-def mock_target_partitioner(
-    request: MockLintTargetsRequest.PartitionRequest,
-) -> Partitions[MockLinterFieldSet, Any]:
+def mock_target_partitioner(__implicitly: tuple) -> Partitions[MockLinterFieldSet, Any]:
+    request, typ = next(iter(__implicitly[0].items()))
+    assert typ == LintTargetsRequest.PartitionRequest
     if type(request) is SkippedRequest.PartitionRequest:
         return Partitions()
 
@@ -207,11 +205,15 @@ class MockFilesRequest(MockLintRequest, LintFilesRequest):
         return LintResult(0, "", "", cls.tool_name)
 
 
-def mock_file_partitioner(request: MockFilesRequest.PartitionRequest) -> Partitions[str, Any]:
+def mock_file_partitioner(__implicitly: dict) -> Partitions[str, Any]:
+    request, typ = next(iter(__implicitly[0].items()))
+    assert typ == LintFilesRequest.PartitionRequest
     return Partitions.single_partition(request.files)
 
 
-def mock_lint_partition(request: Any) -> LintResult:
+def mock_lint_partition(__implicitly: dict) -> LintResult:
+    request, typ = next(iter(__implicitly[0].items()))
+    assert typ == AbstractLintRequest.Batch
     request_type = {cls.Batch: cls for cls in _all_lint_requests()}[type(request)]
     return request_type.get_lint_result(request.elements)
 
@@ -308,6 +310,11 @@ class BuildFileFixer(MockLintRequest, FixFilesRequest):
         return LintResult(0, "", "", cls.tool_name)
 
 
+def mock_fix_partition_as_linter(request) -> LintResult:
+    request_type = {cls.Batch: cls for cls in _all_lint_requests()}[type(request)]
+    return request_type.get_lint_result(request.elements)
+
+
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner()
@@ -329,17 +336,19 @@ def run_lint_rule(
     skip_formatters: bool = False,
     skip_fixers: bool = False,
 ) -> tuple[int, str]:
-    union_membership = UnionMembership(
+    union_membership = UnionMembership.from_rules(
         {
-            AbstractLintRequest: lint_request_types,
-            AbstractLintRequest.Batch: [rt.Batch for rt in lint_request_types],
-            LintTargetsRequest.PartitionRequest: [
-                rt.PartitionRequest
+            *[UnionRule(AbstractLintRequest, t) for t in lint_request_types],
+            *[UnionRule(AbstractLintRequest.Batch, rt.Batch) for rt in lint_request_types],
+            *[
+                UnionRule(LintTargetsRequest.PartitionRequest, rt.PartitionRequest)
                 for rt in lint_request_types
                 if issubclass(rt, LintTargetsRequest)
             ],
-            LintFilesRequest.PartitionRequest: [
-                rt.PartitionRequest for rt in lint_request_types if issubclass(rt, LintFilesRequest)
+            *[
+                UnionRule(LintFilesRequest.PartitionRequest, rt.PartitionRequest)
+                for rt in lint_request_types
+                if issubclass(rt, LintFilesRequest)
             ],
         }
     )
@@ -350,6 +359,7 @@ def run_lint_rule(
         skip_formatters=skip_formatters,
         skip_fixers=skip_fixers,
     )
+
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
         result: Lint = run_rule_with_mocks(
             lint,
@@ -361,40 +371,18 @@ def run_lint_rule(
                 union_membership,
                 DistDir(relpath=Path("dist")),
             ],
-            mock_gets=[
-                MockGet(
-                    output_type=Partitions,
-                    input_types=(LintTargetsRequest.PartitionRequest,),
-                    mock=mock_target_partitioner,
-                ),
-                MockGet(
-                    output_type=EnvironmentTarget,
-                    input_types=(EnvironmentNameRequest,),
-                    mock=lambda _: EnvironmentTarget(None, None),
-                ),
-                MockGet(
-                    output_type=Partitions,
-                    input_types=(LintFilesRequest.PartitionRequest,),
-                    mock=mock_file_partitioner,
-                ),
-                MockGet(
-                    output_type=LintResult,
-                    input_types=(AbstractLintRequest.Batch,),
-                    mock=mock_lint_partition,
-                ),
-                MockGet(
-                    output_type=Snapshot,
-                    input_types=(PathGlobs,),
-                    mock=lambda _: EMPTY_SNAPSHOT,
-                ),
-            ],
             mock_calls={
-                "pants.engine.internals.graph.filter_targets": lambda: FilteredTargets(
+                "pants.engine.internals.graph.filter_targets": lambda __implicitly: FilteredTargets(
                     tuple(targets)
                 ),
                 "pants.engine.internals.specs_rules.resolve_specs_paths": lambda _: SpecsPaths(
                     ("f.txt", "BUILD"), ()
                 ),
+                "pants.core.goals.lint.partition_targets": mock_target_partitioner,
+                "pants.core.goals.lint.partition_files": mock_file_partitioner,
+                "pants.core.goals.lint.lint_batch": mock_lint_partition,
+                "pants.core.goals.lint_goal.run_fixer_or_formatter_as_linter": mock_fix_partition_as_linter,
+                "pants.engine.intrinsics.digest_to_snapshot": lambda __implicitly: EMPTY_SNAPSHOT,
             },
             union_membership=union_membership,
             # We don't want temporary warnings to interfere with our expected output.
@@ -568,7 +556,7 @@ def test_default_single_partition_partitioner() -> None:
 
     class LintKitchenRequest(LintTargetsRequest):
         field_set_type = MockLinterFieldSet
-        tool_subsystem = KitchenSubsystem
+        tool_subsystem = KitchenSubsystem  # type: ignore[assignment]
         partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
     rules = [

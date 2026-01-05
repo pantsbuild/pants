@@ -6,6 +6,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from textwrap import dedent
+from typing import Any
 
 import pytest
 
@@ -22,6 +23,7 @@ from pants.core.environments.rules import (
     UnrecognizedEnvironmentError,
     extract_process_config_from_environment,
     resolve_environment_name,
+    resolve_environment_sensitive_option,
 )
 from pants.core.environments.subsystems import EnvironmentsSubsystem
 from pants.core.environments.target_types import (
@@ -39,19 +41,15 @@ from pants.core.environments.target_types import (
     RemoteExtraPlatformPropertiesField,
 )
 from pants.engine.environment import LOCAL_ENVIRONMENT_MATCHER, ChosenLocalWorkspaceEnvironmentName
-from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
+from pants.engine.internals.docker import DockerResolveImageResult
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessCacheScope
 from pants.engine.target import FieldSet, OptionalSingleSourceField, Target
 from pants.option.global_options import GlobalOptions, KeepSandboxes
+from pants.option.option_types import ShellStrListOption
+from pants.option.subsystem import Subsystem
 from pants.testutil.option_util import create_subsystem
-from pants.testutil.rule_runner import (
-    MockGet,
-    QueryRule,
-    RuleRunner,
-    engine_error,
-    run_rule_with_mocks,
-)
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error, run_rule_with_mocks
 
 
 @pytest.fixture
@@ -112,13 +110,11 @@ def test_extract_process_config_from_environment() -> None:
                 keep_sandboxes,
                 env_subsystem,
             ],
-            mock_gets=[
-                MockGet(
-                    output_type=DockerResolveImageResult,
-                    input_types=(DockerResolveImageRequest,),
-                    mock=lambda req: DockerResolveImageResult("sha256:abc123"),
-                )
-            ],
+            mock_calls={
+                "pants.engine.intrinsics.docker_resolve_image": lambda req: DockerResolveImageResult(
+                    "sha256:abc123"
+                ),
+            },
         )
         assert result.platform == Platform.linux_arm64.value
         assert result.remote_execution is expected_remote_execution
@@ -366,14 +362,10 @@ def test_resolve_environment_name_local_and_docker_fallbacks(monkeypatch) -> Non
                 "pants.core.environments.rules.determine_local_environment": mock_determine_local_environment,
                 "pants.core.environments.rules.determine_local_workspace_environment": mock_determine_local_workspace_environment,
                 "pants.core.environments.rules.get_target_for_environment_name": mock_get_target_for_environment_name,
-            },
-            mock_gets=[
-                MockGet(
-                    output_type=EnvironmentName,
-                    input_types=(EnvironmentNameRequest,),
-                    mock=lambda req: EnvironmentName(req.raw_value),
+                "pants.core.environments.rules.resolve_environment_name": lambda req: EnvironmentName(
+                    req.raw_value
                 ),
-            ],
+            },
         ).val
         return result
 
@@ -555,3 +547,109 @@ def test_find_chosen_local_and_experimental_workspace_environments(rule_runner: 
 
     chosen_workspace_env = rule_runner.request(ChosenLocalWorkspaceEnvironmentName, [])
     assert chosen_workspace_env.val.val == "workspace"
+
+
+def test_sequence_field_inheritance() -> None:
+    """Test environment field inheritance for sequence fields."""
+
+    class TestSubsystem(Subsystem):
+        options_scope = "test-subsystem"
+        help = "Test subsystem"
+
+        class EnvironmentAware(Subsystem.EnvironmentAware):
+            test_sequence_option = ShellStrListOption(help="Test sequence option")
+
+    rule_runner = RuleRunner(
+        target_types=[LocalEnvironmentTarget],
+        rules=[
+            *TestSubsystem.rules(),
+            *environments_rules.rules(),
+        ],
+    )
+
+    rule_runner.set_options(
+        [
+            "--test-subsystem-test-sequence-option=GLOBAL_VAR=global_value",
+            "--test-subsystem-test-sequence-option=TEST_VAR=test_value",
+        ]
+    )
+
+    def test_environment_resolution(
+        runner: RuleRunner,
+        env_name: str,
+        env_definition: str,
+        expected_result: Any,
+        description: str,
+    ):
+        runner.write_files(
+            {
+                f"{env_name}/BUILD": dedent(f"""\
+            local_environment(
+                name="{env_name}",
+                compatible_platforms=["linux_x86_64", "macos_arm64"],
+                {env_definition}
+            )
+            """)
+            }
+        )
+
+        env_target = runner.get_target(Address(env_name, target_name=env_name))
+
+        test_sequence_field: Any = None
+        for field_type in env_target.field_values:
+            field = env_target.field_values[field_type]
+            if hasattr(field, "alias") and field.alias == "test_subsystem_test_sequence_option":
+                test_sequence_field = field
+                break
+
+        assert test_sequence_field is not None
+
+        subsystem_class = test_sequence_field.subsystem
+        mock_env_aware = subsystem_class()
+        mock_env_aware.env_tgt = EnvironmentTarget(env_name, env_target)
+
+        result = resolve_environment_sensitive_option(
+            test_sequence_field.option_name,
+            mock_env_aware,
+        )
+
+        assert result == expected_result, f"{description}: Expected {expected_result}, got {result}"
+
+    test_environment_resolution(
+        rule_runner, "env1", "", None, "Field not specified - should inherit global config"
+    )
+
+    test_environment_resolution(
+        rule_runner,
+        "env2",
+        "test_subsystem_test_sequence_option=[],",
+        (),
+        "Global values can be overridden with empty",
+    )
+
+    test_environment_resolution(
+        rule_runner,
+        "env3",
+        'test_subsystem_test_sequence_option=["ENV_VAR=env_value"],',
+        ("ENV_VAR=env_value",),
+        "Field with values - should override global config",
+    )
+
+    # Set global options to empty to test inheritance from empty global
+    rule_runner.set_options([])
+
+    test_environment_resolution(
+        rule_runner,
+        "env4",
+        "",
+        None,
+        "Field not specified with empty global - should inherit empty global",
+    )
+
+    test_environment_resolution(
+        rule_runner,
+        "env5",
+        'test_subsystem_test_sequence_option=["NEW_VAR=new_value"],',
+        ("NEW_VAR=new_value",),
+        "Empty global can be overridden with values",
+    )
