@@ -22,6 +22,9 @@ updates:
 
   - package-ecosystem: "cargo"
     directory: "/src/rust"
+    ignore:
+      # No longer developed, referred to 1.3.3 as complete, lots of drama (https://sr.ht/~stygianentity/bincode/ and https://old.reddit.com/r/rust/comments/1pnz1iz/bincode_development_has_ceased_permanently/)
+      - dependency-name: "bincode" 
     groups:
       rust-security-updates:
         applies-to: security-updates
