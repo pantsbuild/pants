@@ -48,11 +48,18 @@ python_distribution(
 pex_binary(
     name="pants-pex",
     dependencies=[":pants-packaged"],
-    script="pants",
+    #script="pants",
     execution_mode="venv",
     shebang="/usr/bin/env python",
     strip_pex_env=False,
     layout="zipapp",
+    #extra_build_args=['--validate-entry-point'],
+    scie="eager",
+    scie_name_style="platform-file-suffix",
+    # The native code engine is per platform
+    scie_platform=["current"],
+    scie_pbs_stripped=True,
+    scie_hash_alg="sha256",
 )
 
 # NB: we use `dummy.c` to avoid clang/gcc complaining `error: no input files` when building
