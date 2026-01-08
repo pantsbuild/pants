@@ -563,7 +563,7 @@ def test_constraints_validation(tmp_path: Path, rule_runner: PythonRuleRunner) -
 
     # This string won't parse as a Requirement if it doesn't contain a netloc,
     # so we explicitly mention localhost.
-    url_req = f"foorl@ git+file://localhost{foorl_dir.as_posix()}@9.8.7"
+    url_req = f"foorl @ git+file://localhost{foorl_dir.as_posix()}@9.8.7"
 
     rule_runner.write_files(
         {
