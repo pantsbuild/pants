@@ -192,29 +192,19 @@ impl CapturedWorkdir for CommandRunner {
         })
         .await?;
 
-            // If we have stdin bytes, spawn a task to write them to the child's stdin
-            if let Some(bytes) = stdin_bytes {
-                debug!("Preparing to write {} bytes to stdin", bytes.len());
-                if let Some(mut stdin) = child.stdin.take() {
-                    tokio::spawn(async move {
-                        use tokio::io::AsyncWriteExt;
-                        debug!("Writing {} bytes to stdin", bytes.len());
-                        match stdin.write_all(&bytes).await {
-                            Ok(_) => {
-                                debug!("Successfully wrote {} bytes to stdin", bytes.len());
-                            }
-                            Err(e) => {
-                                debug!("Failed to write stdin: {:?}", e);
-                            }
-                        }
-                        // Close stdin by dropping it
-                        drop(stdin);
-                        debug!("Closed stdin");
-                    });
-                } else {
-                    debug!("Warning: child.stdin was None");
-                }
+        let stdin_write_handle = if let Some(bytes) = stdin_bytes {
+            if let Some(mut stdin) = child.stdin.take() {
+                Some(tokio::spawn(async move {
+                    use tokio::io::AsyncWriteExt;
+                    stdin.write_all(&bytes).await
+                        .map_err(|e| format!("Failed to write to stdin: {e}"))
+                }))
+            } else {
+                None
             }
+        } else {
+            None
+        };
 
         debug!(
             "spawned workspace process as {:?} for {:?}",
@@ -230,6 +220,25 @@ impl CapturedWorkdir for CommandRunner {
             .fuse()
             .boxed();
         let exit_stream = async move {
+            // If stdin write was spawned, wait for it to complete and propagate any error
+            if let Some(handle) = stdin_write_handle {
+                match handle.await {
+                    Err(e) => {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            format!("Stdin write task panicked: {e}"),
+                        ))
+                    }
+                    Ok(Err(e)) => {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            format!("Failed to write to stdin: {e}"),
+                        ))
+                    }
+                    Ok(Ok(())) => {}
+                }
+            }
+
             child
                 .wait()
                 .map_ok(|exit_status| {

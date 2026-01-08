@@ -520,11 +520,7 @@ def test_concurrency_templating(rule_runner: RuleRunner) -> None:
 
 
 def test_stdin(rule_runner: RuleRunner) -> None:
-    """Test that stdin parameter properly pipes data to the process."""
-    # Provide content via stdin parameter
     stdin_content = b"Hello from stdin!\nLine 2\nLine 3\n"
-    
-    # Use /bin/cat to read from stdin and output to stdout
     process = Process(
         argv=("/bin/cat",),
         stdin=stdin_content,
@@ -532,39 +528,22 @@ def test_stdin(rule_runner: RuleRunner) -> None:
     )
     result = rule_runner.request(ProcessResult, [process])
 
-    # The output should match the input we provided via stdin
     assert result.stdout == stdin_content
     assert result.stderr == b""
 
-
-def test_stdin_with_grep(rule_runner: RuleRunner) -> None:
-    """Test that stdin works with filtering commands like grep."""
-    # Provide stdin content with multiple lines
-    stdin_content = b"apple\nbanana\ncherry\napricot\nblueberry\n"
-    
-    # Use grep to filter lines starting with 'a'
-    process = Process(
-        argv=("/bin/grep", "^a"),
-        stdin=stdin_content,
-        description="test stdin with grep",
-    )
-    result = rule_runner.request(ProcessResult, [process])
-    
-    # Should only output lines starting with 'a'
-    assert result.stdout == b"apple\napricot\n"
-    assert result.stderr == b""
-
-
 def test_stdin_empty(rule_runner: RuleRunner) -> None:
-    """Test that processes work normally when stdin is not provided."""
-    # Process without stdin should work normally
+    file_content = b"file contents\n"
+    input_digest = rule_runner.request(
+        Digest, [CreateDigest([FileContent("test.txt", file_content)])]
+    )
     process = Process(
-        argv=("/bin/echo", "hello"),
-        description="test no stdin",
+        argv=("/bin/cat", "-", "test.txt"),
+        description="test empty stdin",
+        input_digest=input_digest,
     )
     result = rule_runner.request(ProcessResult, [process])
-    
-    assert result.stdout == b"hello\n"
+
+    assert result.stdout == file_content
 
 
 def test_concurrency_enum():

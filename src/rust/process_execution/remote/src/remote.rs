@@ -905,13 +905,16 @@ impl process_execution::CommandRunner for CommandRunner {
         _workunit: &mut RunningWorkunit,
         request: Process,
     ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
-        // Processes with stdin should have been forced to local execution in lift_process_fields.
-        // This assertion ensures they never reach the remote execution code path.
+        // Remote execution does not support stdin.
+        // This is checked up in the python engine, but checking
+        // here as well in case another caller comes along.
         if request.stdin.is_some() {
             return Err(ProcessError::Unclassified(
-                "Internal error: Process with stdin reached remote execution. \
-                 Stdin should have been handled by forcing local execution."
-                    .to_string(),
+                format!(
+                    "Process '{}' cannot use stdin with remote execution. \
+                     Configure the process to run locally or remove stdin.",
+                    request.description
+                ),
             ));
         }
 
