@@ -20,7 +20,6 @@
     "mypy-typing-asserts==0.1.1",
     "node-semver==0.9.0",
     "packaging==25.0",
-    "pex==2.73.1",
     "psutil==5.9.8",
     "pydevd-pycharm==251.23536.40",
     "pytest!=7.1.0,!=7.1.1,<9,>=7",

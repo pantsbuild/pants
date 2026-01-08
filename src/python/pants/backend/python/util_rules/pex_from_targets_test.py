@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import importlib.resources
+import os
 import subprocess
-import sys
 from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
@@ -40,6 +40,7 @@ from pants.backend.python.util_rules.pex import (
     PexRequest,
     PexRequirementsInfo,
 )
+from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.backend.python.util_rules.pex_from_targets import (
     ChosenPythonResolve,
     ChosenPythonResolveRequest,
@@ -493,20 +494,25 @@ def create_project_dir(workdir: Path, project: Project) -> PurePath:
     return project_dir
 
 
-def create_dists(workdir: Path, project: Project, *projects: Project) -> PurePath:
+def create_dists(
+    workdir: Path, rule_runner: PythonRuleRunner, project: Project, *projects: Project
+) -> PurePath:
     project_dirs = [create_project_dir(workdir, proj) for proj in (project, *projects)]
 
-    pex = workdir / "pex"
+    # Get the pex CLI binary and materialize it
+    pex_pex = rule_runner.request(PexPEX, [])
+    rule_runner.scheduler.write_digest(pex_pex.digest)
+    pex_binary = Path(rule_runner.build_root) / pex_pex.exe
+
+    pex_output = workdir / "output.pex"
     subprocess.run(
         args=[
-            sys.executable,
-            "-m",
-            "pex",
+            pex_binary,
             *project_dirs,
             *build_deps,
             "--include-tools",
             "-o",
-            pex,
+            pex_output,
         ],
         check=True,
     )
@@ -514,16 +520,15 @@ def create_dists(workdir: Path, project: Project, *projects: Project) -> PurePat
     find_links = workdir / "find-links"
     subprocess.run(
         args=[
-            sys.executable,
-            "-m",
-            "pex.tools",
-            pex,
+            pex_binary,
+            pex_output,
             "repository",
             "extract",
             "--find-links",
             find_links,
         ],
         check=True,
+        env=os.environ.copy() | {"PEX_MODULE": "pex.tools"},
     )
     return find_links
 
@@ -537,6 +542,7 @@ def test_constraints_validation(tmp_path: Path, rule_runner: PythonRuleRunner) -
     sdists.mkdir()
     find_links = create_dists(
         sdists,
+        rule_runner,
         Project("Foo-Bar", "1.0.0"),
         Project("Bar", "5.5.5"),
         Project("baz", "2.2.2"),
@@ -696,7 +702,7 @@ def test_exclude_requirements(
 ) -> None:
     sdists = tmp_path / "sdists"
     sdists.mkdir()
-    find_links = create_dists(sdists, Project("baz", "2.2.2"))
+    find_links = create_dists(sdists, rule_runner, Project("baz", "2.2.2"))
 
     rule_runner.write_files(
         {
