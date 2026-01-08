@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib.resources
 import os
+import re
 import subprocess
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -537,6 +538,15 @@ def requirements(rule_runner: PythonRuleRunner, pex: Pex) -> list[str]:
     return cast(list[str], get_all_data(rule_runner, pex).info["requirements"])
 
 
+def _normalize_url_req(s: str) -> str:
+    """See https://github.com/pypa/packaging/issues/935.
+
+    Several tests here are brittle and rely on Pex/Pants being on the same packaging version.  These
+    are pretty low value.  Back this out after upgrading packaging.
+    """
+    return re.sub(r"\s*@\s*", "@ ", s)
+
+
 def test_constraints_validation(tmp_path: Path, rule_runner: PythonRuleRunner) -> None:
     sdists = tmp_path / "sdists"
     sdists.mkdir()
@@ -634,7 +644,12 @@ def test_constraints_validation(tmp_path: Path, rule_runner: PythonRuleRunner) -
     assert isinstance(pex_req1.requirements, PexRequirements)
     assert pex_req1.requirements.constraints_strings == FrozenOrderedSet(constraints1_strings)
     req_strings_obj1 = rule_runner.request(PexRequirementsInfo, (pex_req1.requirements,))
-    assert req_strings_obj1.req_strings == ("bar==5.5.5", "baz", "foo-bar>=0.1.2", url_req)
+    assert tuple(_normalize_url_req(s) for s in req_strings_obj1.req_strings) == (
+        "bar==5.5.5",
+        "baz",
+        "foo-bar>=0.1.2",
+        _normalize_url_req(url_req),
+    )
 
     pex_req2 = get_pex_request(
         constraints1_filename,
@@ -645,13 +660,22 @@ def test_constraints_validation(tmp_path: Path, rule_runner: PythonRuleRunner) -
     pex_req2_reqs = pex_req2.requirements
     assert isinstance(pex_req2_reqs, PexRequirements)
     req_strings_obj2 = rule_runner.request(PexRequirementsInfo, (pex_req2_reqs,))
-    assert req_strings_obj2.req_strings == ("bar==5.5.5", "baz", "foo-bar>=0.1.2", url_req)
+    assert tuple(_normalize_url_req(s) for s in req_strings_obj2.req_strings) == (
+        "bar==5.5.5",
+        "baz",
+        "foo-bar>=0.1.2",
+        _normalize_url_req(url_req),
+    )
     assert isinstance(pex_req2_reqs.from_superset, Pex)
     repository_pex = pex_req2_reqs.from_superset
     assert not get_all_data(rule_runner, repository_pex).info["strip_pex_env"]
-    assert ["Foo._-BAR==1.0.0", "bar==5.5.5", "baz==2.2.2", url_req, "qux==3.4.5"] == requirements(
-        rule_runner, repository_pex
-    )
+    assert [
+        "Foo._-BAR==1.0.0",
+        "bar==5.5.5",
+        "baz==2.2.2",
+        _normalize_url_req(url_req),
+        "qux==3.4.5",
+    ] == [_normalize_url_req(r) for r in requirements(rule_runner, repository_pex)]
 
     with engine_error(
         ValueError,
