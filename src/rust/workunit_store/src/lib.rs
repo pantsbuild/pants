@@ -254,6 +254,25 @@ impl Workunit {
             (WorkunitState::Completed { .. }, _) => "Completed:",
         };
 
+        // Format duration for completed workunits (not canceled ones)
+        let duration_str = if !canceled {
+            if let WorkunitState::Completed { time_span } = &self.state {
+                let duration = std::time::Duration::from(time_span.duration);
+                let total_secs = duration.as_secs_f64();
+                if total_secs >= 60.0 {
+                    let mins = (total_secs / 60.0).floor() as u64;
+                    let secs = total_secs % 60.0;
+                    format!(" ({mins}m {secs:.1}s)")
+                } else {
+                    format!(" ({total_secs:.2}s)")
+                }
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        };
+
         let identifier = if let Some(ref s) = metadata.desc {
             s.as_str()
         } else {
@@ -281,7 +300,7 @@ impl Workunit {
             "".to_string()
         };
 
-        log!(self.level, "{state} {effective_identifier}{message}");
+        log!(self.level, "{state} {effective_identifier}{duration_str}{message}");
     }
 }
 
