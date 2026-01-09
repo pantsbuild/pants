@@ -218,17 +218,13 @@ class CompletePexEnvironment:
         *args: str,
         python: PythonExecutable | PythonBuildStandaloneBinary | None = None,
     ) -> tuple[str, ...]:
+        python_exe = python or self._pex_environment.bootstrap_python
         pex_relpath = (
             os.path.relpath(pex_filepath, self._working_directory)
             if self._working_directory
             else pex_filepath
         )
-        python = python or self._pex_environment.bootstrap_python
-        if python:
-            return (python.path, pex_relpath, *args)
-        if os.path.basename(pex_relpath) == pex_relpath:
-            return (f"./{pex_relpath}", *args)
-        return (pex_relpath, *args)
+        return (python_exe.path, pex_relpath, *args)
 
     def environment_dict(self, *, python_configured: bool) -> Mapping[str, str]:
         """The environment to use for running anything with PEX.
