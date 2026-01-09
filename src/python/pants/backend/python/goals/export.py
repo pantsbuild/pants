@@ -266,7 +266,7 @@ async def do_export(
                 ),
                 {
                     **complete_pex_env.environment_dict(python_configured=True),
-                    "PEX_TOOLS": "1",
+                    "PEX_SCRIPT": "pex-tools",
                 },
             ),
             # Remove the requirements and pex pexes, to avoid confusion.
