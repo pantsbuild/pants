@@ -121,7 +121,7 @@ async def _create_python_source_run_request(
         *chrooted_source_roots,
     ]
     extra_env = {
-        **complete_pex_environment.environment_dict(python=python),
+        **complete_pex_environment.environment_dict(python_configured=True),
         "PEX_EXTRA_SYS_PATH": os.pathsep.join(source_roots),
     }
     append_only_caches = (
