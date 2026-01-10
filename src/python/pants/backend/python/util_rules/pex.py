@@ -8,7 +8,7 @@ import json
 import logging
 import os
 import shlex
-import uuid
+import zlib
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import PurePath
@@ -761,7 +761,12 @@ async def build_pex(
         output_file = request.output_filename
         strip_output_chroot = False
     else:
-        output_chroot = f"pex-dist-{uuid.uuid4().hex}"
+        # In principle a cache should always be just a cache, but existing
+        # tests in this repo make the assumption that they can look into a
+        # still intact cache and see the same thing as was there before, which
+        # requires this to be deterministic and not random.  adler32, because
+        # it is in the stlib, fast, and doesn't need to be cryptographic.
+        output_chroot = f"pex-dist-{zlib.adler32(request.output_filename.encode()):08x}"
         strip_output_chroot = True
         output_file = os.path.join(output_chroot, request.output_filename)
 
