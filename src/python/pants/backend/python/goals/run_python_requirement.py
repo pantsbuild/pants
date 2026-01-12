@@ -162,7 +162,7 @@ async def create_python_requirement_run_request(
     input_digest = venv_pex.digest
 
     extra_env = {
-        **complete_pex_environment.environment_dict(python=None),
+        **complete_pex_environment.environment_dict(python_configured=venv_pex.python is not None),
     }
 
     return RunRequest(
