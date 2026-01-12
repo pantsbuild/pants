@@ -262,10 +262,11 @@ async def do_export(
                 complete_pex_env.create_argv(
                     os.path.join(tmpdir_under_digest_root, pex_pex.exe),
                     *pex_args,
+                    python=requirements_pex.python,
                 ),
                 {
-                    **complete_pex_env.environment_dict(python=requirements_pex.python),
-                    "PEX_MODULE": "pex.tools",
+                    **complete_pex_env.environment_dict(python_configured=True),
+                    "PEX_SCRIPT": "pex-tools",
                 },
             ),
             # Remove the requirements and pex pexes, to avoid confusion.
