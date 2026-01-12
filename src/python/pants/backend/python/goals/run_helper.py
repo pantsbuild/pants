@@ -19,7 +19,6 @@ from pants.backend.python.util_rules.pex import (
     Pex,
     VenvPexRequest,
     create_venv_pex,
-    find_interpreter,
 )
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import (
@@ -97,9 +96,8 @@ async def _create_python_source_run_request(
         complete_pex_environment = pex_env.in_sandbox(working_directory=None)
     else:
         complete_pex_environment = pex_env.in_workspace()
-    venv_pex, python = await concurrently(
-        create_venv_pex(VenvPexRequest(pex_request, complete_pex_environment), **implicitly()),
-        find_interpreter(pex_request.interpreter_constraints, **implicitly()),
+    venv_pex = await create_venv_pex(
+        VenvPexRequest(pex_request, complete_pex_environment), **implicitly()
     )
     input_digests = [
         venv_pex.digest,
