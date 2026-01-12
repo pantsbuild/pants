@@ -199,9 +199,9 @@ async def setup_pex_cli_process(
     ]
 
     complete_pex_env = pex_env.in_sandbox(working_directory=None)
-    normalized_argv = complete_pex_env.create_argv(pex_pex.exe, *args)
+    normalized_argv = complete_pex_env.create_argv(pex_pex.exe, *args, python=bootstrap_python)
     env = {
-        **complete_pex_env.environment_dict(python=bootstrap_python),
+        **complete_pex_env.environment_dict(python_configured=True),
         **python_native_code.subprocess_env_vars,
         **(request.extra_env or {}),
         # If a subcommand is used, we need to use the `pex3` console script.
