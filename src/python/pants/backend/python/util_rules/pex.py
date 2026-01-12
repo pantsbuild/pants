@@ -937,7 +937,7 @@ class VenvScriptWriter:
         env_vars = (
             f"{name}={shlex.quote(value)}"
             for name, value in self.complete_pex_env.environment_dict(
-                python=self.pex.python
+                python_configured=True
             ).items()
         )
 
@@ -945,7 +945,7 @@ class VenvScriptWriter:
         venv_dir = shlex.quote(str(self.venv_dir))
         execute_pex_args = " ".join(
             f"$(adjust_relative_paths {shlex.quote(arg)})"
-            for arg in self.complete_pex_env.create_argv(self.pex.name)
+            for arg in self.complete_pex_env.create_argv(self.pex.name, python=self.pex.python)
         )
 
         script = dedent(
@@ -1222,9 +1222,9 @@ class PexProcess:
 async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment) -> Process:
     pex = request.pex
     complete_pex_env = pex_environment.in_sandbox(working_directory=request.working_directory)
-    argv = complete_pex_env.create_argv(pex.name, *request.argv)
+    argv = complete_pex_env.create_argv(pex.name, *request.argv, python=pex.python)
     env = {
-        **complete_pex_env.environment_dict(python=pex.python),
+        **complete_pex_env.environment_dict(python_configured=pex.python is not None),
         **request.extra_env,
     }
     input_digest = (
