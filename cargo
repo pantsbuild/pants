@@ -24,7 +24,11 @@ if is_macos_big_sur; then
 fi
 
 if ! command -v rustup &> /dev/null; then
-  die "Please install Rustup and ensure \`rustup\` is on your PATH (usually by adding ~/.cargo/bin). See https://rustup.rs."
+  die "Please install Rustup and ensure \`rustup\` is on your PATH (usually by adding ~/.cargo/bin). See https://rustup.rs"
+fi
+
+if ! command -v protoc &> /dev/null; then
+  die "Please install the protocol buffers compiler and ensure \`protoc\` is on your PATH (as required by tonic-build). See https://protobuf.dev/installation/"
 fi
 
 cd "${REPO_ROOT}/src/rust" || exit "${PIPESTATUS[0]}"
