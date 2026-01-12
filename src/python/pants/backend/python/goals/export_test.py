@@ -166,7 +166,7 @@ def test_export_venv_new_codepath(
             else:
                 assert ppc0.argv[7] == "--non-hermetic-scripts"
             assert ppc0.argv[-1] == "{digest_root}"
-            assert ppc0.extra_env["PEX_MODULE"] == "pex.tools"
+            assert ppc0.extra_env["PEX_SCRIPT"] == "pex-tools"
             assert ppc0.extra_env.get("PEX_ROOT") is not None
 
             ppc1 = result.post_processing_cmds[-1]
