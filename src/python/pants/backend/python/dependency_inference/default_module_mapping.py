@@ -110,6 +110,7 @@ DEFAULT_MODULE_MAPPING: dict[str, tuple[str, ...]] = {
     "ansicolors": ("colors",),
     "antlr4-python3-runtime": ("antlr4",),
     "apache-airflow": ("airflow",),
+    "apache-airflow-client": ("airflow_client",),
     "atlassian-python-api": ("atlassian",),
     "attrs": ("attr", "attrs"),
     "auth0-python": ("auth0",),
