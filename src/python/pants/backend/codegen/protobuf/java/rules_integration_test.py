@@ -69,7 +69,9 @@ message HelloReply {
 def protobuf_java_lockfile_def() -> JVMLockfileFixtureDefinition:
     return JVMLockfileFixtureDefinition(
         "protobuf-java.test.lock",
-        ["com.google.protobuf:protobuf-java:3.19.4"],
+        [
+            "com.google.protobuf:protobuf-java:4.33.2",
+        ],
     )
 
 
@@ -253,10 +255,10 @@ def protobuf_java_grpc_lockfile_def() -> JVMLockfileFixtureDefinition:
     return JVMLockfileFixtureDefinition(
         "protobuf-grpc-java.test.lock",
         [
-            "com.google.protobuf:protobuf-java:3.19.4",
-            "io.grpc:grpc-netty-shaded:1.48.0",
-            "io.grpc:grpc-protobuf:1.48.0",
-            "io.grpc:grpc-stub:1.48.0",
+            "com.google.protobuf:protobuf-java:4.33.2",
+            "io.grpc:grpc-netty-shaded:1.78.0",
+            "io.grpc:grpc-protobuf:1.78.0",
+            "io.grpc:grpc-stub:1.78.0",
             "org.apache.tomcat:annotations-api:6.0.53",
         ],
     )
