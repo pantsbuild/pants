@@ -271,6 +271,10 @@ async def built_package_for_pex_from_targets_request(
                 != os.path.commonpath((pft_request.request.output_filename, artifact))
             )
         )
+    # Make sure the "regular PEX first" invariant explained above is true
+    assert artifacts[0].relpath in snapshot.files or artifacts[0].relpath in snapshot.dirs, (
+        "PEX must be first BuiltPackageArtifact"
+    )
     return BuiltPackage(pex.digest, tuple(artifacts))
 
 
