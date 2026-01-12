@@ -15,11 +15,7 @@ from pants.backend.python.target_types import (
     ResolvePexEntryPointRequest,
 )
 from pants.backend.python.target_types_rules import resolve_pex_entry_point
-from pants.backend.python.util_rules.pex import (
-    Pex,
-    VenvPexRequest,
-    create_venv_pex,
-)
+from pants.backend.python.util_rules.pex import Pex, VenvPexRequest, create_venv_pex
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import (
     PexFromTargetsRequest,
