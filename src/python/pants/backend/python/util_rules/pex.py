@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import shlex
+import zlib
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import PurePath
@@ -61,7 +62,15 @@ from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    AddPrefix,
+    CreateDigest,
+    Digest,
+    FileContent,
+    MergeDigests,
+    RemovePrefix,
+)
 from pants.engine.internals.graph import (
     hydrate_sources,
     resolve_targets,
@@ -69,7 +78,13 @@ from pants.engine.internals.graph import (
 )
 from pants.engine.internals.graph import transitive_targets as transitive_targets_get
 from pants.engine.internals.native_engine import Snapshot
-from pants.engine.intrinsics import add_prefix, create_digest, digest_to_snapshot, merge_digests
+from pants.engine.intrinsics import (
+    add_prefix,
+    create_digest,
+    digest_to_snapshot,
+    merge_digests,
+    remove_prefix,
+)
 from pants.engine.process import (
     Process,
     ProcessCacheScope,
@@ -186,15 +201,11 @@ class PexRequest(EngineAwareParameter):
     pex_path: tuple[Pex, ...]
     description: str | None = dataclasses.field(compare=False)
     cache_scope: ProcessCacheScope
-    scie_output_files: Iterable[str] | None = None
-    scie_output_directories: Iterable[str] | None = None
 
     def __init__(
         self,
         *,
         output_filename: str,
-        scie_output_files: Iterable[str] | None = None,
-        scie_output_directories: Iterable[str] | None = None,
         internal_only: bool,
         layout: PexLayout | None = None,
         python: PythonExecutable | None = None,
@@ -248,12 +259,8 @@ class PexRequest(EngineAwareParameter):
         :param description: A human-readable description to render in the dynamic UI when building
             the Pex.
         :param cache_scope: The cache scope for the underlying pex cli invocation process.
-        :param scie_output_files If we are also building native executable scies for the PEX, their filenames
-        :param scie_output_directories If we are also building native executable scies for the PEX, using a directory layout, their dirs.
         """
         object.__setattr__(self, "output_filename", output_filename)
-        object.__setattr__(self, "scie_output_files", scie_output_files)
-        object.__setattr__(self, "scie_output_directories", scie_output_directories)
         object.__setattr__(self, "internal_only", internal_only)
         # Use any explicitly requested layout, or Packed for internal PEXes (which is a much
         # friendlier layout for the CAS than Zipapp.)
@@ -749,9 +756,23 @@ async def build_pex(
         )
         req_strings = ()
 
+    output_chroot = os.path.dirname(request.output_filename)
+    if output_chroot:
+        output_file = request.output_filename
+        strip_output_chroot = False
+    else:
+        # In principle a cache should always be just a cache, but existing
+        # tests in this repo make the assumption that they can look into a
+        # still intact cache and see the same thing as was there before, which
+        # requires this to be deterministic and not random.  adler32, because
+        # it is in the stlib, fast, and doesn't need to be cryptographic.
+        output_chroot = f"pex-dist-{zlib.adler32(request.output_filename.encode()):08x}"
+        strip_output_chroot = True
+        output_file = os.path.join(output_chroot, request.output_filename)
+
     argv = [
         "--output-file",
-        request.output_filename,
+        output_file,
         *request.additional_args,
     ]
 
@@ -804,22 +825,6 @@ async def build_pex(
 
     argv.extend(["--layout", request.layout.value])
 
-    pex_output_files: Iterable[str] | None = None
-    pex_output_directories: Iterable[str] | None = None
-    if PexLayout.ZIPAPP == request.layout:
-        pex_output_files = [request.output_filename]
-    else:
-        pex_output_directories = [request.output_filename]
-
-    output_files = (
-        *(pex_output_files if pex_output_files else []),
-        *(request.scie_output_files if request.scie_output_files else []),
-    )
-    output_directories = (
-        *(pex_output_directories if pex_output_directories else []),
-        *(request.scie_output_directories if request.scie_output_directories else []),
-    )
-
     result = await fallible_to_exec_result_or_raise(
         **implicitly(
             PexCliProcess(
@@ -827,8 +832,8 @@ async def build_pex(
                 extra_args=argv,
                 additional_input_digest=merged_digest,
                 description=_build_pex_description(request, req_strings, python_setup.resolves),
-                output_files=output_files if output_files else None,
-                output_directories=output_directories if output_directories else None,
+                output_files=None,
+                output_directories=[output_chroot],
                 concurrency_available=requirements_setup.concurrency_available,
                 cache_scope=request.cache_scope,
             )
@@ -837,12 +842,17 @@ async def build_pex(
 
     maybe_log_pex_stderr(result.stderr, pex_subsystem.verbosity)
 
+    if strip_output_chroot:
+        output_digest = await remove_prefix(RemovePrefix(result.output_digest, output_chroot))
+    else:
+        output_digest = result.output_digest
+
     digest = (
         await merge_digests(
-            MergeDigests((result.output_digest, *(pex.digest for pex in request.pex_path)))
+            MergeDigests((output_digest, *(pex.digest for pex in request.pex_path)))
         )
         if request.pex_path
-        else result.output_digest
+        else output_digest
     )
 
     return BuildPexResult(
