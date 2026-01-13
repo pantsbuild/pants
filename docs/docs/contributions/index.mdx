@@ -38,17 +38,11 @@ Pants's engine is written in Rust. See [Developing Rust](./development/developin
 
 ## First, share your plan
 
-Before investing your time into a code change, it helps to share your interest. This will allow us to give you initial feedback that will save you time, such as pointing you to related code.
+Before investing your time into a code change, share your ideas so we can give you initial feedback that should save you time (for example, pointing you to related code or prior art).
 
-To share your plan, please either open a [GitHub issue](https://github.com/pantsbuild/pants/issues) or message us on [Slack](/community/getting-help#slack) (you can start with the #general channel). Briefly describe the change you'd like to make, including a motivation for the change.
+To share your plan, please either open a [GitHub issue](https://github.com/pantsbuild/pants/issues) or message us on [Slack](/community/getting-help#slack) (you can start with the #general channel). Briefly describe the change you'd like to make, including motivation and links to any relevant issues or PRs in the Pants repo. If the proposed change is large, consider splitting it up into multiple smaller, independent pieces.
 
-If we do not respond within 24 business hours, please gently ping us by commenting "ping" on your GitHub issue or messaging on Slack asking if someone could please take a look.
-
-:::note Tip: Can you split out any "prework"?
-If your change is big, such as adding a new feature, it can help to split it up into multiple pull requests. This makes it easier for us to review and to get passing CI.
-
-This is a reason we encourage you to share your plan with us - we can help you to scope out if it would make sense to split into multiple PRs.
-:::
+Before adding a new backend or plugin to Pants, develop and iterate on it as an [in-repo plugin](../writing-plugins/overview#in-repo-plugins) in your own project. This lets you validate design and APIs with real users and iterate quickly without being blocked on upstream review. Once the plugin is stable, open an issue describing the functionality and your users' experience with it, along with a proposal to upstream it.
 
 ## Design docs
 
@@ -135,12 +129,10 @@ Alternatively, you can push an empty commit with `git commit --allow-empty` to f
 
 One or more reviewers will leave feedback. If you are confused by any of the feedback, please do not be afraid to ask for clarification!
 
-If we do not respond within 24 business hours, please gently ping us by commenting "ping" on your pull request or messaging on Slack asking if someone could please take a look.
-
 Once one or more reviewers have approved—and CI goes green—a reviewer will merge your change.
 
 :::note When will your change be released?
-Your change will be included in the next weekly dev release, which usually happens every Friday or Monday. If you fixed a bug, your change may also be cherry-picked into a release candidate from the prior release series.
+Your change will be included in the next dev release, which usually happens every week or two. If you fixed a bug, your change may also be cherry-picked into a release candidate from the prior release series.
 
 See [Release strategy](./releases/release-strategy.mdx).
 :::
