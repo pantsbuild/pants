@@ -767,6 +767,19 @@ class ScieNameStyle(StrEnum):
     PLATFORM_FILE_SUFFIX = "platform-file-suffix"
 
 
+class PexScieLoadDotenvField(TriBoolField):
+    alias = "scie_load_dotenv"
+    required = False
+    default = None
+    help = help_text(
+        """ Have the scie launcher load `.env` files and apply the loaded env
+        vars to the PEX scie environment. See the 'load_dotenv' docs here for
+        more on the `.env` loading specifics: https://github.com/a-
+        scie/jump/blob/main/docs/packaging.md#optional-fields (Pex default:
+        False) """
+    )
+
+
 class PexScieNameStyleField(StringField):
     alias = "scie_name_style"
     valid_choices = ScieNameStyle
@@ -822,15 +835,19 @@ class PexScieBusyBox(StringField):
     )
 
 
-class PexScieBusyboxPexEntrypointEnvPassthrough(TriBoolField):
-    alias = "scie_busybox_pex_entrypoint_env_passthrough"
+class PexSciePexEntrypointEnvPassthrough(TriBoolField):
+    alias = "scie_pex_entrypoint_env_passthrough"
     required = False
     default = None
     help = help_text(
-        """ When creating a busybox, allow overriding the primary entrypoint
-        at runtime via PEX_INTERPRETER, PEX_SCRIPT and PEX_MODULE. Note that
-        when using the `venv` execution mode this adds modest startup overhead
-        on the order of 10ms.  """
+        """
+        Allow overriding the primary entrypoint at runtime via
+        PEX_INTERPRETER, PEX_SCRIPT and PEX_MODULE. Note that
+        when using --venv with a script entrypoint this adds
+        modest startup overhead on the order of 10ms. Defaults
+        to false for busybox scies and true for single
+        entrypoint scies.
+        """
     )
 
 
@@ -891,6 +908,31 @@ class PexSciePythonVersion(StringField):
     )
 
 
+class PexSciePbsFreeThreaded(TriBoolField):
+    alias = "scie_pbs_free_threaded"
+    default = None
+    help = help_text(
+        """
+        Should the Python Standalone Builds CPython
+        distributions be free-threaded. If left unspecified or
+        otherwise turned off, creating a scie from a PEX with
+        free-threaded abi wheels will automatically turn this
+        option on. Note that this option is not compatible
+        with `scie_pbs_stripped=True`. (Pex default: False)
+        """
+    )
+
+
+class PexSciePbsDebug(TriBoolField):
+    alias = "scie_pbs_debug"
+    default = None
+    help = help_text(
+        """ Should the Python Standalone Builds CPython distributions be debug
+        builds. Note that this option is not compatible with
+        `scie_pbs_stripped=True`. (default: False) """
+    )
+
+
 class PexSciePbsStripped(TriBoolField):
     alias = "scie_pbs_stripped"
     required = False
@@ -899,7 +941,9 @@ class PexSciePbsStripped(TriBoolField):
         """ Should the Python Standalone Builds CPython distributions used be
         stripped of debug symbols or not. For Linux and Windows particularly,
         the stripped distributions are less than half the size of the
-        distributions that ship with debug symbols.  """
+        distributions that ship with debug symbols.  Note that this option is
+        not compatible with `scie_pbs_free_threaded=True` or
+        `scie_pbs_debug=True`. (Pex default: False) """
     )
 
 
@@ -944,12 +988,15 @@ _PEX_BINARY_COMMON_FIELDS = (
 
 _PEX_SCIE_BINARY_FIELDS = (
     PexScieField,
+    PexScieLoadDotenvField,
     PexScieNameStyleField,
     PexScieBusyBox,
-    PexScieBusyboxPexEntrypointEnvPassthrough,
+    PexSciePexEntrypointEnvPassthrough,
     PexSciePlatformField,
     PexSciePbsReleaseField,
     PexSciePythonVersion,
+    PexSciePbsFreeThreaded,
+    PexSciePbsDebug,
     PexSciePbsStripped,
     PexScieHashAlgField,
 )

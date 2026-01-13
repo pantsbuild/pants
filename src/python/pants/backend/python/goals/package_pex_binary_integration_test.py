@@ -643,8 +643,8 @@ def test_scie_platform_parent_dir(rule_runner: PythonRuleRunner) -> None:
     "passthrough",
     [
         "",
-        "scie_busybox_pex_entrypoint_env_passthrough=True,",
-        "scie_busybox_pex_entrypoint_env_passthrough=False,",
+        "scie_pex_entrypoint_env_passthrough=True,",
+        "scie_pex_entrypoint_env_passthrough=False,",
     ],
 )
 def test_scie_busybox_moo(rule_runner: PythonRuleRunner, passthrough: str) -> None:
@@ -819,3 +819,99 @@ def test_scie_pbs_stripped(rule_runner: PythonRuleRunner, stripped: str) -> None
     assert expected_pex_relpath == result.artifacts[0].relpath
     expected_scie_relpath = "src.py.project/project"
     assert expected_scie_relpath == result.artifacts[1].relpath
+
+
+@pytest.mark.parametrize("scie_load_dotenv", [True, False])
+def test_scie_load_dotenv_passthru(rule_runner: PythonRuleRunner, scie_load_dotenv: bool) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                f"""\
+                python_sources(name="lib")
+                pex_binary(
+                    entry_point="app.py",
+                    scie="lazy",
+                    scie_load_dotenv={scie_load_dotenv},
+                    scie_pbs_release="20251031",  # The last release that includes Python 3.9.
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+    # Just asserting that this executes, but not re-checking Pex's implementation
+    assert len(result.artifacts) == 2
+    assert "src.py.project/project.pex" == result.artifacts[0].relpath
+
+
+def test_scie_pbs_free_threaded(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(name="lib")
+                pex_binary(
+                    entry_point="app.py",
+                    scie="lazy",
+                    scie_python_version="3.14.2",
+                    scie_pbs_free_threaded=True,
+                    scie_pbs_release="20251205",  # With free threaded and 3.14.2
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+    rule_runner.write_digest(result.digest)
+    executable = os.path.join(rule_runner.build_root, "src.py.project/project")
+    output = subprocess.check_output(executable, env={"SCIE": "inspect"})
+    # Minimal check without brittle binding to the exact SCIE=inspect format
+    # Will look something like 'ptex':
+    # {'cpython-3.14.2+20251205-x86_64-unknown-linux-gnu-freethreaded+pgo+lto-full.tar.zst':
+    # 'https://github.com/astral-sh/python-build-standalone/releases/download/20251205/cpython-3.14.2%2B20251205-x86_64-unknown-linux-gnu-freethreaded%2Bpgo%2Blto-full.tar.zst'}}
+    assert b"freethreaded" in output
+
+
+def test_scie_pbs_debug(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(name="lib")
+                pex_binary(
+                    entry_point="app.py",
+                    scie="lazy",
+                    scie_pbs_debug=True,
+                    scie_pbs_release="20251031",  # The last release that includes Python 3.9.
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+
+    rule_runner.write_digest(result.digest)
+    executable = os.path.join(rule_runner.build_root, "src.py.project/project")
+    output = subprocess.check_output(executable, env={"SCIE": "inspect"})
+    assert b"stripped" not in output

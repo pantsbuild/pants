@@ -28,12 +28,15 @@ from pants.backend.python.target_types import (
     PexLayout,
     PexLayoutField,
     PexScieBusyBox,
-    PexScieBusyboxPexEntrypointEnvPassthrough,
     PexScieField,
     PexScieHashAlgField,
+    PexScieLoadDotenvField,
     PexScieNameStyleField,
+    PexSciePbsDebug,
+    PexSciePbsFreeThreaded,
     PexSciePbsReleaseField,
     PexSciePbsStripped,
+    PexSciePexEntrypointEnvPassthrough,
     PexSciePlatformField,
     PexSciePythonVersion,
     PexScriptField,
@@ -100,13 +103,16 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     extra_build_args: PexExtraBuildArgsField
 
     scie: PexScieField
+    scie_load_dotenv: PexScieLoadDotenvField
     scie_name_style: PexScieNameStyleField
     scie_busybox: PexScieBusyBox
-    scie_busybox_pex_entrypoint_env_passthrough: PexScieBusyboxPexEntrypointEnvPassthrough
+    scie_pex_entrypoint_env_passthrough: PexSciePexEntrypointEnvPassthrough
     scie_platform: PexSciePlatformField
     scie_pbs_release: PexSciePbsReleaseField
     scie_python_version: PexSciePythonVersion
     scie_hash_alg: PexScieHashAlgField
+    scie_pbs_free_threaded: PexSciePbsFreeThreaded
+    scie_pbs_debug: PexSciePbsDebug
     scie_pbs_stripped: PexSciePbsStripped
 
     def builds_pex_and_scie(self) -> bool:
@@ -152,11 +158,16 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
         args = []
         if self.scie.value is not None:
             args.append(f"--scie={self.scie.value}")
+        if self.scie_load_dotenv.value is not None:
+            if self.scie_load_dotenv.value:
+                args.append("--scie-load-dotenv")
+            else:
+                args.append("--no-scie-load-dotenv")
         if self.scie_name_style.value is not None:
             args.append(f"--scie-name-style={self.scie_name_style.value}")
         if self.scie_busybox.value is not None:
             args.append(f"--scie-busybox={self.scie_busybox.value}")
-        if self.scie_busybox_pex_entrypoint_env_passthrough.value is True:
+        if self.scie_pex_entrypoint_env_passthrough.value is True:
             args.append("--scie-busybox-pex-entrypoint-env-passthrough")
         if self.scie_platform.value is not None:
             args.extend([f"--scie-platform={platform}" for platform in self.scie_platform.value])
@@ -166,6 +177,16 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
             args.append(f"--scie-python-version={self.scie_python_version.value}")
         if self.scie_hash_alg.value is not None:
             args.append(f"--scie-hash-alg={self.scie_hash_alg.value}")
+        if self.scie_pbs_debug.value is not None:
+            if self.scie_pbs_debug.value:
+                args.append("--scie-pbs-debug")
+            else:
+                args.append("--no-scie-pbs-debug")
+        if self.scie_pbs_free_threaded.value is not None:
+            if self.scie_pbs_free_threaded.value:
+                args.append("--scie-pbs-free-threaded")
+            else:
+                args.append("--no-scie-pbs-free-threaded")
         if self.scie_pbs_stripped.value is True:
             args.append("--scie-pbs-stripped")
 
