@@ -1,4 +1,4 @@
-// Copyright 2016 Google Inc.
+// Copyright 2025 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,13 +16,9 @@ syntax = "proto3";
 
 package google.bytestream;
 
-import "google/api/annotations.proto";
-import "google/protobuf/wrappers.proto";
-
 option go_package = "google.golang.org/genproto/googleapis/bytestream;bytestream";
 option java_outer_classname = "ByteStreamProto";
 option java_package = "com.google.bytestream";
-
 
 // #### Introduction
 //
@@ -91,7 +87,8 @@ service ByteStream {
   // evicted. For any sequence of `QueryWriteStatus()` calls for a given
   // resource name, the sequence of returned `committed_size` values will be
   // non-decreasing.
-  rpc QueryWriteStatus(QueryWriteStatusRequest) returns (QueryWriteStatusResponse);
+  rpc QueryWriteStatus(QueryWriteStatusRequest)
+      returns (QueryWriteStatusResponse);
 }
 
 // Request object for ByteStream.Read.
