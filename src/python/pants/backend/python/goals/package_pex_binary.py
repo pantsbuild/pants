@@ -2,10 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import dataclasses
-import itertools
 import logging
 import os
-from collections.abc import Iterable
 from dataclasses import dataclass
 
 from pants.backend.python.target_types import (
@@ -28,12 +26,15 @@ from pants.backend.python.target_types import (
     PexLayout,
     PexLayoutField,
     PexScieBusyBox,
-    PexScieBusyboxPexEntrypointEnvPassthrough,
     PexScieField,
     PexScieHashAlgField,
+    PexScieLoadDotenvField,
     PexScieNameStyleField,
+    PexSciePbsDebug,
+    PexSciePbsFreeThreaded,
     PexSciePbsReleaseField,
     PexSciePbsStripped,
+    PexSciePexEntrypointEnvPassthrough,
     PexSciePlatformField,
     PexSciePythonVersion,
     PexScriptField,
@@ -43,7 +44,6 @@ from pants.backend.python.target_types import (
     PexVenvHermeticScripts,
     PexVenvSitePackagesCopies,
     ResolvePexEntryPointRequest,
-    ScieNameStyle,
 )
 from pants.backend.python.target_types_rules import resolve_pex_entry_point
 from pants.backend.python.util_rules.pex import create_pex, digest_complete_platforms
@@ -59,7 +59,7 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior
-from pants.engine.platform import Platform
+from pants.engine.intrinsics import digest_to_snapshot
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
@@ -100,13 +100,16 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     extra_build_args: PexExtraBuildArgsField
 
     scie: PexScieField
+    scie_load_dotenv: PexScieLoadDotenvField
     scie_name_style: PexScieNameStyleField
     scie_busybox: PexScieBusyBox
-    scie_busybox_pex_entrypoint_env_passthrough: PexScieBusyboxPexEntrypointEnvPassthrough
+    scie_pex_entrypoint_env_passthrough: PexSciePexEntrypointEnvPassthrough
     scie_platform: PexSciePlatformField
     scie_pbs_release: PexSciePbsReleaseField
     scie_python_version: PexSciePythonVersion
     scie_hash_alg: PexScieHashAlgField
+    scie_pbs_free_threaded: PexSciePbsFreeThreaded
+    scie_pbs_debug: PexSciePbsDebug
     scie_pbs_stripped: PexSciePbsStripped
 
     def builds_pex_and_scie(self) -> bool:
@@ -152,11 +155,16 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
         args = []
         if self.scie.value is not None:
             args.append(f"--scie={self.scie.value}")
+        if self.scie_load_dotenv.value is not None:
+            if self.scie_load_dotenv.value:
+                args.append("--scie-load-dotenv")
+            else:
+                args.append("--no-scie-load-dotenv")
         if self.scie_name_style.value is not None:
             args.append(f"--scie-name-style={self.scie_name_style.value}")
         if self.scie_busybox.value is not None:
             args.append(f"--scie-busybox={self.scie_busybox.value}")
-        if self.scie_busybox_pex_entrypoint_env_passthrough.value is True:
+        if self.scie_pex_entrypoint_env_passthrough.value is True:
             args.append("--scie-busybox-pex-entrypoint-env-passthrough")
         if self.scie_platform.value is not None:
             args.extend([f"--scie-platform={platform}" for platform in self.scie_platform.value])
@@ -166,6 +174,16 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
             args.append(f"--scie-python-version={self.scie_python_version.value}")
         if self.scie_hash_alg.value is not None:
             args.append(f"--scie-hash-alg={self.scie_hash_alg.value}")
+        if self.scie_pbs_debug.value is not None:
+            if self.scie_pbs_debug.value:
+                args.append("--scie-pbs-debug")
+            else:
+                args.append("--no-scie-pbs-debug")
+        if self.scie_pbs_free_threaded.value is not None:
+            if self.scie_pbs_free_threaded.value:
+                args.append("--scie-pbs-free-threaded")
+            else:
+                args.append("--no-scie-pbs-free-threaded")
         if self.scie_pbs_stripped.value is True:
             args.append("--scie-pbs-stripped")
 
@@ -173,102 +191,6 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
 
     def output_pex_filename(self) -> str:
         return self.output_path.value_or_default(file_ending="pex")
-
-    def scie_output_filenames(self) -> tuple[str, ...] | None:
-        if not self.builds_pex_and_scie():
-            return None
-        return _scie_output_filenames(
-            self.output_path.value_or_default(file_ending=None),
-            self.scie_name_style.value
-            if self.scie_name_style.value
-            else self.scie_name_style.default,
-            self.scie_platform.value,
-            self.scie_hash_alg.value,
-        )
-
-    def scie_output_directories(self) -> tuple[str, ...] | None:
-        if not self.builds_pex_and_scie():
-            return None
-        return _scie_output_directories(
-            self.output_path.value_or_default(file_ending=None),
-            self.scie_name_style.value
-            if self.scie_name_style.value
-            else self.scie_name_style.default,
-            self.scie_platform.value,
-        )
-
-
-# Stand alone functions for ease of testing
-def _current_scie_platform() -> str:
-    # This is only a subset of the platforms that Pex can produce
-    # scies for.  While Pants can produce foreign platform scies, the
-    # "current" platform can only be one Pants itself can run on.
-    platform = Platform.create_for_localhost().replace("_", "-")
-    if platform == Platform.linux_arm64:
-        return platform.replace("arm64", "aarch64")
-    else:
-        return platform
-
-
-def _scie_output_filenames(
-    no_suffix_output_path: str,
-    scie_name_style: str,
-    scie_platform: Iterable[str] | None,
-    scie_hash_alg: str | None,
-) -> tuple[str, ...] | None:
-    filenames: list[str] = []
-
-    if scie_name_style == ScieNameStyle.DYNAMIC:
-        filenames = [no_suffix_output_path]
-    elif scie_name_style == ScieNameStyle.PLATFORM_PARENT_DIR:
-        return None  # handed by output_directories
-    elif scie_name_style == ScieNameStyle.PLATFORM_FILE_SUFFIX:
-        if scie_platform:
-            filenames = [no_suffix_output_path + f"-{platform}" for platform in scie_platform]
-        else:
-            filenames = [no_suffix_output_path + f"-{_current_scie_platform()}"]
-
-    if scie_hash_alg is None:
-        return tuple(filenames)
-    else:
-        return tuple(
-            itertools.chain.from_iterable(
-                [(fname, f"{fname}.{scie_hash_alg}") for fname in filenames]
-            )
-        )
-
-
-def _scie_output_directories(
-    no_suffix_output_path: str,
-    scie_name_style: str,
-    scie_platform: Iterable[str] | None,
-) -> tuple[str, ...] | None:
-    if scie_name_style != ScieNameStyle.PLATFORM_PARENT_DIR:
-        return None
-
-    if scie_platform:
-        return tuple(
-            [
-                os.path.join(os.path.dirname(no_suffix_output_path), platform)
-                for platform in scie_platform
-            ]
-        )
-    else:
-        return tuple(os.path.join(os.path.dirname(no_suffix_output_path), _current_scie_platform()))
-
-
-def _scie_build_package_artifacts(field_set: PexBinaryFieldSet) -> tuple[BuiltPackageArtifact, ...]:
-    artifacts = []
-
-    scie_output_filenames = field_set.scie_output_filenames()
-    if scie_output_filenames is not None:
-        artifacts.extend(
-            [BuiltPackageArtifact(scie_filename) for scie_filename in scie_output_filenames]
-        )
-    scie_output_directories = field_set.scie_output_directories()
-    if scie_output_directories is not None:
-        artifacts.extend([BuiltPackageArtifact(scie_dir) for scie_dir in scie_output_directories])
-    return tuple(artifacts)
 
 
 @dataclass(frozen=True)
@@ -325,27 +247,35 @@ async def built_package_for_pex_from_targets_request(
         pex_request = dataclasses.replace(
             await create_pex_from_targets(**implicitly(pft_request.request)),
             additional_args=(*pft_request.request.additional_args, *field_set.generate_scie_args()),
-            scie_output_files=field_set.scie_output_filenames(),
-            scie_output_directories=field_set.scie_output_directories(),
         )
-        artifacts = (
-            BuiltPackageArtifact(
-                pex_request.output_filename,
-            ),
-            *_scie_build_package_artifacts(field_set),
-        )
-
     else:
         pex_request = await create_pex_from_targets(**implicitly(pft_request.request))
-        artifacts = (
-            BuiltPackageArtifact(
-                pex_request.output_filename,
-            ),
-        )
 
     pex = await create_pex(**implicitly(pex_request))
+    snapshot = await digest_to_snapshot(pex.digest)
 
-    return BuiltPackage(pex.digest, artifacts)
+    # "The" PEX, and not scie, hashes, or future auxiliary files must be first
+    artifacts = [BuiltPackageArtifact(pft_request.request.output_filename)]
+    if PexLayout.ZIPAPP == pft_request.request.layout:
+        artifacts.extend(
+            BuiltPackageArtifact(artifact)
+            for artifact in snapshot.files
+            if artifact != pft_request.request.output_filename
+        )
+    else:
+        artifacts.extend(
+            BuiltPackageArtifact(artifact)
+            for artifact in snapshot.files
+            if (
+                pft_request.request.output_filename
+                != os.path.commonpath((pft_request.request.output_filename, artifact))
+            )
+        )
+    # Make sure the "regular PEX first" invariant explained above is true
+    assert artifacts[0].relpath in snapshot.files or artifacts[0].relpath in snapshot.dirs, (
+        "PEX must be first BuiltPackageArtifact"
+    )
+    return BuiltPackage(pex.digest, tuple(artifacts))
 
 
 def rules():
