@@ -609,8 +609,6 @@ pub struct Process {
     ///
     pub input_digests: InputDigests,
 
-    ///
-
     pub output_files: BTreeSet<RelativePath>,
 
     pub output_directories: BTreeSet<RelativePath>,

@@ -166,7 +166,7 @@ impl CapturedWorkdir for CommandRunner {
         exclusive_spawn: bool,
     ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, CapturedWorkdirError> {
         // Get stdin bytes from the process if provided
-        let stdin_bytes = req.stdin.as_ref().map(|bytes| bytes.clone());
+        let stdin_bytes = req.stdin.clone();
 
         let cwd = if let Some(working_directory) = &req.working_directory {
             build_root.join(working_directory)
@@ -193,15 +193,11 @@ impl CapturedWorkdir for CommandRunner {
         .await?;
 
         let stdin_write_handle = if let Some(bytes) = stdin_bytes {
-            if let Some(mut stdin) = child.stdin.take() {
-                Some(tokio::spawn(async move {
+            child.stdin.take().map(|mut stdin| tokio::spawn(async move {
                     use tokio::io::AsyncWriteExt;
                     stdin.write_all(&bytes).await
                         .map_err(|e| format!("Failed to write to stdin: {e}"))
                 }))
-            } else {
-                None
-            }
         } else {
             None
         };
@@ -224,14 +220,12 @@ impl CapturedWorkdir for CommandRunner {
             if let Some(handle) = stdin_write_handle {
                 match handle.await {
                     Err(e) => {
-                        return Err(std::io::Error::new(
-                            std::io::ErrorKind::Other,
+                        return Err(std::io::Error::other(
                             format!("Stdin write task panicked: {e}"),
                         ))
                     }
                     Ok(Err(e)) => {
-                        return Err(std::io::Error::new(
-                            std::io::ErrorKind::Other,
+                        return Err(std::io::Error::other(
                             format!("Failed to write to stdin: {e}"),
                         ))
                     }

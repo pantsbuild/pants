@@ -2865,7 +2865,7 @@ async fn stdin_with_remote_execution_fails() {
     let (_, mut workunit) = WorkunitStore::setup_for_tests();
     
     let cas = mock::StubCAS::builder().build().await;
-    let (command_runner, _store) = create_command_runner("".to_owned(), &cas).await;
+    let (command_runner, _store) = create_command_runner(cas.address(), &cas).await;
     
     let mut process = Process::new(owned_string_vec(&["/bin/cat"]));
     process.stdin = Some(b"test input".to_vec());

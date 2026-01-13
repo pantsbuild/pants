@@ -531,6 +531,7 @@ def test_stdin(rule_runner: RuleRunner) -> None:
     assert result.stdout == stdin_content
     assert result.stderr == b""
 
+
 def test_stdin_empty(rule_runner: RuleRunner) -> None:
     file_content = b"file contents\n"
     input_digest = rule_runner.request(
