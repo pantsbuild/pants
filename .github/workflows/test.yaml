@@ -27,6 +27,16 @@ jobs:
     - image=ubuntu22-full-arm64-python3.7-3.13
     - run-id=${{ github.run_id }}
     steps:
+    - name: Free up disk space
+      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+      with:
+        android: true
+        docker-images: false
+        dotnet: true
+        haskell: true
+        large-packages: false
+        swap-storage: false
+        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v4
       with:
@@ -114,6 +124,16 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
+    - name: Free up disk space
+      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+      with:
+        android: true
+        docker-images: false
+        dotnet: true
+        haskell: true
+        large-packages: false
+        swap-storage: false
+        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v4
       with:
@@ -223,6 +243,16 @@ jobs:
     - self-hosted
     - macos-13
     steps:
+    - name: Free up disk space
+      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+      with:
+        android: true
+        docker-images: false
+        dotnet: true
+        haskell: true
+        large-packages: false
+        swap-storage: false
+        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v4
       with:
@@ -310,6 +340,16 @@ jobs:
     runs-on:
     - macos-14
     steps:
+    - name: Free up disk space
+      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+      with:
+        android: true
+        docker-images: false
+        dotnet: true
+        haskell: true
+        large-packages: false
+        swap-storage: false
+        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v4
       with:
@@ -418,6 +458,14 @@ jobs:
     - image=ubuntu22-full-arm64-python3.7-3.13
     - run-id=${{ github.run_id }}
     steps:
+    - name: Free up disk space
+      run: |-
+        df -h
+        rm -rf /mnt/host-root/usr/share/dotnet || true
+        rm -rf /mnt/host-root/usr/local/lib/android || true
+        rm -rf /mnt/host-root/opt/ghc || true
+        rm -rf /mnt/host-root/usr/local/.ghcup || true
+        df -h
     - name: Check out code
       uses: actions/checkout@v4
       with:
@@ -471,6 +519,8 @@ jobs:
   build_wheels_linux_x86_64:
     container:
       image: quay.io/pypa/manylinux_2_28_x86_64:latest
+      volumes:
+      - /:/mnt/host-root
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
       MODE: debug
@@ -487,6 +537,14 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
+    - name: Free up disk space
+      run: |-
+        df -h
+        rm -rf /mnt/host-root/usr/share/dotnet || true
+        rm -rf /mnt/host-root/usr/local/lib/android || true
+        rm -rf /mnt/host-root/opt/ghc || true
+        rm -rf /mnt/host-root/usr/local/.ghcup || true
+        df -h
     - name: Check out code
       uses: actions/checkout@v4
       with:
@@ -563,6 +621,16 @@ jobs:
     - self-hosted
     - macos-13
     steps:
+    - name: Free up disk space
+      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+      with:
+        android: true
+        docker-images: false
+        dotnet: true
+        haskell: true
+        large-packages: false
+        swap-storage: false
+        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v4
       with:
@@ -641,6 +709,16 @@ jobs:
     runs-on:
     - macos-14
     steps:
+    - name: Free up disk space
+      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+      with:
+        android: true
+        docker-images: false
+        dotnet: true
+        haskell: true
+        large-packages: false
+        swap-storage: false
+        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v4
       with:
@@ -977,6 +1055,16 @@ jobs:
     - image=ubuntu22-full-arm64-python3.7-3.13
     - run-id=${{ github.run_id }}
     steps:
+    - name: Free up disk space
+      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+      with:
+        android: true
+        docker-images: false
+        dotnet: true
+        haskell: true
+        large-packages: false
+        swap-storage: false
+        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v4
       with:
@@ -1050,6 +1138,16 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
+    - name: Free up disk space
+      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+      with:
+        android: true
+        docker-images: false
+        dotnet: true
+        haskell: true
+        large-packages: false
+        swap-storage: false
+        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v4
       with:
@@ -1166,6 +1264,16 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
+    - name: Free up disk space
+      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+      with:
+        android: true
+        docker-images: false
+        dotnet: true
+        haskell: true
+        large-packages: false
+        swap-storage: false
+        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v4
       with:
@@ -1282,6 +1390,16 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
+    - name: Free up disk space
+      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+      with:
+        android: true
+        docker-images: false
+        dotnet: true
+        haskell: true
+        large-packages: false
+        swap-storage: false
+        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v4
       with:
@@ -1398,6 +1516,16 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
+    - name: Free up disk space
+      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+      with:
+        android: true
+        docker-images: false
+        dotnet: true
+        haskell: true
+        large-packages: false
+        swap-storage: false
+        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v4
       with:
@@ -1514,6 +1642,16 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
+    - name: Free up disk space
+      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+      with:
+        android: true
+        docker-images: false
+        dotnet: true
+        haskell: true
+        large-packages: false
+        swap-storage: false
+        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v4
       with:
@@ -1630,6 +1768,16 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
+    - name: Free up disk space
+      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+      with:
+        android: true
+        docker-images: false
+        dotnet: true
+        haskell: true
+        large-packages: false
+        swap-storage: false
+        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v4
       with:
@@ -1746,6 +1894,16 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
+    - name: Free up disk space
+      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+      with:
+        android: true
+        docker-images: false
+        dotnet: true
+        haskell: true
+        large-packages: false
+        swap-storage: false
+        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v4
       with:
@@ -1862,6 +2020,16 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
+    - name: Free up disk space
+      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+      with:
+        android: true
+        docker-images: false
+        dotnet: true
+        haskell: true
+        large-packages: false
+        swap-storage: false
+        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v4
       with:
@@ -1978,6 +2146,16 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
+    - name: Free up disk space
+      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+      with:
+        android: true
+        docker-images: false
+        dotnet: true
+        haskell: true
+        large-packages: false
+        swap-storage: false
+        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v4
       with:
@@ -2094,6 +2272,16 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
+    - name: Free up disk space
+      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+      with:
+        android: true
+        docker-images: false
+        dotnet: true
+        haskell: true
+        large-packages: false
+        swap-storage: false
+        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v4
       with:
@@ -2212,6 +2400,16 @@ jobs:
     - self-hosted
     - macos-13
     steps:
+    - name: Free up disk space
+      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+      with:
+        android: true
+        docker-images: false
+        dotnet: true
+        haskell: true
+        large-packages: false
+        swap-storage: false
+        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v4
       with:
@@ -2286,6 +2484,16 @@ jobs:
     runs-on:
     - macos-14
     steps:
+    - name: Free up disk space
+      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+      with:
+        android: true
+        docker-images: false
+        dotnet: true
+        haskell: true
+        large-packages: false
+        swap-storage: false
+        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v4
       with:
