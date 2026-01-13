@@ -278,6 +278,16 @@ jobs:
     - self-hosted
     - macos-13
     steps:
+    - name: Free up disk space
+      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+      with:
+        android: true
+        docker-images: false
+        dotnet: true
+        haskell: true
+        large-packages: false
+        swap-storage: false
+        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v4
       with:
