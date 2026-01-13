@@ -212,17 +212,21 @@ class CompletePexEnvironment:
     def interpreter_search_paths(self) -> tuple[str, ...]:
         return self._pex_environment.interpreter_search_paths
 
-    def create_argv(self, pex_filepath: str, *args: str) -> tuple[str, ...]:
+    def create_argv(
+        self,
+        pex_filepath: str,
+        *args: str,
+        python: PythonExecutable | PythonBuildStandaloneBinary | None = None,
+    ) -> tuple[str, ...]:
+        python_exe = python or self._pex_environment.bootstrap_python
         pex_relpath = (
             os.path.relpath(pex_filepath, self._working_directory)
             if self._working_directory
             else pex_filepath
         )
-        return (self._pex_environment.bootstrap_python.path, pex_relpath, *args)
+        return (python_exe.path, pex_relpath, *args)
 
-    def environment_dict(
-        self, *, python: PythonExecutable | PythonBuildStandaloneBinary | None = None
-    ) -> Mapping[str, str]:
+    def environment_dict(self, *, python_configured: bool) -> Mapping[str, str]:
         """The environment to use for running anything with PEX.
 
         If the Process is run with a pre-selected Python interpreter, set `python_configured=True`
@@ -244,9 +248,10 @@ class CompletePexEnvironment:
             ),
             **subprocess_env_dict,
         )
-        if python:
-            d["PEX_PYTHON"] = python.path
-        else:
+        # NB: We only set `PEX_PYTHON_PATH` if the Python interpreter has not already been
+        # pre-selected by Pants. Otherwise, Pex would inadvertently try to find another interpreter
+        # when running PEXes. (Creating a PEX will ignore this env var in favor of `--python-path`.)
+        if not python_configured:
             d["PEX_PYTHON_PATH"] = os.pathsep.join(self.interpreter_search_paths)
         return d
 

@@ -37,9 +37,9 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
-_PEX_VERSION = "v2.77.0"
-_PEX_BINARY_HASH = "08f3dfcc9f07be2f789d1abb2248fa38e595c2d48093e1d1b29277ae67c1e7a6"
-_PEX_BINARY_SIZE = 4944069
+_PEX_VERSION = "v2.79.0"
+_PEX_BINARY_HASH = "f7a50bfb31c2304f4b30ef6eabb623c86abae0b5841dc3d8a147afd1568ecd4e"
+_PEX_BINARY_SIZE = 4940234
 
 
 class PexCli(TemplatedExternalTool):
@@ -49,7 +49,7 @@ class PexCli(TemplatedExternalTool):
 
     default_version = _PEX_VERSION
     default_url_template = "https://github.com/pex-tool/pex/releases/download/{version}/pex"
-    version_constraints = ">=2.13.0,<3.0"
+    version_constraints = ">=2.76.0,<3.0"
 
     # extra args to be passed to the pex tool; note that they
     # are going to apply to all invocations of the pex tool.
@@ -199,9 +199,9 @@ async def setup_pex_cli_process(
     ]
 
     complete_pex_env = pex_env.in_sandbox(working_directory=None)
-    normalized_argv = complete_pex_env.create_argv(pex_pex.exe, *args)
+    normalized_argv = complete_pex_env.create_argv(pex_pex.exe, *args, python=bootstrap_python)
     env = {
-        **complete_pex_env.environment_dict(python=bootstrap_python),
+        **complete_pex_env.environment_dict(python_configured=True),
         **python_native_code.subprocess_env_vars,
         **(request.extra_env or {}),
         # If a subcommand is used, we need to use the `pex3` console script.
