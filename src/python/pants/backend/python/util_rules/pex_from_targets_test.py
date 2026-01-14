@@ -524,7 +524,6 @@ def create_dists(
     find_links = workdir / "find-links"
     subprocess.run(
         args=[
-            pex_binary,
             pex_output,
             "repository",
             "extract",
@@ -532,7 +531,7 @@ def create_dists(
             find_links,
         ],
         check=True,
-        env=os.environ.copy() | {"PEX_MODULE": "pex.tools"},
+        env=os.environ.copy() | {"PEX_TOOLS": "1"},
     )
     return find_links
 
