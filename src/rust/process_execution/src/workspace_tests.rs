@@ -157,9 +157,7 @@ async fn stdin_input() {
     let mut process = Process::new(owned_string_vec(&["/bin/cat"]));
     process.stdin = Some(stdin_content.as_bytes().to_vec());
 
-    let result = run_command(process, workspace_dir.path())
-        .await
-        .unwrap();
+    let result = run_command(process, workspace_dir.path()).await.unwrap();
 
     assert_eq!(result.stdout_bytes, stdin_content.as_bytes());
     assert_eq!(result.stderr_bytes, "".as_bytes());

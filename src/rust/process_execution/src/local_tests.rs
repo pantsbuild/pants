@@ -64,17 +64,16 @@ async fn stdout_and_stderr_and_exit_code() {
 #[cfg(unix)]
 async fn stdin_input() {
     let store_dir = TempDir::new().unwrap();
-    let store = Store::local_only(task_executor::Executor::new(), store_dir.path())
-        .unwrap();
-    
+    let store = Store::local_only(task_executor::Executor::new(), store_dir.path()).unwrap();
+
     let stdin_content = "test input from stdin\n";
     let mut process = Process::new(owned_string_vec(&["/bin/cat"]));
     process.stdin = Some(stdin_content.as_bytes().to_vec());
-    
+
     let result = run_command_locally_in_dir_with_store(process, store.clone())
         .await
         .unwrap();
-    
+
     assert_eq!(result.stdout_bytes, stdin_content.as_bytes());
     assert_eq!(result.stderr_bytes, "".as_bytes());
     assert_eq!(result.original.exit_code, 0);

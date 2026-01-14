@@ -2863,23 +2863,24 @@ fn one_second() -> Option<Duration> {
 #[tokio::test]
 async fn stdin_with_remote_execution_fails() {
     let (_, mut workunit) = WorkunitStore::setup_for_tests();
-    
+
     let cas = mock::StubCAS::builder().build().await;
     let (command_runner, _store) = create_command_runner(cas.address(), &cas).await;
-    
+
     let mut process = Process::new(owned_string_vec(&["/bin/cat"]));
     process.stdin = Some(b"test input".to_vec());
     process.description = "test stdin rejection".to_string();
     process.execution_environment = make_environment(Platform::Linux_x86_64);
-    
+
     let result = command_runner
         .run(Context::default(), &mut workunit, process)
         .await;
-    
+
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert!(
-        err.to_string().contains("cannot use stdin with remote execution"),
+        err.to_string()
+            .contains("cannot use stdin with remote execution"),
         "Expected error about stdin with remote execution, got: {}",
         err
     );

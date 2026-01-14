@@ -193,11 +193,15 @@ impl CapturedWorkdir for CommandRunner {
         .await?;
 
         let stdin_write_handle = if let Some(bytes) = stdin_bytes {
-            child.stdin.take().map(|mut stdin| tokio::spawn(async move {
+            child.stdin.take().map(|mut stdin| {
+                tokio::spawn(async move {
                     use tokio::io::AsyncWriteExt;
-                    stdin.write_all(&bytes).await
+                    stdin
+                        .write_all(&bytes)
+                        .await
                         .map_err(|e| format!("Failed to write to stdin: {e}"))
-                }))
+                })
+            })
         } else {
             None
         };
@@ -220,14 +224,14 @@ impl CapturedWorkdir for CommandRunner {
             if let Some(handle) = stdin_write_handle {
                 match handle.await {
                     Err(e) => {
-                        return Err(std::io::Error::other(
-                            format!("Stdin write task panicked: {e}"),
-                        ))
+                        return Err(std::io::Error::other(format!(
+                            "Stdin write task panicked: {e}"
+                        )));
                     }
                     Ok(Err(e)) => {
-                        return Err(std::io::Error::other(
-                            format!("Failed to write to stdin: {e}"),
-                        ))
+                        return Err(std::io::Error::other(format!(
+                            "Failed to write to stdin: {e}"
+                        )));
                     }
                     Ok(Ok(())) => {}
                 }

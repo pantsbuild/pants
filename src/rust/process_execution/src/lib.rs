@@ -677,7 +677,7 @@ pub struct Process {
     /// This is included in hash/eq so it creates a unique node in the runtime graph.
     ///
     pub attempt: usize,
-    
+
     ///
     /// Optional bytes to pipe to the process's standard input.
     ///

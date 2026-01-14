@@ -909,13 +909,11 @@ impl process_execution::CommandRunner for CommandRunner {
         // This is checked up in the python engine, but checking
         // here as well in case another caller comes along.
         if request.stdin.is_some() {
-            return Err(ProcessError::Unclassified(
-                format!(
-                    "Process '{}' cannot use stdin with remote execution. \
+            return Err(ProcessError::Unclassified(format!(
+                "Process '{}' cannot use stdin with remote execution. \
                      Configure the process to run locally or remove stdin.",
-                    request.description
-                ),
-            ));
+                request.description
+            )));
         }
 
         // Retrieve capabilities for this server.
