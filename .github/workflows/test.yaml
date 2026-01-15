@@ -24,16 +24,6 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
-    - name: Free up disk space
-      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
-      with:
-        android: true
-        docker-images: false
-        dotnet: true
-        haskell: true
-        large-packages: false
-        swap-storage: false
-        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v6
       with:
@@ -64,12 +54,6 @@ jobs:
           ~/.rustup/toolchains/1.92.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
-    - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.2
-      with:
-        cache-bin: 'false'
-        shared-key: engine
-        workspaces: src/rust
     - id: get-engine-hash
       name: Get native engine hash
       run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
@@ -116,12 +100,6 @@ jobs:
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
-        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
-      name: Validate CI config
-      run: |
-        ./pants run src/python/pants_release/generate_github_workflows.py -- --check
-    - env:
         TMPDIR: ${{ runner.temp }}
       if: needs.classify_changes.outputs.rust == 'true'
       name: Test and lint Rust
@@ -141,16 +119,6 @@ jobs:
     runs-on:
     - macos-14
     steps:
-    - name: Free up disk space
-      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
-      with:
-        android: true
-        docker-images: false
-        dotnet: true
-        haskell: true
-        large-packages: false
-        swap-storage: false
-        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v6
       with:
@@ -179,12 +147,6 @@ jobs:
           ~/.rustup/toolchains/1.92.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
-    - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.2
-      with:
-        cache-bin: 'false'
-        shared-key: engine
-        workspaces: src/rust
     - id: get-engine-hash
       name: Get native engine hash
       run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
@@ -340,16 +302,6 @@ jobs:
     runs-on:
     - macos-14
     steps:
-    - name: Free up disk space
-      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
-      with:
-        android: true
-        docker-images: false
-        dotnet: true
-        haskell: true
-        large-packages: false
-        swap-storage: false
-        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v6
       with:
@@ -378,12 +330,6 @@ jobs:
           ~/.rustup/toolchains/1.92.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
-    - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.2
-      with:
-        cache-bin: 'false'
-        shared-key: engine
-        workspaces: src/rust
     - name: Install Protoc
       uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
@@ -639,16 +585,6 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
-    - name: Free up disk space
-      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
-      with:
-        android: true
-        docker-images: false
-        dotnet: true
-        haskell: true
-        large-packages: false
-        swap-storage: false
-        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v6
       with:
@@ -765,16 +701,6 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
-    - name: Free up disk space
-      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
-      with:
-        android: true
-        docker-images: false
-        dotnet: true
-        haskell: true
-        large-packages: false
-        swap-storage: false
-        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v6
       with:
@@ -891,16 +817,6 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
-    - name: Free up disk space
-      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
-      with:
-        android: true
-        docker-images: false
-        dotnet: true
-        haskell: true
-        large-packages: false
-        swap-storage: false
-        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v6
       with:
@@ -1017,16 +933,6 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
-    - name: Free up disk space
-      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
-      with:
-        android: true
-        docker-images: false
-        dotnet: true
-        haskell: true
-        large-packages: false
-        swap-storage: false
-        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v6
       with:
@@ -1143,16 +1049,6 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
-    - name: Free up disk space
-      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
-      with:
-        android: true
-        docker-images: false
-        dotnet: true
-        haskell: true
-        large-packages: false
-        swap-storage: false
-        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v6
       with:
@@ -1269,16 +1165,6 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
-    - name: Free up disk space
-      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
-      with:
-        android: true
-        docker-images: false
-        dotnet: true
-        haskell: true
-        large-packages: false
-        swap-storage: false
-        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v6
       with:
@@ -1395,16 +1281,6 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
-    - name: Free up disk space
-      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
-      with:
-        android: true
-        docker-images: false
-        dotnet: true
-        haskell: true
-        large-packages: false
-        swap-storage: false
-        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v6
       with:
@@ -1521,16 +1397,6 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
-    - name: Free up disk space
-      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
-      with:
-        android: true
-        docker-images: false
-        dotnet: true
-        haskell: true
-        large-packages: false
-        swap-storage: false
-        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v6
       with:
@@ -1647,16 +1513,6 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
-    - name: Free up disk space
-      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
-      with:
-        android: true
-        docker-images: false
-        dotnet: true
-        haskell: true
-        large-packages: false
-        swap-storage: false
-        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v6
       with:
@@ -1773,16 +1629,6 @@ jobs:
     runs-on:
     - ubuntu-22.04
     steps:
-    - name: Free up disk space
-      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
-      with:
-        android: true
-        docker-images: false
-        dotnet: true
-        haskell: true
-        large-packages: false
-        swap-storage: false
-        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v6
       with:
@@ -1900,16 +1746,6 @@ jobs:
     runs-on:
     - macos-14
     steps:
-    - name: Free up disk space
-      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
-      with:
-        android: true
-        docker-images: false
-        dotnet: true
-        haskell: true
-        large-packages: false
-        swap-storage: false
-        tool-cache: false
     - name: Check out code
       uses: actions/checkout@v6
       with:
