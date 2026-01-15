@@ -64,7 +64,7 @@ pex_binary(
     scie_load_dotenv=True,
     scie_bind_resource_path=["PANTS_NATIVE_CLIENT=pants/bin/native_client"],
     scie_exe=["{scie.env.PANTS_NATIVE_CLIENT}"],
-    scie_env=["SCIE_PANTS_VERSION=0.12.2", "_PANTS_SERVER_EXE={scie.env.VIRTUAL_ENV}/bin/pants"],
+    scie_env=["NO_SCIE_WARNING=true", "_PANTS_SERVER_EXE={scie.env.VIRTUAL_ENV}/bin/pants"],
 )
 
 # NB: we use `dummy.c` to avoid clang/gcc complaining `error: no input files` when building
