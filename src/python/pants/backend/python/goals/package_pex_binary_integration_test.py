@@ -962,9 +962,8 @@ def test_scie_with_local_dist(rule_runner: PythonRuleRunner) -> None:
                 pex_binary(
                     name="app",
                     entry_point="main.py",
-                    dependencies=["lib:dist"],
-                    include_sources=False,
-                    scie="eager", # Going to run it, so might as well
+                    dependencies=[":sources", "lib:dist"],
+                    scie="eager",  # Going to run it, so might as well
                     scie_pbs_release="20251031",
                 )
                 """
