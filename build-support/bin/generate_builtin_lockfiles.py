@@ -56,6 +56,7 @@ from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.sql.lint.sqlfluff.subsystem import Sqlfluff
 from pants.backend.terraform.dependency_inference import TerraformHcl2Parser
+from pants.backend.tools.codespell.subsystem import Codespell
 from pants.backend.tools.semgrep.subsystem import SemgrepSubsystem
 from pants.backend.tools.yamllint.subsystem import Yamllint
 from pants.base.build_environment import get_buildroot
@@ -110,6 +111,7 @@ all_python_tools = tuple(
             PythonTool(Bandit, "pants.backend.python.lint.bandit"),
             PythonTool(Black, "pants.backend.python.lint.black"),
             PythonTool(ClangFormat, "pants.backend.experimental.cc.lint.clangformat"),
+            PythonTool(Codespell, "pants.backend.experimental.tools.codespell"),
             PythonTool(CoverageSubsystem, "pants.backend.python"),
             PythonTool(DebugPy, "pants.backend.python"),
             PythonTool(Docformatter, "pants.backend.python.lint.docformatter"),
