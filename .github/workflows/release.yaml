@@ -91,7 +91,17 @@ jobs:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants-*.whl
     - if: needs.release_info.outputs.is-release == 'true'
       name: Rename the Pants Pex to its final name for upload
-      run: "PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"import pants.version;print(pants.version.VERSION)\")\nPY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')\")\nPLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')\")\nPEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex\nPEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT\n\n\nmv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME\nmv dist/src.python.pants/pants-pex dist/src.python.pants/$PEX_FILENAME\necho \"PEX_FILENAME=$PEX_FILENAME\" | tee -a \"$GITHUB_ENV\"\necho \"PEX_FILENAME=$PEX_SCIE_FILENAME\" | tee -a \"$GITHUB_ENV\"                                \n"
+      run: |
+        PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
+        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')")
+        PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
+        PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
+        PEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT
+
+        mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
+        mv dist/src.python.pants/pants-pex dist/src.python.pants/$PEX_SCIE_FILENAME
+        echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
+        echo "PEX_SCIE_FILENAME=$PEX_SCIE_FILENAME" | tee -a "$GITHUB_ENV"
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v3
@@ -111,7 +121,7 @@ jobs:
             -X POST \
             -H "Authorization: Bearer ${{ github.token }}" \
             -H "Content-Type: application/octet-stream" \
-            ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \
+            ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_SCIE_FILENAME \
             --data-binary "@dist/src.python.pants/$PEX_SCIE_FILENAME"
 
         WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild_pants-*.whl")
@@ -215,7 +225,17 @@ jobs:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants-*.whl
     - if: needs.release_info.outputs.is-release == 'true'
       name: Rename the Pants Pex to its final name for upload
-      run: "PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"import pants.version;print(pants.version.VERSION)\")\nPY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')\")\nPLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')\")\nPEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex\nPEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT\n\n\nmv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME\nmv dist/src.python.pants/pants-pex dist/src.python.pants/$PEX_FILENAME\necho \"PEX_FILENAME=$PEX_FILENAME\" | tee -a \"$GITHUB_ENV\"\necho \"PEX_FILENAME=$PEX_SCIE_FILENAME\" | tee -a \"$GITHUB_ENV\"                                \n"
+      run: |
+        PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
+        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')")
+        PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
+        PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
+        PEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT
+
+        mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
+        mv dist/src.python.pants/pants-pex dist/src.python.pants/$PEX_SCIE_FILENAME
+        echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
+        echo "PEX_SCIE_FILENAME=$PEX_SCIE_FILENAME" | tee -a "$GITHUB_ENV"
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v3
@@ -235,7 +255,7 @@ jobs:
             -X POST \
             -H "Authorization: Bearer ${{ github.token }}" \
             -H "Content-Type: application/octet-stream" \
-            ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \
+            ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_SCIE_FILENAME \
             --data-binary "@dist/src.python.pants/$PEX_SCIE_FILENAME"
 
         WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild_pants-*.whl")
@@ -364,7 +384,17 @@ jobs:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants-*.whl
     - if: needs.release_info.outputs.is-release == 'true'
       name: Rename the Pants Pex to its final name for upload
-      run: "PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"import pants.version;print(pants.version.VERSION)\")\nPY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')\")\nPLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')\")\nPEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex\nPEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT\n\n\nmv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME\nmv dist/src.python.pants/pants-pex dist/src.python.pants/$PEX_FILENAME\necho \"PEX_FILENAME=$PEX_FILENAME\" | tee -a \"$GITHUB_ENV\"\necho \"PEX_FILENAME=$PEX_SCIE_FILENAME\" | tee -a \"$GITHUB_ENV\"                                \n"
+      run: |
+        PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
+        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')")
+        PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
+        PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
+        PEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT
+
+        mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
+        mv dist/src.python.pants/pants-pex dist/src.python.pants/$PEX_SCIE_FILENAME
+        echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
+        echo "PEX_SCIE_FILENAME=$PEX_SCIE_FILENAME" | tee -a "$GITHUB_ENV"
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v3
@@ -384,7 +414,7 @@ jobs:
             -X POST \
             -H "Authorization: Bearer ${{ github.token }}" \
             -H "Content-Type: application/octet-stream" \
-            ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \
+            ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_SCIE_FILENAME \
             --data-binary "@dist/src.python.pants/$PEX_SCIE_FILENAME"
 
         WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild_pants-*.whl")
