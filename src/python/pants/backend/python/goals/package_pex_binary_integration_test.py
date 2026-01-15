@@ -922,7 +922,7 @@ def test_scie_pbs_debug(rule_runner: PythonRuleRunner) -> None:
 
 def test_scie_with_local_dist(rule_runner: PythonRuleRunner) -> None:
     # This is a regression test for a bug early in adding scie support where
-    # the --requirements-pex flag was lost when building a SCIE pex, causing
+    # the --requirements-pex flag was lost when building a scie pex, causing
     # local distributions to not be included in the final executable.
     rule_runner.write_files(
         {
