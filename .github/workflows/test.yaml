@@ -13,112 +13,11 @@ env:
   PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: 'False'
   RUST_BACKTRACE: all
 jobs:
-  bootstrap_pants_linux_arm64:
-    env:
-      PANTS_REMOTE_CACHE_READ: 'false'
-      PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
-    name: Bootstrap Pants, test Rust (Linux-ARM64)
-    needs:
-    - classify_changes
-    runs-on:
-    - self-hosted
-    - runs-on
-    - runner=4cpu-linux-arm64
-    - image=ubuntu22-full-arm64-python3.7-3.13
-    - run-id=${{ github.run_id }}
-    steps:
-    - name: Free up disk space
-      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
-      with:
-        android: true
-        docker-images: false
-        dotnet: true
-        haskell: true
-        large-packages: false
-        swap-storage: false
-        tool-cache: false
-    - name: Check out code
-      uses: actions/checkout@v6
-      with:
-        fetch-depth: 10
-    - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        version: 23.x
-    - name: Set rustup profile
-      run: rustup set profile default
-    - name: Cache Rust toolchain
-      uses: actions/cache@v5
-      with:
-        key: Linux-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
-        path: |
-          ~/.rustup/toolchains/1.92.0-*
-          ~/.rustup/update-hashes
-          ~/.rustup/settings.toml
-    - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.2
-      with:
-        cache-bin: 'false'
-        shared-key: engine
-        workspaces: src/rust
-    - id: get-engine-hash
-      name: Get native engine hash
-      run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
-      shell: bash
-    - name: Cache native engine
-      uses: actions/cache@v5
-      with:
-        key: Linux-ARM64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
-        path: |-
-          src/python/pants/bin/native_client
-          src/python/pants/bin/sandboxer
-          src/python/pants/engine/internals/native_engine.so
-          src/python/pants/engine/internals/native_engine.so.metadata
-    - env:
-        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
-      name: Bootstrap Pants
-      run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout ]]
-    - env:
-        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
-      name: Run smoke tests
-      run: |
-        ./pants list ::
-        ./pants roots
-        ./pants help goals
-        ./pants help targets
-        ./pants help subsystems
-    - continue-on-error: true
-      if: always()
-      name: Upload pants.log
-      uses: actions/upload-artifact@v6
-      with:
-        name: logs-bootstrap-Linux-ARM64
-        overwrite: 'true'
-        path: .pants.d/workdir/*.log
-    - name: Upload native binaries
-      uses: actions/upload-artifact@v6
-      with:
-        name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
-        path: |-
-          src/python/pants/bin/native_client
-          src/python/pants/bin/sandboxer
-          src/python/pants/engine/internals/native_engine.so
-          src/python/pants/engine/internals/native_engine.so.metadata
-    - env:
-        TMPDIR: ${{ runner.temp }}
-      if: needs.classify_changes.outputs.rust == 'true'
-      name: Test Rust
-      run: ./cargo test --locked --tests -- --nocapture
-    timeout-minutes: 60
   bootstrap_pants_linux_x86_64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
+    if: needs.classify_changes.outputs.no_code != 'true'
     name: Bootstrap Pants, test and lint Rust (Linux-x86_64)
     needs:
     - classify_changes
@@ -235,7 +134,7 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
+    if: needs.classify_changes.outputs.no_code != 'true'
     name: Bootstrap Pants, test Rust (macOS14-ARM64)
     needs:
     - classify_changes
@@ -337,87 +236,6 @@ jobs:
       name: Test Rust
       run: ./cargo test --locked --tests -- --nocapture
     timeout-minutes: 60
-  build_wheels_linux_arm64:
-    container:
-      image: quay.io/pypa/manylinux_2_28_aarch64:latest
-    env:
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
-      MODE: debug
-      PANTS_REMOTE_CACHE_READ: 'false'
-      PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true' || needs.classify_changes.outputs.ci_config == 'true')) && (needs.classify_changes.outputs.no_code != 'true')
-    name: Build wheels (Linux-ARM64)
-    needs:
-    - classify_changes
-    permissions:
-      attestations: write
-      contents: write
-      id-token: write
-    runs-on:
-    - self-hosted
-    - runs-on
-    - runner=4cpu-linux-arm64
-    - image=ubuntu22-full-arm64-python3.7-3.13
-    - run-id=${{ github.run_id }}
-    steps:
-    - name: Free up disk space
-      run: |-
-        df -h
-        rm -rf /mnt/host-root/usr/share/dotnet || true
-        rm -rf /mnt/host-root/usr/local/lib/android || true
-        rm -rf /mnt/host-root/opt/ghc || true
-        rm -rf /mnt/host-root/usr/local/.ghcup || true
-        df -h
-    - name: Check out code
-      uses: actions/checkout@v6
-      with:
-        fetch-depth: 10
-    - name: Configure Git
-      run: git config --global safe.directory "$GITHUB_WORKSPACE"
-    - name: Install rustup
-      run: |
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y --default-toolchain none
-        echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
-    - name: Install Rust toolchain
-      run: |
-        # Set the default toolchain. Installs the toolchain if it is not already installed.
-        rustup default 1.92.0
-        cargo version
-    - name: Expose Pythons
-      run: |
-        echo "/opt/python/cp37-cp37m/bin" >> $GITHUB_PATH
-        echo "/opt/python/cp38-cp38/bin" >> $GITHUB_PATH
-        echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
-        echo "/opt/python/cp310-cp310/bin" >> $GITHUB_PATH
-        echo "/opt/python/cp311-cp311/bin" >> $GITHUB_PATH
-        echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
-        echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
-    - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        version: 23.x
-    - name: Install Python headers
-      run: yum install -y python3.11-devel
-    - env:
-        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
-      name: Build wheels
-      run: ./pants run src/python/pants_release/release.py -- build-wheels
-    - env:
-        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
-      name: Build Pants PEX
-      run: ./pants package src/python/pants:pants-pex
-    - continue-on-error: true
-      if: always()
-      name: Upload pants.log
-      uses: actions/upload-artifact@v6
-      with:
-        name: logs-wheels-and-pex-Linux-ARM64
-        overwrite: 'true'
-        path: .pants.d/workdir/*.log
-    timeout-minutes: 90
   build_wheels_linux_x86_64:
     container:
       image: quay.io/pypa/manylinux_2_28_x86_64:latest
@@ -602,42 +420,7 @@ jobs:
         overwrite: 'true'
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
-  build_windows11_x86_64:
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
-    name: Test in-progress Windows support
-    needs:
-    - classify_changes
-    runs-on:
-    - windows-2025
-    steps:
-    - name: Check out code
-      uses: actions/checkout@v6
-      with:
-        fetch-depth: 10
-    - name: Install MSYS2
-      uses: msys2/setup-msys2@v2
-      with:
-        install: base-devel mingw-w64-ucrt-x86_64-toolchain mingw-w64-ucrt-x86_64-nasm mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-protobuf
-        msystem: UCRT64
-        update: true
-    - name: Set Up Rust Toolchain
-      uses: actions-rust-lang/setup-rust-toolchain@v1
-      with:
-        rust-src-dir: src/rust
-        target: x86_64-pc-windows-gnu
-        toolchain: stable
-    - name: Check and Test Rust Code
-      run: |
-        # $GITHUB_PATH affects the regular Windows path, not the MSYS2 path,
-        # so we must modify the MSYS2 PATH directly in each step that needs it.
-        export PATH=$PATH:$(cygpath $USERPROFILE)/.cargo/bin
-        cd src/rust
-        cargo check  -p address -p async_latch -p async_value -p concrete_time -p grpc_util -p hashing -p stdio -p task_executor -p workunit_store
-        cargo test  -p address -p async_latch -p async_value -p concrete_time -p grpc_util -p hashing -p stdio -p task_executor -p workunit_store
-      shell: msys2 {0}
-    timeout-minutes: 60
   check_release_notes:
-    if: github.repository_owner == 'pantsbuild'
     name: Ensure PR has release notes
     needs:
     - classify_changes
@@ -666,7 +449,6 @@ jobs:
           Feel free to ask a maintainer for help if you are not sure what is appropriate!
         mode: minimum
   classify_changes:
-    if: github.repository_owner == 'pantsbuild'
     name: Classify changes
     outputs:
       ci_config: ${{ steps.classify.outputs.ci_config }}
@@ -717,7 +499,6 @@ jobs:
     - test_python_linux_x86_64_7
     - test_python_linux_x86_64_8
     - test_python_linux_x86_64_9
-    - test_python_linux_arm64
     - test_python_macos14_arm64
     - classify_changes
     runs-on:
@@ -728,7 +509,7 @@ jobs:
         fail-on-error: false
         parallel-finished: true
   lint_python:
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
+    if: needs.classify_changes.outputs.no_code != 'true'
     name: Lint Python and Shell
     needs:
     - bootstrap_pants_linux_x86_64
@@ -821,18 +602,14 @@ jobs:
     needs:
     - classify_changes
     - check_release_notes
-    - bootstrap_pants_linux_arm64
     - bootstrap_pants_linux_x86_64
     - bootstrap_pants_macos14_arm64
-    - build_wheels_linux_arm64
     - build_wheels_linux_x86_64
     - build_wheels_macos14_arm64
-    - build_windows11_x86_64
     - check_release_notes
     - classify_changes
     - coveralls_done
     - lint_python
-    - test_python_linux_arm64
     - test_python_linux_x86_64_0
     - test_python_linux_x86_64_1
     - test_python_linux_x86_64_2
@@ -851,96 +628,10 @@ jobs:
     steps:
     - id: set_merge_ok
       run: echo 'merge_ok=true' >> ${GITHUB_OUTPUT}
-  test_python_linux_arm64:
-    env: {}
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
-    name: Test Python (Linux-ARM64)
-    needs:
-    - bootstrap_pants_linux_arm64
-    - classify_changes
-    runs-on:
-    - self-hosted
-    - runs-on
-    - runner=4cpu-linux-arm64
-    - image=ubuntu22-full-arm64-python3.7-3.13
-    - run-id=${{ github.run_id }}
-    steps:
-    - name: Free up disk space
-      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
-      with:
-        android: true
-        docker-images: false
-        dotnet: true
-        haskell: true
-        large-packages: false
-        swap-storage: false
-        tool-cache: false
-    - name: Check out code
-      uses: actions/checkout@v6
-      with:
-        fetch-depth: 10
-    - name: Install AdoptJDK
-      uses: actions/setup-java@v5
-      with:
-        distribution: adopt
-        java-version: '11'
-    - name: Install Go
-      uses: actions/setup-go@v6
-      with:
-        go-version: 1.25.3
-    - name: Install Go
-      uses: actions/setup-go@v6
-      with:
-        go-version: 1.24.9
-    - name: Download native binaries
-      uses: actions/download-artifact@v7
-      with:
-        name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
-        path: src/python/pants
-    - name: Make native-client runnable
-      run: chmod +x src/python/pants/bin/native_client
-    - env:
-        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
-      name: Run Python tests
-      run: |
-        ./pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
-    - continue-on-error: true
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
-      if: always()
-      name: Upload test reports
-      run: |
-        export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-ARM64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
-        echo "Uploading test reports to ${S3_DST}"
-        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
-    - continue-on-error: true
-      if: always()
-      name: Upload pants.log
-      uses: actions/upload-artifact@v6
-      with:
-        name: logs-python-test-Linux-ARM64
-        overwrite: 'true'
-        path: .pants.d/workdir/*.log
-    - continue-on-error: true
-      if: always()
-      name: Report coverage to coveralls.io
-      uses: coverallsapp/github-action@v2
-      with:
-        allow-empty: true
-        fail-on-error: false
-        file: dist/coverage/python/coverage.xml
-        flag-name: test_python_linux_arm64
-        format: cobertura
-        parallel: true
-    timeout-minutes: 90
   test_python_linux_x86_64_0:
     env:
       PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
+    if: needs.classify_changes.outputs.no_code != 'true'
     name: Test Python (Linux-x86_64) Shard 0/10
     needs:
     - bootstrap_pants_linux_x86_64
@@ -1066,7 +757,7 @@ jobs:
   test_python_linux_x86_64_1:
     env:
       PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
+    if: needs.classify_changes.outputs.no_code != 'true'
     name: Test Python (Linux-x86_64) Shard 1/10
     needs:
     - bootstrap_pants_linux_x86_64
@@ -1192,7 +883,7 @@ jobs:
   test_python_linux_x86_64_2:
     env:
       PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
+    if: needs.classify_changes.outputs.no_code != 'true'
     name: Test Python (Linux-x86_64) Shard 2/10
     needs:
     - bootstrap_pants_linux_x86_64
@@ -1318,7 +1009,7 @@ jobs:
   test_python_linux_x86_64_3:
     env:
       PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
+    if: needs.classify_changes.outputs.no_code != 'true'
     name: Test Python (Linux-x86_64) Shard 3/10
     needs:
     - bootstrap_pants_linux_x86_64
@@ -1444,7 +1135,7 @@ jobs:
   test_python_linux_x86_64_4:
     env:
       PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
+    if: needs.classify_changes.outputs.no_code != 'true'
     name: Test Python (Linux-x86_64) Shard 4/10
     needs:
     - bootstrap_pants_linux_x86_64
@@ -1570,7 +1261,7 @@ jobs:
   test_python_linux_x86_64_5:
     env:
       PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
+    if: needs.classify_changes.outputs.no_code != 'true'
     name: Test Python (Linux-x86_64) Shard 5/10
     needs:
     - bootstrap_pants_linux_x86_64
@@ -1696,7 +1387,7 @@ jobs:
   test_python_linux_x86_64_6:
     env:
       PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
+    if: needs.classify_changes.outputs.no_code != 'true'
     name: Test Python (Linux-x86_64) Shard 6/10
     needs:
     - bootstrap_pants_linux_x86_64
@@ -1822,7 +1513,7 @@ jobs:
   test_python_linux_x86_64_7:
     env:
       PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
+    if: needs.classify_changes.outputs.no_code != 'true'
     name: Test Python (Linux-x86_64) Shard 7/10
     needs:
     - bootstrap_pants_linux_x86_64
@@ -1948,7 +1639,7 @@ jobs:
   test_python_linux_x86_64_8:
     env:
       PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
+    if: needs.classify_changes.outputs.no_code != 'true'
     name: Test Python (Linux-x86_64) Shard 8/10
     needs:
     - bootstrap_pants_linux_x86_64
@@ -2074,7 +1765,7 @@ jobs:
   test_python_linux_x86_64_9:
     env:
       PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
+    if: needs.classify_changes.outputs.no_code != 'true'
     name: Test Python (Linux-x86_64) Shard 9/10
     needs:
     - bootstrap_pants_linux_x86_64
@@ -2201,7 +1892,7 @@ jobs:
     env:
       ARCHFLAGS: -arch arm64
       _PYTHON_HOST_PLATFORM: macosx-14.0-arm64
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.no_code != 'true')
+    if: needs.classify_changes.outputs.no_code != 'true'
     name: Test Python (macOS14-ARM64)
     needs:
     - bootstrap_pants_macos14_arm64

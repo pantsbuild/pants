@@ -146,7 +146,7 @@ def classify_changes() -> Jobs:
         "classify_changes": {
             "name": "Classify changes",
             "runs-on": linux_x86_64_helper.runs_on(),
-            "if": IS_PANTS_OWNER,
+            # "if": is_pants_owner,
             "outputs": {
                 "dev_utils": gha_expr("steps.classify.outputs.dev_utils"),
                 "docs": gha_expr("steps.classify.outputs.docs"),
@@ -751,7 +751,7 @@ def bootstrap_jobs(
         "runs-on": helper.runs_on(),
         "env": DISABLE_REMOTE_CACHE_ENV,
         "timeout-minutes": 60,
-        "if": IS_PANTS_OWNER,
+        # "if": is_pants_owner,
         "steps": [
             *helper.bootstrap_pants(),
             *(
@@ -816,7 +816,7 @@ def test_jobs(
         "needs": helper.job_name("bootstrap_pants"),
         "env": helper.platform_env(),
         "timeout-minutes": 90,
-        "if": IS_PANTS_OWNER,
+        # "if": is_pants_owner,
         "steps": [
             free_disk_space_step(),
             *checkout(),
@@ -923,7 +923,7 @@ def windows11_x86_64_test_jobs() -> Jobs:
             "name": "Test in-progress Windows support",
             "runs-on": helper.runs_on(),
             "timeout-minutes": 60,
-            "if": IS_PANTS_OWNER,
+            # "if": is_pants_owner,
             "steps": [
                 *checkout(),
                 {
@@ -1163,7 +1163,7 @@ def build_wheels_jobs(*, for_deploy_ref: str | None = None, needs: list[str] | N
     # total in the release.py script. Currently here:
     return {
         **build_wheels_job(Platform.LINUX_X86_64, for_deploy_ref, needs),
-        **build_wheels_job(Platform.LINUX_ARM64, for_deploy_ref, needs),
+        # **build_wheels_job(Platform.LINUX_ARM64, for_deploy_ref, needs),
         **build_wheels_job(Platform.MACOS14_ARM64, for_deploy_ref, needs),
     }
 
@@ -1175,15 +1175,15 @@ def test_workflow_jobs() -> Jobs:
             "name": "Ensure PR has release notes",
             "runs-on": linux_x86_64_helper.runs_on(),
             "needs": ["classify_changes"],
-            "if": IS_PANTS_OWNER,
+            # "if": is_pants_owner,
             "steps": ensure_release_notes(),
         },
     }
     jobs.update(**linux_x86_64_test_jobs())
-    jobs.update(**linux_arm64_test_jobs())
+    # jobs.update(**linux_arm64_test_jobs())
     jobs.update(**macos14_arm64_test_jobs())
     jobs.update(**build_wheels_jobs())
-    jobs.update(**windows11_x86_64_test_jobs())
+    # jobs.update(**windows11_x86_64_test_jobs())
     jobs.update(
         {
             "lint_python": {
@@ -1191,7 +1191,7 @@ def test_workflow_jobs() -> Jobs:
                 "runs-on": linux_x86_64_helper.runs_on(),
                 "needs": "bootstrap_pants_linux_x86_64",
                 "timeout-minutes": 30,
-                "if": IS_PANTS_OWNER,
+                # "if": is_pants_owner,
                 "steps": [
                     *checkout(),
                     *launch_bazel_remote(),
@@ -1317,7 +1317,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
         "release_info": {
             "name": "Create draft release and output info",
             "runs-on": "ubuntu-22.04",
-            "if": IS_PANTS_OWNER,
+            # "if": is_pants_owner,
             "steps": [
                 {
                     "name": "Determine ref to build",
@@ -2019,7 +2019,7 @@ def generate() -> dict[Path, str]:
             "jobs": {
                 "audit": {
                     "runs-on": "ubuntu-22.04",
-                    "if": IS_PANTS_OWNER,
+                    # "if": is_pants_owner,
                     "steps": [
                         *checkout(),
                         {
