@@ -9,8 +9,10 @@ Created as part of the release process.
 + Aditya Raj Verma
 + Alan Paulin
 + Alan Velasco
++ Aleksandr Artemenkov
 + Alex Bancroft
 + Alex Schmitt
++ Alex Tremblay
 + Alexander Heldt
 + Alexander Johnson
 + Alexander Kuhn-Regnier
@@ -217,6 +219,7 @@ Created as part of the release process.
 + Kristian Tashkov
 + Kushal Dave
 + Kyle Derr
++ Kyle Purdon
 + Kyujin Cho
 + Larry Hosken
 + Lasse Alm
@@ -336,6 +339,7 @@ Created as part of the release process.
 + Srikanth Kotagiri
 + Stefan Sauer
 + Stephan Erb
++ Stephen Hopper
 + Stu Hood
 + Subin Kim
 + Suresh Joshi

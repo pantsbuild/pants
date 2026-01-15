@@ -30,21 +30,21 @@ def action(name: str) -> str:
         "action-send-mail": "dawidd6/action-send-mail@v3.8.0",
         "actions-rust-lang": "actions-rust-lang/setup-rust-toolchain@v1",
         "attest-build-provenance": "actions/attest-build-provenance@v3",
-        "cache": "actions/cache@v4",
-        "checkout": "actions/checkout@v5",
+        "cache": "actions/cache@v5",
+        "checkout": "actions/checkout@v6",
         "coverallsapp": "coverallsapp/github-action@v2",
-        "download-artifact": "actions/download-artifact@v6",
+        "download-artifact": "actions/download-artifact@v7",
+        "free-disk-space": "jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be",
         "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
         "msys2": "msys2/setup-msys2@v2",
-        "rust-cache": "Swatinem/rust-cache@v2.8.1",
-        # Switch to v6 once https://github.com/actions/setup-go/pull/665 is released
-        "setup-go": "actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f",
+        "rust-cache": "Swatinem/rust-cache@v2.8.2",
+        "setup-go": "actions/setup-go@v6",
         "setup-java": "actions/setup-java@v5",
         "setup-node": "actions/setup-node@v6",
         "setup-protoc": "arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623",
         "setup-python": "actions/setup-python@v6",
         "slack-github-action": "slackapi/slack-github-action@v2.1.1",
-        "upload-artifact": "actions/upload-artifact@v5",
+        "upload-artifact": "actions/upload-artifact@v6",
     }
     try:
         return version_map[name]
@@ -581,6 +581,7 @@ class Helper:
 
     def bootstrap_pants(self) -> Sequence[Step]:
         return [
+            free_disk_space_step(),
             *checkout(),
             *self.setup_pythons(),
             *self.bootstrap_caches(),
@@ -670,6 +671,42 @@ class Helper:
         }
 
 
+def free_disk_space_step() -> Step:
+    return {
+        "name": "Free up disk space",
+        "uses": action("free-disk-space"),
+        "with": {
+            "android": True,  # ~9GB
+            "dotnet": True,  # ~4GB
+            "haskell": True,  # ~6GB
+            # Keep the tool cache since we use other actions which install to the tool cache.
+            "tool-cache": False,
+            # Disable these because not as huge an impact or for `large-packages` it would take time to remove packages
+            # since `apt-get` must be invoked.
+            "large-packages": False,
+            "docker-images": False,
+            "swap-storage": False,
+        },
+    }
+
+
+# A greatly simplified limited version for use when running in a container
+def free_disk_space_in_container(host_root_mount: str) -> Step:
+    return {
+        "name": "Free up disk space",
+        "run": "\n".join(
+            [
+                "df -h",
+                f"rm -rf {host_root_mount}/usr/share/dotnet || true",
+                f"rm -rf {host_root_mount}/usr/local/lib/android || true",
+                f"rm -rf {host_root_mount}/opt/ghc || true",
+                f"rm -rf {host_root_mount}/usr/local/.ghcup || true",
+                "df -h",
+            ]
+        ),
+    }
+
+
 class RustTesting(Enum):
     NONE = "NONE"
     SOME = "SOME"  # Most tests.
@@ -703,7 +740,6 @@ def bootstrap_jobs(
             [
                 "./build-support/bin/check_rust_pre_commit.sh",
                 "./cargo test --locked --all --tests --benches -- --nocapture",
-                "./cargo doc",
             ]
         )
     else:
@@ -742,7 +778,9 @@ def bootstrap_jobs(
                         # We pass --tests to skip doc tests because our generated protos contain
                         # invalid doc tests in their comments.
                         "run": step_cmd,
-                        "env": {"TMPDIR": f"{gha_expr('runner.temp')}"},
+                        "env": {
+                            "TMPDIR": f"{gha_expr('runner.temp')}",
+                        },
                         "if": DONT_SKIP_RUST,
                     }
                 ]
@@ -783,6 +821,7 @@ def test_jobs(
         "timeout-minutes": 90,
         "if": IS_PANTS_OWNER,
         "steps": [
+            free_disk_space_step(),
             *checkout(),
             *(launch_bazel_remote() if with_remote_caching else []),
             install_jdk(),
@@ -939,7 +978,10 @@ def build_wheels_job(
     # the code, install rustup and expose Pythons.
     # TODO: Apply rust caching here.
     if platform == Platform.LINUX_X86_64:
-        container = {"image": "quay.io/pypa/manylinux_2_28_x86_64:latest"}
+        container = {
+            "image": "quay.io/pypa/manylinux_2_28_x86_64:latest",
+            "volumes": ["/:/mnt/host-root"],
+        }
     elif platform == Platform.LINUX_ARM64:
         container = {"image": "quay.io/pypa/manylinux_2_28_aarch64:latest"}
     else:
@@ -947,6 +989,7 @@ def build_wheels_job(
 
     if container:
         initial_steps = [
+            free_disk_space_in_container("/mnt/host-root"),
             *checkout(containerized=True, ref=for_deploy_ref),
             *install_rustup(),
             {
@@ -967,6 +1010,7 @@ def build_wheels_job(
         ]
     else:
         initial_steps = [
+            free_disk_space_step(),
             *checkout(ref=for_deploy_ref),
             *helper.setup_pythons(),
             # NB: We only cache Rust, but not `native_engine.so` and the Pants

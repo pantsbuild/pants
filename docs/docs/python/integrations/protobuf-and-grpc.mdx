@@ -212,7 +212,7 @@ python_requirement(
     name="protobuf",
     # Here, we use the same version of Protobuf in both resolves. You could instead create
     # a distinct target per resolve so that they have different versions.
-    requirements=["protobuf==3.19.4"],
+    requirements=["protobuf==6.31.1"],
     resolve=parametrize("resolve-a", "resolve-b"),
 )
 

@@ -69,25 +69,25 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "0287e96f4d26d4149305414d4e3bc32f0dcd0862365a4bddea19d7a1ec38c4fc",
-              "url": "https://files.pythonhosted.org/packages/15/b3/9b1a8074496371342ec1e796a96f99c82c945a339cd81a8e73de28b4cf9e/anyio-4.11.0-py3-none-any.whl"
+              "hash": "dad2376a628f98eeca4881fc56cd06affd18f659b17a747d3ff0307ced94b1bb",
+              "url": "https://files.pythonhosted.org/packages/7f/9c/36c5c37947ebfb8c7f22e0eb6e4d188ee2d53aa3880f3f2744fb894f0cb1/anyio-4.12.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "82a8d0b81e318cc5ce71a5f1f8b5c4e63619620b63141ef8c995fa0db95a57c4",
-              "url": "https://files.pythonhosted.org/packages/c6/78/7d432127c41b50bccba979505f272c16cbcadcc33645d5fa3a738110ae75/anyio-4.11.0.tar.gz"
+              "hash": "73c693b567b0c55130c104d0b43a9baf3aa6a31fc6110116509f27bf75e21ec0",
+              "url": "https://files.pythonhosted.org/packages/16/ce/8a777047513153587e5434fd752e89334ac33e379aa3497db860eeb60377/anyio-4.12.0.tar.gz"
             }
           ],
           "project_name": "anyio",
           "requires_dists": [
             "exceptiongroup>=1.0.2; python_version < \"3.11\"",
             "idna>=2.8",
-            "sniffio>=1.1",
-            "trio>=0.31.0; extra == \"trio\"",
+            "trio>=0.31.0; python_version < \"3.10\" and extra == \"trio\"",
+            "trio>=0.32.0; python_version >= \"3.10\" and extra == \"trio\"",
             "typing_extensions>=4.5; python_version < \"3.13\""
           ],
           "requires_python": ">=3.9",
-          "version": "4.11.0"
+          "version": "4.12.0"
         },
         {
           "artifacts": [
@@ -1105,27 +1105,6 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d47c2438fe1577c1de2f1b8228247904f356d84e688aa328275a21082be23eb0",
-              "url": "https://files.pythonhosted.org/packages/3b/74/51f3ef71b4e47af1136b496fefb760d46658f0f8bd00cf99c89111d8787f/pex-2.69.2-py2.py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "39d5bf1bbd2e687132d990ae56107a4d229f0b6b0be2fd080a2463b5031b2c9f",
-              "url": "https://files.pythonhosted.org/packages/4f/d6/6e62f2c7bb78d1bff2f84f15939b4318e7534495cc576724e1724f3a052f/pex-2.69.2.tar.gz"
-            }
-          ],
-          "project_name": "pex",
-          "requires_dists": [
-            "psutil>=5.3; extra == \"management\"",
-            "subprocess32>=3.2.7; python_version < \"3\" and extra == \"subprocess\""
-          ],
-          "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,<3.16,>=2.7",
-          "version": "2.69.2"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
               "hash": "e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746",
               "url": "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl"
             },
@@ -1207,13 +1186,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "92d3d202a745d46f9be6df459ac5a064fdaa3c1c4cd8adcfa332ccf3c05f871e",
-              "url": "https://files.pythonhosted.org/packages/82/2f/e68750da9b04856e2a7ec56fc6f034a5a79775e9b9a81882252789873798/pydantic-2.12.4-py3-none-any.whl"
+              "hash": "e561593fccf61e8a20fc46dfc2dfe075b8be7d0188df33f221ad1f0139180f9d",
+              "url": "https://files.pythonhosted.org/packages/5a/87/b70ad306ebb6f9b585f114d0ac2137d792b48be34d732d60e597c2f8465a/pydantic-2.12.5-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "0f8cb9555000a4b5b617f66bfd2566264c4984b27589d3b845685983e8ea85ac",
-              "url": "https://files.pythonhosted.org/packages/96/ad/a17bc283d7d81837c061c49e3eaa27a45991759a1b7eae1031921c6bd924/pydantic-2.12.4.tar.gz"
+              "hash": "4d351024c75c0f085a9febbb665ce8c0c6ec5d30e903bdb6394b7ede26aebb49",
+              "url": "https://files.pythonhosted.org/packages/69/44/36f1a6e523abc58ae5f928898e4aca2e0ea509b5aa6f6f392a5d882be928/pydantic-2.12.5.tar.gz"
             }
           ],
           "project_name": "pydantic",
@@ -1226,7 +1205,7 @@
             "tzdata; (python_version >= \"3.9\" and platform_system == \"Windows\") and extra == \"timezone\""
           ],
           "requires_python": ">=3.9",
-          "version": "2.12.4"
+          "version": "2.12.5"
         },
         {
           "artifacts": [
@@ -2025,24 +2004,6 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2",
-              "url": "https://files.pythonhosted.org/packages/e9/44/75a9c9421471a6c4805dbf2356f7c181a29c1879239abab1ea2cc8f38b40/sniffio-1.3.1-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "f4324edc670a0f49750a81b895f35c3adb843cca46f0530f79fc1babb23789dc",
-              "url": "https://files.pythonhosted.org/packages/a2/87/a6771e1546d97e7e041b6ae58d80074f81b7d5121207425c964ddf5cfdbd/sniffio-1.3.1.tar.gz"
-            }
-          ],
-          "project_name": "sniffio",
-          "requires_dists": [],
-          "requires_python": ">=3.7",
-          "version": "1.3.1"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
               "hash": "0cc76456a30e20f5d7f2e14a98a4ae2ee4e5abdc7c5ea0aafe795f344bc7984c",
               "url": "https://files.pythonhosted.org/packages/14/a0/bb38d3b76b8cae341dad93a2dd83ab7462e6dbcdd84d43f54ee60a8dc167/soupsieve-2.8-py3-none-any.whl"
             },
@@ -2646,7 +2607,7 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.69.2",
+  "pex_version": "2.73.1",
   "pip_version": "25.3",
   "prefer_older_binary": false,
   "requirements": [
@@ -2666,7 +2627,6 @@
     "mypy-typing-asserts==0.1.1",
     "node-semver==0.9.0",
     "packaging==25.0",
-    "pex==2.69.2",
     "psutil==5.9.8",
     "pydevd-pycharm==251.23536.40",
     "pytest!=7.1.0,!=7.1.1,<9,>=7",

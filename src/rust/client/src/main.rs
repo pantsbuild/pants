@@ -95,7 +95,7 @@ fn try_execv_fallback_client(pants_server: OsString) -> Result<Infallible, i32> 
     })
 }
 
-fn execv_fallback_client(pants_server: OsString) -> Infallible {
+fn execv_fallback_client(pants_server: OsString) -> ! {
     let Err(exit_code) = try_execv_fallback_client(pants_server);
     std::process::exit(exit_code);
 }
@@ -132,7 +132,6 @@ async fn main() {
             // The user requested that the native client not be used. Immediately fall back to the legacy
             // client.
             execv_fallback_client(pants_server.clone());
-            return;
         }
         _ => {}
     }

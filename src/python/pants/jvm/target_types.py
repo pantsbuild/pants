@@ -16,6 +16,11 @@ from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField, RunFieldSet, RunInSandboxBehavior
 from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
+from pants.core.target_types import (
+    ResolveLikeField,
+    ResolveLikeFieldToValueRequest,
+    ResolveLikeFieldToValueResult,
+)
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.addresses import Address
 from pants.engine.intrinsics import get_digest_contents
@@ -58,7 +63,11 @@ class JvmDependenciesField(Dependencies):
     pass
 
 
-class JvmResolveField(StringField, AsyncFieldMixin):
+class JvmResolveLikeFieldToValueRequest(ResolveLikeFieldToValueRequest):
+    pass
+
+
+class JvmResolveField(StringField, AsyncFieldMixin, ResolveLikeField):
     alias = "resolve"
     required = False
     help = help_text(
@@ -80,6 +89,9 @@ class JvmResolveField(StringField, AsyncFieldMixin):
                 description_of_origin=f"the field `{self.alias}` in the target {self.address}",
             )
         return resolve
+
+    def get_resolve_like_field_to_value_request(self) -> type[ResolveLikeFieldToValueRequest]:
+        return JvmResolveLikeFieldToValueRequest
 
 
 class JvmJdkField(StringField):
@@ -980,11 +992,20 @@ async def jvm_resolve_field_default_factory(
     return FieldDefaultFactoryResult(lambda f: f.normalized_value(jvm))
 
 
+@rule
+async def jvm_get_resolve_from_resolve_like_field_request(
+    request: JvmResolveLikeFieldToValueRequest, jvm: JvmSubsystem
+) -> ResolveLikeFieldToValueResult:
+    resolve = request.target[JvmResolveField].normalized_value(jvm)
+    return ResolveLikeFieldToValueResult(value=resolve)
+
+
 def rules():
     return [
         *collect_rules(),
         UnionRule(GenerateTargetsRequest, GenerateFromPomXmlRequest),
         UnionRule(FieldDefaultFactoryRequest, JvmResolveFieldDefaultFactoryRequest),
+        UnionRule(ResolveLikeFieldToValueRequest, JvmResolveLikeFieldToValueRequest),
     ]
 
 

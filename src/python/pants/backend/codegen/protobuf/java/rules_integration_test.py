@@ -11,6 +11,7 @@ from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
     JVMLockfileFixture,
     JVMLockfileFixtureDefinition,
 )
+from pants.backend.codegen.protobuf import protobuf_dependency_inference
 from pants.backend.codegen.protobuf.java.rules import GenerateJavaFromProtobufRequest
 from pants.backend.codegen.protobuf.java.rules import rules as java_protobuf_rules
 from pants.backend.codegen.protobuf.target_types import (
@@ -22,6 +23,7 @@ from pants.backend.experimental.java.register import rules as java_backend_rules
 from pants.backend.java.compile.javac import CompileJavaSourceRequest
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JavaSourceTarget
 from pants.engine.addresses import Address, Addresses
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
@@ -31,6 +33,7 @@ from pants.engine.target import (
 )
 from pants.jvm import testutil
 from pants.jvm.target_types import JvmArtifactTarget
+from pants.jvm.target_types import rules as jvm_target_types_rules
 from pants.jvm.testutil import (
     RenderedClasspath,
     expect_single_expanded_coarsened_target,
@@ -66,7 +69,9 @@ message HelloReply {
 def protobuf_java_lockfile_def() -> JVMLockfileFixtureDefinition:
     return JVMLockfileFixtureDefinition(
         "protobuf-java.test.lock",
-        ["com.google.protobuf:protobuf-java:3.19.4"],
+        [
+            "com.google.protobuf:protobuf-java:4.33.2",
+        ],
     )
 
 
@@ -84,6 +89,8 @@ def rule_runner() -> RuleRunner:
             *java_backend_rules(),
             *java_protobuf_rules(),
             *target_types_rules(),
+            *jvm_target_types_rules(),
+            *protobuf_dependency_inference.rules(),
             *testutil.rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GenerateJavaFromProtobufRequest]),
@@ -99,14 +106,13 @@ def rule_runner() -> RuleRunner:
     )
 
 
-def assert_files_generated(
+def _run_codegen(
     rule_runner: RuleRunner,
     address: Address,
     *,
-    expected_files: list[str],
     source_roots: list[str],
     extra_args: list[str] | None = None,
-) -> None:
+) -> frozenset[str]:
     args = [f"--source-root-patterns={repr(source_roots)}", *(extra_args or ())]
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     tgt = rule_runner.get_target(address)
@@ -117,7 +123,21 @@ def assert_files_generated(
         GeneratedSources,
         [GenerateJavaFromProtobufRequest(protocol_sources.snapshot, tgt)],
     )
-    assert set(generated_sources.snapshot.files) == set(expected_files)
+    return frozenset(generated_sources.snapshot.files)
+
+
+def assert_files_generated(
+    rule_runner: RuleRunner,
+    address: Address,
+    *,
+    expected_files: list[str],
+    source_roots: list[str],
+    extra_args: list[str] | None = None,
+) -> None:
+    generated_sources = _run_codegen(
+        rule_runner=rule_runner, address=address, source_roots=source_roots, extra_args=extra_args
+    )
+    assert generated_sources == frozenset(expected_files)
 
 
 @maybe_skip_jdk_test
@@ -235,10 +255,10 @@ def protobuf_java_grpc_lockfile_def() -> JVMLockfileFixtureDefinition:
     return JVMLockfileFixtureDefinition(
         "protobuf-grpc-java.test.lock",
         [
-            "com.google.protobuf:protobuf-java:3.19.4",
-            "io.grpc:grpc-netty-shaded:1.48.0",
-            "io.grpc:grpc-protobuf:1.48.0",
-            "io.grpc:grpc-stub:1.48.0",
+            "com.google.protobuf:protobuf-java:4.33.2",
+            "io.grpc:grpc-netty-shaded:1.78.0",
+            "io.grpc:grpc-protobuf:1.78.0",
+            "io.grpc:grpc-stub:1.78.0",
             "org.apache.tomcat:annotations-api:6.0.53",
         ],
     )
@@ -308,3 +328,235 @@ def test_generates_grpc_java(
         resolve=make_resolve(rule_runner),
     )
     _ = rule_runner.request(RenderedClasspath, [request])
+
+
+# Multi-resolve tests
+
+
+@maybe_skip_jdk_test
+def test_code_generation_with_single_jvm_resolve(
+    rule_runner: RuleRunner, protobuf_java_lockfile: JVMLockfileFixture
+) -> None:
+    """Verify that code generation works correctly when all protobuf targets use the same JVM
+    resolve."""
+    rule_runner.write_files(
+        {
+            "protos/a.proto": dedent(
+                """\
+                syntax = "proto3";
+                message A {
+                  string name = 1;
+                }
+                """
+            ),
+            "protos/b.proto": dedent(
+                """\
+                syntax = "proto3";
+                message B {
+                  int32 id = 1;
+                }
+                """
+            ),
+            "protos/BUILD": "protobuf_sources(jvm_resolve='jvm-default')",
+            "3rdparty/jvm/jvm-default.lock": protobuf_java_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": protobuf_java_lockfile.requirements_as_jvm_artifact_targets(
+                resolve="jvm-default"
+            ),
+        }
+    )
+
+    # Test code generation for both proto files
+    assert_files_generated(
+        rule_runner,
+        Address("protos", relative_file_path="a.proto"),
+        source_roots=["protos"],
+        expected_files=["protos/AOuterClass.java"],
+        extra_args=[
+            "--jvm-resolves={'jvm-default': '3rdparty/jvm/jvm-default.lock'}",
+        ],
+    )
+
+    assert_files_generated(
+        rule_runner,
+        Address("protos", relative_file_path="b.proto"),
+        source_roots=["protos"],
+        expected_files=["protos/BOuterClass.java"],
+        extra_args=[
+            "--jvm-resolves={'jvm-default': '3rdparty/jvm/jvm-default.lock'}",
+        ],
+    )
+
+
+@maybe_skip_jdk_test
+def test_code_generation_with_multiple_jvm_resolves(
+    rule_runner: RuleRunner, protobuf_java_lockfile: JVMLockfileFixture
+) -> None:
+    """Verify that protobuf targets in different JVM resolves generate code correctly and
+    independently."""
+    rule_runner.write_files(
+        {
+            "protos/a/service.proto": dedent(
+                """\
+                syntax = "proto3";
+                message ProdService {
+                  string name = 1;
+                }
+                """
+            ),
+            "protos/a/BUILD": "protobuf_sources(jvm_resolve='a')",
+            "protos/b/service.proto": dedent(
+                """\
+                syntax = "proto3";
+                message DevService {
+                  string name = 1;
+                }
+                """
+            ),
+            "protos/b/BUILD": "protobuf_sources(jvm_resolve='b')",
+            "3rdparty/jvm/a.lock": protobuf_java_lockfile.serialized_lockfile,
+            "3rdparty/jvm/b.lock": protobuf_java_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD.a": protobuf_java_lockfile.requirements_as_jvm_artifact_targets(
+                resolve="a", target_name_prefix="a"
+            ),
+            "3rdparty/jvm/BUILD.b": protobuf_java_lockfile.requirements_as_jvm_artifact_targets(
+                resolve="b", target_name_prefix="b"
+            ),
+        }
+    )
+
+    source_roots = ["protos/a", "protos/b"]
+    extra_args = [
+        "--jvm-resolves={'a': '3rdparty/jvm/a.lock', 'b': '3rdparty/jvm/b.lock'}",
+    ]
+
+    # Test code generation for resolve `a`.`
+    assert_files_generated(
+        rule_runner,
+        Address("protos/a", relative_file_path="service.proto"),
+        source_roots=source_roots,
+        expected_files=["protos/a/Service.java"],
+        extra_args=extra_args,
+    )
+
+    # Test code generation for dev resolve
+    assert_files_generated(
+        rule_runner,
+        Address("protos/b", relative_file_path="service.proto"),
+        source_roots=source_roots,
+        expected_files=["protos/b/Service.java"],
+        extra_args=extra_args,
+    )
+
+
+@maybe_skip_jdk_test
+def test_protobuf_imports_within_jvm_resolve(
+    rule_runner: RuleRunner, protobuf_java_lockfile: JVMLockfileFixture
+) -> None:
+    """Verify that protobuf imports work correctly within the same JVM resolve."""
+    rule_runner.write_files(
+        {
+            "protos/common.proto": dedent(
+                """\
+                syntax = "proto3";
+                message Common {
+                  string id = 1;
+                }
+                """
+            ),
+            "protos/service.proto": dedent(
+                """\
+                syntax = "proto3";
+                import "common.proto";
+                message Service {
+                  Common common = 1;
+                }
+                """
+            ),
+            "protos/BUILD": "protobuf_sources()",
+            "3rdparty/jvm/jvm-default.lock": protobuf_java_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": protobuf_java_lockfile.requirements_as_jvm_artifact_targets(),
+        }
+    )
+
+    # Test that both files are generated correctly
+    assert_files_generated(
+        rule_runner,
+        Address("protos", relative_file_path="common.proto"),
+        source_roots=["protos"],
+        expected_files=["protos/CommonOuterClass.java"],
+        extra_args=[
+            "--jvm-resolves={'jvm-default': '3rdparty/jvm/jvm-default.lock'}",
+        ],
+    )
+
+    assert_files_generated(
+        rule_runner,
+        Address("protos", relative_file_path="service.proto"),
+        source_roots=["protos"],
+        expected_files=["protos/ServiceOuterClass.java"],
+        extra_args=[
+            "--jvm-resolves={'jvm-default': '3rdparty/jvm/jvm-default.lock'}",
+        ],
+    )
+
+
+@maybe_skip_jdk_test
+def test_protobuf_imports_no_cross_resolve(
+    rule_runner: RuleRunner, protobuf_java_lockfile: JVMLockfileFixture
+) -> None:
+    """Verify that protobuf imports cannot be resolved across different JVM resolves."""
+    rule_runner.write_files(
+        {
+            "protos/a/main.proto": dedent(
+                """\
+                syntax = "proto3";
+                import "common.proto";
+                message Main {
+                  string name = 1;
+                }
+                """
+            ),
+            "protos/a/BUILD": "protobuf_sources(jvm_resolve='a')",
+            "protos/b/common.proto": dedent(
+                """\
+                syntax = "proto3";
+                message Common {
+                  string id = 1;
+                }
+                """
+            ),
+            "protos/b/BUILD": "protobuf_sources(jvm_resolve='b')",
+            "3rdparty/jvm/a.lock": protobuf_java_lockfile.serialized_lockfile,
+            "3rdparty/jvm/b.lock": protobuf_java_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD.a": protobuf_java_lockfile.requirements_as_jvm_artifact_targets(
+                resolve="a", target_name_prefix="a"
+            ),
+            "3rdparty/jvm/BUILD.b": protobuf_java_lockfile.requirements_as_jvm_artifact_targets(
+                resolve="b", target_name_prefix="b"
+            ),
+        }
+    )
+
+    source_roots = ["protos"]
+    extra_args = [
+        "--jvm-resolves={'a': '3rdparty/jvm/a.lock', 'b': '3rdparty/jvm/b.lock'}",
+    ]
+
+    # The import won't be resolved since common.proto is in a different resolve.
+    with pytest.raises(ExecutionError, match=r"common.proto: File not found."):
+        assert_files_generated(
+            rule_runner,
+            Address("protos/a", relative_file_path="main.proto"),
+            source_roots=source_roots,
+            expected_files=["protos/a/MainOuterClass.java"],
+            extra_args=extra_args,
+        )
+
+    # Verify common.proto in resolve `b`` can still generate independently.
+    assert_files_generated(
+        rule_runner,
+        Address("protos/b", relative_file_path="common.proto"),
+        source_roots=source_roots,
+        expected_files=["protos/CommonOuterClass.java"],
+        extra_args=extra_args,
+    )

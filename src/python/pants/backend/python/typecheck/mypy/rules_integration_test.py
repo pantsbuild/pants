@@ -572,7 +572,7 @@ def test_protobuf_mypy(rule_runner: PythonRuleRunner, protoc_type_stubs: bool) -
     )
     rule_runner.write_files(
         {
-            "BUILD": ("python_requirement(name='protobuf', requirements=['protobuf==3.13.0'])"),
+            "BUILD": ("python_requirement(name='protobuf', requirements=['protobuf==6.31.1'])"),
             f"{PACKAGE}/__init__.py": "",
             f"{PACKAGE}/proto.proto": dedent(
                 """\

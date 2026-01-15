@@ -10,9 +10,11 @@ from dataclasses import dataclass
 
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
+    RunShellCommandCommandField,
     RunShellCommandWorkdirField,
     ShellCommandCacheScopeField,
     ShellCommandCommandField,
+    ShellCommandCommandFieldBase,
     ShellCommandExecutionDependenciesField,
     ShellCommandExtraEnvVarsField,
     ShellCommandLogOutputField,
@@ -98,7 +100,7 @@ async def prepare_process_request_from_target(
     working_directory = shell_command[ShellCommandWorkdirField].value
     assert working_directory is not None, "working_directory should always be a string"
 
-    command = shell_command[ShellCommandCommandField].value
+    command = shell_command[ShellCommandCommandFieldBase].value
     if not command:
         raise ValueError(f"Missing `command` line in `{description}.")
 
@@ -214,10 +216,24 @@ async def prepare_process_request_from_target(
 
 class RunShellCommand(RunFieldSet):
     required_fields = (
-        ShellCommandCommandField,
+        RunShellCommandCommandField,
         RunShellCommandWorkdirField,
     )
     run_in_sandbox_behavior = RunInSandboxBehavior.NOT_SUPPORTED
+
+
+@dataclass(frozen=True)
+class RunShellCommandBuild(RunFieldSet):
+    """Run a shell_command target interactively with explicit tool dependencies."""
+
+    required_fields = (ShellCommandCommandField,)
+    run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
+
+    command: ShellCommandCommandField
+    execution_dependencies: ShellCommandExecutionDependenciesField
+    runnable_dependencies: ShellCommandRunnableDependenciesField
+    tools: ShellCommandToolsField
+    workdir: ShellCommandWorkdirField
 
 
 @rule(desc="Running shell command", level=LogLevel.DEBUG)
@@ -255,7 +271,7 @@ async def _interactive_shell_command(
     if working_directory is None:
         raise ValueError("Working directory must be not be `None` for interactive processes.")
 
-    command = shell_command[ShellCommandCommandField].value
+    command = shell_command[RunShellCommandCommandField].value
     if not command:
         raise ValueError(f"Missing `command` line in `{description}.")
 
@@ -303,12 +319,110 @@ async def run_shell_command_request(bash: BashBinary, shell_command: RunShellCom
     )
 
 
+@rule(desc="Running shell_command target", level=LogLevel.DEBUG)
+async def run_shell_command_build_request(
+    field_set: RunShellCommandBuild,
+    bash: BashBinary,
+    shell_setup: ShellSetup.EnvironmentAware,
+) -> RunRequest:
+    """Execute a shell_command target interactively with explicit tool dependencies."""
+
+    command = field_set.command.value
+    if not command:
+        raise ValueError(
+            f"Missing `command` field in `shell_command` target at `{field_set.address}`."
+        )
+
+    # Resolve execution environment with all dependencies
+    execution_environment = await resolve_execution_environment(
+        ResolveExecutionDependenciesRequest(
+            field_set.address,
+            field_set.execution_dependencies.value,
+            field_set.runnable_dependencies.value,
+        ),
+        **implicitly(),
+    )
+
+    # Resolve tools into binary shims
+    tools = field_set.tools.value or ()
+    tools = tuple(tool for tool in tools if tool not in BASH_BUILTIN_COMMANDS)
+    resolved_tools = await create_binary_shims(
+        BinaryShimsRequest.for_binaries(
+            *tools,
+            rationale=f"execute `shell_command` at `{field_set.address}`",
+            search_path=shell_setup.executable_search_path,
+        ),
+        bash,
+    )
+
+    # Prepare extra sandbox contents with tools and runnable dependencies
+    runnable_dependencies = execution_environment.runnable_dependencies
+    extra_sandbox_contents: list[ExtraSandboxContents] = []
+
+    # Add tools to the environment
+    extra_sandbox_contents.append(
+        ExtraSandboxContents(
+            digest=EMPTY_DIGEST,
+            paths=(resolved_tools.path_component,),
+            immutable_input_digests=FrozenDict(resolved_tools.immutable_input_digests or {}),
+            append_only_caches=FrozenDict(),
+            extra_env=FrozenDict(),
+        )
+    )
+
+    # Add runnable dependencies
+    if runnable_dependencies:
+        extra_sandbox_contents.append(
+            ExtraSandboxContents(
+                digest=EMPTY_DIGEST,
+                paths=(f"{{chroot}}/{runnable_dependencies.path_component}",),
+                immutable_input_digests=runnable_dependencies.immutable_input_digests,
+                append_only_caches=runnable_dependencies.append_only_caches,
+                extra_env=runnable_dependencies.extra_env,
+            )
+        )
+
+    merged_extras = await merge_extra_sandbox_contents(
+        MergeExtraSandboxContents(tuple(extra_sandbox_contents))
+    )
+
+    # Prepare environment variables
+    env_vars = await prepare_env_vars(
+        merged_extras.extra_env,
+        (),  # No extra env vars field for run
+        extra_paths=merged_extras.paths,
+        description_of_origin=f"`shell_command` target at `{field_set.address}`",
+    )
+
+    # Parse working directory
+    working_directory = field_set.workdir.value
+    if working_directory is None:
+        working_directory = "."
+
+    relpath = parse_relative_directory(working_directory, field_set.address)
+    boot_script = f"cd {shlex.quote(relpath)}; " if relpath != "" else ""
+
+    return RunRequest(
+        digest=execution_environment.digest,
+        args=(
+            bash.path,
+            "-c",
+            boot_script + command,
+            f"{bin_name()} run {field_set.address.spec} --",
+        ),
+        extra_env=env_vars,
+        immutable_input_digests=FrozenDict.frozen(merged_extras.immutable_input_digests),
+        append_only_caches=FrozenDict.frozen(merged_extras.append_only_caches),
+    )
+
+
 def rules():
     return [
         *collect_rules(),
         *adhoc_process_support_rules(),
         UnionRule(GenerateSourcesRequest, GenerateFilesFromShellCommandRequest),
         *RunShellCommand.rules(),
+        *RunShellCommandBuild.rules(),
     ]
 
 

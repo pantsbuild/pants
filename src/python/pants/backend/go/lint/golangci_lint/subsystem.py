@@ -15,8 +15,14 @@ class GolangciLint(TemplatedExternalTool):
     name = "golangci-lint"
     help = "A fast Go linters runner"
 
-    default_version = "1.64.6"
+    default_version = "2.7.1"
     default_known_versions = [
+        # v2.x versions
+        "2.7.1|macos_x86_64|ad6b614138f4db8bc5d27c81fc7ffbf55e155efd6a29618c92d06483bbdfe5b3|14807330",
+        "2.7.1|macos_arm64|b4a7b574d47a1e5e3d9e13636b121a4a15303410939f0ef25d1f32696e94d043|13843697",
+        "2.7.1|linux_x86_64|34a9f54d3f970f4bcbc4e75bf5bce898a888cfb65e5066551ed25708922c201c|14451382",
+        "2.7.1|linux_arm64|39a932a66ad2068e2b01e60d9497c4b32bf012c423d5243ca06ad8a6c26f35b5|13199382",
+        # v1.x versions (kept for backward compatibility)
         "1.64.6|macos_x86_64|08f9459e7125fed2612abd71596e04d172695921aff82120d1c1e5e9b6fff2a3|12671159",
         "1.64.6|macos_arm64|8c10d0c7c3935b8c2269d628b6a06a8f48d8fb4cc31af02fe4ce0cd18b0704c1|11978218",
         "1.64.6|linux_x86_64|71e290acbacb7b3ba4f68f0540fb74dc180c4336ac8a6f3bdcd7fcc48b15148d|12365159",

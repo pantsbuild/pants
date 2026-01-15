@@ -9,6 +9,7 @@ import pkgutil
 import subprocess
 from dataclasses import dataclass
 from textwrap import dedent
+from typing import cast
 
 import pytest
 
@@ -29,7 +30,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules import pex_from_targets
 from pants.build_graph.address import Address
-from pants.core.goals.package import BuiltPackage
+from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact
 from pants.core.target_types import (
     FilesGeneratorTarget,
     FileTarget,
@@ -42,6 +43,12 @@ from pants.testutil.python_interpreter_selection import skip_unless_python38_pre
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import QueryRule
 from pants.testutil.skip_utils import skip_if_linux_arm64
+
+
+def sorted_artifact_paths(artifacts: tuple[BuiltPackageArtifact, ...]) -> list[str]:
+    relpaths = [a.relpath for a in artifacts]
+    assert None not in relpaths
+    return sorted(cast(list[str], relpaths))
 
 
 @pytest.fixture
@@ -528,11 +535,12 @@ def test_scie_defaults(rule_runner: PythonRuleRunner) -> None:
     tgt = rule_runner.get_target(Address("src/py/project"))
     field_set = PexBinaryFieldSet.create(tgt)
     result = rule_runner.request(BuiltPackage, [field_set])
-    assert len(result.artifacts) == 2
-    expected_pex_relpath = "src.py.project/project.pex"
-    assert expected_pex_relpath == result.artifacts[0].relpath
-    expected_scie_relpath = "src.py.project/project"
-    assert expected_scie_relpath == result.artifacts[1].relpath
+    assert (
+        result.artifacts[0].relpath == "src.py.project/project.pex"
+    )  # PEX must be first invariant
+    assert sorted(
+        ("src.py.project/project.pex", "src.py.project/project")
+    ) == sorted_artifact_paths(result.artifacts)
 
 
 @pytest.mark.parametrize("scie_hash_alg", ["md5", "sha1", "sha256", "sha384", "sha512"])
@@ -560,13 +568,13 @@ def test_scie_hash_present(rule_runner: PythonRuleRunner, scie_hash_alg: str) ->
     tgt = rule_runner.get_target(Address("src/py/project"))
     field_set = PexBinaryFieldSet.create(tgt)
     result = rule_runner.request(BuiltPackage, [field_set])
-    assert len(result.artifacts) == 3
-    expected_pex_relpath = "src.py.project/project.pex"
-    assert expected_pex_relpath == result.artifacts[0].relpath
-    expected_scie_relpath = "src.py.project/project"
-    assert expected_scie_relpath == result.artifacts[1].relpath
-    expected_scie_hash_relpath = f"src.py.project/project.{scie_hash_alg}"
-    assert expected_scie_hash_relpath == result.artifacts[2].relpath
+    assert sorted(
+        (
+            "src.py.project/project.pex",
+            "src.py.project/project",
+            f"src.py.project/project.{scie_hash_alg}",
+        )
+    ) == sorted_artifact_paths(result.artifacts)
 
 
 def test_scie_platform_file_suffix(rule_runner: PythonRuleRunner) -> None:
@@ -594,14 +602,13 @@ def test_scie_platform_file_suffix(rule_runner: PythonRuleRunner) -> None:
     tgt = rule_runner.get_target(Address("src/py/project"))
     field_set = PexBinaryFieldSet.create(tgt)
     result = rule_runner.request(BuiltPackage, [field_set])
-    assert len(result.artifacts) == 3
-    expected_relpaths = {
-        "src.py.project/project.pex",
-        "src.py.project/project-linux-aarch64",
-        "src.py.project/project-linux-x86_64",
-    }
-    relpaths = {artifact.relpath for artifact in result.artifacts}
-    assert expected_relpaths == relpaths
+    assert sorted(
+        (
+            "src.py.project/project.pex",
+            "src.py.project/project-linux-aarch64",
+            "src.py.project/project-linux-x86_64",
+        )
+    ) == sorted_artifact_paths(result.artifacts)
 
 
 def test_scie_platform_parent_dir(rule_runner: PythonRuleRunner) -> None:
@@ -629,9 +636,13 @@ def test_scie_platform_parent_dir(rule_runner: PythonRuleRunner) -> None:
     tgt = rule_runner.get_target(Address("src/py/project"))
     field_set = PexBinaryFieldSet.create(tgt)
     result = rule_runner.request(BuiltPackage, [field_set])
-    assert len(result.artifacts) == 3
-    expected_pex_relpath = "src.py.project/project.pex"
-    assert expected_pex_relpath == result.artifacts[0].relpath
+    assert sorted(
+        (
+            "src.py.project/project.pex",
+            "src.py.project/linux-aarch64/project",
+            "src.py.project/linux-x86_64/project",
+        )
+    ) == sorted_artifact_paths(result.artifacts)
     # The result is to directories, materialize to look inside and make sure
     # the right files are there
     rule_runner.write_digest(result.digest)
@@ -643,8 +654,8 @@ def test_scie_platform_parent_dir(rule_runner: PythonRuleRunner) -> None:
     "passthrough",
     [
         "",
-        "scie_busybox_pex_entrypoint_env_passthrough=True,",
-        "scie_busybox_pex_entrypoint_env_passthrough=False,",
+        "scie_pex_entrypoint_env_passthrough=True,",
+        "scie_pex_entrypoint_env_passthrough=False,",
     ],
 )
 def test_scie_busybox_moo(rule_runner: PythonRuleRunner, passthrough: str) -> None:
@@ -675,11 +686,9 @@ def test_scie_busybox_moo(rule_runner: PythonRuleRunner, passthrough: str) -> No
     result = rule_runner.request(BuiltPackage, [field_set])
     # Just asserting the right files are there to avoid downloading the whole
     # PBS during testing
-    assert len(result.artifacts) == 2
-    expected_pex_relpath = "src.py.project/project.pex"
-    assert expected_pex_relpath == result.artifacts[0].relpath
-    expected_scie_relpath = "src.py.project/project"
-    assert expected_scie_relpath == result.artifacts[1].relpath
+    assert sorted(
+        ("src.py.project/project.pex", "src.py.project/project")
+    ) == sorted_artifact_paths(result.artifacts)
 
 
 def test_scie_pbs_version(rule_runner: PythonRuleRunner) -> None:
@@ -708,11 +717,9 @@ def test_scie_pbs_version(rule_runner: PythonRuleRunner) -> None:
     result = rule_runner.request(BuiltPackage, [field_set])
     # Just asserting the right files are there to avoid downloading the whole
     # PBS during testing
-    assert len(result.artifacts) == 2
-    expected_pex_relpath = "src.py.project/project.pex"
-    assert expected_pex_relpath == result.artifacts[0].relpath
-    expected_scie_relpath = "src.py.project/project"
-    assert expected_scie_relpath == result.artifacts[1].relpath
+    assert sorted(
+        ("src.py.project/project.pex", "src.py.project/project")
+    ) == sorted_artifact_paths(result.artifacts)
 
 
 def test_scie_python_version_available(rule_runner: PythonRuleRunner) -> None:
@@ -741,11 +748,9 @@ def test_scie_python_version_available(rule_runner: PythonRuleRunner) -> None:
     result = rule_runner.request(BuiltPackage, [field_set])
     # Just asserting the right files are there to avoid downloading the whole
     # PBS during testing
-    assert len(result.artifacts) == 2
-    expected_pex_relpath = "src.py.project/project.pex"
-    assert expected_pex_relpath == result.artifacts[0].relpath
-    expected_scie_relpath = "src.py.project/project"
-    assert expected_scie_relpath == result.artifacts[1].relpath
+    assert sorted(
+        ("src.py.project/project.pex", "src.py.project/project")
+    ) == sorted_artifact_paths(result.artifacts)
 
 
 def test_scie_python_version_unavailable(rule_runner: PythonRuleRunner) -> None:
@@ -814,8 +819,102 @@ def test_scie_pbs_stripped(rule_runner: PythonRuleRunner, stripped: str) -> None
     result = rule_runner.request(BuiltPackage, [field_set])
     # Just asserting the right files are there to avoid downloading the whole
     # PBS during testing
+    assert sorted(
+        ("src.py.project/project.pex", "src.py.project/project")
+    ) == sorted_artifact_paths(result.artifacts)
+
+
+@pytest.mark.parametrize("scie_load_dotenv", [True, False])
+def test_scie_load_dotenv_passthru(rule_runner: PythonRuleRunner, scie_load_dotenv: bool) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                f"""\
+                python_sources(name="lib")
+                pex_binary(
+                    entry_point="app.py",
+                    scie="lazy",
+                    scie_load_dotenv={scie_load_dotenv},
+                    scie_pbs_release="20251031",  # The last release that includes Python 3.9.
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+    # Just asserting that this executes, but not re-checking Pex's implementation
     assert len(result.artifacts) == 2
-    expected_pex_relpath = "src.py.project/project.pex"
-    assert expected_pex_relpath == result.artifacts[0].relpath
-    expected_scie_relpath = "src.py.project/project"
-    assert expected_scie_relpath == result.artifacts[1].relpath
+    assert "src.py.project/project.pex" == result.artifacts[0].relpath
+
+
+def test_scie_pbs_free_threaded(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(name="lib")
+                pex_binary(
+                    entry_point="app.py",
+                    scie="lazy",
+                    scie_python_version="3.14.2",
+                    scie_pbs_free_threaded=True,
+                    scie_pbs_release="20251205",  # With free threaded and 3.14.2
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+    rule_runner.write_digest(result.digest)
+    executable = os.path.join(rule_runner.build_root, "src.py.project/project")
+    output = subprocess.check_output(executable, env={"SCIE": "inspect"})
+    # Minimal check without brittle binding to the exact SCIE=inspect format
+    # Will look something like 'ptex':
+    # {'cpython-3.14.2+20251205-x86_64-unknown-linux-gnu-freethreaded+pgo+lto-full.tar.zst':
+    # 'https://github.com/astral-sh/python-build-standalone/releases/download/20251205/cpython-3.14.2%2B20251205-x86_64-unknown-linux-gnu-freethreaded%2Bpgo%2Blto-full.tar.zst'}}
+    assert b"freethreaded" in output
+
+
+def test_scie_pbs_debug(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(name="lib")
+                pex_binary(
+                    entry_point="app.py",
+                    scie="lazy",
+                    scie_pbs_debug=True,
+                    scie_pbs_release="20251031",  # The last release that includes Python 3.9.
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+
+    rule_runner.write_digest(result.digest)
+    executable = os.path.join(rule_runner.build_root, "src.py.project/project")
+    output = subprocess.check_output(executable, env={"SCIE": "inspect"})
+    assert b"stripped" not in output

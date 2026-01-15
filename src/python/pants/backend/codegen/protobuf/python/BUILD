@@ -10,6 +10,10 @@ python_tests(
 )
 python_tests(name="python_protobuf_subsystem_test", sources=["python_protobuf_subsystem_test.py"])
 python_tests(
+    name="python_protobuf_dependency_inference_test",
+    sources=["python_protobuf_dependency_inference_test.py"],
+)
+python_tests(
     name="rules_integration_test",
     sources=["rules_integration_test.py"],
     dependencies=[":test_lockfile"],

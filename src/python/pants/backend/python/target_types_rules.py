@@ -41,12 +41,14 @@ from pants.backend.python.target_types import (
     PythonFilesGeneratorSettingsRequest,
     PythonProvidesField,
     PythonResolveField,
+    PythonResolveLikeFieldToValueRequest,
     ResolvedPexEntryPoint,
     ResolvedPythonDistributionEntryPoints,
     ResolvePexEntryPointRequest,
     ResolvePythonDistributionEntryPointsRequest,
 )
 from pants.backend.python.util_rules.interpreter_constraints import interpreter_constraints_contains
+from pants.core.target_types import ResolveLikeFieldToValueRequest, ResolveLikeFieldToValueResult
 from pants.core.util_rules.unowned_dependency_behavior import (
     UnownedDependencyError,
     UnownedDependencyUsage,
@@ -678,6 +680,16 @@ async def validate_python_dependencies(
     return ValidatedDependencies()
 
 
+@rule
+async def python_get_resolve_from_resolve_like_field_request(
+    request: PythonResolveLikeFieldToValueRequest, python_setup: PythonSetup
+) -> ResolveLikeFieldToValueResult:
+    if not python_setup.enable_resolves:
+        return ResolveLikeFieldToValueResult(value=None)
+    resolve = request.target[PythonResolveField].normalized_value(python_setup)
+    return ResolveLikeFieldToValueResult(value=resolve)
+
+
 def rules():
     return (
         *collect_rules(),
@@ -688,4 +700,5 @@ def rules():
         UnionRule(InferDependenciesRequest, InferPexBinaryEntryPointDependency),
         UnionRule(InferDependenciesRequest, InferPythonDistributionDependencies),
         UnionRule(ValidateDependenciesRequest, PythonValidateDependenciesRequest),
+        UnionRule(ResolveLikeFieldToValueRequest, PythonResolveLikeFieldToValueRequest),
     )
