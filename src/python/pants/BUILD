@@ -54,7 +54,8 @@ pex_binary(
     strip_pex_env=False,
     layout="zipapp",
     scie="eager",
-    scie_name_style="platform-file-suffix",
+    # GitHub Actions already have naming logic
+    scie_name_style="dynamic",
     # The native code engine is per platform
     scie_platform=["current"],
     scie_pbs_stripped=True,
