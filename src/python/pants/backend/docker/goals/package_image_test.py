@@ -34,7 +34,7 @@ from pants.backend.docker.target_types import (
     DockerImageTagsRequest,
     DockerImageTarget,
 )
-from pants.backend.docker.util_rules.docker_binary import DockerBinary
+from pants.backend.docker.util_rules.binaries import DockerBinary
 from pants.backend.docker.util_rules.docker_build_args import (
     DockerBuildArgs,
     DockerBuildArgsRequest,

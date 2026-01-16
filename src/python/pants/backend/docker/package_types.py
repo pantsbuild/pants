@@ -4,16 +4,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
 
 from pants.core.goals.package import BuiltPackageArtifact
 from pants.util.strutil import bullet_list, pluralize
-
-
-class DockerBuildEngine(Enum):
-    DOCKER = "docker"
-    LEGACY = "legacy"
-    BUILDKIT = "buildkit"
 
 
 @dataclass(frozen=True)

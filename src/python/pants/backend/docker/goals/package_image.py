@@ -10,11 +10,14 @@ from collections.abc import Iterator
 from dataclasses import asdict, dataclass
 from functools import partial
 from itertools import chain
+from pathlib import Path
 from typing import Literal, cast
+
+from pants.backend.docker.engine_types import DockerBuildEngine
 
 # Re-exporting BuiltDockerImage here, as it has its natural home here, but has moved out to resolve
 # a dependency cycle from docker_build_context.
-from pants.backend.docker.package_types import BuiltDockerImage as BuiltDockerImage
+from pants.backend.docker.package_types import BuiltDockerImage
 from pants.backend.docker.registries import DockerRegistries, DockerRegistryOptions
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
@@ -34,7 +37,12 @@ from pants.backend.docker.target_types import (
     DockerImageTargetStageField,
     get_docker_image_tags,
 )
-from pants.backend.docker.util_rules.docker_binary import DockerBinary
+from pants.backend.docker.util_rules.binaries import (
+    BuildctlBinary,
+    DockerBinary,
+    get_buildctl,
+    get_docker,
+)
 from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
@@ -388,7 +396,6 @@ async def build_docker_image(
     field_set: DockerPackageFieldSet,
     options: DockerOptions,
     global_options: GlobalOptions,
-    docker: DockerBinary,
     keep_sandboxes: KeepSandboxes,
     union_membership: UnionMembership,
 ) -> BuiltPackage:
@@ -444,26 +451,40 @@ async def build_docker_image(
         "__UPSTREAM_IMAGE_IDS": ",".join(context.upstream_image_ids),
     }
     context_root = field_set.get_context_root(options.default_context_root)
-    process = docker.build_image(
-        build_args=context.build_args,
-        digest=context.digest,
-        dockerfile=context.dockerfile,
-        context_root=context_root,
-        env=env,
-        tags=tags,
-        use_buildx=options.use_buildx,
-        extra_args=tuple(
-            get_build_options(
-                context=context,
-                field_set=field_set,
-                global_target_stage_option=options.build_target_stage,
-                global_build_hosts_options=options.build_hosts,
-                global_build_no_cache_option=options.build_no_cache,
-                use_buildx_option=options.use_buildx,
-                target=wrapped_target.target,
-            )
-        ),
-    )
+    if options.build_engine == DockerBuildEngine.BUILDKIT:
+        buildctl = await get_buildctl(**implicitly())
+        process = buildctl.build_image(
+            build_args=context.build_args,
+            digest=context.digest,
+            dockerfile=Path(context.dockerfile),
+            context_root=context_root,
+            env=env,
+            tags=tags,
+        )
+        parse_image_id = partial(parse_image_id_from_buildctl_build_output, buildctl)
+    else:
+        docker = await get_docker(**implicitly())
+        process = docker.build_image(
+            build_args=context.build_args,
+            digest=context.digest,
+            dockerfile=context.dockerfile,
+            context_root=context_root,
+            env=env,
+            tags=tags,
+            use_buildx=options.use_buildx,
+            extra_args=tuple(
+                get_build_options(
+                    context=context,
+                    field_set=field_set,
+                    global_target_stage_option=options.build_target_stage,
+                    global_build_hosts_options=options.build_hosts,
+                    global_build_no_cache_option=options.build_no_cache,
+                    use_buildx_option=options.use_buildx,
+                    target=wrapped_target.target,
+                )
+            ),
+        )
+        parse_image_id = partial(parse_image_id_from_docker_build_output, docker)
     result = await execute_process(process, **implicitly())
 
     if result.exit_code != 0:
@@ -487,7 +508,7 @@ async def build_docker_image(
             keep_sandboxes=keep_sandboxes,
         )
 
-    image_id = parse_image_id_from_docker_build_output(docker, result.stdout, result.stderr)
+    image_id = parse_image_id(result.stdout, result.stderr)
     docker_build_output_msg = "\n".join(
         (
             f"Docker build output for {tags[0]}:",
@@ -565,6 +586,9 @@ def parse_image_id_from_docker_build_output(docker: DockerBinary, *outputs: byte
                 return image_id
 
     return "<unknown>"
+
+
+def parse_image_id_from_buildctl_build_output(buildctl: BuildctlBinary, *outputs: bytes) -> str: ...
 
 
 def format_docker_build_context_help_message(

@@ -6,7 +6,7 @@ from __future__ import annotations
 import sys
 from typing import Any
 
-from pants.backend.docker.package_types import DockerBuildEngine
+from pants.backend.docker.engine_types import DockerBuildEngine, DockerRunEngine
 from pants.backend.docker.registries import DockerRegistries
 from pants.core.util_rules.search_paths import ExecutableSearchPathsOptionMixin
 from pants.option.option_types import (
@@ -146,9 +146,18 @@ class DockerOptions(Subsystem):
             """
         ),
     )
+    global_options = ShellStrListOption(
+        default=[],
+        help=softwrap(
+            """
+            Global options to use for all Docker and BuildKit invocations.
+            """
+        ),
+    )
     build_engine = EnumOption(
         default=DockerBuildEngine.DOCKER,
         enum_type=DockerBuildEngine,
+        mutually_exclusive_group="build_engine",
         help=softwrap(
             """
             The engine to use for Docker builds.
@@ -163,6 +172,7 @@ class DockerOptions(Subsystem):
     )
     use_buildx = BoolOption(
         default=False,
+        mutually_exclusive_group="build_engine",
         help=softwrap(
             """
             DEPRECATED: Use [docker].build_engine = "docker" instead.
@@ -172,7 +182,16 @@ class DockerOptions(Subsystem):
         ),
         deprecation_start_version="2.31.0",
     )
-
+    run_engine = EnumOption(
+        default=DockerRunEngine.DOCKER,
+        enum_type=DockerRunEngine,
+        mutually_exclusive_group="run_engine",
+        help=softwrap(
+            """
+            The engine to use for Docker runs.
+            """
+        ),
+    )
     _build_args = ShellStrListOption(
         help=softwrap(
             f"""
