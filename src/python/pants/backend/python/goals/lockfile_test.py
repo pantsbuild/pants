@@ -341,6 +341,58 @@ def test_multiple_resolves() -> None:
     }
 
 
+def test_find_links_scoped_to_resolve() -> None:
+    rule_runner = PythonRuleRunner(
+        rules=[
+            setup_user_lockfile_requests,
+            *PythonSetup.rules(),
+            QueryRule(UserGenerateLockfiles, [RequestedPythonUserResolveNames]),
+        ],
+        target_types=[PythonRequirementTarget],
+    )
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                # Using the underscore field directly instead of pulling all of
+                # pants.backend.plugin_development into the test
+                python_requirement(
+                    name='a',
+                    requirements=['a'],
+                    resolve='a',
+                    _find_links=['https://example.com/wheels'],
+                )
+                python_requirement(
+                    name='b',
+                    requirements=['b'],
+                    resolve='b',
+                )
+                """
+            ),
+        }
+    )
+    rule_runner.set_options(
+        [
+            "--python-resolves={'a': 'a.lock', 'b': 'b.lock'}",
+            "--python-enable-resolves",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    result = rule_runner.request(
+        UserGenerateLockfiles, [RequestedPythonUserResolveNames(["a", "b"])]
+    )
+    assert all(isinstance(r, GeneratePythonLockfile) for r in result)
+    result_by_resolve = {r.resolve_name: r for r in result}
+    assert isinstance(result_by_resolve["a"], GeneratePythonLockfile)
+    assert isinstance(result_by_resolve["b"], GeneratePythonLockfile)
+
+    assert result_by_resolve["a"].requirements == FrozenOrderedSet(["a"])
+    assert result_by_resolve["b"].requirements == FrozenOrderedSet(["b"])
+
+    assert result_by_resolve["a"].find_links == FrozenOrderedSet(["https://example.com/wheels"])
+    assert result_by_resolve["b"].find_links == FrozenOrderedSet([])
+
+
 def test_empty_requirements(rule_runner: PythonRuleRunner) -> None:
     with pytest.raises(ExecutionError) as excinfo:
         json.loads(
