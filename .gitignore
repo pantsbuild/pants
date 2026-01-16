@@ -69,3 +69,6 @@ GTAGS
 .tool-versions
 TAGS
 node_modules
+
+# Local hack for NV environment
+HOME/
