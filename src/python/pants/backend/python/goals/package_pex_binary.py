@@ -171,7 +171,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
                 ]
             )
         if self.scie_exe.value is not None:
-            args.extend([f"--scie-exe={exe}" for exe in self.scie_exe.value])
+            args.append(f"--scie-exe={self.scie_exe.value}")
         if self.scie_args.value is not None:
             args.extend([f"--scie-args={arg}" for arg in self.scie_args.value])
         if self.scie_env.value is not None:

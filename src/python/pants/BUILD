@@ -62,8 +62,10 @@ pex_binary(
     scie_hash_alg="sha256",
     scie_pex_entrypoint_env_passthrough=True,
     scie_load_dotenv=True,
+    # NOTE: Existing scie-pants releases expects this to be at
+    # pants/bin/native_client instead of as a  "script" in the wheel.
     scie_bind_resource_path=["PANTS_NATIVE_CLIENT=pants/bin/native_client"],
-    scie_exe=["{scie.env.PANTS_NATIVE_CLIENT}"],
+    scie_exe="{scie.env.PANTS_NATIVE_CLIENT}",
     scie_env=["NO_SCIE_WARNING=true", "_PANTS_SERVER_EXE={scie.env.VIRTUAL_ENV}/bin/pants"],
 )
 

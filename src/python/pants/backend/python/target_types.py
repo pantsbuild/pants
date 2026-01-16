@@ -784,7 +784,7 @@ class PexScieBindResourcePathField(StringSequenceField):
     )
 
 
-class PexScieExeField(StringSequenceField):
+class PexScieExeField(StringField):
     alias = "scie_exe"
     default = None
     help = help_text(
