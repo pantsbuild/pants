@@ -6,11 +6,13 @@ from __future__ import annotations
 import sys
 from typing import Any
 
+from pants.backend.docker.package_types import DockerBuildEngine
 from pants.backend.docker.registries import DockerRegistries
 from pants.core.util_rules.search_paths import ExecutableSearchPathsOptionMixin
 from pants.option.option_types import (
     BoolOption,
     DictOption,
+    EnumOption,
     ShellStrListOption,
     StrListOption,
     StrOption,
@@ -144,13 +146,31 @@ class DockerOptions(Subsystem):
             """
         ),
     )
+    build_engine = EnumOption(
+        default=DockerBuildEngine.DOCKER,
+        enum_type=DockerBuildEngine,
+        help=softwrap(
+            """
+            The engine to use for Docker builds.
+
+            Valid values are:
+
+            - `docker`: Use the Docker CLI with buildx to build images. (https://docs.docker.com/reference/cli/docker/buildx/build/)
+            - `legacy`: Use the legacy engine to build images. (https://docs.docker.com/reference/cli/docker/build-legacy/)
+            - `buildkit`: Invoke buildkit directly to build images. (https://github.com/moby/buildkit/blob/master/docs/reference/buildctl.md#build)
+            """
+        ),
+    )
     use_buildx = BoolOption(
         default=False,
         help=softwrap(
             """
+            DEPRECATED: Use [docker].build_engine = "docker" instead.
+
             Use [buildx](https://github.com/docker/buildx#buildx) (and BuildKit) for builds.
             """
         ),
+        deprecation_start_version="2.31.0",
     )
 
     _build_args = ShellStrListOption(

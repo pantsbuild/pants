@@ -4,6 +4,7 @@
 from pants.backend.docker.goals import package_image, publish, run_image
 from pants.backend.docker.subsystems import dockerfile_parser
 from pants.backend.docker.util_rules import (
+    buildctl_binary,
     dependencies,
     docker_binary,
     docker_build_args,
@@ -15,6 +16,7 @@ from pants.backend.docker.util_rules import (
 
 def rules():
     return [
+        *buildctl_binary.rules(),
         *dependencies.rules(),
         *docker_binary.rules(),
         *docker_build_args.rules(),
