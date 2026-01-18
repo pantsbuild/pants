@@ -89,7 +89,8 @@ pub const CACHE_KEY_SALT_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_SALT";
 pub const CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_TARGET_PLATFORM";
 
 // Environment variable which includes stdin content in the cache key to ensure processes with
-// different stdin have different cache keys, even though the Remote Execution API doesn't support stdin.
+// different stdin have different cache keys.
+// Even though the Remote Execution API doesn't support stdin, the remote cache is used for local processes.
 pub const CACHE_KEY_STDIN_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_STDIN";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1488,7 +1489,8 @@ pub async fn make_execute_request(
 
     // If stdin is provided, add a hash of its content as a synthetic environment variable to
     // ensure it affects the cache key. This ensures processes with different stdin content get
-    // different cache keys, even though the remote execution API doesn't support stdin directly.
+    // different cache keys, even though the Remote Execution API doesn't support stdin directly.
+    // Even though the RBE API doesn't support stdin, the remote cache is used for local processes.
     if let Some(ref stdin_bytes) = req.stdin {
         // Compute the digest of the stdin content for the cache key
         let stdin_digest = Digest::of_bytes(stdin_bytes);

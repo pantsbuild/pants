@@ -214,10 +214,6 @@ impl ExecuteProcess {
         workunit: &mut RunningWorkunit,
         backtrack_level: usize,
     ) -> NodeResult<ProcessResult> {
-        log::info!(
-            "ExecuteProcess::run_node starting for: {}",
-            self.process.description
-        );
         let request = self.process;
 
         let command_runner = context
