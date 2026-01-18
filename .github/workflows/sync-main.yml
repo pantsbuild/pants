@@ -27,11 +27,19 @@ jobs:
           git remote add upstream https://github.com/pantsbuild/pants.git || true
           git fetch upstream
 
-      - name: Merge upstream/main into main
+      - name: Merge upstream/main into main_clean
+        run: |
+          git checkout main_clean
+          # Try fast-forward first; if not possible, do a regular merge (may fail on conflicts)
+          git merge --ff-only upstream/main
+
+      - name: Push to origin/main_clean
+        run: git push origin main_clean
+
+      - name: Rebase upstream/main into main
         run: |
           git checkout main
-          # Try fast-forward first; if not possible, do a regular merge (may fail on conflicts)
-          git merge --ff-only upstream/main || git merge --no-edit upstream/main
+          git rebase upstream/main
 
-      - name: Push to origin
+      - name: push to origin/main
         run: git push origin main
