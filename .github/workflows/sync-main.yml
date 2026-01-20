@@ -40,6 +40,7 @@ jobs:
         run: |
           git checkout main
           git merge upstream/main
+          git pull
 
       - name: push to origin/main
         run: git push origin main
