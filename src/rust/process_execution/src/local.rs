@@ -19,9 +19,9 @@ use fs::{
     GlobMatching, PathGlobs, Permissions, RelativePath, StrictGlobMatching, SymlinkBehavior,
     TypedPath,
 };
-use hashing::Digest;
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
 use futures::{FutureExt, TryFutureExt, try_join};
+use hashing::Digest;
 use log::{debug, info};
 use nails::execution::ExitCode;
 use sandboxer::Sandboxer;
