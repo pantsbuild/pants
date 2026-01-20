@@ -18,6 +18,7 @@ use nails::execution::ExitCode;
 use sandboxer::Sandboxer;
 use store::{ImmutableInputs, Store};
 use task_executor::Executor;
+use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use tokio::sync::RwLock;
 use tokio_util::codec::{BytesCodec, FramedRead};
@@ -195,7 +196,6 @@ impl CapturedWorkdir for CommandRunner {
         let stdin_write_handle = if let Some(bytes) = stdin_bytes {
             child.stdin.take().map(|mut stdin| {
                 tokio::spawn(async move {
-                    use tokio::io::AsyncWriteExt;
                     stdin
                         .write_all(&bytes)
                         .await

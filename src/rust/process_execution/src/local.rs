@@ -31,6 +31,7 @@ use store::{
 };
 use task_executor::Executor;
 use tempfile::TempDir;
+use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use tokio::sync::RwLock;
 use tokio::time::timeout;
@@ -326,7 +327,6 @@ impl CapturedWorkdir for CommandRunner {
         let stdin_write_handle = if let Some(bytes) = stdin_bytes {
             child.stdin.take().map(|mut stdin| {
                 tokio::spawn(async move {
-                    use tokio::io::AsyncWriteExt;
                     stdin
                         .write_all(&bytes)
                         .await
