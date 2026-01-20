@@ -127,7 +127,10 @@ impl From<StoreError> for ProcessError {
 
 impl From<CapturedWorkdirError> for ProcessError {
     fn from(err: CapturedWorkdirError) -> Self {
-        ProcessError::Unclassified(err.to_string())
+        match err {
+            CapturedWorkdirError::MissingDigest(s, d) => ProcessError::MissingDigest(s, d),
+            _ => ProcessError::Unclassified(err.to_string()),
+        }
     }
 }
 
