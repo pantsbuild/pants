@@ -39,7 +39,7 @@ jobs:
       - name: Rebase upstream/main into main
         run: |
           git checkout main
-          git rebase upstream/main
+          git merge upstream/main
 
       - name: push to origin/main
         run: git push origin main
