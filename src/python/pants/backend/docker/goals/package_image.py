@@ -28,6 +28,7 @@ from pants.backend.docker.target_types import (
     DockerImageTagsField,
     DockerImageTagsRequest,
     DockerImageTargetStageField,
+    OptionValueFormatter,
     get_docker_image_tags,
 )
 from pants.backend.docker.util_rules.binaries import get_buildctl, get_docker, get_podman
@@ -309,25 +310,29 @@ class DockerInfoV1ImageTag:
     name: str
 
 
+def get_value_formatter(
+    context: DockerBuildContext, target: Target, field_alias: str
+) -> OptionValueFormatter:
+    return partial(
+        context.interpolation_context.format,
+        source=InterpolationContext.TextSource(
+            address=target.address, target_alias=target.alias, field_alias=field_alias
+        ),
+        error_cls=DockerImageOptionValueError,
+    )
+
+
 def get_build_options(
     context: DockerBuildContext,
     field_set: DockerPackageFieldSet,
     docker_options: DockerOptions,
     target: Target,
 ) -> Iterator[str]:
-    # Build options from target fields inheriting from DockerBuildOptionFieldMixin
     for field_type in target.field_types:
-        if issubclass(field_type, DockerBuildOptionsFieldMixin):
-            source = InterpolationContext.TextSource(
-                address=target.address, target_alias=target.alias, field_alias=field_type.alias
-            )
-            value_formatter = partial(
-                context.interpolation_context.format,
-                source=source,
-                error_cls=DockerImageOptionValueError,
-            )
+        if issubclass(field_type, DockerBuildOptionsFieldMixin) and field_type.validate_with_options(docker_options):
             yield from target[field_type].docker_build_options(
-                docker=docker_options, value_formatter=value_formatter
+                docker=docker_options,
+                value_formatter=get_value_formatter(context, target, field_type.alias),
             )
 
     # Target stage
