@@ -42,6 +42,7 @@ from pants.backend.docker.util_rules.binaries import (
     DockerBinary,
     get_buildctl,
     get_docker,
+    get_podman
 )
 from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContext,
@@ -451,40 +452,37 @@ async def build_docker_image(
         "__UPSTREAM_IMAGE_IDS": ",".join(context.upstream_image_ids),
     }
     context_root = field_set.get_context_root(options.default_context_root)
-    if options.build_engine == DockerBuildEngine.BUILDKIT:
-        buildctl = await get_buildctl(**implicitly())
-        process = buildctl.build_image(
-            build_args=context.build_args,
-            digest=context.digest,
-            dockerfile=Path(context.dockerfile),
-            context_root=context_root,
-            env=env,
-            tags=tags,
-        )
-        parse_image_id = partial(parse_image_id_from_buildctl_build_output, buildctl)
-    else:
-        docker = await get_docker(**implicitly())
-        process = docker.build_image(
-            build_args=context.build_args,
-            digest=context.digest,
-            dockerfile=context.dockerfile,
-            context_root=context_root,
-            env=env,
-            tags=tags,
-            use_buildx=options.use_buildx,
-            extra_args=tuple(
-                get_build_options(
-                    context=context,
-                    field_set=field_set,
-                    global_target_stage_option=options.build_target_stage,
-                    global_build_hosts_options=options.build_hosts,
-                    global_build_no_cache_option=options.build_no_cache,
-                    use_buildx_option=options.use_buildx,
-                    target=wrapped_target.target,
-                )
-            ),
-        )
-        parse_image_id = partial(parse_image_id_from_docker_build_output, docker)
+    match options.build_engine:
+        case DockerBuildEngine.BUILDKIT:
+            binary = await get_buildctl(**implicitly())
+            parse_image_id = parse_image_id_from_buildctl_build_output
+        case DockerBuildEngine.PODMAN:
+            binary = await get_podman(**implicitly())
+            parse_image_id = parse_image_id_from_podman_build_output
+        case _:
+            binary = await get_docker(**implicitly())
+            parse_image_id = parse_image_id_from_docker_build_output
+
+    process = binary.build_image(
+        build_args=context.build_args,
+        digest=context.digest,
+        dockerfile=context.dockerfile,
+        context_root=context_root,
+        env=env,
+        tags=tags,
+        use_buildx=options.use_buildx,
+        extra_args=tuple(
+            get_build_options(
+                context=context,
+                field_set=field_set,
+                global_target_stage_option=options.build_target_stage,
+                global_build_hosts_options=options.build_hosts,
+                global_build_no_cache_option=options.build_no_cache,
+                use_buildx_option=options.use_buildx,
+                target=wrapped_target.target,
+            )
+        ),
+    )
     result = await execute_process(process, **implicitly())
 
     if result.exit_code != 0:
@@ -534,61 +532,62 @@ async def build_docker_image(
     )
 
 
-def parse_image_id_from_docker_build_output(docker: DockerBinary, *outputs: bytes) -> str:
+def parse_image_id_from_docker_build_output(*outputs: bytes) -> str | None:
     """Outputs are typically the stdout/stderr pair from the `docker build` process."""
     # NB: We use the extracted image id for invalidation. The short_id may theoretically
     #  not be unique enough, although in a non adversarial situation, this is highly unlikely
     #  to be an issue in practice.
-    if docker.is_podman:
-        for output in outputs:
-            try:
-                _, image_id, success, *__ = reversed(output.decode().split("\n"))
-            except ValueError:
-                continue
-
-            if success.startswith("Successfully tagged"):
-                return image_id
-
-    else:
-        image_id_regexp = re.compile(
-            "|".join(
-                (
-                    # BuildKit output.
-                    r"(writing image (?P<digest>sha256:\S+))",
-                    # BuildKit with containerd-snapshotter output.
-                    r"(exporting manifest list (?P<manifest_list>sha256:\S+))",
-                    # BuildKit with containerd-snapshotter output and no attestation.
-                    r"(exporting manifest (?P<manifest>sha256:\S+))",
-                    # Docker output.
-                    r"(Successfully built (?P<short_id>\S+))",
-                ),
-            )
+    image_id_regexp = re.compile(
+        "|".join(
+            (
+                # BuildKit output.
+                r"(writing image (?P<digest>sha256:\S+))",
+                # BuildKit with containerd-snapshotter output.
+                r"(exporting manifest list (?P<manifest_list>sha256:\S+))",
+                # BuildKit with containerd-snapshotter output and no attestation.
+                r"(exporting manifest (?P<manifest>sha256:\S+))",
+                # Docker output.
+                r"(Successfully built (?P<short_id>\S+))",
+            ),
         )
-        for output in outputs:
-            image_id_match = next(
-                (
-                    match
-                    for match in (
-                        re.search(image_id_regexp, line)
-                        for line in reversed(output.decode().split("\n"))
-                    )
-                    if match
-                ),
-                None,
-            )
-            if image_id_match:
-                image_id = (
-                    image_id_match.group("digest")
-                    or image_id_match.group("short_id")
-                    or image_id_match.group("manifest_list")
-                    or image_id_match.group("manifest")
+    )
+    for output in outputs:
+        image_id_match = next(
+            (
+                match
+                for match in (
+                    re.search(image_id_regexp, line)
+                    for line in reversed(output.decode().split("\n"))
                 )
-                return image_id
+                if match
+            ),
+            None,
+        )
+        if image_id_match:
+            image_id = (
+                image_id_match.group("digest")
+                or image_id_match.group("short_id")
+                or image_id_match.group("manifest_list")
+                or image_id_match.group("manifest")
+            )
+            return image_id
 
-    return "<unknown>"
+    return None
 
 
-def parse_image_id_from_buildctl_build_output(buildctl: BuildctlBinary, *outputs: bytes) -> str: ...
+def parse_image_id_from_podman_build_output(*outputs: bytes) -> str:
+    for output in outputs:
+        try:
+            _, image_id, success, *__ = reversed(output.decode().split("\n"))
+        except ValueError:
+            continue
+
+        if success.startswith("Successfully tagged"):
+            return image_id
+    return None
+
+
+def parse_image_id_from_buildctl_build_output(*outputs: bytes) -> str: ...
 
 
 def format_docker_build_context_help_message(
