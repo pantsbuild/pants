@@ -128,6 +128,11 @@ class PublishFieldSet(Generic[_T], FieldSet, metaclass=ABCMeta):
     def get_output_data(self) -> PublishOutputData:
         return PublishOutputData({"target": self.address})
 
+    def package_before_publish(self, package_fs: PackageFieldSet) -> bool:
+        """Hook method to determine if a corresponding `package` rule should be executed before the
+        associated `publish` rule."""
+        return True
+
 
 # This is the same as the Enum in the test goal.  It is initially separate as
 # DRYing out is easier than undoing pre-mature abstraction.
@@ -262,8 +267,12 @@ async def package_for_publish(
     request: PublishProcessesRequest, local_environment: ChosenLocalEnvironmentName
 ) -> PublishProcesses:
     packages = await concurrently(
-        environment_aware_package(EnvironmentAwarePackageRequest(field_set))
-        for field_set in request.package_field_sets
+        environment_aware_package(EnvironmentAwarePackageRequest(package_fs))
+        for package_fs in request.package_field_sets
+        if any(
+            publish_fs.package_before_publish(package_fs)
+            for publish_fs in request.publish_field_sets
+        )
     )
 
     for pkg in packages:
