@@ -20,6 +20,7 @@ from pants.backend.docker.package_types import BuiltDockerImage
 from pants.backend.docker.registries import DockerRegistries, DockerRegistryOptions
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
+    BuildctlOptionsFieldMixin,
     DockerBuildOptionsFieldMixin,
     DockerImageContextRootField,
     DockerImageRegistriesField,
@@ -328,19 +329,29 @@ def get_build_options(
     docker_options: DockerOptions,
     target: Target,
 ) -> Iterator[str]:
+    engine_build_options_field_type, gen_options_func_name = (
+        (BuildctlOptionsFieldMixin, "buildctl_options")
+        if docker_options.build_engine == DockerBuildEngine.BUILDKIT
+        else (DockerBuildOptionsFieldMixin, "docker_build_options")
+    )
     for field_type in target.field_types:
-        if issubclass(field_type, DockerBuildOptionsFieldMixin) and field_type.validate_with_options(docker_options):
-            yield from target[field_type].docker_build_options(
+        if issubclass(field_type, engine_build_options_field_type) and field_type.validate_options(
+            docker_options, context
+        ):
+            gen_options_func = getattr(field_type, gen_options_func_name)
+            yield from gen_options_func(
                 docker=docker_options,
                 value_formatter=get_value_formatter(context, target, field_type.alias),
             )
 
-    # Target stage
+    # Special handling for global options
     if docker_options.build_target_stage in context.stages:
-        yield from ("--target", docker_options.build_target_stage)
-    elif field_set.target_stage.value:
-        yield from ("--target", field_set.target_stage.value)
+        if docker_options.build_engine == DockerBuildEngine.BUILDKIT:
+            yield from ("--opt", f"target={docker_options.build_target_stage}")
+        else:
+            yield from ("--target", docker_options.build_target_stage)
 
+    # This is the same for docker and buildkit
     if docker_options.build_no_cache:
         yield "--no-cache"
 
@@ -423,7 +434,6 @@ async def build_docker_image(
         context_root=context_root,
         env=env,
         tags=tags,
-        use_buildx=options.use_buildx,
         extra_args=tuple(
             get_build_options(
                 context=context,

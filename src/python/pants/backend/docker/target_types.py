@@ -8,7 +8,7 @@ import re
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from typing import ClassVar, cast, final
+from typing import TYPE_CHECKING, ClassVar, cast, final
 
 from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
 from pants.backend.docker.subsystems.docker_options import DockerOptions
@@ -41,6 +41,9 @@ from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import classproperty
 from pants.util.strutil import help_text, softwrap
+
+if TYPE_CHECKING:
+    from pants.backend.docker.util_rules.docker_build_context import DockerBuildContext
 
 # Common help text to be applied to each field that supports value interpolation.
 _interpolation_help = (
@@ -156,21 +159,6 @@ class DockerImageTagsField(StringSequenceField):
     )
 
 
-class DockerImageTargetStageField(StringField):
-    alias = "target_stage"
-    help = help_text(
-        """
-        Specify target build stage, rather than building the entire `Dockerfile`.
-
-        When using multi-stage build, you may name your stages, and can target them when building
-        to only selectively build a certain stage. See also the `--docker-build-target-stage`
-        option.
-
-        Read more about [multi-stage Docker builds](https://docs.docker.com/develop/develop-images/multistage-build/#stop-at-a-specific-build-stage)
-        """
-    )
-
-
 class DockerImageDependenciesField(Dependencies):
     supports_transitive_excludes = True
 
@@ -239,12 +227,16 @@ class DockerImageSkipPushField(BoolField):
 OptionValueFormatter = Callable[[str], str]
 
 
-class _ValidateWithOptionsMixin(ABC):
-    def validate_with_options(self, options: DockerOptions) -> bool:
+class ValidateOptionsMixin(ABC):
+    def validate_options(self, options: DockerOptions, context: DockerBuildContext) -> bool:
+        """Hook method telling Pants to ignore this option in certain contexts.
+
+        Can also be used to throw errors simply by raising an exception.
+        """
         return True
 
 
-class DockerBuildOptionsFieldMixin(_ValidateWithOptionsMixin, ABC):
+class DockerBuildOptionsFieldMixin(ValidateOptionsMixin, ABC):
     docker_build_option: ClassVar[str]
 
     @abstractmethod
@@ -346,7 +338,7 @@ class DockerBuildOptionFlagFieldMixin(BoolField, DockerBuildOptionsFieldMixin, A
             yield f"{self.docker_build_option}"
 
 
-class BuildctlOptionsFieldMixin(_ValidateWithOptionsMixin, ABC):
+class BuildctlOptionsFieldMixin(ValidateOptionsMixin, ABC):
     buildctl_option: ClassVar[str]
 
     @abstractmethod
@@ -508,6 +500,30 @@ class BuildctlOptionFlagFieldMixin(BoolField, BuildctlOptionsFieldMixin, ABC):
             yield f"{self.buildctl_option}"
 
 
+class DockerImageTargetStageField(
+    DockerBuildOptionFieldValueMixin, BuildctlLayeredOptionFieldValueMixin, StringField
+):
+    alias = "target_stage"
+    help = help_text(
+        """
+        Specify target build stage, rather than building the entire `Dockerfile`.
+
+        When using multi-stage build, you may name your stages, and can target them when building
+        to only selectively build a certain stage. See also the `--docker-build-target-stage`
+        option.
+
+        Read more about [multi-stage Docker builds](https://docs.docker.com/develop/develop-images/multistage-build/#stop-at-a-specific-build-stage)
+        """
+    )
+    docker_build_option = "--target"
+    buildctl_option = "--opt"
+    suboption = "target"
+
+    def validate_options(self, options: DockerOptions, context: DockerBuildContext) -> bool:
+        # Defer to global option if set and matches a stage
+        return options.build_target_stage not in context.stages
+
+
 class DockerImageBuildImageLabelsOptionField(
     DockerBuildOptionMultiValueFieldMixin,
     BuildctlOptionMultiValueFieldMixin,
@@ -598,7 +614,7 @@ class DockerImageBuildImageCacheToField(
     docker_build_option = "--cache-to"
     buildctl_option = "--export-cache"
 
-    def validate_with_options(self, options: DockerOptions) -> bool:
+    def validate_options(self, options: DockerOptions, context: DockerBuildContext) -> bool:
         return not options.build_no_cache
 
 
@@ -640,7 +656,7 @@ class DockerImageBuildImageCacheFromField(
     docker_build_option = "--cache-from"
     buildctl_option = "--import-cache"
 
-    def validate_with_options(self, options: DockerOptions) -> bool:
+    def validate_options(self, options: DockerOptions, context: DockerBuildContext) -> bool:
         return not options.build_no_cache
 
 
