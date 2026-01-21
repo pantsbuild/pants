@@ -10,7 +10,6 @@ from collections.abc import Iterator
 from dataclasses import asdict, dataclass
 from functools import partial
 from itertools import chain
-from pathlib import Path
 from typing import Literal, cast
 
 from pants.backend.docker.engine_types import DockerBuildEngine
@@ -21,13 +20,7 @@ from pants.backend.docker.package_types import BuiltDockerImage
 from pants.backend.docker.registries import DockerRegistries, DockerRegistryOptions
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
-    DockerBuildKitOptionField,
-    DockerBuildOptionFieldListOfMultiValueDictMixin,
-    DockerBuildOptionFieldMixin,
-    DockerBuildOptionFieldMultiValueDictMixin,
-    DockerBuildOptionFieldMultiValueMixin,
-    DockerBuildOptionFieldValueMixin,
-    DockerBuildOptionFlagFieldMixin,
+    DockerBuildOptionsFieldMixin,
     DockerImageContextRootField,
     DockerImageRegistriesField,
     DockerImageRepositoryField,
@@ -37,13 +30,7 @@ from pants.backend.docker.target_types import (
     DockerImageTargetStageField,
     get_docker_image_tags,
 )
-from pants.backend.docker.util_rules.binaries import (
-    BuildctlBinary,
-    DockerBinary,
-    get_buildctl,
-    get_docker,
-    get_podman
-)
+from pants.backend.docker.util_rules.binaries import get_buildctl, get_docker, get_podman
 from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
@@ -325,70 +312,31 @@ class DockerInfoV1ImageTag:
 def get_build_options(
     context: DockerBuildContext,
     field_set: DockerPackageFieldSet,
-    global_target_stage_option: str | None,
-    global_build_hosts_options: dict | None,
-    global_build_no_cache_option: bool | None,
-    use_buildx_option: bool,
+    docker_options: DockerOptions,
     target: Target,
 ) -> Iterator[str]:
     # Build options from target fields inheriting from DockerBuildOptionFieldMixin
     for field_type in target.field_types:
-        if issubclass(field_type, DockerBuildKitOptionField):
-            if use_buildx_option is not True:
-                if target[field_type].value != target[field_type].default:
-                    raise DockerImageOptionValueError(
-                        f"The {target[field_type].alias} field on the = `{target.alias}` target in `{target.address}` was set to `{target[field_type].value}`"
-                        f" and buildx is not enabled. Buildx must be enabled via the Docker subsystem options in order to use this field."
-                    )
-                else:
-                    # Case where BuildKit option has a default value - still should not be generated
-                    continue
-
-        if issubclass(
-            field_type,
-            (
-                DockerBuildOptionFieldMixin,
-                DockerBuildOptionFieldMultiValueDictMixin,
-                DockerBuildOptionFieldListOfMultiValueDictMixin,
-                DockerBuildOptionFieldValueMixin,
-                DockerBuildOptionFieldMultiValueMixin,
-                DockerBuildOptionFlagFieldMixin,
-            ),
-        ):
+        if issubclass(field_type, DockerBuildOptionsFieldMixin):
             source = InterpolationContext.TextSource(
                 address=target.address, target_alias=target.alias, field_alias=field_type.alias
             )
-            format = partial(
+            value_formatter = partial(
                 context.interpolation_context.format,
                 source=source,
                 error_cls=DockerImageOptionValueError,
             )
-            yield from target[field_type].options(
-                format, global_build_hosts_options=global_build_hosts_options
+            yield from target[field_type].docker_build_options(
+                docker=docker_options, value_formatter=value_formatter
             )
 
     # Target stage
-    target_stage = None
-    if global_target_stage_option in context.stages:
-        target_stage = global_target_stage_option
+    if docker_options.build_target_stage in context.stages:
+        yield from ("--target", docker_options.build_target_stage)
     elif field_set.target_stage.value:
-        target_stage = field_set.target_stage.value
-        if target_stage not in context.stages:
-            raise DockerBuildTargetStageError(
-                f"The {field_set.target_stage.alias!r} field in `{target.alias}` "
-                f"{field_set.address} was set to {target_stage!r}"
-                + (
-                    f", but there is no such stage in `{context.dockerfile}`. "
-                    f"Available stages: {', '.join(context.stages)}."
-                    if context.stages
-                    else f", but there are no named stages in `{context.dockerfile}`."
-                )
-            )
+        yield from ("--target", field_set.target_stage.value)
 
-    if target_stage:
-        yield from ("--target", target_stage)
-
-    if global_build_no_cache_option:
+    if docker_options.build_no_cache:
         yield "--no-cache"
 
 
@@ -475,10 +423,7 @@ async def build_docker_image(
             get_build_options(
                 context=context,
                 field_set=field_set,
-                global_target_stage_option=options.build_target_stage,
-                global_build_hosts_options=options.build_hosts,
-                global_build_no_cache_option=options.build_no_cache,
-                use_buildx_option=options.use_buildx,
+                docker_options=options,
                 target=wrapped_target.target,
             )
         ),

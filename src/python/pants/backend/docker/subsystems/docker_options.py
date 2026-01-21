@@ -168,8 +168,8 @@ class DockerOptions(Subsystem):
             Valid values are:
 
             - `docker`: Use the Docker CLI with buildx to build images. (https://docs.docker.com/reference/cli/docker/buildx/build/)
-            - `legacy`: Use the legacy engine to build images. (https://docs.docker.com/reference/cli/docker/build-legacy/)
             - `buildkit`: Invoke buildkit directly to build images. (https://github.com/moby/buildkit/blob/master/docs/reference/buildctl.md#build)
+            - `podman`: Use Podman to build images. (https://docs.podman.io/en/latest/markdown/podman-build.1.html)
             """
         ),
     )
@@ -178,6 +178,8 @@ class DockerOptions(Subsystem):
         help=softwrap(
             """
             DEPRECATED: Use [docker].build_engine = "docker" instead.
+
+            See here for using the legacy builder: https://docs.docker.com/reference/cli/docker/build-legacy/
 
             Use [buildx](https://github.com/docker/buildx#buildx) (and BuildKit) for builds.
             """
@@ -198,7 +200,9 @@ class DockerOptions(Subsystem):
         if isinstance(result, bool):
             warning = '`[docker].use_buildx` is deprecated. Buildx is now the default Docker build engine. Use `[docker].build_engine = "docker"` instead.'
             if not result:
-                warning += " To use the legacy engine, add `DOCKER_BUILDKIT=0` to `[docker].env_vars`."
+                warning += (
+                    " To use the legacy engine, add `DOCKER_BUILDKIT=0` to `[docker].env_vars`."
+                )
             logger.warning(warning)
             explicit = result
             result = DockerBuildEngine.DOCKER
@@ -208,10 +212,14 @@ class DockerOptions(Subsystem):
             used_option = '[docker].build_engine != "podman"'
         experimental_enable_podman = self.options.get("experimental_enable_podman", None)
         if experimental_enable_podman is not None:
-            logger.warning('`[docker].experimental_enable_podman` is deprecated. Use `[docker].build_engine = "podman"` instead.')
+            logger.warning(
+                '`[docker].experimental_enable_podman` is deprecated. Use `[docker].build_engine = "podman"` instead.'
+            )
             if experimental_enable_podman:
                 if explicit and result != DockerBuildEngine.PODMAN:
-                    raise ValueError(f"Conflicting options `{used_option}` and `[docker].experimental_enable_podman` both enabled.")
+                    raise ValueError(
+                        f"Conflicting options `{used_option}` and `[docker].experimental_enable_podman` both enabled."
+                    )
                 result = DockerBuildEngine.PODMAN
         return result
 
@@ -229,13 +237,19 @@ class DockerOptions(Subsystem):
     def run_engine(self) -> DockerRunEngine:
         experimental_enable_podman = self.options.get("experimental_enable_podman", None)
         if experimental_enable_podman is not None:
-            logger.warning('`[docker].experimental_enable_podman` is deprecated. Use `[docker].run_engine = "podman"` instead.')
+            logger.warning(
+                '`[docker].experimental_enable_podman` is deprecated. Use `[docker].run_engine = "podman"` instead.'
+            )
             if experimental_enable_podman:
                 if not self.options.is_default("run_engine"):
-                    raise ValueError(f'Conflicting options `[docker].run_engine != "podman"` and `[docker].experimental_enable_podman` both enabled.')
+                    raise ValueError(
+                        f'Conflicting options `[docker].run_engine != "podman"` and `[docker].experimental_enable_podman` both enabled.'
+                    )
                 return DockerRunEngine.PODMAN
             if self._run_engine == DockerRunEngine.PODMAN:
-                raise ValueError('`[docker].run_engine` is set to "podman", but the deprecated option `[docker].experimental_enable_podman` is disabled.')
+                raise ValueError(
+                    '`[docker].run_engine` is set to "podman", but the deprecated option `[docker].experimental_enable_podman` is disabled.'
+                )
         return self._run_engine
 
     _build_args = ShellStrListOption(
