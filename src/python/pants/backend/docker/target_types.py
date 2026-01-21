@@ -432,14 +432,14 @@ class BuildctlOptionFieldValueMixin(Field, BuildctlOptionsFieldMixin, ABC):
 
 class BuildctlLayeredOptionFieldValueMixin(Field, BuildctlOptionsFieldMixin, ABC):
     """Inherit this mixin class to provide layered options (i.e. option in the form of `--flag
-    suboption:value`) to `buildctl build`.
+    suboption=value`) to `buildctl build`.
 
-    You can override the option-value delimiter (default is `:`) by setting the
+    You can override the option-value delimiter (default is `=`) by setting the
     `suboption_value_delimiter` class variable.
     """
 
     suboption: ClassVar[str]
-    suboption_value_delimiter: ClassVar[str] = ":"
+    suboption_value_delimiter: ClassVar[str] = "="
 
     @final
     def buildctl_options(
@@ -468,14 +468,14 @@ class BuildctlLayeredOptionFieldMultiValueMixin(
     StringSequenceField, BuildctlOptionsFieldMixin, ABC
 ):
     """Inherit this mixin class to provide layered options in the form of `--flag
-    suboption:value1,value2` to `buildctl build`.
+    suboption=value1,value2` to `buildctl build`.
 
-    You can override the option-values delimiter (default is `:`) by setting the
+    You can override the option-values delimiter (default is `=`) by setting the
     `suboption_value_delimiter` class variable.
     """
 
     suboption: ClassVar[str]
-    suboption_value_delimiter: ClassVar[str] = ":"
+    suboption_value_delimiter: ClassVar[str] = "="
 
     @final
     def buildctl_options(
@@ -519,7 +519,8 @@ class DockerImageTargetStageField(
     buildctl_option = "--opt"
     suboption = "target"
 
-    def validate_options(self, options: DockerOptions, context: DockerBuildContext) -> bool:
+    @staticmethod
+    def validate_options(options: DockerOptions, context: DockerBuildContext) -> bool:
         # Defer to global option if set and matches a stage
         return options.build_target_stage not in context.stages
 
@@ -614,7 +615,8 @@ class DockerImageBuildImageCacheToField(
     docker_build_option = "--cache-to"
     buildctl_option = "--export-cache"
 
-    def validate_options(self, options: DockerOptions, context: DockerBuildContext) -> bool:
+    @staticmethod
+    def validate_options(options: DockerOptions, context: DockerBuildContext) -> bool:
         return not options.build_no_cache
 
 
@@ -656,7 +658,8 @@ class DockerImageBuildImageCacheFromField(
     docker_build_option = "--cache-from"
     buildctl_option = "--import-cache"
 
-    def validate_options(self, options: DockerOptions, context: DockerBuildContext) -> bool:
+    @staticmethod
+    def validate_options(options: DockerOptions, context: DockerBuildContext) -> bool:
         return not options.build_no_cache
 
 
@@ -816,7 +819,6 @@ class DockerImageBuildPlatformOptionField(
     docker_build_option = "--platform"
     buildctl_option = "--opt"
     suboption = "platform"
-    suboption_value_delimiter = "="
 
 
 class DockerImageRunExtraArgsField(StringSequenceField):

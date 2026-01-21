@@ -325,7 +325,6 @@ def get_value_formatter(
 
 def get_build_options(
     context: DockerBuildContext,
-    field_set: DockerPackageFieldSet,
     docker_options: DockerOptions,
     target: Target,
 ) -> Iterator[str]:
@@ -335,10 +334,10 @@ def get_build_options(
         else (DockerBuildOptionsFieldMixin, "docker_build_options")
     )
     for field_type in target.field_types:
-        if issubclass(field_type, engine_build_options_field_type) and field_type.validate_options(
-            docker_options, context
-        ):
-            gen_options_func = getattr(field_type, gen_options_func_name)
+        if issubclass(field_type, engine_build_options_field_type) and target[
+            field_type
+        ].validate_options(docker_options, context):
+            gen_options_func = getattr(target[field_type], gen_options_func_name)
             yield from gen_options_func(
                 docker=docker_options,
                 value_formatter=get_value_formatter(context, target, field_type.alias),
@@ -347,9 +346,15 @@ def get_build_options(
     # Special handling for global options
     if docker_options.build_target_stage in context.stages:
         if docker_options.build_engine == DockerBuildEngine.BUILDKIT:
-            yield from ("--opt", f"target={docker_options.build_target_stage}")
+            yield from (
+                DockerImageTargetStageField.buildctl_option,
+                f"{DockerImageTargetStageField.suboption}{DockerImageTargetStageField.suboption_value_delimiter}{docker_options.build_target_stage}",
+            )
         else:
-            yield from ("--target", docker_options.build_target_stage)
+            yield from (
+                DockerImageTargetStageField.docker_build_option,
+                docker_options.build_target_stage,
+            )
 
     # This is the same for docker and buildkit
     if docker_options.build_no_cache:
@@ -437,7 +442,6 @@ async def build_docker_image(
         extra_args=tuple(
             get_build_options(
                 context=context,
-                field_set=field_set,
                 docker_options=options,
                 target=wrapped_target.target,
             )
@@ -446,7 +450,7 @@ async def build_docker_image(
     result = await execute_process(process, **implicitly())
 
     if result.exit_code != 0:
-        msg = f"Docker build failed for `docker_image` {field_set.address}."
+        msg = f"{options.build_engine.value.capitalize()} build failed for `docker_image` {field_set.address}."
         if options.suggest_renames:
             maybe_help_msg = format_docker_build_context_help_message(
                 context_root=context_root,
@@ -469,7 +473,7 @@ async def build_docker_image(
     image_id = parse_image_id(result.stdout, result.stderr)
     docker_build_output_msg = "\n".join(
         (
-            f"Docker build output for {tags[0]}:",
+            f"{options.build_engine.value.capitalize()} build output for {tags[0]}:",
             "stdout:",
             result.stdout.decode(),
             "stderr:",
