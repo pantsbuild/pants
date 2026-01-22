@@ -8,6 +8,7 @@ import os
 from abc import ABCMeta
 from collections.abc import Iterable
 from dataclasses import dataclass
+from enum import StrEnum, auto
 from string import Template
 
 from pants.core.environments.rules import EnvironmentNameRequest, resolve_environment_name
@@ -37,7 +38,7 @@ from pants.engine.target import (
     Targets,
 )
 from pants.engine.unions import UnionMembership, union
-from pants.option.option_types import BoolOption
+from pants.option.option_types import EnumOption
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -146,6 +147,22 @@ class OutputPathField(StringField, AsyncFieldMixin):
         return os.path.normpath(result)
 
 
+class PackagingSideEffectBehavior(StrEnum):
+    ALLOW = auto()
+    IGNORE = auto()
+    WARN = auto()
+    ERROR = auto()
+
+
+class SideEffectingPackageException(Exception):
+    """Exception raised when a package request has unallowed side effects in the current context."""
+
+    def __init__(self, field_set: PackageFieldSet):
+        super().__init__(
+            f'The package request for {field_set.address} has side effects but `[package].side_effecting_behavior` is set to "error".'
+        )
+
+
 @dataclass(frozen=True)
 class EnvironmentAwarePackageRequest:
     """Request class to request a `BuiltPackage` in an environment-aware fashion.
@@ -155,13 +172,18 @@ class EnvironmentAwarePackageRequest:
     """
 
     field_set: PackageFieldSet
-    allow_side_effects: bool = False
+    side_effecting_behavior: PackagingSideEffectBehavior = PackagingSideEffectBehavior.WARN
 
 
 @rule
 async def environment_aware_package(request: EnvironmentAwarePackageRequest) -> BuiltPackage:
-    if (not request.allow_side_effects) and request.field_set.has_side_effects():
-        return BuiltPackage(EMPTY_DIGEST, ())
+    match request.side_effecting_behavior:
+        case PackagingSideEffectBehavior.IGNORE if request.field_set.has_side_effects():
+            return BuiltPackage(EMPTY_DIGEST, ())
+        case PackagingSideEffectBehavior.ERROR if request.field_set.has_side_effects():
+            raise SideEffectingPackageException(request.field_set)
+        case PackagingSideEffectBehavior.WARN if request.field_set.has_side_effects():
+            logger.warning(f"Side-effecting package request for {request.field_set.address}")
     environment_name = await resolve_environment_name(
         EnvironmentNameRequest.from_field_set(request.field_set), **implicitly()
     )
@@ -179,9 +201,9 @@ class PackageSubsystem(GoalSubsystem):
     def activated(cls, union_membership: UnionMembership) -> bool:
         return PackageFieldSet in union_membership
 
-    allow_side_effects = BoolOption(
-        default=True,
-        help="Allow package requests with side effects to be built when running `pants package`.",
+    side_effecting_behavior = EnumOption(
+        default=PackagingSideEffectBehavior.WARN,
+        help="The behavior to take when a package request has side effects.",
     )
 
 
@@ -223,7 +245,9 @@ async def package_asset(
 
     packages = await concurrently(
         environment_aware_package(
-            EnvironmentAwarePackageRequest(field_set, subsystem.allow_side_effects)
+            EnvironmentAwarePackageRequest(
+                field_set, side_effecting_behavior=subsystem.side_effecting_behavior
+            )
         )
         for field_set in target_roots_to_field_sets.field_sets
     )
