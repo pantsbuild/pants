@@ -18,10 +18,10 @@ Example rule:
 
 from __future__ import annotations
 
-import collections
 import json
 import logging
 from abc import ABCMeta
+from collections import defaultdict
 from collections.abc import Coroutine
 from dataclasses import asdict, dataclass, field, is_dataclass, replace
 from enum import Enum
@@ -39,6 +39,7 @@ from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.graph import transitive_targets as transitive_targets_get
 from pants.engine.internals.specs_rules import find_valid_field_sets_for_target_roots
 from pants.engine.intrinsics import execute_process, run_interactive_process_in_environment
 from pants.engine.process import (
@@ -54,6 +55,7 @@ from pants.engine.target import (
     ImmutableValue,
     NoApplicableTargetsBehavior,
     TargetRootsToFieldSetsRequest,
+    TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.option_types import EnumOption, StrOption
@@ -130,7 +132,11 @@ class PublishFieldSet(Generic[_T], FieldSet, metaclass=ABCMeta):
 
     def package_before_publish(self, package_fs: PackageFieldSet) -> bool:
         """Hook method to determine if a corresponding `package` rule should be executed before the
-        associated `publish` rule."""
+        associated `publish` rule.
+
+        The target referred to by the PackageFieldSet is guaranteed to be a transitive dependency of
+        the target referred to by `self`, including being the same target as `self`.
+        """
         return True
 
 
@@ -266,12 +272,27 @@ def _to_publish_output_results_and_data(
 async def package_for_publish(
     request: PublishProcessesRequest, local_environment: ChosenLocalEnvironmentName
 ) -> PublishProcesses:
+    # Map an address to all of its PublishFieldSets
+    address_to_publish_fss: defaultdict[Address, list[PublishFieldSet]] = defaultdict(list)
+    for publish_fs in request.publish_field_sets:
+        address_to_publish_fss[publish_fs.address].append(publish_fs)
+    transitive_deps = await concurrently(
+        transitive_targets_get(TransitiveTargetsRequest([address]), **implicitly())
+        for address in address_to_publish_fss.keys()
+    )
+    # Map an address to all of the PublishFieldSets that transitively depend on each address (including its own PublishFieldSet)
+    publish_fs_to_check_for_package: defaultdict[Address, set[PublishFieldSet]] = defaultdict(set)
+    for publish_fss, tds in zip(address_to_publish_fss.values(), transitive_deps):
+        for address in tds.closure:
+            # `request.package_field_sets` and `request.publish_field_sets` refer to the same set of addresses
+            if address in address_to_publish_fss:
+                publish_fs_to_check_for_package[address].update(publish_fss)
     packages = await concurrently(
         environment_aware_package(EnvironmentAwarePackageRequest(package_fs))
         for package_fs in request.package_field_sets
         if any(
             publish_fs.package_before_publish(package_fs)
-            for publish_fs in request.publish_field_sets
+            for publish_fs in publish_fs_to_check_for_package[package_fs.address]
         )
     )
 
