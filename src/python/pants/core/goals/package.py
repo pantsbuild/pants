@@ -15,7 +15,7 @@ from pants.core.util_rules import distdir
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import Digest, MergeDigests, Workspace
+from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.graph import find_valid_field_sets
 from pants.engine.internals.specs_rules import find_valid_field_sets_for_target_roots
@@ -37,6 +37,7 @@ from pants.engine.target import (
     Targets,
 )
 from pants.engine.unions import UnionMembership, union
+from pants.option.option_types import BoolOption
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -48,6 +49,13 @@ logger = logging.getLogger(__name__)
 @union(in_scope_types=[EnvironmentName])
 class PackageFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary to build an asset from a target."""
+
+    def has_side_effects(self) -> bool:
+        """Subclasses should implement this method to check if the package request has side effects.
+
+        Returns False by default.
+        """
+        return False
 
 
 @dataclass(frozen=True)
@@ -140,13 +148,20 @@ class OutputPathField(StringField, AsyncFieldMixin):
 
 @dataclass(frozen=True)
 class EnvironmentAwarePackageRequest:
-    """Request class to request a `BuiltPackage` in an environment-aware fashion."""
+    """Request class to request a `BuiltPackage` in an environment-aware fashion.
+
+    Also includes information about the context in which this package request is being called in,
+    i.e. can this package request have side effects.
+    """
 
     field_set: PackageFieldSet
+    allow_side_effects: bool = False
 
 
 @rule
 async def environment_aware_package(request: EnvironmentAwarePackageRequest) -> BuiltPackage:
+    if (not request.allow_side_effects) and request.field_set.has_side_effects():
+        return BuiltPackage(EMPTY_DIGEST, ())
     environment_name = await resolve_environment_name(
         EnvironmentNameRequest.from_field_set(request.field_set), **implicitly()
     )
@@ -163,6 +178,11 @@ class PackageSubsystem(GoalSubsystem):
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
         return PackageFieldSet in union_membership
+
+    allow_side_effects = BoolOption(
+        default=True,
+        help="Allow package requests with side effects to be built when running `pants package`.",
+    )
 
 
 class Package(Goal):
@@ -187,7 +207,9 @@ async def find_all_packageable_targets(all_targets: AllTargets) -> AllPackageabl
 
 
 @goal_rule
-async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
+async def package_asset(
+    workspace: Workspace, dist_dir: DistDir, subsystem: PackageSubsystem
+) -> Package:
     target_roots_to_field_sets = await find_valid_field_sets_for_target_roots(
         TargetRootsToFieldSetsRequest(
             PackageFieldSet,
@@ -200,7 +222,9 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
         return Package(exit_code=0)
 
     packages = await concurrently(
-        environment_aware_package(EnvironmentAwarePackageRequest(field_set))
+        environment_aware_package(
+            EnvironmentAwarePackageRequest(field_set, subsystem.allow_side_effects)
+        )
         for field_set in target_roots_to_field_sets.field_sets
     )
 
