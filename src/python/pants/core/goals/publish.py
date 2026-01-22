@@ -283,10 +283,10 @@ async def package_for_publish(
     # Map an address to all of the PublishFieldSets that transitively depend on each address (including its own PublishFieldSet)
     publish_fs_to_check_for_package: defaultdict[Address, set[PublishFieldSet]] = defaultdict(set)
     for publish_fss, tds in zip(address_to_publish_fss.values(), transitive_deps):
-        for address in tds.closure:
+        for tgt in tds.closure:
             # `request.package_field_sets` and `request.publish_field_sets` refer to the same set of addresses
-            if address in address_to_publish_fss:
-                publish_fs_to_check_for_package[address].update(publish_fss)
+            if tgt.address in address_to_publish_fss:
+                publish_fs_to_check_for_package[tgt.address].update(publish_fss)
     packages = await concurrently(
         environment_aware_package(EnvironmentAwarePackageRequest(package_fs))
         for package_fs in request.package_field_sets
