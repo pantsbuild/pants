@@ -22,7 +22,7 @@ import json
 import logging
 from abc import ABCMeta
 from collections import defaultdict
-from collections.abc import Coroutine
+from collections.abc import Coroutine, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, is_dataclass, replace
 from enum import Enum
 from itertools import chain
@@ -470,9 +470,9 @@ class _PublishJsonEncoder(json.JSONEncoder):
         """Return a serializable object for o."""
         if is_dataclass(o):
             return asdict(o)
-        if isinstance(o, collections.abc.Mapping):
+        if isinstance(o, Mapping):
             return dict(o)
-        if isinstance(o, collections.abc.Sequence):
+        if isinstance(o, Sequence):
             return list(o)
         try:
             return super().default(o)
