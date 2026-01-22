@@ -2014,25 +2014,43 @@ class StringSequenceField(SequenceField[str]):
         return value_or_default
 
 
-class DictStringToStringField(Field):
+class DictStringToAnyField(Field):
+    value: FrozenDict[str, Any] | None
+    default: ClassVar[FrozenDict[str, Any] | None] = None
+    _expected_type_description: ClassVar[str] = "a dictionary of string -> any"
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: dict[str, Any] | None, address: Address
+    ) -> FrozenDict[str, Any] | None:
+        value_or_default = super().compute_value(raw_value, address)
+        if value_or_default is None:
+            return None
+        invalid_type_exception = InvalidFieldTypeException(
+            address, cls.alias, raw_value, expected_type=cls._expected_type_description
+        )
+        if not isinstance(value_or_default, collections.abc.Mapping):
+            raise invalid_type_exception
+        if not all(isinstance(k, str) for k in value_or_default.keys()):
+            raise invalid_type_exception
+        return FrozenDict(value_or_default)
+
+
+class DictStringToStringField(DictStringToAnyField):
     value: FrozenDict[str, str] | None
     default: ClassVar[FrozenDict[str, str] | None] = None
+    _expected_type_description: ClassVar[str] = "a dictionary of string -> string"
 
     @classmethod
     def compute_value(
         cls, raw_value: dict[str, str] | None, address: Address
     ) -> FrozenDict[str, str] | None:
         value_or_default = super().compute_value(raw_value, address)
-        if value_or_default is None:
-            return None
-        invalid_type_exception = InvalidFieldTypeException(
-            address, cls.alias, raw_value, expected_type="a dictionary of string -> string"
-        )
-        if not isinstance(value_or_default, collections.abc.Mapping):
-            raise invalid_type_exception
-        if not all(isinstance(k, str) and isinstance(v, str) for k, v in value_or_default.items()):
-            raise invalid_type_exception
-        return FrozenDict(value_or_default)
+        if value_or_default and not all(isinstance(v, str) for v in value_or_default.values()):
+            raise InvalidFieldTypeException(
+                address, cls.alias, raw_value, expected_type=cls._expected_type_description
+            )
+        return value_or_default
 
 
 class ListOfDictStringToStringField(Field):

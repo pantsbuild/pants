@@ -26,6 +26,7 @@ from pants.engine.target import (
     AsyncFieldMixin,
     BoolField,
     Dependencies,
+    DictStringToAnyField,
     DictStringToStringField,
     Field,
     InvalidFieldException,
@@ -299,7 +300,7 @@ class DockerImageBuildImageExtraHostsField(DockerBuildOptionFieldMixin, DictStri
                 yield f"{label}:{value_formatter(value)}"
 
 
-class DockerBuildOptionFieldMultiValueDictMixin(DictStringToStringField):
+class DockerBuildOptionFieldMultiValueDictMixin(DictStringToAnyField):
     """Inherit this mixin class to provide options in the form of `--flag=key1=value1,key2=value2`
     to `docker build`."""
 
@@ -412,7 +413,7 @@ class DockerImageBuildImageCacheFromField(
 
 
 class DockerImageBuildImageOutputField(
-    DockerBuildOptionFieldMultiValueDictMixin, DictStringToStringField, DockerBuildKitOptionField
+    DockerBuildOptionFieldMultiValueDictMixin, DockerBuildKitOptionField
 ):
     alias = "output"
     default = FrozenDict({"type": "docker"})

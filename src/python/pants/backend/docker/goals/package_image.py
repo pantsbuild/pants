@@ -25,6 +25,7 @@ from pants.backend.docker.target_types import (
     DockerBuildOptionFieldMultiValueMixin,
     DockerBuildOptionFieldValueMixin,
     DockerBuildOptionFlagFieldMixin,
+    DockerImageBuildImageOutputField,
     DockerImageContextRootField,
     DockerImageRegistriesField,
     DockerImageRepositoryField,
@@ -74,7 +75,7 @@ class DockerImageOptionValueError(InterpolationError):
 
 @dataclass(frozen=True)
 class DockerPackageFieldSet(PackageFieldSet):
-    required_fields = (DockerImageSourceField,)
+    required_fields = (DockerImageSourceField, DockerImageBuildImageOutputField)
 
     context_root: DockerImageContextRootField
     registries: DockerImageRegistriesField
@@ -83,6 +84,11 @@ class DockerPackageFieldSet(PackageFieldSet):
     tags: DockerImageTagsField
     target_stage: DockerImageTargetStageField
     output_path: OutputPathField
+    output: DockerImageBuildImageOutputField
+
+    def has_side_effects(self) -> bool:
+        value_or_default = self.output.value or self.output.default
+        return value_or_default.get("push") is True or value_or_default["type"] == "registry"
 
     def format_tag(self, tag: str, interpolation_context: InterpolationContext) -> str:
         source = InterpolationContext.TextSource(
