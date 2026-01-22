@@ -13,6 +13,7 @@ from pants.backend.python.util_rules.pex import (
     create_venv_pex,
     setup_venv_pex_process,
 )
+from pants.core.goals.package import PackageFieldSet
 from pants.core.goals.publish import (
     PublishFieldSet,
     PublishOutputData,
@@ -78,6 +79,9 @@ class PublishPythonPackageFieldSet(PublishFieldSet):
                 **super().get_output_data(),
             }
         )
+
+    def package_before_publish(self, package_fs: PackageFieldSet) -> bool:
+        return not self.skip_twine.value
 
     # I'd rather opt out early here, so we don't build unnecessarily, however the error feedback is
     # misleading and not very helpful in that case.

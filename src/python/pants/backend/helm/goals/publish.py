@@ -15,6 +15,7 @@ from pants.backend.helm.target_types import (
     HelmSkipPushField,
 )
 from pants.backend.helm.util_rules.tool import HelmProcess, helm_process
+from pants.core.goals.package import PackageFieldSet
 from pants.core.goals.publish import (
     PublishFieldSet,
     PublishOutputData,
@@ -49,6 +50,9 @@ class HelmPublishFieldSet(HelmChartFieldSet, PublishFieldSet):
                 **super().get_output_data(),
             }
         )
+
+    def package_before_publish(self, package_fs: PackageFieldSet) -> bool:
+        return not self.skip_push.value
 
 
 @rule(desc="Push Helm chart to OCI registries", level=LogLevel.DEBUG)
