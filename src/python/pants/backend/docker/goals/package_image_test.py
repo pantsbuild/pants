@@ -2225,3 +2225,19 @@ def test_docker_info_serialize() -> None:
 
     result = DockerInfoV1.serialize(image_refs, image_id)
     assert json.loads(result) == expected
+
+
+@pytest.mark.parametrize(
+    ("output", "expected"),
+    [({"type": "image", "push": "true"}, True), ({"type": "registry"}, True), (None, False)],
+)
+def test_field_set_has_side_effects(output: dict | None, expected: bool) -> None:
+    rule_runner = RuleRunner(target_types=[DockerImageTarget])
+    output_str = f", output={output}" if output else ""
+    rule_runner.write_files(
+        {"BUILD": f"docker_image(name='image', source='Dockerfile'{output_str})"}
+    )
+    field_set = DockerPackageFieldSet.create(
+        rule_runner.get_target(Address("", target_name="image"))
+    )
+    assert field_set.has_side_effects() is expected
