@@ -10,8 +10,8 @@ import pytest
 from pants.backend.docker.goals.package_image import (
     DockerPackageFieldSet,
     build_docker_image,
+    rules,
 )
-from pants.backend.docker.goals.package_image import rules
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
@@ -43,11 +43,11 @@ def rule_runner() -> RuleRunner:
 
 def create_test_context(rule_runner: RuleRunner, pull_value=None):
     """Helper to create a mock build context and target with specific pull value."""
-    from pants.backend.docker.util_rules.docker_build_context import DockerBuildContext
     from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
+    from pants.backend.docker.util_rules.docker_build_context import DockerBuildContext
     from pants.backend.docker.util_rules.docker_build_env import DockerBuildEnvironment
     from pants.util.value_interpolation import InterpolationContext, InterpolationValue
-    
+
     # Create BUILD file with optional pull value
     # Python booleans need to be capitalized (True/False) in BUILD files
     build_content = "docker_image(name='test'"
@@ -58,28 +58,32 @@ def create_test_context(rule_runner: RuleRunner, pull_value=None):
             # Convert bool to string with proper capitalization
             build_content += f", pull={str(pull_value)}"
     build_content += ")"
-    
-    rule_runner.write_files({
-        "test/BUILD": build_content,
-        "test/Dockerfile": "FROM alpine:3.16\n",
-    })
-    
+
+    rule_runner.write_files(
+        {
+            "test/BUILD": build_content,
+            "test/Dockerfile": "FROM alpine:3.16\n",
+        }
+    )
+
     tgt = rule_runner.get_target(Address("test"))
-    
+
     # Mock build context
     build_context = DockerBuildContext(
         build_args=DockerBuildArgs(),
         digest=EMPTY_DIGEST,
         dockerfile="test/Dockerfile",
         build_env=DockerBuildEnvironment(environment={}),
-        interpolation_context=InterpolationContext.from_dict({
-            "tags": InterpolationValue({}),
-        }),
+        interpolation_context=InterpolationContext.from_dict(
+            {
+                "tags": InterpolationValue({}),
+            }
+        ),
         copy_source_vs_context_source=(("test/Dockerfile", ""),),
         stages=(),
         upstream_image_ids=(),
     )
-    
+
     return tgt, build_context
 
 
@@ -90,12 +94,13 @@ def create_test_context(rule_runner: RuleRunner, pull_value=None):
 def test_podman_pull_string_policies(rule_runner: RuleRunner, policy: str) -> None:
     """Test that Podman accepts all valid string pull policies."""
     tgt, build_context = create_test_context(rule_runner, pull_value=policy)
-    
+
     process_args = []
-    
+
     def capture_process(process: Process):
         process_args.append(process.argv)
         from pants.engine.process import FallibleProcessResult, ProcessResultMetadata
+
         return FallibleProcessResult(
             stdout=b"Successfully built abc123\n",
             stdout_digest=EMPTY_DIGEST,
@@ -103,12 +108,25 @@ def test_podman_pull_string_policies(rule_runner: RuleRunner, policy: str) -> No
             stderr_digest=EMPTY_DIGEST,
             exit_code=0,
             output_digest=EMPTY_DIGEST,
-            metadata=ProcessResultMetadata(0, ProcessExecutionEnvironment(environment_name=None, platform="linux_x86_64", docker_image=None, remote_execution=False, remote_execution_extra_platform_properties=[], execute_in_workspace=False, keep_sandboxes="never"), "ran_locally", 0),
+            metadata=ProcessResultMetadata(
+                0,
+                ProcessExecutionEnvironment(
+                    environment_name=None,
+                    platform="linux_x86_64",
+                    docker_image=None,
+                    remote_execution=False,
+                    remote_execution_extra_platform_properties=[],
+                    execute_in_workspace=False,
+                    keep_sandboxes="never",
+                ),
+                "ran_locally",
+                0,
+            ),
         )
-    
+
     def mock_digest(_: CreateDigest):
         return EMPTY_DIGEST
-    
+
     docker_options = create_subsystem(
         DockerOptions,
         registries={},
@@ -122,9 +140,9 @@ def test_podman_pull_string_policies(rule_runner: RuleRunner, policy: str) -> No
         use_buildx=False,
         env_vars=[],
     )
-    
+
     global_options = rule_runner.request(GlobalOptions, [])
-    
+
     # Use Podman binary
     podman_binary = DockerBinary(
         path="/bin/podman",
@@ -133,8 +151,8 @@ def test_podman_pull_string_policies(rule_runner: RuleRunner, policy: str) -> No
         extra_input_digests=None,
         is_podman=True,
     )
-    
-    result = run_rule_with_mocks(
+
+    run_rule_with_mocks(
         build_docker_image,
         rule_args=[
             DockerPackageFieldSet.create(tgt),
@@ -153,7 +171,7 @@ def test_podman_pull_string_policies(rule_runner: RuleRunner, policy: str) -> No
         union_membership=UnionMembership.from_rules([]),
         show_warnings=False,
     )
-    
+
     # Verify that the correct policy was used
     assert len(process_args) == 1
     argv = process_args[0]
@@ -164,7 +182,7 @@ def test_podman_pull_string_policies(rule_runner: RuleRunner, policy: str) -> No
 def test_docker_pull_string_raises_error(rule_runner: RuleRunner) -> None:
     """Test that Docker backend raises error when given a string pull policy."""
     tgt, build_context = create_test_context(rule_runner, pull_value="always")
-    
+
     docker_options = create_subsystem(
         DockerOptions,
         registries={},
@@ -178,9 +196,9 @@ def test_docker_pull_string_raises_error(rule_runner: RuleRunner) -> None:
         use_buildx=False,
         env_vars=[],
     )
-    
+
     global_options = rule_runner.request(GlobalOptions, [])
-    
+
     # Use Docker binary (not Podman)
     docker_binary = DockerBinary(
         path="/bin/docker",
@@ -189,10 +207,10 @@ def test_docker_pull_string_raises_error(rule_runner: RuleRunner) -> None:
         extra_input_digests=None,
         is_podman=False,
     )
-    
+
     def mock_digest(_: CreateDigest):
         return EMPTY_DIGEST
-    
+
     # Should raise InvalidFieldException
     with pytest.raises(InvalidFieldException) as exc_info:
         run_rule_with_mocks(
@@ -213,5 +231,5 @@ def test_docker_pull_string_raises_error(rule_runner: RuleRunner) -> None:
             union_membership=UnionMembership.from_rules([]),
             show_warnings=False,
         )
-    
+
     assert "string pull policies are only supported by Podman" in str(exc_info.value)
