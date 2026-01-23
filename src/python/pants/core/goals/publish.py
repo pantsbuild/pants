@@ -134,8 +134,7 @@ class PublishFieldSet(Generic[_T], FieldSet, metaclass=ABCMeta):
         """Hook method to determine if a corresponding `package` rule should be executed before the
         associated `publish` rule.
 
-        The target referred to by the PackageFieldSet is guaranteed to be a transitive dependency of
-        the target referred to by `self`, including being the same target as `self`.
+        The target referred to by the PackageFieldSet is guaranteed to be the same target as `self`.
         """
         return True
 
@@ -276,23 +275,13 @@ async def package_for_publish(
     address_to_publish_fss: defaultdict[Address, list[PublishFieldSet]] = defaultdict(list)
     for publish_fs in request.publish_field_sets:
         address_to_publish_fss[publish_fs.address].append(publish_fs)
-    transitive_deps = await concurrently(
-        transitive_targets_get(TransitiveTargetsRequest([address]), **implicitly())
-        for address in address_to_publish_fss.keys()
-    )
-    # Map an address to all of the PublishFieldSets that transitively depend on each address (including its own PublishFieldSet)
-    publish_fs_to_check_for_package: defaultdict[Address, set[PublishFieldSet]] = defaultdict(set)
-    for publish_fss, tds in zip(address_to_publish_fss.values(), transitive_deps):
-        for tgt in tds.closure:
-            # `request.package_field_sets` and `request.publish_field_sets` refer to the same set of addresses
-            if tgt.address in address_to_publish_fss:
-                publish_fs_to_check_for_package[tgt.address].update(publish_fss)
+    # Check if any of a PackageFieldSets associated PublishFieldSets require packaging
     packages = await concurrently(
-        environment_aware_package(EnvironmentAwarePackageRequest(package_fs))
+        environment_aware_package(EnvironmentAwarePackageRequest(package_fs), **implicitly())
         for package_fs in request.package_field_sets
         if any(
             publish_fs.package_before_publish(package_fs)
-            for publish_fs in publish_fs_to_check_for_package[package_fs.address]
+            for publish_fs in address_to_publish_fss[package_fs.address]
         )
     )
 
