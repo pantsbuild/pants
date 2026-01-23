@@ -331,6 +331,7 @@ def get_build_options(
     global_build_no_cache_option: bool | None,
     use_buildx_option: bool,
     target: Target,
+    docker: DockerBinary | None = None,
 ) -> Iterator[str]:
     # Build options from target fields inheriting from DockerBuildOptionFieldMixin
     for field_type in target.field_types:
@@ -355,7 +356,7 @@ def get_build_options(
                 DockerBuildOptionFieldMultiValueMixin,
                 DockerBuildOptionFlagFieldMixin,
             ),
-        ):
+        ) or field_type.__name__ == "DockerImageBuildPullOptionField":
             source = InterpolationContext.TextSource(
                 address=target.address, target_alias=target.alias, field_alias=field_type.alias
             )
@@ -365,7 +366,7 @@ def get_build_options(
                 error_cls=DockerImageOptionValueError,
             )
             yield from target[field_type].options(
-                format, global_build_hosts_options=global_build_hosts_options
+                format, global_build_hosts_options=global_build_hosts_options, docker=docker
             )
 
     # Target stage
@@ -510,6 +511,7 @@ async def get_docker_image_build_process(
                 global_build_no_cache_option=options.build_no_cache,
                 use_buildx_option=options.use_buildx,
                 target=wrapped_target.target,
+                docker=docker,
             )
         ),
     )
