@@ -816,7 +816,7 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
         FieldSetsPerTargetRequest(PackageFieldSet, package_targets), **implicitly()
     )
     packages = await concurrently(
-        environment_aware_package(EnvironmentAwarePackageRequest(field_set))
+        environment_aware_package(EnvironmentAwarePackageRequest(field_set), **implicitly())
         for field_set in package_field_sets_per_target.field_sets
     )
 

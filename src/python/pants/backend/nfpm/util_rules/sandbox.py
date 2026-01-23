@@ -175,7 +175,7 @@ async def populate_nfpm_content_sandbox(
         FieldSetsPerTargetRequest(PackageFieldSet, deps.package_targets), **implicitly()
     )
     packages = await concurrently(
-        environment_aware_package(EnvironmentAwarePackageRequest(field_set))
+        environment_aware_package(EnvironmentAwarePackageRequest(field_set), **implicitly())
         for field_set in package_field_sets_per_target.field_sets
     )
 

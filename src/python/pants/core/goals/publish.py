@@ -39,7 +39,6 @@ from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.graph import transitive_targets as transitive_targets_get
 from pants.engine.internals.specs_rules import find_valid_field_sets_for_target_roots
 from pants.engine.intrinsics import execute_process, run_interactive_process_in_environment
 from pants.engine.process import (
@@ -55,7 +54,6 @@ from pants.engine.target import (
     ImmutableValue,
     NoApplicableTargetsBehavior,
     TargetRootsToFieldSetsRequest,
-    TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.option_types import EnumOption, StrOption
