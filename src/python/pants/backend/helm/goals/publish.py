@@ -52,7 +52,7 @@ class HelmPublishFieldSet(HelmChartFieldSet, PublishFieldSet):
         )
 
     def package_before_publish(self, package_fs: PackageFieldSet) -> bool:
-        return not self.skip_push.value
+        return (not self.skip_push.value) and bool(self.registries.value)
 
 
 @rule(desc="Push Helm chart to OCI registries", level=LogLevel.DEBUG)

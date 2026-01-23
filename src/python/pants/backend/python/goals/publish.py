@@ -81,7 +81,7 @@ class PublishPythonPackageFieldSet(PublishFieldSet):
         )
 
     def package_before_publish(self, package_fs: PackageFieldSet) -> bool:
-        return not self.skip_twine.value
+        return (not self.skip_twine.value) and bool(self.repositories.value)
 
     # I'd rather opt out early here, so we don't build unnecessarily, however the error feedback is
     # misleading and not very helpful in that case.
