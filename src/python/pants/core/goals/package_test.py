@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
@@ -16,14 +17,17 @@ from pants.core.goals.package import (
     OutputPathField,
     Package,
     PackageFieldSet,
+    SideEffectingPackageException,
     TraverseIfNotPackageTarget,
 )
 from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import CreateDigest, FileContent
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.intrinsics import create_digest
 from pants.engine.rules import rule
 from pants.engine.target import (
+    BoolField,
     Dependencies,
     DependenciesRequest,
     StringField,
@@ -70,20 +74,29 @@ class MockTypeField(StringField):
         raise ValueError(f"don't understand {self.value}")
 
 
+class MockSideEffectsField(BoolField):
+    alias = "side_effects"
+    default = False
+
+
 class MockDependenciesField(Dependencies):
     pass
 
 
 class MockTarget(Target):
     alias = "mock"
-    core_fields = (MockTypeField, MockDependenciesField, OutputPathField)
+    core_fields = (MockTypeField, MockSideEffectsField, MockDependenciesField, OutputPathField)
 
 
 @dataclass(frozen=True)
 class MockPackageFieldSet(PackageFieldSet):
-    required_fields = (MockTypeField,)
+    required_fields = (MockTypeField, MockSideEffectsField)
 
     type: MockTypeField
+    side_effects: MockSideEffectsField
+
+    def has_side_effects(self) -> bool:
+        return self.side_effects.value
 
 
 @rule
@@ -117,12 +130,20 @@ def dist_base(rule_runner) -> Path:
     return Path(rule_runner.build_root, "dist/base")
 
 
-def test_package_single_file_artifact(rule_runner: RuleRunner, dist_base: Path) -> None:
-    rule_runner.write_files({"src/BUILD": "mock(name='x', type='single_file')"})
+@pytest.mark.parametrize("test_with_side_effects", [True, False])
+def test_package_single_file_artifact(
+    test_with_side_effects: bool, rule_runner: RuleRunner, dist_base: Path
+) -> None:
+    rule_runner.write_files(
+        {"src/BUILD": f"mock(name='x', type='single_file', side_effects={test_with_side_effects})"}
+    )
     result = rule_runner.run_goal_rule(
         Package,
         args=("src:x",),
         env_inherit={"HOME", "PATH", "PYENV_ROOT"},
+        global_args=[
+            "--package-side-effecting-behavior=" + ("allow" if test_with_side_effects else "error")
+        ],
     )
 
     assert result.exit_code == 0
@@ -307,3 +328,50 @@ def test_output_path_template_behavior(rule_runner: RuleRunner) -> None:
 
     output_path_address_and_ext_2 = get_output_path("with-address-and-ext", file_ending="ext")
     assert output_path_address_and_ext_2 == "xyzzy/with-address-and-ext.ext"
+
+
+def test_package_side_effecting_artifact_error(rule_runner: RuleRunner, dist_base: Path) -> None:
+    rule_runner.write_files({"src/BUILD": "mock(name='x', type='single_file', side_effects=True)"})
+    with pytest.raises(ExecutionError) as excinfo:
+        rule_runner.run_goal_rule(
+            Package,
+            args=("src:x",),
+            env_inherit={"HOME", "PATH", "PYENV_ROOT"},
+            global_args=["--package-side-effecting-behavior=error"],
+        )
+    exc = excinfo.value
+    assert len(exc.wrapped_exceptions) == 1
+    assert type(exc.wrapped_exceptions[0]) is SideEffectingPackageException
+    assert not (dist_base / "x").exists()
+
+
+def test_package_side_effecting_artifact_warn(
+    rule_runner: RuleRunner, dist_base: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    rule_runner.write_files({"src/BUILD": "mock(name='x', type='single_file', side_effects=True)"})
+    result = rule_runner.run_goal_rule(
+        Package,
+        args=("src:x",),
+        env_inherit={"HOME", "PATH", "PYENV_ROOT"},
+        global_args=["--package-side-effecting-behavior=warn"],
+    )
+    assert result.exit_code == 0
+    assert (dist_base / "x").read_text() == "single"
+    for record in caplog.records:
+        if record.levelno == logging.WARNING:
+            if "Side-effecting package request for src:x" in record.message:
+                break
+    else:
+        pytest.fail("Warning message not found")
+
+
+def test_package_side_effecting_artifact_ignore(rule_runner: RuleRunner, dist_base: Path) -> None:
+    rule_runner.write_files({"src/BUILD": "mock(name='x', type='single_file', side_effects=True)"})
+    result = rule_runner.run_goal_rule(
+        Package,
+        args=("src:x",),
+        env_inherit={"HOME", "PATH", "PYENV_ROOT"},
+        global_args=["--package-side-effecting-behavior=ignore"],
+    )
+    assert result.exit_code == 0
+    assert not (dist_base / "x").exists()
