@@ -3,13 +3,14 @@
 
 from __future__ import annotations
 
+import os
 from textwrap import dedent
 from typing import cast
 
 import pytest
 
 from pants.backend.helm.goals import publish
-from pants.backend.helm.goals.package import BuiltHelmArtifact
+from pants.backend.helm.goals.package import BuiltHelmArtifact, HelmPackageFieldSet
 from pants.backend.helm.goals.publish import HelmPublishFieldSet, PublishHelmChartRequest
 from pants.backend.helm.target_types import HelmChartTarget
 from pants.backend.helm.util_rules import tool
@@ -225,3 +226,15 @@ def test_helm_push_registries_with_custom_repository(rule_runner: RuleRunner) ->
             )
         ),
     )
+
+
+@pytest.mark.parametrize(
+    ("target_dir", "expected"), [("registries", True), ("repository", True), ("skip-push", False)]
+)
+def test_publish_field_set_package_before_publish(
+    target_dir: str, expected: bool, rule_runner: RuleRunner
+) -> None:
+    _declare_targets(rule_runner)
+    tgt = rule_runner.get_target(Address(os.path.join("src", target_dir)))
+    fs = HelmPublishFieldSet.create(tgt)
+    assert fs.package_before_publish(HelmPackageFieldSet.create(tgt)) is expected
