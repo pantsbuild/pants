@@ -14,6 +14,7 @@ from pants.backend.python.goals.publish import (
     rules,
 )
 from pants.backend.python.macros.python_artifact import PythonArtifact
+from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import PythonDistribution, PythonSourcesGeneratorTarget
 from pants.backend.python.util_rules import pex_from_targets
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact
@@ -223,3 +224,13 @@ def test_twine_cert_arg(rule_runner, packages, options, cert_arg) -> None:
     else:
         assert isinstance(process, InteractiveProcess)
         assert not any(arg.startswith("--cert") for arg in process.process.argv)
+
+
+@pytest.mark.parametrize("skip_twine", [True, False])
+def test_publish_field_set_package_before_publish(
+    skip_twine: bool, rule_runner: PythonRuleRunner
+) -> None:
+    rule_runner.write_files(project_files(skip_twine=skip_twine))
+    tgt = rule_runner.get_target(Address("src", target_name="dist"))
+    fs = PublishPythonPackageFieldSet.create(tgt)
+    assert fs.package_before_publish(PythonDistributionFieldSet.create(tgt)) is (not skip_twine)
