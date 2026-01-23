@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from typing import cast
 
@@ -230,3 +231,12 @@ def test_docker_push_env(rule_runner: RuleRunner) -> None:
             env=FrozenDict({"DOCKER_CONFIG": "/etc/docker/custom-config"}),
         ),
     )
+
+
+@pytest.mark.parametrize(("target_dir", "expected"), [("default", True), ("skip-test", False)])
+def test_publish_field_set_package_before_publish(
+    target_dir: str, expected: bool, rule_runner: RuleRunner
+) -> None:
+    tgt = rule_runner.get_target(Address(os.path.join("src", target_dir)))
+    fs = PublishDockerImageFieldSet.create(tgt)
+    assert fs.package_before_publish(DockerPackageFieldSet.create(tgt)) is expected
