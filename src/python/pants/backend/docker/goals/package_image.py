@@ -32,6 +32,7 @@ from pants.backend.docker.target_types import (
     DockerImageTagsField,
     DockerImageTagsRequest,
     DockerImageTargetStageField,
+    DockerImageBuildPullOptionField,
     get_docker_image_tags,
 )
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
@@ -346,6 +347,7 @@ def get_build_options(
                     DockerBuildOptionFieldValueMixin,
                     DockerBuildOptionFieldMultiValueMixin,
                     DockerBuildOptionFlagFieldMixin,
+                    DockerImageBuildPullOptionField
                 ),
             )
         ):

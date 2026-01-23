@@ -1916,7 +1916,9 @@ class StringOrBoolField(Field):
     valid_choices: ClassVar[type[Enum] | tuple[str, ...] | None] = None
 
     @classmethod
-    def compute_value(cls, raw_value: str | bool | None, address: Address) -> str | bool | None | Any:
+    def compute_value(
+        cls, raw_value: str | bool | None, address: Address
+    ) -> str | bool | None | Any:
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default is not None:
             if not isinstance(value_or_default, (str, bool)):
