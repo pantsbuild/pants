@@ -348,7 +348,6 @@ def get_build_options(
                     DockerBuildOptionFlagFieldMixin,
                 ),
             )
-            or field_type.__name__ == "DockerImageBuildPullOptionField"
         ):
             source = InterpolationContext.TextSource(
                 address=target.address, target_alias=target.alias, field_alias=field_type.alias
