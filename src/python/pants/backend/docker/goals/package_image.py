@@ -28,6 +28,7 @@ from pants.backend.docker.target_types import (
     DockerBuildOptionFieldValueMixin,
     DockerBuildOptionFlagFieldMixin,
     DockerImageBuildImageOutputField,
+    DockerImageBuildPullOptionField,
     DockerImageContextRootField,
     DockerImageRegistriesField,
     DockerImageRepositoryField,
@@ -35,7 +36,6 @@ from pants.backend.docker.target_types import (
     DockerImageTagsField,
     DockerImageTagsRequest,
     DockerImageTargetStageField,
-    DockerImageBuildPullOptionField,
     get_docker_image_tags,
 )
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
@@ -347,19 +347,17 @@ def get_build_options(
                     # Case where BuildKit option has a default value - still should not be generated
                     continue
 
-        if (
-            issubclass(
-                field_type,
-                (
-                    DockerBuildOptionFieldMixin,
-                    DockerBuildOptionFieldMultiValueDictMixin,
-                    DockerBuildOptionFieldListOfMultiValueDictMixin,
-                    DockerBuildOptionFieldValueMixin,
-                    DockerBuildOptionFieldMultiValueMixin,
-                    DockerBuildOptionFlagFieldMixin,
-                    DockerImageBuildPullOptionField
-                ),
-            )
+        if issubclass(
+            field_type,
+            (
+                DockerBuildOptionFieldMixin,
+                DockerBuildOptionFieldMultiValueDictMixin,
+                DockerBuildOptionFieldListOfMultiValueDictMixin,
+                DockerBuildOptionFieldValueMixin,
+                DockerBuildOptionFieldMultiValueMixin,
+                DockerBuildOptionFlagFieldMixin,
+                DockerImageBuildPullOptionField,
+            ),
         ):
             source = InterpolationContext.TextSource(
                 address=target.address, target_alias=target.alias, field_alias=field_type.alias
