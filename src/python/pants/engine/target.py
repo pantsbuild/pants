@@ -1900,6 +1900,37 @@ class StringField(ScalarField[str]):
         return value_or_default
 
 
+class StringOrBoolField(Field):
+    """A field whose value can be either a string or a boolean.
+
+    This is useful for fields that need to accept both boolean flags and string options.
+    Subclasses must either set `default: str | bool` or `required = True` so that the value is
+    always defined.
+
+    If you expect the string to only be one of several values, set the class property
+    `valid_choices`.
+    """
+
+    value: str | bool | None
+    default: ClassVar[str | bool | None] = None
+    valid_choices: ClassVar[type[Enum] | tuple[str, ...] | None] = None
+
+    @classmethod
+    def compute_value(cls, raw_value: str | bool | None, address: Address) -> str | bool | None:
+        value_or_default = super().compute_value(raw_value, address)
+        if value_or_default is not None:
+            if not isinstance(value_or_default, (str, bool)):
+                raise InvalidFieldTypeException(
+                    address, cls.alias, raw_value, expected_type="a string or boolean"
+                )
+            # Validate string choices if provided
+            if isinstance(value_or_default, str) and cls.valid_choices is not None:
+                _validate_choices(
+                    address, cls.alias, [value_or_default], valid_choices=cls.valid_choices
+                )
+        return value_or_default
+
+
 class SequenceField(Generic[T], Field):
     """A field whose value is a homogeneous sequence.
 
