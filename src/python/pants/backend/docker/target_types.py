@@ -525,9 +525,10 @@ class DockerBuildOptionFieldMultiValueMixin(StringSequenceField):
             yield f"{self.docker_build_option}={','.join(list(self.value))}"
 
 
-class DockerImageBuildPullOptionField(DockerBuildOptionFieldValueMixin, StringOrBoolField):
+class DockerImageBuildPullOptionField(StringOrBoolField):
     alias = "pull"
     default = None
+    valid_choices = ("always", "missing", "never", "newer")
     help = help_text(
         """
         Pull policy for the image.
@@ -542,26 +543,6 @@ class DockerImageBuildPullOptionField(DockerBuildOptionFieldValueMixin, StringOr
         """
     )
     docker_build_option = "--pull"
-
-    @classmethod
-    def compute_value(cls, raw_value, address):
-        value_or_default = super().compute_value(raw_value, address=address)
-        if value_or_default is None:
-            return None
-        
-        if not isinstance(value_or_default, (bool, str)):
-            raise InvalidFieldException(
-                f"The {cls.alias!r} field in target {address} must be a boolean or a string, "
-                f"but was {type(value_or_default).__name__}."
-            )
-        if isinstance(value_or_default, str):
-            valid_policies = ("always", "missing", "never", "newer")
-            if value_or_default not in valid_policies:
-                raise InvalidFieldException(
-                    f"The {cls.alias!r} field in target {address} must be one of {valid_policies}, "
-                    f"but was {value_or_default!r}."
-                )
-        return value_or_default
 
     def options(self, value_formatter, global_build_hosts_options=None, **kwargs):
         # Determine backend type from DockerBinary (which is resolved based on
