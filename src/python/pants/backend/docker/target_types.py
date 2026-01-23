@@ -532,10 +532,9 @@ class DockerImageBuildPullOptionField(StringOrBoolField):
     help = help_text(
         """
         Pull policy for the image.
-        
+
         For Docker: accepts boolean (true to always pull, false to use cached).
         For Podman: accepts boolean or string policy ("always", "missing", "never", "newer").
-        
         Default: false for Docker, "missing" for Podman.
 
         NOTE: This option cannot be used on images that build off of "transitive" base images
@@ -549,13 +548,15 @@ class DockerImageBuildPullOptionField(StringOrBoolField):
         # the [docker].experimental_enable_podman option). When experimental_enable_podman=true,
         # the docker_binary will be 'podman' and is_podman will be True.
         docker_binary = kwargs.get("docker") or kwargs.get("docker_binary")
-        is_podman = getattr(docker_binary, "is_podman", False) if docker_binary is not None else False
-        
+        is_podman = (
+            getattr(docker_binary, "is_podman", False) if docker_binary is not None else False
+        )
+
         val = self.value
         if val is None:
             # Use defaults based on backend
             val = "missing" if is_podman else False
-        
+
         if isinstance(val, str):
             # String policies are only supported by Podman
             if not is_podman:

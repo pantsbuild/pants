@@ -27,7 +27,14 @@ from pants.core.environments.rules import option_field_name_for
 from pants.engine.goal import GoalSubsystem
 from pants.engine.internals.parser import BuildFileSymbolInfo, BuildFileSymbolsInfo, Registrar
 from pants.engine.rules import Rule, TaskRule
-from pants.engine.target import Field, RegisteredTargetTypes, StringField, Target, TargetGenerator, StringOrBoolField
+from pants.engine.target import (
+    Field,
+    RegisteredTargetTypes,
+    StringField,
+    StringOrBoolField,
+    Target,
+    TargetGenerator,
+)
 from pants.engine.unions import UnionMembership, UnionRule, is_union
 from pants.option.native_options import NativeOptionParser, parse_dest
 from pants.option.option_types import OptionInfo
@@ -215,7 +222,6 @@ class TargetFieldHelpInfo:
                 type_hint = " | ".join([*(repr(c) for c in valid_choices), "bool", "None"])
             else:
                 type_hint = " | ".join([*(repr(c) for c in valid_choices), "None"])
-             
 
         if field.required:
             # We hackily remove `None` as a valid option for the field when it's required. This
