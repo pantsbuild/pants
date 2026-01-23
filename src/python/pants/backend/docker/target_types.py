@@ -33,6 +33,7 @@ from pants.engine.target import (
     ListOfDictStringToStringField,
     OptionalSingleSourceField,
     StringField,
+    StringOrBoolField,
     StringSequenceField,
     Target,
     Targets,
@@ -524,7 +525,7 @@ class DockerBuildOptionFieldMultiValueMixin(StringSequenceField):
             yield f"{self.docker_build_option}={','.join(list(self.value))}"
 
 
-class DockerImageBuildPullOptionField(Field):
+class DockerImageBuildPullOptionField(DockerBuildOptionFieldValueMixin, StringOrBoolField):
     alias = "pull"
     default = None
     help = help_text(
@@ -547,6 +548,7 @@ class DockerImageBuildPullOptionField(Field):
         value_or_default = super().compute_value(raw_value, address=address)
         if value_or_default is None:
             return None
+        
         if not isinstance(value_or_default, (bool, str)):
             raise InvalidFieldException(
                 f"The {cls.alias!r} field in target {address} must be a boolean or a string, "
