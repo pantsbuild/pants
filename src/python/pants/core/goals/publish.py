@@ -22,11 +22,11 @@ import json
 import logging
 from abc import ABCMeta
 from collections import defaultdict
-from collections.abc import Coroutine, Mapping, Sequence
+from collections.abc import Coroutine, Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, is_dataclass, replace
 from enum import Enum
 from itertools import chain
-from typing import Any, ClassVar, Generic, TypeVar, cast, final
+from typing import Any, ClassVar, Generic, Self, TypeVar, cast, final
 
 from pants.core.goals.package import (
     BuiltPackage,
@@ -111,6 +111,9 @@ class PublishFieldSet(Generic[_T], FieldSet, metaclass=ABCMeta):
     # Subclasses must provide this, to a union member (subclass) of `PublishRequest`.
     publish_request_type: ClassVar[type[_T]]
 
+    # Subclasses may implement this to enable pre-emptive skipping
+    has_preemptive_skip: ClassVar[bool] = False
+
     @final
     def _request(self, packages: tuple[BuiltPackage, ...]) -> _T:
         """Internal helper for the core publish goal."""
@@ -127,14 +130,6 @@ class PublishFieldSet(Generic[_T], FieldSet, metaclass=ABCMeta):
 
     def get_output_data(self) -> PublishOutputData:
         return PublishOutputData({"target": self.address})
-
-    def package_before_publish(self, package_fs: PackageFieldSet) -> bool:
-        """Hook method to determine if a corresponding `package` rule should be executed before the
-        associated `publish` rule.
-
-        The target referred to by the PackageFieldSet is guaranteed to be the same target as `self`.
-        """
-        return True
 
 
 # This is the same as the Enum in the test goal.  It is initially separate as
@@ -178,6 +173,23 @@ class PublishPackages:
         )
 
 
+@dataclass(frozen=True)
+class SkippedPublishPackages:
+    """PublishPackages that were pre-emptively skipped.
+    
+    If `inner` is None, this indicates that this request should NOT be skipped."""
+
+    inner: PublishPackages | None
+
+    @classmethod
+    def skip(cls, *, names: Iterable[str], description: str | None = None, data: PublishOutputData | None = None) -> Self:
+        return cls(PublishPackages(names=tuple(names), description=description, data=data or PublishOutputData()))
+
+    @classmethod
+    def noskip(cls) -> Self:
+        return cls(None)
+
+
 class PublishProcesses(Collection[PublishPackages]):
     """Collection of what processes to run for all built packages.
 
@@ -186,6 +198,11 @@ class PublishProcesses(Collection[PublishPackages]):
     Depending on the capabilities of the publishing tool, the work may be partitioned based on
     number of artifacts and/or repositories to publish to.
     """
+
+
+@rule(polymorphic=True)
+async def preemptive_skip_publish_packages(field_set: PublishFieldSet, environment_name: EnvironmentName) -> SkippedPublishPackages:
+    raise NotImplementedError()
 
 
 @rule(polymorphic=True)
@@ -269,18 +286,9 @@ def _to_publish_output_results_and_data(
 async def package_for_publish(
     request: PublishProcessesRequest, local_environment: ChosenLocalEnvironmentName
 ) -> PublishProcesses:
-    # Map an address to all of its PublishFieldSets
-    address_to_publish_fss: defaultdict[Address, list[PublishFieldSet]] = defaultdict(list)
-    for publish_fs in request.publish_field_sets:
-        address_to_publish_fss[publish_fs.address].append(publish_fs)
-    # Check if any of a PackageFieldSets associated PublishFieldSets require packaging
     packages = await concurrently(
-        environment_aware_package(EnvironmentAwarePackageRequest(package_fs), **implicitly())
+        environment_aware_package(EnvironmentAwarePackageRequest(package_fs))
         for package_fs in request.package_field_sets
-        if any(
-            publish_fs.package_before_publish(package_fs)
-            for publish_fs in address_to_publish_fss[package_fs.address]
-        )
     )
 
     for pkg in packages:
@@ -317,7 +325,7 @@ async def package_for_publish(
 
 @goal_rule
 async def run_publish(
-    console: Console, publish: PublishSubsystem, local_environment: ChosenLocalEnvironmentName
+    console: Console, publish: PublishSubsystem, local_environment: ChosenLocalEnvironmentName, union_membership: UnionMembership,
 ) -> Publish:
     target_roots_to_package_field_sets, target_roots_to_publish_field_sets = await concurrently(
         find_valid_field_sets_for_target_roots(
@@ -347,6 +355,19 @@ async def run_publish(
     if not targets:
         return Publish(exit_code=0)
 
+    maybe_preemptive_skips = [tgt for tgt, publish_fss in target_roots_to_publish_field_sets.mapping.items() if all(publish_fs.has_preemptive_skip for publish_fs in publish_fss)]
+    preemptive_skips = await concurrently(
+        preemptive_skip_publish_packages(**implicitly({publish_fs: PublishFieldSet, local_environment.val: EnvironmentName}))
+        for tgt in maybe_preemptive_skips
+        for publish_fss in target_roots_to_publish_field_sets.mapping[tgt]
+        for publish_fs in publish_fss
+    )
+    skipped_publishes: list[PublishPackages] = []
+    for tgt, skip in zip(maybe_preemptive_skips, preemptive_skips):
+        if skip.inner:
+            targets.remove(tgt)
+            skipped_publishes.append(skip.inner)
+
     # Build all packages and request the processes to run for each field set.
     processes = await concurrently(
         package_for_publish(
@@ -370,9 +391,7 @@ async def run_publish(
     foreground_publishes: list[PublishPackages] = [
         pub for pub in flattened_processes if isinstance(pub.process, InteractiveProcess)
     ]
-    skipped_publishes: list[PublishPackages] = [
-        pub for pub in flattened_processes if pub.process is None
-    ]
+    skipped_publishes.extend(pub for pub in flattened_processes if pub.process is None)
     background_requests: list[Coroutine[Any, Any, FallibleProcessResult]] = []
     for pub in background_publishes:
         process = cast(Process, pub.process)

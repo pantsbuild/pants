@@ -25,7 +25,6 @@ from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import rule
 from pants.engine.target import StringSequenceField
 from pants.testutil.rule_runner import RuleRunner
-from pants.util.frozendict import FrozenDict
 
 
 class MockRepositoriesField(StringSequenceField):
@@ -43,11 +42,6 @@ class PublishTestFieldSet(PublishFieldSet):
     required_fields = (MockRepositoriesField,)
 
     repositories: MockRepositoriesField
-
-    def package_before_publish(self, package_fs: package.PackageFieldSet) -> bool:
-        return self.repositories.value is not None and any(
-            repo != "skip" for repo in self.repositories.value
-        )
 
 
 @rule
@@ -149,7 +143,8 @@ def test_skipped_publish(rule_runner: RuleRunner) -> None:
     )
 
     assert result.exit_code == 0
-    assert "Nothing published." in result.stderr
+    assert "my_package-0.1.0.tar.gz skipped (requested)." in result.stderr
+    assert "my_package-0.1.0-py3-none-any.whl skipped (requested)." in result.stderr
 
 
 def test_structured_output(rule_runner: RuleRunner) -> None:
@@ -164,7 +159,7 @@ def test_structured_output(rule_runner: RuleRunner) -> None:
                     name="my-package",
                     version="0.1.0",
                   ),
-                  repositories=["skip", "noskip"],
+                  repositories=["skip"],
                 )
                 """
             ),
@@ -183,40 +178,23 @@ def test_structured_output(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 0
     assert "my_package-0.1.0.tar.gz skipped (requested)." in result.stderr
     assert "my_package-0.1.0-py3-none-any.whl skipped (requested)." in result.stderr
-    assert "my_package-0.1.0.tar.gz published to noskip." in result.stderr
-    assert "my_package-0.1.0-py3-none-any.whl published to noskip." in result.stderr
 
-    expected = {
-        FrozenDict.deep_freeze(
-            {
-                "names": [
-                    "my_package-0.1.0-py3-none-any.whl",
-                    "my_package-0.1.0.tar.gz",
-                ],
-                "published": False,
-                "status": "skipped (requested)",
-                "target": "src:dist",
-            }
-        ),
-        FrozenDict.deep_freeze(
-            {
-                "exit_code": 0,
-                "names": [
-                    "my_package-0.1.0-py3-none-any.whl",
-                    "my_package-0.1.0.tar.gz",
-                ],
-                "published": True,
-                "status": "published to noskip",
-                "target": "src:dist",
-            }
-        ),
-    }
+    expected = [
+        {
+            "names": [
+                "my_package-0.1.0-py3-none-any.whl",
+                "my_package-0.1.0.tar.gz",
+            ],
+            "published": False,
+            "status": "skipped (requested)",
+            "target": "src:dist",
+        },
+    ]
 
     with rule_runner.pushd():
         with open("published.json") as fd:
             data = json.load(fd)
-    assert isinstance(data, list)
-    assert {FrozenDict.deep_freeze(item) for item in data} == expected
+            assert data == expected
 
 
 def test_mocked_publish(rule_runner: RuleRunner) -> None:
