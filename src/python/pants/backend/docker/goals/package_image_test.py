@@ -2231,7 +2231,7 @@ def test_docker_info_serialize() -> None:
     ("output", "expected"),
     [({"type": "image", "push": "true"}, True), ({"type": "registry"}, True), (None, False)],
 )
-def test_field_set_has_side_effects(output: dict | None, expected: bool) -> None:
+def test_field_set_pushes_on_package(output: dict | None, expected: bool) -> None:
     rule_runner = RuleRunner(target_types=[DockerImageTarget])
     output_str = f", output={output}" if output else ""
     rule_runner.write_files(
@@ -2240,4 +2240,4 @@ def test_field_set_has_side_effects(output: dict | None, expected: bool) -> None
     field_set = DockerPackageFieldSet.create(
         rule_runner.get_target(Address("", target_name="image"))
     )
-    assert field_set.has_side_effects() is expected
+    assert field_set.pushes_on_package() is expected

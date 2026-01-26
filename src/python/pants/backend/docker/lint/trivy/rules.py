@@ -61,9 +61,7 @@ async def run_trivy_docker(
     )
     [field_set] = field_sets_per_tgt.field_sets
 
-    package = await environment_aware_package(
-        EnvironmentAwarePackageRequest(field_set), **implicitly()
-    )
+    package = await environment_aware_package(EnvironmentAwarePackageRequest(field_set))
     built_image: BuiltDockerImage = cast(BuiltDockerImage, package.artifacts[0])
     r = await run_trivy(
         RunTrivyRequest(

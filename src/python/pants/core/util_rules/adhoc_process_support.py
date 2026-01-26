@@ -364,7 +364,7 @@ async def resolve_execution_environment(
     )
 
     packages = await concurrently(
-        environment_aware_package(EnvironmentAwarePackageRequest(field_set), **implicitly())
+        environment_aware_package(EnvironmentAwarePackageRequest(field_set))
         for field_set in pkgs_per_target.field_sets
     )
 

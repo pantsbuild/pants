@@ -116,7 +116,7 @@ async def package_pyoxidizer_binary(
         FieldSetsPerTargetRequest(PackageFieldSet, direct_deps), **implicitly()
     )
     built_packages = await concurrently(
-        environment_aware_package(EnvironmentAwarePackageRequest(field_set), **implicitly())
+        environment_aware_package(EnvironmentAwarePackageRequest(field_set))
         for field_set in deps_field_sets.field_sets
     )
     wheel_paths = [

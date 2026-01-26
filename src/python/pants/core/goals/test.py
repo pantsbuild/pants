@@ -1251,7 +1251,7 @@ async def build_runtime_package_dependencies(
         FieldSetsPerTargetRequest(PackageFieldSet, tgts), **implicitly()
     )
     packages = await concurrently(
-        environment_aware_package(EnvironmentAwarePackageRequest(field_set), **implicitly())
+        environment_aware_package(EnvironmentAwarePackageRequest(field_set))
         for field_set in field_sets_per_tgt.field_sets
     )
     return BuiltPackageDependencies(packages)

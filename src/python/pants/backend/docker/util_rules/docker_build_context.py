@@ -313,7 +313,7 @@ async def create_docker_build_context(
         )
     ]
     embedded_pkgs = await concurrently(
-        environment_aware_package(EnvironmentAwarePackageRequest(field_set), **implicitly())
+        environment_aware_package(EnvironmentAwarePackageRequest(field_set))
         for field_set in pkgs_wanting_embedding
     )
 
