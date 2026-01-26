@@ -252,7 +252,28 @@ async def prepare_jdk_environment(
             f"{java_version_result.stderr.decode('utf-8')}"
         )
 
-    java_version = java_version_result.stderr.decode("utf-8").strip()
+    java_version_raw = java_version_result.stderr.decode("utf-8").strip()
+    
+    # Filter out Coursier download progress messages which are non-deterministic
+    # and would cause cache key instability. Keep only actual java -version output.
+    java_version_lines = []
+    for line in java_version_raw.splitlines():
+        line_lower = line.lower().strip()
+        # Skip Coursier download progress messages
+        if any(skip in line_lower for skip in [
+            "downloading",
+            "still downloading",
+            "downloaded",
+            "https://",
+            "http://",
+            "found ",
+        ]):
+            continue
+        # Keep lines that look like java -version output
+        if line.strip():
+            java_version_lines.append(line)
+    
+    java_version = "\n".join(java_version_lines)
     jre_major_version = parse_jre_major_version(java_version)
     if not jre_major_version:
         raise ValueError(
