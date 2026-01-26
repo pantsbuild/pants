@@ -16,6 +16,8 @@ from typing import Literal, cast
 # dependency cycles.
 from pants.backend.docker.package_types import (
     BuiltDockerImage as BuiltDockerImage,
+)
+from pants.backend.docker.package_types import (
     DockerPushOnPackageBehavior,
     DockerPushOnPackageException,
 )
@@ -412,7 +414,9 @@ async def build_docker_image(
             case DockerPushOnPackageBehavior.ERROR:
                 raise DockerPushOnPackageException(field_set.address)
             case DockerPushOnPackageBehavior.WARN:
-                logger.warning(f"Docker image {field_set.address} will push to a registry during packaging")
+                logger.warning(
+                    f"Docker image {field_set.address} will push to a registry during packaging"
+                )
 
     context, wrapped_target = await concurrently(
         create_docker_build_context(

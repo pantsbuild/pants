@@ -6,8 +6,8 @@ from __future__ import annotations
 import sys
 from typing import Any
 
-from pants.backend.docker.registries import DockerRegistries
 from pants.backend.docker.package_types import DockerPushOnPackageBehavior
+from pants.backend.docker.registries import DockerRegistries
 from pants.core.util_rules.search_paths import ExecutableSearchPathsOptionMixin
 from pants.option.option_types import (
     BoolOption,
