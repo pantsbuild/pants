@@ -20,7 +20,7 @@ python_tests(
         "lockfile_test.py": {"timeout": 120},
         "package_pex_binary_integration_test.py": {
             "dependencies": [":platforms"],
-            "timeout": 120,
+            "timeout": 300,
         },
         "pytest_runner_integration_test.py": {
             "dependencies": [":test_lockfile"],
@@ -32,7 +32,7 @@ python_tests(
             "timeout": 300,
         },
         "run_pex_binary_integration_test.py": {"timeout": 660},
-        "run_python_source_integration_test.py": {"timeout": 180},
+        "run_python_source_integration_test.py": {"timeout": 300},
         "package_dists_integration_test.py": {
             "dependencies": ["testprojects/src/python:native_directory"],
             "tags": ["platform_specific_behavior"],
