@@ -49,6 +49,7 @@ from pants.backend.docker.util_rules.docker_build_context import (
 )
 from pants.backend.docker.utils import format_rename_suggestion
 from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
+from pants.engine.collection import Collection
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, FileContent
 from pants.engine.internals.graph import resolve_target
 from pants.engine.intrinsics import create_digest, execute_process
@@ -396,6 +397,53 @@ def get_build_options(
         yield "--no-cache"
 
 
+@dataclass(frozen=True)
+class GetImageTagsRequest:
+    field_set: DockerPackageFieldSet
+    build_upstream_images: bool
+
+
+class DockerImageRefs(Collection[ImageRefRegistry]):
+    pass
+
+
+@rule
+async def get_image_tags(
+    request: GetImageTagsRequest, options: DockerOptions, union_membership: UnionMembership
+) -> DockerImageRefs:
+    context, wrapped_target = await concurrently(
+        create_docker_build_context(
+            DockerBuildContextRequest(
+                address=request.field_set.address,
+                build_upstream_images=request.build_upstream_images,
+            ),
+            **implicitly(),
+        ),
+        resolve_target(
+            WrappedTargetRequest(request.field_set.address, description_of_origin="<infallible>"),
+            **implicitly(),
+        ),
+    )
+
+    image_tags_requests = union_membership.get(DockerImageTagsRequest)
+    additional_image_tags = await concurrently(
+        get_docker_image_tags(
+            **implicitly({image_tags_request_cls(wrapped_target.target): DockerImageTagsRequest})
+        )
+        for image_tags_request_cls in image_tags_requests
+        if image_tags_request_cls.is_applicable(wrapped_target.target)
+    )
+
+    return DockerImageRefs(
+        request.field_set.image_refs(
+            default_repository=options.default_repository,
+            registries=options.registries(),
+            interpolation_context=context.interpolation_context,
+            additional_tags=tuple(chain.from_iterable(additional_image_tags)),
+        )
+    )
+
+
 @rule
 async def build_docker_image(
     field_set: DockerPackageFieldSet,
@@ -403,7 +451,6 @@ async def build_docker_image(
     global_options: GlobalOptions,
     docker: DockerBinary,
     keep_sandboxes: KeepSandboxes,
-    union_membership: UnionMembership,
 ) -> BuiltPackage:
     """Build a Docker image using `docker build`."""
     # Check if this build would push and handle according to push_on_package behavior
@@ -418,7 +465,7 @@ async def build_docker_image(
                     f"Docker image {field_set.address} will push to a registry during packaging"
                 )
 
-    context, wrapped_target = await concurrently(
+    context, wrapped_target, image_refs = await concurrently(
         create_docker_build_context(
             DockerBuildContextRequest(
                 address=field_set.address,
@@ -430,24 +477,13 @@ async def build_docker_image(
             WrappedTargetRequest(field_set.address, description_of_origin="<infallible>"),
             **implicitly(),
         ),
-    )
-
-    image_tags_requests = union_membership.get(DockerImageTagsRequest)
-    additional_image_tags = await concurrently(
-        get_docker_image_tags(
-            **implicitly({image_tags_request_cls(wrapped_target.target): DockerImageTagsRequest})
-        )
-        for image_tags_request_cls in image_tags_requests
-        if image_tags_request_cls.is_applicable(wrapped_target.target)
-    )
-
-    image_refs = tuple(
-        field_set.image_refs(
-            default_repository=options.default_repository,
-            registries=options.registries(),
-            interpolation_context=context.interpolation_context,
-            additional_tags=tuple(chain.from_iterable(additional_image_tags)),
-        )
+        get_image_tags(
+            GetImageTagsRequest(
+                field_set=field_set,
+                build_upstream_images=True,
+            ),
+            **implicitly(),
+        ),
     )
     tags = tuple(tag.full_name for registry in image_refs for tag in registry.tags)
     if not tags:

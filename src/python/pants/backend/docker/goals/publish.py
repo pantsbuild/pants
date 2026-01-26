@@ -9,22 +9,31 @@ from dataclasses import dataclass
 from itertools import chain
 from typing import DefaultDict, cast
 
-from pants.backend.docker.goals.package_image import BuiltDockerImage
+from pants.backend.docker.goals.package_image import (
+    BuiltDockerImage,
+    DockerPackageFieldSet,
+    GetImageTagsRequest,
+    get_image_tags,
+)
+from pants.backend.docker.registries import DockerRegistryOptions
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerImageRegistriesField, DockerImageSkipPushField
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.core.goals.package import PackageFieldSet
 from pants.core.goals.publish import (
+    PreemptiveSkipRequest,
     PublishFieldSet,
     PublishOutputData,
     PublishPackages,
     PublishProcesses,
     PublishRequest,
+    SkippedPublishPackages,
 )
 from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.process import InteractiveProcess, Process
 from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.unions import UnionRule
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +50,15 @@ class PublishDockerImageFieldSet(PublishFieldSet):
     registries: DockerImageRegistriesField
     skip_push: DockerImageSkipPushField
 
+    def make_skip_request(
+        self, package_fs: PackageFieldSet
+    ) -> PublishDockerImageSkipRequest | None:
+        return (
+            PublishDockerImageSkipRequest(publish_fs=self, package_fs=package_fs)
+            if isinstance(package_fs, DockerPackageFieldSet)
+            else None
+        )
+
     def get_output_data(self) -> PublishOutputData:
         return PublishOutputData(
             {
@@ -50,8 +68,42 @@ class PublishDockerImageFieldSet(PublishFieldSet):
             }
         )
 
-    def package_before_publish(self, package_fs: PackageFieldSet) -> bool:
-        return not self.skip_push.value
+
+class PublishDockerImageSkipRequest(PreemptiveSkipRequest[PublishDockerImageFieldSet]):
+    pass
+
+
+@rule
+async def check_if_skip_push(
+    request: PublishDockerImageSkipRequest, options: DockerOptions
+) -> SkippedPublishPackages:
+    skip_registries = {
+        registry for registry in options.registries().registries.values() if registry.skip_push
+    }
+    if not (request.publish_fs.skip_push.value or skip_registries):
+        return SkippedPublishPackages.no_skip()
+    image_refs = await get_image_tags(
+        GetImageTagsRequest(
+            field_set=cast(DockerPackageFieldSet, request.publish_fs), build_upstream_images=False
+        ),
+        **implicitly(),
+    )
+    if request.publish_fs.skip_push.value:
+        return SkippedPublishPackages.skip(
+            names=[tag.full_name for registry in image_refs for tag in registry.tags],
+            description=f"(by `{request.publish_fs.skip_push.alias}` on {request.address})",
+        )
+    return (
+        SkippedPublishPackages(
+            PublishPackages(
+                names=tuple(tag.full_name for tag in image_ref.tags),
+                description=f"(by skip_push on @{cast(DockerRegistryOptions, image_ref.registry).alias})",
+            )
+            for image_ref in image_refs
+        )
+        if all(image_ref.registry in skip_registries for image_ref in image_refs)
+        else SkippedPublishPackages.no_skip()
+    )
 
 
 @rule
@@ -129,4 +181,5 @@ def rules():
     return (
         *collect_rules(),
         *PublishDockerImageFieldSet.rules(),
+        UnionRule(PreemptiveSkipRequest, PublishDockerImageSkipRequest),
     )
