@@ -1,5 +1,7 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
+#![allow(deprecated)]
+
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -124,9 +126,11 @@ async fn make_execute_request() {
                 value: "value".to_owned(),
             },
         ],
-        output_files: vec!["other/file.ext".to_owned(), "path/to/file.ext".to_owned()],
-        output_directories: vec!["directory/name".to_owned()],
-        platform: Some(remexec::Platform::default()),
+        output_paths: vec![
+            "directory/name".to_owned(),
+            "other/file.ext".to_owned(),
+            "path/to/file.ext".to_owned(),
+        ],
         ..Default::default()
     };
 
@@ -134,14 +138,15 @@ async fn make_execute_request() {
         command_digest: Some(
             (&Digest::new(
                 Fingerprint::from_hex_string(
-                    "d7b7538a7a57a2b04da51ffffff758036f43ebb92d37b66bd1bb8c6af0030e57",
+                    "3152fb71b660cc9c92fc0494435de7f666b10a55e84af918f4e6c61b22baecd9",
                 )
                 .unwrap(),
-                187,
+                185,
             ))
                 .into(),
         ),
         input_root_digest: Some((&input_directory.digest()).into()),
+        platform: Some(remexec::Platform::default()),
         ..Default::default()
     };
 
@@ -149,10 +154,10 @@ async fn make_execute_request() {
         action_digest: Some(
             (&Digest::new(
                 Fingerprint::from_hex_string(
-                    "16bf057effe6d18553979a069228f0da81df307c964ea0f162bb60e31070bb27",
+                    "71d5304c409027c67699d5282aa2b2407fd487fc2d3e928d622368bd14b9b535",
                 )
                 .unwrap(),
-                141,
+                143,
             ))
                 .into(),
         ),
@@ -226,8 +231,26 @@ async fn make_execute_request_with_instance_name() {
                 value: "value".to_owned(),
             },
         ],
-        output_files: vec!["other/file.ext".to_owned(), "path/to/file.ext".to_owned()],
-        output_directories: vec!["directory/name".to_owned()],
+        output_paths: vec![
+            "directory/name".to_owned(),
+            "other/file.ext".to_owned(),
+            "path/to/file.ext".to_owned(),
+        ],
+        ..Default::default()
+    };
+
+    let want_action = remexec::Action {
+        command_digest: Some(
+            (&Digest::new(
+                Fingerprint::from_hex_string(
+                    "3152fb71b660cc9c92fc0494435de7f666b10a55e84af918f4e6c61b22baecd9",
+                )
+                .unwrap(),
+                185,
+            ))
+                .into(),
+        ),
+        input_root_digest: Some((&input_directory.digest()).into()),
         platform: Some(remexec::Platform {
             properties: vec![remexec::platform::Property {
                 name: "target_platform".to_owned(),
@@ -237,30 +260,15 @@ async fn make_execute_request_with_instance_name() {
         ..Default::default()
     };
 
-    let want_action = remexec::Action {
-        command_digest: Some(
-            (&Digest::new(
-                Fingerprint::from_hex_string(
-                    "9f8a65e780495003c341923b62a06ae6796dcad47e396dc89704b10bc26e1729",
-                )
-                .unwrap(),
-                216,
-            ))
-                .into(),
-        ),
-        input_root_digest: Some((&input_directory.digest()).into()),
-        ..Default::default()
-    };
-
     let want_execute_request = remexec::ExecuteRequest {
         instance_name: "dark-tower".to_owned(),
         action_digest: Some(
             (&Digest::new(
                 Fingerprint::from_hex_string(
-                    "5b017857389d245cd0663105f3b8ee47bb7412940e4859098c8af46bdd21c8b6",
+                    "dc65bb3934a5baf532076a4feac017ec6515183d1250d28086bd4086cbbc8b28",
                 )
                 .unwrap(),
-                141,
+                172,
             ))
                 .into(),
         ),
@@ -337,9 +345,11 @@ async fn make_execute_request_with_cache_key_gen_version() {
                 value: "value".to_owned(),
             },
         ],
-        output_files: vec!["other/file.ext".to_owned(), "path/to/file.ext".to_owned()],
-        output_directories: vec!["directory/name".to_owned()],
-        platform: Some(remexec::Platform::default()),
+        output_paths: vec![
+            "directory/name".to_owned(),
+            "other/file.ext".to_owned(),
+            "path/to/file.ext".to_owned(),
+        ],
         ..Default::default()
     };
     want_command
@@ -350,14 +360,15 @@ async fn make_execute_request_with_cache_key_gen_version() {
         command_digest: Some(
             (&Digest::new(
                 Fingerprint::from_hex_string(
-                    "04ed10b1ddac69249ad1ca463fd4284c4f9c0115a2f2aaf1fd8a9ce6571ee29c",
+                    "01fa005270a638d4fd098ce95d0e02d56336954179349b182fb09b41f65103ec",
                 )
                 .unwrap(),
-                224,
+                222,
             ))
                 .into(),
         ),
         input_root_digest: Some((&input_directory.digest()).into()),
+        platform: Some(remexec::Platform::default()),
         ..Default::default()
     };
 
@@ -365,10 +376,10 @@ async fn make_execute_request_with_cache_key_gen_version() {
         action_digest: Some(
             (&Digest::new(
                 Fingerprint::from_hex_string(
-                    "e55329e2c0413a6def422752f9e964204e7e40ec81e2867a6222a43727ba29d1",
+                    "f4183da326d105472405d62397f91e4720aef220bcb36ecd7bb43f03a481d340",
                 )
                 .unwrap(),
-                141,
+                143,
             ))
                 .into(),
         ),
@@ -413,6 +424,21 @@ async fn make_execute_request_with_jdk() {
                 value: "linux_x86_64".to_owned(),
             },
         ],
+        ..Default::default()
+    };
+
+    let want_action = remexec::Action {
+        command_digest: Some(
+            (&Digest::new(
+                Fingerprint::from_hex_string(
+                    "d825e7cf83e2c16e867709013f1c907f00ed6a4d99bba75b1d48dfecab446a29",
+                )
+                .unwrap(),
+                119,
+            ))
+                .into(),
+        ),
+        input_root_digest: Some((&input_directory.digest()).into()),
         platform: Some(remexec::Platform {
             properties: vec![remexec::platform::Property {
                 name: "JDK_SYMLINK".to_owned(),
@@ -422,29 +448,14 @@ async fn make_execute_request_with_jdk() {
         ..Default::default()
     };
 
-    let want_action = remexec::Action {
-        command_digest: Some(
-            (&Digest::new(
-                Fingerprint::from_hex_string(
-                    "45e72f32f1d935e02732e26a8aaec041877811a9b7fe66816ace7b570173953e",
-                )
-                .unwrap(),
-                142,
-            ))
-                .into(),
-        ),
-        input_root_digest: Some((&input_directory.digest()).into()),
-        ..Default::default()
-    };
-
     let want_execute_request = remexec::ExecuteRequest {
         action_digest: Some(
             (&Digest::new(
                 Fingerprint::from_hex_string(
-                    "2868a54befe3ad9d8fd2ac30c2a170ac890715ec0b196ab8259e8b6beabf7d1c",
+                    "2954ca7842d8885f5bb261e100894a7fcc649cffa09c240f181a9c114530b8ce",
                 )
                 .unwrap(),
-                141,
+                163,
             ))
                 .into(),
         ),
@@ -493,6 +504,21 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
                 value: "linux_x86_64".to_owned(),
             },
         ],
+        ..Default::default()
+    };
+
+    let want_action = remexec::Action {
+        command_digest: Some(
+            (&Digest::new(
+                Fingerprint::from_hex_string(
+                    "8d9609abb66f4fd6d554b198c30f6393974dca1528de8911b93070184ce5c264",
+                )
+                .unwrap(),
+                120,
+            ))
+                .into(),
+        ),
+        input_root_digest: Some((&input_directory.digest()).into()),
         platform: Some(remexec::Platform {
             properties: vec![
                 remexec::platform::Property {
@@ -520,29 +546,14 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
         ..Default::default()
     };
 
-    let want_action = remexec::Action {
-        command_digest: Some(
-            (&Digest::new(
-                Fingerprint::from_hex_string(
-                    "03b368b6f449438938636f57fbaf6b6e2a1eb776583b5197c1320b646ee8d64a",
-                )
-                .unwrap(),
-                198,
-            ))
-                .into(),
-        ),
-        input_root_digest: Some((&input_directory.digest()).into()),
-        ..Default::default()
-    };
-
     let want_execute_request = remexec::ExecuteRequest {
         action_digest: Some(
             (&Digest::new(
                 Fingerprint::from_hex_string(
-                    "0291bda0da047d715b6da33c1e4c2a74679ab06c95a32424ea754f70be5242ed",
+                    "c4498ce03ed0b5826daf66561041b9ed2df6f794abd09b19066ed29cbb2bea9a",
                 )
                 .unwrap(),
-                141,
+                218,
             ))
                 .into(),
         ),
@@ -608,9 +619,11 @@ async fn make_execute_request_with_timeout() {
                 value: "value".to_owned(),
             },
         ],
-        output_files: vec!["other/file.ext".to_owned(), "path/to/file.ext".to_owned()],
-        output_directories: vec!["directory/name".to_owned()],
-        platform: Some(remexec::Platform::default()),
+        output_paths: vec![
+            "directory/name".to_owned(),
+            "other/file.ext".to_owned(),
+            "path/to/file.ext".to_owned(),
+        ],
         ..Default::default()
     };
 
@@ -618,15 +631,16 @@ async fn make_execute_request_with_timeout() {
         command_digest: Some(
             (&Digest::new(
                 Fingerprint::from_hex_string(
-                    "d7b7538a7a57a2b04da51ffffff758036f43ebb92d37b66bd1bb8c6af0030e57",
+                    "3152fb71b660cc9c92fc0494435de7f666b10a55e84af918f4e6c61b22baecd9",
                 )
                 .unwrap(),
-                187,
+                185,
             ))
                 .into(),
         ),
         input_root_digest: Some((&input_directory.digest()).into()),
         timeout: Some(prost_types::Duration::try_from(Duration::from_secs(1)).unwrap()),
+        platform: Some(remexec::Platform::default()),
         ..Default::default()
     };
 
@@ -634,10 +648,10 @@ async fn make_execute_request_with_timeout() {
         action_digest: Some(
             (&Digest::new(
                 Fingerprint::from_hex_string(
-                    "6e3666265a4ef89ddf26a406516484429b2d8e744fbae6b36a66c6853407626a",
+                    "8931d71fd6d605078f7348f0af3fe4f5e93e979493e15fe7cb895a93949c17ef",
                 )
                 .unwrap(),
-                145,
+                147,
             ))
                 .into(),
         ),
@@ -713,7 +727,6 @@ async fn make_execute_request_with_append_only_caches() {
                 value: "value".to_owned(),
             },
         ],
-        platform: Some(remexec::Platform::default()),
         ..Default::default()
     };
 
@@ -721,10 +734,10 @@ async fn make_execute_request_with_append_only_caches() {
         command_digest: Some(
             (&Digest::new(
                 Fingerprint::from_hex_string(
-                    "1deb19eddcefd5074263064a7df2a19caeb4e6d86a849bc07e23a5d856f886ec",
+                    "c3dd90cef0e9e849b9135d66a35e9a68802041dd8184b72b1a658d8a65de9753",
                 )
                 .unwrap(),
-                178,
+                176,
             ))
                 .into(),
         ),
@@ -739,6 +752,7 @@ async fn make_execute_request_with_append_only_caches() {
             .into(),
         ),
         timeout: Some(prost_types::Duration::try_from(Duration::from_secs(1)).unwrap()),
+        platform: Some(remexec::Platform::default()),
         ..Default::default()
     };
 
@@ -746,10 +760,10 @@ async fn make_execute_request_with_append_only_caches() {
         action_digest: Some(
             (&Digest::new(
                 Fingerprint::from_hex_string(
-                    "798ac2aaf68b36d571fcb90719e8dafdf5929081c491f178ac7f4663b591183e",
+                    "dd0e3a5b0e6fe5dff28c75febc097eff59d8e6f240eb3601d8854ab165c6d5e7",
                 )
                 .unwrap(),
-                146,
+                148,
             ))
                 .into(),
         ),
@@ -870,9 +884,11 @@ async fn make_execute_request_using_immutable_inputs() {
                 value: "value".to_owned(),
             },
         ],
-        output_files: vec!["other/file.ext".to_owned(), "path/to/file.ext".to_owned()],
-        output_directories: vec!["directory/name".to_owned()],
-        platform: Some(remexec::Platform::default()),
+        output_paths: vec![
+            "directory/name".to_owned(),
+            "other/file.ext".to_owned(),
+            "path/to/file.ext".to_owned(),
+        ],
         ..Default::default()
     };
 
@@ -880,14 +896,15 @@ async fn make_execute_request_using_immutable_inputs() {
         command_digest: Some(
             (&Digest::new(
                 Fingerprint::from_hex_string(
-                    "d7b7538a7a57a2b04da51ffffff758036f43ebb92d37b66bd1bb8c6af0030e57",
+                    "3152fb71b660cc9c92fc0494435de7f666b10a55e84af918f4e6c61b22baecd9",
                 )
                 .unwrap(),
-                187,
+                185,
             ))
                 .into(),
         ),
         input_root_digest: Some((&expected_digest.as_digest()).into()),
+        platform: Some(remexec::Platform::default()),
         ..Default::default()
     };
 
@@ -895,10 +912,10 @@ async fn make_execute_request_using_immutable_inputs() {
         action_digest: Some(
             (&Digest::new(
                 Fingerprint::from_hex_string(
-                    "2c1eae75a54d2464ac63ba51587deb3986f15c3966c61f77fb9b06b195f4127a",
+                    "077171b3ce37e9979aa14236e589dffec075d9960290278abba56b2b2467b5e1",
                 )
                 .unwrap(),
-                141,
+                143,
             ))
                 .into(),
         ),
@@ -2339,6 +2356,7 @@ async fn extract_output_files_from_response_just_directory() {
                 path: "cats".into(),
                 tree_digest: Some(test_tree.digest().into()),
                 is_topologically_sorted: false,
+                root_directory_digest: None,
             }],
             ..Default::default()
         }),
@@ -2371,11 +2389,13 @@ async fn extract_output_files_from_response_directories_and_files() {
                     path: "pets/cats".into(),
                     tree_digest: Some((&TestTree::roland_at_root().digest()).into()),
                     is_topologically_sorted: false,
+                    root_directory_digest: None,
                 },
                 remexec::OutputDirectory {
                     path: "pets/dogs".into(),
                     tree_digest: Some((&TestTree::robin_at_root().digest()).into()),
                     is_topologically_sorted: false,
+                    root_directory_digest: None,
                 },
             ],
             ..Default::default()
@@ -2405,6 +2425,7 @@ async fn extract_output_files_from_response_no_prefix() {
                 path: String::new(),
                 tree_digest: Some((&TestTree::roland_at_root().digest()).into()),
                 is_topologically_sorted: false,
+                root_directory_digest: None,
             }],
             ..Default::default()
         }),

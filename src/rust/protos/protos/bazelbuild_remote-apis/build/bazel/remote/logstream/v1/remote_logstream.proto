@@ -1,0 +1,139 @@
+// Copyright 2020 The Bazel Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Log Stream API
+
+syntax = "proto3";
+
+package build.bazel.remote.logstream.v1;
+
+option csharp_namespace = "Build.Bazel.Remote.LogStream.v1";
+option go_package = "github.com/bazelbuild/remote-apis/build/bazel/remote/logstream/v1;remotelogstream";
+option java_multiple_files = true;
+option java_outer_classname = "RemoteLogStreamProto";
+option java_package = "build.bazel.remote.logstream.v1";
+option objc_class_prefix = "RL";
+
+
+// #### Introduction
+//
+// The Log Stream API manages LogStream resources which are used to stream
+// writes and reads of an ordered sequence of bytes of unknown eventual length.
+//
+// Note that this is an API Interface and not an API Service, per the definitions
+// at: https://cloud.google.com/apis/design/glossary
+//
+// Log Stream API supports the reading of unfinalized LogStreams either by
+// seeking or in "tail" mode, for example by end-users browsing to a build
+// result UI interested in seeing logs from a build action as soon as they are
+// (or as they become) available.
+//
+// Reads and Writes of LogStreams are done via the Byte Stream API:
+// https://cloud.google.com/dataproc/docs/reference/rpc/google.bytestream
+// https://github.com/googleapis/googleapis/blob/master/google/bytestream/bytestream.proto
+//
+// #### Writing LogStreams
+//
+// LogStreams are written to via the Byte Stream API's `Write` RPC. Bytes
+// written to LogStreams are expected to be committed and available for reading
+// within a reasonable period of time (implementation-defined). Committed bytes
+// to a LogStream cannot be overwritten, and finalized LogStreams - indicated by
+// setting `finish_write` field in the final WriteRequest - also cannot be
+// appended to.
+//
+// When calling the Byte Stream API's `Write` RPC to write LogStreams, writers
+// must pass the `write_resource_name` of a LogStream as
+// `ByteStream.WriteRequest.resource_name` rather than the LogStream's `name`.
+// Separate resource names for reading and writing allows for broadcasting the
+// read resource name widely while simultaneously ensuring that only writer(s)
+// with knowledge of the write resource name may have written bytes to the
+// LogStream.
+//
+// #### Reading LogStreams
+//
+// Use the Byte Stream API's `Read` RPC to read LogStreams. When reading
+// finalized LogStreams the server will stream all contents of the LogStream
+// starting at `ByteStream.ReadRequest.read_offset`.
+//
+// When reading unfinalized LogStreams the server must keep the streaming
+// `ByteStream.Read` RPC open and send `ByteStream.ReadResponse` messages as
+// more bytes become available or the LogStream is finalized.
+//
+// #### Example Multi-Party Read/Write Flow
+//
+// 1. LogStream Writer calls `CreateLogStream`
+// 2. LogStream Writer publishes `LogStream.name`
+// 3. LogStream Writer calls `ByteStream.Write` with
+//    `LogStream.write_resource_name` as
+//    `ByteStream.WriteRequest.resource_name`,
+//    `ByteStream.WriteRequest.finish_write`=false.
+// 4. LogStream Reader(s) call `ByteStream.Read` with the published
+//    `LogStream.name` as `ByteStream.ReadRequest.resource_name`.
+// 5. LogStream Service streams all committed bytes to LogStream Reader(s),
+//    leave the stream open.
+// 6. LogStream Writer calls `ByteStream.Write` with
+//    `LogStream.write_resource_name` as
+//    `ByteStream.WriteRequest.resource_name`,
+//    `ByteStream.WriteRequest.finish_write`=true.
+// 7. LogStream Service streams all remaining bytes to LogStream Reader(s),
+//    terminates the stream.
+service LogStreamService {
+  // Create a LogStream which may be written to.
+  //
+  // The returned LogStream resource name will include a `write_resource_name`
+  // which is the resource to use when writing to the LogStream.
+  // Callers of CreateLogStream are expected to NOT publish the
+  // `write_resource_name`.
+  rpc CreateLogStream(CreateLogStreamRequest) returns (LogStream) {}
+}
+
+// Contains all information necessary to create a new LogStream resource.
+message CreateLogStreamRequest {
+  // Required. The parent resource of the created LogStream.
+  // The list of valid types of parent resources of LogStreams is up to the
+  // implementing server.
+  // Example: projects/123
+  string parent = 1;
+}
+
+// A handle to a log (an ordered sequence of bytes).
+message LogStream {
+  // Structured name of the resource in the format:
+  //   {parent=**}/logstreams/{logstream_id}
+  //   Example: projects/123/logstreams/456-def
+  // Attempting to call the Byte Stream API's `Write` RPC with a LogStream's
+  //   `name` as the value for `ByteStream.Write.resource_name` is an error.
+  string name = 1;
+
+  // Resource name to pass to `ByteStream.Write` in the format:
+  //   {parent=**}/logstreams/{logstream_id}/{write_token}
+  //   Example: projects/123/logstreams/456-def/789-ghi
+  // Attempting to call the Byte Stream API's `Read` RPC with a LogStream's
+  //   `write_resource_name` as the value for `ByteStream.Write.resource_name`
+  //   is an error.
+  //
+  // `write_resource_name` is separate from `name` to ensure that only the
+  // intended writers can write to a given LogStream. Writers must address write
+  // operations to the `write_resource_name`, not the `name`, and must have
+  // permission to write LogStreams. `write_resource_name` embeds a secret token
+  // and should be protected accordingly; a mishandled `write_resource_name` can
+  // result in unintended writers corrupting the LogStream. Therefore, the field
+  // should be excluded from calls to any calls which retrieve LogStream
+  // metadata (i.e.: `GetLogStream`).
+  //
+  // Bytes written to this resource must to be readable when `ByteStream.Read`
+  // is called with the `name` resource.
+  // Reading a write_resource_name must return an INVALID_ARGUMENT error.
+  string write_resource_name = 2;
+}

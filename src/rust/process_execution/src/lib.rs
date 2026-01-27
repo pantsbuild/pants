@@ -1394,29 +1394,28 @@ pub async fn make_execute_request(
             });
     }
 
-    let mut output_files = req
-        .output_files
-        .iter()
-        .map(|p| {
-            p.to_str()
-                .map(str::to_owned)
-                .ok_or_else(|| format!("Non-UTF8 output file path: {p:?}"))
-        })
-        .collect::<Result<Vec<String>, String>>()?;
-    output_files.sort();
-    command.output_files = output_files;
+    // Combine output_files and output_directories into output_paths (v2.1+ API)
+    let mut output_paths = Vec::new();
 
-    let mut output_directories = req
-        .output_directories
-        .iter()
-        .map(|p| {
+    for p in &req.output_files {
+        output_paths.push(
             p.to_str()
                 .map(str::to_owned)
-                .ok_or_else(|| format!("Non-UTF8 output directory path: {p:?}"))
-        })
-        .collect::<Result<Vec<String>, String>>()?;
-    output_directories.sort();
-    command.output_directories = output_directories;
+                .ok_or_else(|| format!("Non-UTF8 output file path: {p:?}"))?,
+        );
+    }
+
+    for p in &req.output_directories {
+        output_paths.push(
+            p.to_str()
+                .map(str::to_owned)
+                .ok_or_else(|| format!("Non-UTF8 output directory path: {p:?}"))?,
+        );
+    }
+
+    output_paths.sort();
+    output_paths.dedup(); // Deduplicate as required by the spec
+    command.output_paths = output_paths;
 
     if let Some(working_directory) = &req.working_directory {
         // Do not set `working_directory` if a wrapper script is in use because the wrapper script
@@ -1441,12 +1440,12 @@ pub async fn make_execute_request(
         platform_properties.push(("JDK_SYMLINK".to_owned(), ".jdk".to_owned()));
     }
 
-    // Extract `Platform` proto from the `Command` to avoid a partial move of `Command`.
-    let mut command_platform = command.platform.take().unwrap_or_default();
+    // Build the Platform proto (will be set on Action, not Command, per v2.2+ API)
+    let mut action_platform = remexec::Platform::default();
 
     // Add configured platform properties to the `Platform`.
     for (name, value) in platform_properties {
-        command_platform
+        action_platform
             .properties
             .push(remexec::platform::Property {
                 name: name.clone(),
@@ -1463,15 +1462,12 @@ pub async fn make_execute_request(
     //   is done by code point, equivalently, by the UTF-8 bytes.
     //
     // Note: BuildBarn enforces this requirement.
-    command_platform
+    action_platform
         .properties
         .sort_by(|x, y| match x.name.cmp(&y.name) {
             Ordering::Equal => x.value.cmp(&y.value),
             v => v,
         });
-
-    // Store the separate copy back into the Command proto.
-    command.platform = Some(command_platform);
 
     // Sort the environment variables. REv2 spec requires sorting by name for same reasons that
     // platform properties are sorted, i.e. consistent hashing.
@@ -1496,6 +1492,7 @@ pub async fn make_execute_request(
     let mut action = remexec::Action {
         command_digest: Some((&digest(&command)?).into()),
         input_root_digest: Some(input_root_digest.as_digest().into()),
+        platform: Some(action_platform),
         ..remexec::Action::default()
     };
 

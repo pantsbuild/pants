@@ -1,5 +1,7 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
+#![allow(deprecated)]
+
 use std::collections::{BTreeMap, HashSet};
 use std::convert::TryInto;
 use std::sync::Arc;
@@ -702,13 +704,11 @@ async fn extract_output_file() {
         .is_none()
     );
 
-    // Error if a path has been declared as a file but isn't.
-    assert_eq!(
-        crate::remote_cache::CommandRunner::extract_output_file(&input_tree.digest_trie(), "cats",),
-        Err(format!(
-            "Declared output file path \"cats\" in output digest {:?} contained a directory instead.",
-            TestDirectory::nested().digest()
-        ))
+    // When a directory is encountered, return None so it can be handled as output_directories
+    assert!(
+        crate::remote_cache::CommandRunner::extract_output_file(&input_tree.digest_trie(), "cats",)
+            .unwrap()
+            .is_none()
     );
 }
 
@@ -792,8 +792,7 @@ async fn make_action_result_basic() {
 
     let command = remexec::Command {
         arguments: vec!["this is a test".into()],
-        output_files: vec!["pets/cats/roland.ext".into()],
-        output_directories: vec!["pets/cats".into()],
+        output_paths: vec!["pets/cats/roland.ext".into(), "pets/cats".into()],
         ..Default::default()
     };
 
@@ -846,6 +845,7 @@ async fn make_action_result_basic() {
             path: "pets/cats".to_owned(),
             tree_digest: Some(TestTree::roland_at_root().digest().into()),
             is_topologically_sorted: false,
+            root_directory_digest: None,
         }
     );
 

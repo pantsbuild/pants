@@ -521,6 +521,24 @@ impl ContentAddressableStorage for StubCASResponder {
     ) -> Result<Response<Self::GetTreeStream>, Status> {
         Err(Status::unimplemented("".to_owned()))
     }
+
+    async fn split_blob(
+        &self,
+        _: Request<remexec::SplitBlobRequest>,
+    ) -> Result<Response<remexec::SplitBlobResponse>, Status> {
+        Err(Status::unimplemented(
+            "split_blob not implemented in mock".to_owned(),
+        ))
+    }
+
+    async fn splice_blob(
+        &self,
+        _: Request<remexec::SpliceBlobRequest>,
+    ) -> Result<Response<remexec::SpliceBlobResponse>, Status> {
+        Err(Status::unimplemented(
+            "splice_blob not implemented in mock".to_owned(),
+        ))
+    }
 }
 
 #[tonic::async_trait]

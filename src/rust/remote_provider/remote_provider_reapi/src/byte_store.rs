@@ -125,6 +125,7 @@ impl Provider {
                 data: bytes,
                 compressor: remexec::compressor::Value::Identity as i32,
             }],
+            digest_function: remexec::digest_function::Value::Unknown as i32,
         };
 
         let mut client = self.cas_client.as_ref().clone();
@@ -509,6 +510,7 @@ impl ByteStoreProvider for Provider {
                     instance_name: self.instance_name.as_ref().cloned().unwrap_or_default(),
                     digests: digests,
                     acceptable_compressors: vec![],
+                    digest_function: remexec::digest_function::Value::Unknown as i32,
                 };
 
                 let client = client.clone();
@@ -596,6 +598,7 @@ impl ByteStoreProvider for Provider {
             remexec::FindMissingBlobsRequest {
                 instance_name: self.instance_name.as_ref().cloned().unwrap_or_default(),
                 blob_digests: digests.to_vec(),
+                digest_function: remexec::digest_function::Value::Unknown as i32,
             }
         });
 
@@ -654,6 +657,7 @@ mod tests {
     use crate::remexec::FindMissingBlobsRequest;
     use prost::Message;
     use protos::pb::build::bazel::remote::execution::v2;
+    use protos::pb::build::bazel::remote::execution::v2 as remexec;
     use protos::pb::google::rpc;
     use testutil::data::TestData;
 
@@ -664,12 +668,14 @@ mod tests {
         let small_request = FindMissingBlobsRequest {
             instance_name: instance_name.to_string(),
             blob_digests: vec![TestData::catnip().digest().into()],
+            digest_function: remexec::digest_function::Value::Unknown as i32,
         };
         assert_eq!(small_request.encoded_len(), 70);
 
         let medium_request = FindMissingBlobsRequest {
             instance_name: instance_name.to_string(),
             blob_digests: vec![TestData::all_the_henries().digest().into()],
+            digest_function: remexec::digest_function::Value::Unknown as i32,
         };
         assert_eq!(medium_request.encoded_len(), 72);
 
@@ -679,6 +685,7 @@ mod tests {
         let large_request = FindMissingBlobsRequest {
             instance_name: instance_name.to_string(),
             blob_digests: vec![big_blob.into()],
+            digest_function: remexec::digest_function::Value::Unknown as i32,
         };
         assert_eq!(large_request.encoded_len(), 74);
 
@@ -688,6 +695,7 @@ mod tests {
                 hash: big_blob.hash.to_string(),
                 size_bytes: i64::MAX,
             }],
+            digest_function: remexec::digest_function::Value::Unknown as i32,
         };
         assert_eq!(max_request.encoded_len(), 78);
     }
@@ -785,6 +793,7 @@ mod tests {
             let request = FindMissingBlobsRequest {
                 instance_name: instance_name.to_string(),
                 blob_digests: blobs.clone(),
+                digest_function: remexec::digest_function::Value::Unknown as i32,
             };
 
             let size = request.encoded_len();
