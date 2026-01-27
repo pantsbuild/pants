@@ -42,6 +42,12 @@ class LockfileGenerator(enum.Enum):
     POETRY = "poetry"
 
 
+@enum.unique
+class LockfileResolver(enum.Enum):
+    pip = "pip"
+    uv = "uv"
+
+
 RESOLVE_OPTION_KEY__DEFAULT = "__default__"
 
 _T = TypeVar("_T")
@@ -303,6 +309,24 @@ class PythonSetup(Subsystem):
 
             N.B.: The `latest` value selects the latest of the choices listed by PEX which is not
             necessarily the latest Pip version released on PyPI.
+            """
+        ),
+        advanced=True,
+    )
+    lockfile_resolver = EnumOption(
+        default=LockfileResolver.pip,
+        help=softwrap(
+            """
+            Which resolver to use when generating Pex lockfiles with `pants generate-lockfiles`.
+
+            - `pip` (default): Use `pex lock create` with pip's resolver.
+            - `uv` (experimental): Use `uv pip compile` to pre-resolve the full set of pinned
+              requirements, then run `pex lock create --no-transitive` to materialize a Pex lock.
+
+            Limitations when using `uv`:
+            - Only supported for non-`universal` lock styles and without `complete_platforms`.
+            - Does not currently model all Pex-specific features (e.g. certain per-resolve
+              `--override` behavior) during the `uv` pre-resolution step.
             """
         ),
         advanced=True,
