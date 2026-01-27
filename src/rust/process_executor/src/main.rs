@@ -410,6 +410,7 @@ async fn make_request_from_flat_args(
         env: collection_from_keyvalues(args.command.env.iter()),
         working_directory,
         input_digests,
+        stdin: None,
         output_files,
         output_directories,
         timeout: Some(Duration::new(15 * 60, 0)),
@@ -491,6 +492,7 @@ async fn extract_request_from_action_digest(
             .collect(),
         working_directory,
         input_digests,
+        stdin: None,
         output_files: command
             .output_files
             .iter()
