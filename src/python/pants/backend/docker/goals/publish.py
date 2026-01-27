@@ -12,8 +12,8 @@ from typing import DefaultDict, cast
 from pants.backend.docker.goals.package_image import (
     BuiltDockerImage,
     DockerPackageFieldSet,
-    GetImageTagsRequest,
-    get_image_tags,
+    GetImageRefsRequest,
+    get_image_refs,
 )
 from pants.backend.docker.registries import DockerRegistryOptions
 from pants.backend.docker.subsystems.docker_options import DockerOptions
@@ -82,8 +82,8 @@ async def check_if_skip_push(
     }
     if not (request.publish_fs.skip_push.value or skip_registries):
         return SkippedPublishPackages.no_skip()
-    image_refs = await get_image_tags(
-        GetImageTagsRequest(
+    image_refs = await get_image_refs(
+        GetImageRefsRequest(
             field_set=cast(DockerPackageFieldSet, request.publish_fs), build_upstream_images=False
         ),
         **implicitly(),
@@ -120,16 +120,6 @@ async def push_docker_images(
             for image in pkg.artifacts
         )
     )
-
-    if request.field_set.skip_push.value:
-        return PublishProcesses(
-            [
-                PublishPackages(
-                    names=tags,
-                    description=f"(by `{request.field_set.skip_push.alias}` on {request.field_set.address})",
-                ),
-            ]
-        )
 
     env = await environment_vars_subset(
         EnvironmentVarsRequest(options_env_aware.env_vars), **implicitly()

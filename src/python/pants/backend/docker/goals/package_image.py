@@ -398,7 +398,7 @@ def get_build_options(
 
 
 @dataclass(frozen=True)
-class GetImageTagsRequest:
+class GetImageRefsRequest:
     field_set: DockerPackageFieldSet
     build_upstream_images: bool
 
@@ -408,8 +408,8 @@ class DockerImageRefs(Collection[ImageRefRegistry]):
 
 
 @rule
-async def get_image_tags(
-    request: GetImageTagsRequest, options: DockerOptions, union_membership: UnionMembership
+async def get_image_refs(
+    request: GetImageRefsRequest, options: DockerOptions, union_membership: UnionMembership
 ) -> DockerImageRefs:
     context, wrapped_target = await concurrently(
         create_docker_build_context(
@@ -477,8 +477,8 @@ async def build_docker_image(
             WrappedTargetRequest(field_set.address, description_of_origin="<infallible>"),
             **implicitly(),
         ),
-        get_image_tags(
-            GetImageTagsRequest(
+        get_image_refs(
+            GetImageRefsRequest(
                 field_set=field_set,
                 build_upstream_images=True,
             ),
