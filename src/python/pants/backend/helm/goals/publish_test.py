@@ -3,27 +3,35 @@
 
 from __future__ import annotations
 
-import os
 from textwrap import dedent
 from typing import cast
+from unittest.mock import Mock
 
 import pytest
 
 from pants.backend.helm.goals import publish
 from pants.backend.helm.goals.package import BuiltHelmArtifact, HelmPackageFieldSet
-from pants.backend.helm.goals.publish import HelmPublishFieldSet, PublishHelmChartRequest
+from pants.backend.helm.goals.publish import (
+    HelmPublishFieldSet,
+    PublishHelmChartRequest,
+    PublishHelmChartSkipRequest,
+    check_if_skip_push,
+)
+from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import HelmChartTarget
 from pants.backend.helm.util_rules import tool
+from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
 from pants.backend.helm.util_rules.chart_metadata import HelmChartMetadata
 from pants.backend.helm.util_rules.tool import HelmBinary
 from pants.core.goals.package import BuiltPackage
-from pants.core.goals.publish import PublishPackages, PublishProcesses
+from pants.core.goals.publish import PublishPackages, PublishProcesses, SkippedPublishPackages
 from pants.core.util_rules import external_tool
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.process import InteractiveProcess
+from pants.testutil.option_util import create_subsystem
 from pants.testutil.process_util import process_assertion
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 
 
 @pytest.fixture
@@ -110,37 +118,80 @@ def _declare_targets(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_helm_push_no_charts_when_registries_are_not_set(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    ["address", "default_registry", "expected"],
+    [
+        pytest.param(
+            Address("src/registries"),
+            False,
+            SkippedPublishPackages.no_skip(),
+            id="no_skip_has_registries_and_skip_push_false",
+        ),
+        pytest.param(
+            Address("src/missing-registries"),
+            False,
+            SkippedPublishPackages.skip(
+                names=["missing-registries-0.1.0"],
+                description="(by missing `registries` on src/missing-registries:missing-registries)",
+            ),
+            id="skip_missing_registries",
+        ),
+        pytest.param(
+            Address("src/skip-push"),
+            True,
+            SkippedPublishPackages.skip(
+                names=["skip-push-0.1.0"],
+                description="(by `skip_push` on src/skip-push:skip-push)",
+            ),
+            id="skip_explicit_skip_push_true",
+        ),
+        pytest.param(
+            Address("src/missing-registries"),
+            True,
+            SkippedPublishPackages.no_skip(),
+            id="no_skip_missing_registries_and_default_repo_true",
+        ),
+    ],
+)
+def test_check_if_skip_push(
+    rule_runner: RuleRunner,
+    address: Address,
+    default_registry: bool,
+    expected: SkippedPublishPackages,
+) -> None:
     _declare_targets(rule_runner)
 
-    chart_metadata = HelmChartMetadata("missing-registries", "0.1.0")
-    result, _ = _run_publish(rule_runner, Address("src/missing-registries"), chart_metadata)
-
-    assert len(result) == 1
-    assert_publish(
-        result[0],
-        ("missing-registries-0.1.0",),
-        "(by missing `registries` on src/missing-registries:missing-registries)",
-        None,
+    artifact_name = expected.inner[0].names[0] if expected.inner else None
+    helm_subsystem = create_subsystem(
+        HelmSubsystem,
+        registries={"internal": {"address": "oci://www.example.com", "default": default_registry}},
     )
+    tgt = rule_runner.get_target(address)
+    publish_fs = HelmPublishFieldSet.create(tgt)
+    package_fs = HelmPackageFieldSet.create(tgt)
 
+    def mock_get_helm_chart(request: HelmChartRequest) -> HelmChart:
+        assert request.field_set == publish_fs
+        mock_helm_chart = Mock(spec=HelmChart)
+        mock_info = Mock(spec=HelmChartMetadata)
+        mock_info.artifact_name = artifact_name
+        mock_helm_chart.info = mock_info
+        return mock_helm_chart
 
-def test_helm_skip_push(rule_runner: RuleRunner) -> None:
-    _declare_targets(rule_runner)
-
-    registries = {"internal": {"address": "oci://www.example.com/internal", "default": True}}
-    chart_metadata = HelmChartMetadata("foo-chart", "0.1.0")
-    result, _ = _run_publish(
-        rule_runner, Address("src/skip-push"), chart_metadata, registries=registries
+    mock_calls = (
+        {"pants.backend.helm.util_rules.chart.get_helm_chart": mock_get_helm_chart}
+        if artifact_name
+        else None
     )
-
-    assert len(result) == 1
-    assert_publish(
-        result[0],
-        ("oci://www.example.com/internal/foo-chart-0.1.0",),
-        "(by `skip_push` on src/skip-push:skip-push)",
-        None,
+    result = run_rule_with_mocks(
+        check_if_skip_push,
+        rule_args=[
+            PublishHelmChartSkipRequest(publish_fs=publish_fs, package_fs=package_fs),
+            helm_subsystem,
+        ],
+        mock_calls=mock_calls,
     )
+    assert result == expected
 
 
 def test_helm_push_use_default_registries(rule_runner: RuleRunner) -> None:
@@ -226,15 +277,3 @@ def test_helm_push_registries_with_custom_repository(rule_runner: RuleRunner) ->
             )
         ),
     )
-
-
-@pytest.mark.parametrize(
-    ("target_dir", "expected"), [("registries", True), ("repository", True), ("skip-push", False)]
-)
-def test_publish_field_set_package_before_publish(
-    target_dir: str, expected: bool, rule_runner: RuleRunner
-) -> None:
-    _declare_targets(rule_runner)
-    tgt = rule_runner.get_target(Address(os.path.join("src", target_dir)))
-    fs = HelmPublishFieldSet.create(tgt)
-    assert fs.package_before_publish(HelmPackageFieldSet.create(tgt)) is expected
