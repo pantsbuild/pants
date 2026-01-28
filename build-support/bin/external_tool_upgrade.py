@@ -27,6 +27,7 @@ from urllib.parse import urlparse
 
 import requests
 from external_tool.github import GithubReleases
+from external_tool.helm import HelmReleases
 from external_tool.kubectl import KubernetesReleases
 from external_tool.python import (
     find_modules_with_subclasses,
@@ -230,9 +231,9 @@ def main():
     mapping: dict[str, Releases | None] = {
         "dl.k8s.io": KubernetesReleases(pool=pool, only_latest=True),
         "github.com": GithubReleases(only_latest=True),
+        "get.helm.sh": HelmReleases(only_latest=True),
         "releases.hashicorp.com": None,  # TODO
         "raw.githubusercontent.com": None,  # TODO
-        "get.helm.sh": None,  # TODO
         "binaries.pantsbuild.org": None,  # TODO
     }
 
