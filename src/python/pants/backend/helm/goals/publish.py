@@ -87,6 +87,7 @@ async def check_if_skip_push(
     return SkippedPublishPackages.skip(
         names=[chart.info.artifact_name],
         description=f"(by {reason} on {request.publish_fs.address})",
+        data=request.publish_fs.get_output_data(),
     )
 
 

@@ -29,7 +29,12 @@ from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.docker.util_rules import docker_binary
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.core.goals.package import BuiltPackage
-from pants.core.goals.publish import PublishPackages, PublishProcesses, SkippedPublishPackages
+from pants.core.goals.publish import (
+    PublishOutputData,
+    PublishPackages,
+    PublishProcesses,
+    SkippedPublishPackages,
+)
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.process import InteractiveProcess, Process
@@ -117,18 +122,23 @@ def assert_publish(
         assert publish.process is None
 
 
+SKIP_TEST_ADDRESS = Address("src/skip-test")
+REGISTRIES_ADDRESS = Address("src/registries")
+DEFAULT_ADDRESS = Address("src/default")
+
+
 @pytest.mark.parametrize(
     ["address", "options", "image_refs", "expected"],
     [
         pytest.param(
-            Address("src/default"),
+            DEFAULT_ADDRESS,
             {},
             None,
             SkippedPublishPackages.no_skip(),
             id="no_skip_conditions_early_exit",
         ),
         pytest.param(
-            Address("src/skip-test"),
+            SKIP_TEST_ADDRESS,
             {},
             DockerImageRefs(
                 [
@@ -149,11 +159,16 @@ def assert_publish(
             SkippedPublishPackages.skip(
                 names=["skip-test/skip-test:latest"],
                 description="(by `skip_push` on src/skip-test:skip-test)",
+                data={
+                    "publisher": "docker",
+                    "target": SKIP_TEST_ADDRESS,
+                    "registries": ["<all default registries>"],
+                },
             ),
             id="target_skip_push_true",
         ),
         pytest.param(
-            Address("src/registries"),
+            REGISTRIES_ADDRESS,
             {
                 "registries": {
                     "inhouse1": {"address": "inhouse1.registry", "skip_push": True},
@@ -201,17 +216,31 @@ def assert_publish(
                     PublishPackages(
                         names=("inhouse1.registry/registries/registries:latest",),
                         description="(by skip_push on @inhouse1)",
+                        data=PublishOutputData.deep_freeze(
+                            {
+                                "publisher": "docker",
+                                "target": REGISTRIES_ADDRESS,
+                                "registries": ["@inhouse1", "@inhouse2"],
+                            }
+                        ),
                     ),
                     PublishPackages(
                         names=("inhouse2.registry/registries/registries:latest",),
                         description="(by skip_push on @inhouse2)",
+                        data=PublishOutputData.deep_freeze(
+                            {
+                                "publisher": "docker",
+                                "target": REGISTRIES_ADDRESS,
+                                "registries": ["@inhouse1", "@inhouse2"],
+                            }
+                        ),
                     ),
                 ]
             ),
             id="all_registries_skip_push_true",
         ),
         pytest.param(
-            Address("src/registries"),
+            REGISTRIES_ADDRESS,
             {
                 "registries": {
                     "inhouse1": {"address": "inhouse1.registry", "skip_push": True},
@@ -296,7 +325,7 @@ def test_check_if_skip_push(
 
 
 def test_docker_push_images(rule_runner: RuleRunner) -> None:
-    result, docker = run_publish(rule_runner, Address("src/default"))
+    result, docker = run_publish(rule_runner, DEFAULT_ADDRESS)
     assert len(result) == 1
     assert_publish(
         result[0],
@@ -317,7 +346,7 @@ def test_docker_push_registries(rule_runner: RuleRunner) -> None:
     )
     result, docker = run_publish(
         rule_runner,
-        Address("src/registries"),
+        REGISTRIES_ADDRESS,
         {
             "registries": registries,
         },
@@ -360,7 +389,7 @@ def test_docker_skip_push_registries(rule_runner: RuleRunner) -> None:
     )
     result, docker = run_publish(
         rule_runner,
-        Address("src/registries"),
+        REGISTRIES_ADDRESS,
         {
             "registries": registries,
         },
@@ -392,7 +421,7 @@ def test_docker_push_env(rule_runner: RuleRunner) -> None:
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         env={"DOCKER_CONFIG": "/etc/docker/custom-config"},
     )
-    result, docker = run_publish(rule_runner, Address("src/default"))
+    result, docker = run_publish(rule_runner, DEFAULT_ADDRESS)
     assert len(result) == 1
     assert_publish(
         result[0],

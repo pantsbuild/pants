@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from textwrap import dedent
 from typing import cast
 from unittest.mock import Mock
@@ -24,7 +25,12 @@ from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
 from pants.backend.helm.util_rules.chart_metadata import HelmChartMetadata
 from pants.backend.helm.util_rules.tool import HelmBinary
 from pants.core.goals.package import BuiltPackage
-from pants.core.goals.publish import PublishPackages, PublishProcesses, SkippedPublishPackages
+from pants.core.goals.publish import (
+    PublishOutputData,
+    PublishPackages,
+    PublishProcesses,
+    SkippedPublishPackages,
+)
 from pants.core.util_rules import external_tool
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST
@@ -118,35 +124,55 @@ def _declare_targets(rule_runner: RuleRunner) -> None:
     )
 
 
+def get_publish_output_data(target: Address, registries: Iterable[str]) -> PublishOutputData:
+    return PublishOutputData(
+        {
+            "publisher": "helm",
+            "target": target,
+            "registries": tuple(registries),
+        }
+    )
+
+
+MISSING_REGISTRIES_ADDRESS = Address("src/missing-registries")
+SKIP_PUSH_ADDRESS = Address("src/skip-push")
+REGISTRIES_ADDRESS = Address("src/registries")
+REPOSITORY_ADDRESS = Address("src/repository")
+
+
 @pytest.mark.parametrize(
     ["address", "default_registry", "expected"],
     [
         pytest.param(
-            Address("src/registries"),
+            REGISTRIES_ADDRESS,
             False,
             SkippedPublishPackages.no_skip(),
             id="no_skip_has_registries_and_skip_push_false",
         ),
         pytest.param(
-            Address("src/missing-registries"),
+            MISSING_REGISTRIES_ADDRESS,
             False,
             SkippedPublishPackages.skip(
                 names=["missing-registries-0.1.0"],
                 description="(by missing `registries` on src/missing-registries:missing-registries)",
+                data=get_publish_output_data(
+                    MISSING_REGISTRIES_ADDRESS, ["<ALL DEFAULT HELM REGISTRIES>"]
+                ),
             ),
             id="skip_missing_registries",
         ),
         pytest.param(
-            Address("src/skip-push"),
+            SKIP_PUSH_ADDRESS,
             True,
             SkippedPublishPackages.skip(
                 names=["skip-push-0.1.0"],
                 description="(by `skip_push` on src/skip-push:skip-push)",
+                data=get_publish_output_data(SKIP_PUSH_ADDRESS, ["<ALL DEFAULT HELM REGISTRIES>"]),
             ),
             id="skip_explicit_skip_push_true",
         ),
         pytest.param(
-            Address("src/missing-registries"),
+            MISSING_REGISTRIES_ADDRESS,
             True,
             SkippedPublishPackages.no_skip(),
             id="no_skip_missing_registries_and_default_repo_true",

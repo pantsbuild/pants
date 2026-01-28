@@ -92,18 +92,20 @@ async def check_if_skip_push(
         return SkippedPublishPackages.skip(
             names=[tag.full_name for registry in image_refs for tag in registry.tags],
             description=f"(by `{request.publish_fs.skip_push.alias}` on {request.address})",
+            data=request.publish_fs.get_output_data(),
         )
-    return (
-        SkippedPublishPackages(
+    if all(image_ref.registry in skip_registries for image_ref in image_refs):
+        output_data = request.publish_fs.get_output_data()
+        return SkippedPublishPackages(
             PublishPackages(
                 names=tuple(tag.full_name for tag in image_ref.tags),
                 description=f"(by skip_push on @{cast(DockerRegistryOptions, image_ref.registry).alias})",
+                data=output_data,
             )
             for image_ref in image_refs
         )
-        if all(image_ref.registry in skip_registries for image_ref in image_refs)
-        else SkippedPublishPackages.no_skip()
-    )
+
+    return SkippedPublishPackages.no_skip()
 
 
 @rule

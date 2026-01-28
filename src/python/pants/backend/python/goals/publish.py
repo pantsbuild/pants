@@ -118,6 +118,7 @@ async def check_if_skip_upload(
             )
         ],
         description=reason,
+        data=request.publish_fs.get_output_data(),
     )
 
 
