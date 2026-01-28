@@ -980,6 +980,7 @@ def test_scie_with_local_dist(rule_runner: PythonRuleRunner) -> None:
     output = subprocess.check_output([executable], text=True)
     assert "Hello from local dist!" in output
 
+
 def test_scie_custom_exe_with_env_and_args(rule_runner: PythonRuleRunner) -> None:
     # Test that scie_exe, scie_args, and scie_env work together correctly.
     # The script path comes from scie_bind_resource_path -> scie_env -> scie_exe,
