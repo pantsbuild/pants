@@ -12,9 +12,15 @@ from functools import partial
 from itertools import chain
 from typing import Literal, cast
 
-# Re-exporting BuiltDockerImage here, as it has its natural home here, but has moved out to resolve
-# a dependency cycle from docker_build_context.
-from pants.backend.docker.package_types import BuiltDockerImage as BuiltDockerImage
+# Re-exporting types here as they have their natural home here, but have moved out to resolve
+# dependency cycles.
+from pants.backend.docker.package_types import (
+    BuiltDockerImage as BuiltDockerImage,
+)
+from pants.backend.docker.package_types import (
+    DockerPushOnPackageBehavior,
+    DockerPushOnPackageException,
+)
 from pants.backend.docker.registries import DockerRegistries, DockerRegistryOptions
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
@@ -25,6 +31,7 @@ from pants.backend.docker.target_types import (
     DockerBuildOptionFieldMultiValueMixin,
     DockerBuildOptionFieldValueMixin,
     DockerBuildOptionFlagFieldMixin,
+    DockerImageBuildImageOutputField,
     DockerImageContextRootField,
     DockerImageRegistriesField,
     DockerImageRepositoryField,
@@ -42,7 +49,8 @@ from pants.backend.docker.util_rules.docker_build_context import (
 )
 from pants.backend.docker.utils import format_rename_suggestion
 from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
-from pants.engine.fs import CreateDigest, FileContent
+from pants.engine.collection import Collection
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, FileContent
 from pants.engine.internals.graph import resolve_target
 from pants.engine.intrinsics import create_digest, execute_process
 from pants.engine.process import ProcessExecutionFailure
@@ -74,7 +82,7 @@ class DockerImageOptionValueError(InterpolationError):
 
 @dataclass(frozen=True)
 class DockerPackageFieldSet(PackageFieldSet):
-    required_fields = (DockerImageSourceField,)
+    required_fields = (DockerImageSourceField, DockerImageBuildImageOutputField)
 
     context_root: DockerImageContextRootField
     registries: DockerImageRegistriesField
@@ -83,6 +91,12 @@ class DockerPackageFieldSet(PackageFieldSet):
     tags: DockerImageTagsField
     target_stage: DockerImageTargetStageField
     output_path: OutputPathField
+    output: DockerImageBuildImageOutputField
+
+    def pushes_on_package(self) -> bool:
+        """Returns True if this docker_image target would push to a registry during packaging."""
+        value_or_default = self.output.value or self.output.default
+        return value_or_default.get("push") == "true" or value_or_default["type"] == "registry"
 
     def format_tag(self, tag: str, interpolation_context: InterpolationContext) -> str:
         source = InterpolationContext.TextSource(
@@ -383,26 +397,30 @@ def get_build_options(
         yield "--no-cache"
 
 
+@dataclass(frozen=True)
+class GetImageRefsRequest:
+    field_set: DockerPackageFieldSet
+    build_upstream_images: bool
+
+
+class DockerImageRefs(Collection[ImageRefRegistry]):
+    pass
+
+
 @rule
-async def build_docker_image(
-    field_set: DockerPackageFieldSet,
-    options: DockerOptions,
-    global_options: GlobalOptions,
-    docker: DockerBinary,
-    keep_sandboxes: KeepSandboxes,
-    union_membership: UnionMembership,
-) -> BuiltPackage:
-    """Build a Docker image using `docker build`."""
+async def get_image_refs(
+    request: GetImageRefsRequest, options: DockerOptions, union_membership: UnionMembership
+) -> DockerImageRefs:
     context, wrapped_target = await concurrently(
         create_docker_build_context(
             DockerBuildContextRequest(
-                address=field_set.address,
-                build_upstream_images=True,
+                address=request.field_set.address,
+                build_upstream_images=request.build_upstream_images,
             ),
             **implicitly(),
         ),
         resolve_target(
-            WrappedTargetRequest(field_set.address, description_of_origin="<infallible>"),
+            WrappedTargetRequest(request.field_set.address, description_of_origin="<infallible>"),
             **implicitly(),
         ),
     )
@@ -416,13 +434,56 @@ async def build_docker_image(
         if image_tags_request_cls.is_applicable(wrapped_target.target)
     )
 
-    image_refs = tuple(
-        field_set.image_refs(
+    return DockerImageRefs(
+        request.field_set.image_refs(
             default_repository=options.default_repository,
             registries=options.registries(),
             interpolation_context=context.interpolation_context,
             additional_tags=tuple(chain.from_iterable(additional_image_tags)),
         )
+    )
+
+
+@rule
+async def build_docker_image(
+    field_set: DockerPackageFieldSet,
+    options: DockerOptions,
+    global_options: GlobalOptions,
+    docker: DockerBinary,
+    keep_sandboxes: KeepSandboxes,
+) -> BuiltPackage:
+    """Build a Docker image using `docker build`."""
+    # Check if this build would push and handle according to push_on_package behavior
+    if field_set.pushes_on_package():
+        match options.push_on_package:
+            case DockerPushOnPackageBehavior.IGNORE:
+                return BuiltPackage(EMPTY_DIGEST, ())
+            case DockerPushOnPackageBehavior.ERROR:
+                raise DockerPushOnPackageException(field_set.address)
+            case DockerPushOnPackageBehavior.WARN:
+                logger.warning(
+                    f"Docker image {field_set.address} will push to a registry during packaging"
+                )
+
+    context, wrapped_target, image_refs = await concurrently(
+        create_docker_build_context(
+            DockerBuildContextRequest(
+                address=field_set.address,
+                build_upstream_images=True,
+            ),
+            **implicitly(),
+        ),
+        resolve_target(
+            WrappedTargetRequest(field_set.address, description_of_origin="<infallible>"),
+            **implicitly(),
+        ),
+        get_image_refs(
+            GetImageRefsRequest(
+                field_set=field_set,
+                build_upstream_images=True,
+            ),
+            **implicitly(),
+        ),
     )
     tags = tuple(tag.full_name for registry in image_refs for tag in registry.tags)
     if not tags:
