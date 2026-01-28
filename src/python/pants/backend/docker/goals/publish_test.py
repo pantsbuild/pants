@@ -3,30 +3,39 @@
 
 from __future__ import annotations
 
-import os
 from collections.abc import Callable
 from typing import cast
 
 import pytest
 
-from pants.backend.docker.goals.package_image import BuiltDockerImage, DockerPackageFieldSet
+from pants.backend.docker.goals.package_image import (
+    BuiltDockerImage,
+    DockerImageRefs,
+    DockerPackageFieldSet,
+    GetImageRefsRequest,
+    ImageRefRegistry,
+    ImageRefTag,
+)
 from pants.backend.docker.goals.publish import (
     PublishDockerImageFieldSet,
     PublishDockerImageRequest,
-    rules,
+    PublishDockerImageSkipRequest,
+    check_if_skip_push,
+    push_docker_images,
 )
+from pants.backend.docker.registries import DockerRegistryOptions
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.docker.util_rules import docker_binary
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.core.goals.package import BuiltPackage
-from pants.core.goals.publish import PublishPackages, PublishProcesses
+from pants.core.goals.publish import PublishPackages, PublishProcesses, SkippedPublishPackages
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.process import InteractiveProcess, Process
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.process_util import process_assertion
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
 from pants.util.value_interpolation import InterpolationContext
 
@@ -35,7 +44,7 @@ from pants.util.value_interpolation import InterpolationContext
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *rules(),
+            push_docker_images,
             *docker_binary.rules(),
             QueryRule(PublishProcesses, [PublishDockerImageRequest]),
             QueryRule(DockerBinary, []),
@@ -108,15 +117,182 @@ def assert_publish(
         assert publish.process is None
 
 
-def test_docker_skip_push(rule_runner: RuleRunner) -> None:
-    result, _ = run_publish(rule_runner, Address("src/skip-test"))
-    assert len(result) == 1
-    assert_publish(
-        result[0],
-        ("skip-test/skip-test:latest",),
-        "(by `skip_push` on src/skip-test:skip-test)",
-        None,
+@pytest.mark.parametrize(
+    ["address", "options", "image_refs", "expected"],
+    [
+        pytest.param(
+            Address("src/default"),
+            {},
+            None,
+            SkippedPublishPackages.no_skip(),
+            id="no_skip_conditions_early_exit",
+        ),
+        pytest.param(
+            Address("src/skip-test"),
+            {},
+            DockerImageRefs(
+                [
+                    ImageRefRegistry(
+                        registry=None,
+                        repository="skip-test/skip-test",
+                        tags=(
+                            ImageRefTag(
+                                template="latest",
+                                formatted="latest",
+                                full_name="skip-test/skip-test:latest",
+                                uses_local_alias=False,
+                            ),
+                        ),
+                    ),
+                ]
+            ),
+            SkippedPublishPackages.skip(
+                names=["skip-test/skip-test:latest"],
+                description="(by `skip_push` on src/skip-test:skip-test)",
+            ),
+            id="target_skip_push_true",
+        ),
+        pytest.param(
+            Address("src/registries"),
+            {
+                "registries": {
+                    "inhouse1": {"address": "inhouse1.registry", "skip_push": True},
+                    "inhouse2": {"address": "inhouse2.registry", "skip_push": True},
+                }
+            },
+            DockerImageRefs(
+                [
+                    ImageRefRegistry(
+                        registry=DockerRegistryOptions(
+                            address="inhouse1.registry",
+                            alias="inhouse1",
+                            skip_push=True,
+                        ),
+                        repository="registries/registries",
+                        tags=(
+                            ImageRefTag(
+                                template="latest",
+                                formatted="latest",
+                                full_name="inhouse1.registry/registries/registries:latest",
+                                uses_local_alias=False,
+                            ),
+                        ),
+                    ),
+                    ImageRefRegistry(
+                        registry=DockerRegistryOptions(
+                            address="inhouse2.registry",
+                            alias="inhouse2",
+                            skip_push=True,
+                        ),
+                        repository="registries/registries",
+                        tags=(
+                            ImageRefTag(
+                                template="latest",
+                                formatted="latest",
+                                full_name="inhouse2.registry/registries/registries:latest",
+                                uses_local_alias=False,
+                            ),
+                        ),
+                    ),
+                ]
+            ),
+            SkippedPublishPackages(
+                [
+                    PublishPackages(
+                        names=("inhouse1.registry/registries/registries:latest",),
+                        description="(by skip_push on @inhouse1)",
+                    ),
+                    PublishPackages(
+                        names=("inhouse2.registry/registries/registries:latest",),
+                        description="(by skip_push on @inhouse2)",
+                    ),
+                ]
+            ),
+            id="all_registries_skip_push_true",
+        ),
+        pytest.param(
+            Address("src/registries"),
+            {
+                "registries": {
+                    "inhouse1": {"address": "inhouse1.registry", "skip_push": True},
+                    "inhouse2": {"address": "inhouse2.registry"},
+                }
+            },
+            DockerImageRefs(
+                [
+                    ImageRefRegistry(
+                        registry=DockerRegistryOptions(
+                            address="inhouse1.registry",
+                            alias="inhouse1",
+                            skip_push=True,
+                        ),
+                        repository="registries/registries",
+                        tags=(
+                            ImageRefTag(
+                                template="latest",
+                                formatted="latest",
+                                full_name="inhouse1.registry/registries/registries:latest",
+                                uses_local_alias=False,
+                            ),
+                        ),
+                    ),
+                    ImageRefRegistry(
+                        registry=DockerRegistryOptions(
+                            address="inhouse2.registry",
+                            alias="inhouse2",
+                            skip_push=False,
+                        ),
+                        repository="registries/registries",
+                        tags=(
+                            ImageRefTag(
+                                template="latest",
+                                formatted="latest",
+                                full_name="inhouse2.registry/registries/registries:latest",
+                                uses_local_alias=False,
+                            ),
+                        ),
+                    ),
+                ]
+            ),
+            SkippedPublishPackages.no_skip(),
+            id="mixed_registries_should_not_skip",
+        ),
+    ],
+)
+def test_check_if_skip_push(
+    rule_runner: RuleRunner,
+    address: Address,
+    options: dict,
+    image_refs: DockerImageRefs | None,
+    expected: SkippedPublishPackages,
+) -> None:
+    opts = options or {}
+    opts.setdefault("registries", {})
+    opts.setdefault("default_repository", "{directory}/{name}")
+    docker_options = create_subsystem(DockerOptions, **opts)
+    tgt = cast(DockerImageTarget, rule_runner.get_target(address))
+    package_fs = DockerPackageFieldSet.create(tgt)
+    publish_fs = PublishDockerImageFieldSet.create(tgt)
+
+    def mock_get_image_refs(request: GetImageRefsRequest) -> DockerImageRefs:
+        assert request.field_set == package_fs
+        assert request.build_upstream_images is False
+        return cast(DockerImageRefs, image_refs)
+
+    mock_calls = (
+        {"pants.backend.docker.goals.package_image.get_image_refs": mock_get_image_refs}
+        if image_refs
+        else None
     )
+    result = run_rule_with_mocks(
+        check_if_skip_push,
+        rule_args=[
+            PublishDockerImageSkipRequest(publish_fs=publish_fs, package_fs=package_fs),
+            docker_options,
+        ],
+        mock_calls=mock_calls,
+    )
+    assert result == expected
 
 
 def test_docker_push_images(rule_runner: RuleRunner) -> None:

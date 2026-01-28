@@ -84,7 +84,7 @@ async def check_if_skip_push(
         return SkippedPublishPackages.no_skip()
     image_refs = await get_image_refs(
         GetImageRefsRequest(
-            field_set=cast(DockerPackageFieldSet, request.publish_fs), build_upstream_images=False
+            field_set=cast(DockerPackageFieldSet, request.package_fs), build_upstream_images=False
         ),
         **implicitly(),
     )
