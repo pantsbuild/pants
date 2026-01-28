@@ -454,9 +454,9 @@ class Helper:
         # platforms without realizing it.
         ret = ["self-hosted"] if self.platform in SELF_HOSTED else []
         if self.platform == Platform.MACOS14_ARM64:
-            ret += ["macos-14"]
+            ret += ["depot-macos-14"]
         elif self.platform == Platform.LINUX_X86_64:
-            ret += ["ubuntu-22.04"]
+            ret += ["depot-ubuntu-22.04"]
         elif self.platform == Platform.LINUX_ARM64:
             ret += [
                 "runs-on",
