@@ -208,12 +208,14 @@ class SkippedPublishPackages:
         *,
         names: Iterable[str],
         description: str | None = None,
-        data: PublishOutputData | None = None,
+        data: Mapping[str, Any] | None = None,
     ) -> Self:
         return cls(
             [
                 PublishPackages(
-                    names=tuple(names), description=description, data=data or PublishOutputData()
+                    names=tuple(names),
+                    description=description,
+                    data=PublishOutputData.deep_freeze(data) if data else PublishOutputData(),
                 )
             ]
         )
