@@ -324,6 +324,17 @@ def test_check_if_skip_push(
     assert result == expected
 
 
+def test_docker_skip_push(rule_runner: RuleRunner) -> None:
+    result, _ = run_publish(rule_runner, SKIP_TEST_ADDRESS)
+    assert len(result) == 1
+    assert_publish(
+        result[0],
+        ("skip-test/skip-test:latest",),
+        "(by `skip_push` on src/skip-test:skip-test)",
+        None,
+    )
+
+
 def test_docker_push_images(rule_runner: RuleRunner) -> None:
     result, docker = run_publish(rule_runner, DEFAULT_ADDRESS)
     assert len(result) == 1

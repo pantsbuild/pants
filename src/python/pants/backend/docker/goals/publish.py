@@ -122,6 +122,15 @@ async def push_docker_images(
             for image in pkg.artifacts
         )
     )
+    if request.field_set.skip_push.value:
+        return PublishProcesses(
+            [
+                PublishPackages(
+                    names=tags,
+                    description=f"(by `{request.field_set.skip_push.alias}` on {request.field_set.address})",
+                ),
+            ]
+        )
 
     env = await environment_vars_subset(
         EnvironmentVarsRequest(options_env_aware.env_vars), **implicitly()
