@@ -205,10 +205,16 @@ async def prepare_jdk_environment(
         coursier_jdk_option = f"--jvm={version}"
 
     if not coursier.jvm_index:
-        coursier_options = ["java-home", coursier_jdk_option]
+        coursier_options = ["java-home", "--quiet", "--quiet", coursier_jdk_option]
     else:
         jvm_index_option = f"--jvm-index={coursier.jvm_index}"
-        coursier_options = ["java-home", jvm_index_option, coursier_jdk_option]
+        coursier_options = [
+            "java-home",
+            "--quiet",
+            "--quiet",
+            jvm_index_option,
+            coursier_jdk_option,
+        ]
 
     # TODO(#16104) This argument re-writing code should use the native {chroot} support.
     # See also `run` for other argument re-writing code.
