@@ -25,7 +25,11 @@ from pants.backend.python.target_types import (
     PexInheritPathField,
     PexLayout,
     PexLayoutField,
+    PexScieArgsField,
+    PexScieBindResourcePathField,
     PexScieBusyBox,
+    PexScieEnvField,
+    PexScieExeField,
     PexScieField,
     PexScieHashAlgField,
     PexScieLoadDotenvField,
@@ -100,6 +104,10 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     extra_build_args: PexExtraBuildArgsField
 
     scie: PexScieField
+    scie_bind_resource_path: PexScieBindResourcePathField
+    scie_exe: PexScieExeField
+    scie_args: PexScieArgsField
+    scie_env: PexScieEnvField
     scie_load_dotenv: PexScieLoadDotenvField
     scie_name_style: PexScieNameStyleField
     scie_busybox: PexScieBusyBox
@@ -155,6 +163,19 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
         args = []
         if self.scie.value is not None:
             args.append(f"--scie={self.scie.value}")
+        if self.scie_bind_resource_path.value is not None:
+            args.extend(
+                [
+                    f"--scie-bind-resource-path={resource_path}"
+                    for resource_path in self.scie_bind_resource_path.value
+                ]
+            )
+        if self.scie_exe.value is not None:
+            args.append(f"--scie-exe={self.scie_exe.value}")
+        if self.scie_args.value is not None:
+            args.extend([f"--scie-args={arg}" for arg in self.scie_args.value])
+        if self.scie_env.value is not None:
+            args.extend([f"--scie-env={e}" for e in self.scie_env.value])
         if self.scie_load_dotenv.value is not None:
             if self.scie_load_dotenv.value:
                 args.append("--scie-load-dotenv")
