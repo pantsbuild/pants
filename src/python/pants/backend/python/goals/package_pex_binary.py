@@ -243,13 +243,14 @@ async def built_package_for_pex_from_targets_request(
 ) -> BuiltPackage:
     pft_request = await package_pex_binary(field_set, **implicitly())
 
+    base_pex_request = await create_pex_from_targets(**implicitly(pft_request.request))
     if field_set.builds_pex_and_scie():
         pex_request = dataclasses.replace(
-            await create_pex_from_targets(**implicitly(pft_request.request)),
-            additional_args=(*pft_request.request.additional_args, *field_set.generate_scie_args()),
+            base_pex_request,
+            additional_args=(*base_pex_request.additional_args, *field_set.generate_scie_args()),
         )
     else:
-        pex_request = await create_pex_from_targets(**implicitly(pft_request.request))
+        pex_request = base_pex_request
 
     pex = await create_pex(**implicitly(pex_request))
     snapshot = await digest_to_snapshot(pex.digest)

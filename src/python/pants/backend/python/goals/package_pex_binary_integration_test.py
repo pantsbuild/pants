@@ -918,3 +918,64 @@ def test_scie_pbs_debug(rule_runner: PythonRuleRunner) -> None:
     executable = os.path.join(rule_runner.build_root, "src.py.project/project")
     output = subprocess.check_output(executable, env={"SCIE": "inspect"})
     assert b"stripped" not in output
+
+
+def test_scie_with_local_dist(rule_runner: PythonRuleRunner) -> None:
+    # This is a regression test for a bug early in adding scie support where
+    # the --requirements-pex flag was lost when building a scie pex, causing
+    # local distributions to not be included in the final executable.
+    rule_runner.write_files(
+        {
+            "lib/__init__.py": "",
+            "lib/greeting.py": dedent(
+                """\
+                def get_greeting():
+                    return "Hello from local dist!"
+                """
+            ),
+            "lib/BUILD": dedent(
+                """\
+                python_sources(name="sources")
+
+                python_distribution(
+                    name="dist",
+                    dependencies=[":sources"],
+                    provides=python_artifact(
+                        name="guten-tag-lib",
+                        version="0.0.1",
+                    ),
+                )
+                """
+            ),
+            "app/main.py": dedent(
+                """\
+                from lib.greeting import get_greeting
+
+                if __name__ == "__main__":
+                    print(get_greeting())
+                """
+            ),
+            "app/BUILD": dedent(
+                """\
+                python_sources(name="sources")
+
+                pex_binary(
+                    name="app",
+                    entry_point="main.py",
+                    dependencies=[":sources", "lib:dist"],
+                    scie="eager",  # Going to run it, so might as well
+                    scie_pbs_release="20251031",
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("app", target_name="app"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+
+    rule_runner.write_digest(result.digest)
+    executable = os.path.join(rule_runner.build_root, "app/app")
+
+    output = subprocess.check_output([executable], text=True)
+    assert "Hello from local dist!" in output
