@@ -128,7 +128,7 @@ class PublishFieldSet(Generic[_T], FieldSet, metaclass=ABCMeta):
         """Internal helper for the core publish goal."""
         return self.publish_request_type(field_set=self, packages=packages)
 
-    def make_skip_request(self, package_fs: PackageFieldSet) -> CheckSkipRequest[Self] | None:
+    def check_skip_request(self, package_fs: PackageFieldSet) -> CheckSkipRequest[Self] | None:
         """Subclasses can override this method if they want to preempt packaging for publish
         requests that are just going to be skipped."""
         return None
@@ -427,20 +427,13 @@ async def run_publish(
     if not targets:
         return Publish(exit_code=0)
 
-    skip_check_requests: list[CheckSkipRequest] = []
-    for tgt, publish_fss in target_roots_to_publish_field_sets.mapping.items():
-        for package_fs in target_roots_to_package_field_sets.mapping[tgt]:
-            srs = []
-            for publish_fs in publish_fss:
-                maybe_skip_request = publish_fs.make_skip_request(package_fs)
-                if not maybe_skip_request:
-                    break
-                srs.append(maybe_skip_request)
-            # We use a for-else construct here because we're only interested in skip
-            # requests if every combination for a single publish_fs or package_fs has
-            # one. Otherwise, we already know we're going to have to package/publish.
-            else:
-                skip_check_requests.extend(srs)
+    skip_check_requests = [
+        skip_request
+        for tgt in targets
+        for package_fs in target_roots_to_package_field_sets.mapping[tgt]
+        for publish_fs in target_roots_to_publish_field_sets.mapping[tgt]
+        if (skip_request := publish_fs.check_skip_request(package_fs))
+    ]
     skip_check_results = await concurrently(
         preemptive_skip_publish_packages(
             **implicitly({skip_request: CheckSkipRequest, local_environment.val: EnvironmentName})
@@ -449,18 +442,15 @@ async def run_publish(
     )
     # In `package_skips`, True represents skip, False represents a definitive non-skip, and not present means we don't know yet.
     package_skips: dict[PackageFieldSet, bool] = {}
-
-    def set_skip_package(package_fs: PackageFieldSet, skip: bool) -> None:
-        seen = package_fs in package_skips
-        if (seen and not skip) or not seen:
-            package_skips[package_fs] = skip
-
     # In `publish_skips`, the value is a list of PublishPackages means skip, None is a non-skip, and not present means we don't know yet.
     publish_skips: dict[PublishFieldSet, list[PublishPackages] | None] = {}
     for skip_request, maybe_skip in zip(skip_check_requests, skip_check_results):
+        skip_package = maybe_skip.skip_package
+        package_skip_seen = skip_request.package_fs in package_skips
+        # If skip_package is False, set to False, otherwise set only if this package_fs has not been seen yet.
+        if (package_skip_seen and not skip_package) or not package_skip_seen:
+            package_skips[skip_request.package_fs] = skip_package
         if maybe_skip.skip_publish:
-            # Even if we're not skipping publish for this `PublishFieldSet`, we might still be able to skip package
-            set_skip_package(skip_request.package_fs, True)
             try:
                 skip_publish_packages = publish_skips[skip_request.publish_fs]
             except KeyError:
@@ -470,7 +460,6 @@ async def run_publish(
                     skip_publish_packages.extend(maybe_skip.inner)
         else:
             publish_skips[skip_request.publish_fs] = None
-            set_skip_package(skip_request.package_fs, maybe_skip.skip_package)
 
     skipped_publishes: list[PublishPackages] = list(
         itertools.chain.from_iterable(pubskip for pubskip in publish_skips.values() if pubskip)
