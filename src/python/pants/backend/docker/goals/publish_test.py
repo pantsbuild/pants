@@ -11,6 +11,7 @@ import pytest
 
 from pants.backend.docker.goals.package_image import (
     BuiltDockerImage,
+    DockerImageBuildProcess,
     DockerImageRefs,
     DockerPackageFieldSet,
     GetImageRefsRequest,
@@ -62,6 +63,7 @@ def rule_runner() -> RuleRunner:
             "src/default/BUILD": """docker_image()""",
             "src/skip-test/BUILD": """docker_image(skip_push=True)""",
             "src/registries/BUILD": """docker_image(registries=["@inhouse1", "@inhouse2"])""",
+            "src/push-on-package/BUILD": """docker_image(output={"type": "registry"})""",
         }
     )
     return rule_runner
@@ -93,6 +95,7 @@ def run_publish(
     address: Address,
     options: dict | None = None,
     env_vars: list[str] | None = None,
+    mock_calls: dict | None = None,
 ) -> tuple[PublishProcesses, DockerBinary]:
     opts = options or {}
     opts.setdefault("registries", {})
@@ -106,14 +109,16 @@ def run_publish(
     mock_env_aware = MagicMock(spec=DockerOptions.EnvironmentAware)
     if env_vars:
         mock_env_aware.env_vars = env_vars
+
+    mock_calls = mock_calls or {
+        "pants.core.util_rules.env_vars.environment_vars_subset": lambda *args: rule_runner.request(
+            EnvironmentVars, args
+        )
+    }
     result = run_rule_with_mocks(
         push_docker_images,
         rule_args=[fs._request(packages), docker, docker_options, mock_env_aware],
-        mock_calls={
-            "pants.core.util_rules.env_vars.environment_vars_subset": lambda *args: rule_runner.request(
-                EnvironmentVars, args
-            )
-        },
+        mock_calls=mock_calls,
     )
     return result, docker
 
@@ -137,6 +142,7 @@ def assert_publish(
 SKIP_TEST_ADDRESS = Address("src/skip-test")
 REGISTRIES_ADDRESS = Address("src/registries")
 DEFAULT_ADDRESS = Address("src/default")
+PUSH_ON_PACKAGE_ADDRESS = Address("src/push-on-package")
 
 
 @pytest.mark.parametrize(
@@ -444,4 +450,45 @@ def test_docker_push_env(rule_runner: RuleRunner) -> None:
             ),
             env=FrozenDict({"DOCKER_CONFIG": "/etc/docker/custom-config"}),
         ),
+    )
+
+
+def test_docker_push_on_package(rule_runner: RuleRunner) -> None:
+    """Test push_docker_images when pushes_on_package() returns True."""
+    docker = DockerBinary("/dummy/docker")
+
+    # Create mock build process that will be returned by get_docker_image_build_process
+    mock_tags = ("push-on-package/push-on-package:latest",)
+    expected_process = Process(
+        argv=(docker.path, "build", "--output", "type=registry", "--tag", mock_tags[0], "."),
+        description="Build and push docker image",
+    )
+
+    def expect_process(process: Process) -> None:
+        assert process == expected_process
+
+    def mock_get_build_process(field_set: DockerPackageFieldSet) -> DockerImageBuildProcess:
+        assert field_set.address == PUSH_ON_PACKAGE_ADDRESS
+        return DockerImageBuildProcess(
+            process=expected_process,
+            context=MagicMock(),  # Mock DockerBuildContext
+            context_root=".",
+            image_refs=MagicMock(),  # Mock DockerImageRefs
+            tags=mock_tags,
+        )
+
+    result, docker = run_publish(
+        rule_runner,
+        PUSH_ON_PACKAGE_ADDRESS,
+        mock_calls={
+            "pants.backend.docker.goals.package_image.get_docker_image_build_process": mock_get_build_process,
+        },
+    )
+
+    assert len(result) == 1
+    assert_publish(
+        result[0],
+        mock_tags,
+        None,
+        expect_process,
     )
