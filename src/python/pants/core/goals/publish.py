@@ -203,7 +203,7 @@ class CheckSkipResult:
 
     def __post_init__(self):
         if any(pp.process is not None for pp in self.inner):
-            raise ValueError("SkippedPublishPackages must not have any non-None processes")
+            raise ValueError("CheckSkipResult must not have any non-None processes")
 
     @property
     def skip_publish(self) -> bool:
