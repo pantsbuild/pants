@@ -33,7 +33,7 @@ from pants.core.goals.publish import (
     PublishOutputData,
     PublishPackages,
     PublishProcesses,
-    SkippedPublishPackages,
+    CheckSkipResult,
 )
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST
@@ -134,7 +134,7 @@ DEFAULT_ADDRESS = Address("src/default")
             DEFAULT_ADDRESS,
             {},
             None,
-            SkippedPublishPackages.no_skip(),
+            CheckSkipResult.no_skip(),
             id="no_skip_conditions_early_exit",
         ),
         pytest.param(
@@ -156,7 +156,7 @@ DEFAULT_ADDRESS = Address("src/default")
                     ),
                 ]
             ),
-            SkippedPublishPackages.skip(
+            CheckSkipResult.skip(
                 names=["skip-test/skip-test:latest"],
                 description="(by `skip_push` on src/skip-test:skip-test)",
                 data={
@@ -211,7 +211,7 @@ DEFAULT_ADDRESS = Address("src/default")
                     ),
                 ]
             ),
-            SkippedPublishPackages(
+            CheckSkipResult(
                 [
                     PublishPackages(
                         names=("inhouse1.registry/registries/registries:latest",),
@@ -283,7 +283,7 @@ DEFAULT_ADDRESS = Address("src/default")
                     ),
                 ]
             ),
-            SkippedPublishPackages.no_skip(),
+            CheckSkipResult.no_skip(),
             id="mixed_registries_should_not_skip",
         ),
     ],
@@ -293,7 +293,7 @@ def test_check_if_skip_push(
     address: Address,
     options: dict,
     image_refs: DockerImageRefs | None,
-    expected: SkippedPublishPackages,
+    expected: CheckSkipResult,
 ) -> None:
     opts = options or {}
     opts.setdefault("registries", {})
