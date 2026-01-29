@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Iterator, Mapping
-from typing import Any, TypeVar, cast, overload
+from typing import Any, Self, TypeVar, cast, overload
 
 from pants.util.memo import memoized_method
 from pants.util.strutil import softwrap
@@ -47,7 +47,7 @@ class FrozenDict(Mapping[K, V]):
         self._hash = self._calculate_hash()
 
     @classmethod
-    def deep_freeze(cls, data: Mapping[K, V]) -> FrozenDict[K, V]:
+    def deep_freeze(cls, data: Mapping[K, V]) -> Self:
         """Convert mutable values to their frozen counter parts.
 
         Sets and lists are turned into tuples and dicts into FrozenDicts.

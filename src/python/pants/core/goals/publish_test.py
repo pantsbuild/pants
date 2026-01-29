@@ -15,13 +15,13 @@ from pants.backend.python.target_types import PythonDistribution, PythonSourcesG
 from pants.backend.python.target_types_rules import rules as python_target_type_rules
 from pants.core.goals import package, publish
 from pants.core.goals.publish import (
-    PreemptiveSkipRequest,
+    CheckSkipRequest,
+    CheckSkipResult,
     Publish,
     PublishFieldSet,
     PublishPackages,
     PublishProcesses,
     PublishRequest,
-    SkippedPublishPackages,
 )
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import rule
@@ -50,22 +50,22 @@ class PublishTestFieldSet(PublishFieldSet):
         return TestPreemptiveSkipRequest(publish_fs=self, package_fs=package_fs)
 
 
-class TestPreemptiveSkipRequest(PreemptiveSkipRequest[PublishTestFieldSet]):
+class TestPreemptiveSkipRequest(CheckSkipRequest[PublishTestFieldSet]):
     pass
 
 
 @rule
-async def mock_check_if_skip(request: TestPreemptiveSkipRequest) -> SkippedPublishPackages:
+async def mock_check_if_skip(request: TestPreemptiveSkipRequest) -> CheckSkipResult:
     if not request.publish_fs.repositories.value:
-        return SkippedPublishPackages.skip(names=[], data=request.publish_fs.get_output_data())
+        return CheckSkipResult.skip(names=[], data=request.publish_fs.get_output_data())
     return (
-        SkippedPublishPackages.skip(
+        CheckSkipResult.skip(
             names=["my_package-0.1.0-py3-none-any.whl", "my_package-0.1.0.tar.gz"],
             description="(requested)",
             data=request.publish_fs.get_output_data(),
         )
         if all(repo == "skip" for repo in request.publish_fs.repositories.value)
-        else SkippedPublishPackages.no_skip()
+        else CheckSkipResult.no_skip()
     )
 
 
@@ -106,7 +106,7 @@ def rule_runner() -> RuleRunner:
             mock_publish,
             PythonDistribution.register_plugin_field(MockRepositoriesField),
             *PublishTestFieldSet.rules(),
-            UnionRule(PreemptiveSkipRequest, TestPreemptiveSkipRequest),
+            UnionRule(CheckSkipRequest, TestPreemptiveSkipRequest),
         ],
         target_types=[PythonSourcesGeneratorTarget, PythonDistribution],
         objects={"python_artifact": PythonArtifact},

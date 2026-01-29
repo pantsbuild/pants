@@ -18,6 +18,7 @@ Example rule:
 
 from __future__ import annotations
 
+import itertools
 import json
 import logging
 from abc import ABCMeta
@@ -25,7 +26,7 @@ from collections.abc import Coroutine, Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, is_dataclass, replace
 from enum import Enum
 from itertools import chain
-from typing import Any, ClassVar, Generic, Self, TypeVar, cast, final
+from typing import Any, ClassVar, Generic, Literal, Self, TypeVar, cast, final, overload
 
 from pants.core.goals.package import (
     BuiltPackage,
@@ -98,7 +99,7 @@ class PublishRequest(Generic[_F]):
 
 @union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
-class PreemptiveSkipRequest(Generic[_F]):
+class CheckSkipRequest(Generic[_F]):
     package_fs: PackageFieldSet
     publish_fs: _F
 
@@ -127,7 +128,7 @@ class PublishFieldSet(Generic[_T], FieldSet, metaclass=ABCMeta):
         """Internal helper for the core publish goal."""
         return self.publish_request_type(field_set=self, packages=packages)
 
-    def make_skip_request(self, package_fs: PackageFieldSet) -> PreemptiveSkipRequest[Self] | None:
+    def make_skip_request(self, package_fs: PackageFieldSet) -> CheckSkipRequest[Self] | None:
         """Subclasses can override this method if they want to preempt packaging for publish
         requests that are just going to be skipped."""
         return None
@@ -187,21 +188,36 @@ class PublishPackages:
 
 
 @dataclass(frozen=True)
-class SkippedPublishPackages:
+class CheckSkipResult:
     """PublishPackages that were pre-emptively skipped.
 
     If `inner` is None, this indicates that this request should NOT be skipped.
     """
 
     inner: tuple[PublishPackages, ...]
+    _skip_packaging_only: bool
 
-    def __init__(self, inner: Iterable[PublishPackages]) -> None:
+    def __init__(self, inner: Iterable[PublishPackages], skip_packaging_only: bool = False) -> None:
         object.__setattr__(self, "inner", tuple(inner))
+        object.__setattr__(self, "_skip_packaging_only", skip_packaging_only)
 
     def __post_init__(self):
         if any(pp.process is not None for pp in self.inner):
             raise ValueError("SkippedPublishPackages must not have any non-None processes")
 
+    @property
+    def skip_publish(self) -> bool:
+        return bool(self.inner)
+
+    @property
+    def skip_package(self) -> bool:
+        return self.skip_publish or self._skip_packaging_only
+
+    @overload
+    @classmethod
+    def skip(cls, *, skip_packaging_only: Literal[True]) -> Self: ...
+
+    @overload
     @classmethod
     def skip(
         cls,
@@ -209,20 +225,36 @@ class SkippedPublishPackages:
         names: Iterable[str],
         description: str | None = None,
         data: Mapping[str, Any] | None = None,
+    ) -> Self: ...
+
+    @classmethod
+    def skip(
+        cls,
+        *,
+        skip_packaging_only: bool = False,
+        names: Iterable[str] = (),
+        description: str | None = None,
+        data: Mapping[str, Any] | None = None,
     ) -> Self:
-        return cls(
-            [
-                PublishPackages(
-                    names=tuple(names),
-                    description=description,
-                    data=PublishOutputData.deep_freeze(data) if data else PublishOutputData(),
-                )
-            ]
+        args = (
+            ((), True)
+            if skip_packaging_only
+            else (
+                [
+                    PublishPackages(
+                        names=tuple(names),
+                        description=description,
+                        data=PublishOutputData.deep_freeze(data) if data else PublishOutputData(),
+                    )
+                ],
+                False,
+            )
         )
+        return cls(*args)
 
     @classmethod
     def no_skip(cls) -> Self:
-        return cls(())
+        return cls((), False)
 
 
 class PublishProcesses(Collection[PublishPackages]):
@@ -237,8 +269,8 @@ class PublishProcesses(Collection[PublishPackages]):
 
 @rule(polymorphic=True)
 async def preemptive_skip_publish_packages(
-    request: PreemptiveSkipRequest, environment_name: EnvironmentName
-) -> SkippedPublishPackages:
+    request: CheckSkipRequest, environment_name: EnvironmentName
+) -> CheckSkipResult:
     raise NotImplementedError()
 
 
@@ -395,7 +427,7 @@ async def run_publish(
     if not targets:
         return Publish(exit_code=0)
 
-    skip_requests: list[PreemptiveSkipRequest] = []
+    skip_check_requests: list[CheckSkipRequest] = []
     for tgt, publish_fss in target_roots_to_publish_field_sets.mapping.items():
         for package_fs in target_roots_to_package_field_sets.mapping[tgt]:
             srs = []
@@ -408,35 +440,41 @@ async def run_publish(
             # requests if every combination for a single publish_fs or package_fs has
             # one. Otherwise, we already know we're going to have to package/publish.
             else:
-                skip_requests.extend(srs)
-    preemptive_skips = await concurrently(
+                skip_check_requests.extend(srs)
+    skip_check_results = await concurrently(
         preemptive_skip_publish_packages(
-            **implicitly(
-                {skip_request: PreemptiveSkipRequest, local_environment.val: EnvironmentName}
-            )
+            **implicitly({skip_request: CheckSkipRequest, local_environment.val: EnvironmentName})
         )
-        for skip_request in skip_requests
+        for skip_request in skip_check_requests
     )
-    skipped_publishes: list[PublishPackages] = []
-    # We track nonskips because, if a publish or package FS has a nonskip, then we need to include it
-    nonskip_package_fs: set[PackageFieldSet] = set()
-    nonskip_publish_fs: set[PublishFieldSet] = set()
-    for skip_request, maybe_skip in zip(skip_requests, preemptive_skips):
-        if maybe_skip.inner:
-            skipped_publishes.extend(maybe_skip.inner)
+    # In `package_skips`, True represents skip, False represents a definitive non-skip, and not present means we don't know yet.
+    package_skips: dict[PackageFieldSet, bool] = {}
+
+    def set_skip_package(package_fs: PackageFieldSet, skip: bool) -> None:
+        seen = package_fs in package_skips
+        if (seen and not skip) or not seen:
+            package_skips[package_fs] = skip
+
+    # In `publish_skips`, the value is a list of PublishPackages means skip, None is a non-skip, and not present means we don't know yet.
+    publish_skips: dict[PublishFieldSet, list[PublishPackages] | None] = {}
+    for skip_request, maybe_skip in zip(skip_check_requests, skip_check_results):
+        if maybe_skip.skip_publish:
+            # Even if we're not skipping publish for this `PublishFieldSet`, we might still be able to skip package
+            set_skip_package(skip_request.package_fs, True)
+            try:
+                skip_publish_packages = publish_skips[skip_request.publish_fs]
+            except KeyError:
+                publish_skips[skip_request.publish_fs] = list(maybe_skip.inner)
+            else:
+                if skip_publish_packages is not None:
+                    skip_publish_packages.extend(maybe_skip.inner)
         else:
-            nonskip_package_fs.add(skip_request.package_fs)
-            nonskip_publish_fs.add(skip_request.publish_fs)
-    package_skips = {
-        skip_request.package_fs
-        for skip_request in skip_requests
-        if skip_request.package_fs not in nonskip_package_fs
-    }
-    publish_skips = {
-        skip_request.publish_fs
-        for skip_request in skip_requests
-        if skip_request.publish_fs not in nonskip_publish_fs
-    }
+            publish_skips[skip_request.publish_fs] = None
+            set_skip_package(skip_request.package_fs, maybe_skip.skip_package)
+
+    skipped_publishes: list[PublishPackages] = list(
+        itertools.chain.from_iterable(pubskip for pubskip in publish_skips.values() if pubskip)
+    )
     # Build all packages and request the processes to run for each field set.
     processes = await concurrently(
         package_for_publish(
@@ -444,12 +482,12 @@ async def run_publish(
                 tuple(
                     pfs
                     for pfs in target_roots_to_package_field_sets.mapping[tgt]
-                    if pfs not in package_skips
+                    if not package_skips.get(pfs, False)
                 ),
                 tuple(
                     pfs
                     for pfs in target_roots_to_publish_field_sets.mapping[tgt]
-                    if pfs not in publish_skips
+                    if not publish_skips.get(pfs)
                 ),
             ),
             **implicitly(),
