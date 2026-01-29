@@ -10,7 +10,7 @@ from collections.abc import Iterator
 from dataclasses import asdict, dataclass
 from functools import partial
 from itertools import chain
-from typing import Literal, cast
+from typing import Literal, cast, final
 
 # Re-exporting types here as they have their natural home here, but have moved out to resolve
 # dependency cycles.
@@ -53,7 +53,7 @@ from pants.engine.collection import Collection
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, FileContent
 from pants.engine.internals.graph import resolve_target
 from pants.engine.intrinsics import create_digest, execute_process
-from pants.engine.process import ProcessExecutionFailure
+from pants.engine.process import Process, ProcessExecutionFailure
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import InvalidFieldException, Target, WrappedTargetRequest
 from pants.engine.unions import UnionMembership, UnionRule
@@ -82,7 +82,7 @@ class DockerImageOptionValueError(InterpolationError):
 
 @dataclass(frozen=True)
 class DockerPackageFieldSet(PackageFieldSet):
-    required_fields = (DockerImageSourceField, DockerImageBuildImageOutputField)
+    required_fields = (DockerImageSourceField,)
 
     context_root: DockerImageContextRootField
     registries: DockerImageRegistriesField
@@ -93,6 +93,7 @@ class DockerPackageFieldSet(PackageFieldSet):
     output_path: OutputPathField
     output: DockerImageBuildImageOutputField
 
+    @final
     def pushes_on_package(self) -> bool:
         """Returns True if this docker_image target would push to a registry during packaging."""
         value_or_default = self.output.value or self.output.default
@@ -444,27 +445,19 @@ async def get_image_refs(
     )
 
 
-@rule
-async def build_docker_image(
-    field_set: DockerPackageFieldSet,
-    options: DockerOptions,
-    global_options: GlobalOptions,
-    docker: DockerBinary,
-    keep_sandboxes: KeepSandboxes,
-) -> BuiltPackage:
-    """Build a Docker image using `docker build`."""
-    # Check if this build would push and handle according to push_on_package behavior
-    if field_set.pushes_on_package():
-        match options.push_on_package:
-            case DockerPushOnPackageBehavior.IGNORE:
-                return BuiltPackage(EMPTY_DIGEST, ())
-            case DockerPushOnPackageBehavior.ERROR:
-                raise DockerPushOnPackageException(field_set.address)
-            case DockerPushOnPackageBehavior.WARN:
-                logger.warning(
-                    f"Docker image {field_set.address} will push to a registry during packaging"
-                )
+@dataclass(frozen=True)
+class DockerImageBuildProcess:
+    process: Process
+    context: DockerBuildContext
+    context_root: str
+    image_refs: DockerImageRefs
+    tags: tuple[str, ...]
 
+
+@rule
+async def get_docker_image_build_process(
+    field_set: DockerPackageFieldSet, options: DockerOptions, docker: DockerBinary
+) -> DockerImageBuildProcess:
     context, wrapped_target, image_refs = await concurrently(
         create_docker_build_context(
             DockerBuildContextRequest(
@@ -525,14 +518,45 @@ async def build_docker_image(
             )
         ),
     )
-    result = await execute_process(process, **implicitly())
+    return DockerImageBuildProcess(
+        process=process,
+        context=context,
+        context_root=context_root,
+        image_refs=image_refs,
+        tags=tags,
+    )
+
+
+@rule
+async def build_docker_image(
+    field_set: DockerPackageFieldSet,
+    options: DockerOptions,
+    global_options: GlobalOptions,
+    docker: DockerBinary,
+    keep_sandboxes: KeepSandboxes,
+) -> BuiltPackage:
+    """Build a Docker image using `docker build`."""
+    # Check if this build would push and handle according to push_on_package behavior
+    if field_set.pushes_on_package():
+        match options.push_on_package:
+            case DockerPushOnPackageBehavior.IGNORE:
+                return BuiltPackage(EMPTY_DIGEST, ())
+            case DockerPushOnPackageBehavior.ERROR:
+                raise DockerPushOnPackageException(field_set.address)
+            case DockerPushOnPackageBehavior.WARN:
+                logger.warning(
+                    f"Docker image {field_set.address} will push to a registry during packaging"
+                )
+
+    build_process = await get_docker_image_build_process(field_set, **implicitly())
+    result = await execute_process(build_process.process, **implicitly())
 
     if result.exit_code != 0:
         msg = f"Docker build failed for `docker_image` {field_set.address}."
         if options.suggest_renames:
             maybe_help_msg = format_docker_build_context_help_message(
-                context_root=context_root,
-                context=context,
+                context_root=build_process.context_root,
+                context=build_process.context,
                 colors=global_options.colors,
             )
             if maybe_help_msg:
@@ -544,14 +568,14 @@ async def build_docker_image(
             result.exit_code,
             result.stdout,
             result.stderr,
-            process.description,
+            build_process.process.description,
             keep_sandboxes=keep_sandboxes,
         )
 
     image_id = parse_image_id_from_docker_build_output(docker, result.stdout, result.stderr)
     docker_build_output_msg = "\n".join(
         (
-            f"Docker build output for {tags[0]}:",
+            f"Docker build output for {build_process.tags[0]}:",
             "stdout:",
             result.stdout.decode(),
             "stderr:",
@@ -565,12 +589,12 @@ async def build_docker_image(
         logger.debug(docker_build_output_msg)
 
     metadata_filename = field_set.output_path.value_or_default(file_ending="docker-info.json")
-    metadata = DockerInfoV1.serialize(image_refs, image_id=image_id)
+    metadata = DockerInfoV1.serialize(build_process.image_refs, image_id=image_id)
     digest = await create_digest(CreateDigest([FileContent(metadata_filename, metadata)]))
 
     return BuiltPackage(
         digest,
-        (BuiltDockerImage.create(image_id, tags, metadata_filename),),
+        (BuiltDockerImage.create(image_id, build_process.tags, metadata_filename),),
     )
 
 
