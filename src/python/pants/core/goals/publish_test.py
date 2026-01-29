@@ -58,27 +58,33 @@ class TestPreemptiveSkipRequest(CheckSkipRequest[PublishTestFieldSet]):
 async def mock_check_if_skip(request: TestPreemptiveSkipRequest) -> CheckSkipResult:
     if not request.publish_fs.repositories.value:
         return CheckSkipResult.skip(names=[], data=request.publish_fs.get_output_data())
-    return (
-        CheckSkipResult.skip(
+    if request.publish_fs.repositories.value == ("skip-package",):
+        return CheckSkipResult.skip(skip_packaging_only=True)
+    if request.publish_fs.repositories.value == ("skip",):
+        return CheckSkipResult.skip(
             names=["my_package-0.1.0-py3-none-any.whl", "my_package-0.1.0.tar.gz"],
             description="(requested)",
             data=request.publish_fs.get_output_data(),
         )
-        if all(repo == "skip" for repo in request.publish_fs.repositories.value)
-        else CheckSkipResult.no_skip()
-    )
+    return CheckSkipResult.no_skip()
 
 
 @rule
 async def mock_publish(request: MockPublishRequest) -> PublishProcesses:
+    assert len(request.field_set.repositories.value) > 0
+    names = (
+        ("my_other_package-0.1.0-py3-none-any.whl", "my_other_package-0.1.0.tar.gz")
+        if request.field_set.repositories.value == ("skip-package",)
+        else tuple(
+            artifact.relpath
+            for pkg in request.packages
+            for artifact in pkg.artifacts
+            if artifact.relpath
+        )
+    )
     return PublishProcesses(
         PublishPackages(
-            names=tuple(
-                artifact.relpath
-                for pkg in request.packages
-                for artifact in pkg.artifacts
-                if artifact.relpath
-            ),
+            names=names,
             process=(
                 None
                 if repo == "skip"
@@ -169,6 +175,35 @@ def test_skipped_publish(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 0
     assert "my_package-0.1.0.tar.gz skipped (requested)." in result.stderr
     assert "my_package-0.1.0-py3-none-any.whl skipped (requested)." in result.stderr
+
+
+def test_skip_package_only(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                python_sources()
+                python_distribution(
+                  name="dist",
+                  provides=python_artifact(
+                    name="my-package",
+                    version="0.1.0",
+                  ),
+                  repositories=["skip-package"],
+                )
+                """
+            ),
+        }
+    )
+    result = rule_runner.run_goal_rule(
+        Publish,
+        args=("src:dist",),
+        env_inherit={"HOME", "PATH", "PYENV_ROOT"},
+    )
+
+    assert result.exit_code == 0
+    assert "my_other_package-0.1.0.tar.gz published to skip-package." in result.stderr
+    assert "my_other_package-0.1.0-py3-none-any.whl published to skip-package." in result.stderr
 
 
 def test_structured_output(rule_runner: RuleRunner) -> None:
