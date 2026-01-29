@@ -102,7 +102,7 @@ async def check_if_skip_upload(
     request: PythonDistCheckSkipRequest, twine_subsystem: TwineSubsystem
 ) -> CheckSkipResult:
     if twine_subsystem.skip:
-        reason = f"(by `[{TwineSubsystem.name}].skip_push = True`)"
+        reason = f"(by `[{TwineSubsystem.name}].skip = True`)"
     elif request.publish_fs.skip_twine.value:
         reason = f"(by `{request.publish_fs.skip_twine.alias}` on {request.address})"
     elif not request.publish_fs.repositories.value:
