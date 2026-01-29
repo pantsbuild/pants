@@ -979,3 +979,54 @@ def test_scie_with_local_dist(rule_runner: PythonRuleRunner) -> None:
 
     output = subprocess.check_output([executable], text=True)
     assert "Hello from local dist!" in output
+
+
+def test_scie_custom_exe_with_env_and_args(rule_runner: PythonRuleRunner) -> None:
+    # Test that scie_exe, scie_args, and scie_env work together correctly.
+    # The script path comes from scie_bind_resource_path -> scie_env -> scie_exe,
+    # and an argument value comes from scie_env -> scie_args.
+    rule_runner.write_files(
+        {
+            "src/py/project/print_argv.py": dedent(
+                """\
+                import os
+                import sys
+
+                print("ARGV:" + repr(sys.argv[1:]))
+                print("GREETING:" + os.environ.get("GREETING", "NOT_SET"))
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(name="lib")
+                pex_binary(
+                    entry_point="print_argv.py",
+                    scie="eager",
+                    scie_pbs_release="20251031",
+                    # Bind the script's resource path to MY_SCRIPT env var
+                    scie_bind_resource_path=["MY_SCRIPT=project/print_argv.py"],
+                    # Set env vars: GREETING will be used in scie_args
+                    scie_env=["GREETING=hello_world"],
+                    # Use the venv's Python as the executable
+                    scie_exe="{scie.env.VIRTUAL_ENV}/bin/python",
+                    # Pass the script path and the greeting as args
+                    scie_args=["{scie.env.MY_SCRIPT}", "--message", "{scie.env.GREETING}"],
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+
+    rule_runner.write_digest(result.digest)
+    executable = os.path.join(rule_runner.build_root, "src.py.project/project")
+    output = subprocess.check_output([executable], text=True)
+
+    # Verify the script received the args from scie_args (with scie_env substitution)
+    assert "ARGV:" in output
+    assert "'--message'" in output
+    assert "'hello_world'" in output
+    # Verify the GREETING env var was set by scie_env
+    assert "GREETING:hello_world" in output

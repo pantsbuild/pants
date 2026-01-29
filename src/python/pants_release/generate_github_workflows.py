@@ -1079,9 +1079,12 @@ def build_wheels_job(
                                 PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')")
                                 PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
                                 PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
+                                PEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT
 
                                 mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
+                                mv dist/src.python.pants/pants-pex dist/src.python.pants/$PEX_SCIE_FILENAME
                                 echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
+                                echo "PEX_SCIE_FILENAME=$PEX_SCIE_FILENAME" | tee -a "$GITHUB_ENV"
                                 """
                             ),
                         },
@@ -1090,7 +1093,7 @@ def build_wheels_job(
                             "if": "needs.release_info.outputs.is-release == 'true'",
                             "uses": action("attest-build-provenance"),
                             "with": {
-                                "subject-path": "dist/src.python.pants/*.pex",
+                                "subject-path": "dist/src.python.pants/*",
                             },
                         },
                         {
@@ -1108,6 +1111,13 @@ def build_wheels_job(
                                     -H "Content-Type: application/octet-stream" \\
                                     ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \\
                                     --data-binary "@dist/src.python.pants/$PEX_FILENAME"
+
+                                curl -L --fail \\
+                                    -X POST \\
+                                    -H "Authorization: Bearer ${{ github.token }}" \\
+                                    -H "Content-Type: application/octet-stream" \\
+                                    ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_SCIE_FILENAME \\
+                                    --data-binary "@dist/src.python.pants/$PEX_SCIE_FILENAME"
 
                                 WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild_pants-*.whl")
                                 curl -L --fail \\
