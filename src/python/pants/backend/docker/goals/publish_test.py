@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from typing import cast
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -18,7 +19,6 @@ from pants.backend.docker.goals.package_image import (
 )
 from pants.backend.docker.goals.publish import (
     PublishDockerImageFieldSet,
-    PublishDockerImageRequest,
     PublishDockerImageSkipRequest,
     check_if_skip_push,
     push_docker_images,
@@ -26,21 +26,23 @@ from pants.backend.docker.goals.publish import (
 from pants.backend.docker.registries import DockerRegistryOptions
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerImageTarget
-from pants.backend.docker.util_rules import docker_binary
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.core.goals.package import BuiltPackage
 from pants.core.goals.publish import (
+    CheckSkipResult,
     PublishOutputData,
     PublishPackages,
     PublishProcesses,
-    CheckSkipResult,
 )
+from pants.core.util_rules.env_vars import rules as env_vars_rules
 from pants.engine.addresses import Address
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.process import InteractiveProcess, Process
+from pants.engine.rules import QueryRule
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.process_util import process_assertion
-from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
+from pants.testutil.rule_runner import RuleRunner, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
 from pants.util.value_interpolation import InterpolationContext
 
@@ -48,12 +50,7 @@ from pants.util.value_interpolation import InterpolationContext
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
-        rules=[
-            push_docker_images,
-            *docker_binary.rules(),
-            QueryRule(PublishProcesses, [PublishDockerImageRequest]),
-            QueryRule(DockerBinary, []),
-        ],
+        rules=[*env_vars_rules(), QueryRule(EnvironmentVars, [EnvironmentVarsRequest])],
         target_types=[DockerImageTarget],
     )
     rule_runner.set_options(
@@ -92,17 +89,32 @@ def build(tgt: DockerImageTarget, options: DockerOptions):
 
 
 def run_publish(
-    rule_runner: RuleRunner, address: Address, options: dict | None = None
+    rule_runner: RuleRunner,
+    address: Address,
+    options: dict | None = None,
+    env_vars: list[str] | None = None,
 ) -> tuple[PublishProcesses, DockerBinary]:
     opts = options or {}
     opts.setdefault("registries", {})
     opts.setdefault("default_repository", "{directory}/{name}")
+    opts.setdefault("publish_noninteractively", False)
     docker_options = create_subsystem(DockerOptions, **opts)
     tgt = cast(DockerImageTarget, rule_runner.get_target(address))
     fs = PublishDockerImageFieldSet.create(tgt)
     packages = build(tgt, docker_options)
-    result = rule_runner.request(PublishProcesses, [fs._request(packages)])
-    docker = rule_runner.request(DockerBinary, [])
+    docker = DockerBinary("/dummy/docker")
+    mock_env_aware = MagicMock(spec=DockerOptions.EnvironmentAware)
+    if env_vars:
+        mock_env_aware.env_vars = env_vars
+    result = run_rule_with_mocks(
+        push_docker_images,
+        rule_args=[fs._request(packages), docker, docker_options, mock_env_aware],
+        mock_calls={
+            "pants.core.util_rules.env_vars.environment_vars_subset": lambda *args: rule_runner.request(
+                EnvironmentVars, args
+            )
+        },
+    )
     return result, docker
 
 
@@ -324,17 +336,6 @@ def test_check_if_skip_push(
     assert result == expected
 
 
-def test_docker_skip_push(rule_runner: RuleRunner) -> None:
-    result, _ = run_publish(rule_runner, SKIP_TEST_ADDRESS)
-    assert len(result) == 1
-    assert_publish(
-        result[0],
-        ("skip-test/skip-test:latest",),
-        "(by `skip_push` on src/skip-test:skip-test)",
-        None,
-    )
-
-
 def test_docker_push_images(rule_runner: RuleRunner) -> None:
     result, docker = run_publish(rule_runner, DEFAULT_ADDRESS)
     assert len(result) == 1
@@ -427,12 +428,9 @@ def test_docker_skip_push_registries(rule_runner: RuleRunner) -> None:
 
 
 def test_docker_push_env(rule_runner: RuleRunner) -> None:
-    rule_runner.set_options(
-        ["--docker-env-vars=DOCKER_CONFIG"],
-        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
-        env={"DOCKER_CONFIG": "/etc/docker/custom-config"},
+    result, docker = run_publish(
+        rule_runner, DEFAULT_ADDRESS, env_vars=["DOCKER_CONFIG=/etc/docker/custom-config"]
     )
-    result, docker = run_publish(rule_runner, DEFAULT_ADDRESS)
     assert len(result) == 1
     assert_publish(
         result[0],
