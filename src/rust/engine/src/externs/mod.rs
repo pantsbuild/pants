@@ -371,9 +371,9 @@ pub(crate) fn generator_send(
                     ))
                 } else {
                     Err(PyValueError::new_err(format!(
-            "Expected an `All` or `concurrently` to receive calls to rules, \
+                        "Expected an `All` or `concurrently` to receive calls to rules, \
             but got: {response}"
-          )))
+                    )))
                 }
             })
             .collect::<Result<Vec<_>, _>>()?;
