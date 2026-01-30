@@ -150,7 +150,7 @@ def test_multiget_invalid_Nones() -> None:
 # 3. 11 or more homogenous Gets.
 #
 # Here we test that the runtime actually accepts 11 or more Gets. This is really just a regression
-# test that checks MultiGet retains a trailing *args slot.
+# test that checks that concurrently() retains a trailing *args slot.
 @pytest.mark.call_by_type
 @pytest.mark.parametrize("count", list(range(1, 20)))
 def test_homogenous(count) -> None:

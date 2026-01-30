@@ -168,7 +168,7 @@ impl Task {
                 }
                 externs::GetOrGenerator::Generator(generator) => {
                     // TODO: The generator may run concurrently with any other generators requested in an
-                    // `All`/`MultiGet` (due to `future::try_join_all`), and so it needs its own workunit.
+                    // `All`/`concurrently` (due to `future::try_join_all`), and so it needs its own workunit.
                     // Should look into removing this constraint: possibly by running all generators from an
                     // `All` on a tokio `LocalSet`.
                     in_workunit!("generator", Level::Trace, |workunit| async move {

@@ -15,7 +15,7 @@ import pytest
 
 from pants.base.exceptions import RuleTypeError
 from pants.engine.internals.rule_visitor import collect_awaitables
-from pants.engine.internals.selectors import Get, GetParseError, MultiGet
+from pants.engine.internals.selectors import Get, GetParseError, concurrently
 from pants.engine.rules import implicitly, rule
 from pants.util.strutil import softwrap
 
@@ -129,7 +129,7 @@ def test_multiple_gets() -> None:
 @pytest.mark.call_by_type
 def test_multiget_homogeneous() -> None:
     async def rule():
-        await MultiGet(Get(STR, INT(x)) for x in range(5))
+        await concurrently(Get(STR, INT(x)) for x in range(5))
 
     assert_awaitables(rule, [(str, int)])
 
@@ -137,7 +137,7 @@ def test_multiget_homogeneous() -> None:
 @pytest.mark.call_by_type
 def test_multiget_heterogeneous() -> None:
     async def rule():
-        await MultiGet(Get(STR, INT, 42), Get(INT, STR("bob")))
+        await concurrently(Get(STR, INT, 42), Get(INT, STR("bob")))
 
     assert_awaitables(rule, [(str, int), (int, str)])
 
@@ -392,7 +392,7 @@ def test_deep_infer_types() -> None:
         s = request.arg2
         Get(bool, s)
         # 3, 4
-        a, b = await MultiGet(
+        a, b = await concurrently(
             Get(list, str),
             Get(tuple, str),
         )
@@ -403,7 +403,7 @@ def test_deep_infer_types() -> None:
         # 7 -- this is huge!
         c = Request.create_get()
         # 8 -- the `c` is already accounted for, make sure it's not duplicated.
-        await MultiGet([c, Get(str, dict)])
+        await concurrently([c, Get(str, dict)])
         # 9
         Get(float, request._helped())
 

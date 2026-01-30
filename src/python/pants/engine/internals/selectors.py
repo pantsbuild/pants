@@ -163,7 +163,7 @@ class Get(Generic[_Output], Awaitable[_Output]):
 
 
 @dataclass(frozen=True)
-class _MultiGet:
+class _Concurrently:
     gets: tuple[Get | Coroutine, ...]
 
     def __await__(self) -> Generator[tuple[Get | Coroutine, ...], None, tuple]:
@@ -172,7 +172,7 @@ class _MultiGet:
 
 
 # These type variables are used to parametrize from 1 to 10 Gets when used in a tuple-style
-# MultiGet call.
+# concurrently() call.
 
 _Out0 = TypeVar("_Out0")
 _Out1 = TypeVar("_Out1")
@@ -187,13 +187,13 @@ _Out9 = TypeVar("_Out9")
 
 
 @overload
-async def MultiGet(
+async def Concurrently(
     __gets: Iterable[Get[_Output] | Coroutine[Any, Any, _Output]],
 ) -> tuple[_Output, ...]: ...
 
 
 @overload
-async def MultiGet(
+async def Concurrently(
     __get0: Get[_Output] | Coroutine[Any, Any, _Output],
     __get1: Get[_Output] | Coroutine[Any, Any, _Output],
     __get2: Get[_Output] | Coroutine[Any, Any, _Output],
@@ -210,7 +210,7 @@ async def MultiGet(
 
 
 @overload
-async def MultiGet(
+async def Concurrently(
     __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
     __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
     __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
@@ -225,7 +225,7 @@ async def MultiGet(
 
 
 @overload
-async def MultiGet(
+async def Concurrently(
     __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
     __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
     __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
@@ -239,7 +239,7 @@ async def MultiGet(
 
 
 @overload
-async def MultiGet(
+async def Concurrently(
     __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
     __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
     __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
@@ -252,7 +252,7 @@ async def MultiGet(
 
 
 @overload
-async def MultiGet(
+async def Concurrently(
     __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
     __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
     __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
@@ -264,7 +264,7 @@ async def MultiGet(
 
 
 @overload
-async def MultiGet(
+async def Concurrently(
     __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
     __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
     __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
@@ -275,7 +275,7 @@ async def MultiGet(
 
 
 @overload
-async def MultiGet(
+async def Concurrently(
     __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
     __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
     __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
@@ -285,7 +285,7 @@ async def MultiGet(
 
 
 @overload
-async def MultiGet(
+async def Concurrently(
     __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
     __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
     __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
@@ -294,7 +294,7 @@ async def MultiGet(
 
 
 @overload
-async def MultiGet(
+async def Concurrently(
     __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
     __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
     __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
@@ -302,13 +302,13 @@ async def MultiGet(
 
 
 @overload
-async def MultiGet(
+async def Concurrently(
     __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
     __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
 ) -> tuple[_Out0, _Out1]: ...
 
 
-async def MultiGet(
+async def Concurrently(
     __arg0: (
         Iterable[Get[_Output] | Coroutine[Any, Any, _Output]]
         | Get[_Out0]
@@ -345,7 +345,7 @@ async def MultiGet(
 
     The engine will fulfill these Get instances in parallel, and return a tuple of _Output
     instances to this method, which then returns this tuple to the `@rule` which called
-    `await MultiGet(Get(_Output, ...) for ... in ...)`.
+    `await concurrently(Get(_Output, ...) for ... in ...)`.
     """
     if (
         isinstance(__arg0, Iterable)
@@ -360,7 +360,7 @@ async def MultiGet(
         and __arg9 is None
         and not __args
     ):
-        return await _MultiGet(tuple(__arg0))
+        return await _Concurrently(tuple(__arg0))
 
     if (
         isinstance(__arg0, (Get, Coroutine))
@@ -375,7 +375,7 @@ async def MultiGet(
         and __arg9 is None
         and not __args
     ):
-        return await _MultiGet((__arg0,))
+        return await _Concurrently((__arg0,))
 
     if (
         isinstance(__arg0, (Get, Coroutine))
@@ -390,7 +390,7 @@ async def MultiGet(
         and __arg9 is None
         and not __args
     ):
-        return await _MultiGet((__arg0, __arg1))
+        return await _Concurrently((__arg0, __arg1))
 
     if (
         isinstance(__arg0, (Get, Coroutine))
@@ -405,7 +405,7 @@ async def MultiGet(
         and __arg9 is None
         and not __args
     ):
-        return await _MultiGet((__arg0, __arg1, __arg2))
+        return await _Concurrently((__arg0, __arg1, __arg2))
 
     if (
         isinstance(__arg0, (Get, Coroutine))
@@ -420,7 +420,7 @@ async def MultiGet(
         and __arg9 is None
         and not __args
     ):
-        return await _MultiGet((__arg0, __arg1, __arg2, __arg3))
+        return await _Concurrently((__arg0, __arg1, __arg2, __arg3))
 
     if (
         isinstance(__arg0, (Get, Coroutine))
@@ -435,7 +435,7 @@ async def MultiGet(
         and __arg9 is None
         and not __args
     ):
-        return await _MultiGet((__arg0, __arg1, __arg2, __arg3, __arg4))
+        return await _Concurrently((__arg0, __arg1, __arg2, __arg3, __arg4))
 
     if (
         isinstance(__arg0, (Get, Coroutine))
@@ -450,7 +450,7 @@ async def MultiGet(
         and __arg9 is None
         and not __args
     ):
-        return await _MultiGet((__arg0, __arg1, __arg2, __arg3, __arg4, __arg5))
+        return await _Concurrently((__arg0, __arg1, __arg2, __arg3, __arg4, __arg5))
 
     if (
         isinstance(__arg0, (Get, Coroutine))
@@ -465,7 +465,7 @@ async def MultiGet(
         and __arg9 is None
         and not __args
     ):
-        return await _MultiGet((__arg0, __arg1, __arg2, __arg3, __arg4, __arg5, __arg6))
+        return await _Concurrently((__arg0, __arg1, __arg2, __arg3, __arg4, __arg5, __arg6))
 
     if (
         isinstance(__arg0, (Get, Coroutine))
@@ -480,7 +480,7 @@ async def MultiGet(
         and __arg9 is None
         and not __args
     ):
-        return await _MultiGet((__arg0, __arg1, __arg2, __arg3, __arg4, __arg5, __arg6, __arg7))
+        return await _Concurrently((__arg0, __arg1, __arg2, __arg3, __arg4, __arg5, __arg6, __arg7))
 
     if (
         isinstance(__arg0, (Get, Coroutine))
@@ -495,7 +495,7 @@ async def MultiGet(
         and __arg9 is None
         and not __args
     ):
-        return await _MultiGet(
+        return await _Concurrently(
             (__arg0, __arg1, __arg2, __arg3, __arg4, __arg5, __arg6, __arg7, __arg8)
         )
 
@@ -512,7 +512,7 @@ async def MultiGet(
         and isinstance(__arg9, (Get, Coroutine))
         and all(isinstance(arg, Get) for arg in __args)
     ):
-        return await _MultiGet(
+        return await _Concurrently(
             (
                 __arg0,
                 __arg1,
@@ -582,8 +582,7 @@ async def MultiGet(
     )
 
 
-# Alias for `MultiGet` to new syntax name `concurrently`, while remaining backwards compatible.
-concurrently = MultiGet
+concurrently = Concurrently
 
 
 @dataclass(frozen=True)
