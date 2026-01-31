@@ -49,6 +49,7 @@ from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core import target_types
 from pants.core.target_types import AllAssetTargetsByPath, map_assets_by_path
 from pants.core.util_rules import stripped_source_files
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.core.util_rules.unowned_dependency_behavior import (
     UnownedDependencyError,
     UnownedDependencyUsage,
@@ -372,9 +373,10 @@ async def _exec_parse_deps(
     interpreter_constraints = InterpreterConstraints.create_from_field_sets(
         [field_set], python_setup
     )
+    source = await determine_source_files(SourceFilesRequest([field_set.source]))
     resp = await parse_python_dependencies_get(
         ParsePythonDependenciesRequest(
-            field_set.source,
+            source,
             interpreter_constraints,
         ),
         **implicitly(),
