@@ -356,7 +356,7 @@ pub(crate) fn generator_send(
     } else if let Ok(call) = response.extract::<PyRef<PyGeneratorResponseNativeCall>>() {
         Ok(GeneratorResponse::NativeCall(call.take(py)?))
     } else if let Ok(get_multi) = response.cast::<PySequence>() {
-        // Was an `All` or `MultiGet`.
+        // Was an `All` or `concurrently`.
         let gogs = get_multi
             .try_iter()?
             .map(|gog| {
@@ -371,16 +371,16 @@ pub(crate) fn generator_send(
                     ))
                 } else {
                     Err(PyValueError::new_err(format!(
-            "Expected an `All` or `MultiGet` to receive either `Get`s or calls to rules, \
+                        "Expected an `All` or `concurrently` to receive calls to rules, \
             but got: {response}"
-          )))
+                    )))
                 }
             })
             .collect::<Result<Vec<_>, _>>()?;
         Ok(GeneratorResponse::All(gogs))
     } else {
         Err(PyValueError::new_err(format!(
-            "Async @rule error. Expected a rule query such as `Get(..)` or similar, but got: {response}"
+            "Async @rule error. Expected a rule call, but got: {response}"
         )))
     };
 

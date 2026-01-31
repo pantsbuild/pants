@@ -29,7 +29,6 @@ from pants.engine.internals.rule_visitor import collect_awaitables
 from pants.engine.internals.selectors import AwaitableConstraints, Call
 from pants.engine.internals.selectors import Effect as Effect  # noqa: F401
 from pants.engine.internals.selectors import Get as Get  # noqa: F401
-from pants.engine.internals.selectors import MultiGet as MultiGet  # noqa: F401
 from pants.engine.internals.selectors import concurrently as concurrently  # noqa: F401
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
@@ -441,8 +440,8 @@ def rule(**kwargs: Unpack[RuleDecoratorKwargs]) -> Callable[[F], F]:
 def rule(_func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Coroutine[Any, Any, R]]:
     """Handles bare @rule decorators on async functions.
 
-    Usage of Coroutine[...] (vs Awaitable[...]) is intentional, as `MultiGet`/`concurrently` use
-    coroutines directly.
+    Usage of Coroutine[...] (vs Awaitable[...]) is intentional, as `concurrently` uses coroutines
+    directly.
     """
     ...
 
@@ -452,8 +451,8 @@ def rule(_func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]:
     """Handles bare @rule decorators on non-async functions It's debatable whether we should even
     have non-async @rule functions, but keeping this to not break the world for plugin authors.
 
-    Usage of Coroutine[...] (vs Awaitable[...]) is intentional, as `MultiGet`/`concurrently` use
-    coroutines directly.
+    Usage of Coroutine[...] (vs Awaitable[...]) is intentional, as `concurrently` uses coroutines
+    directly.
     """
     ...
 

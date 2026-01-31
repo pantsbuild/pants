@@ -24,7 +24,7 @@ from pants.engine.internals.selectors import (
     AwaitableConstraints,
     Effect,
     GetParseError,
-    MultiGet,
+    concurrently,
 )
 from pants.util.docutil import doc_url
 from pants.util.memo import memoized
@@ -427,7 +427,7 @@ class _AwaitableCollector(ast.NodeVisitor):
                 continue
             if isinstance(node, ast.Call):
                 f = self._lookup(node.func)
-                if f is MultiGet:
+                if f is concurrently:
                     value = tuple(get.output_type for get in collected_awaitables)
                 elif f is not None:
                     value = _lookup_return_type(f)
