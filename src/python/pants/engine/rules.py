@@ -27,8 +27,6 @@ from typing_extensions import ParamSpec
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.internals.rule_visitor import collect_awaitables
 from pants.engine.internals.selectors import AwaitableConstraints, Call
-from pants.engine.internals.selectors import Effect as Effect  # noqa: F401
-from pants.engine.internals.selectors import Get as Get  # noqa: F401
 from pants.engine.internals.selectors import concurrently as concurrently  # noqa: F401
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict

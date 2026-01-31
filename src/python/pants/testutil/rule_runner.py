@@ -37,7 +37,7 @@ from pants.engine.goal import CurrentExecutingGoals, Goal
 from pants.engine.internals import native_engine, options_parsing
 from pants.engine.internals.native_engine import ProcessExecutionEnvironment, PyExecutor
 from pants.engine.internals.scheduler import ExecutionError, Scheduler, SchedulerSession
-from pants.engine.internals.selectors import Call, Effect, Get, Params
+from pants.engine.internals.selectors import Call, Params
 from pants.engine.internals.session import SessionValues
 from pants.engine.platform import Platform
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
@@ -760,7 +760,7 @@ def run_rule_with_mocks(
     unconsumed_mock_calls = set(mock_calls.keys())
     unconsumed_mock_gets = set(mock_gets)
 
-    def get(res: Get | Effect | Call | Coroutine):
+    def get(res: Call | Coroutine):
         if isinstance(res, Coroutine):
             # A call-by-name element in a concurrently() is a Coroutine whose frame is
             # the trampoline wrapper that creates and immediately awaits the Call.
@@ -785,47 +785,9 @@ def run_rule_with_mocks(
             if mock_call:
                 unconsumed_mock_calls.discard(res.rule_id)
                 return mock_call(*res.inputs)
-            # For now we fall through, to allow an old-style MockGet to mock a call-by-name, for
-            # legacy reasons. But we will deprecate and then remove this in the future, at which
-            # point we should AssertionError error here as well.
-            # Note that this fallthrough only works for single call-by-names. When wrapped in a
-            # concurrently() call, mock_calls *must* be used, hence the error above.
-            if show_warnings:
-                # Note that we used `warnings` instead of `logger.warning` because the latter may
-                # get captured or swallowed by the test framework. These warnings will go away
-                # once we're fully on call-by-name, anyway.
-                warnings.warn(
-                    f"No mock_call provided for {res.rule_id}, attempting to find a MockGet to "
-                    "satisfy it. Note that this will soon be deprecated, so we recommend switching "
-                    "to mock_call ASAP."
-                )
-
-        provider = next(
-            (
-                mock_get
-                for mock_get in mock_gets
-                if mock_get.output_type == res.output_type
-                and all(
-                    # Either the input type is directly provided.
-                    input_type in mock_get.input_types
-                    or (
-                        # Or the input type is a union and the mock has an input whose
-                        # type is one of the union members.
-                        union_membership
-                        and input_type in union_membership
-                        and any(
-                            union_membership.is_member(input_type, t) for t in mock_get.input_types
-                        )
-                    )
-                    for input_type in res.input_types
-                )
-            ),
-            None,
-        )
-        if provider is None:
-            raise AssertionError(f"Rule requested: {res}, which cannot be satisfied.")
-        unconsumed_mock_gets.discard(provider)
-        return provider.mock(*res.inputs)
+            raise AssertionError(f"No mock_call provided for {res.rule_id}.")
+        else:
+            raise AssertionError(f"Bad arg type: {res}")
 
     rule_coroutine = res
     rule_input = None
@@ -842,7 +804,7 @@ def run_rule_with_mocks(
     while True:
         try:
             res = rule_coroutine.send(rule_input)
-            if isinstance(res, (Get, Effect, Call)):
+            if isinstance(res, Call):
                 rule_input = get(res)
             elif type(res) in (tuple, list):
                 rule_input = [get(g) for g in res]

@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import datetime
 from io import RawIOBase
-from typing import Any, ClassVar, Generic, Protocol, Self, TextIO, TypeVar, overload
+from typing import Any, ClassVar, Protocol, Self, TextIO, TypeVar, overload
 
 from pants.engine.fs import (
     CreateDigest,
@@ -953,7 +953,6 @@ _Input = TypeVar("_Input")
 class PyGeneratorResponseCall:
     rule_id: str
     output_type: type
-    input_types: Sequence[type]
     inputs: Sequence[Any]
 
     @overload
@@ -983,36 +982,6 @@ class PyGeneratorResponseCall:
         rule_id: str,
         output_type: type,
         args: tuple[Any, ...],
-        input_arg0: type[_Input] | _Input,
-        input_arg1: _Input | None = None,
-    ) -> None: ...
-
-class PyGeneratorResponseGet(Generic[_Output]):
-    output_type: type[_Output]
-    input_types: Sequence[type]
-    inputs: Sequence[Any]
-
-    @overload
-    def __init__(self, output_type: type[_Output]) -> None: ...
-    @overload
-    def __init__(
-        self,
-        output_type: type[_Output],
-        input_arg0: dict[Any, type],
-    ) -> None: ...
-    @overload
-    def __init__(self, output_type: type[_Output], input_arg0: _Input) -> None: ...
-    @overload
-    def __init__(
-        self,
-        output_type: type[_Output],
-        input_arg0: type[_Input],
-        input_arg1: _Input,
-    ) -> None: ...
-    @overload
-    def __init__(
-        self,
-        output_type: type[_Output],
         input_arg0: type[_Input] | _Input,
         input_arg1: _Input | None = None,
     ) -> None: ...
