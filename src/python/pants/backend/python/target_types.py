@@ -514,6 +514,19 @@ class PexCompletePlatformsField(SpecialCasedDependencies):
     )
 
 
+class PexCompressField(BoolField):
+    alias = "compress"
+    default = True
+    help = help_text(
+        """
+        Whether to compress zip entries when creating either a
+        zipapp PEX file or a packed PEX's bootstrap and
+        dependency zip files. Does nothing for loose layout
+        PEXes.
+        """
+    )
+
+
 class PexInheritPathField(StringField):
     alias = "inherit_path"
     valid_choices = ("false", "fallback", "prefer")
@@ -1022,6 +1035,7 @@ _PEX_BINARY_COMMON_FIELDS = (
     PexBinaryDependenciesField,
     PexCheckField,
     PexCompletePlatformsField,
+    PexCompressField,
     PexInheritPathField,
     PexStripEnvField,
     PexIgnoreErrorsField,
