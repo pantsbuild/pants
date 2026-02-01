@@ -194,7 +194,8 @@ async fn invalidate_with_changed_dependencies() {
     );
 }
 
-// Historically flaky: https://github.com/pantsbuild/pants/issues/10839
+#[ignore] // flaky:
+// https://github.com/pantsbuild/pants/issues/10839
 #[tokio::test]
 async fn invalidate_randomly() {
     let graph = empty_graph();
