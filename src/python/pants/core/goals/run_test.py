@@ -29,12 +29,12 @@ from pants.engine.internals.specs_rules import (
     AmbiguousImplementationsException,
     TooManyTargetsException,
 )
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult
+from pants.engine.process import InteractiveProcess
 from pants.engine.target import FieldSet, Target, TargetRootsToFieldSets
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.testutil.option_util import create_goal_subsystem, create_subsystem
-from pants.testutil.rule_runner import MockEffect, RuleRunner, mock_console, run_rule_with_mocks
+from pants.testutil.rule_runner import RuleRunner, mock_console, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
 
 
@@ -118,14 +118,12 @@ def single_target_run(
                 "pants.core.goals.run.generate_run_debug_adapter_request": lambda _: create_mock_run_request(
                     rule_runner, program_text
                 ),
+                "pants.engine.intrinsics._interactive_process": lambda interactive_process: rule_runner.run_interactive_process(
+                    interactive_process
+                ),
             },
             mock_gets=[
                 rule_runner.do_not_use_mock(EnvironmentTarget, (EnvironmentNameRequest,)),
-                MockEffect(
-                    output_type=InteractiveProcessResult,
-                    input_types=(InteractiveProcess,),
-                    mock=rule_runner.run_interactive_process,
-                ),
             ],
             union_membership=UnionMembership.from_rules(
                 {UnionRule(RunFieldSet, TestRunFieldSet)},
