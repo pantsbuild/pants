@@ -231,6 +231,18 @@ class DockerOptions(Subsystem):
             """
         ),
     )
+    args_for_docker_build = ShellStrListOption(
+        default=[],
+        help=softwrap(
+            f"""
+            Additional arguments to use for `docker build` invocations.
+
+            Example:
+                $ {bin_name()} package --{options_scope}-args-for-docker-build="--shm-size 256m"\
+                    src/example:image
+            """
+        ),
+    )
     publish_noninteractively = BoolOption(
         default=False,
         help=softwrap(
