@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 import re
+import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
@@ -32,6 +33,7 @@ from pants.engine.target import (
     ListOfDictStringToStringField,
     OptionalSingleSourceField,
     StringField,
+    StringOrBoolField,
     StringSequenceField,
     Target,
     Targets,
@@ -252,7 +254,7 @@ class DockerBuildOptionFieldMixin(ABC):
 
     @final
     def options(
-        self, value_formatter: OptionValueFormatter, global_build_hosts_options
+        self, value_formatter: OptionValueFormatter, global_build_hosts_options, **kwargs
     ) -> Iterator[str]:
         for value in self.option_values(
             value_formatter=value_formatter, global_build_hosts_options=global_build_hosts_options
@@ -523,18 +525,63 @@ class DockerBuildOptionFieldMultiValueMixin(StringSequenceField):
             yield f"{self.docker_build_option}={','.join(list(self.value))}"
 
 
-class DockerImageBuildPullOptionField(DockerBuildOptionFieldValueMixin, BoolField):
+class DockerImageBuildPullOptionField(StringOrBoolField):
     alias = "pull"
-    default = False
+    default = None
+    valid_choices = ("always", "missing", "never", "newer")
     help = help_text(
         """
-        If true, then docker will always attempt to pull a newer version of the image.
+        Pull policy for the image.
+
+        For Docker: accepts boolean (true to always pull, false to use cached).
+        For Podman: accepts boolean or string policy ("always", "missing", "never", "newer").
+        Default: false for Docker, "missing" for Podman.
 
         NOTE: This option cannot be used on images that build off of "transitive" base images
         referenced by address (i.e. `FROM path/to/your/base/Dockerfile`).
         """
     )
     docker_build_option = "--pull"
+
+    def options(self, value_formatter, global_build_hosts_options=None, **kwargs):
+        # Determine backend type from DockerBinary (which is resolved based on
+        # the [docker].experimental_enable_podman option). When experimental_enable_podman=true,
+        # the docker_binary will be 'podman' and is_podman will be True.
+        docker_binary = kwargs.get("docker") or kwargs.get("docker_binary")
+        is_podman = (
+            getattr(docker_binary, "is_podman", False) if docker_binary is not None else False
+        )
+
+        val = self.value
+        if val is None:
+            # Use defaults based on backend
+            val = "missing" if is_podman else False
+
+        if isinstance(val, str):
+            # String policies are only supported by Podman
+            if not is_podman:
+                raise InvalidFieldException(
+                    f"The {self.alias!r} field was set to string value {val!r}, "
+                    f"but string pull policies are only supported by Podman, not Docker. "
+                    f"Use a boolean value (true/false) for Docker."
+                )
+            yield f"{self.docker_build_option}={value_formatter(val)}"
+        else:
+            # Boolean value
+            if is_podman:
+                # Convert boolean to Podman policy string
+                warnings.warn(
+                    f"Using boolean values for the 'pull' field with Podman is deprecated. "
+                    f"Please use string values instead: 'always', 'missing', 'never', or 'newer'. "
+                    f"Boolean {val} is being converted to 'always' if val else 'missing' policy.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+                policy = "always" if val else "missing"
+                yield f"{self.docker_build_option}={policy}"
+            else:
+                # Docker: emit explicit boolean value with capital first letter
+                yield f"{self.docker_build_option}={str(val).capitalize()}"
 
 
 class DockerBuildOptionFlagFieldMixin(BoolField, ABC):
