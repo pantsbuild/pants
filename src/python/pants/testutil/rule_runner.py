@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path, PurePath
 from tempfile import mkdtemp
-from typing import Any, Generic, TypeVar, cast, overload
+from typing import Any, TypeVar, cast, overload
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
@@ -637,39 +637,16 @@ class RuleRunner:
                 ),
             )
 
-    def do_not_use_mock(self, output_type: type[Any], input_types: Iterable[type[Any]]) -> MockGet:
-        """Returns a `MockGet` whose behavior is to run the actual rule using this `RuleRunner`"""
-        return MockGet(
-            output_type=output_type,
-            input_types=tuple(input_types),
-            mock=lambda *input_values: self.request(output_type, input_values),
-        )
-
 
 # -----------------------------------------------------------------------------------------------
 # `run_rule_with_mocks()`
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
-class MockEffect(Generic[_O]):
-    output_type: type[_O]
-    input_types: tuple[type, ...]
-    mock: Callable[..., _O]
-
-
-@dataclass(frozen=True)
-class MockGet(Generic[_O]):
-    output_type: type[_O]
-    input_types: tuple[type, ...]
-    mock: Callable[..., _O]
-
-
 def run_rule_with_mocks(
     rule: Callable[..., Coroutine[Any, Any, _O]],
     *,
     rule_args: Sequence[Any] = (),
-    mock_gets: Sequence[MockGet | MockEffect] = (),
     mock_calls: Mapping[str, Callable] | None = None,
     union_membership: UnionMembership | None = None,
     show_warnings: bool = True,
@@ -683,15 +660,11 @@ def run_rule_with_mocks(
     return_value = run_rule_with_mocks(my_rule, rule_args=[arg1])
     ```
 
-    In the case of an @rule that invokes other @rules, either by name or via `Get` requests, things
-    get more interesting: either or both of the `mock_calls` and `mock_gets` arguments must be
-    provided.
+    In the case of an @rule that invokes other @rules, either by name or via `Get` requests,
+    the `mock_calls` argument must be provided.
 
-    - `mock_calls` is a mapping of fully-qualified rule name to the function that mocks that rule,
-      and mocks out calls by name to the corresponding rules.
-    - `mock_gets` is a sequence of `MockGet`s and `MockEffect`s. Each MockGet takes the Product and
-      Subject type, along with a one-argument function that takes a subject value and returns a
-      product value.
+    `mock_calls` is a mapping of fully-qualified rule name to the function that mocks that rule,
+    and mocks out calls by name to the corresponding rules.
 
     So in the case of an @rule named `my_co_rule` that takes one argument and calls the @rule
     `path.to.module.list_dir` by name to produce a `Listing` from a `Dir`, the invoke might look
@@ -706,28 +679,6 @@ def run_rule_with_mocks(
       },
     )
     ```
-
-    And if that same rule uses a Get request for a product type `Listing` with subject type `Dir`,
-    the invoke might look like:
-
-    ```
-    return_value = run_rule_with_mocks(
-      my_co_rule,
-      rule_args=[arg1],
-      mock_gets=[
-        MockGet(
-          output_type=Listing,
-          input_type=Dir,
-          mock=lambda dir_subject: Listing(..),
-        ),
-      ],
-    )
-    ```
-
-    If any of the @rule's Get requests involve union members, you should pass a `UnionMembership`
-    mapping the union base to any union members you'd like to test. For example, if your rule has
-    `await Get(TestResult, TargetAdaptor, target_adaptor)`, you may pass
-    `UnionMembership({TargetAdaptor: PythonTestsTargetAdaptor})` to this function.
 
     :returns: The return value of the completed @rule.
     """
@@ -758,7 +709,6 @@ def run_rule_with_mocks(
         return res
 
     unconsumed_mock_calls = set(mock_calls.keys())
-    unconsumed_mock_gets = set(mock_gets)
 
     def get(res: Call | Coroutine):
         if isinstance(res, Coroutine):
@@ -798,8 +748,6 @@ def run_rule_with_mocks(
         if show_warnings:
             if unconsumed_mock_calls:
                 warnings.warn(f"Unconsumed mock_calls: {unconsumed_mock_calls}")
-            if unconsumed_mock_gets:
-                warnings.warn(f"Unconsumed mock_gets: {unconsumed_mock_gets}")
 
     while True:
         try:

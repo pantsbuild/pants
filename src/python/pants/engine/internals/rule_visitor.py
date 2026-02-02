@@ -311,9 +311,6 @@ class _AwaitableCollector(ast.NodeVisitor):
             output_type,
             explicit_args_arity,
             input_types,
-            # TODO: Extract this from the callee? Currently only intrinsics can be Effects, so need
-            # to figure out their new syntax first.
-            is_effect=False,
         )
 
     def visit_Call(self, call_node: ast.Call) -> None:
