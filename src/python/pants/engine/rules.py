@@ -239,8 +239,6 @@ class RuleDecoratorKwargs(TypedDict):
     `await base_rule(arg, other_arg)`
 
     will invoke `derived_rule(arg, other_arg)`
-
-    This is the call-by-name equivalent of Get(OutputType, UnionBase, union_member_instance).
     """
 
     _masked_types: NotRequired[Iterable[type[Any]]]
@@ -393,20 +391,9 @@ def validate_requirements(
         input_type_side_effecting = [
             it for it in awaitable.input_types if issubclass(it, SideEffecting)
         ]
-        if input_type_side_effecting and not awaitable.is_effect:
+        if input_type_side_effecting:
             raise ValueError(
-                f"A `Get` may not request side-effecting types ({input_type_side_effecting}). "
-                f"Use `Effect` instead: `{awaitable}`."
-            )
-        if not input_type_side_effecting and awaitable.is_effect:
-            raise ValueError(
-                f"An `Effect` should not be used with pure types ({awaitable.input_types}). "
-                f"Use `Get` instead: `{awaitable}`."
-            )
-        if cacheable and awaitable.is_effect:
-            raise ValueError(
-                f"A `@rule` that is not a @goal_rule ({func_id}) may not use an "
-                f"Effect: `{awaitable}`."
+                f"A `@rule` may not request side-effecting types ({input_type_side_effecting})."
             )
 
 

@@ -7,7 +7,7 @@ import logging
 import os
 import time
 from collections import defaultdict
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import PurePath
 from types import CoroutineType
@@ -417,9 +417,6 @@ class SchedulerSession:
 
     def visualize_rule_graph_to_file(self, filename: str) -> None:
         self._scheduler.visualize_rule_graph_to_file(filename)
-
-    def rule_graph_rule_gets(self) -> dict[Callable, list[tuple[type, list[type], Callable]]]:
-        return native_engine.rule_graph_rule_gets(self.py_scheduler)
 
     def execution_request(
         self,

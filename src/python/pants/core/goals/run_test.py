@@ -11,8 +11,6 @@ from typing import cast
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
 
-from pants.core.environments.rules import EnvironmentNameRequest
-from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.goals.run import (
     Run,
     RunDebugAdapterRequest,
@@ -122,9 +120,6 @@ def single_target_run(
                     interactive_process
                 ),
             },
-            mock_gets=[
-                rule_runner.do_not_use_mock(EnvironmentTarget, (EnvironmentNameRequest,)),
-            ],
             union_membership=UnionMembership.from_rules(
                 {UnionRule(RunFieldSet, TestRunFieldSet)},
             ),

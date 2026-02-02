@@ -21,7 +21,6 @@ class AwaitableConstraints:
     # The number of explicit positional arguments passed to a call-by-name awaitable.
     explicit_args_arity: int
     input_types: tuple[type, ...]
-    is_effect: bool
 
     def __repr__(self) -> str:
         inputs = ", ".join(f"{t.__name__}" for t in self.input_types)
