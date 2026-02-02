@@ -1239,7 +1239,7 @@ def test_docker_output_option(
     ["output", "expect_error"],
     [(None, False), ({"type": "registry"}, True), ({"type": "image", "push": "true"}, True)],
 )
-def test_docker_output_option_raises_when_push_on_package_error(
+def test_docker_output_option_when_push_on_package_error(
     rule_runner: RuleRunner, output: dict | None, expect_error: bool
 ) -> None:
     output_str = f"output={repr(output)}," if output else ""
@@ -1283,7 +1283,7 @@ def test_docker_output_option_raises_when_push_on_package_error(
         ),
     ],
 )
-def test_docker_output_option_raises_when_push_on_package_warn(
+def test_docker_output_option_when_push_on_package_warn(
     rule_runner: RuleRunner,
     caplog: pytest.LogCaptureFixture,
     output: dict | None,
@@ -1338,7 +1338,7 @@ def test_docker_output_option_raises_when_push_on_package_warn(
         ({"type": "image", "push": "true"}, None),
     ],
 )
-def test_docker_output_option_raises_when_push_on_package_ignore(
+def test_docker_output_option_when_push_on_package_ignore(
     rule_runner: RuleRunner, output: dict | None, expected_output_arg: str | None
 ) -> None:
     output_str = f"output={repr(output)}," if output else ""
