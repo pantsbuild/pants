@@ -191,10 +191,10 @@ def test_check_if_skip_upload(
     )
     result = rule_runner.request(CheckSkipResult, [request])
     if expected:
-        assert not result.inner
+        assert not result.skipped_packages
     else:
-        assert len(result.inner) == 1
-        assert result.inner[0].names == ("my-package",)
+        assert len(result.skipped_packages) == 1
+        assert result.skipped_packages[0].names == ("my-package",)
 
 
 @pytest.mark.parametrize(
