@@ -187,7 +187,7 @@ def test_check_if_skip_push(
 ) -> None:
     _declare_targets(rule_runner)
 
-    artifact_name = expected.inner[0].names[0] if expected.inner else None
+    artifact_name = expected.skipped_packages[0].names[0] if expected.skipped_packages else None
     helm_subsystem = create_subsystem(
         HelmSubsystem,
         registries={"internal": {"address": "oci://www.example.com", "default": default_registry}},
