@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import cast
 
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.subsystems.twine import TwineSubsystem
@@ -78,11 +77,7 @@ class PublishPythonPackageFieldSet(PublishFieldSet):
     skip_twine: SkipTwineUploadField
 
     def make_skip_request(self, package_fs: PackageFieldSet) -> PythonDistCheckSkipRequest | None:
-        return (
-            PythonDistCheckSkipRequest(publish_fs=self, package_fs=package_fs)
-            if isinstance(package_fs, PythonDistributionFieldSet)
-            else None
-        )
+        return PythonDistCheckSkipRequest(publish_fs=self, package_fs=package_fs)
 
     def get_output_data(self) -> PublishOutputData:
         return PublishOutputData(
@@ -109,12 +104,13 @@ async def check_if_skip_upload(
         reason = f"(no `{request.publish_fs.repositories.alias}` specified for {request.address})"
     else:
         return CheckSkipResult.no_skip()
+    name = (
+        request.package_fs.provides.value.kwargs.get("name", "<unknown python artifact>")
+        if isinstance(request.package_fs, PythonDistributionFieldSet)
+        else "<unknown artifact>"
+    )
     return CheckSkipResult.skip(
-        names=[
-            cast(PythonDistributionFieldSet, request.package_fs).provides.value.kwargs.get(
-                "name", "<unknown python artifact>"
-            )
-        ],
+        names=[name],
         description=reason,
         data=request.publish_fs.get_output_data(),
     )
