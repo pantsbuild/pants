@@ -19,6 +19,7 @@ from pants.backend.python.target_types import PythonSourceField, PythonSourceTar
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.util_rules import stripped_source_files
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.testutil.python_interpreter_selection import (
     skip_unless_python38_present,
@@ -34,6 +35,7 @@ def rule_runner() -> RuleRunner:
             *parse_python_dependencies.rules(),
             *stripped_source_files.rules(),
             *pex.rules(),
+            QueryRule(SourceFiles, [SourceFilesRequest]),
             QueryRule(ParsedPythonDependencies, [ParsePythonDependenciesRequest]),
         ],
         target_types=[PythonSourceTarget],
@@ -72,11 +74,12 @@ def assert_deps_parsed(
         }
     )
     tgt = rule_runner.get_target(Address("", target_name="t"))
+    source_files = rule_runner.request(SourceFiles, [SourceFilesRequest([tgt[PythonSourceField]])])
     result = rule_runner.request(
         ParsedPythonDependencies,
         [
             ParsePythonDependenciesRequest(
-                tgt[PythonSourceField],
+                source_files,
                 InterpreterConstraints([constraints]),
             )
         ],

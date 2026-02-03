@@ -155,10 +155,9 @@ async def _interactive_process(
         del process.__dict__[__SQUELCH_WARNING]
     else:
         logging.warning(
-            "A plugin is calling `await Effect(InteractiveProcessResult, InteractiveProcess, "
-            "process)` directly. This will cause restarting logic not to be applied. "
-            "Use `await run_interactive_process(process)` or `await "
-            "run_interactive_process_in_environment(process, environment_name)` instead. "
+            "A plugin is calling `await _interactive_process(...)` directly. This will cause "
+            "restarting logic not to be applied. Use `await run_interactive_process(process)` "
+            "or `await run_interactive_process_in_environment(process, environment_name)` instead. "
             f"See {git_url('src/python/pants/engine/intrinsics.py')} for more details."
         )
     return await native_engine.interactive_process(process, process_execution_environment)
