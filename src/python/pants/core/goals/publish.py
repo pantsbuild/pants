@@ -191,23 +191,23 @@ class PublishPackages:
 class CheckSkipResult:
     """PublishPackages that were pre-emptively skipped.
 
-    If `inner` is None, this indicates that this request should NOT be skipped.
+    If `skipped_packages` is empty, this indicates that this request should NOT be skipped.
     """
 
-    inner: tuple[PublishPackages, ...]
+    skipped_packages: tuple[PublishPackages, ...]
     _skip_packaging_only: bool
 
     def __init__(self, inner: Iterable[PublishPackages], skip_packaging_only: bool = False) -> None:
-        object.__setattr__(self, "inner", tuple(inner))
+        object.__setattr__(self, "skipped_packages", tuple(inner))
         object.__setattr__(self, "_skip_packaging_only", skip_packaging_only)
 
     def __post_init__(self):
-        if any(pp.process is not None for pp in self.inner):
+        if any(pp.process is not None for pp in self.skipped_packages):
             raise ValueError("CheckSkipResult must not have any non-None processes")
 
     @property
     def skip_publish(self) -> bool:
-        return bool(self.inner)
+        return bool(self.skipped_packages)
 
     @property
     def skip_package(self) -> bool:
@@ -454,10 +454,10 @@ async def run_publish(
             try:
                 skip_publish_packages = publish_skips[skip_request.publish_fs]
             except KeyError:
-                publish_skips[skip_request.publish_fs] = list(maybe_skip.inner)
+                publish_skips[skip_request.publish_fs] = list(maybe_skip.skipped_packages)
             else:
                 if skip_publish_packages is not None:
-                    skip_publish_packages.extend(maybe_skip.inner)
+                    skip_publish_packages.extend(maybe_skip.skipped_packages)
         else:
             publish_skips[skip_request.publish_fs] = None
 

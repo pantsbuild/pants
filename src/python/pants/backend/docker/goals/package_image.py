@@ -15,6 +15,10 @@ from typing import Literal, cast
 # Re-exporting BuiltDockerImage here, as it has its natural home here, but has moved out to resolve
 # a dependency cycle from docker_build_context.
 from pants.backend.docker.package_types import BuiltDockerImage as BuiltDockerImage
+from pants.backend.docker.package_types import (
+    DockerPushOnPackageBehavior,
+    DockerPushOnPackageException,
+)
 from pants.backend.docker.registries import DockerRegistries, DockerRegistryOptions
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
@@ -25,6 +29,7 @@ from pants.backend.docker.target_types import (
     DockerBuildOptionFieldMultiValueMixin,
     DockerBuildOptionFieldValueMixin,
     DockerBuildOptionFlagFieldMixin,
+    DockerImageBuildImageOutputField,
     DockerImageContextRootField,
     DockerImageRegistriesField,
     DockerImageRepositoryField,
@@ -42,7 +47,7 @@ from pants.backend.docker.util_rules.docker_build_context import (
 )
 from pants.backend.docker.utils import format_rename_suggestion
 from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
-from pants.engine.fs import CreateDigest, FileContent
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, FileContent
 from pants.engine.internals.graph import resolve_target
 from pants.engine.intrinsics import create_digest, execute_process
 from pants.engine.process import ProcessExecutionFailure
@@ -83,6 +88,12 @@ class DockerPackageFieldSet(PackageFieldSet):
     tags: DockerImageTagsField
     target_stage: DockerImageTargetStageField
     output_path: OutputPathField
+    output: DockerImageBuildImageOutputField
+
+    def pushes_on_package(self) -> bool:
+        """Returns True if this docker_image target would push to a registry during packaging."""
+        value_or_default = self.output.value or self.output.default
+        return value_or_default.get("push") == "true" or value_or_default["type"] == "registry"
 
     def format_tag(self, tag: str, interpolation_context: InterpolationContext) -> str:
         source = InterpolationContext.TextSource(
@@ -393,6 +404,18 @@ async def build_docker_image(
     union_membership: UnionMembership,
 ) -> BuiltPackage:
     """Build a Docker image using `docker build`."""
+    # Check if this build would push and handle according to push_on_package behavior
+    if field_set.pushes_on_package():
+        match options.push_on_package:
+            case DockerPushOnPackageBehavior.IGNORE:
+                return BuiltPackage(EMPTY_DIGEST, ())
+            case DockerPushOnPackageBehavior.ERROR:
+                raise DockerPushOnPackageException(field_set.address)
+            case DockerPushOnPackageBehavior.WARN:
+                logger.warning(
+                    f"Docker image {field_set.address} will push to a registry during packaging"
+                )
+
     context, wrapped_target = await concurrently(
         create_docker_build_context(
             DockerBuildContextRequest(

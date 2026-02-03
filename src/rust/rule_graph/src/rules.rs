@@ -198,7 +198,7 @@ impl<T: TypeId> Display for DependencyKey<T> {
         } else if self.provided_params.is_empty() {
             write!(f, "{}", self.product)
         } else {
-            write!(f, "Get({}, {:?})", self.product, self.provided_params)
+            write!(f, "({:?}) -> {}", self.provided_params, self.product)
         }
     }
 }

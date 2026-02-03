@@ -804,7 +804,7 @@ class _DependencyMapping:
 async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _DependencyMapping:
     """This uses iteration, rather than recursion, so that we can tolerate dependency cycles.
 
-    Unlike a traditional BFS algorithm, we batch each round of traversals via `MultiGet` for
+    Unlike a traditional BFS algorithm, we batch each round of traversals via `concurrently` for
     improved performance / concurrency.
     """
     roots_as_targets = await resolve_unexpanded_targets(Addresses(request.tt_request.roots))

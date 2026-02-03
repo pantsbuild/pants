@@ -115,8 +115,6 @@ fn native_engine(py: Python, m: &Bound<'_, PyModule>) -> PyO3Result<()> {
     m.add_function(wrap_pyfunction!(tasks_task_begin, m)?)?;
     m.add_function(wrap_pyfunction!(tasks_task_end, m)?)?;
     m.add_function(wrap_pyfunction!(tasks_add_call, m)?)?;
-    m.add_function(wrap_pyfunction!(tasks_add_get, m)?)?;
-    m.add_function(wrap_pyfunction!(tasks_add_get_union, m)?)?;
     m.add_function(wrap_pyfunction!(tasks_add_query, m)?)?;
 
     m.add_function(wrap_pyfunction!(write_digest, m)?)?;
@@ -137,7 +135,6 @@ fn native_engine(py: Python, m: &Bound<'_, PyModule>) -> PyO3Result<()> {
 
     m.add_function(wrap_pyfunction!(validate_reachability, m)?)?;
     m.add_function(wrap_pyfunction!(rule_graph_consumed_types, m)?)?;
-    m.add_function(wrap_pyfunction!(rule_graph_rule_gets, m)?)?;
     m.add_function(wrap_pyfunction!(rule_graph_visualize, m)?)?;
     m.add_function(wrap_pyfunction!(rule_subgraph_visualize, m)?)?;
 
@@ -1356,47 +1353,6 @@ fn tasks_add_call<'py>(
 }
 
 #[pyfunction]
-fn tasks_add_get<'py>(
-    py: Python<'py>,
-    py_tasks: &Bound<'py, PyTasks>,
-    output: &Bound<'py, PyType>,
-    inputs: Vec<Bound<'py, PyType>>,
-) {
-    let output = TypeId::new(output);
-    let inputs = inputs.into_iter().map(|t| TypeId::new(&t)).collect();
-    py_tasks
-        .borrow_mut()
-        .0
-        .lock_py_attached(py)
-        .as_mut()
-        .unwrap()
-        .add_get(output, inputs);
-}
-
-#[pyfunction]
-fn tasks_add_get_union<'py>(
-    py: Python<'py>,
-    py_tasks: &Bound<'py, PyTasks>,
-    output_type: &Bound<'py, PyType>,
-    input_types: Vec<Bound<'py, PyType>>,
-    in_scope_types: Vec<Bound<'py, PyType>>,
-) {
-    let product = TypeId::new(output_type);
-    let input_types = input_types.into_iter().map(|t| TypeId::new(&t)).collect();
-    let in_scope_types = in_scope_types
-        .into_iter()
-        .map(|t| TypeId::new(&t))
-        .collect();
-    py_tasks
-        .borrow_mut()
-        .0
-        .lock_py_attached(py)
-        .as_mut()
-        .unwrap()
-        .add_get_union(product, input_types, in_scope_types);
-}
-
-#[pyfunction]
 fn tasks_add_query<'py>(
     py: Python<'py>,
     py_tasks: &Bound<'py, PyTasks>,
@@ -1606,58 +1562,6 @@ fn rule_graph_consumed_types<'py>(
             .into_iter()
             .map(|type_id| type_id.as_py_type(py))
             .collect())
-    })
-}
-
-#[pyfunction]
-fn rule_graph_rule_gets<'py>(
-    py: Python<'py>,
-    py_scheduler: &Bound<'py, PyScheduler>,
-) -> PyO3Result<Bound<'py, PyDict>> {
-    let core = &py_scheduler.borrow().0.core;
-    core.executor.enter(|| {
-        let result = PyDict::new(py);
-        for (rule, rule_dependencies) in core.rule_graph.rule_dependencies() {
-            let task = rule.0;
-            let function = &task.func;
-            #[allow(clippy::type_complexity)]
-            let mut dependencies: Vec<(
-                Bound<'_, PyType>,
-                Vec<Bound<'_, PyType>>,
-                pyo3::Py<PyAny>,
-            )> = Vec::new();
-            for (dependency_key, rule) in rule_dependencies {
-                // NB: We are only migrating non-union Gets, which are those in the `gets` list
-                // which do not have `in_scope_params` marking them as being for unions, or a call
-                // signature marking them as already being call-by-name.
-                if dependency_key.call_signature.is_some()
-                    || dependency_key.in_scope_params.is_some()
-                    || !task.gets.contains(dependency_key)
-                {
-                    continue;
-                }
-                let function = &rule.0.func;
-
-                let provided_params = dependency_key
-                    .provided_params
-                    .iter()
-                    .map(|p| p.as_py_type(py))
-                    .collect::<Vec<_>>();
-                dependencies.push((
-                    dependency_key.product.as_py_type(py),
-                    provided_params,
-                    function.0.value.into_pyobject(py)?.into_any().unbind(),
-                ));
-            }
-            if dependencies.is_empty() {
-                continue;
-            }
-            result.set_item(
-                function.0.value.into_pyobject(py)?,
-                dependencies.into_pyobject(py)?,
-            )?;
-        }
-        Ok(result)
     })
 }
 

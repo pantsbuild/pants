@@ -46,7 +46,7 @@ class PublishTestFieldSet(PublishFieldSet):
 
     repositories: MockRepositoriesField
 
-    def make_skip_request(self, package_fs: package.PackageFieldSet) -> TestPreemptiveSkipRequest:
+    def check_skip_request(self, package_fs: package.PackageFieldSet) -> TestPreemptiveSkipRequest:
         return TestPreemptiveSkipRequest(publish_fs=self, package_fs=package_fs)
 
 

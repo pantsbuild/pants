@@ -157,7 +157,7 @@ Where does Pants get the values for implicit parameters? They can be:
 - From the input parameters of the calling rule.
 - Computed from other params by (transitively) applying suitable rules. You can think of this as a form of dependency injection via type: Pants knows the type of the implicit parameter, and can traverse a path through rule execution to go from an initial set of values, known from context, to the needed value.
 
-Since explicit params must be provided positionally, they must be the first arguments to the rule. This means that when you write a rules, you should put the parameters expected to be passed explicitly before the parameters expected to be provided implicitly.
+Since explicit params must be provided positionally, they must be the first arguments to the rule. This means that when you write a rule, you should put the parameters expected to be passed explicitly before the parameters expected to be provided implicitly.
 
 ### Extra context for implicit parameters
 
