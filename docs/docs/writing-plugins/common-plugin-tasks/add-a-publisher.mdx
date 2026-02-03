@@ -1,0 +1,247 @@
+---
+title: Add a publisher
+sidebar_position: 6
+---
+
+How to add a new publisher to the `publish` goal.
+
+---
+
+In Pants, publishers are responsible for taking built artifacts and pushing them to remote registries or repositories.
+
+This guide walks through implementing a publisher for artifacts that you can build in Pants (e.g., Docker images, Helm charts, Python distributions, or custom artifacts).
+
+## 1. Define target fields
+
+Before implementing the publisher, define the fields that targets need to specify for publishing. These typically include:
+
+- A field for the registries/repositories to publish to (required)
+- A field to skip publishing (optional but recommended)
+- Any publisher-specific configuration fields
+
+For example, if you're creating a publisher for a custom artifact type:
+
+```python
+from pants.engine.target import BoolField, StringSequenceField
+
+
+class MyRepositoriesField(StringSequenceField):
+    alias = "repositories"
+    help = "The registries to push this artifact to."
+
+
+class MySkipPushField(BoolField):
+    alias = "skip_push"
+    default = False
+    help = "If true, do not push this artifact to registries when running `pants publish`."
+```
+
+If you're adding a publisher for an existing target type (like `python_distribution`), you may need to register these fields on the target type:
+
+```python
+MyTargetType.register_plugin_field(MyRepositoriesField)
+MyTargetType.register_plugin_field(MySkipPushField)
+```
+
+## 2. Create `PublishRequest` and `PublishFieldSet`
+
+A `PublishFieldSet` tells Pants which fields your publisher needs for targets to be publishable. Similar to other plugin patterns, you'll create two related classes:
+
+```python
+from dataclasses import dataclass
+
+from pants.core.goals.publish import PublishFieldSet, PublishRequest
+
+
+class MyPublishRequest(PublishRequest):
+    """Request to publish an artifact."""
+    pass
+
+
+@dataclass(frozen=True)
+class MyPublishFieldSet(PublishFieldSet):
+    publish_request_type = MyPublishRequest
+    required_fields = (MyRepositoriesField,)
+
+    repositories: MyRepositoriesField
+    skip_push: MySkipPushField
+```
+
+The `PublishFieldSet` base class provides a `get_output_data()` method that you can optionally override to include publisher-specific metadata in the output:
+
+```python
+def get_output_data(self) -> PublishOutputData:
+    return PublishOutputData({
+        "publisher": "my_publisher",
+        **super().get_output_data(),
+    })
+```
+
+## 3. Implement the publish rule
+
+Create a rule that takes your `PublishRequest` and returns `PublishProcesses`. This rule builds the processes that will actually publish your artifacts:
+
+```python
+from pants.core.goals.publish import PublishPackages, PublishProcesses
+from pants.engine.process import InteractiveProcess, Process, ProcessCacheScope
+from pants.engine.rules import rule
+
+
+@rule
+async def publish_my_artifacts(request: MyPublishRequest) -> PublishProcesses:
+    # Access the built artifacts
+    artifacts = []
+    for package in request.packages:
+        for artifact in package.artifacts:
+            if artifact.relpath:
+                artifacts.append(artifact.relpath)
+
+    # Check if publishing should be skipped
+    if request.field_set.skip_push.value:
+        return PublishProcesses([
+            PublishPackages(
+                names=tuple(artifacts),
+                description=f"(by `{request.field_set.skip_push.alias}` on {request.field_set.address})",
+            )
+        ])
+
+    # Build a process for each repository
+    processes = []
+    for repository in request.field_set.repositories.value:
+        process = Process(
+            argv=["push-tool", "--repo", repository, *artifacts],
+            cache_scope=ProcessCacheScope.PER_SESSION,
+            description=f"Push artifacts to {repository}",
+        )
+
+        processes.append(PublishPackages(
+            names=tuple(artifacts),
+            process=process,
+            description=repository,
+        ))
+
+    return PublishProcesses(processes)
+```
+
+Key points:
+
+- Use `request.packages` to access the built artifacts
+- Use `request.field_set` to access target configuration
+- Return `PublishProcesses` containing one or more `PublishPackages`
+- Each `PublishPackages` represents a single publish operation
+- If `process` is `None`, the artifacts are marked as skipped
+- Set `cache_scope=ProcessCacheScope.PER_SESSION` to prevent caching publish operations
+- Use `InteractiveProcess` if your publisher requires user interaction (e.g., authentication)
+
+## 4. Register your publisher
+
+At the bottom of your file, register your rules and field set:
+
+```python
+def rules():
+    return [
+        *collect_rules(),
+        *MyPublishFieldSet.rules(),  # Auto-registers the union rules
+    ]
+```
+
+The `PublishFieldSet.rules()` helper automatically registers the necessary union rules.
+
+Then update your plugin's `register.py`:
+
+```python
+from mybackend import publish
+
+
+def rules():
+    return [*publish.rules()]
+```
+
+## 5. Optimize with preemptive skip checking (optional)
+
+If your publisher has expensive packaging steps, you can use `check_skip_request` to preemptively skip packaging when you know the publish will be skipped:
+
+```python
+from pants.core.goals.publish import CheckSkipRequest, CheckSkipResult
+from pants.core.goals import package
+
+
+@dataclass(frozen=True)
+class MyPublishFieldSet(PublishFieldSet):
+    publish_request_type = MyPublishRequest
+    required_fields = (MyRepositoriesField,)
+
+    repositories: MyRepositoriesField
+    skip_push: MySkipPushField
+
+    def check_skip_request(self, package_fs: package.PackageFieldSet) -> CheckSkipRequest[Self] | None:
+        """Return a request to check if we should skip packaging."""
+        return MyPublishSkipRequest(publish_fs=self, package_fs=package_fs)
+```
+
+Then implement a rule to handle the skip check:
+
+```python
+class MyPublishSkipRequest(CheckSkipRequest[MyPublishFieldSet]):
+    """Request to check if we should skip packaging."""
+    pass
+
+
+@rule
+async def check_my_publish_skip(request: MyPublishSkipRequest) -> CheckSkipResult:
+    """Check if publishing should be skipped, and return the result."""
+
+    # Skip if no repositories configured
+    if not request.publish_fs.repositories.value:
+        return CheckSkipResult.skip(
+            names=[],
+            data=request.publish_fs.get_output_data(),
+        )
+
+    # Skip both packaging and publishing if explicitly set
+    if request.publish_fs.skip_push.value:
+        return CheckSkipResult.skip(
+            names=["example-artifact"],
+            description=f"(by `{request.publish_fs.skip_push.alias}`)",
+            data=request.publish_fs.get_output_data(),
+        )
+
+    # Skip packaging only (we already have artifacts)
+    if some_condition:
+        return CheckSkipResult.skip(skip_packaging_only=True)
+
+    # Don't skip anything
+    return CheckSkipResult.no_skip()
+```
+
+Register the union rule in your `rules()` function:
+
+```python
+def rules():
+    return [
+        *collect_rules(),
+        *MyPublishFieldSet.rules(),
+        UnionRule(CheckSkipRequest, MyPublishSkipRequest),  # Register the skip request
+    ]
+```
+
+The `CheckSkipResult` class provides three modes:
+
+- `CheckSkipResult.no_skip()` - Proceed with both packaging and publishing
+- `CheckSkipResult.skip(skip_packaging_only=True)` - Skip packaging but still run the publish rule
+- `CheckSkipResult.skip(names=..., description=..., data=...)` - Skip both packaging and publishing
+
+## 6. Real-world examples
+
+For complete implementations, see these existing publishers:
+
+- **Docker** ([source](https://github.com/pantsbuild/pants/blob/main/src/python/pants/backend/docker/goals/publish.py)): Supports pushing Docker images to multiple registries
+- **Helm** ([source](https://github.com/pantsbuild/pants/blob/main/src/python/pants/backend/helm/goals/publish.py)): Pushes Helm charts to OCI registries
+- **Python/Twine** ([source](https://github.com/pantsbuild/pants/blob/main/src/python/pants/backend/python/goals/publish.py)): Uploads Python distributions to PyPI or other repositories using Twine
+
+Each demonstrates different patterns:
+
+- Multiple registries/repositories in a single publish operation
+- Different credential handling approaches
+- Interactive vs non-interactive process execution
+- Skip logic at different levels (target, registry, subsystem)
