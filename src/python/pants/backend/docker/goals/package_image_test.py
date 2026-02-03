@@ -9,7 +9,7 @@ import os.path
 from collections import namedtuple
 from collections.abc import Callable
 from textwrap import dedent
-from typing import ContextManager, cast
+from typing import Any, ContextManager, cast
 
 import pytest
 
@@ -25,6 +25,10 @@ from pants.backend.docker.goals.package_image import (
     build_docker_image,
     parse_image_id_from_docker_build_output,
     rules,
+)
+from pants.backend.docker.package_types import (
+    DockerPushOnPackageBehavior,
+    DockerPushOnPackageException,
 )
 from pants.backend.docker.registries import DockerRegistries, DockerRegistryOptions
 from pants.backend.docker.subsystems.docker_options import DockerOptions
@@ -49,6 +53,7 @@ from pants.backend.docker.util_rules.docker_build_env import (
     DockerBuildEnvironmentRequest,
 )
 from pants.backend.docker.util_rules.docker_build_env import rules as build_env_rules
+from pants.core.goals.package import BuiltPackage
 from pants.engine.addresses import Address
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -110,6 +115,7 @@ def assert_build(
     version_tags: tuple[str, ...] = (),
     plugin_tags: tuple[str, ...] = (),
     expected_registries_metadata: None | list = None,
+    result_assertions: Callable[[BuiltPackage], None] | None = None,
 ) -> None:
     tgt = rule_runner.get_target(address)
     metadata_file_path: list[str] = []
@@ -180,6 +186,7 @@ def assert_build(
         opts.setdefault("use_buildx", False)
         opts.setdefault("env_vars", [])
         opts.setdefault("suggest_renames", True)
+        opts.setdefault("push_on_package", DockerPushOnPackageBehavior.WARN)
 
         docker_options = create_subsystem(
             DockerOptions,
@@ -216,22 +223,25 @@ def assert_build(
         show_warnings=False,
     )
 
-    assert result.digest == EMPTY_DIGEST
-    assert len(result.artifacts) == 1
-    assert len(metadata_file_path) == len(metadata_file_contents) == 1
-    assert result.artifacts[0].relpath == metadata_file_path[0]
+    if result_assertions:
+        result_assertions(result)
+    else:
+        assert result.digest == EMPTY_DIGEST
+        assert len(result.artifacts) == 1
+        assert len(metadata_file_path) == len(metadata_file_contents) == 1
+        assert result.artifacts[0].relpath == metadata_file_path[0]
 
-    metadata = json.loads(metadata_file_contents[0])
-    # basic checks that we can always do
-    assert metadata["version"] == 1
-    assert metadata["image_id"] == "<unknown>"
-    assert isinstance(metadata["registries"], list)
-    # detailed checks, if the test opts in
-    if expected_registries_metadata is not None:
-        assert metadata["registries"] == expected_registries_metadata
+        metadata = json.loads(metadata_file_contents[0])
+        # basic checks that we can always do
+        assert metadata["version"] == 1
+        assert metadata["image_id"] == "<unknown>"
+        assert isinstance(metadata["registries"], list)
+        # detailed checks, if the test opts in
+        if expected_registries_metadata is not None:
+            assert metadata["registries"] == expected_registries_metadata
 
-    for log_line in extra_log_lines:
-        assert log_line in result.artifacts[0].extra_log_lines
+        for log_line in extra_log_lines:
+            assert log_line in result.artifacts[0].extra_log_lines
 
 
 def test_build_docker_image(rule_runner: RuleRunner) -> None:
@@ -1174,30 +1184,41 @@ def test_docker_cache_from_option(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_docker_output_option(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    ["output", "expected_output_arg"],
+    [
+        (None, "--output=type=docker"),
+        ({"type": "registry"}, "--output=type=registry"),
+        ({"type": "image", "push": "true"}, "--output=type=image,push=true"),
+    ],
+)
+def test_docker_output_option(
+    rule_runner: RuleRunner, output: dict | None, expected_output_arg: str
+) -> None:
     """Testing non-default output type 'image'.
 
     Default output type 'docker' tested implicitly in other scenarios
     """
+    output_str = f"output={repr(output)}," if output else ""
     rule_runner.write_files(
         {
             "docker/test/BUILD": dedent(
-                """\
+                f"""\
                 docker_image(
                   name="img1",
-                  output={"type": "image"}
+                  {output_str}
                 )
                 """
             ),
         }
     )
 
-    def check_docker_proc(process: Process):
+    def check_docker_proc(process: Process) -> None:
         assert process.argv == (
             "/dummy/docker",
             "buildx",
             "build",
-            "--output=type=image",
+            expected_output_arg,
             "--pull=False",
             "--tag",
             "img1:latest",
@@ -1210,7 +1231,158 @@ def test_docker_output_option(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("docker/test", target_name="img1"),
         process_assertions=check_docker_proc,
-        options=dict(use_buildx=True),
+        options=dict(use_buildx=True, push_on_package=DockerPushOnPackageBehavior.ALLOW),
+    )
+
+
+@pytest.mark.parametrize(
+    ["output", "expect_error"],
+    [(None, False), ({"type": "registry"}, True), ({"type": "image", "push": "true"}, True)],
+)
+def test_docker_output_option_when_push_on_package_error(
+    rule_runner: RuleRunner, output: dict | None, expect_error: bool
+) -> None:
+    output_str = f"output={repr(output)}," if output else ""
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                f"""\
+                docker_image(
+                  name="img1",
+                  {output_str}
+                )
+                """
+            ),
+        }
+    )
+    try:
+        assert_build(
+            rule_runner,
+            Address("docker/test", target_name="img1"),
+            options=dict(use_buildx=True, push_on_package=DockerPushOnPackageBehavior.ERROR),
+        )
+    except DockerPushOnPackageException:
+        assert expect_error
+    else:
+        assert not expect_error
+
+
+@pytest.mark.parametrize(
+    ["output", "expected_output_arg", "expected_message"],
+    [
+        (None, "--output=type=docker", None),
+        (
+            {"type": "registry"},
+            "--output=type=registry",
+            "Docker image docker/test:img1 will push to a registry during packaging",
+        ),
+        (
+            {"type": "image", "push": "true"},
+            "--output=type=image,push=true",
+            "Docker image docker/test:img1 will push to a registry during packaging",
+        ),
+    ],
+)
+def test_docker_output_option_when_push_on_package_warn(
+    rule_runner: RuleRunner,
+    caplog: pytest.LogCaptureFixture,
+    output: dict | None,
+    expected_output_arg: str,
+    expected_message: str | None,
+) -> None:
+    output_str = f"output={repr(output)}," if output else ""
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                f"""\
+                docker_image(
+                  name="img1",
+                  {output_str}
+                )
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process) -> None:
+        assert process.argv == (
+            "/dummy/docker",
+            "buildx",
+            "build",
+            expected_output_arg,
+            "--pull=False",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        process_assertions=check_docker_proc,
+        options=dict(use_buildx=True, push_on_package=DockerPushOnPackageBehavior.WARN),
+    )
+    has_message = expected_message in [
+        record.message for record in caplog.records if record.levelno == logging.WARNING
+    ]
+    assert has_message is (expected_message is not None)
+
+
+@pytest.mark.parametrize(
+    ["output", "expected_output_arg"],
+    [
+        (None, "--output=type=docker"),
+        ({"type": "registry"}, None),
+        ({"type": "image", "push": "true"}, None),
+    ],
+)
+def test_docker_output_option_when_push_on_package_ignore(
+    rule_runner: RuleRunner, output: dict | None, expected_output_arg: str | None
+) -> None:
+    output_str = f"output={repr(output)}," if output else ""
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                f"""\
+                docker_image(
+                  name="img1",
+                  {output_str}
+                )
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process) -> None:
+        assert process.argv == (
+            "/dummy/docker",
+            "buildx",
+            "build",
+            expected_output_arg,
+            "--pull=False",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    def check_empty_result(result: BuiltPackage) -> None:
+        assert result.digest == EMPTY_DIGEST
+        assert len(result.artifacts) == 0
+
+    kwargs: dict[str, Any] = (
+        {"process_assertions": check_docker_proc}
+        if expected_output_arg
+        else {"result_assertions": check_empty_result}
+    )
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        options=dict(use_buildx=True, push_on_package=DockerPushOnPackageBehavior.IGNORE),
+        **kwargs,
     )
 
 
