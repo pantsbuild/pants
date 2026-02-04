@@ -10,10 +10,8 @@ from collections.abc import Iterator
 from dataclasses import asdict, dataclass
 from functools import partial
 from itertools import chain
-from typing import Literal, cast, final
+from typing import Literal, cast
 
-# Re-exporting BuiltDockerImage here, as it has its natural home here, but has moved out to resolve
-# a dependency cycle from docker_build_context.
 from pants.backend.docker.package_types import (
     BuiltDockerImage,
     DockerPushOnPackageBehavior,

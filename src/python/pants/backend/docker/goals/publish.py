@@ -10,12 +10,12 @@ from itertools import chain
 from typing import DefaultDict, cast
 
 from pants.backend.docker.goals.package_image import (
-    BuiltDockerImage,
     DockerPackageFieldSet,
     GetImageRefsRequest,
     get_docker_image_build_process,
     get_image_refs,
 )
+from pants.backend.docker.package_types import BuiltDockerImage
 from pants.backend.docker.registries import DockerRegistryOptions
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerImageRegistriesField, DockerImageSkipPushField

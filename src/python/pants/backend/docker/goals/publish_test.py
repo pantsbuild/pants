@@ -10,7 +10,6 @@ from unittest.mock import MagicMock
 import pytest
 
 from pants.backend.docker.goals.package_image import (
-    BuiltDockerImage,
     DockerImageBuildProcess,
     DockerImageRefs,
     DockerPackageFieldSet,
@@ -24,6 +23,7 @@ from pants.backend.docker.goals.publish import (
     check_if_skip_push,
     push_docker_images,
 )
+from pants.backend.docker.package_types import BuiltDockerImage
 from pants.backend.docker.registries import DockerRegistryOptions
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerImageTarget
