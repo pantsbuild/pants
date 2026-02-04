@@ -173,12 +173,12 @@ impl<T: TypeId> Display for DependencyKey<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(call_signature) = &self.call_signature {
             let explicit_args_arity: Cow<str> = if call_signature.explicit_args_arity > 0 {
-                format!("<{}>, ", call_signature.explicit_args_arity).into()
+                format!("<{}>", call_signature.explicit_args_arity).into()
             } else {
                 "".into()
             };
             let provided_params: Cow<str> = if self.provided_params.is_empty() {
-                "".into()
+                "_".into()
             } else {
                 format!(
                     "**implicitly({})",
