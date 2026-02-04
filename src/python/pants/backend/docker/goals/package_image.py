@@ -12,12 +12,10 @@ from functools import partial
 from itertools import chain
 from typing import Literal, cast, final
 
-# Re-exporting types here as they have their natural home here, but have moved out to resolve
-# dependency cycles.
+# Re-exporting BuiltDockerImage here, as it has its natural home here, but has moved out to resolve
+# a dependency cycle from docker_build_context.
 from pants.backend.docker.package_types import (
-    BuiltDockerImage as BuiltDockerImage,
-)
-from pants.backend.docker.package_types import (
+    BuiltDockerImage,
     DockerPushOnPackageBehavior,
     DockerPushOnPackageException,
 )
@@ -93,7 +91,6 @@ class DockerPackageFieldSet(PackageFieldSet):
     output_path: OutputPathField
     output: DockerImageBuildImageOutputField
 
-    @final
     def pushes_on_package(self) -> bool:
         """Returns True if this docker_image target would push to a registry during packaging."""
         value_or_default = self.output.value or self.output.default

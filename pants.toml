@@ -181,7 +181,7 @@ args = ["--external-sources"]
 args = ["-i 2", "-ci", "-sr"]
 
 [pytest]
-args = ["--no-header", "--noskip", "-vv", "-m", "'not call_by_type'"]
+args = ["--no-header", "--noskip", "-vv"]
 execution_slot_var = "TEST_EXECUTION_SLOT"
 install_from_resolve = "pytest"
 requirements = ["//3rdparty/python:pytest"]
