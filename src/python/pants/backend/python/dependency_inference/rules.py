@@ -22,9 +22,9 @@ from pants.backend.python.dependency_inference.module_mapper import (
 )
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
     ParsedPythonAssetPaths,
-    ParsedPythonDependencies,
     ParsedPythonImports,
     ParsePythonDependenciesRequest,
+    PythonFileDependencies,
 )
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
     parse_python_dependencies as parse_python_dependencies_get,
@@ -369,7 +369,7 @@ async def _handle_unowned_imports(
 async def _exec_parse_deps(
     field_set: PythonImportDependenciesInferenceFieldSet,
     python_setup: PythonSetup,
-) -> ParsedPythonDependencies:
+) -> PythonFileDependencies:
     interpreter_constraints = InterpreterConstraints.create_from_field_sets(
         [field_set], python_setup
     )
@@ -381,13 +381,14 @@ async def _exec_parse_deps(
         ),
         **implicitly(),
     )
-    return resp
+    assert len(resp.path_to_deps) == 1
+    return next(iter(resp.path_to_deps.values()))
 
 
 @dataclass(frozen=True)
 class ResolvedParsedPythonDependenciesRequest:
     field_set: PythonImportDependenciesInferenceFieldSet
-    parsed_dependencies: ParsedPythonDependencies
+    parsed_dependencies: PythonFileDependencies
     resolve: str | None
 
 
