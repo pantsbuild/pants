@@ -21,9 +21,9 @@ from pants.engine.fs import (
 )
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.internals.native_dep_inference import (
-    NativeParsedDockerfileInfo,
-    NativeParsedJavascriptDependencies,
-    NativeParsedPythonDependencies,
+    NativeDockerfileInfo,
+    NativeJavascriptFileDependencies,
+    NativePythonFileDependencies,
 )
 from pants.engine.internals.scheduler import Workunit, _PathGlobsAndRootCollection
 from pants.engine.internals.session import RunId, SessionValues
@@ -592,13 +592,13 @@ async def interactive_process(
 async def docker_resolve_image(request: DockerResolveImageRequest) -> DockerResolveImageResult: ...
 async def parse_dockerfile_info(
     deps_request: NativeDependenciesRequest,
-) -> NativeParsedDockerfileInfo: ...
+) -> tuple[tuple[str, NativeDockerfileInfo]]: ...
 async def parse_python_deps(
     deps_request: NativeDependenciesRequest,
-) -> NativeParsedPythonDependencies: ...
+) -> tuple[tuple[str, NativePythonFileDependencies]]: ...
 async def parse_javascript_deps(
     deps_request: NativeDependenciesRequest,
-) -> NativeParsedJavascriptDependencies: ...
+) -> tuple[tuple[str, NativeJavascriptFileDependencies]]: ...
 async def path_metadata_request(request: PathMetadataRequest) -> PathMetadataResult: ...
 
 # ------------------------------------------------------------------------------
@@ -767,9 +767,8 @@ class InferenceMetadata:
     def __repr__(self) -> str: ...
 
 class NativeDependenciesRequest:
-    """A request to parse the dependencies of a file.
+    """A request to parse the dependencies of a set of files.
 
-    * The `digest` is expected to contain exactly one source file.
     * Depending on the implementation, a `metadata` structure
       can be passed. It will be supplied to the native parser, and
       it will be incorporated into the cache key.

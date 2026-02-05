@@ -40,10 +40,10 @@ from pants.engine.goal import CurrentExecutingGoals, Goal
 from pants.engine.internals import native_engine
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.internals.native_dep_inference import (
-    NativeParsedDockerfileInfo,
-    NativeParsedJavascriptDependencies,
-    NativeParsedPythonDependencies,
-    ParsedJavascriptDependencyCandidate,
+    JavascriptDependencyCandidate,
+    NativeDockerfileInfo,
+    NativeJavascriptFileDependencies,
+    NativePythonFileDependencies,
 )
 from pants.engine.internals.native_engine import (
     PyExecutionRequest,
@@ -183,10 +183,10 @@ class Scheduler:
             engine_aware_parameter=EngineAwareParameter,
             docker_resolve_image_request=DockerResolveImageRequest,
             docker_resolve_image_result=DockerResolveImageResult,
-            parsed_python_deps_result=NativeParsedPythonDependencies,
-            parsed_javascript_deps_result=NativeParsedJavascriptDependencies,
-            parsed_dockerfile_info_result=NativeParsedDockerfileInfo,
-            parsed_javascript_deps_candidate_result=ParsedJavascriptDependencyCandidate,
+            parsed_python_deps_result=NativePythonFileDependencies,
+            parsed_javascript_deps_result=NativeJavascriptFileDependencies,
+            parsed_dockerfile_info_result=NativeDockerfileInfo,
+            parsed_javascript_deps_candidate_result=JavascriptDependencyCandidate,
         )
         remoting_options = PyRemotingOptions(
             provider=execution_options.remote_provider.value,
