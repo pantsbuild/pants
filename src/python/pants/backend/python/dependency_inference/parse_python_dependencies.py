@@ -106,9 +106,11 @@ async def parse_python_dependencies(
     # We operate on PythonSourceField, which should be one file.
     assert len(stripped_sources.snapshot.files) == 1
 
-    native_result = await parse_python_deps(
+    native_results = await parse_python_deps(
         NativeDependenciesRequest(stripped_sources.snapshot.digest)
     )
+    assert len(native_results.path_to_deps) == 1
+    native_result = next(iter(native_results.path_to_deps.values()))
     imports = dict(native_result.imports)
     assets = set()
 

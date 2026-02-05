@@ -46,7 +46,7 @@ from pants.engine.internals.graph import (
     hydrate_sources,
     resolve_targets,
 )
-from pants.engine.internals.native_dep_inference import ParsedJavascriptDependencyCandidate
+from pants.engine.internals.native_dep_inference import JavascriptDependencyCandidate
 from pants.engine.internals.native_engine import InferenceMetadata, NativeDependenciesRequest
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import parse_javascript_deps, path_globs_to_paths
@@ -177,7 +177,7 @@ def _add_extensions(file_imports: frozenset[str], file_extensions: tuple[str, ..
 
 
 async def _determine_import_from_candidates(
-    candidates: ParsedJavascriptDependencyCandidate,
+    candidates: JavascriptDependencyCandidate,
     package_candidate_map: NodePackageCandidateMap,
     file_extensions: tuple[str, ...],
 ) -> Addresses:
@@ -257,15 +257,18 @@ async def infer_js_source_dependencies(
     )
     metadata = await _prepare_inference_metadata(request.field_set.address, source.file_path)
 
-    import_strings, candidate_pkgs = await concurrently(
+    native_results, candidate_pkgs = await concurrently(
         parse_javascript_deps(NativeDependenciesRequest(sources.snapshot.digest, metadata)),
         map_candidate_node_packages(
             RequestNodePackagesCandidateMap(request.field_set.address), **implicitly()
         ),
     )
+    assert len(native_results.path_to_deps) == 1
+    native_result = next(iter(native_results.path_to_deps.values()))
+
     imports = dict(
         zip(
-            import_strings.imports,
+            native_result.imports,
             await concurrently(
                 _determine_import_from_candidates(
                     candidates,
@@ -277,7 +280,7 @@ async def infer_js_source_dependencies(
                         + TSX_FILE_EXTENSIONS
                     ),
                 )
-                for string, candidates in import_strings.imports.items()
+                for string, candidates in native_result.imports.items()
             ),
         )
     )
