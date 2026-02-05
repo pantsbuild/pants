@@ -99,75 +99,51 @@ fn parse_dockerfile_info(deps_request: Value) -> PyGeneratorResponseNativeCall {
                     })
                     .await?;
 
-                // Vec of (path, info).
-                let mut result_pairs = Vec::with_capacity(parsed_results.len());
-                for (path, result) in parsed_results.into_iter() {
-                    let py_result_pair = Python::attach(|py| -> Result<_, PyErr> {
-                        let path_str: String = path
-                                    .as_os_str()
-                                    .to_str()
-                                    .map(|s| s.to_string())
-                                    .ok_or_else(|| {
-                                        PyException::new_err(format!(
-                                            "Could not convert path `{}` to UTF8.",
-                                            path.display()
-                                        ))
-                                    })?;
-                        externs::store_tuple(py,
-                            vec![
-                                path_str.into_pyobject(py)?.into_any().into(),
-                                externs::unsafe_call(
-                                    py,
-                                    core.types.parsed_dockerfile_info_result,
-                                    &[
-                                        result
-                                            .path
-                                            .as_os_str()
-                                            .to_str()
-                                            .map(|s| s.to_string())
-                                            .ok_or_else(|| {
-                                                PyException::new_err(format!(
-                                                    "Could not convert ParsedDockerfileDependencies.path `{}` to UTF8.",
-                                                    result.path.display()
-                                                ))
-                                            })?
-                                            .into_pyobject(py)?
-                                            .into_any()
-                                            .into(),
-                                        result.build_args.into_pyobject(py)?.into_any().into(),
-                                        result
-                                            .copy_source_paths
-                                            .into_pyobject(py)?
-                                            .into_any()
-                                            .into(),
-                                        result.copy_build_args.into_pyobject(py)?.into_any().into(),
-                                        result
-                                            .from_image_build_args
-                                            .into_pyobject(py)?
-                                            .into_any()
-                                            .into(),
-                                        result
-                                            .version_tags
-                                            .into_iter()
-                                            .map(|(stage, tag)| match tag {
-                                                Some(tag) => format!("{stage} {tag}"),
-                                                None => stage.to_string(),
-                                            })
-                                            .collect::<Vec<_>>()
-                                            .into_pyobject(py)?
-                                            .into_any()
-                                            .into(),
-                                    ]
-                                )
-                            ]
-                        )
-                    })?;
-                    result_pairs.push(py_result_pair);
-                }
-
-                let tuple_result =
-                    Python::attach(|py| externs::store_tuple(py, result_pairs)).map_err(Failure::from)?;
-                Ok::<_, Failure>(tuple_result)
+                convert_results_to_tuple(parsed_results, |py, _path, result| {
+                    Ok(externs::unsafe_call(
+                        py,
+                        core.types.parsed_dockerfile_info_result,
+                        &[
+                            result
+                                .path
+                                .as_os_str()
+                                .to_str()
+                                .map(|s| s.to_string())
+                                .ok_or_else(|| {
+                                    PyException::new_err(format!(
+                                        "Could not convert ParsedDockerfileDependencies.path `{}` to UTF8.",
+                                        result.path.display()
+                                    ))
+                                })?
+                                .into_pyobject(py)?
+                                .into_any()
+                                .into(),
+                            result.build_args.into_pyobject(py)?.into_any().into(),
+                            result
+                                .copy_source_paths
+                                .into_pyobject(py)?
+                                .into_any()
+                                .into(),
+                            result.copy_build_args.into_pyobject(py)?.into_any().into(),
+                            result
+                                .from_image_build_args
+                                .into_pyobject(py)?
+                                .into_any()
+                                .into(),
+                            result
+                                .version_tags
+                                .into_iter()
+                                .map(|(stage, tag)| match tag {
+                                    Some(tag) => format!("{stage} {tag}"),
+                                    None => stage.to_string(),
+                                })
+                                .collect::<Vec<_>>()
+                                .into_pyobject(py)?
+                                .into_any()
+                                .into(),
+                        ],
+                    ))
+                })
             }
         )
         .await
@@ -198,45 +174,20 @@ fn parse_python_deps(deps_request: Value) -> PyGeneratorResponseNativeCall {
                     )
                     .await?;
 
-                // Vec of (path, info).
-                let mut result_pairs = Vec::with_capacity(parsed_results.len());
-                for (path, result) in parsed_results {
-                    let py_result_pair = Python::attach(|py| -> Result<_, PyErr> {
-                        let path_str: String = path
-                            .as_os_str()
-                            .to_str()
-                            .map(|s| s.to_string())
-                            .ok_or_else(|| {
-                                PyException::new_err(format!(
-                                    "Could not convert path `{}` to UTF8.",
-                                    path.display()
-                                ))
-                            })?;
-                        externs::store_tuple(
-                            py,
-                            vec![
-                                path_str.into_pyobject(py)?.into_any().into(),
-                                externs::unsafe_call(
-                                    py,
-                                    core.types.parsed_python_deps_result,
-                                    &[
-                                        result.imports.into_pyobject(py)?.into_any().into(),
-                                        result
-                                            .string_candidates
-                                            .into_pyobject(py)?
-                                            .into_any()
-                                            .into(),
-                                    ],
-                                ),
-                            ],
-                        )
-                    })?;
-                    result_pairs.push(py_result_pair);
-                }
-
-                let tuple_result = Python::attach(|py| externs::store_tuple(py, result_pairs))
-                    .map_err(Failure::from)?;
-                Ok::<_, Failure>(tuple_result)
+                convert_results_to_tuple(parsed_results, |py, _path, result| {
+                    Ok(externs::unsafe_call(
+                        py,
+                        core.types.parsed_python_deps_result,
+                        &[
+                            result.imports.into_pyobject(py)?.into_any().into(),
+                            result
+                                .string_candidates
+                                .into_pyobject(py)?
+                                .into_any()
+                                .into(),
+                        ],
+                    ))
+                })
             }
         )
         .await
@@ -279,59 +230,31 @@ fn parse_javascript_deps(deps_request: Value) -> PyGeneratorResponseNativeCall {
                     )
                     .await?;
 
-                // Vec of (path, info).
-                let mut result_pairs = Vec::with_capacity(parsed_results.len());
-                for (path, result) in parsed_results {
-                    let py_result_pair = Python::attach(|py| -> Result<_, PyErr> {
-                        let path_str: String = path
-                            .as_os_str()
-                            .to_str()
-                            .map(|s| s.to_string())
-                            .ok_or_else(|| {
-                                PyException::new_err(format!(
-                                    "Could not convert path `{}` to UTF8.",
-                                    path.display()
-                                ))
-                            })?;
-                        let import_items = result
-                            .imports
-                            .into_iter()
-                            .map(|(string, info)| -> Result<_, PyErr> {
-                                Ok((
-                                    string.into_pyobject(py)?.into_any().into(),
-                                    externs::unsafe_call(
-                                        py,
-                                        core.types.parsed_javascript_deps_candidate_result,
-                                        &[
-                                            info.file_imports.into_pyobject(py)?.into_any().into(),
-                                            info.package_imports
-                                                .into_pyobject(py)?
-                                                .into_any()
-                                                .into(),
-                                        ],
-                                    ),
-                                ))
-                            })
-                            .collect::<Result<Vec<_>, PyErr>>()?;
-
-                        externs::store_tuple(
-                            py,
-                            vec![
-                                path_str.into_pyobject(py)?.into_any().into(),
+                convert_results_to_tuple(parsed_results, |py, _path, result| {
+                    let import_items = result
+                        .imports
+                        .into_iter()
+                        .map(|(string, info)| -> Result<_, PyErr> {
+                            Ok((
+                                string.into_pyobject(py)?.into_any().into(),
                                 externs::unsafe_call(
                                     py,
-                                    core.types.parsed_javascript_deps_result,
-                                    &[store_dict(py, import_items)?],
+                                    core.types.parsed_javascript_deps_candidate_result,
+                                    &[
+                                        info.file_imports.into_pyobject(py)?.into_any().into(),
+                                        info.package_imports.into_pyobject(py)?.into_any().into(),
+                                    ],
                                 ),
-                            ],
-                        )
-                    })?;
-                    result_pairs.push(py_result_pair);
-                }
+                            ))
+                        })
+                        .collect::<Result<Vec<_>, PyErr>>()?;
 
-                let tuple_result = Python::attach(|py| externs::store_tuple(py, result_pairs))
-                    .map_err(Failure::from)?;
-                Ok::<_, Failure>(tuple_result)
+                    Ok(externs::unsafe_call(
+                        py,
+                        core.types.parsed_javascript_deps_result,
+                        &[store_dict(py, import_items)?],
+                    ))
+                })
             }
         )
         .await
@@ -341,6 +264,40 @@ fn parse_javascript_deps(deps_request: Value) -> PyGeneratorResponseNativeCall {
 struct PathAndDigest {
     path: PathBuf,
     digest: Digest,
+}
+
+fn convert_results_to_tuple<T, F>(
+    parsed_results: Vec<(PathBuf, T)>,
+    result_converter: F,
+) -> NodeResult<Value>
+where
+    F: Fn(Python<'_>, &Path, T) -> Result<Value, PyErr>,
+{
+    let mut result_pairs = Vec::with_capacity(parsed_results.len());
+    for (path, result) in parsed_results {
+        let py_result_pair = Python::attach(|py| -> Result<_, PyErr> {
+            let path_str: String = path
+                .as_os_str()
+                .to_str()
+                .map(|s| s.to_string())
+                .ok_or_else(|| {
+                    PyException::new_err(format!(
+                        "Could not convert path `{}` to UTF8.",
+                        path.display()
+                    ))
+                })?;
+            externs::store_tuple(
+                py,
+                vec![
+                    path_str.into_pyobject(py)?.into_any().into(),
+                    result_converter(py, &path, result)?,
+                ],
+            )
+        })?;
+        result_pairs.push(py_result_pair);
+    }
+
+    Python::attach(|py| externs::store_tuple(py, result_pairs)).map_err(Failure::from)
 }
 
 pub(crate) async fn get_or_create_inferred_dependencies<T, F>(
