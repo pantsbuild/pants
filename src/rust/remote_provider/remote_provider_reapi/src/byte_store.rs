@@ -667,12 +667,14 @@ mod tests {
         let small_request = FindMissingBlobsRequest {
             instance_name: instance_name.to_string(),
             blob_digests: vec![TestData::catnip().digest().into()],
+            ..Default::default()
         };
         assert_eq!(small_request.encoded_len(), 70);
 
         let medium_request = FindMissingBlobsRequest {
             instance_name: instance_name.to_string(),
             blob_digests: vec![TestData::all_the_henries().digest().into()],
+            ..Default::default()
         };
         assert_eq!(medium_request.encoded_len(), 72);
 
@@ -682,6 +684,7 @@ mod tests {
         let large_request = FindMissingBlobsRequest {
             instance_name: instance_name.to_string(),
             blob_digests: vec![big_blob.into()],
+            ..Default::default()
         };
         assert_eq!(large_request.encoded_len(), 74);
 
@@ -691,6 +694,7 @@ mod tests {
                 hash: big_blob.hash.to_string(),
                 size_bytes: i64::MAX,
             }],
+            ..Default::default()
         };
         assert_eq!(max_request.encoded_len(), 78);
     }
@@ -788,6 +792,7 @@ mod tests {
             let request = FindMissingBlobsRequest {
                 instance_name: instance_name.to_string(),
                 blob_digests: blobs.clone(),
+                ..Default::default()
             };
 
             let size = request.encoded_len();
