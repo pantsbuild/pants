@@ -8,7 +8,6 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from pants.backend.python.dependency_inference.subsystem import PythonInferSubsystem
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.util_rules.source_files import SourceFiles
 from pants.core.util_rules.stripped_source_files import strip_source_roots
 from pants.engine.collection import DeduplicatedCollection
@@ -62,7 +61,6 @@ class PythonFilesDependencies:
 @dataclass(frozen=True)
 class ParsePythonDependenciesRequest:
     source: SourceFiles
-    interpreter_constraints: InterpreterConstraints
 
 
 @dataclass(frozen=True)
