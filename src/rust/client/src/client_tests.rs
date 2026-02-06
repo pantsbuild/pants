@@ -1,7 +1,7 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::time::SystemTime;
 
 use options::{Args, Env, OptionParser};
@@ -37,7 +37,7 @@ async fn test_client_fingerprint_mismatch() {
             "--pants-subprocessdir={}",
             tmpdir.path().display()
         )]),
-        Env::new(HashMap::new()),
+        Env::new(BTreeMap::new()),
         None,
         true,
         false,

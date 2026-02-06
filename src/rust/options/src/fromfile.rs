@@ -6,6 +6,8 @@ use super::{BuildRoot, DictEdit, DictEditAction, ListEdit, ListEditAction};
 use crate::parse::{ParseError, Parseable, mk_parse_err, parse_dict};
 use log::warn;
 use serde::de::Deserialize;
+use sha2::{Digest, Sha256};
+use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 
@@ -51,7 +53,7 @@ fn try_deserialize<'a, DE: Deserialize<'a>>(
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct FromfileExpander {
     build_root: BuildRoot,
 }
@@ -146,6 +148,10 @@ impl FromfileExpander {
         } else {
             Ok(None)
         }
+    }
+
+    pub fn add_to_sha256(&self, hasher: &mut Sha256) {
+        hasher.update(self.build_root.as_os_str().as_bytes());
     }
 }
 

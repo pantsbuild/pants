@@ -2,12 +2,15 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::any::Any;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
+use std::hash::Hash;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
 use regex::Regex;
+use sha2::Sha256;
+use sha2::digest::Update;
 use toml::Value;
 use toml::value::Table;
 
@@ -16,7 +19,7 @@ use crate::fromfile::FromfileExpander;
 use crate::id::{NameTransform, OptionId};
 use crate::parse::Parseable;
 
-type InterpolationMap = HashMap<String, String>;
+type InterpolationMap = BTreeMap<String, String>;
 
 static DEFAULT_SECTION: &str = "DEFAULT";
 
@@ -253,9 +256,140 @@ impl ConfigSource {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Config {
     value: Value,
+}
+
+// Value doesn't implement Eq and Hash because of floats, but in our case we can insist that
+// NaN == NaN for config equality/hash purposes. For one thing, we don't meaningfully
+// support NaN in config values (although we don't enforce that they don't appear).
+// For another, if NaN != NaN then we must invalidate that config on every run,
+// which is very unlikely to be what the user intends.
+
+fn _eq_toml_value(left: &Value, right: &Value) -> bool {
+    match left {
+        Value::String(s0) => {
+            if let Value::String(s1) = right {
+                s0 == s1
+            } else {
+                false
+            }
+        }
+        Value::Integer(i0) => {
+            if let Value::Integer(i1) = right {
+                i0 == i1
+            } else {
+                false
+            }
+        }
+        Value::Float(f0) => {
+            if let Value::Float(f1) = right {
+                f0.to_bits() == f1.to_bits()
+            } else {
+                false
+            }
+        }
+        Value::Boolean(b0) => {
+            if let Value::Boolean(b1) = right {
+                b0 == b1
+            } else {
+                false
+            }
+        }
+        Value::Datetime(d0) => {
+            if let Value::Datetime(d1) = right {
+                d0 == d1
+            } else {
+                false
+            }
+        }
+        Value::Array(a0) => {
+            if let Value::Array(a1) = right {
+                a0.len() == a1.len()
+                    && a0
+                        .iter()
+                        .zip(a1.iter())
+                        .all(|(v0, v1)| _eq_toml_value(v0, v1))
+            } else {
+                false
+            }
+        }
+        // We use the preserve_order feature, so we'll get the table entries in a consistent order.
+        Value::Table(t0) => {
+            if let Value::Table(t1) = right {
+                t0.len() == t1.len()
+                    && t0
+                        .iter()
+                        .zip(t1.iter())
+                        .all(|(e0, e1)| e0.0 == e1.0 && _eq_toml_value(e0.1, e1.1))
+            } else {
+                false
+            }
+        }
+    }
+}
+
+impl PartialEq for Config {
+    fn eq(&self, other: &Self) -> bool {
+        _eq_toml_value(&self.value, &other.value)
+    }
+}
+
+impl Eq for Config {}
+
+fn _hash_toml_value<H: std::hash::Hasher>(value: &Value, state: &mut H) {
+    match value {
+        Value::String(s) => s.hash(state),
+        Value::Integer(i) => i.hash(state),
+        Value::Float(f) => state.write_u64(f.to_bits()),
+        Value::Boolean(b) => b.hash(state),
+        // We don't support datetime types in config, so we won't incur this to_string() cost
+        // in practice.
+        Value::Datetime(dt) => dt.to_string().hash(state),
+        Value::Array(a) => {
+            for m in a {
+                _hash_toml_value(m, state);
+            }
+        }
+        // We use the preserve_order feature, so we'll get the table entries in a consistent order.
+        Value::Table(t) => {
+            for (k, v) in t.iter() {
+                k.hash(state);
+                _hash_toml_value(v, state);
+            }
+        }
+    }
+}
+
+impl Hash for Config {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        _hash_toml_value(&self.value, state);
+    }
+}
+
+fn add_to_sha256(value: &Value, hasher: &mut Sha256) {
+    match value {
+        Value::String(s) => hasher.update(s.as_bytes()),
+        Value::Integer(i) => hasher.update(&i.to_le_bytes()),
+        Value::Float(f) => hasher.update(&f.to_le_bytes()),
+        Value::Boolean(b) => hasher.update(&(if *b { [b'1'] } else { [b'0'] })),
+        // We don't support datetime types in config, so we won't incur this to_string() cost
+        // in practice.
+        Value::Datetime(dt) => hasher.update(dt.to_string().as_bytes()),
+        Value::Array(a) => {
+            for m in a {
+                add_to_sha256(m, hasher);
+            }
+        }
+        // We use the preserve_order feature, so we'll get the table entries in a consistent order.
+        Value::Table(t) => {
+            for (k, v) in t.iter() {
+                hasher.update(k.as_bytes());
+                add_to_sha256(v, hasher);
+            }
+        }
+    }
 }
 
 impl Config {
@@ -336,6 +470,10 @@ impl Config {
             value: Value::Table(new_table),
         })
     }
+
+    pub fn add_to_sha256(&self, hasher: &mut Sha256) {
+        add_to_sha256(&self.value, hasher);
+    }
 }
 
 pub struct ConfigReader {
@@ -349,6 +487,10 @@ impl ConfigReader {
             config,
             fromfile_expander,
         }
+    }
+
+    pub fn add_to_sha256(&self, hasher: &mut Sha256) {
+        self.config.add_to_sha256(hasher);
     }
 
     // Given a map from section name to valid keys for that section,

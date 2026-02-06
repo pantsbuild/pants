@@ -1137,6 +1137,7 @@ dependencies = [
  "nailgun",
  "num_enum",
  "options",
+ "options_pants_ng",
  "pantsd",
  "parking_lot 0.12.4",
  "pe_nailgun",
@@ -2710,6 +2711,7 @@ checksum = "d05e27ee213611ffe7d6348b942e8f942b37114c00cc03cec254295a4a17852e"
 name = "options"
 version = "0.0.1"
 dependencies = [
+ "hashing",
  "itertools 0.14.0",
  "log",
  "maplit",
@@ -2719,6 +2721,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "sha2",
  "shellexpand",
  "shlex",
  "tempfile",
@@ -2732,12 +2735,16 @@ version = "0.0.1"
 dependencies = [
  "fs",
  "glob",
+ "hashing",
  "maplit",
  "options",
  "parking_lot 0.12.4",
  "regex",
+ "sha2",
+ "shellexpand",
  "shlex",
  "tempfile",
+ "whoami",
 ]
 
 [[package]]

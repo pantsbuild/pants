@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::any::Any;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::env;
 use std::ffi::OsString;
 
@@ -13,9 +13,9 @@ use crate::fromfile::FromfileExpander;
 use crate::parse::Parseable;
 use crate::scope::Scope;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Env {
-    pub(crate) env: HashMap<String, String>,
+    pub env: BTreeMap<String, String>,
 }
 
 #[derive(Debug)]
@@ -25,7 +25,7 @@ pub struct DroppedEnvVars {
 }
 
 impl Env {
-    pub fn new(env: HashMap<String, String>) -> Self {
+    pub fn new(env: BTreeMap<String, String>) -> Self {
         Self { env }
     }
 
@@ -37,7 +37,7 @@ impl Env {
     where
         I: Iterator<Item = (OsString, OsString)>,
     {
-        let mut env: HashMap<String, String> = HashMap::with_capacity(env_os.size_hint().0);
+        let mut env: BTreeMap<String, String> = BTreeMap::new();
         let mut dropped = DroppedEnvVars {
             non_utf8_keys: Vec::new(),
             keys_with_non_utf8_values: Vec::new(),
