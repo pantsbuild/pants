@@ -9,11 +9,11 @@ import pytest
 
 from pants.backend.python.dependency_inference import parse_python_dependencies
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
-    ParsedPythonDependencies,
-    ParsePythonDependenciesRequest,
+    ParsedPythonImportInfo as ImpInfo,
 )
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
-    ParsedPythonImportInfo as ImpInfo,
+    ParsePythonDependenciesRequest,
+    PythonFilesDependencies,
 )
 from pants.backend.python.target_types import PythonSourceField, PythonSourceTarget
 from pants.backend.python.util_rules import pex
@@ -36,7 +36,7 @@ def rule_runner() -> RuleRunner:
             *stripped_source_files.rules(),
             *pex.rules(),
             QueryRule(SourceFiles, [SourceFilesRequest]),
-            QueryRule(ParsedPythonDependencies, [ParsePythonDependenciesRequest]),
+            QueryRule(PythonFilesDependencies, [ParsePythonDependenciesRequest]),
         ],
         target_types=[PythonSourceTarget],
     )
@@ -75,14 +75,18 @@ def assert_deps_parsed(
     )
     tgt = rule_runner.get_target(Address("", target_name="t"))
     source_files = rule_runner.request(SourceFiles, [SourceFilesRequest([tgt[PythonSourceField]])])
-    result = rule_runner.request(
-        ParsedPythonDependencies,
-        [
-            ParsePythonDependenciesRequest(
-                source_files,
-                InterpreterConstraints([constraints]),
-            )
-        ],
+    result = next(
+        iter(
+            rule_runner.request(
+                PythonFilesDependencies,
+                [
+                    ParsePythonDependenciesRequest(
+                        source_files,
+                        InterpreterConstraints([constraints]),
+                    )
+                ],
+            ).path_to_deps.values()
+        )
     )
     assert dict(result.imports) == expected_imports
     assert list(result.assets) == sorted(expected_assets)
