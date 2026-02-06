@@ -125,6 +125,7 @@ impl Provider {
                 data: bytes,
                 compressor: remexec::compressor::Value::Identity as i32,
             }],
+            ..Default::default()
         };
 
         let mut client = self.cas_client.as_ref().clone();
@@ -509,6 +510,7 @@ impl ByteStoreProvider for Provider {
                     instance_name: self.instance_name.as_ref().cloned().unwrap_or_default(),
                     digests: digests,
                     acceptable_compressors: vec![],
+                    ..Default::default()
                 };
 
                 let client = client.clone();
@@ -596,6 +598,7 @@ impl ByteStoreProvider for Provider {
             remexec::FindMissingBlobsRequest {
                 instance_name: self.instance_name.as_ref().cloned().unwrap_or_default(),
                 blob_digests: digests.to_vec(),
+                ..Default::default()
             }
         });
 

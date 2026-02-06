@@ -433,6 +433,7 @@ async fn make_request_from_flat_args(
 }
 
 #[allow(clippy::redundant_closure)] // False positives for prost::Message::decode: https://github.com/rust-lang/rust-clippy/issues/5939
+#[allow(deprecated)] // TODO: Move to REAPI `output_path` instead of `output_files` and `output_directories`.
 async fn extract_request_from_action_digest(
     store: &Store,
     action_digest: Digest,

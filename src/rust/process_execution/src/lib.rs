@@ -1256,6 +1256,7 @@ fn maybe_make_wrapper_script(
     Ok(Some(script))
 }
 
+#[allow(deprecated)] // TODO: Move to REAPI `output_path` instead of `output_files` and `output_directories`.
 pub async fn make_execute_request(
     req: &Process,
     instance_name: Option<String>,
