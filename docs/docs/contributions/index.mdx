@@ -17,6 +17,28 @@ If you ever encounter a confusing or mediocre error message, we would love your 
 (If you'd be interested in then changing the code, we'd be happy to point you in the right direction!)
 :::
 
+## LLM Assistance Notice
+
+AI/LLM assisted *code contributions* are welcome.  That includes using LLM assistance to write, introspect, read, reason about, debug, or test code contributions.  However, the extent of the LLM assistance use must be disclosed in the Pull Request description.  All of the normal expectations of a human apply: you need to understand it, have tested it, and be able to discuss the proposed change.
+
+This isn't meant to discourage LLM use -- it is not frowned upon! -- but it is critical *context* for reviewers.  One of the most valuable community actions is careful line-by-line, review of an earnest first time contribution.  That takes a lot of time and care.  But that effort doesn't help a robot and different modes of feedback are more appropriate.
+
+An example disclosure:
+
+    This PR was written primarily by Claude Code.
+Or:
+
+    ChatGPT looked for prior art and came up with the approach but I wrote the code manually.
+Or:
+
+    Gemini generated all of the test cases.
+
+Minor exceptions to this policy include basic auto-complete functionality or the various Machine Learning techniques that are no longer called "AI".  Spellcheck is not an AI.
+
+:::note AI/LLM generation is for *code* changes only.  All community interactions, including comments, discussion, issues, PR titles, and descriptions *must be composed by a human*.  Be respectful to one another and mindful of the person on the other end.
+
+This policy was inspired by the [ghostty AI Assistance Notice]( https://github.com/ghostty-org/ghostty/blob/main/CONTRIBUTING.md).  For further discussion of LLM prose and social contracts see [Using LLMs at Oxide](https://rfd.shared.oxide.computer/rfd/0576).
+
 ## Documentation Fixes
 
 To suggest edits to Pants documentation, fork the [Pants repository](https://github.com/pantsbuild/pants), make changes to files in the `docs/` directory, and submit a PR against the `main` branch. Address feedback from maintainers and, once approved, your changes will be incorporated into the official documentation.
