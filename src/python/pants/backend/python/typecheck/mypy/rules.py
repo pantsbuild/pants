@@ -307,10 +307,16 @@ async def mypy_typecheck_partition(
                             {" ".join(shell_quote(arg) for arg in argv)}
                             EXIT_CODE=$?
 
-                            if ! {ln.path} "$SANDBOX_CACHE_DB" "$NAMED_CACHE_DB" > /dev/null 2>&1; then
-                                TMP_CACHE=$({mktemp.path} "$SANDBOX_CACHE_DB.tmp.XXXXXX")
-                                {cp.path} "$SANDBOX_CACHE_DB" "$TMP_CACHE" > /dev/null 2>&1
-                                {mv.path} "$TMP_CACHE" "$NAMED_CACHE_DB" > /dev/null 2>&1
+                            # Only update the cache on successful runs (exit code 0 or 1).
+                            # Exit code 2 indicates a crash or internal error, which may have
+                            # left the cache in an inconsistent state.
+                            # See https://github.com/python/mypy/issues/6003 for exit codes
+                            if [ $EXIT_CODE -le 1 ]; then
+                                if ! {ln.path} "$SANDBOX_CACHE_DB" "$NAMED_CACHE_DB" > /dev/null 2>&1; then
+                                    TMP_CACHE=$({mktemp.path} "$SANDBOX_CACHE_DB.tmp.XXXXXX")
+                                    {cp.path} "$SANDBOX_CACHE_DB" "$TMP_CACHE" > /dev/null 2>&1
+                                    {mv.path} "$TMP_CACHE" "$NAMED_CACHE_DB" > /dev/null 2>&1
+                                fi
                             fi
 
                             exit $EXIT_CODE
