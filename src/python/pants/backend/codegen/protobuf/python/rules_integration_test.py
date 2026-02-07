@@ -408,6 +408,7 @@ def test_grpclib_plugin(rule_runner: RuleRunner) -> None:
     )
 
 
+@pytest.mark.platform_specific_behavior
 def test_all_plugins(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
