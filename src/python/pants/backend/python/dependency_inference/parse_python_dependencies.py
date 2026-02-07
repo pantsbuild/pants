@@ -111,9 +111,6 @@ async def parse_python_dependencies(
     python_infer_subsystem: PythonInferSubsystem,
 ) -> PythonFilesDependencies:
     stripped_sources = await strip_source_roots(request.source)
-    # We operate on PythonSourceField, which should be one file.
-    assert len(stripped_sources.snapshot.files) == 1
-
     native_results = await parse_python_deps(
         NativeDependenciesRequest(stripped_sources.snapshot.digest)
     )
