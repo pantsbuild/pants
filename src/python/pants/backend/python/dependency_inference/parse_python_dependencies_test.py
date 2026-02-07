@@ -17,7 +17,6 @@ from pants.backend.python.dependency_inference.parse_python_dependencies import 
 )
 from pants.backend.python.target_types import PythonSourceField, PythonSourceTarget
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
@@ -49,7 +48,6 @@ def assert_deps_parsed(
     expected_imports: dict[str, ImpInfo] | None = None,
     expected_assets: list[str] | None = None,
     filename: str = "project/foo.py",
-    constraints: str = ">=3.6",
     string_imports: bool = True,
     string_imports_min_dots: int = 2,
     assets: bool = True,
@@ -82,7 +80,6 @@ def assert_deps_parsed(
                 [
                     ParsePythonDependenciesRequest(
                         source_files,
-                        InterpreterConstraints([constraints]),
                     )
                 ],
             ).path_to_deps.values()
@@ -463,7 +460,6 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
     assert_deps_parsed(
         rule_runner,
         content,
-        constraints=">=3.8",
         expected_imports={
             "demo": ImpInfo(lineno=5, weak=False),
             "project.demo.Demo": ImpInfo(lineno=6, weak=False),
@@ -496,7 +492,6 @@ def test_works_with_python39(rule_runner: RuleRunner) -> None:
     assert_deps_parsed(
         rule_runner,
         content,
-        constraints=">=3.9",
         expected_imports={
             "demo": ImpInfo(lineno=7, weak=False),
             "project.demo.Demo": ImpInfo(lineno=8, weak=False),

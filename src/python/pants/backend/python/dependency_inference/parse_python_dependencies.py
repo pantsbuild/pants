@@ -8,7 +8,6 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from pants.backend.python.dependency_inference.subsystem import PythonInferSubsystem
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.util_rules.source_files import SourceFiles
 from pants.core.util_rules.stripped_source_files import strip_source_roots
 from pants.engine.collection import DeduplicatedCollection
@@ -62,7 +61,6 @@ class PythonFilesDependencies:
 @dataclass(frozen=True)
 class ParsePythonDependenciesRequest:
     source: SourceFiles
-    interpreter_constraints: InterpreterConstraints
 
 
 @dataclass(frozen=True)
@@ -113,9 +111,6 @@ async def parse_python_dependencies(
     python_infer_subsystem: PythonInferSubsystem,
 ) -> PythonFilesDependencies:
     stripped_sources = await strip_source_roots(request.source)
-    # We operate on PythonSourceField, which should be one file.
-    assert len(stripped_sources.snapshot.files) == 1
-
     native_results = await parse_python_deps(
         NativeDependenciesRequest(stripped_sources.snapshot.digest)
     )
