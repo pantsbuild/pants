@@ -18,7 +18,7 @@ use protos::pb::build::bazel::remote::execution::v2 as remexec;
 use protos::pb::build::bazel::semver::SemVer;
 use protos::pb::google::longrunning::{
     CancelOperationRequest, DeleteOperationRequest, GetOperationRequest, ListOperationsRequest,
-    ListOperationsResponse, Operation, operations_server::Operations,
+    ListOperationsResponse, Operation, WaitOperationRequest, operations_server::Operations,
     operations_server::OperationsServer,
 };
 use protos::require_digest;
@@ -423,6 +423,15 @@ impl Operations for MockResponder {
         let request = request.into_inner();
         self.cancelation_requests.lock().push(request);
         Ok(Response::new(()))
+    }
+
+    async fn wait_operation(
+        &self,
+        _: Request<WaitOperationRequest>,
+    ) -> Result<Response<Operation>, Status> {
+        Err(Status::unimplemented(
+            "wait_operation not implemented in mock".to_owned(),
+        ))
     }
 }
 

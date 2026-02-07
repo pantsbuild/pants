@@ -183,11 +183,8 @@ impl CommandRunner {
            digest {trie_digest:?} contained a symlink instead.",
                 trie_digest = root_trie.compute_root_digest(),
             )),
-            Some(directory::Entry::Directory(_)) => Err(format!(
-                "Declared output file path {file_path:?} in output \
-           digest {trie_digest:?} contained a directory instead.",
-                trie_digest = root_trie.compute_root_digest(),
-            )),
+            // Return None for directories so they can be handled as output_directories
+            Some(directory::Entry::Directory(_)) => Ok(None),
         }
     }
 
@@ -221,36 +218,32 @@ impl CommandRunner {
         digests.insert(result.stdout_digest);
         digests.insert(result.stderr_digest);
 
-        for output_directory in &command.output_directories {
-            let (tree, file_digests) = match Self::make_tree_for_output_directory(
+        // Use output_paths (v2.1+ API) instead of deprecated output_files/output_directories
+        for output_path in &command.output_paths {
+            // Check if this path is a file first (more common case)
+            if let Some(output_file) = Self::extract_output_file(&output_trie, output_path)? {
+                // It's a file
+                digests.insert(require_digest(output_file.digest.as_ref())?);
+                action_result.output_files.push(output_file);
+            } else if let Some((tree, file_digests)) = Self::make_tree_for_output_directory(
                 &output_trie,
-                RelativePath::new(output_directory).unwrap(),
+                RelativePath::new(output_path).unwrap(),
             )? {
-                Some(res) => res,
-                None => continue,
-            };
+                // It's a directory
+                let tree_digest = crate::remote::store_proto_locally(&self.store, &tree).await?;
+                digests.insert(tree_digest);
+                digests.extend(file_digests);
 
-            let tree_digest = crate::remote::store_proto_locally(&self.store, &tree).await?;
-            digests.insert(tree_digest);
-            digests.extend(file_digests);
-
-            action_result
-                .output_directories
-                .push(remexec::OutputDirectory {
-                    path: output_directory.to_owned(),
-                    tree_digest: Some(tree_digest.into()),
-                    is_topologically_sorted: false,
-                });
-        }
-
-        for output_file_path in &command.output_files {
-            let output_file = match Self::extract_output_file(&output_trie, output_file_path)? {
-                Some(output_file) => output_file,
-                None => continue,
-            };
-
-            digests.insert(require_digest(output_file.digest.as_ref())?);
-            action_result.output_files.push(output_file);
+                action_result
+                    .output_directories
+                    .push(remexec::OutputDirectory {
+                        path: output_path.to_owned(),
+                        tree_digest: Some(tree_digest.into()),
+                        is_topologically_sorted: false,
+                        root_directory_digest: None,
+                    });
+            }
+            // If neither file nor directory, skip (path doesn't exist in output)
         }
 
         Ok((action_result, digests.into_iter().collect::<Vec<_>>()))

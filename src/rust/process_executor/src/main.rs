@@ -477,6 +477,32 @@ async fn extract_request_from_action_digest(
         .await
         .map_err(|e| e.to_string())?;
 
+    // Use output_paths if available, otherwise fall back to deprecated output_files/output_directories
+    let (output_files, output_directories) = if command.output_paths.is_empty() {
+        // Fall back to deprecated fields for backwards compatibility
+        #[allow(deprecated)]
+        let files = command
+            .output_files
+            .iter()
+            .map(RelativePath::new)
+            .collect::<Result<_, _>>()?;
+        #[allow(deprecated)]
+        let dirs = command
+            .output_directories
+            .iter()
+            .map(RelativePath::new)
+            .collect::<Result<_, _>>()?;
+        (files, dirs)
+    } else {
+        // Use the new output_paths field (v2.1+)
+        let all_paths: BTreeSet<RelativePath> = command
+            .output_paths
+            .iter()
+            .map(RelativePath::new)
+            .collect::<Result<_, _>>()?;
+        (all_paths.clone(), all_paths)
+    };
+
     let process = process_execution::Process {
         argv: command.arguments,
         env: command
@@ -491,16 +517,8 @@ async fn extract_request_from_action_digest(
             .collect(),
         working_directory,
         input_digests,
-        output_files: command
-            .output_files
-            .iter()
-            .map(RelativePath::new)
-            .collect::<Result<_, _>>()?,
-        output_directories: command
-            .output_directories
-            .iter()
-            .map(RelativePath::new)
-            .collect::<Result<_, _>>()?,
+        output_files,
+        output_directories,
         timeout: action.timeout.map(|timeout| {
             Duration::from_nanos(timeout.nanos as u64 + timeout.seconds as u64 * 1000000000)
         }),
