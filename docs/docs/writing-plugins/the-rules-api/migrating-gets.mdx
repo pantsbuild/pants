@@ -7,9 +7,11 @@ Migrating away from the old call-by-type Rules API.
 
 ---
 
-## `Get` and `MultiGet`
+## Background: `Get` and `MultiGet`
 
-As [we've seen](./concepts.mdx), rules invoke other rules directly by name:
+The Pants Rules API has evolved from an implicit call-by-type system to an explicit call-by-name system. This guide helps you migrate your plugins to the new approach.
+
+**The new way** - as [described in the Rules API concepts](./concepts.mdx), rules invoke other rules directly by name:
 
 ```python
 from pants.engine.fs import NativeDownloadFile
@@ -25,7 +27,7 @@ async def my_rule() -> MyResult:
     ...
 ```
 
-However, a previous version of the Rules API had a different idiom, call-by-type. This was achieved using a construct called `Get`:
+**The old way (deprecated)** - rules used `Get()` for implicit call-by-type:
 
 ```python
 from pants.engine.fs import Digest, NativeDownloadFile
@@ -42,40 +44,745 @@ A `Get(OutputType, InputType, input)` or `Get(OutputType, InputType(...))` invok
 
 To achieve concurrency you could `await MultiGet(<iterable of Gets>)`.
 
-## `Get` and `MultiGet` are deprecated
+## Why Migrate? `Get` and `MultiGet` are Deprecated
 
-`Get` and `MultiGet` are now deprecated, and will be removed entirely soon. Pants itself no longer uses them internally, but external plugins still might. Plugin authors must migrate from `Get`/`MultiGet` to call-by-name syntax as soon as possible.
+:::warning Deprecation Notice
+`Get` and `MultiGet` are **deprecated as of Pants 2.30** and will be **removed in Pants 2.31**.
+:::
 
-## Migrating to call-by-name
+**Current status:**
+- ✅ Pants core has migrated to call-by-name
+- ⚠️ External plugins may still use `Get`/`MultiGet`
+- 🎯 **Action required:** Plugin authors must migrate before Pants 2.31
 
-Migrating to call-by-name is fairly straightforward:
+**Why the change?** Call-by-name is more explicit, easier to understand, and provides better IDE support with clear imports and function signatures.
 
-First, replace all `MultiGet`s with `concurrently`, imported from from `pants.engine.rules`. `MultiGet` is now just an alias for `concurrently`, so this is trivial to do with a find/replace.
+---
 
-Then, replace `await Get(OutputType, InputType, input)` with `await rule_name(...)` where `rule_name` is the rule that returns a value `OutputType`.
+## Migration Guide
 
-- If the rule has exactly one parameter, of type `InputType`, then this as simple as:
+### Understanding Intrinsics vs Regular Rules
+
+Before migrating, it's crucial to understand the two types of callable functions in the Rules API:
+
+1. **Intrinsics**: Built-in engine operations from `pants.engine.intrinsics` (e.g., `create_digest`, `merge_digests`, `execute_process`)
+2. **Regular Rules**: User-defined or plugin-defined `@rule` functions (e.g., `determine_source_files`, `get_source_root`)
+
+**The key difference**: Intrinsics do NOT need `**implicitly()`, but regular rules DO (with one exception for Process-based intrinsics, explained below).
+
+### Migrating to call-by-name
+
+#### Step 1: Update Imports
+
+**Why more imports?** Previously, `Get()` was a generic abstraction that hid which functions you were calling. With call-by-name, you explicitly import each function you use. You only need to add imports for the specific intrinsics and rules your code actually calls.
+
+<table>
+<tr>
+<td> Before </td> <td> After </td>
+</tr>
+<tr>
+<td>
 
 ```python
-val = await rule_name(input)
+from pants.engine.rules import Get, MultiGet, rule
 ```
 
-- If the rule has other parameters that should be passed implicitly, then add an empty `**implicitly()`:
+</td>
+<td>
 
 ```python
-val = await rule_name(input, **implicitly())
+from pants.engine.rules import concurrently, implicitly, rule
+
+# Add intrinsics you're using
+from pants.engine.intrinsics import (
+    create_digest,
+    digest_to_snapshot,
+    merge_digests,
+    execute_process,
+    execute_process_or_raise,
+    # ... add others as needed
+)
+
+# Add regular rules you're calling
+from pants.core.util_rules.source_files import determine_source_files
+from pants.source.source_root import get_source_root
+# ... add others as needed
 ```
 
-- If the rule that returns `OutputType` does not take `InputType` directly, but rather some `IntermediateType`, then we need to tell the Pants engine to fill in the blanks, just as the `Get` would have:
+</td>
+</tr>
+</table>
+
+#### Step 2: Replace MultiGet with concurrently
+
+Replace all `MultiGet`s with `concurrently`, imported from `pants.engine.rules`. `MultiGet` is now just an alias for `concurrently`, so this is straightforward:
+
+<table>
+<tr>
+<td> Before </td> <td> After </td>
+</tr>
+<tr>
+<td>
+
+```python
+from pants.engine.rules import Get, MultiGet
+
+results = await MultiGet(
+    Get(ProcessResult, Process(...))
+    for item in items
+)
+```
+
+</td>
+<td>
+
+```python
+from pants.engine.rules import concurrently, implicitly
+
+results = await concurrently(
+    execute_process_or_raise(**implicitly(Process(...)))
+    for item in items
+)
+```
+
+</td>
+</tr>
+</table>
+
+#### Step 3: Migrate Get() Calls
+
+Replace `await Get(OutputType, InputType, input)` with `await rule_name(...)` where `rule_name` is the rule that returns `OutputType`. The exact pattern depends on whether you're calling an intrinsic or a regular rule.
+
+#### Pattern A: Intrinsics (No `**implicitly()` needed)
+
+Most intrinsics are called directly without `**implicitly()`:
+
+<table>
+<tr>
+<td> Before </td> <td> After </td>
+</tr>
+<tr>
+<td>
+
+```python
+# File system operations
+digest = await Get(Digest, CreateDigest([FileContent(...)]))
+snapshot = await Get(Snapshot, Digest, my_digest)
+merged = await Get(Digest, MergeDigests([digest1, digest2]))
+contents = await Get(DigestContents, Digest, my_digest)
+```
+
+</td>
+<td>
+
+```python
+# File system operations - call intrinsics directly
+digest = await create_digest(CreateDigest([FileContent(...)]))
+snapshot = await digest_to_snapshot(my_digest)
+merged = await merge_digests(MergeDigests([digest1, digest2]))
+contents = await get_digest_contents(my_digest)
+```
+
+</td>
+</tr>
+</table>
+
+#### Pattern B: Process Intrinsics (Special case - use `**implicitly()` to wrap Process)
+
+Process-based intrinsics use `**implicitly()` to wrap the Process object:
+
+**Before:**
+```python
+result = await Get(ProcessResult, Process(
+    argv=["command", "arg"],
+    description="Run command",
+))
+```
+
+**After (for processes that should fail on non-zero exit):**
+```python
+from pants.engine.process import Process, ProcessResult, execute_process_or_raise
+
+result: ProcessResult = await execute_process_or_raise(**implicitly(
+    Process(
+        argv=["command", "arg"],
+        description="Run command",
+    )
+))
+```
+
+**After (for processes where you need to handle errors):**
+```python
+from pants.engine.intrinsics import execute_process
+from pants.engine.process import Process, FallibleProcessResult
+
+result: FallibleProcessResult = await execute_process(
+    Process(
+        argv=["command", "arg"],
+        description="Run command",
+    ),
+    **implicitly(),
+)
+
+if result.exit_code != 0:
+    # Handle error
+    logger.warning(f"Command failed: {result.stderr.decode()}")
+```
+
+#### Pattern C: Regular Rules (Always use `**implicitly()`)
+
+Regular rules always need `**implicitly()`:
+
+<table>
+<tr>
+<td> Before </td> <td> After </td>
+</tr>
+<tr>
+<td>
+
+```python
+sources = await Get(SourceFiles, SourceFilesRequest([field]))
+source_root = await Get(SourceRoot, SourceRootRequest, req)
+wrapped = await Get(WrappedTarget, WrappedTargetRequest(address, desc))
+targets = await Get(Targets, DependenciesRequest(target.get(Dependencies)))
+```
+
+</td>
+<td>
+
+```python
+from pants.core.util_rules.source_files import determine_source_files
+from pants.source.source_root import get_source_root
+from pants.engine.internals.graph import resolve_target, resolve_targets
+
+sources = await determine_source_files(
+    SourceFilesRequest([field]),
+    **implicitly(),
+)
+source_root = await get_source_root(req, **implicitly())
+wrapped = await resolve_target(
+    WrappedTargetRequest(address, desc),
+    **implicitly(),
+)
+targets = await resolve_targets(
+    **implicitly(DependenciesRequest(target.get(Dependencies)))
+)
+```
+
+</td>
+</tr>
+</table>
+
+#### Pattern D: Implicit Parameter Inference
+
+If the rule doesn't take `InputType` directly but needs the engine to infer parameters:
+
+<table>
+<tr>
+<td> Before </td> <td> After </td>
+</tr>
+<tr>
+<td>
+
+```python
+val = await Get(OutputType, InputType, input)
+```
+
+</td>
+<td>
 
 ```python
 val = await rule_name(**implicitly({input: InputType}))
 ```
 
-There may be various corner cases that require slightly more refactoring. We encourage you to ask for help on [Slack](/community/getting-help) with those.
+</td>
+</tr>
+</table>
 
-For examples of migrations, you can review [pull requests](https://github.com/pantsbuild/pants/pulls?q=is%3Apr+%22call-by-name%22+is%3Aclosed) made to the Pants repository. Additionally, there are some simplified examples in the form of [Pants integration tests](https://github.com/pantsbuild/pants/blob/main/src/python/pants/goal/migrate_call_by_name_integration_test.py).
+### Common Intrinsics Reference
 
-## Migrating union `Get`s to call-by-name
+Here's a quick reference for commonly used intrinsics:
+
+| Old `Get()` Pattern | New Call-by-Name | Import From | Return Type |
+|---------------------|------------------|-------------|-------------|
+| `Get(Digest, CreateDigest(...))` | `create_digest(CreateDigest(...))` | `pants.engine.intrinsics` | `Digest` |
+| `Get(Snapshot, Digest, d)` | `digest_to_snapshot(d)` | `pants.engine.intrinsics` | `Snapshot` |
+| `Get(Digest, MergeDigests(...))` | `merge_digests(MergeDigests(...))` | `pants.engine.intrinsics` | `Digest` |
+| `Get(DigestContents, Digest, d)` | `get_digest_contents(d)` | `pants.engine.intrinsics` | `DigestContents` |
+| `Get(Digest, AddPrefix(...))` | `add_prefix(AddPrefix(...))` | `pants.engine.intrinsics` | `Digest` ⚠️ |
+| `Get(Digest, RemovePrefix(...))` | `remove_prefix(RemovePrefix(...))` | `pants.engine.intrinsics` | `Digest` ⚠️ |
+| `Get(Digest, DigestSubset(...))` | `digest_subset_to_digest(DigestSubset(...))` | `pants.engine.intrinsics` | `Digest` |
+| `Get(ProcessResult, Process(...))` | `execute_process_or_raise(**implicitly(Process(...)))` | `pants.engine.intrinsics` | `ProcessResult` |
+| `Get(FallibleProcessResult, Process(...))` | `execute_process(Process(...), **implicitly())` | `pants.engine.intrinsics` | `FallibleProcessResult` |
+
+⚠️ **Important**: In the old API, `Get(Snapshot, AddPrefix(...))` would return a `Snapshot`. In the new API, `add_prefix` and `remove_prefix` return `Digest`. If you need a `Snapshot`, you must explicitly convert:
+
+<table>
+<tr>
+<td> Before </td> <td> After </td>
+</tr>
+<tr>
+<td>
+
+```python
+prefixed_snapshot = await Get(
+    Snapshot,
+    AddPrefix(digest, "prefix/")
+)
+files = prefixed_snapshot.files  # Works
+```
+
+</td>
+<td>
+
+```python
+# add_prefix returns Digest, not Snapshot
+prefixed_digest = await add_prefix(
+    AddPrefix(digest, "prefix/")
+)
+prefixed_snapshot = await digest_to_snapshot(
+    prefixed_digest
+)  # Explicit conversion
+files = prefixed_snapshot.files  # Now works
+```
+
+</td>
+</tr>
+</table>
+
+### Complete Before/After Examples
+
+#### Example 1: File Operations with Source Root
+
+<table>
+<tr>
+<td> Before </td> <td> After </td>
+</tr>
+<tr>
+<td>
+
+```python
+from pants.engine.rules import Get, rule
+from pants.engine.fs import AddPrefix, Snapshot
+from pants.source.source_root import (
+    SourceRoot, SourceRootRequest
+)
+
+@rule
+async def my_rule(field: MyField) -> MyResult:
+    source_root = await Get(
+        SourceRoot,
+        SourceRootRequest,
+        SourceRootRequest.for_address(
+            field.address
+        )
+    )
+
+    # Get sources and add prefix
+    sources = await Get(
+        SourceFiles,
+        SourceFilesRequest([field])
+    )
+    if source_root.path != ".":
+        prefixed = await Get(
+            Snapshot,
+            AddPrefix(
+                sources.snapshot.digest,
+                source_root.path
+            )
+        )
+    else:
+        prefixed = sources.snapshot
+
+    return MyResult(prefixed.digest)
+```
+
+</td>
+<td>
+
+```python
+from pants.engine.rules import implicitly, rule
+from pants.engine.intrinsics import (
+    add_prefix, digest_to_snapshot
+)
+from pants.engine.fs import AddPrefix
+from pants.source.source_root import (
+    SourceRootRequest, get_source_root
+)
+from pants.core.util_rules.source_files import (
+    SourceFilesRequest,
+    determine_source_files
+)
+
+@rule
+async def my_rule(field: MyField) -> MyResult:
+    # Regular rule - needs **implicitly()
+    source_root = await get_source_root(
+        SourceRootRequest.for_address(
+            field.address
+        ),
+        **implicitly(),
+    )
+
+    # Regular rule - needs **implicitly()
+    sources = await determine_source_files(
+        SourceFilesRequest([field]),
+        **implicitly(),
+    )
+
+    # Intrinsic - returns Digest
+    if source_root.path != ".":
+        prefixed_digest = await add_prefix(
+            AddPrefix(
+                sources.snapshot.digest,
+                source_root.path
+            )
+        )
+        prefixed = await digest_to_snapshot(
+            prefixed_digest
+        )
+    else:
+        prefixed = sources.snapshot
+
+    return MyResult(prefixed.digest)
+```
+
+</td>
+</tr>
+</table>
+
+#### Example 2: Process Execution and JAR Download
+
+<table>
+<tr>
+<td> Before </td> <td> After </td>
+</tr>
+<tr>
+<td>
+
+```python
+from pants.engine.rules import Get, MultiGet, rule
+from pants.engine.process import (
+    Process, ProcessResult
+)
+from pants.engine.fs import Digest, DigestContents
+
+@rule
+async def download_jars(
+    artifacts: list[str]
+) -> Digest:
+    # Download all JARs in parallel
+    results = await MultiGet(
+        Get(
+            ProcessResult,
+            Process(
+                argv=[
+                    "/usr/bin/curl",
+                    "-f", "-o",
+                    "artifact.jar",
+                    url
+                ],
+                output_files=("artifact.jar",),
+            ),
+        )
+        for url in artifacts
+    )
+
+    # Extract contents
+    all_contents = await MultiGet(
+        Get(
+            DigestContents,
+            Digest,
+            result.output_digest
+        )
+        for result in results
+    )
+
+    return process_contents(all_contents)
+```
+
+</td>
+<td>
+
+```python
+from pants.engine.rules import (
+    concurrently, implicitly, rule
+)
+from pants.engine.process import (
+    Process, ProcessResult,
+    execute_process_or_raise
+)
+from pants.engine.intrinsics import (
+    get_digest_contents
+)
+from pants.engine.fs import Digest, DigestContents
+
+@rule
+async def download_jars(
+    artifacts: list[str]
+) -> Digest:
+    # Download all JARs in parallel
+    results = await concurrently(
+        execute_process_or_raise(**implicitly(
+            Process(
+                argv=[
+                    "/usr/bin/curl",
+                    "-f", "-o",
+                    "artifact.jar",
+                    url
+                ],
+                output_files=("artifact.jar",),
+            )
+        ))
+        for url in artifacts
+    )
+
+    # Extract contents - intrinsic
+    all_contents = await concurrently(
+        get_digest_contents(result.output_digest)
+        for result in results
+    )
+
+    return process_contents(all_contents)
+```
+
+</td>
+</tr>
+</table>
+
+#### Example 3: Merging Digests
+
+<table>
+<tr>
+<td> Before </td> <td> After </td>
+</tr>
+<tr>
+<td>
+
+```python
+from pants.engine.rules import (
+    Get, MultiGet, rule
+)
+from pants.engine.fs import (
+    Digest, CreateDigest,
+    MergeDigests, FileContent
+)
+
+@rule
+async def create_merged_digest(
+    files: list[str]
+) -> Digest:
+    # Create individual digests
+    digests = await MultiGet(
+        Get(
+            Digest,
+            CreateDigest([
+                FileContent(
+                    filename,
+                    content
+                )
+            ])
+        )
+        for filename, content in files
+    )
+
+    # Merge them
+    merged = await Get(
+        Digest,
+        MergeDigests(digests)
+    )
+    return merged
+```
+
+</td>
+<td>
+
+```python
+from pants.engine.rules import (
+    concurrently, rule
+)
+from pants.engine.intrinsics import (
+    create_digest, merge_digests
+)
+from pants.engine.fs import (
+    CreateDigest, MergeDigests,
+    FileContent
+)
+
+@rule
+async def create_merged_digest(
+    files: list[str]
+) -> Digest:
+    # Create individual digests
+    digests = await concurrently(
+        create_digest(
+            CreateDigest([
+                FileContent(
+                    filename,
+                    content
+                )
+            ])
+        )
+        for filename, content in files
+    )
+
+    # Merge them - intrinsic
+    merged = await merge_digests(
+        MergeDigests(digests)
+    )
+    return merged
+```
+
+</td>
+</tr>
+</table>
+
+#### Example 4: Environment Variables
+
+<table>
+<tr>
+<td> Before </td> <td> After </td>
+</tr>
+<tr>
+<td>
+
+```python
+from pants.engine.rules import Get, rule
+from pants.engine.env_vars import (
+    EnvironmentVars,
+    EnvironmentVarsRequest
+)
+
+@rule
+async def my_rule() -> MyResult:
+    env_vars = await Get(
+        EnvironmentVars,
+        EnvironmentVarsRequest(
+            ["PATH", "HOME"]
+        )
+    )
+    return MyResult(env_vars)
+```
+
+</td>
+<td>
+
+```python
+from pants.engine.rules import (
+    implicitly, rule
+)
+from pants.core.util_rules.env_vars import (
+    environment_vars_subset
+)
+from pants.engine.env_vars import (
+    EnvironmentVarsRequest
+)
+
+@rule
+async def my_rule() -> MyResult:
+    # Regular rule
+    env_vars = await environment_vars_subset(
+        EnvironmentVarsRequest(
+            ["PATH", "HOME"]
+        ),
+        **implicitly(),
+    )
+    return MyResult(env_vars)
+```
+
+</td>
+</tr>
+</table>
+
+### Common Pitfalls
+
+#### Pitfall 1: Forgetting `**implicitly()` on Regular Rules
+
+**Error Message:**
+```
+No source of dependency my_rule(<1>, , ) -> MyType
+```
+
+**Cause:** You're calling a regular rule without `**implicitly()`.
+
+**Fix:**
+```python
+# Wrong - missing **implicitly()
+result = await determine_source_files(SourceFilesRequest([field]))
+
+# Correct
+result = await determine_source_files(
+    SourceFilesRequest([field]),
+    **implicitly(),
+)
+```
+
+#### Pitfall 2: Adding `**implicitly()` to Non-Process Intrinsics
+
+**Error Message:**
+```
+TypeError: ... got an unexpected keyword argument
+```
+
+**Cause:** Intrinsics don't accept `**implicitly()` (except Process intrinsics which use it differently).
+
+**Wrong:**
+```python
+# Don't do this - intrinsics don't take **implicitly()
+digest = await create_digest(CreateDigest([...]), **implicitly())
+```
+
+**Correct:**
+```python
+# Intrinsics are called directly
+digest = await create_digest(CreateDigest([...]))
+
+# Exception: Process intrinsics use **implicitly() to wrap the Process
+result = await execute_process_or_raise(**implicitly(Process(...)))
+```
+
+#### Pitfall 3: Expecting Snapshot Instead of Digest
+
+**Error Message:**
+```
+AttributeError: 'builtins.Digest' object has no attribute 'files'
+```
+
+**Cause:** Some intrinsics that used to return `Snapshot` with `Get()` now return `Digest`.
+
+**Fix:**
+```python
+# Old code - Get() automatically converted to Snapshot
+prefixed = await Get(Snapshot, AddPrefix(digest, "prefix/"))
+files = prefixed.files  # Works
+
+# New code - add_prefix returns Digest, must convert explicitly
+prefixed_digest = await add_prefix(AddPrefix(digest, "prefix/"))
+prefixed_snapshot = await digest_to_snapshot(prefixed_digest)  # Convert
+files = prefixed_snapshot.files  # Now works
+```
+
+### Testing Your Migration
+
+After migrating, verify everything works:
+
+```bash
+# Verify rule graph is valid
+pants list ::
+
+# Run your plugin's tests
+pants test path/to/your/plugin::
+
+# Check for remaining deprecation warnings
+pants --level=debug list :: 2>&1 | grep "Get() is deprecated"
+```
+
+For more examples of migrations, you can review [pull requests](https://github.com/pantsbuild/pants/pulls?q=is%3Apr+%22call-by-name%22+is%3Aclosed) made to the Pants repository. Additionally, there are some simplified examples in the form of [Pants integration tests](https://github.com/pantsbuild/pants/blob/main/src/python/pants/goal/migrate_call_by_name_integration_test.py).
+
+---
+
+## Advanced: Union Rules
+
+#### Migrating union `Get`s to call-by-name
 
 If you're relying on polymorphic dispatch via a [union](./union-rules-advanced.mdx), then you must make sure that your implementation rule has the same signature as the "base" rule (the `@rule(polymorphic=True)` rule) - the same type annotations for parameters and return value - except with your subtype in place of the union type. If things aren't working and the base rule is a standard Pants rule, you can examine its signature in the Pants source code.
