@@ -1,7 +1,7 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fs;
 use std::process::{Command, Stdio};
 use std::str::from_utf8;
@@ -27,7 +27,7 @@ pub fn launch_pantsd() -> (BuildRoot, OptionParser, TempDir) {
     ];
     let options_parser = OptionParser::new(
         Args::new(args.clone()),
-        Env::new(HashMap::new()),
+        Env::new(BTreeMap::new()),
         None,
         true,
         false,

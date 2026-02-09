@@ -49,6 +49,7 @@ logging = { path = "../logging" }
 nailgun = { path = "../nailgun" }
 num_enum = { workspace = true }
 options = { path = "../options" }
+options_pants_ng = { path = "../pants_ng/options" }
 pantsd = { path = "../pantsd" }
 parking_lot = { workspace = true }
 petgraph = { workspace = true }

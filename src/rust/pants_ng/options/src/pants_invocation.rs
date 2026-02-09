@@ -1,19 +1,18 @@
 // Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::env;
+use std::collections::HashMap;
 use std::iter::Peekable;
-use std::path;
 use std::sync::LazyLock;
+use std::{env, path};
 
 use options::Scope;
 use regex::Regex;
-use std::collections::HashMap;
 
 static NAME_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^[A-Za-z][0-9A-Za-z_\-]*$").unwrap());
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Args {
     pub(crate) arg_strings: Vec<String>,
 }
@@ -40,19 +39,29 @@ impl Args {
 }
 
 // Represents a single cli flag used to set an option value, e.g., `--foo`, or `--bar=baz`.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Flag {
     pub key: String, // The flag name, without the `--` prefix, up to the `=` if any.
     pub value: Option<String>, // The value after the `=`, if any.
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+impl Flag {
+    pub fn to_arg_string(&self) -> String {
+        if let Some(val) = self.value.as_ref() {
+            format!("--{}={}", self.key, val)
+        } else {
+            format!("--{}", self.key)
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SubCommand {
     pub name: String,
     pub flags: Vec<Flag>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Command {
     pub name: String,
     pub flags: Vec<Flag>,
@@ -71,7 +80,7 @@ pub struct Command {
 //   path/to/spec1 path/to/spec2 ... path/to/specM \
 //   (-- passthru-args)?
 //
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct PantsInvocation {
     pub global_flags: Vec<Flag>,
     pub commands: Vec<Command>,
@@ -220,11 +229,24 @@ impl PantsInvocation {
         })
     }
 
+    pub fn goals(&self) -> Vec<String> {
+        self.commands
+            .iter()
+            .map(|cmd| {
+                if let Some(subcmd) = cmd.subcommand.as_ref() {
+                    format!("{}.{}", cmd.name, subcmd.name)
+                } else {
+                    cmd.name.clone()
+                }
+            })
+            .collect()
+    }
+
     pub(crate) fn get_flags(&self) -> HashMap<Scope, HashMap<String, Vec<Option<String>>>> {
         let mut flags: HashMap<Scope, HashMap<String, Vec<Option<String>>>> = HashMap::new();
         // Global flags can either refer implicitly to options in the global scope (--global_option),
         // or prefixed with an explicit scope and a dash (--explicit-scope-flag_in_that_scope).
-        // Multi-word scope names must uses dashes as word separators, while multi-word option
+        // Multi-word scope names must use dashes as word separators, while multi-word option
         // names must use underscores as word separators, so that a flag is never ambiguous.
         for flag in &self.global_flags {
             let (scope_name, name) = flag.key.rsplit_once("-").unwrap_or(("", &flag.key));

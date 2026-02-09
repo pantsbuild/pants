@@ -51,7 +51,7 @@ impl Args {
 }
 
 // The details of a Pants invocation command, not including option flags.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct PantsCommand {
     pub builtin_or_auxiliary_goal: Option<String>, // Requested builtin/auxiliary goal.
     pub goals: Vec<String>,                        // Requested known goals.
