@@ -242,7 +242,7 @@ A more sustainable solution for shared resources is to use the [`[pytest].execut
 In recent Ubuntu distributions, the Docker service is often installed using [Snap](https://snapcraft.io/docker).
 It works mostly same as a normal installation, but has an important difference: it cannot access the `/tmp` directory of the host because it is virtualized when Snap starts the Docker service.
 
-This may cause problems if your code or tests ry to create a container with a bind-mount of a directory or file _under the current working directory_. Container creation will fail with "invalid mount config for type "bind": bind source path does not exist", because Pants' default `local_execution_root_dir` option is `/tmp`, which the Snap-based Docker service cannot access.
+This may cause problems if your code or tests try to create a container with a bind-mount of a directory or file _under the current working directory_. Container creation will fail with "invalid mount config for type "bind": bind source path does not exist", because Pants' default `local_execution_root_dir` option is `/tmp`, which the Snap-based Docker service cannot access.
 
 You can work around this issue by explicitly setting `[GLOBAL].local_execution_root_dir` to a directory outside the system `/tmp` directory, such as `"%(buildroot)s/tmp"`.
 
