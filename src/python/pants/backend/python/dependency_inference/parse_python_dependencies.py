@@ -38,8 +38,10 @@ class ParsedPythonImports(FrozenDict[str, ParsedPythonImportInfo]):
 
 class ParsedPythonAssetPaths(DeduplicatedCollection[str]):
     """All the discovered possible assets from a Python source file."""
-
     # N.B. Don't set `sort_input`, as the input is already sorted
+
+class ExplicitPythonDependencies(FrozenDict[str, int]):
+    """Dependencies provided via the # pants: infer-dep() pragma (mapped to lineno)."""
 
 
 # TODO: Use the Native* eqivalents of these classes directly? Would require
@@ -51,6 +53,7 @@ class ParsedPythonAssetPaths(DeduplicatedCollection[str]):
 class PythonFileDependencies:
     imports: ParsedPythonImports
     assets: ParsedPythonAssetPaths
+    explicit_dependencies: ExplicitPythonDependencies
 
 
 @dataclass(frozen=True)
@@ -134,11 +137,14 @@ async def parse_python_dependencies(
                 ):
                     assets.add(string)
 
+        explicit_deps = dict(native_result.explicit_dependencies)
+
         path_to_deps[path] = PythonFileDependencies(
             ParsedPythonImports(
                 (key, ParsedPythonImportInfo(*value)) for key, value in imports.items()
             ),
             ParsedPythonAssetPaths(sorted(assets)),
+            ExplicitPythonDependencies(FrozenDict(explicit_deps))
         )
     return PythonFilesDependencies(FrozenDict(path_to_deps))
 

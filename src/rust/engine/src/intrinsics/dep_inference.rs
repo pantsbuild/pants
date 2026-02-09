@@ -185,6 +185,11 @@ fn parse_python_deps(deps_request: Value) -> PyGeneratorResponseNativeCall {
                                 .into_pyobject(py)?
                                 .into_any()
                                 .into(),
+                            result
+                                .explicit_dependencies
+                                .into_pyobject(py)?
+                                .into_any()
+                                .into(),
                         ],
                     ))
                 })
