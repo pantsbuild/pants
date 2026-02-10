@@ -3,7 +3,12 @@
 import doctest
 
 import external_tool_upgrade
-from external_tool_upgrade import ExternalToolVersion, filter_versions_by_constraint
+from external_tool_upgrade import (
+    PLATFORM_WIDTH,
+    ExternalToolVersion,
+    filter_versions_by_constraint,
+    sorted_by_version_and_platform,
+)
 from packaging.version import Version
 
 
@@ -151,3 +156,65 @@ def test_version_constraint_with_v_prefix_upgrades_correctly() -> None:
 
     result = _select_default_version_with_constraint(known_versions, current_default, constraint)
     assert result == "v5.0"
+
+
+def test_encode_pads_platform_to_fixed_width() -> None:
+    v = ExternalToolVersion("1.0", "linux_arm64", "abc123", 100)
+    encoded = v.encode()
+    parts = encoded.split("|")
+    assert parts[1] == "linux_arm64 "
+    assert len(parts[1]) == PLATFORM_WIDTH
+
+
+def test_encode_no_padding_needed_for_max_width_platform() -> None:
+    v = ExternalToolVersion("1.0", "macos_x86_64", "abc123", 100)
+    encoded = v.encode()
+    parts = encoded.split("|")
+    assert parts[1] == "macos_x86_64"
+    assert len(parts[1]) == PLATFORM_WIDTH
+
+
+def test_encode_decode_round_trip() -> None:
+    original = ExternalToolVersion("2.0", "linux_arm64", "abc123def456", 999)
+    decoded = ExternalToolVersion.decode(original.encode())
+    assert decoded == original
+
+
+def test_sorted_by_version_and_platform() -> None:
+    versions = [
+        ExternalToolVersion("2.0", "macos_x86_64", "a", 1),
+        ExternalToolVersion("1.0", "linux_arm64", "b", 2),
+        ExternalToolVersion("2.0", "linux_arm64", "c", 3),
+        ExternalToolVersion("1.0", "macos_x86_64", "d", 4),
+        ExternalToolVersion("2.0", "linux_x86_64", "e", 5),
+    ]
+    result = sorted_by_version_and_platform(versions)
+
+    expected_order = [
+        ("2.0", "linux_arm64"),
+        ("2.0", "linux_x86_64"),
+        ("2.0", "macos_x86_64"),
+        ("1.0", "linux_arm64"),
+        ("1.0", "macos_x86_64"),
+    ]
+    actual_order = [(v.version, v.platform) for v in result]
+    assert actual_order == expected_order
+
+
+def test_sorted_by_version_and_platform_with_non_pep440_versions() -> None:
+    versions = [
+        ExternalToolVersion("v2.1.0-M5-18-gfebf9838c", "linux_x86_64", "a", 1),
+        ExternalToolVersion("v2.1.24", "linux_x86_64", "b", 2),
+        ExternalToolVersion("v2.1.6", "linux_x86_64", "c", 3),
+        ExternalToolVersion("v2.0.16-169-g194ebc55c", "linux_x86_64", "d", 4),
+    ]
+    result = sorted_by_version_and_platform(versions)
+
+    expected_order = [
+        "v2.1.24",
+        "v2.1.6",
+        "v2.1.0-M5-18-gfebf9838c",
+        "v2.0.16-169-g194ebc55c",
+    ]
+    actual_order = [v.version for v in result]
+    assert actual_order == expected_order
