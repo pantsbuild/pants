@@ -22,10 +22,10 @@ class SuccinctCodeCounter(TemplatedExternalTool):
 
     default_version = "3.0.0"
     default_known_versions = [
-        "3.0.0|macos_arm64 |846cb1b25025a0794d455719bc17cfb3f588576a58af1d95036f6c654e294f98|2006145",
-        "3.0.0|macos_x86_64|9c3064e477ab36e16204ad34f649372034bca4df669615eff5de4aa05b2ddf1a|2048134",
         "3.0.0|linux_arm64 |04f9e797b70a678833e49df5e744f95080dfb7f963c0cd34f5b5d4712d290f33|1768037",
         "3.0.0|linux_x86_64|13ca47ce00b5bd032f97f3af7aa8eb3c717b8972b404b155a378b09110e4aa0c|1948341",
+        "3.0.0|macos_arm64 |846cb1b25025a0794d455719bc17cfb3f588576a58af1d95036f6c654e294f98|2006145",
+        "3.0.0|macos_x86_64|9c3064e477ab36e16204ad34f649372034bca4df669615eff5de4aa05b2ddf1a|2048134",
     ]
     default_url_template = (
         "https://github.com/boyter/scc/releases/download/v{version}/scc-{version}-{platform}.zip"
