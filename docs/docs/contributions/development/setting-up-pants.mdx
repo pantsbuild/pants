@@ -37,9 +37,11 @@ If your system Python is not the version Pants expects (currently Python 3.11), 
 - [Fedora](https://packages.fedoraproject.org/pkgs/python3.11/python3.11/)
 - [ASDF](https://github.com/asdf-community/asdf-python)
 - [PyEnv](https://github.com/pyenv/pyenv)
-  Providers that sometimes cause issues include:
+
+Providers that sometimes cause issues include:
 - Ubuntu Deadsnakes
-  You also need to have the protobuf compiler and LLVM clang installed. On Debian derivatives, these can be installed using `apt install clang protobuf-compiler`.
+
+You also need to have the protobuf compiler and LLVM clang installed. On Debian derivatives, these can be installed using `apt install clang protobuf-compiler`.
 
 Then, run `pants` to set up the Python virtual environment and compile the engine.
 
