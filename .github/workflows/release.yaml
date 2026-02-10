@@ -48,7 +48,7 @@ jobs:
     - name: Install Rust toolchain
       run: |
         # Set the default toolchain. Installs the toolchain if it is not already installed.
-        rustup default 1.92.0
+        rustup default 1.93.0
         cargo version
     - name: Expose Pythons
       run: |
@@ -96,14 +96,17 @@ jobs:
         PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')")
         PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
         PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
+        PEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT
 
         mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
+        mv dist/src.python.pants/pants-pex dist/src.python.pants/$PEX_SCIE_FILENAME
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
+        echo "PEX_SCIE_FILENAME=$PEX_SCIE_FILENAME" | tee -a "$GITHUB_ENV"
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v3
       with:
-        subject-path: dist/src.python.pants/*.pex
+        subject-path: dist/src.python.pants/*
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
       run: |
@@ -113,6 +116,13 @@ jobs:
             -H "Content-Type: application/octet-stream" \
             ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \
             --data-binary "@dist/src.python.pants/$PEX_FILENAME"
+
+        curl -L --fail \
+            -X POST \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Content-Type: application/octet-stream" \
+            ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_SCIE_FILENAME \
+            --data-binary "@dist/src.python.pants/$PEX_SCIE_FILENAME"
 
         WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild_pants-*.whl")
         curl -L --fail \
@@ -140,7 +150,7 @@ jobs:
       contents: write
       id-token: write
     runs-on:
-    - ubuntu-22.04
+    - depot-ubuntu-22.04
     steps:
     - name: Free up disk space
       run: |-
@@ -164,7 +174,7 @@ jobs:
     - name: Install Rust toolchain
       run: |
         # Set the default toolchain. Installs the toolchain if it is not already installed.
-        rustup default 1.92.0
+        rustup default 1.93.0
         cargo version
     - name: Expose Pythons
       run: |
@@ -220,14 +230,17 @@ jobs:
         PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')")
         PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
         PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
+        PEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT
 
         mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
+        mv dist/src.python.pants/pants-pex dist/src.python.pants/$PEX_SCIE_FILENAME
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
+        echo "PEX_SCIE_FILENAME=$PEX_SCIE_FILENAME" | tee -a "$GITHUB_ENV"
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v3
       with:
-        subject-path: dist/src.python.pants/*.pex
+        subject-path: dist/src.python.pants/*
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
       run: |
@@ -237,6 +250,13 @@ jobs:
             -H "Content-Type: application/octet-stream" \
             ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \
             --data-binary "@dist/src.python.pants/$PEX_FILENAME"
+
+        curl -L --fail \
+            -X POST \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Content-Type: application/octet-stream" \
+            ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_SCIE_FILENAME \
+            --data-binary "@dist/src.python.pants/$PEX_SCIE_FILENAME"
 
         WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild_pants-*.whl")
         curl -L --fail \
@@ -275,7 +295,7 @@ jobs:
       contents: write
       id-token: write
     runs-on:
-    - macos-14
+    - depot-macos-14
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -313,7 +333,7 @@ jobs:
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.92.0-*
+          ~/.rustup/toolchains/1.93.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
@@ -369,14 +389,17 @@ jobs:
         PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')")
         PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
         PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
+        PEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT
 
         mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
+        mv dist/src.python.pants/pants-pex dist/src.python.pants/$PEX_SCIE_FILENAME
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
+        echo "PEX_SCIE_FILENAME=$PEX_SCIE_FILENAME" | tee -a "$GITHUB_ENV"
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
       uses: actions/attest-build-provenance@v3
       with:
-        subject-path: dist/src.python.pants/*.pex
+        subject-path: dist/src.python.pants/*
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
       run: |
@@ -386,6 +409,13 @@ jobs:
             -H "Content-Type: application/octet-stream" \
             ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \
             --data-binary "@dist/src.python.pants/$PEX_FILENAME"
+
+        curl -L --fail \
+            -X POST \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Content-Type: application/octet-stream" \
+            ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_SCIE_FILENAME \
+            --data-binary "@dist/src.python.pants/$PEX_SCIE_FILENAME"
 
         WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild_pants-*.whl")
         curl -L --fail \
@@ -435,7 +465,7 @@ jobs:
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.92.0-*
+          ~/.rustup/toolchains/1.93.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo

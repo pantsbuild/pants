@@ -26,9 +26,9 @@ from pants.engine.fs import (
 from pants.engine.internals import native_engine
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.internals.native_dep_inference import (
-    NativeParsedDockerfileInfo,
-    NativeParsedJavascriptDependencies,
-    NativeParsedPythonDependencies,
+    NativeDockerfileInfos,
+    NativeJavascriptFilesDependencies,
+    NativePythonFilesDependencies,
 )
 from pants.engine.internals.native_engine import NativeDependenciesRequest, task_side_effected
 from pants.engine.internals.session import RunId, SessionValues
@@ -43,6 +43,7 @@ from pants.engine.process import (
 )
 from pants.engine.rules import _uncacheable_rule, collect_rules, implicitly, rule
 from pants.util.docutil import git_url
+from pants.util.frozendict import FrozenDict
 
 
 @rule
@@ -155,10 +156,9 @@ async def _interactive_process(
         del process.__dict__[__SQUELCH_WARNING]
     else:
         logging.warning(
-            "A plugin is calling `await Effect(InteractiveProcessResult, InteractiveProcess, "
-            "process)` directly. This will cause restarting logic not to be applied. "
-            "Use `await run_interactive_process(process)` or `await "
-            "run_interactive_process_in_environment(process, environment_name)` instead. "
+            "A plugin is calling `await _interactive_process(...)` directly. This will cause "
+            "restarting logic not to be applied. Use `await run_interactive_process(process)` "
+            "or `await run_interactive_process_in_environment(process, environment_name)` instead. "
             f"See {git_url('src/python/pants/engine/intrinsics.py')} for more details."
         )
     return await native_engine.interactive_process(process, process_execution_environment)
@@ -198,22 +198,25 @@ async def docker_resolve_image(request: DockerResolveImageRequest) -> DockerReso
 @rule
 async def parse_dockerfile_info(
     deps_request: NativeDependenciesRequest,
-) -> NativeParsedDockerfileInfo:
-    return await native_engine.parse_dockerfile_info(deps_request)
+) -> NativeDockerfileInfos:
+    path_infos_pairs = await native_engine.parse_dockerfile_info(deps_request)
+    return NativeDockerfileInfos(FrozenDict(path_infos_pairs))
 
 
 @rule
 async def parse_python_deps(
     deps_request: NativeDependenciesRequest,
-) -> NativeParsedPythonDependencies:
-    return await native_engine.parse_python_deps(deps_request)
+) -> NativePythonFilesDependencies:
+    path_deps_pairs = await native_engine.parse_python_deps(deps_request)
+    return NativePythonFilesDependencies(FrozenDict(path_deps_pairs))
 
 
 @rule
 async def parse_javascript_deps(
     deps_request: NativeDependenciesRequest,
-) -> NativeParsedJavascriptDependencies:
-    return await native_engine.parse_javascript_deps(deps_request)
+) -> NativeJavascriptFilesDependencies:
+    path_deps_pairs = await native_engine.parse_javascript_deps(deps_request)
+    return NativeJavascriptFilesDependencies(FrozenDict(path_deps_pairs))
 
 
 @rule

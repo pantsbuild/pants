@@ -232,7 +232,7 @@ async def demo(...) -> Foo:
 If you need the transitive dependencies of a target, use `transitive_targets()`.
 
 ```python
-from pants.engine.internals graph import transitive_targets
+from pants.engine.internals.graph import transitive_targets
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.rules import implicitly, rule
 

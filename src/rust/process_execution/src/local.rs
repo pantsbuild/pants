@@ -21,13 +21,15 @@ use fs::{
 };
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
 use futures::{FutureExt, TryFutureExt, try_join};
+use hashing::Digest;
 use log::{debug, info};
 use nails::execution::ExitCode;
 use sandboxer::Sandboxer;
 use serde::Serialize;
 use shell_quote::Bash;
 use store::{
-    ImmutableInputs, OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, WorkdirSymlink,
+    ImmutableInputs, OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, StoreError,
+    WorkdirSymlink,
 };
 use task_executor::Executor;
 use tempfile::TempDir;
@@ -358,11 +360,23 @@ pub enum CapturedWorkdirError {
     },
     Retryable(String),
     Fatal(String),
+    /// A Digest was not present in the local store. This error type is preserved through the
+    /// error chain to allow the backtracking mechanism to retry with caches disabled.
+    MissingDigest(String, Digest),
 }
 
 impl From<String> for CapturedWorkdirError {
     fn from(value: String) -> Self {
         Self::Fatal(value)
+    }
+}
+
+impl From<StoreError> for CapturedWorkdirError {
+    fn from(err: StoreError) -> Self {
+        match err {
+            StoreError::MissingDigest(s, d) => Self::MissingDigest(s, d),
+            StoreError::Unclassified(s) => Self::Fatal(s),
+        }
     }
 }
 
@@ -384,6 +398,7 @@ impl Display for CapturedWorkdirError {
                 write!(f, "{message} (retryable error)")
             }
             Self::Fatal(s) => write!(f, "{s}"),
+            Self::MissingDigest(s, d) => write!(f, "{s}: {d:?}"),
         }
     }
 }
@@ -587,9 +602,8 @@ pub async fn prepare_workdir_digest(
                 .local_paths(&req.input_digests.immutable_inputs)
                 .await
                 .map_err(|se| {
-                    CapturedWorkdirError::Fatal(
-                        se.enrich("An error occurred when creating symlinks to immutable inputs")
-                            .to_string(),
+                    CapturedWorkdirError::from(
+                        se.enrich("An error occurred when creating symlinks to immutable inputs"),
                     )
                 })?;
 
@@ -652,10 +666,7 @@ pub async fn prepare_workdir_digest(
         .merge(vec![input_digest, additions.into()])
         .await
         .map_err(|se| {
-            CapturedWorkdirError::Fatal(
-                se.enrich("An error occurred when merging digests")
-                    .to_string(),
-            )
+            CapturedWorkdirError::from(se.enrich("An error occurred when merging digests"))
         })
 }
 
@@ -750,7 +761,7 @@ pub async fn prepare_workdir(
                     Permissions::Writable,
                 )
                 .await
-                .map_err(|se| se.enrich(format!("An error occurred when attempting to materialize a working directory at {workdir_path:#?}").as_str()).to_string())?;
+                .map_err(|se| CapturedWorkdirError::from(se.enrich(format!("An error occurred when attempting to materialize a working directory at {workdir_path:#?}").as_str())))?;
         }
 
         if let Some(executable_path) = maybe_executable_path {

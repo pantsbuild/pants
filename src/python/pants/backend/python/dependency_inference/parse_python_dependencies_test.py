@@ -9,16 +9,16 @@ import pytest
 
 from pants.backend.python.dependency_inference import parse_python_dependencies
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
-    ParsedPythonDependencies,
-    ParsePythonDependenciesRequest,
+    ParsedPythonImportInfo as ImpInfo,
 )
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
-    ParsedPythonImportInfo as ImpInfo,
+    ParsePythonDependenciesRequest,
+    PythonFilesDependencies,
 )
 from pants.backend.python.target_types import PythonSourceField, PythonSourceTarget
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.util_rules import stripped_source_files
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.testutil.python_interpreter_selection import (
     skip_unless_python38_present,
@@ -34,7 +34,8 @@ def rule_runner() -> RuleRunner:
             *parse_python_dependencies.rules(),
             *stripped_source_files.rules(),
             *pex.rules(),
-            QueryRule(ParsedPythonDependencies, [ParsePythonDependenciesRequest]),
+            QueryRule(SourceFiles, [SourceFilesRequest]),
+            QueryRule(PythonFilesDependencies, [ParsePythonDependenciesRequest]),
         ],
         target_types=[PythonSourceTarget],
     )
@@ -47,7 +48,6 @@ def assert_deps_parsed(
     expected_imports: dict[str, ImpInfo] | None = None,
     expected_assets: list[str] | None = None,
     filename: str = "project/foo.py",
-    constraints: str = ">=3.6",
     string_imports: bool = True,
     string_imports_min_dots: int = 2,
     assets: bool = True,
@@ -72,14 +72,18 @@ def assert_deps_parsed(
         }
     )
     tgt = rule_runner.get_target(Address("", target_name="t"))
-    result = rule_runner.request(
-        ParsedPythonDependencies,
-        [
-            ParsePythonDependenciesRequest(
-                tgt[PythonSourceField],
-                InterpreterConstraints([constraints]),
-            )
-        ],
+    source_files = rule_runner.request(SourceFiles, [SourceFilesRequest([tgt[PythonSourceField]])])
+    result = next(
+        iter(
+            rule_runner.request(
+                PythonFilesDependencies,
+                [
+                    ParsePythonDependenciesRequest(
+                        source_files,
+                    )
+                ],
+            ).path_to_deps.values()
+        )
     )
     assert dict(result.imports) == expected_imports
     assert list(result.assets) == sorted(expected_assets)
@@ -456,7 +460,6 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
     assert_deps_parsed(
         rule_runner,
         content,
-        constraints=">=3.8",
         expected_imports={
             "demo": ImpInfo(lineno=5, weak=False),
             "project.demo.Demo": ImpInfo(lineno=6, weak=False),
@@ -489,7 +492,6 @@ def test_works_with_python39(rule_runner: RuleRunner) -> None:
     assert_deps_parsed(
         rule_runner,
         content,
-        constraints=">=3.9",
         expected_imports={
             "demo": ImpInfo(lineno=7, weak=False),
             "project.demo.Demo": ImpInfo(lineno=8, weak=False),

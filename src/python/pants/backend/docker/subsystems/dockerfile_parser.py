@@ -147,7 +147,9 @@ class DockerfileInfoRequest:
 
 
 async def _natively_parse_dockerfile(address: Address, digest: Digest) -> DockerfileInfo:
-    result = await parse_dockerfile_info(NativeDependenciesRequest(digest))
+    results = await parse_dockerfile_info(NativeDependenciesRequest(digest))
+    assert len(results.path_to_infos) == 1
+    result = next(iter(results.path_to_infos.values()))
     return DockerfileInfo(
         address=address,
         digest=digest,
