@@ -38,7 +38,9 @@ class ParsedPythonImports(FrozenDict[str, ParsedPythonImportInfo]):
 
 class ParsedPythonAssetPaths(DeduplicatedCollection[str]):
     """All the discovered possible assets from a Python source file."""
+
     # N.B. Don't set `sort_input`, as the input is already sorted
+
 
 class ExplicitPythonDependencies(FrozenDict[str, int]):
     """Dependencies provided via the # pants: infer-dep() pragma (mapped to lineno)."""
@@ -144,7 +146,7 @@ async def parse_python_dependencies(
                 (key, ParsedPythonImportInfo(*value)) for key, value in imports.items()
             ),
             ParsedPythonAssetPaths(sorted(assets)),
-            ExplicitPythonDependencies(FrozenDict(explicit_deps))
+            ExplicitPythonDependencies(FrozenDict(explicit_deps)),
         )
     return PythonFilesDependencies(FrozenDict(path_to_deps))
 

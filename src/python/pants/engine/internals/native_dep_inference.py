@@ -15,7 +15,12 @@ class NativePythonFileDependencies:
     string_candidates: FrozenDict[str, int]
     explicit_dependencies: FrozenDict[str, int]
 
-    def __init__(self, imports: dict[str, tuple[int, bool]], string_candidates: dict[str, int], explicit_dependencies: dict[str, int]):
+    def __init__(
+        self,
+        imports: dict[str, tuple[int, bool]],
+        string_candidates: dict[str, int],
+        explicit_dependencies: dict[str, int],
+    ):
         object.__setattr__(self, "imports", FrozenDict(imports))
         object.__setattr__(self, "string_candidates", FrozenDict(string_candidates))
         object.__setattr__(self, "explicit_dependencies", FrozenDict(explicit_dependencies))
