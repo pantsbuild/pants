@@ -63,7 +63,7 @@ To run tests for all crates, run:
 ./cargo test
 ```
 
-To run for a specific crate, such as the `fs` create, run:
+To run for a specific crate, such as the `fs` crate, run:
 
 ```bash
 ./cargo test -p fs
@@ -118,7 +118,7 @@ To inspect a particular snapshot, you'll need to tell `fs_util` where the storag
 For example, this command pretty prints the recursive file list of a directory through the directory subcommand.
 
 ```bash
-$ src/rust/target/debug/fs_util --local-store-path=${HOME}/.cache/pants/lmdb_store directory cat-proto --output-format=recursive-file-list <digesh> <len>
+$ src/rust/target/debug/fs_util --local-store-path=${HOME}/.cache/pants/lmdb_store directory cat-proto --output-format=recursive-file-list <digest> <len>
 ```
 
 Pass the `--help` flag to see other ways of using `fs_util`, along with its subcommands. Each subcommand can be passed the `--help` flag.

@@ -90,13 +90,14 @@ class NativeOptionParser:
             else [PyConfigSource(cs.path, cs.content) for cs in config_sources]
         )
         self._native_parser = native_engine.PyOptionParser(
-            args,
-            dict(get_strict_env(env, logger)),
-            py_config_sources,
-            allow_pantsrc,
-            include_derivation,
-            known_scopes_to_flags,
-            known_goals,
+            buildroot=None,
+            args=args,
+            env=dict(get_strict_env(env, logger)),
+            configs=py_config_sources,
+            allow_pantsrc=allow_pantsrc,
+            include_derivation=include_derivation,
+            known_scopes_to_flags=known_scopes_to_flags,
+            known_goals=known_goals,
         )
 
         # (type, member_type) -> native get for that type.

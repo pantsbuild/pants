@@ -6,6 +6,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import datetime
 from io import RawIOBase
+from pathlib import Path
 from typing import Any, ClassVar, Protocol, Self, TextIO, TypeVar, overload
 
 from pants.engine.fs import (
@@ -704,6 +705,7 @@ def py_bin_name() -> str: ...
 class PyOptionParser:
     def __init__(
         self,
+        buildroot: Path | None,
         args: Sequence[str] | None,
         env: dict[str, str],
         configs: Sequence[PyConfigSource] | None,

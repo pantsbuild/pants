@@ -111,7 +111,7 @@ When building an Lambda artifact, Pants and the underlying Pex tool need to know
         architecture="arm64",
     )
     ```
-3. Inferred from [the relevant interpreter constraints](../overview/interpreter-compatibility.mdx): the interpreter constraints may unambiguously imply a value for the `runtime` and thus `complete_platforms` fields. For example, `interpreter_constaints = ["==3.12.*"]` implies `runtime="python3.12"`. This only works with interpreter constraints that cover all patch versions of a given minor release series: `>=3.11,<3.13` is too wide (it covers both 3.11 and 3.12), while `==3.12.0` is too specific (AWS's `python3.12` runtime may not use that exact patch version). As with option 2, the architecture is `x86_64` by default, but can changed using the `architecture` field.
+3. Inferred from [the relevant interpreter constraints](../overview/interpreter-compatibility.mdx): the interpreter constraints may unambiguously imply a value for the `runtime` and thus `complete_platforms` fields. For example, `interpreter_constraints = ["==3.12.*"]` implies `runtime="python3.12"`. This only works with interpreter constraints that cover all patch versions of a given minor release series: `>=3.11,<3.13` is too wide (it covers both 3.11 and 3.12), while `==3.12.0` is too specific (AWS's `python3.12` runtime may not use that exact patch version). As with option 2, the architecture is `x86_64` by default, but can changed using the `architecture` field.
 
     ```toml tab={"label":"pants.toml"}
     [python]

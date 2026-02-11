@@ -174,7 +174,7 @@ async def generate_python_from_protobuf(
     request: GeneratePythonFromProtobufRequest, protoc: Protoc
 ) -> GeneratedSources:
     ...
-    return GeneratedSources(result_snaphsot)
+    return GeneratedSources(result_snapshot)
 ```
 
 The `request` parameter will have two fields: `protocol_sources: Snapshot` and `protocol_target: Target`. Often, you will want to include `protocol_sources` in the `input_digest` to the `Process` you use to run the generator. You can use `protocol_target` to look up more information about the input target, such as finding its dependencies.
