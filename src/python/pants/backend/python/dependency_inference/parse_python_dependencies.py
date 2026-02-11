@@ -42,8 +42,9 @@ class ParsedPythonAssetPaths(DeduplicatedCollection[str]):
     # N.B. Don't set `sort_input`, as the input is already sorted
 
 
+# Map from argument of `pants: infer-dep(...)` to line number at which it appears.
 class ExplicitPythonDependencies(FrozenDict[str, int]):
-    """Dependencies provided via the # pants: infer-dep() pragma (mapped to lineno)."""
+    """Dependencies provided via the # pants: infer-dep() pragma."""
 
 
 # TODO: Use the Native* eqivalents of these classes directly? Would require
