@@ -42,6 +42,11 @@ class ParsedPythonAssetPaths(DeduplicatedCollection[str]):
     # N.B. Don't set `sort_input`, as the input is already sorted
 
 
+# Map from argument of `pants: infer-dep(...)` to line number at which it appears.
+class ExplicitPythonDependencies(FrozenDict[str, int]):
+    """Dependencies provided via the # pants: infer-dep() pragma."""
+
+
 # TODO: Use the Native* eqivalents of these classes directly? Would require
 #  conversion to the component classes in Rust code. Might require passing
 #  the PythonInferSubsystem settings through to Rust and acting on them there.
@@ -51,6 +56,7 @@ class ParsedPythonAssetPaths(DeduplicatedCollection[str]):
 class PythonFileDependencies:
     imports: ParsedPythonImports
     assets: ParsedPythonAssetPaths
+    explicit_dependencies: ExplicitPythonDependencies
 
 
 @dataclass(frozen=True)
@@ -134,11 +140,14 @@ async def parse_python_dependencies(
                 ):
                     assets.add(string)
 
+        explicit_deps = dict(native_result.explicit_dependencies)
+
         path_to_deps[path] = PythonFileDependencies(
             ParsedPythonImports(
                 (key, ParsedPythonImportInfo(*value)) for key, value in imports.items()
             ),
             ParsedPythonAssetPaths(sorted(assets)),
+            ExplicitPythonDependencies(FrozenDict(explicit_deps)),
         )
     return PythonFilesDependencies(FrozenDict(path_to_deps))
 
