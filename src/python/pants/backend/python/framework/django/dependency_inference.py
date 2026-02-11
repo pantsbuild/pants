@@ -6,6 +6,7 @@ from pathlib import PurePath
 
 from pants.backend.python import dependency_inference
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
+    ExplicitPythonDependencies,
     ParsedPythonAssetPaths,
     ParsedPythonImportInfo,
     ParsedPythonImports,
@@ -102,6 +103,7 @@ async def _django_migration_dependencies(
                     (module, ParsedPythonImportInfo(0, False)) for module in modules
                 ),
                 ParsedPythonAssetPaths(),
+                ExplicitPythonDependencies(),
             ),
             resolve,
         ),
@@ -147,6 +149,7 @@ async def _django_app_implicit_dependencies(
                     for package in implicit_dependency_packages
                 ),
                 ParsedPythonAssetPaths(),
+                ExplicitPythonDependencies(),
             ),
             resolve,
         ),
