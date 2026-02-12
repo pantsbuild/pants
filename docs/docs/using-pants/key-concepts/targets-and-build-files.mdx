@@ -294,7 +294,7 @@ To add to a default value rather than replacing it, the current default value fo
 python_sources(
   name="my-one-top-level-target",
   sources=[
-    f"{pattern[0] if pattern.startswith("!") else ""}**/{pattern.lstrip("!")}"
+    f"{pattern[0] if pattern.startswith('!') else ''}**/{pattern.lstrip('!')}"
     for pattern in python_sources.sources.default
   ]
 )
