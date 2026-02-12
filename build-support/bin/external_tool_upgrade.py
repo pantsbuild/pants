@@ -35,7 +35,7 @@ from external_tool.python import (
     replace_class_variables,
 )
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
-from packaging.version import Version
+from packaging.version import InvalidVersion, Version
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
@@ -44,6 +44,13 @@ logger = logging.getLogger(__name__)
 # The ExternalToolVersion class is copied here to avoid depending on pants.
 # This makes it possible to run this as a standalone script with uv or use a
 # separate resolve in pants.
+
+# Max platform name width for consistent formatting. Hardcoded rather than
+# computed from pants.engine.platform.Platform to maintain independent resolves.
+# If Platform gains values, update this constant.
+PLATFORM_WIDTH = 12
+
+
 @dataclass(frozen=True)
 class ExternalToolVersion:
     version: str
@@ -53,7 +60,8 @@ class ExternalToolVersion:
     url_override: str | None = None
 
     def encode(self) -> str:
-        parts = [self.version, self.platform, self.sha256, str(self.filesize)]
+        padded_platform = self.platform.ljust(PLATFORM_WIDTH)
+        parts = [self.version, padded_platform, self.sha256, str(self.filesize)]
         if self.url_override:
             parts.append(self.url_override)
         return "|".join(parts)
@@ -64,6 +72,29 @@ class ExternalToolVersion:
         version, platform, sha256, filesize = parts[:4]
         url_override = parts[4] if len(parts) > 4 else None
         return cls(version, platform, sha256, int(filesize), url_override=url_override)
+
+
+def _version_key(version_str: str) -> tuple[int, Version | str]:
+    """Return a sort key for version strings, handling non-PEP 440 versions.
+
+    Valid PEP 440 versions get priority (1, ...) so they sort first with reverse=True. Invalid
+    versions get (0, ...) and fall back to string comparison.
+    """
+    try:
+        return (1, Version(version_str.lstrip("v")))
+    except InvalidVersion:
+        return (0, version_str)
+
+
+def sorted_by_version_and_platform(
+    versions: list[ExternalToolVersion],
+) -> list[ExternalToolVersion]:
+    """Sort by version descending, then platform alphabetically.
+
+    See https://github.com/pantsbuild/pants/issues/23045
+    """
+    by_platform = sorted(versions, key=lambda etv: etv.platform)
+    return sorted(by_platform, key=lambda etv: _version_key(etv.version), reverse=True)
 
 
 def format_string_to_regex(format_string: str) -> re.Pattern:
@@ -356,8 +387,7 @@ def main():
 
         fetched_versions = set(external_versions)
 
-        known_versions = list(existing_versions | fetched_versions)
-        known_versions.sort(key=lambda tu: (Version(tu.version), tu.platform), reverse=True)
+        known_versions = sorted_by_version_and_platform(list(existing_versions | fetched_versions))
 
         if args.version_constraint:
             # Only upgrade if the newest matching version is greater than current default
