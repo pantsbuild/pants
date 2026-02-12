@@ -240,7 +240,7 @@ We strongly recommend using [lockfiles](./lockfiles.mdx) to ensure secure, repea
 
 Sometimes a requirement does not properly declare in its packaging metadata the other dependencies it depends on, so those will not be installed. It's especially common to leave off dependencies on `setuptools`, which results in import errors like this:
 
-```
+```text
 import pkg_resources
 ModuleNotFoundError: No module named 'pkg_resources'
 ```

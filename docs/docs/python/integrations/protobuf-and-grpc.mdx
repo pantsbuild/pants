@@ -90,7 +90,7 @@ It is recommended to share the same dependencies versions between the protobuf p
 
 ```toml title="pants.toml"
 [python-protobuf-grpclib]
-install_from_resolve = python-default
+install_from_resolve = "python-default"
 # Change the path to your requirements.
 requirements = [
   "//3rdparty/python#grpclib",

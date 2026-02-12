@@ -439,7 +439,7 @@ from pants.engine.rules import rule
 from pants.engine.target import SourcesField
 
 @rule
-async demo(...) -> Foo:
+async def demo(...) -> Foo:
     ...
     unstripped_sources: SourceFiles = await determine_source_files(
         SourceFilesRequest([target.get(SourcesField)])
