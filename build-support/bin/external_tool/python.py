@@ -13,6 +13,18 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
+def _format_value(value: Any, indent: int = 4) -> str:
+    # Do some extra work to format lists with a trailing comma to minimize
+    # conflict with ruff/black, otherwise just json.dumps
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        if not value:
+            return "[]"
+        spaces = " " * indent
+        formatted_items = [f'{spaces}"{item}",' for item in value]
+        return "[\n" + "\n".join(formatted_items) + "\n]"
+    return json.dumps(value, indent=indent)
+
+
 def get_class_variables(file_path: Path, class_name: str, *, variables: type[T]) -> T:
     """Reads a Python file and retrieves the values of specified class variables."""
 
@@ -62,7 +74,7 @@ def replace_class_variables(file_path: Path, class_name: str, replacements: dict
         for var, (start, end) in class_var_ranges.items():
             file.writelines(lines[prev_end:start])
             line = textwrap.indent(
-                f"{var} = {json.dumps(replacements[var], indent=4)}\n",
+                f"{var} = {_format_value(replacements[var])}\n",
                 "    ",
             )
             file.writelines([line])
