@@ -8,7 +8,11 @@ python_tests(
     # The package.json files are inlined in ./test_integration_tests.py
     overrides={
         "test_integration_test.py": {
-            "dependencies": ["./jest_resources", "./mocha_resources"],
+            "dependencies": [
+                "./jest_resources",
+                "./mocha_resources",
+                "//src/python/pants/backend/javascript:test_resources",
+            ],
             "timeout": 240,
         },
         "export_test.py": {
