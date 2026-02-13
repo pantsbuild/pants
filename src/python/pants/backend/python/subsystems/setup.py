@@ -47,6 +47,10 @@ RESOLVE_OPTION_KEY__DEFAULT = "__default__"
 _T = TypeVar("_T")
 
 
+DEFAULT_TEST_FILE_GLOBS = ("test_*.py", "*_test.py", "tests.py")
+DEFAULT_TESTUTIL_FILE_GLOBS = ("conftest.py", "test_*.pyi", "*_test.pyi", "tests.pyi")
+
+
 class PythonSetup(Subsystem):
     options_scope = "python"
     help = "Options for Pants's Python backend."
@@ -718,6 +722,59 @@ class PythonSetup(Subsystem):
             """
         ),
         advanced=True,
+    )
+    tailor_test_file_globs = StrListOption(
+        default=list(DEFAULT_TEST_FILE_GLOBS),
+        help=softwrap(
+            """
+        Globs to match your test files. Used to decide which files should tailor
+        python_tests() vs python_sources() targets.
+
+        NB: This doesn't change the default set of files that a target owns, just the files
+          that trigger tailoring of a target. If you need those to match (and you almost always do)
+          then you should also create custom target type macros whose globs match these, and list
+          them as substitutes for python_tests() and python_sources() in `[tailor].alias_mapping`.
+          (see {doc_url("docs/writing-plugins/macros")} and
+          {doc_url("reference/goals/tailor#alias_mapping")}).
+
+        For example, you can set `[python].tailor_test_file_globs` to `["*_mytests.py"]`, and then
+        create `my_pants_macros.py` with:
+
+        ```
+        def my_python_tests(**kwargs):
+            if "sources" not in kwargs:
+                kwargs["sources"] = ["*_mytests.py"]
+            python_tests(**kwargs)
+
+
+        def my_python_sources(**kwargs):
+            if "sources" not in kwargs:
+                kwargs["sources"] = ["*.py", "!*_mytests.py"]
+            python_sources(**kwargs)
+        ```
+
+        And set the following in `pants.toml`:
+
+        [global]
+        build_file_prelude_globs = ["my_pants_macros.py"]
+
+        [tailor]
+        alias_mapping = { python_sources = "my_python_sources", python_tests = "my_python_tests" }
+        """
+        ),
+        metavar="glob",
+    )
+    tailor_testutils_file_globs = StrListOption(
+        default=list(DEFAULT_TESTUTIL_FILE_GLOBS),
+        help=softwrap(
+            """
+        Globs to match your testutil files. Used to decide which files should tailor
+        python_test_utils() vs python_sources() targets.
+
+        See tailor_test_file_globs above for caveats and usage.
+        """
+        ),
+        metavar="glob",
     )
     macos_big_sur_compatibility = BoolOption(
         default=False,
