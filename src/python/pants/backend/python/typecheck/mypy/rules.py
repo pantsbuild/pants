@@ -312,12 +312,13 @@ async def mypy_typecheck_partition(
                             # left the cache in an inconsistent state.
                             # See https://github.com/python/mypy/issues/6003 for exit codes
                             if [ $EXIT_CODE -le 1 ]; then
-                                if {ln.path} "$SANDBOX_CACHE_DB" "$NAMED_CACHE_DB.$$.tmp" > /dev/null 2>&1; then
-                                    {mv.path} "$NAMED_CACHE_DB.$$.tmp" "$NAMED_CACHE_DB" > /dev/null 2>&1
+                                if LN_TMP=$({mktemp.path} -u "$NAMED_CACHE_DB.tmp.XXXXXX") &&
+                                   {ln.path} "$SANDBOX_CACHE_DB" "$LN_TMP" > /dev/null 2>&1; then
+                                    {mv.path} "$LN_TMP" "$NAMED_CACHE_DB" > /dev/null 2>&1
                                 else
-                                    TMP_CACHE=$({mktemp.path} "$NAMED_CACHE_DB.tmp.XXXXXX")
-                                    {cp.path} "$SANDBOX_CACHE_DB" "$TMP_CACHE" > /dev/null 2>&1
-                                    {mv.path} "$TMP_CACHE" "$NAMED_CACHE_DB" > /dev/null 2>&1
+                                    CP_TMP=$({mktemp.path} "$NAMED_CACHE_DB.tmp.XXXXXX") &&
+                                        {cp.path} "$SANDBOX_CACHE_DB" "$CP_TMP" > /dev/null 2>&1 &&
+                                        {mv.path} "$CP_TMP" "$NAMED_CACHE_DB" > /dev/null 2>&1
                                 fi
                             fi
 
