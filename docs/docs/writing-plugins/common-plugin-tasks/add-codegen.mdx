@@ -54,12 +54,13 @@ Instead of users having to explicitly add this dependency every time, you can dy
 To inject dependencies:
 
 1. Subclass the `Dependencies` field. Register this subclass on your protocol target type.
-2. Define a subclass of `InjectDependenciesRequest` and set the class property `inject_for` to the `Dependencies` subclass defined in the previous step. Register this new class with a [`UnionRule`](../the-rules-api/union-rules-advanced.mdx) for `InjectDependenciesRequest`.
-3. Create a new rule that takes your new `InjectDependenciesRequest` subclass as a parameter and returns `InjectedDependencies`.
+2. Define a `FieldSet` subclass that includes the `Dependencies` subclass and any other fields needed for inference.
+3. Define a subclass of `InferDependenciesRequest` and set the class property `infer_from` to the `FieldSet` subclass defined in the previous step. Register this new class with a [`UnionRule`](../the-rules-api/union-rules-advanced.mdx) for `InferDependenciesRequest`.
+4. Create a new rule that takes your new `InferDependenciesRequest` subclass as a parameter and returns `InferredDependencies`.
 
 ```python
 from pants.engine.addresses import Address
-from pants.engine.target import Dependencies, InjectDependenciesRequest, InjectedDependencies
+from pants.engine.target import Dependencies, FieldSet, InferDependenciesRequest, InferredDependencies
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 
@@ -72,18 +73,24 @@ class ProtobufSourceTarget(Target):
     alias = "protobuf_source"
     core_fields = (*COMMON_TARGET_FIELDS, ProtobufDependencies, ProtobufSourceField)
 
-class InjectProtobufDependencies(InjectDependenciesRequest):
-    inject_for = ProtobufDependencies
+class ProtobufDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (ProtobufDependencies,)
+    dependencies: ProtobufDependencies
+
+class InferProtobufDependencies(InferDependenciesRequest):
+    infer_from = ProtobufDependenciesInferenceFieldSet
 
 @rule
-async def inject_dependencies(_: InjectProtobufDependencies) -> InjectedDependencies:
+async def infer_protobuf_dependencies(
+    request: InferProtobufDependencies
+) -> InferredDependencies:
     address = Address("3rdparty/python", target_name="protobuf")
-    return InjectedDependencies([address])
+    return InferredDependencies([address])
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(InjectDependenciesRequest, InjectProtobufDependencies),
+        UnionRule(InferDependenciesRequest, InferProtobufDependencies),
     ]
 ```
 

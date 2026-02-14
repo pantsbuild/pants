@@ -33,12 +33,12 @@ class LintTargetsRequest(ABC):
 
 
 @dataclass(frozen=True)
-class LintResults:
+class LintResult:
     ...
 
 
 @rule(polymorphic=True)
-async def lint_target(req: LintTargetsRequest) -> LintResults:
+async def lint_target(req: LintTargetsRequest) -> LintResult:
     # If no implementation for the member type is found, this generic
     # implementation will be invoked. In this case that is not useful,
     # so we raise.
@@ -63,7 +63,7 @@ async def lint(targets: Targets, union_membership: UnionMembership) -> Lint:
 ```
 
 ```python title="pants-plugins/bash/shellcheck.py"
-from pants.core.goals.lint import LintResults, LintTargetsRequest
+from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.engine.rules import collect_rules, rule
 
 
@@ -75,7 +75,7 @@ class ShellcheckRequest(LintTargetsRequest):
 
 
 @rule
-async def shellcheck_target(req: ShellcheckRequest) -> LintResults:
+async def shellcheck_target(req: ShellcheckRequest) -> LintResult:
     # At runtime, calls to the generic `lint_target()` on a
     # `ShellcheckRequest` will be dispatched here.
     ...
