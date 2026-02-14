@@ -31,7 +31,7 @@ from pants.engine.intrinsics import (
     execute_process_with_retry,
     merge_digests,
 )
-from pants.engine.process import InteractiveProcess, ProcessCacheScope, ProcessWithRetries
+from pants.engine.process import InteractiveProcess, ProcessWithRetries
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import SourcesField, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
@@ -124,9 +124,7 @@ async def setup_junit_for_target(
     user_classpath_arg = ":".join(classpath.root_args())
 
     # Cache test runs only if they are successful, or not at all if `--test-force`.
-    cache_scope = (
-        ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
-    )
+    cache_scope = test_subsystem.default_process_cache_scope
 
     extra_jvm_args: list[str] = []
     if request.is_debug:
