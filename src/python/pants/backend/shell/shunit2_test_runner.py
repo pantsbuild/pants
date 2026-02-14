@@ -47,7 +47,7 @@ from pants.engine.intrinsics import (
     merge_digests,
 )
 from pants.engine.platform import Platform
-from pants.engine.process import InteractiveProcess, Process, ProcessCacheScope, ProcessWithRetries
+from pants.engine.process import InteractiveProcess, Process, ProcessWithRetries
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import SourcesField, Target, TransitiveTargetsRequest
 from pants.option.global_options import GlobalOptions
@@ -227,9 +227,7 @@ async def setup_shunit2_for_target(
         if runner.shell == Shunit2Shell.zsh
         else [runner.binary_path.path, *field_set_sources.snapshot.files]
     )
-    cache_scope = (
-        ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
-    )
+    cache_scope = test_subsystem.default_process_cache_scope
     process = Process(
         argv=argv,
         input_digest=input_digest,

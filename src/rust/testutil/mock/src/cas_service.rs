@@ -22,7 +22,7 @@ use remexec::{
     BatchReadBlobsRequest, BatchReadBlobsResponse, BatchUpdateBlobsRequest,
     BatchUpdateBlobsResponse, CacheCapabilities, ExecutionCapabilities, FindMissingBlobsRequest,
     FindMissingBlobsResponse, GetCapabilitiesRequest, GetTreeRequest, GetTreeResponse,
-    ServerCapabilities,
+    ServerCapabilities, SpliceBlobRequest, SpliceBlobResponse, SplitBlobRequest, SplitBlobResponse,
 };
 use tonic::metadata::{AsciiMetadataKey, KeyAndValueRef};
 use tonic::{Request, Response, Status};
@@ -519,6 +519,20 @@ impl ContentAddressableStorage for StubCASResponder {
         &self,
         _: Request<GetTreeRequest>,
     ) -> Result<Response<Self::GetTreeStream>, Status> {
+        Err(Status::unimplemented("".to_owned()))
+    }
+
+    async fn split_blob(
+        &self,
+        _: Request<SplitBlobRequest>,
+    ) -> Result<Response<SplitBlobResponse>, Status> {
+        Err(Status::unimplemented("".to_owned()))
+    }
+
+    async fn splice_blob(
+        &self,
+        _: Request<SpliceBlobRequest>,
+    ) -> Result<Response<SpliceBlobResponse>, Status> {
         Err(Status::unimplemented("".to_owned()))
     }
 }

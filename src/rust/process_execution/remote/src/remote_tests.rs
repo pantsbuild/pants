@@ -1,5 +1,8 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+#![allow(deprecated)] // TODO: Move to REAPI `output_path` instead of `output_files` and `output_directories`.
+
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -2339,6 +2342,7 @@ async fn extract_output_files_from_response_just_directory() {
                 path: "cats".into(),
                 tree_digest: Some(test_tree.digest().into()),
                 is_topologically_sorted: false,
+                ..Default::default()
             }],
             ..Default::default()
         }),
@@ -2371,11 +2375,13 @@ async fn extract_output_files_from_response_directories_and_files() {
                     path: "pets/cats".into(),
                     tree_digest: Some((&TestTree::roland_at_root().digest()).into()),
                     is_topologically_sorted: false,
+                    ..Default::default()
                 },
                 remexec::OutputDirectory {
                     path: "pets/dogs".into(),
                     tree_digest: Some((&TestTree::robin_at_root().digest()).into()),
                     is_topologically_sorted: false,
+                    ..Default::default()
                 },
             ],
             ..Default::default()
@@ -2405,6 +2411,7 @@ async fn extract_output_files_from_response_no_prefix() {
                 path: String::new(),
                 tree_digest: Some((&TestTree::roland_at_root().digest()).into()),
                 is_topologically_sorted: false,
+                ..Default::default()
             }],
             ..Default::default()
         }),

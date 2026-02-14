@@ -757,7 +757,7 @@ Rather than subclassing `PrimitiveField`, subclass `Field` directly. `Field` now
 Rather than subclassing `AsyncField` or `AsyncStringSequenceField`, subclass `Field` or a template like `StringField` and also subclass `AsyncFieldMixin`:
 
 ```python
-from pants.engine.target import AsyncFieldMixin, StringField)
+from pants.engine.target import AsyncFieldMixin, StringField
 
 class MyField(StringField, AsyncFieldMixin):
     alias = "my_field"
@@ -812,17 +812,17 @@ If you have any custom fields that act like the dependencies field, but do not s
 2. You can use `UnparsedAddressInputs` from `pants.engine.addresses` to resolve the addresses:
 
 ```python
-from pants.engine.addresses import Address, Addresses, UnparsedAddressedInputs
+from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.target import Targets
 
 ...
 
-addresses = await Get(Addresses, UnparsedAddressedInputs(["//:addr1", "project/addr2"], owning_address=None)
+addresses = await Get(Addresses, UnparsedAddressInputs(["//:addr1", "project/addr2"], owning_address=None))
 
 # Or, use this.
 targets = await Get(
     Targets,
-    UnparsedAddressedInputs(["//:addr1", "project/addr2"], owning_address=Address("project", target_name="original")
+    UnparsedAddressInputs(["//:addr1", "project/addr2"], owning_address=Address("project", target_name="original"))
 )
 ```
 

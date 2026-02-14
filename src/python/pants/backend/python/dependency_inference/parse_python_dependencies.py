@@ -8,7 +8,6 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from pants.backend.python.dependency_inference.subsystem import PythonInferSubsystem
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.util_rules.source_files import SourceFiles
 from pants.core.util_rules.stripped_source_files import strip_source_roots
 from pants.engine.collection import DeduplicatedCollection
@@ -43,6 +42,11 @@ class ParsedPythonAssetPaths(DeduplicatedCollection[str]):
     # N.B. Don't set `sort_input`, as the input is already sorted
 
 
+# Map from argument of `pants: infer-dep(...)` to line number at which it appears.
+class ExplicitPythonDependencies(FrozenDict[str, int]):
+    """Dependencies provided via the # pants: infer-dep() pragma."""
+
+
 # TODO: Use the Native* eqivalents of these classes directly? Would require
 #  conversion to the component classes in Rust code. Might require passing
 #  the PythonInferSubsystem settings through to Rust and acting on them there.
@@ -52,6 +56,7 @@ class ParsedPythonAssetPaths(DeduplicatedCollection[str]):
 class PythonFileDependencies:
     imports: ParsedPythonImports
     assets: ParsedPythonAssetPaths
+    explicit_dependencies: ExplicitPythonDependencies
 
 
 @dataclass(frozen=True)
@@ -62,7 +67,6 @@ class PythonFilesDependencies:
 @dataclass(frozen=True)
 class ParsePythonDependenciesRequest:
     source: SourceFiles
-    interpreter_constraints: InterpreterConstraints
 
 
 @dataclass(frozen=True)
@@ -113,9 +117,6 @@ async def parse_python_dependencies(
     python_infer_subsystem: PythonInferSubsystem,
 ) -> PythonFilesDependencies:
     stripped_sources = await strip_source_roots(request.source)
-    # We operate on PythonSourceField, which should be one file.
-    assert len(stripped_sources.snapshot.files) == 1
-
     native_results = await parse_python_deps(
         NativeDependenciesRequest(stripped_sources.snapshot.digest)
     )
@@ -139,11 +140,14 @@ async def parse_python_dependencies(
                 ):
                     assets.add(string)
 
+        explicit_deps = dict(native_result.explicit_dependencies)
+
         path_to_deps[path] = PythonFileDependencies(
             ParsedPythonImports(
                 (key, ParsedPythonImportInfo(*value)) for key, value in imports.items()
             ),
             ParsedPythonAssetPaths(sorted(assets)),
+            ExplicitPythonDependencies(FrozenDict(explicit_deps)),
         )
     return PythonFilesDependencies(FrozenDict(path_to_deps))
 

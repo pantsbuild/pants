@@ -17,6 +17,7 @@ include!(concat!(env!("OUT_DIR"), "/python_impl_hash.rs"));
 pub struct ParsedPythonDependencies {
     pub imports: HashMap<String, (u64, bool)>,
     pub string_candidates: HashMap<String, u64>,
+    pub explicit_dependencies: HashMap<String, u64>,
 }
 
 pub fn get_dependencies(
@@ -67,12 +68,14 @@ pub fn get_dependencies(
     Ok(ParsedPythonDependencies {
         imports: import_map,
         string_candidates: collector.string_candidates,
+        explicit_dependencies: collector.explicit_dependencies,
     })
 }
 
 struct ImportCollector<'a> {
     pub import_map: HashMap<String, (u64, bool)>,
     pub string_candidates: HashMap<String, u64>,
+    pub explicit_dependencies: HashMap<String, u64>,
     code: &'a str,
     weaken_imports: bool,
 }
@@ -88,6 +91,7 @@ impl ImportCollector<'_> {
         ImportCollector {
             import_map: HashMap::default(),
             string_candidates: HashMap::default(),
+            explicit_dependencies: HashMap::default(),
             code,
             weaken_imports: false,
         }
@@ -267,8 +271,25 @@ impl ImportCollector<'_> {
     }
 }
 
-// NB: https://tree-sitter.github.io/tree-sitter/playground is very helpful
+const _INFER_DEP_PREFIX: &str = "# pants: infer-dep(";
+const _INFER_DEP_SUFFIX: &str = ")";
+
+// NB: https://tree-sitter.github.io/tree-sitter/7-playground.html is very helpful
 impl Visitor for ImportCollector<'_> {
+    fn visit_comment(&mut self, node: tree_sitter::Node) -> ChildBehavior {
+        let comment_text = self.code_at(node.range()).trim();
+        if comment_text.starts_with(_INFER_DEP_PREFIX) && comment_text.ends_with(_INFER_DEP_SUFFIX)
+        {
+            // Prefix and suffix are ASCII so the subslice will be on character boundaries.
+            let dep_text = comment_text
+                [_INFER_DEP_PREFIX.len()..comment_text.len() - _INFER_DEP_SUFFIX.len()]
+                .to_string();
+            self.explicit_dependencies
+                .insert(dep_text, (node.range().start_point.row + 1) as u64);
+        }
+        ChildBehavior::Ignore
+    }
+
     fn visit_import_statement(&mut self, node: tree_sitter::Node) -> ChildBehavior {
         if !self.is_pragma_ignored(node) {
             self.insert_import(BaseNode::Node(node.named_child(0).unwrap()), None);

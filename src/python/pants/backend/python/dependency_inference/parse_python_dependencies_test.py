@@ -17,7 +17,6 @@ from pants.backend.python.dependency_inference.parse_python_dependencies import 
 )
 from pants.backend.python.target_types import PythonSourceField, PythonSourceTarget
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
@@ -48,8 +47,8 @@ def assert_deps_parsed(
     *,
     expected_imports: dict[str, ImpInfo] | None = None,
     expected_assets: list[str] | None = None,
+    expected_explicit_deps: dict[str, int] | None = None,
     filename: str = "project/foo.py",
-    constraints: str = ">=3.6",
     string_imports: bool = True,
     string_imports_min_dots: int = 2,
     assets: bool = True,
@@ -57,6 +56,8 @@ def assert_deps_parsed(
 ) -> None:
     expected_imports = expected_imports or {}
     expected_assets = expected_assets or []
+    expected_explicit_deps = expected_explicit_deps or {}
+
     rule_runner.set_options(
         [
             f"--python-infer-string-imports={string_imports}",
@@ -82,7 +83,6 @@ def assert_deps_parsed(
                 [
                     ParsePythonDependenciesRequest(
                         source_files,
-                        InterpreterConstraints([constraints]),
                     )
                 ],
             ).path_to_deps.values()
@@ -90,6 +90,7 @@ def assert_deps_parsed(
     )
     assert dict(result.imports) == expected_imports
     assert list(result.assets) == sorted(expected_assets)
+    assert dict(result.explicit_dependencies) == expected_explicit_deps
 
 
 def test_normal_imports(rule_runner: RuleRunner) -> None:
@@ -463,7 +464,6 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
     assert_deps_parsed(
         rule_runner,
         content,
-        constraints=">=3.8",
         expected_imports={
             "demo": ImpInfo(lineno=5, weak=False),
             "project.demo.Demo": ImpInfo(lineno=6, weak=False),
@@ -496,7 +496,6 @@ def test_works_with_python39(rule_runner: RuleRunner) -> None:
     assert_deps_parsed(
         rule_runner,
         content,
-        constraints=">=3.9",
         expected_imports={
             "demo": ImpInfo(lineno=7, weak=False),
             "project.demo.Demo": ImpInfo(lineno=8, weak=False),
@@ -564,3 +563,15 @@ def test_assets(rule_runner: RuleRunner, min_slashes: int) -> None:
         rule_runner, content, expected_assets=expected, assets_min_slashes=min_slashes
     )
     assert_deps_parsed(rule_runner, content, assets=False, expected_assets=[])
+
+
+def test_explicit_deps_pragma(rule_runner: RuleRunner) -> None:
+    # Python (OG) dep inference doesn't yet handle the deps from these pragmas.
+    # We still need to decide on their format. This just tests that the arg
+    # is plumbed through to Python.
+    content = dedent(
+        """\
+        # pants: infer-dep(foo/bar/baz.py)
+        """
+    )
+    assert_deps_parsed(rule_runner, content, expected_explicit_deps={"foo/bar/baz.py": 1})

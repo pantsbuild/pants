@@ -22,6 +22,7 @@ from pants.source.source_root import (
 from pants.source.source_root import rules as source_root_rules
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import RuleRunner, run_rule_with_mocks
+from pants.util.frozendict import FrozenDict
 
 
 def _find_root(
@@ -287,3 +288,26 @@ def test_source_roots_request() -> None:
         PurePath("src/python/foo"): SourceRoot("src/python"),
         PurePath("src/python/baz/qux"): SourceRoot("src/python"),
     } == dict(res.path_to_root)
+
+
+def test_root_to_paths() -> None:
+    res = SourceRootsResult(
+        FrozenDict(
+            {
+                PurePath("src/python/foo/bar.py"): SourceRoot("src/python"),
+                PurePath("tests/python/foo/bar_test.py"): SourceRoot("tests/python"),
+                PurePath("src/python/foo"): SourceRoot("src/python"),
+                PurePath("src/python/baz/qux"): SourceRoot("src/python"),
+            }
+        )
+    )
+    assert res.root_to_paths() == FrozenDict(
+        {
+            SourceRoot("src/python"): (
+                PurePath("src/python/baz/qux"),
+                PurePath("src/python/foo"),
+                PurePath("src/python/foo/bar.py"),
+            ),
+            SourceRoot("tests/python"): (PurePath("tests/python/foo/bar_test.py"),),
+        }
+    )

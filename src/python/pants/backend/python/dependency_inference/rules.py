@@ -44,7 +44,6 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules import ancestor_files, pex
 from pants.backend.python.util_rules.ancestor_files import AncestorFilesRequest, find_ancestor_files
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core import target_types
 from pants.core.target_types import AllAssetTargetsByPath, map_assets_by_path
@@ -370,14 +369,10 @@ async def _exec_parse_deps(
     field_set: PythonImportDependenciesInferenceFieldSet,
     python_setup: PythonSetup,
 ) -> PythonFileDependencies:
-    interpreter_constraints = InterpreterConstraints.create_from_field_sets(
-        [field_set], python_setup
-    )
     source = await determine_source_files(SourceFilesRequest([field_set.source]))
     resp = await parse_python_dependencies_get(
         ParsePythonDependenciesRequest(
             source,
-            interpreter_constraints,
         ),
         **implicitly(),
     )

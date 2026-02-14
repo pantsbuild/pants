@@ -240,7 +240,7 @@ We strongly recommend using [lockfiles](./lockfiles.mdx) to ensure secure, repea
 
 Sometimes a requirement does not properly declare in its packaging metadata the other dependencies it depends on, so those will not be installed. It's especially common to leave off dependencies on `setuptools`, which results in import errors like this:
 
-```
+```text
 import pkg_resources
 ModuleNotFoundError: No module named 'pkg_resources'
 ```
@@ -459,7 +459,7 @@ pytest = "3rdparty/python/pytest_constraints.txt"
 
 ```text tab={"label":"3rdparty/python/data_science_constraints.txt"}
 requests==22.1.0
-urrllib3==4.2
+urllib3==4.2
 ```
 
 You can also set the key `__default__` to apply the same constraints file to every resolve by default, although this is not always useful because resolves often need different constraints.

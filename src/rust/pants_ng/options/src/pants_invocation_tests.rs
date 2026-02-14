@@ -1,13 +1,10 @@
 // Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use crate::pants_invocation::Args;
-use crate::pants_invocation::Command;
-use crate::pants_invocation::Flag;
-use crate::pants_invocation::PantsInvocation;
-use crate::pants_invocation::SubCommand;
 use maplit::hashmap;
 use options::Scope;
+
+use crate::pants_invocation::{Args, Command, Flag, PantsInvocation, SubCommand};
 
 fn mk_flag(key: &str, value: Option<&str>) -> Flag {
     Flag {

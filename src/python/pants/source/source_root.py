@@ -6,6 +6,7 @@ from __future__ import annotations
 import itertools
 import logging
 import os
+from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
@@ -173,7 +174,7 @@ class SourceRootsRequest:
 
     @classmethod
     def for_files(cls, file_paths: Iterable[str]) -> SourceRootsRequest:
-        """Create a request for the source root for the given file."""
+        """Create a request for the source root for the given files."""
         return cls({PurePath(file_path) for file_path in file_paths}, ())
 
 
@@ -216,6 +217,12 @@ class SourceRootRequest(EngineAwareParameter):
 @dataclass(frozen=True)
 class SourceRootsResult:
     path_to_root: FrozenDict[PurePath, SourceRoot]
+
+    def root_to_paths(self) -> FrozenDict[SourceRoot, tuple[PurePath, ...]]:
+        res = defaultdict(list)
+        for path, root in self.path_to_root.items():
+            res[root].append(path)
+        return FrozenDict((k, tuple(sorted(v))) for k, v in res.items())
 
 
 @dataclass(frozen=True)

@@ -101,7 +101,7 @@ You can also [manually add](../../using-pants/key-concepts/targets-and-build-fil
 python_sources(dependencies=["models:models"])
 ```
 
-:::note TIp: set `namespace py`
+:::note Tip: set `namespace py`
 Pants can handle Thrift regardless of whether you set `namespace py`.
 
 However, it's often a good idea to set the namespace because it can make your imports more predictable and declarative. It also reduces the risk of your Thrift file names conflicting with other Python modules used, such as those from third-party requirements.
@@ -145,7 +145,7 @@ python_requirement(
     name="thrift-requirement",
     # Here, we use the same version of Thrift in both resolves. You could instead create
     # a distinct target per resolve so that they have different versions.
-    requirements=["thrift==0.15.0""],
+    requirements=["thrift==0.15.0"],
     resolve=parametrize("resolve-a", "resolve-b"),
 )
 
