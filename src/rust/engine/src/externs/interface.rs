@@ -1569,7 +1569,6 @@ fn rule_graph_consumed_types<'py>(
 fn rule_graph_visualize(py_scheduler: &Bound<'_, PyScheduler>, path: PathBuf) -> PyO3Result<()> {
     let core = &py_scheduler.borrow().0.core;
     core.executor.enter(|| {
-        // TODO(#7117): we want to represent union types in the graph visualizer somehow!!!
         write_to_file(path.as_path(), &core.rule_graph).map_err(|e| {
             PyIOError::new_err(format!(
                 "Failed to visualize to {}: {:?}",
@@ -1596,7 +1595,6 @@ fn rule_subgraph_visualize(
             .collect::<Vec<_>>();
         let product_type = TypeId::new(product_type);
 
-        // TODO(#7117): we want to represent union types in the graph visualizer somehow!!!
         let subgraph = scheduler
             .core
             .rule_graph
