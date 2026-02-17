@@ -12,12 +12,12 @@ class GrpcPythonPlugin(ExternalTool):
     # https://github.com/nhurden/protoc-gen-grpc-python-prebuilt maintains a
     # composite versioning strategy with both the grpc plugin version and the
     # version of "protoc-gen-grpc-python-prebuilt" that built it
-    default_version = "v0.3.0+v1.73.1"
+    default_version = "v0.3.1+v1.73.1"
     default_known_versions = [
-        "v0.3.0+v1.73.1|linux_arm64|9ff424250d039f4c99830321237013d031e30fb8bbcb3ee32d80f8a4351304d3 |14175328",
-        "v0.3.0+v1.73.1|linux_x86_64|17952bf233ed86841c15a454a378cc4ef78f2610313c3159d3e58f987ba5f656 |13874656",
-        "v0.3.0+v1.73.1|macos_arm64|7cb578b187eb959402cf3434699dffda0f46c4380baa5648e1e75fc9440d3d12 |32170440",
-        "v0.3.0+v1.73.1|macos_x86_64|7cb578b187eb959402cf3434699dffda0f46c4380baa5648e1e75fc9440d3d12 |32170440",
+        "v0.3.1+v1.73.1|linux_arm64 |aa7730e447a829f61ed0da9b9c0974d56fba8984806ac4a4d984da0c998f1a3d|14536184",
+        "v0.3.1+v1.73.1|linux_x86_64|17952bf233ed86841c15a454a378cc4ef78f2610313c3159d3e58f987ba5f656|13874656",
+        "v0.3.1+v1.73.1|macos_arm64 |7cb578b187eb959402cf3434699dffda0f46c4380baa5648e1e75fc9440d3d12|32170440",
+        "v0.3.1+v1.73.1|macos_x86_64|7cb578b187eb959402cf3434699dffda0f46c4380baa5648e1e75fc9440d3d12|32170440",
         # Old versions from binaries.pantsbuild.org
         "1.32.0|macos_arm64 |b2db586656463841aa2fd4aab34fb6bd3ef887b522d80e4f2f292146c357f533|6215304|https://binaries.pantsbuild.org/bin/grpc_python_plugin/1.32.0/macos/x86_64/grpc_python_plugin",
         "1.32.0|macos_x86_64|b2db586656463841aa2fd4aab34fb6bd3ef887b522d80e4f2f292146c357f533|6215304|https://binaries.pantsbuild.org/bin/grpc_python_plugin/1.32.0/macos/x86_64/grpc_python_plugin",
