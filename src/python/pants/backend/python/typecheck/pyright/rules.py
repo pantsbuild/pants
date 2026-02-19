@@ -42,7 +42,7 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
     prepare_python_sources,
 )
-from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
+from pants.core.goals.check import CheckRequest, CheckResult, CheckResults, CheckSubsystem
 from pants.core.util_rules import config_files
 from pants.core.util_rules.config_files import ConfigFiles, find_config_file
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
@@ -167,6 +167,7 @@ async def _patch_config_file(
 async def pyright_typecheck_partition(
     partition: PyrightPartition,
     pyright: Pyright,
+    check_subsystem: CheckSubsystem,
     pex_environment: PexEnvironment,
     nodejs: NodeJS,
     sh_binary: ShBinary,
@@ -299,6 +300,8 @@ async def pyright_typecheck_partition(
         process = dataclasses.replace(
             process, argv=(sh_binary.path, "-c", shell_script), input_digest=input_digest
         )
+
+    process = dataclasses.replace(process, cache_scope=check_subsystem.default_process_cache_scope)
 
     result = await execute_process(process, **implicitly())
     if result.exit_code == 249 and file_with_spaces:

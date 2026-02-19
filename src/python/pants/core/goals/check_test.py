@@ -22,6 +22,7 @@ from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, Workspace
+from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
 from pants.engine.process import (
     FallibleProcessResult,
@@ -173,6 +174,7 @@ def run_typecheck_rule(
                 DistDir(relpath=Path("dist")),
                 union_membership,
                 check_subsystem,
+                RunId(0),
             ],
             mock_calls={
                 "pants.core.environments.rules.resolve_environment_name": lambda a: EnvironmentName(
