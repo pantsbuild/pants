@@ -28,6 +28,21 @@ use tokio::task_local;
 
 mod metrics;
 
+/// Formats a duration for display in workunit completion logs.
+///
+/// For durations under 60 seconds, returns " (X.XXs)".
+/// For durations of 60 seconds or more, returns " (Xm Y.Ys)".
+pub(crate) fn format_workunit_duration(duration: Duration) -> String {
+    let total_secs = duration.as_secs_f64();
+    if total_secs >= 60.0 {
+        let mins = (total_secs / 60.0).floor() as u64;
+        let secs = total_secs % 60.0;
+        format!(" ({mins}m {secs:.1}s)")
+    } else {
+        format!(" ({total_secs:.2}s)")
+    }
+}
+
 ///
 /// A unique id for a single run or `--loop` iteration of Pants within a single Scheduler.
 ///
@@ -254,6 +269,17 @@ impl Workunit {
             (WorkunitState::Completed { .. }, _) => "Completed:",
         };
 
+        let duration_str: Option<String> = match &self.state {
+            WorkunitState::Completed { time_span } => {
+                Some(format_workunit_duration(std::time::Duration::from(time_span.duration)))
+            }
+            WorkunitState::Started { start_time, .. } if canceled => {
+                let elapsed = start_time.elapsed().unwrap_or_default();
+                Some(format_workunit_duration(elapsed))
+            }
+            _ => None,
+        };
+
         let identifier = if let Some(ref s) = metadata.desc {
             s.as_str()
         } else {
@@ -281,7 +307,11 @@ impl Workunit {
             "".to_string()
         };
 
-        log!(self.level, "{state} {effective_identifier}{message}");
+        log!(
+            self.level,
+            "{state} {effective_identifier}{}{message}",
+            duration_str.as_deref().unwrap_or("")
+        );
     }
 }
 
