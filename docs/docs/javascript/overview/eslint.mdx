@@ -1,0 +1,554 @@
+# ESLint
+
+ESLint is a tool for identifying and reporting on patterns found in ECMAScript/JavaScript code, with the goal of making code more consistent and avoiding bugs.
+
+Pants integrates with ESLint to provide both linting and formatting capabilities for JavaScript and TypeScript projects.
+
+## Activation
+
+To use ESLint with Pants, you need to activate the appropriate backends in your `pants.toml`:
+
+### JavaScript Support
+
+```toml title="pants.toml"
+[GLOBAL]
+backend_packages.add = [
+  "pants.backend.javascript",  # Required for JavaScript support
+  "pants.backend.experimental.javascript.lint.eslint",  # ESLint integration
+]
+```
+
+### TypeScript Support
+
+```toml title="pants.toml"
+[GLOBAL]
+backend_packages.add = [
+  "pants.backend.javascript",  # Required for JavaScript support
+  "pants.backend.typescript",  # Required for TypeScript support
+  "pants.backend.experimental.javascript.lint.eslint",  # ESLint integration
+]
+```
+
+
+## Configuration
+
+### Basic Setup
+
+ESLint will automatically discover configuration files following the standard ESLint resolution order:
+
+1. Flat config files (ESLint 9.0+): `eslint.config.js`, `eslint.config.mjs`, `eslint.config.cjs`
+2. Legacy config files: `.eslintrc`, `.eslintrc.js`, `.eslintrc.cjs`, `.eslintrc.yaml`, `.eslintrc.yml`, `.eslintrc.json`
+3. `eslintConfig` section in `package.json`
+
+### Options
+
+ESLint behavior can be configured through `pants.toml`:
+
+```toml title="pants.toml"
+[eslint]
+# ESLint version to use
+version = "eslint@8.57.0"
+
+# Additional arguments to pass to ESLint
+args = ["--max-warnings=0", "--cache"]
+
+# Explicit config file path (disables automatic discovery)
+config = "custom-eslint.config.js"
+
+# Enable/disable automatic config discovery
+config_discovery = true
+
+# Skip linting and formatting entirely
+skip = false
+
+# Enable JSON output with summary parsing
+json_output = true
+
+# Additional TypeScript/plugin dependencies
+extra_dev_dependencies = [
+    "@typescript-eslint/parser@^6.0.0",
+    "@typescript-eslint/eslint-plugin@^6.0.0"
+]
+```
+
+### Version and Requirements
+
+By default, Pants uses ESLint version 8.57.0. You can customize this:
+
+```toml title="pants.toml"
+[eslint]
+version = "eslint@9.0.0"
+```
+
+## Usage
+
+### Linting
+
+Run ESLint to check for code quality issues:
+
+```bash
+$ pants lint src/js/::
+```
+
+### Formatting
+
+Run ESLint with `--fix` to automatically fix formatting issues:
+
+```bash
+$ pants fmt src/js/::
+```
+
+## BUILD File Configuration
+
+### JavaScript Sources
+
+For JavaScript files, use the `js_sources` target:
+
+```python title="src/js/BUILD"
+js_sources(
+    name="frontend",
+    sources=["**/*.js", "**/*.mjs", "**/*.cjs"],
+)
+```
+
+### TypeScript Sources
+
+For TypeScript files, use the `typescript_sources` target:
+
+```python title="src/ts/BUILD"
+typescript_sources(
+    name="backend",
+    sources=["**/*.ts"],
+)
+```
+
+
+### Mixed Projects
+
+For projects with multiple file types:
+
+```python title="src/BUILD"
+js_sources(
+    name="js_files",
+    sources=["**/*.js"],
+)
+
+typescript_sources(
+    name="ts_files",
+    sources=["**/*.ts"],
+)
+```
+
+### Target-specific Configuration
+
+You can skip ESLint for specific targets using the `skip_eslint` field:
+
+```python title="src/js/BUILD"
+js_sources(
+    name="legacy",
+    sources=["legacy/*.js"],
+    skip_eslint=True,  # Skip linting for legacy code
+)
+
+typescript_sources(
+    name="modern",
+    sources=["modern/*.ts"],
+    # ESLint will run on these files
+)
+```
+
+## Configuration Files
+
+### Flat Config (ESLint 9.0+)
+
+```javascript title="eslint.config.js"
+export default {
+  languageOptions: {
+    ecmaVersion: 2022,
+    sourceType: "module",
+  },
+  rules: {
+    "no-unused-vars": "error",
+    "quotes": ["error", "double"],
+    "semi": ["error", "always"],
+  },
+};
+```
+
+### Legacy Config
+
+```json title=".eslintrc.json"
+{
+  "env": {
+    "browser": true,
+    "es2022": true
+  },
+  "extends": ["eslint:recommended"],
+  "rules": {
+    "no-unused-vars": "error",
+    "quotes": ["error", "double"],
+    "semi": ["error", "always"]
+  }
+}
+```
+
+### Package.json Config
+
+```json title="package.json"
+{
+  "name": "my-project",
+  "eslintConfig": {
+    "extends": ["eslint:recommended"],
+    "rules": {
+      "no-unused-vars": "error"
+    }
+  }
+}
+```
+
+## Supported File Types
+
+ESLint in Pants supports:
+
+- JavaScript (`.js`, `.mjs`, `.cjs`)
+- TypeScript (`.ts`) - requires `@typescript-eslint/parser` and `@typescript-eslint/eslint-plugin`
+
+## Integration with Other Tools
+
+### Prettier Integration
+
+ESLint and Prettier can work together. If you're using both tools, consider:
+
+1. Using `eslint-config-prettier` to disable ESLint formatting rules
+2. Running Prettier first, then ESLint
+3. Using ESLint plugins like `eslint-plugin-prettier`
+
+```toml title="pants.toml"
+[GLOBAL]
+backend_packages.add = [
+  "pants.backend.experimental.javascript.lint.prettier",
+  "pants.backend.experimental.javascript.lint.eslint",
+]
+```
+
+### TypeScript Support
+
+For TypeScript projects, you need to configure the TypeScript ESLint parser and plugin. In Pants, add them via `extra_dev_dependencies`:
+
+```toml title="pants.toml"
+[eslint]
+extra_dev_dependencies = [
+    "@typescript-eslint/parser@^6.0.0",
+    "@typescript-eslint/eslint-plugin@^6.0.0"
+]
+```
+
+Then configure your ESLint config to use them:
+
+```javascript title="eslint.config.js"
+import typescriptEslint from "@typescript-eslint/eslint-plugin";
+import parser from "@typescript-eslint/parser";
+
+export default {
+  files: ["**/*.ts"],
+  languageOptions: {
+    parser: parser,
+  },
+  plugins: {
+    "@typescript-eslint": typescriptEslint,
+  },
+  rules: {
+    "@typescript-eslint/no-unused-vars": "error",
+    "@typescript-eslint/explicit-function-return-type": "warn",
+  },
+};
+```
+
+**Note**: ESLint can lint TypeScript but has limited formatting capabilities for TypeScript-specific syntax. For comprehensive TypeScript formatting, consider using Prettier alongside ESLint.
+
+## Troubleshooting
+
+### Advanced Configuration Options
+
+ESLint provides many CLI options that can be configured through the `args` parameter:
+
+#### Performance and Caching
+```toml title="pants.toml"
+[eslint]
+# Enable caching for faster subsequent runs
+args = ["--cache", "--cache-location=.eslintcache"]
+
+# Use content-based caching strategy (default: metadata)
+args = ["--cache", "--cache-strategy=content"]
+
+# Limit warnings to control build failures
+args = ["--max-warnings=0"]
+```
+
+#### Output Control
+```toml title="pants.toml"
+[eslint]
+# Use different output formats
+args = ["--format=compact"]  # Options: stylish, compact, checkstyle, json, junit, tap, unix
+
+# Write reports to files
+args = ["--output-file=reports/eslint-report.json", "--format=json"]
+
+# Quiet mode - only show errors, not warnings
+args = ["--quiet"]
+```
+
+#### File Handling
+```toml title="pants.toml"
+[eslint]
+# Add custom ignore patterns
+args = ["--ignore-pattern=**/dist/**", "--ignore-pattern=**/build/**"]
+
+# Handle unmatched patterns gracefully
+args = ["--no-error-on-unmatched-pattern"]
+
+# Report unused disable directives
+args = ["--report-unused-disable-directives"]
+```
+
+#### Fix Control
+```toml title="pants.toml"
+[eslint]
+# Control which types of fixes to apply (for fmt goal)
+args = ["--fix-type=problem,suggestion"]  # Options: directive, problem, suggestion, layout
+```
+
+#### Configuration Examples
+
+**Performance-optimized for large projects:**
+```toml title="pants.toml"
+[eslint]
+args = [
+    "--cache",
+    "--cache-location=.eslintcache",
+    "--max-warnings=0",
+    "--quiet"
+]
+```
+
+**CI/CD-friendly configuration:**
+```toml title="pants.toml"
+[eslint]
+args = [
+    "--format=json",
+    "--output-file=reports/eslint.json",
+    "--cache",
+    "--max-warnings=0",
+    "--no-error-on-unmatched-pattern"
+]
+json_output = true  # Enables summary parsing in console
+```
+
+**Development configuration with detailed reporting:**
+```toml title="pants.toml"
+[eslint]
+args = [
+    "--cache",
+    "--report-unused-disable-directives",
+    "--format=stylish"
+]
+```
+
+:::tip Cache Location
+ESLint will create a `.eslintcache` file to store cache data. Consider adding this to your `.gitignore`:
+
+```gitignore title=".gitignore"
+.eslintcache
+reports/
+```
+:::
+
+### Common Issues
+
+1. **ESLint not finding config files**: Ensure config files are in the project root or use explicit config path with `config = "path/to/eslint.config.js"`
+2. **TypeScript errors**: Install TypeScript ESLint plugins using `extra_dev_dependencies` and configure parser in your ESLint config
+3. **Performance issues**: Enable ESLint caching with `args = ["--cache"]` for faster subsequent runs
+4. **Cache invalidation**: Delete `.eslintcache` if you encounter stale results after config changes
+5. **Build failures on warnings**: Use `args = ["--max-warnings=0"]` to fail builds on any warnings, or `args = ["--quiet"]` to suppress warnings
+6. **Empty file sets**: Use `args = ["--no-error-on-unmatched-pattern"]` to prevent failures when no files match patterns
+7. **Output format issues**: Use `json_output = true` for parsed summaries, or `args = ["--format=json"]` for raw JSON output
+
+### Debug Mode
+
+Enable debug logging to troubleshoot issues:
+
+```bash
+$ pants --level=debug lint src/js/::
+```
+
+### Custom ESLint Rules
+
+To use custom ESLint rules or plugins, ensure they're installed in your project:
+
+```json title="package.json"
+{
+  "devDependencies": {
+    "eslint-plugin-custom": "^1.0.0"
+  }
+}
+```
+
+## Examples
+
+### Basic JavaScript Project
+
+```
+my-project/
+├── package.json
+├── .eslintrc.json
+├── src/
+│   ├── BUILD
+│   ├── main.js
+│   └── utils.js
+└── pants.toml
+```
+
+```toml title="pants.toml"
+[GLOBAL]
+backend_packages.add = [
+  "pants.backend.javascript",
+  "pants.backend.experimental.javascript.lint.eslint",
+]
+```
+
+```python title="src/BUILD"
+js_sources(
+    name="src",
+    sources=["*.js"],
+)
+```
+
+### TypeScript Project
+
+```
+my-project/
+├── package.json
+├── tsconfig.json
+├── eslint.config.js
+├── src/
+│   ├── BUILD
+│   ├── main.ts
+│   ├── types.ts
+│   └── utils.ts
+└── pants.toml
+```
+
+```toml title="pants.toml"
+[GLOBAL]
+backend_packages.add = [
+  "pants.backend.javascript",
+  "pants.backend.typescript",
+  "pants.backend.experimental.javascript.lint.eslint",
+]
+
+[eslint]
+extra_dev_dependencies = [
+    "@typescript-eslint/parser@^6.0.0",
+    "@typescript-eslint/eslint-plugin@^6.0.0"
+]
+```
+
+```python title="src/BUILD"
+typescript_sources(
+    name="backend",
+    sources=["*.ts"],
+)
+```
+
+
+### Mixed JavaScript/TypeScript Project
+
+```
+my-project/
+├── package.json
+├── tsconfig.json
+├── eslint.config.js
+├── src/
+│   ├── BUILD
+│   ├── legacy.js       # Legacy JavaScript
+│   └── main.ts         # TypeScript
+└── pants.toml
+```
+
+```toml title="pants.toml"
+[GLOBAL]
+backend_packages.add = [
+  "pants.backend.javascript",
+  "pants.backend.typescript",
+  "pants.backend.experimental.javascript.lint.eslint",
+]
+```
+
+```python title="src/BUILD"
+js_sources(
+    name="legacy",
+    sources=["legacy.js"],
+    skip_eslint=True,  # Skip linting for legacy code
+)
+
+typescript_sources(
+    name="main",
+    sources=["main.ts"],
+)
+```
+
+## CLI Options Reference
+
+### Essential Options
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `--cache` | Enable result caching for faster runs | `args = ["--cache"]` |
+| `--cache-location` | Specify cache file/directory | `args = ["--cache-location=.eslintcache"]` |
+| `--max-warnings` | Maximum warnings before exit code 1 | `args = ["--max-warnings=0"]` |
+| `--quiet` | Report errors only, suppress warnings | `args = ["--quiet"]` |
+| `--fix` | Automatically fix problems (fmt goal) | Applied automatically |
+
+### Output Formatting
+
+| Option | Description | Available Formats |
+|--------|-------------|-------------------|
+| `--format` | Output format | `stylish`, `compact`, `checkstyle`, `json`, `junit`, `tap`, `unix` |
+| `--output-file` | Write report to file | `args = ["--output-file=reports/eslint.json"]` |
+| `--color` / `--no-color` | Force colored output on/off | `args = ["--color"]` |
+
+### File Handling
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `--ignore-pattern` | Additional ignore patterns | `args = ["--ignore-pattern=dist/**"]` |
+| `--no-ignore` | Disable ignore files | `args = ["--no-ignore"]` |
+| `--no-error-on-unmatched-pattern` | Don't error on empty matches | `args = ["--no-error-on-unmatched-pattern"]` |
+
+### Configuration Control
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `--config` | Specify config file | `config = "eslint.config.js"` (Pants option) |
+| `--no-eslintrc` | Disable .eslintrc files | `args = ["--no-eslintrc"]` |
+| `--print-config` | Show effective config | `args = ["--print-config", "file.js"]` |
+
+### Fix Control
+
+| Option | Description | Available Types |
+|--------|-------------|-----------------|
+| `--fix-type` | Specify fix types | `directive`, `problem`, `suggestion`, `layout` |
+| `--fix-dry-run` | Show fixes without applying | `args = ["--fix-dry-run"]` |
+
+### Advanced Options
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `--report-unused-disable-directives` | Report unused eslint-disable | `args = ["--report-unused-disable-directives"]` |
+| `--cache-strategy` | Cache detection strategy (`metadata` or `content`) | `args = ["--cache-strategy=content"]` |
+| `--debug` | Enable debug output | `args = ["--debug"]` |
+| `--env-info` | Show environment info | `args = ["--env-info"]` |
+
+## API Reference
+
+See the [ESLint options reference](../reference/subsystems/eslint.mdx) for all available Pants configuration options.
