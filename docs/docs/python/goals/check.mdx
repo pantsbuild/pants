@@ -244,7 +244,7 @@ from mypy_boto3_ec2 import EC2Client
 
 if TYPE_CHECKING:
     # Safe, but will be flagged as a warning
-    from mypy_boto3_ec2 import EC2ServiceResource
+    from mypy_boto3_ec2 import EC2ServiceResource  # pants: no-infer-dep
 ```
 
 For these reasons, it's recommended to load any type-stub libraries that require explicit imports as part of your normal [third-party dependencies](../overview/third-party-dependencies.mdx). Alternatively, you can set `# pants: no-infer-dep` on the lines of type-stub imports "guarded" by a check of `if TYPE_CHECKING`.
